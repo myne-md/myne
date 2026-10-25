@@ -144,7 +144,7 @@ function deviceLabel(
   return t("sync.devices.shortName", { hex: deviceIdHex.slice(0, 6) });
 }
 
-export function DeviceAttributionPanel() {
+export function DeviceAttributionPanel({ personBorn = null }: { personBorn?: boolean | null } = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
   const hook = useDeviceBindings();
@@ -178,12 +178,28 @@ export function DeviceAttributionPanel() {
   }
 
   // An unshared vault is a STATE, not a failure: the family is `NTV6`-only, so
-  // there is no group key to seal the map under and nobody to bind a device to.
-  // Say so once, in the roster panel's own words for the same vault.
+  // there is no group key to seal the map under and nobody to bind to a device.
+  //
+  // **Two states wear the same refusal and they are not the same fact**
+  // (2026-10-25 owner report: "shared is ready and syncing, yet this says not
+  // shared yet"). An `NTV5` vault has no group tier at all. A person-born `NTV7`
+  // vault HAS one from birth (epoch 1, a one-row owner roster) and this family is
+  // still unreachable on it, because the member plane that would write beside it
+  // is `NTV6`-only (`protocol.md` §9.29). The old copy covered both with "sharing
+  // happens the first time you invite someone", which on the second vault is an
+  // action the product cannot perform, said on a panel the reader reached *after*
+  // doing everything it lists.
   if (view === null && !hook.shared) {
     return (
-      <p data-testid="device-bindings.unshared" style={HELPER_STYLE}>
-        {t("sync.deviceBindings.unshared")}
+      <p
+        data-testid={personBorn === true ? "device-bindings.generation" : "device-bindings.unshared"}
+        style={HELPER_STYLE}
+      >
+        {t(
+          personBorn === true
+            ? "sync.deviceBindings.generationOwnsAlone"
+            : "sync.deviceBindings.unshared",
+        )}
       </p>
     );
   }

@@ -44,6 +44,9 @@ const PANEL_IDS = [
   "appearance",
   "storage",
   "about",
+  // Split out of About on 2026-10-25; it must carry ≥1 entry or the coverage
+  // assertion below fails, which is why the list is independent of the registry.
+  "diagnostics",
 ] as const;
 
 /** Resolve a dotted i18n key against the raw catalog → the string, or undefined. */

@@ -33,6 +33,7 @@ import {
   setPersonIdentityState,
   usePersonIdentityState,
 } from "./personIdentityState";
+import { PersonIdentityUnlock } from "./PersonIdentityUnlock";
 
 const ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -131,16 +132,6 @@ const YOU_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-/** The inline rename form on the caller's own row. It WRAPS rather than laying
- *  the buttons out on a second block, so the row keeps one line at the widths the
- *  members list is read at and the buttons drop below only when they must. */
-const NAME_FORM_STYLE: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "center",
-  gap: "var(--space-2)",
-};
-
 /** A writer failure under the field, on its own line of that wrapped form. */
 const NAME_ERROR_STYLE: CSSProperties = {
   ...ERROR_STYLE,
@@ -150,10 +141,27 @@ const NAME_ERROR_STYLE: CSSProperties = {
 
 export function MemberRosterPanel({
   onDialogOpenChange,
+  personBorn = null,
 }: {
   /** Raises the shell's child-dialog flag so one Escape closes THIS dialog
    *  rather than the whole Settings modal (SettingsModal's own gate comment). */
   onDialogOpenChange?: (open: boolean) => void;
+  /**
+   * Whether the active vault was BORN under a person identity (`NTV7`,
+   * `decisions/storage/0723`), or `null` while that is unknown.
+   *
+   * It decides one control and one sentence, and the reason is a stated limit
+   * rather than a guess: the member plane that writes a shared vault (invite,
+   * removal, group rotation) is `NTV6`-only, and the `NTV7` upgrade refuses a vault
+   * with a live second member, so a person-born vault is **owner-only on every
+   * client today** (`protocol.md` §9.29, "On `NTV7` the family is unreachable
+   * today, and that is stated rather than implied").
+   *
+   * Before this prop existed the panel offered "Invite member" on a vault that
+   * cannot invite, disabled and silent, and the 2026-10-25 owner report is exactly
+   * that screenshot: "I did everything and I still cannot click invite".
+   */
+  personBorn?: boolean | null;
 } = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
@@ -198,6 +206,16 @@ export function MemberRosterPanel({
   const [forgetAck, setForgetAck] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetError, setForgetError] = useState(false);
+  // The generation answer, read once here because two blocks below need it: the
+  // invite control and the "not shared yet" sentence. `null` (unknown) keeps the
+  // pre-change behaviour, which is what a client that cannot read the publish
+  // state should get.
+  const generationOwnsAlone = personBorn === true;
+  // The unlock door for a LOCKED identity, mounted here rather than pointed at.
+  // The Identity row that owns it lives in the Connection topic, so a reader on
+  // the Devices topic had a disabled button, no sentence, and no way to fix it
+  // without leaving the panel (2026-10-25).
+  const [identityUnlockOpen, setIdentityUnlockOpen] = useState(false);
   // The inline name editor (myne-md/myne#851 task 6). Only ever open on the
   // caller's OWN row: the backend keys a name row by the session's own person id
   // and signs it with the session's own key, so there is no other row it could
@@ -285,7 +303,7 @@ export function MemberRosterPanel({
   };
 
   // removal confirm are the two child dialogs.
-  const childDialogOpen = inviteOpen || removeTarget !== null;
+  const childDialogOpen = inviteOpen || removeTarget !== null || nameEdit !== null;
   useEffect(() => {
     onDialogOpenChange?.(childDialogOpen);
     return () => onDialogOpenChange?.(false);
@@ -331,7 +349,13 @@ export function MemberRosterPanel({
   // the invite button under the zero state's description, centred"). The zero
   // state already says "invite someone", so the button belongs with that
   // sentence rather than floating under the box.
-  const inviteButton = (
+  //
+  // **Absent, not disabled, on a generation that cannot share** (2026-10-25).
+  // `protocol.md` §9.29 states that a person-born vault is owner-only today, so
+  // this control was an offer the product cannot honour, and it said nothing while
+  // refusing: the report was "I did everything and I still cannot click invite".
+  // The sentence that replaces it is `generationNotice` below.
+  const inviteButton = generationOwnsAlone ? null : (
     <Button
       type="button"
       variant="primary"
@@ -351,6 +375,14 @@ export function MemberRosterPanel({
       {t("sync.memberRoster.invite")}
     </Button>
   );
+  // Why the invite is not there, in the one place a reader looks for it. Two
+  // facts and no promise: what this vault is, and that the person who owns it
+  // can still reach it from another device by moving the vault, not by sharing.
+  const generationNotice = generationOwnsAlone ? (
+    <p data-testid="member-roster.generation-notice" style={HELPER_STYLE}>
+      {t("sync.memberRoster.generationOwnsAlone")}
+    </p>
+  ) : null;
 
   return (
     <div data-testid="member-roster" style={ROOT_STYLE}>
@@ -508,8 +540,16 @@ export function MemberRosterPanel({
           icon="user"
           size="sm"
           title={t("sync.memberRoster.emptyTitle")}
-          body={t("sync.memberRoster.empty")}
-          {...(authority === "owner" ? { action: inviteButton } : {})}
+          // The zero state asks the question, so it owes the answer for THIS
+          // vault. "Invite someone to share this vault" is a instruction on a
+          // generation that cannot invite, and the sentence above already carries
+          // the reason, so this arm states the fact once and stops.
+          body={t(
+            generationOwnsAlone
+              ? "sync.memberRoster.emptyOwnedAlone"
+              : "sync.memberRoster.empty",
+          )}
+          {...(authority === "owner" && inviteButton !== null ? { action: inviteButton } : {})}
           testId="member-roster.empty"
         />
       ) : (
@@ -536,17 +576,7 @@ export function MemberRosterPanel({
                     "You" marker: `is_self` decides it by identity, never by role
                     (myne#859), and its name renders like anyone else's so its
                     owner can see what the others see. */}
-                {nameEdit?.fingerprint === m.fingerprint_hex ? (
-                  <NameEditor
-                    draft={nameEdit.draft}
-                    busy={nameBusy}
-                    errorKey={nameError}
-                    onChange={(draft) => setNameEdit({ fingerprint: m.fingerprint_hex, draft })}
-                    onSave={() => void saveName()}
-                    onClear={() => void clearName()}
-                    onCancel={closeNameEditor}
-                  />
-                ) : m.is_self ? (
+                {m.is_self ? (
                   /* The caller's OWN row follows the same name rule as every other
                      (a verified name is rendered where there is one), and keeps a
                      "You" marker beside it so identity survives. Only an UNNAMED
@@ -645,19 +675,49 @@ export function MemberRosterPanel({
               </li>
             ))}
           </ul>
-          <p data-testid="member-roster.removal-limits" style={STATUS_STYLE}>
-            {t("sync.memberRoster.removalLimits")}
-          </p>
+          {generationOwnsAlone ? null : (
+            <p data-testid="member-roster.removal-limits" style={STATUS_STYLE}>
+              {t("sync.memberRoster.removalLimits")}
+            </p>
+          )}
         </>
       )}
 
+      {/* Where the invite control would have been, which is where a reader looks
+          for it (2026-10-25). Outside the list/zero-state ternary on purpose: the
+          sentence is about the PANEL's missing action, not about this vault having
+          no members, and it is the whole story on a vault whose only member is the
+          reader. */}
+      {generationNotice}
+
       {/* An unshared vault says so once, plainly, instead of leaving the reader
           to infer it from an error line. `shared` is the roster view's
-          `group_key_epoch`, so this is a state and not a guess. */}
-      {authority === "owner" && personReady && !shared ? (
+          `group_key_epoch`, so this is a state and not a guess.
+
+          Withheld on a person-born vault, deliberately: that vault DOES carry the
+          group tier from birth (epoch 1, a one-row owner roster), so `shared` is
+          true there and this line never rendered anyway. Its job on `NTV5` is
+          unchanged, and the person-born case has its own sentence above
+          (`generationNotice`), because "not shared yet" and "cannot be shared"
+          are different facts and the old copy promised the second would end on the
+          first invite. */}
+      {authority === "owner" && personReady && !shared && !generationOwnsAlone ? (
         <p data-testid="member-roster.unshared" style={HELPER_STYLE}>
           {t("sync.memberRoster.unsharedNotice")}
         </p>
+      ) : null}
+
+      {/* A LOCKED identity, which is the state this panel used to answer with
+          silence (2026-10-25). Its whole "Your identity" section is gated on
+          `personReady`, and the Invite control it disables sits below with no
+          sentence: a dead button and no door. The door is mounted here, not
+          pointed at, because the Identity row that would own it lives in the
+          Connection topic and is therefore off-screen from this one. */}
+      {!personReady ? (
+        <div data-testid="member-roster.identity-locked" style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--space-2)" }}>
+          <p style={HELPER_STYLE}>{t("sync.memberRoster.identityLockedNotice")}</p>
+          <PersonIdentityUnlock open={identityUnlockOpen} onOpenChange={setIdentityUnlockOpen} />
+        </div>
       ) : null}
 
       {/* Invite: owner-only. A member is never shown an admin control they
@@ -832,6 +892,18 @@ export function MemberRosterPanel({
         />
       ) : null}
 
+      {nameEdit !== null ? (
+        <MemberNameDialog
+          draft={nameEdit.draft}
+          busy={nameBusy}
+          errorKey={nameError}
+          onChange={(draft) => setNameEdit({ fingerprint: nameEdit.fingerprint, draft })}
+          onSave={() => void saveName()}
+          onClear={() => void clearName()}
+          onCancel={closeNameEditor}
+        />
+      ) : null}
+
       {actionError ? (
         <p data-testid="member-roster.action-error" style={ERROR_STYLE}>
           {actionError}
@@ -847,7 +919,23 @@ export function MemberRosterPanel({
  *  the row would otherwise keep a half-typed name with no way back. `Clear` is a
  *  distinct action from saving an empty name, because the backend refuses the
  *  latter by design: a tombstone is what makes a cleared name win a merge. */
-function NameEditor({
+/** The display-name dialog (2026-10-25 owner report: "Set a name" should open a
+ *  dialog, not grow an editor inside the row).
+ *
+ *  It is the PANEL's dialog pattern rather than `ModalShell`, which the
+ *  Settings-level dialogs use: this panel is already inside the Settings modal, so
+ *  a second modal chrome would stack two backdrops. `RemoveConfirmDialog` and
+ *  `InviteMemberModal` are the same shape — a `role="dialog"` with a focus trap and
+ *  Escape — and the panel reports it through `childDialogOpen` so the shell stands
+ *  its own Escape handler down while it is up.
+ *
+ *  A name is a signed, synced, other-device-visible record (its own row in
+ *  `vault.member-names`, `MYO5`), which is why it earns a dialog rather than an
+ *  inline field: the row it used to sit in had to wrap its buttons onto a second
+ *  line at the widths the member list is read at. `Clear` stays a separate action
+ *  from saving an empty name, because the backend refuses the latter by design: a
+ *  tombstone is what makes a cleared name win a merge. */
+function MemberNameDialog({
   draft,
   busy,
   errorKey,
@@ -865,51 +953,62 @@ function NameEditor({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
+  const ref = useRef<HTMLDivElement>(null);
+  useFocusTrap(ref, { enabled: true });
+  useEscapeToClose(onCancel);
   return (
-    <form
-      style={NAME_FORM_STYLE}
-      onSubmit={(e) => {
-        e.preventDefault();
-        onSave();
-      }}
+    <div
+      ref={ref}
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("sync.memberRoster.nameLabel")}
+      data-testid="member-roster.name-dialog"
+      style={STATUS_STYLE}
     >
-      <Input
-        data-testid="member-roster.name-input"
-        aria-label={t("sync.memberRoster.nameLabel")}
-        value={draft}
-        disabled={busy}
-        onChange={(e) => onChange(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onCancel();
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSave();
         }}
-      />
-      <Button type="submit" data-testid="member-roster.name-save" disabled={busy}>
-        {t("sync.memberRoster.nameSave")}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        data-testid="member-roster.name-clear"
-        disabled={busy}
-        onClick={onClear}
+        style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}
       >
-        {t("sync.memberRoster.nameClear")}
-      </Button>
-      <Button
-        type="button"
-        variant="ghost"
-        data-testid="member-roster.name-cancel"
-        disabled={busy}
-        onClick={onCancel}
-      >
-        {t("sync.memberRoster.nameCancel")}
-      </Button>
-      {errorKey ? (
-        <span data-testid="member-roster.name-error" role="alert" style={NAME_ERROR_STYLE}>
-          {t(errorKey)}
-        </span>
-      ) : null}
-    </form>
+        <Input
+          data-testid="member-roster.name-input"
+          aria-label={t("sync.memberRoster.nameLabel")}
+          value={draft}
+          disabled={busy}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        {errorKey ? (
+          <span data-testid="member-roster.name-error" role="alert" style={NAME_ERROR_STYLE}>
+            {t(errorKey)}
+          </span>
+        ) : null}
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <Button type="submit" variant="primary" data-testid="member-roster.name-save" disabled={busy}>
+            {t("sync.memberRoster.nameSave")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="member-roster.name-clear"
+            disabled={busy}
+            onClick={onClear}
+          >
+            {t("sync.memberRoster.nameClear")}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            data-testid="member-roster.name-cancel"
+            disabled={busy}
+            onClick={onCancel}
+          >
+            {t("sync.memberRoster.nameCancel")}
+          </Button>
+        </div>
+      </form>
+    </div>
   );
 }
 

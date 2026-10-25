@@ -367,16 +367,17 @@ export interface AccountPanelProps {
    * aiming a mutation at a guess.
    */
   vaultId: string | null;
-  /**
-   * Open another Settings panel by id. The account block's tail used to be a
-   * sentence saying devices and members live in Sync, which is a dead end: the
-   * settings shell owns the rail, so the panel asks it instead. `sync` is the
-   * only destination this panel names.
-   */
-  onOpenPanel?: (panel: "sync") => void;
 }
 
-export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
+/**
+ * The account panel.
+ *
+ * It carried an `onOpenPanel("sync")` prop whose only job was a door the rail
+ * already provides (2026-10-25, below). With the door gone the prop is gone too,
+ * deliberately: a dead parameter is where a second copy of a removed control comes
+ * back from.
+ */
+export function AccountPanel({ vaultId }: AccountPanelProps) {
   const { t } = useTranslation();
 
   // `account === null` after a successful load means the vault is STANDALONE on
@@ -740,22 +741,13 @@ export function AccountPanel({ vaultId, onOpenPanel }: AccountPanelProps) {
             </ul>
           </SettingRow>
 
-          {/* Where the rest of the account actually lives, with the door. The
-              sentence used to end the panel with a direction the user could not
-              follow from here; the shell owns the rail, so this asks it. */}
+          {/* Where the rest of the account actually lives. One statement, no
+              second control: the rail already holds the Sync panel, and a button
+              that repeats a rail item is a third way to say one thing
+              (2026-10-25 owner report; `decisions/ui/0725` item 5 said door
+              INSTEAD of the sentence, and the shipped panel carried both). */}
           <div style={BLOCK_STYLE} data-testid="settings.account-devices-note">
             <p style={HELPER_STYLE}>{t("settings.account.devicesNote")}</p>
-            {onOpenPanel ? (
-              <div>
-                <Button
-                  variant="ghost"
-                  data-testid="settings.account-open-sync"
-                  onClick={() => onOpenPanel("sync")}
-                >
-                  {t("settings.account.openSync")}
-                </Button>
-              </div>
-            ) : null}
           </div>
         </SettingsSection>
       )}
