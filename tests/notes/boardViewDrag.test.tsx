@@ -198,6 +198,11 @@ describe("a refused drag", () => {
 
     const refusal = await screen.findByTestId("view.board-refusal");
     expect(refusal.textContent).toContain("changed somewhere else");
+    // The line names where the card IS, which is the lane it came from. Naming
+    // the drop target read as the opposite of what the reader can see, and only
+    // the "changed somewhere else" half was asserted before.
+    expect(refusal.textContent).toContain("The card is back in Doing.");
+    expect(refusal.textContent).not.toContain("back in Done");
     // Back in the lane the NOTE reports, which is the lane it came from.
     expect(within(lane("Doing")).getAllByTestId("view.card")).toHaveLength(1);
     expect(within(lane("Done")).queryAllByTestId("view.card")).toHaveLength(0);

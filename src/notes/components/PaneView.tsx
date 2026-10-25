@@ -2639,8 +2639,16 @@ function ViewHost({ viewId }: { viewId: string }) {
     },
     [ws],
   );
-  const onCardContextMenu = useCallback(
-    (noteId: string, pos: { x: number; y: number }) =>
+  // A card the BOARD creates is outside the editor's autosave path, so nothing
+  // else tells the sidebar cache about it and the board that just added the card
+  // would be the one surface that cannot see it (its rows are built from this
+  // cache). The "+ New Note" action calls `refreshOne` after create for exactly
+  // this reason.
+  const onNoteCreated = useCallback(
+    (noteId: string) => sidebar.refreshOne(noteId as NoteId),
+    [sidebar],
+  );
+  const onCardContextMenu = useCallback(    (noteId: string, pos: { x: number; y: number }) =>
       setCardMenu({ noteId, x: pos.x, y: pos.y }),
     [],
   );
@@ -2819,6 +2827,9 @@ function ViewHost({ viewId }: { viewId: string }) {
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
+          onNoteCreated={
+            def.view_type === "board" ? onNoteCreated : undefined
+          }
           approved={approved}
           cardActions={def.view_type === "board" ? boardCardActions : undefined}
         />

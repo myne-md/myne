@@ -169,6 +169,35 @@ describe("adding a card", () => {
     });
   });
 
+  it("announces the created note BEFORE opening it, so the board can show it", async () => {
+    // Found by the E2E: a board card is created outside the editor's autosave
+    // path, and a view's rows are built from the host's note cache. Without this
+    // announcement the card the user just added is missing from the board that
+    // created it, while the note itself is on disk with the right lane. The
+    // order is part of the contract: the cache has to know the note before the
+    // new tab takes the board off screen.
+    const order: string[] = [];
+    const onNoteCreated = vi.fn(async (id: string) => {
+      order.push(`created:${id}`);
+    });
+    const onOpenNote = vi.fn(() => {
+      order.push("opened");
+    });
+    render(
+      <BoardView
+        def={boardDef()}
+        result={result()}
+        onNoteCreated={onNoteCreated}
+        onOpenNote={onOpenNote}
+      />,
+    );
+    fireEvent.click(addButton("Backlog")!);
+
+    await waitFor(() => expect(onOpenNote).toHaveBeenCalledTimes(1));
+    expect(onNoteCreated).toHaveBeenCalledWith("new-note");
+    expect(order).toEqual(["created:new-note", "opened"]);
+  });
+
   it("offers nothing at all when the view does not declare its lane field", () => {
     render(<BoardView def={boardDef({ write_fields: ["owner"] })} result={result()} />);
     // Absence, not a disabled button: an offer the host must refuse is a trap.

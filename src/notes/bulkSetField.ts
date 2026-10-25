@@ -49,6 +49,8 @@
 
 import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { NOTE_FIELD_WRITE_EVENT, setNoteField } from "./setNoteField";
+import { noteRead } from "./readNote";
+import { reindexNoteFromBody } from "./vaultIndices";
 import type { NoteSetFieldError } from "../types/note-set-field-error";
 import type { SavedView } from "../lib/prefs";
 import { snapshotRestore } from "./snapshots";
@@ -242,11 +244,19 @@ export async function restoreLastBulkAction(
     }
     try {
       await snapshotRestore(note.noteId, note.snapshotId);
-      restored.push(note.noteId);
-      announceRestored(note.noteId);
     } catch {
       failed.push({ noteId: note.noteId, reason: "restoreFailed" });
+      continue;
     }
+    // The restored BYTES are not the restored INDEX. A snapshot restore writes
+    // the note and announces the pane reload, and the property index is what a
+    // table or a board reads, so without this the view keeps showing the values
+    // the action wrote until something else reindexes (found by the board's E2E:
+    // a restore put the lane back on disk while the board still drew the renamed
+    // lane). Same call `setNoteField` makes for the same reason.
+    await reindexRestored(note.noteId);
+    restored.push(note.noteId);
+    announceRestored(note.noteId);
   }
 
   const previous = action.previousView;
@@ -284,6 +294,22 @@ export async function restoreLastBulkAction(
 export function lastActionIsRestorable(): boolean {
   const action = lastBulkAction();
   return action !== null && canRestoreAction(action);
+}
+
+/**
+ * Re-read a restored note into the property index, best effort.
+ *
+ * A failure here must not be reported as a failed RESTORE: the bytes are back on
+ * disk either way, and the worst case is a derived surface showing the old value
+ * until the next reconcile. `reindexNoteFromBody` already swallows its own parse
+ * and apply failures, so this guard is about the read.
+ */
+async function reindexRestored(noteId: string): Promise<void> {
+  try {
+    await reindexNoteFromBody(noteId, await noteRead(noteId));
+  } catch {
+    /* the restore stands; the index heals on the next reconcile */
+  }
 }
 
 /** A restore rewrites the whole note out of band of any pane's autosave loop, so

@@ -29,6 +29,7 @@ export function ViewRenderHost({
   onOpenNote,
   onCardContextMenu,
   onSetCover,
+  onNoteCreated,
   approved,
   cardActions,
 }: {
@@ -37,6 +38,8 @@ export function ViewRenderHost({
   onOpenNote?: OpenNoteHandler;
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
+  /** The host's note cache refresh, for a card the board creates itself. */
+  onNoteCreated?: (noteId: string) => void | Promise<void>;
   /** This device's verdict on `def`, for the board's own definition writes (a
    *  lane rename must not grant an approval the manager is still asking for). */
   approved?: boolean;
@@ -63,6 +66,7 @@ export function ViewRenderHost({
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
+          onNoteCreated={onNoteCreated}
           approved={approved}
           cardActions={cardActions}
         />
