@@ -25,6 +25,7 @@ export function FormatBar({
   rawMode,
   onToggleRaw,
   onAttach,
+  onPhotoToNote,
   onLibrary,
   onRecord,
   order = [],
@@ -35,6 +36,11 @@ export function FormatBar({
   rawMode: boolean;
   onToggleRaw: () => void;
   onAttach: () => void;
+  /** Photo to note (myne-md/myne#926): the camera/library capture that opens the
+   *  OCR draft sheet. Its own pinned chrome button, NOT a configurable format
+   *  item: `editor_toolbar_order` is a user vocabulary, and a new id there would
+   *  ship an item nobody can see until they reorder. */
+  onPhotoToNote: () => void;
   onLibrary: () => void;
   onRecord: () => void;
   /** Persisted `editor_toolbar_order` (device-local). Empty = canonical order. */
@@ -184,6 +190,19 @@ export function FormatBar({
           {attaching ? <Spinner size={18} /> : (
             <svg width="20" height="20" viewBox="0 0 24 24"><path d="M21 12.5 12.5 21a5 5 0 0 1-7-7l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7L9.6 18.4a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6" {...st} /></svg>
           )}
+        </button>
+        {/* Photo to note (myne-md/myne#926). Its own entry rather than a mode of
+            the attach button: this one reads the page and opens a draft, and
+            folding it into attach would change what attach does for everyone who
+            only wanted the image.
+            A raw <button> like its three siblings in this row, and deliberately
+            so rather than a `<Button>`: this row is the editor's fixed-height
+            scrollable chrome, where a press must be told apart from a scroll drag
+            before it fires (`tap` above), and the shared button's own geometry
+            would be undone by inline overrides until nothing of it was left.
+            `scripts/primitive-adoption.json` carries this file's count. */}
+        <button {...tap(onPhotoToNote)} disabled={attaching} aria-label={t("editor.formatBar.photoToNote")} data-testid="editor.photo-to-note" style={{ ...fbtn, opacity: attaching ? 0.5 : 1 }}>
+          <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2" {...st} /><path d="M8 6l1.5-2h5L16 6" {...st} /><circle cx="12" cy="13" r="3.4" {...st} /></svg>
         </button>
         <button {...tap(onLibrary)} aria-label={t("editor.formatBar.insertFromLibrary")} style={fbtn}>
           <svg width="20" height="20" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2" {...st} /><circle cx="8.5" cy="9.5" r="1.5" fill="var(--fg-2)" /><path d="M20 15l-4.5-4.5L5 20" {...st} /></svg>

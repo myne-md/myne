@@ -28,7 +28,7 @@ import {
   AiOnboardingSheet,
   readAiOnboardingSeen,
 } from "../../components";
-import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
+import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted, createTitledNote } from "../../lib/notes";
 import {
   closeLiveNote,
   openLiveNote,
@@ -80,6 +80,7 @@ import { drainPendingShares } from "../../lib/shareImport";
 import { ShareImportToast } from "./ShareImportToast";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
+import { normalizeNewNoteLocation } from "../../lib/prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
 import { isRtl } from "../../lib/util";
@@ -138,9 +139,16 @@ import { foldDecorationKeys, rewriteFolderPrefix } from "@myne/editor/host/notes
 import { MobileViewRenderHost } from "./editor/views/MobileViewRenderHost";
 import type { SavedView } from "../../lib/prefs";
 import { ViewEditorSheet } from "./ViewEditorSheet";
-import { importFile, ATTACHMENT_ACCEPT } from "../../lib/attachments";
+import { importFile, ATTACHMENT_ACCEPT, attachmentDelete } from "../../lib/attachments";
+import {
+  buildPhotoNoteBlock,
+  localDateStamp,
+  photoNoteTitle,
+  shouldDiscardPhotoDraft,
+} from "../../lib/photoNoteBody";
 import { emitAttachmentEmbed } from "../../lib/attachmentRef";
 import { AttachmentsSheet } from "./AttachmentsSheet";
+import { PhotoNoteSheet, type PhotoNoteDestination } from "./PhotoNoteSheet";
 import { RecordingSheet } from "./RecordingSheet";
 import { VOICE_RECORD_EVENT } from "../../lib/voice-record-bridge";
 import { SnapshotsSheet } from "./SnapshotsSheet";
@@ -417,6 +425,44 @@ const PRESENCE_REPORT_MS = 100;
  *  complete inside the budget, short enough that a user who opens `[[##`
  *  straight after unlocking does not watch an empty picker. */
 const PICKER_FETCH_RETRY_MS = 1_500;
+
+/** One photo-to-note draft, from the picked file until it lands or is discarded.
+ *
+ *  `id` is null while the import runs, which is what lets the sheet show the
+ *  photograph during the seconds OCR takes. `deduplicated` records whether the
+ *  vault already held this exact image: `attachment_import` is content-addressed
+ *  and returns the existing entry in that case, so the flow does NOT own it and
+ *  must never delete it. */
+interface PhotoDraft {
+  id: string | null;
+  filename: string;
+  /** A local `blob:` URL for the picked file, revoked when the draft ends. */
+  previewUrl: string | null;
+  /** The OCR preference as the IMPORT saw it, not as it stands now. */
+  ocrEnabled: boolean;
+  /** True when the import deduplicated onto an attachment the vault already had. */
+  deduplicated: boolean;
+}
+
+/** Ids whose delete a LOCK refused, retried on the next mount.
+ *
+ *  The import runs before the review, so the bytes exist before the user has
+ *  agreed to keep them; a lock mid-draft unmounts this flow AFTER the slot has
+ *  dropped, so `attachment_delete` is refused and the photograph would otherwise
+ *  sit in the library and sync with nothing saying so. The set lives in the
+ *  module, which survives a lock in the same process (auto-lock does not kill the
+ *  app), and the mount effect below retries it once the vault is unlocked again.
+ *  A kill before that next unlock still leaves the import, which is stated in
+ *  `decisions/ui/0731` rather than pretended away. */
+const pendingPhotoDiscards = new Set<string>();
+
+/** Free a draft's blob URL, if it has one. Guarded because the browser-dev
+ *  harness and jsdom do not both provide `URL.createObjectURL`. */
+function releasePhotoPreview(url: string | null): void {
+  if (url !== null && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
@@ -939,6 +985,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // while the picked file is encrypted (MYA1) on the host.
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [attaching, setAttaching] = useState(false);
+  // Photo to note (myne-md/myne#926): the camera/library input, and the one
+  // attachment this flow imported and has not committed yet. `photoNote`
+  // non-null IS the draft sheet being open.
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoNote, setPhotoNote] = useState<PhotoDraft | null>(null);
+  // Whether the open draft already landed. A ref, because the unmount cleanup
+  // reads it in a closure registered once, and because React's own unmount is
+  // what runs it.
+  const photoNoteCommittedRef = useRef(false);
+  // The user backed out while the import was still running, so its result must
+  // be undone rather than shown.
+  const photoNoteCancelledRef = useRef(false);
+  // The same value, in a ref, for the unmount cleanup below: it must not delete
+  // an attachment it no longer owns, and a stale closure would.
+  const photoNoteRef = useRef<PhotoDraft | null>(null);
+  photoNoteRef.current = photoNote;
+  // A lock unmounts this flow mid-import; the resolve has to know.
+  const editorMountedRef = useRef(true);
   // The live CMEditor view, handed over via <CMEditor onReady>. Drives the
   // above-keyboard FormatBar through the shared @myne/editor commands.
   const [editorView, setEditorView] = useState<EditorView | null>(null);
@@ -3233,18 +3297,219 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       const res = await importFile(file);
       insertIntoEditor(emitAttachmentEmbed(res.id, res.filename));
     } catch (e) {
-      const kind = (e as { kind?: string })?.kind;
-      setEditorError(
-        kind === "Oversize"
-          ? t("editor.flow.attachTooLarge")
-          : kind === "UnsupportedType"
-            ? t("editor.flow.attachUnsupported")
-            : t("editor.flow.attachFailed"),
-      );
+      setEditorError(attachFailureMessage(e));
     } finally {
       setAttaching(false);
     }
   }
+
+  /** The three import failures the attachment path already names. Shared by the
+   *  attach button and the photo entry so the newer path cannot answer with a
+   *  vaguer sentence than the one beside it. */
+  function attachFailureMessage(e: unknown): string {
+    const kind = (e as { kind?: string })?.kind;
+    return kind === "Oversize"
+      ? t("editor.flow.attachTooLarge")
+      : kind === "UnsupportedType"
+        ? t("editor.flow.attachUnsupported")
+        : t("editor.flow.attachFailed");
+  }
+
+  /**
+   * Photo to note (myne-md/myne#926): import the photograph, then open the DRAFT
+   * sheet instead of inserting a bare embed.
+   *
+   * The sheet opens on the PICKED FILE, not on the attachment id, because the
+   * import runs OCR and can take seconds: waiting for the id would leave the user
+   * staring at a dimmed toolbar button for exactly the part of the flow that has
+   * something to show. `previewUrl` is a blob URL that dies with the draft.
+   *
+   * The existing attach path is deliberately untouched. A user who wants an
+   * image in a note still gets one in one tap; this entry is the one that also
+   * offers to read the page. Two paths is the accepted cost.
+   */
+  async function attachPhoto(file: File) {
+    if (!HAS_TAURI) {
+      setEditorError(t("editor.flow.attachNeedsApp"));
+      return;
+    }
+    setAttaching(true);
+    setEditorError(null);
+    photoNoteCommittedRef.current = false;
+    photoNoteCancelledRef.current = false;
+    const previewUrl =
+      typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+        ? URL.createObjectURL(file)
+        : null;
+    // The OCR preference AS THE IMPORT READS IT, frozen into the draft. The
+    // cache entry is written (or skipped) inside this call, so a switch flipped
+    // afterwards cannot change what this photo has, and letting the sheet read
+    // the live pref would make it re-probe a cache nobody wrote.
+    setPhotoNote({
+      id: null,
+      filename: file.name || t("photoNote.untitledFile"),
+      previewUrl,
+      ocrEnabled: prefs.attachment_ocr_enabled !== false,
+      deduplicated: false,
+    });
+    try {
+      const res = await importFile(file);
+      // The user backed out, or the vault locked, while the bytes were being
+      // written. The import cannot be aborted, so it is undone here, and ONLY
+      // when it created something: `deduplicated` means the vault already held
+      // this exact image and deleting it would destroy somebody's attachment.
+      if (photoNoteCancelledRef.current || !editorMountedRef.current) {
+        if (!res.deduplicated) {
+          void attachmentDelete(res.id).catch(() => {
+            // Nothing to tell on a dead component, and everything to tell on a
+            // live one: this is the same refusal the cancel path reports.
+            pendingPhotoDiscards.add(res.id);
+            if (editorMountedRef.current) setEditorError(t("photoNote.discardFailed"));
+          });
+        }
+        releasePhotoPreview(previewUrl);
+        return;
+      }
+      setPhotoNote((draft) =>
+        draft === null
+          ? null
+          : {
+              ...draft,
+              id: res.id,
+              filename: res.filename,
+              deduplicated: res.deduplicated,
+            },
+      );
+    } catch (e) {
+      setPhotoNote(null);
+      releasePhotoPreview(previewUrl);
+      setEditorError(attachFailureMessage(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  /**
+   * Land the reviewed draft.
+   *
+   * `note` inserts the block through the editor's ordinary insert path, so it is
+   * one undoable change and takes the normal note-save route (MY01). `new`
+   * creates a titled note through the same helper the saved-transcript path
+   * uses, honours the user's new-note location, then opens it with `openFromList`
+   * rather than `openNote`: mobile has no autosave, and switching buffers
+   * without flushing first silently discards whatever is in the editor.
+   */
+  async function commitPhotoNote(text: string, destination: PhotoNoteDestination) {
+    const draft = photoNote;
+    if (draft === null || draft.id === null) return;
+    const block = buildPhotoNoteBlock(
+      emitAttachmentEmbed(draft.id, draft.filename),
+      text,
+    );
+    // Set BEFORE the write it guards: an unmount inside the create would
+    // otherwise run the cleanup with "not committed" and delete the attachment
+    // the new note was just created to reference. The catch puts it back,
+    // because a create that failed landed nothing.
+    photoNoteCommittedRef.current = true;
+    if (destination === "new") {
+      const title = photoNoteTitle(
+        text,
+        t("photoNote.defaultTitle", { date: localDateStamp() }),
+      );
+      // The user's "Default location for new notes" (MYND-462). An explicit
+      // folder argument wins over the pref everywhere else, and there is none
+      // here, so this is exactly the root-level create the pref governs. No
+      // try/catch: `prefs` is already-loaded plain data, and a swallowed throw
+      // here would file the note at the root while looking like a successful
+      // default, which is the defect this whole clause exists to fix.
+      const mode = normalizeNewNoteLocation(prefs.new_note_location);
+      const folder =
+        mode === "specific"
+          ? prefs.new_note_location_folder ?? null
+          : mode === "current"
+            ? readNoteFolder(editorText)
+            : null;
+      let id: string;
+      try {
+        id = await createTitledNote(block, title, folder);
+      } catch {
+        photoNoteCommittedRef.current = false;
+        // The sheet stays open with the user's text: a failed create must not
+        // look like a successful one, and re-tapping the button retries.
+        setEditorError(t("photoNote.saveFailed"));
+        return;
+      }
+      // The note EXISTS from here. Clearing the draft before opening it used to
+      // share one catch with the create, so a failed OPEN told the user the note
+      // was not created and invited a retry that made a second one.
+      setPhotoNote(null);
+      releasePhotoPreview(draft.previewUrl);
+      try {
+        await openFromList(id);
+      } catch {
+        setEditorError(t("photoNote.openFailed"));
+      }
+      return;
+    }
+    setPhotoNote(null);
+    releasePhotoPreview(draft.previewUrl);
+    insertIntoEditor(block);
+  }
+
+  /**
+   * Abandon the draft: nothing is written, and the attachment this flow imported
+   * is deleted through the existing path.
+   *
+   * **Not every draft owns its attachment.** `attachment_import` is
+   * content-addressed and dedups, so picking a photograph the vault already holds
+   * returns the EXISTING entry with `deduplicated: true`. Deleting that would
+   * break every note that embeds it and push a tombstone to every device, which
+   * is the opposite of "cancel writes nothing". So the dedup flag decides, and
+   * the flow says so on failure instead of closing as though the bytes went away.
+   */
+  function cancelPhotoNote() {
+    const draft = photoNote;
+    photoNoteCancelledRef.current = true;
+    photoNoteCommittedRef.current = false;
+    setPhotoNote(null);
+    releasePhotoPreview(draft?.previewUrl ?? null);
+    if (draft === null || !shouldDiscardPhotoDraft(draft, photoNoteCommittedRef.current)) return;
+    const id = draft.id;
+    if (id === null) return; // the predicate already covers it; this narrows for TS
+    void attachmentDelete(id).catch(() => {
+      pendingPhotoDiscards.add(id);
+      setEditorError(t("photoNote.discardFailed"));
+    });
+  }
+
+  // A lock (or any other unmount of this flow) with a draft open drops the
+  // plaintext with the component and drops the blob URL. The uncommitted import
+  // is deleted best-effort: after a lock the delete is refused, and then the
+  // image stays in the library, which is the recoverable arm rather than a write
+  // nobody asked for. A deduplicated import is never deleted, because the vault
+  // already held it.
+  useEffect(() => {
+    editorMountedRef.current = true;
+    // Retry the discards a lock refused. The slot is unlocked now, which is the
+    // one thing that changed since the delete failed.
+    for (const id of [...pendingPhotoDiscards]) {
+      void attachmentDelete(id)
+        .then(() => pendingPhotoDiscards.delete(id))
+        .catch(() => {});
+    }
+    return () => {
+      editorMountedRef.current = false;
+      const draft = photoNoteRef.current;
+      releasePhotoPreview(draft?.previewUrl ?? null);
+      if (draft === null || !shouldDiscardPhotoDraft(draft, photoNoteCommittedRef.current)) return;
+      const id = draft.id;
+      if (id === null) return;
+      // Register FIRST and clear on success: after a lock this delete is refused,
+      // and the id has to survive to be retried on the next unlock.
+      pendingPhotoDiscards.add(id);
+      void attachmentDelete(id).then(() => pendingPhotoDiscards.delete(id)).catch(() => {});
+    };
+  }, []);
 
   // Heading outline of the note body (skips fenced code so `# in code` isn't a
   // heading). Each entry keeps the char offset so tapping jumps the caret there.
@@ -4057,19 +4322,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           />
         )}
 
-        {settingsOpen && (
-          <SettingsSheet
-            vaultId={vaultId}
-            initialPanel={settingsPanel}
-            onClose={() => {
-              setSettingsOpen(false);
-              setSettingsPanel(undefined);
-            }}
-            onLock={onLock}
-            onDeleteVaultSuccess={onDeleteVaultSuccess}
-          />
-        )}
-
         {aiOnboardingOpen && (
           <AiOnboardingSheet
             onClose={() => setAiOnboardingOpen(false)}
@@ -4350,6 +4602,25 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         }}
       />
 
+      {/* Photo to note (myne-md/myne#926). Deliberately WITHOUT `capture`:
+          `capture` removes the library option, and the OS file picker already
+          offers "Take Photo" beside "Photo Library" for an `image/*` input. So
+          one input reaches both sources, and Myne never opens a camera stream
+          (the camera app produces the bytes). That is the security property
+          that made this the right shape. */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        data-testid="editor.photo-input"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void attachPhoto(f);
+          e.target.value = "";
+        }}
+      />
+
       {editorError && (
         <div style={{ padding: "var(--space-3) var(--space-4) 0" }}>
           <Banner kind="danger">{editorError}</Banner>
@@ -4504,6 +4775,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           rawMode={rawMode}
           onToggleRaw={() => setRawMode((r) => !r)}
           onAttach={() => attachInputRef.current?.click()}
+          onPhotoToNote={() => photoInputRef.current?.click()}
           onLibrary={() => setManageAttachments(true)}
           onRecord={() => setRecordOpen(true)}
           // MYND-555: the user's device-local bar layout. Both default to `[]`
@@ -4608,6 +4880,30 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         />
       )}
 
+      {photoNote && (
+        <PhotoNoteSheet
+          attachmentId={photoNote.id}
+          filename={photoNote.filename}
+          previewUrl={photoNote.previewUrl}
+          // The pref AS THE IMPORT READ IT (`import_mobile.rs` reads the same
+          // value and writes or skips the cache entry), frozen into the draft.
+          // Reading it live would let a switch flipped in Settings re-probe a
+          // cache that was never written and report "no text" about a page
+          // nothing read.
+          ocrEnabled={photoNote.ocrEnabled}
+          onCommit={commitPhotoNote}
+          onCancel={cancelPhotoNote}
+          onOpenOcrSetting={() => {
+            // The draft stays open under the settings sheet rather than being
+            // thrown away: turning the switch on here affects the NEXT import
+            // (this photo's cache was already skipped), and the user can still
+            // add this one without text when they come back.
+            setSettingsPanel("data");
+            setSettingsOpen(true);
+          }}
+        />
+      )}
+
       {manageAttachments && (
         <AttachmentsSheet
           onClose={() => setManageAttachments(false)}
@@ -4678,6 +4974,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // that. ─────────────────────────────────────────────────────────────────────
   const renderSharedOverlays = () => (
     <>
+      {/* Settings lives HERE rather than with the list overlays (myne-md/myne#926
+          review): the compact phone branch renders the editor pane and the
+          shared overlays but NOT the list overlays, so a settings sheet mounted
+          from the list branch never opened while a note was on screen. The photo
+          sheet's "reading is off" state offers exactly that route, and it was a
+          dead button on the one client the feature ships on. */}
+      {settingsOpen && (
+        <SettingsSheet
+          vaultId={vaultId}
+          initialPanel={settingsPanel}
+          onClose={() => {
+            setSettingsOpen(false);
+            setSettingsPanel(undefined);
+          }}
+          onLock={onLock}
+          onDeleteVaultSuccess={onDeleteVaultSuccess}
+        />
+      )}
       {/* SF5 share-import confirmation toast (§9.20, SYNC-18) - self-contained,
           listens for the drain result; renders in every layout branch. */}
       {/* MYND-640: tapping the toast opens the library the share landed in.

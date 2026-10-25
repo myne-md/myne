@@ -1849,6 +1849,7 @@
     "formatBar": {
       "redo": "Redo",
       "attachFile": "Attach new file",
+      "photoToNote": "Photo to note",
       "insertFromLibrary": "Insert from library",
       "recordVoiceNote": "Record voice note",
       "showLivePreview": "Show live preview",
@@ -2786,6 +2787,33 @@
       "defaultSlotName": "Default"
     }
   },
+  "photoNote": {
+    "cancel": "Cancel",
+    "commitNew": "Create note",
+    "commitNote": "Add to this note",
+    "defaultTitle": "Photo note {{date}}",
+    "destinationLabel": "Where to put the photo and its text",
+    "imageOnly": "Add the photo without text",
+    "locked": "The vault locked while this photo was open. It stays in your attachments; unlock and try again.",
+    "machineText": "This text was read by a machine, so check it before you keep it.",
+    "newNote": "New note",
+    "noText": "No text was read from this page. You can still add the photo.",
+    "ocrOff": "Reading text from images is off on this device, so this photo has no text. Turning it on applies to the next photo you take.",
+    "ocrOffAction": "Open the setting",
+    "readFailed": "The text could not be read this time. You can still add the photo.",
+    "reading": "Reading the text…",
+    "textLabel": "Text from the photo",
+    "textPlaceholder": "The text the app read will appear here. You can type it yourself.",
+    "thisNote": "This note",
+    "saveFailed": "The note could not be created. Your text is still here.",
+    "importing": "Saving the photo…",
+    "addReading": "Add the reading",
+    "truncated": "The reading stops at a length limit, so the end of the page may be missing.",
+    "discardFailed": "The photo could not be removed. It is still in your attachments.",
+    "readingArrived": "The reading arrived while you were typing. It is kept below, waiting for you.",
+    "untitledFile": "Photo",
+    "openFailed": "The note was created, but it could not be opened."
+  },
   "plainFile": {
     "closePending": {
       "cancelLabel": "Keep editing",
@@ -3257,7 +3285,8 @@
       "mobileDeviceLocal": "This one is per device: it decides what this phone indexes, so your other devices keep their own choice.",
       "errorSaveSetting": "Could not save this setting.",
       "processing_one": "Reading 1 attachment…",
-      "processing_other": "Reading {{count}} attachments…"
+      "processing_other": "Reading {{count}} attachments…",
+      "draftUse": "The text this reads is also offered as a draft you can add to a note. A note syncs encrypted like any other."
     },
     "folderNotes": {
       "label": "Folder notes",
