@@ -199,6 +199,7 @@ describe("Command palette action registry", () => {
       "view.toggle-source",
       "view.toggle-stacked-tabs",
       "views.import-base",
+      "views.manage",
       "views.show",
       "wikilinks.convert-in-this-note",
       "workspace.delete",
@@ -224,6 +225,18 @@ describe("Command palette action registry", () => {
       void find(id).run(makeContext({ [cb]: fn }));
       expect(fn).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it("views.manage is editor-only and is NOT gated on the device-local Views toggle (view-manifests)", () => {
+    // The contrast with `views.show` is the point: that one hides with the toggle
+    // because it opens the sidebar flyout, and this one is how a reader reaches
+    // views at all when the toggle is off — including the first view that arrived
+    // before anybody could have flipped it.
+    expect(find("views.manage").visibility(makeContext({ stageName: "editor" }))).toBe("show");
+    expect(find("views.manage").visibility(makeContext({ stageName: "welcome" }))).toBe("hidden");
+    const onManageViews = vi.fn();
+    void find("views.manage").run(makeContext({ onManageViews }));
+    expect(onManageViews).toHaveBeenCalledTimes(1);
   });
 
   it("views.import-base is editor-only and dispatches to onImportBaseView (MYND-276 #6)", () => {
