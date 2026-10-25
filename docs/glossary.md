@@ -571,6 +571,12 @@ The Layer-2 storage-reclamation outcome (`sync-protocol.md` §11.3): past the to
 
 Used in: `spec/sync-protocol.md` §11.3; `spec/server-protocol.md` §3.3, §7.2
 
+### **board** &nbsp; 📦 *Product*
+
+A [saved view](#saved-view) rendered as columns of cards (`board-view`, myne-md/myne#922): `view_type: "board"`, which is one more value in the [view type](#view-type) set and not a fourth kind of object. **A board is a saved view, never a container.** There is no board file, no board database and no per-board state that a gesture has to rewrite, so a card cannot be lost by a drag and two devices cannot overwrite each other's board. Its lanes are the distinct values of its `group_by` property ordered by the view's `lanes`, every card is an ordinary note, and the properties a card shows are the view's `columns`. A drag writes **one property on one note** through the host-owned field command a table edit uses (`spec/protocol.md` §6.5), which is what makes it mergeable, undoable and unable to touch a card it did not move; a refused write leaves the note byte-identical and the card returns to the lane the note reports. A [lane rename](#lane) and a multi-card move are **one host-owned action with one restore**, writing every affected card through that same single-note command and contributing each pre-write snapshot to the session journal. Card order inside a lane is the view's `sort`, never a stored rank, and WIP limits are deliberately absent: per-lane limits would need a declared lane object, which is a format decision rather than an addition. Adding a card is a create plus one field write, from the view's `template` body when one is declared. The board is one implementation for all three clients; the drag is pointer-event based so a phone can use it, and the device gesture itself is a manual test surface. See [lane](#lane), [saved view](#saved-view), [view type](#view-type).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions/storage/0730`; `src/notes/views/boardView.tsx`, `src/notes/views/lanes.ts`
+
 ### **bottom bar** &nbsp; 📦 *Product*
 
 The 28px status bar pinned to the bottom of the editor (`BottomBar`, `src/screens/Editor.tsx`). Hosts the connection/sync status text, the [save-status](#optimistic-ui-rollback) badge, and the persistent affordances for the [tag browser](#tag-browser), Saved Views, the whole-vault graph, Settings, vault Lock, and the live document-statistics readout (characters / words / spaces / paragraphs — selection-scoped when a non-empty selection exists, the full breakdown in its hover title; MYND-339, reusing the `word-count` item id). **Bottom-bar customization** (2026-06-15) lets the user hide/show each item via a right-click context menu; the hidden set persists per-vault in the `vault.prefs` `hidden_bar_items` field (set semantics, omitted-when-empty — a fully-visible bar is byte-identical to a pre-feature vault). The bar root stays right-clickable even when fully emptied, which is the only restore path (no Settings-panel mirror). There is deliberately **no** separate top bar — the top controls float into the OS title-bar row (MYND-166).
@@ -1870,6 +1876,12 @@ Used in: `spec/protocol.md` §11
 One of a fixed, bounded set of named, theme-aware colors a [color label](#color-label) may take — six muted hue-named slots (matched to Myne's iron/ochre/brick/forest register, not bright Finder tags) plus "none". Defined as `--label-*` design tokens in `docs/design/colors_and_type.css` with light/dark value pairs mirroring the state tokens; the dot is a solid fill (no `-soft` variant). Slots are fixed and hue-named, **not** user-renamable, and are **not** a repurpose of the semantic state colors (`--danger` etc.) — a label must not read as a state. See also [color label](#color-label). (MYND-184)
 
 Used in: `decisions.md` 2026-06-07
+
+### **lane** &nbsp; 📦 *Product*
+
+One column of a [board](#board) (`board-view`, myne-md/myne#922): a distinct value of the view's `group_by` property, not a stored object and not a folder. The view declares the order in its `lanes` sub-field, and that declaration is the only thing the format holds; the lane values themselves come from the notes. Three rules follow from that shape and each is a behaviour rather than a detail. A **declared lane renders even with no cards**, because dropping a card into an empty lane is the ordinary way to start using it. A **value in the data and absent from the declaration is appended in first-appearance order**, so a status added today cannot hide the cards carrying it. And the array **preserves a repeated value verbatim**, while the renderer draws one lane per distinct value, which keeps the format honest about what the user declared without drawing the same column twice. Renaming a lane writes the new value on every card in it and updates `lanes` as [one host-owned action with one restore](#board). See [board](#board), [saved view](#saved-view).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions/storage/0730`; `src/notes/views/lanes.ts`
 
 ### **language pack (Tier 1)** &nbsp; 🛠️ *Tooling*
 A per-language CodeMirror 6 grammar package (`@codemirror/lang-*`, or a CM5 stream-mode from `@codemirror/legacy-modes`) that provides syntax tokenization for a fenced code block's body. "Tier 1" distinguishes these from the Tier-0 core editor packs: they are **hand-curated** (not pulled via `@codemirror/language-data`) to keep the dependency tree minimal (TB9), and **eager-imported** (revised 2026-05-29 from the original lazy plan, which didn't color reliably in the Tauri WebView). Adopted in the 2026-05-29 decision (MYND-154).
@@ -4360,9 +4372,9 @@ Used in: `spec/protocol.md` §9.5.2; Saved Views (MYND-273 / MYND-274)
 
 ### **view type** &nbsp; 📦 *Product*
 
-The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** (Obsidian-Bases' `map` is dropped, SYNC-5); all three ship — cards (MYND-275), table (MYND-277), list (MYND-278) — behind one `viewRenderHost` dispatch. Every view type renders the **same** grouped query result read-only — no editable cells, no kanban drag-columns — so the choice is purely presentational (cards add a cover [`image:`](#attachment) + groupBy headers; table renders the view's property columns; list reuses the note-list row). The view type is one field of the view definition stored in `vault.prefs` / `MYP1`.
+The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** plus **board** (`board-view`, myne-md/myne#922; Obsidian-Bases' `map` is dropped, SYNC-5); all four ship: cards (MYND-275), table (MYND-277), list (MYND-278), board (myne-md/myne#922), behind one `viewRenderHost` dispatch. **Three of the four are strictly read-only over the same grouped query result**: table renders the view's property columns, cards add a cover [`image:`](#attachment) plus groupBy headers, and list reuses the note-list row, with no editable cells. **[Board](#board) is the exception and the reason this entry changed**: it renders the same result as lanes of cards, and it can write, but only through the host-owned single-property command and only for a property the view declares in `write_fields`. The type is one field of the view definition stored in `vault.prefs` / `MYP1`.
 
-Used in: Saved Views (MYND-271)
+Used in: Saved Views (MYND-271); `spec/protocol.md` §9.5.2; `decisions/storage/0730`
 
 ### **vim mode** &nbsp; 📦 *Product*
 
