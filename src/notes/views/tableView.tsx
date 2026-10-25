@@ -51,18 +51,18 @@ import {
 } from "./viewLayout";
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
 import { refusalSentence } from "./refusalSentence";
+import { SelectToggle } from "./selectToggle";
 import { Button } from "../../components/primitives/Button";
 import { Input } from "../../components/primitives/Input";
 import { SearchableSelect } from "../../components/primitives/SearchableSelect";
-import { Icon } from "../../components/primitives/Icon";
 import type { SelectOption } from "../../components/primitives/Select";
 import {
   bulkSetField,
+  lastActionIsRestorable,
   restoreLastBulkAction,
   type BulkFieldResult,
   type BulkRestoreResult,
 } from "../bulkSetField";
-import { lastBulkAction } from "./bulkUndoJournal";
 import type { CardContextMenuHandler, OpenNoteHandler } from "./card";
 import {
   HOVER_TRANSITION,
@@ -178,35 +178,6 @@ const REFUSAL_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-/** A selection toggle, built from `Button` rather than an `<input>`, and that is
- *  a promise rather than a preference: this table is a READ-ONLY projection
- *  (SYNC-1) and its own spec asserts that no `<input>` appears anywhere in it.
- *  Selection is not cell editing, so the control is a `role="checkbox"` button
- *  (the `Switch` precedent): the announced state and the painted state come from
- *  the same ARIA attribute, and the invariant keeps its letter. */
-const TOGGLE_STYLE: CSSProperties = {
-  width: "var(--target-min)",
-  height: "var(--target-min)",
-  padding: 0,
-  border: 0,
-  background: "transparent",
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  flex: "0 0 auto",
-};
-
-const TOGGLE_BOX_STYLE: CSSProperties = {
-  width: 16,
-  height: 16,
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-1)",
-  color: "var(--fg-1)",
-};
-
 const NAME_TEXT_STYLE: CSSProperties = {
   overflow: "hidden",
   textOverflow: "ellipsis",
@@ -231,43 +202,6 @@ function currentScalar(
   if (value === undefined) return { scalar: null, isList: false };
   if (value.type === "list") return { scalar: null, isList: true };
   return { scalar: value.value ?? null, isList: false };
-}
-
-/** The selection toggle: a `role="checkbox"` button, so it is keyboard-operable
- *  and announceable, and so the table keeps its no-`<input>` promise. */
-function SelectToggle({
-  checked,
-  label,
-  onToggle,
-  testId,
-  noteId,
-}: {
-  checked: boolean;
-  label: string;
-  onToggle: () => void;
-  testId: string;
-  noteId?: string;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      data-testid={testId}
-      {...(noteId === undefined ? {} : { "data-note-id": noteId })}
-      onClick={(e) => {
-        // The row opens the note on click; the toggle must not.
-        e.stopPropagation();
-        onToggle();
-      }}
-      style={TOGGLE_STYLE}
-    >
-      <span style={TOGGLE_BOX_STYLE} aria-hidden="true">
-        {checked ? <Icon name="check" size={12} /> : null}
-      </span>
-    </Button>
-  );
 }
 
 export function TableView({
@@ -396,21 +330,23 @@ export function TableView({
     if (busy) return;
     setBusy(true);
     try {
-      setRestored(await restoreLastBulkAction());
+      // `def` is the definition in hand: a restore that changes the view (a board
+      // lane rename) needs it to move the version forward rather than revive the
+      // old number, which would leave the restored view unapproved.
+      setRestored(await restoreLastBulkAction(def));
     } finally {
       setBusy(false);
     }
-  }, [busy]);
+  }, [busy, def]);
 
-  const restorable = lastBulkAction();
+  const restorable = lastActionIsRestorable();
   // **Only offer the restore when it can restore something.** A note in the
   // current on-disk format is a CRDT note, whose change graph IS its history, so
   // `note_set_field` captures no pre-write snapshot for it and every entry in the
   // journal carries `snapshotId: null`. Rendering the button anyway offered an
   // action that could only answer "Restored 0." on every vault created today,
   // which is the offer-without-a-capability shape the design canon rules out.
-  const restoreAvailable =
-    restorable !== null && restorable.notes.some((n) => n.snapshotId !== null);
+  const restoreAvailable = restorable;
   // ...and when it is absent, the report says WHY rather than leaving the reader
   // to wonder where the button went.
   const nothingToRestore =

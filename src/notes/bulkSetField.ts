@@ -25,6 +25,12 @@
 // states; in practice the writes are independent, so it is the conservative
 // choice rather than a correctness requirement, and it costs nothing.
 //
+// A lane rename also changes the view DEFINITION (`lanes`), so the action carries
+// the definition as it was and the same restore puts it back, with its version
+// moved FORWARD and this device's approval riding along. One action, one restore:
+// a button that brought back forty cards and left the lane order renamed would be
+// a half-restored action wearing the word "restore".
+//
 // Two rules from `src/AGENTS.md` apply to the restore because it is an out-of-band
 // whole-note write:
 //
@@ -44,8 +50,11 @@
 import { flushBeforeFrontmatterWrite } from "./flushBeforeFrontmatterWrite";
 import { NOTE_FIELD_WRITE_EVENT, setNoteField } from "./setNoteField";
 import type { NoteSetFieldError } from "../types/note-set-field-error";
+import type { SavedView } from "../lib/prefs";
 import { snapshotRestore } from "./snapshots";
+import { saveLocalViewEdit } from "./views/saveViewEdit";
 import {
+  canRestoreAction,
   clearBulkUndo,
   lastBulkAction,
   recordBulkAction,
@@ -87,6 +96,12 @@ export interface BulkFieldRequest {
   readonly field: string;
   readonly newValue: string;
   readonly targets: readonly BulkFieldTarget[];
+  /**
+   * The view definition BEFORE this action, when the action also changes it.
+   * A lane rename passes it so one restore puts the declaration back too; every
+   * notes-only action leaves it out.
+   */
+  readonly previousView?: SavedView;
 }
 
 function newActionId(): string {
@@ -147,6 +162,9 @@ export async function bulkSetField(
     viewId: request.viewId,
     field: request.field,
     notes: written.map((w) => ({ noteId: w.noteId, snapshotId: w.snapshotId })),
+    ...(request.previousView === undefined
+      ? {}
+      : { previousView: request.previousView }),
   });
 
   return {
@@ -169,6 +187,13 @@ export interface BulkRestoreResult {
   readonly restored: readonly string[];
   readonly failed: readonly BulkRestoreFailed[];
   readonly restoredCount: number;
+  /** Whether the action's VIEW DEFINITION was put back (a lane rename's `lanes`).
+   *  `false` for an action that never changed the definition. */
+  readonly viewRestored: boolean;
+  /** Whether that definition write was attempted and failed. Never inferred from
+   *  `viewRestored === false`: "nothing to restore" and "the restore failed" are
+   *  different sentences to a reader. */
+  readonly viewRestoreFailed: boolean;
 }
 
 /**
@@ -178,11 +203,26 @@ export interface BulkRestoreResult {
  * either way: the action is no longer "the last bulk action" once the user has
  * acted on it, and a half-restored action re-offered as one button would be a
  * second chance at the same failure.
+ *
+ * `currentView` is the definition the caller is holding NOW, needed because
+ * restoring a definition must move its version FORWARD rather than revive the old
+ * number: a revived version would no longer match this device's approval, so the
+ * view would come back unapproved and the next query would refuse to run. It is
+ * only read when the action changed the definition, which only a lane rename
+ * does.
  */
-export async function restoreLastBulkAction(): Promise<BulkRestoreResult> {
+export async function restoreLastBulkAction(
+  currentView?: SavedView,
+): Promise<BulkRestoreResult> {
   const action: BulkUndoAction | null = lastBulkAction();
   if (action === null) {
-    return { restored: [], failed: [], restoredCount: 0 };
+    return {
+      restored: [],
+      failed: [],
+      restoredCount: 0,
+      viewRestored: false,
+      viewRestoreFailed: false,
+    };
   }
 
   // Once, for the batch, and before the first restore: the rule is the writer's,
@@ -209,8 +249,41 @@ export async function restoreLastBulkAction(): Promise<BulkRestoreResult> {
     }
   }
 
+  const previous = action.previousView;
+  const canRestoreView = previous !== undefined && currentView !== undefined;
+  let viewRestoreFailed = false;
+  if (canRestoreView) {
+    try {
+      // A LOCAL EDIT like any other: the version moves forward and this device's
+      // approval rides along, because the person at this device is the one who
+      // asked for the restore.
+      await saveLocalViewEdit(
+        currentView,
+        { ...currentView, lanes: previous.lanes },
+        true,
+      );
+    } catch {
+      viewRestoreFailed = true;
+    }
+  }
+
   clearBulkUndo();
-  return { restored, failed, restoredCount: restored.length };
+  return {
+    restored,
+    failed,
+    restoredCount: restored.length,
+    // "Nothing to restore" is not "restored nothing": a rename's notes may all be
+    // CRDT notes while its declaration still came back.
+    viewRestored: canRestoreView && !viewRestoreFailed,
+    viewRestoreFailed,
+  };
+}
+
+/** Whether the last action offers anything for one restore to do. Exported so a
+ *  caller does not re-derive the rule (and cannot forget the definition half). */
+export function lastActionIsRestorable(): boolean {
+  const action = lastBulkAction();
+  return action !== null && canRestoreAction(action);
 }
 
 /** A restore rewrites the whole note out of band of any pane's autosave loop, so

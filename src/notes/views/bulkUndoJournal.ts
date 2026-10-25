@@ -1,4 +1,5 @@
-// The session-scoped journal behind one bulk field action (view-manifests task 10).
+// The session-scoped journal behind one bulk field action (view-manifests task 10,
+// extended by the board's lane rename in myne-md/myne#922 task 7).
 //
 // WHAT IT IS FOR, AND WHAT IT PROMISES. A bulk field set is N single-note writes,
 // each with its own pre-write snapshot (task 5's `note_set_field` returns the id of
@@ -15,6 +16,8 @@
 // and a snapshot id are references, not content. That is why the journal can be a
 // plain module-level array, and why it is still cleared on vault lock: leaving one
 // vault must not carry a map of what was touched in it into the next session.
+
+import type { SavedView } from "../../lib/prefs";
 //
 // ONE action is restorable at a time — the last one. Keeping a stack would offer an
 // undo the UI has no surface to express (there is one bar, one button), and a
@@ -35,6 +38,26 @@ export interface BulkUndoAction {
   readonly field: string;
   /** Every note the action wrote, in the order it wrote them. */
   readonly notes: readonly BulkUndoNote[];
+  /**
+   * The view DEFINITION as it was before the action, when the action changed it.
+   *
+   * Only a lane rename does (it rewrites `lanes`), and it is here because the
+   * one-action promise has to cover the definition too: a rename that moved
+   * forty cards and left the lane order renamed would be a half-restored action,
+   * which is the shape the journal exists to prevent. `undefined` for every
+   * action that only wrote notes.
+   */
+  readonly previousView?: SavedView;
+}
+
+/** Whether one restore could put anything back. A rename whose notes were all
+ *  CRDT notes still has a definition to restore, which is why the snapshots are
+ *  not the only answer. */
+export function canRestoreAction(action: BulkUndoAction): boolean {
+  return (
+    action.previousView !== undefined ||
+    action.notes.some((note) => note.snapshotId !== null)
+  );
 }
 
 let last: BulkUndoAction | null = null;
