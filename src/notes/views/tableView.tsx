@@ -63,7 +63,7 @@ import {
 } from "../bulkSetField";
 import { lastBulkAction } from "./bulkUndoJournal";
 import type { NoteSetFieldError } from "../../types/note-set-field-error";
-import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
+import type { CardContextMenuHandler, OpenNoteHandler } from "./card";
 import {
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";
