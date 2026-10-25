@@ -42,6 +42,7 @@ import { noteRead } from "../readNote";
 import { saveNote } from "../saveNote";
 import {
   closeLiveNote,
+  isLiveNote,
   openLiveNote,
   patchEpoch,
   readLiveNote,
@@ -1575,13 +1576,36 @@ export function PaneView({
   // Not the text the core returns: when the core merged a peer edit into this
   // save the returned text holds it and the buffer does not, so a mirror there
   // would hide it from the next drain and the save after would delete it.
+  /** The save's live context — **only while a live session really owns `id`**.
+   *
+   *  This used to answer for EVERY note, and that answer was a data loss. A
+   *  session exists only for an `NC05` note: `live_session_open` decodes the
+   *  durable blob and refuses anything else. For a legacy `MY01` note the open
+   *  therefore fails, no session exists, and handing `saveNote` a session base
+   *  anyway sent the stateless `note_update` to disk with a base taken from the
+   *  editor's session MIRROR — a body the file never held. The write came back
+   *  `BaseMismatch`, the keep-both handler preserved the keystrokes into a
+   *  duplicate note, and the note the user was typing in adopted the pre-edit
+   *  body: the text vanished and a copy appeared beside it.
+   *
+   *  Measured 2026-10-24 on a v0.1 vault, instrumented: `live: "session"` while
+   *  `live_session_read` answered `{"kind":"NotOpen"}`, then `BaseMismatch` on
+   *  the second save of a freshly created note. `NC05` notes are unaffected —
+   *  there the session exists and the base is its own text.
+   *
+   *  Without a session the stateless path is correct BY CONSTRUCTION: it sends
+   *  `sha256(savedBodyRef)`, which is what this hook last saw land.
+   */
   const liveSaveFor = useCallback(
-    (id: string): LiveSaveContext => ({
-      base: sessionMirrorRef.current.get(id),
-      onSent: (sent) => {
-        sessionMirrorRef.current.set(id, sent);
-      },
-    }),
+    (id: string): LiveSaveContext | undefined =>
+      isLiveNote(id)
+        ? {
+            base: sessionMirrorRef.current.get(id),
+            onSent: (sent) => {
+              sessionMirrorRef.current.set(id, sent);
+            },
+          }
+        : undefined,
     [],
   );
   const autosave = useAutosave(
@@ -2359,6 +2383,18 @@ export function PaneView({
     isDrawing,
     setContent,
     drawingIo,
+    // **The peer set, and its absence was a whole feature that never drew.** The
+    // editor element is built INSIDE this memo, so `awareness={paneAwareness}`
+    // only reaches it when the memo recomputes — and this array did not name it.
+    // A remote awareness frame updated the store, re-rendered the pane, mapped
+    // the peer (the Who's-here roster showed it) and then handed the editor the
+    // SAME old prop object, so the decoration effect never fired: the caret
+    // appeared only after an unrelated render invalidated one of the deps above.
+    //
+    // Measured 2026-10-24 on `collab-presence`, instrumented on both sides: the
+    // pane re-rendered with `peers: 1`, and the editor's awareness effect logged
+    // NO dispatch for that frame (`peers: 0` twice, then nothing).
+    paneAwareness,
   ]);
 
   return (

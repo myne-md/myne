@@ -73,7 +73,7 @@ E2E_ENV='export HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/loca
 # passed through to the container's bash, where `$E2E_CARGO_JOBS` and
 # `$E2E_CARGO_CODEGEN_UNITS` are unset and would expand to nothing. See
 # scripts/lib/e2e-docker.sh.
-E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS"
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS $E2E_CARGO_OPT_LEVEL $E2E_SIDECAR_FEATURES"
 
 # The multi-device sync specs need a LINUX myne-server binary inside the
 # container (the host binary is the dev OS's arch) — same wiring as

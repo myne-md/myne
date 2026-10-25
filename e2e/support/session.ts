@@ -357,12 +357,21 @@ const PORT_FALLBACK_ATTEMPTS = 24;
 export async function freeDriverPorts(
   driverPort: number,
   nativePort: number,
-  // Both injectable for the unit test only; production probes for real and gives
-  // the configured pair a SHORT grace period before stepping to an alternate.
+  // All three injectable for the unit test only; production probes for real,
+  // gives the configured pair a SHORT grace period before stepping to an
+  // alternate, and walks the whole band.
   probe: (url: string) => Promise<unknown> = driverStatus,
   firstWaitMs: number = PORT_HANDOVER_MS,
+  // The band width is injectable for the same reason `probe` is: the "every
+  // candidate is held" case has to hold every port the loop will visit, and
+  // reading that count from the constant made the test's own fixture depend on
+  // a number it was not testing. Raising the constant from 4 to 24 then turned
+  // a red guard into a red suite: the test held four ports, the loop found the
+  // fifth, and the assertion never fired. A test that has to be re-baselined
+  // whenever an unrelated tuning number moves is not protecting the behaviour.
+  maxAttempts: number = PORT_FALLBACK_ATTEMPTS,
 ): Promise<{ driverPort: number; nativePort: number; movedFrom?: number }> {
-  for (let attempt = 0; attempt < PORT_FALLBACK_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const candidate = driverPort + attempt * PORT_FALLBACK_STRIDE;
     const candidateNative = nativePort + attempt * PORT_FALLBACK_STRIDE;
     const budget = attempt === 0 ? firstWaitMs : PORT_HANDOVER_MS;

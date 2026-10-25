@@ -168,3 +168,42 @@ E2E_CARGO_CODEGEN_UNITS=""
 if [[ -n "${CARGO_PROFILE_RELEASE_CODEGEN_UNITS:-}" ]]; then
   E2E_CARGO_CODEGEN_UNITS="CARGO_PROFILE_RELEASE_CODEGEN_UNITS=$CARGO_PROFILE_RELEASE_CODEGEN_UNITS"
 fi
+
+# The third and last member of the same family, and the only one that actually
+# made the build fit.
+#
+# `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=4` alone still ended in
+# `myne_desktop_lib … (signal: 9, SIGKILL)` on an 11.66 GiB VM (measured
+# 2026-10-24, twice). `CARGO_PROFILE_RELEASE_OPT_LEVEL=1` built the whole
+# workspace in 4m 33s on the same VM, peak RSS under 4.1 GiB.
+#
+# Read what that trades. `opt-level` is a code-generation setting: the sources,
+# the features, the cfg flags and every behaviour under test are identical, and
+# the binary is slower. So a local run is evidence about BEHAVIOUR and not about
+# the shipped artefact — which is exactly the split the release lane needs, since
+# the tag is built on CI and the E2E suite is what a developer is trying to make
+# green. Do not use this to produce an artefact anybody ships.
+#
+# Opt-in like the other two: unset on the host, the command line is
+# byte-identical to what it was, so a machine with room still builds at
+# opt-level 3.
+E2E_CARGO_OPT_LEVEL=""
+if [[ -n "${CARGO_PROFILE_RELEASE_OPT_LEVEL:-}" ]]; then
+  E2E_CARGO_OPT_LEVEL="CARGO_PROFILE_RELEASE_OPT_LEVEL=$CARGO_PROFILE_RELEASE_OPT_LEVEL"
+fi
+
+# The app's feature list, forwarded to the SIDECAR builds as well.
+#
+# `pnpm tauri build --features a,b` applies the list to the app's own cargo
+# invocation only. The `beforeBuildCommand` sidecar stagers run in a child
+# process that never hears about it, so `myne-clipper-host` (a bin inside the
+# `myne-desktop` package, built by `scripts/build-clipper-host.mjs`) was compiled
+# with DEFAULT features — the real Candle engine — and that is the invocation the
+# OOM killer has been taking: `myne_desktop_lib … (signal: 9, SIGKILL)`, twice on
+# 2026-10-24 at `CARGO_PROFILE_RELEASE_CODEGEN_UNITS=4`. Forwarding the same list
+# makes the container build the artifact CI builds, at a fraction of the peak.
+#
+# Kept beside the other two caps because the three are one story: the release
+# build of this tree does not fit a container VM unless the stub features reach
+# every cargo invocation in it.
+E2E_SIDECAR_FEATURES="MYNE_SIDECAR_FEATURES=voice-capture-stub,local-inference-stub"

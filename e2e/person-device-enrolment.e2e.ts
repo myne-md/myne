@@ -32,6 +32,7 @@ import {
   dismissImporterOffer,
   ipcOk,
   openSettings,
+  registerPersonIdentity,
   selectSettingsTopic,
   startFirstRunIdentity,
 } from "./support/flows";
@@ -89,11 +90,20 @@ describeDevice("person-scoped device enrolment (myne-md/myne#911 task 9)", () =>
         await a.session.byTestId("editor.root", { timeoutMs: KDF_BUDGET_MS });
         await dismissImporterOffer(a.session);
 
-        // Publishing works with the identity LOCKED: the PUT authenticates with
-        // the device token on disk, and the B vaults only need the frame on the
-        // server to be findable.
+        // REGISTER first: publishing is under a NAMED server account and refuses
+        // with "Register your identity first" until the identity's public halves
+        // are written there and this device holds a token. Registration became an
+        // explicit act on 2026-10-24 (the server is a decision that belongs before
+        // any secret is typed); see `registerPersonIdentity`.
+        await registerPersonIdentity(a.session, phrase);
+
+        // Publishing then works with the identity LOCKED: the PUT authenticates
+        // with the device token on disk, and the B vaults only need the frame on
+        // the server to be findable.
         await openSettings(a.session, "sync");
-        await selectSettingsTopic(a.session, "sync", "devices");
+        // The publish row lives in the CONNECTION topic since 2026-10-25 (it is an
+        // identity act, and "Enrolled devices" over it read as a device operation).
+        await selectSettingsTopic(a.session, "sync", "connection");
         await clickByTestId(a.session, "sync.panel.publish", { timeoutMs: 20_000 });
         await a.session.waitUntil(
           async () =>
