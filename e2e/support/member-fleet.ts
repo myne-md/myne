@@ -25,7 +25,6 @@ import {
   ipcOk,
   openSyncConnection,
   openSyncDevices,
-  registerPersonIdentity,
   registerPersonIdentityIn,
   selectSettingsTopic,
   unlockToEditor,
