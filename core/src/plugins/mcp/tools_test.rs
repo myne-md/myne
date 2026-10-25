@@ -9,8 +9,9 @@
 use super::error::McpToolError;
 use super::scope::{resolve_scope, ConnectionScope};
 use super::tools::{
-    excerpt, note_read, note_search, vault_list, vault_state, McpNoteSource, NoteReadRequest,
-    NoteSearchRequest, MAX_EXCERPT_BYTES, MAX_SEARCH_LIMIT,
+    call_tool, excerpt, note_read, note_search, vault_list, vault_state, CallInputs,
+    McpCallOutcome, McpNoteSource, NoteReadRequest, NoteSearchRequest, WireCall, MAX_EXCERPT_BYTES,
+    MAX_SEARCH_LIMIT,
 };
 use crate::plugins::agent::tools::SearchHit;
 use crate::plugins::vault_indices::state::NoteRecord;
@@ -487,4 +488,284 @@ fn control_characters_never_reach_an_excerpt() {
         !text.chars().any(char::is_control),
         "a control character survived: {text:?}"
     );
+}
+
+// ── the working set: liveness, at the clamp rather than in the source ───────
+
+#[test]
+fn a_search_hides_a_note_outside_the_live_working_set() {
+    // The index producer indexes every `.myn`, so a trashed note still has a
+    // record and still ranks. It must not become a ROW: the sidebar does not show
+    // it, and an external connection is a second surface over the same working
+    // set, not a wider one.
+    let mut source = Source::new(&[
+        ("live", Some("Projects"), "alpha in a live note"),
+        ("trashed", Some("Projects"), "alpha in a trashed note"),
+    ]);
+    source.records.get_mut("trashed").expect("record").live = false;
+
+    let rows = block_on(note_search(&scope(), search("alpha"), &source)).expect("search");
+
+    let ids: Vec<&str> = rows.iter().map(|row| row.note_id.as_str()).collect();
+    assert_eq!(ids, vec!["live"], "a trashed note came back: {ids:?}");
+}
+
+#[test]
+fn a_read_of_a_trashed_note_is_indistinguishable_from_an_unknown_one() {
+    // Not `out_of_scope`: that would tell the caller the note exists. The CLI
+    // door answers this same case as `not_found` for exactly this reason.
+    let mut source = Source::new(&[("trashed", Some("Projects"), "body")]);
+    source.records.get_mut("trashed").expect("record").live = false;
+
+    let error = block_on(note_read(
+        &scope(),
+        NoteReadRequest {
+            note_id: "trashed".into(),
+        },
+        &source,
+    ))
+    .unwrap_err();
+
+    assert_eq!(
+        error,
+        McpToolError::UnknownNote {
+            note_id: "trashed".into()
+        },
+        "a trashed note must read as an unknown one, not as an out-of-scope one"
+    );
+}
+
+// ── the call surface: one entry point, four ordered decisions ──────────────
+
+fn grants(pairs: &[(&str, &[&str])]) -> BTreeMap<String, McpConnectionGrant> {
+    pairs
+        .iter()
+        .map(|(name, folders)| ((*name).to_string(), grant(folders)))
+        .collect()
+}
+
+fn inputs<'a>(
+    grants: &'a BTreeMap<String, McpConnectionGrant>,
+    connection: &'a str,
+    tool: &'a str,
+    arguments: &'a serde_json::Value,
+) -> CallInputs<'a> {
+    CallInputs {
+        call: WireCall {
+            connection,
+            tool,
+            arguments,
+        },
+        grants,
+        deliberate_folders: &[],
+        archived_folders: &[],
+    }
+}
+
+#[test]
+fn a_connection_with_no_grant_is_refused_before_the_vault_is_read() {
+    // The source below panics on every question, so an empty `records` answer
+    // cannot hide the ordering: `no_grant` has to come from the grants map alone.
+    struct Unreachable;
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl McpNoteSource for Unreachable {
+        async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError> {
+            panic!("a connection with no grant must not read the index");
+        }
+        async fn read_body(&self, _note_id: &str) -> Result<String, McpToolError> {
+            panic!("a connection with no grant must not read a note");
+        }
+        async fn search(
+            &self,
+            _query: &str,
+            _limit: usize,
+        ) -> Result<Vec<SearchHit>, McpToolError> {
+            panic!("a connection with no grant must not search");
+        }
+    }
+
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let arguments = json!({ "query": "alpha" });
+    // `unnamed-client` is what the shim sends for a client configured by hand
+    // with no `MYNE_MCP_CONNECTION`: a name no approval can produce by accident.
+    for name in ["unnamed-client", "", "claude-desktop-2"] {
+        assert_eq!(
+            block_on(call_tool(
+                inputs(&map, name, "note_search", &arguments),
+                &Unreachable
+            )),
+            McpCallOutcome::Refused(McpToolError::NoGrant),
+            "{name} was not refused"
+        );
+    }
+}
+
+#[test]
+fn an_unimplemented_verb_is_version_skew_rather_than_a_scope_refusal() {
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let source = Source::new(&[("a", Some("Projects"), "alpha")]);
+    let arguments = json!({ "body": "x" });
+    for tool in [
+        "note_create",
+        "note_append",
+        "note_set_field",
+        "note_move",
+        "note_edit",
+        "delete",
+        "",
+    ] {
+        assert_eq!(
+            block_on(call_tool(
+                inputs(&map, "claude-desktop", tool, &arguments),
+                &source
+            )),
+            McpCallOutcome::UnknownTool,
+            "{tool} was not reported as an unknown verb"
+        );
+    }
+}
+
+#[test]
+fn malformed_arguments_are_refused_before_the_vault_is_read() {
+    struct Unreachable;
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl McpNoteSource for Unreachable {
+        async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError> {
+            panic!("malformed arguments must not read the index");
+        }
+        async fn read_body(&self, _note_id: &str) -> Result<String, McpToolError> {
+            panic!("malformed arguments must not read a note");
+        }
+        async fn search(
+            &self,
+            _query: &str,
+            _limit: usize,
+        ) -> Result<Vec<SearchHit>, McpToolError> {
+            panic!("malformed arguments must not search");
+        }
+    }
+
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    // Each of these is a caller bug, not a scope decision: an unknown field (the
+    // requests are `deny_unknown_fields`, so a payload cannot smuggle a folder
+    // list), a missing required field, a wrong type, and a null arguments object.
+    for (tool, arguments) in [
+        (
+            "note_search",
+            json!({ "query": "a", "scope": ["Private/"] }),
+        ),
+        ("note_search", json!({})),
+        ("note_read", json!({ "note_id": 7 })),
+        ("vault_state", json!(null)),
+        ("vault_list", json!({ "anything": true })),
+    ] {
+        assert_eq!(
+            block_on(call_tool(
+                inputs(&map, "claude-desktop", tool, &arguments),
+                &Unreachable
+            )),
+            McpCallOutcome::Malformed,
+            "{tool} accepted {arguments}"
+        );
+    }
+}
+
+#[test]
+fn a_search_through_the_call_surface_returns_in_scope_rows_and_excludes_the_rest() {
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let source = Source::new(&[
+        ("in", Some("Projects"), "the quarterly alpha report"),
+        ("out", Some("Private"), "the alpha plan nobody approved"),
+    ]);
+    let arguments = json!({ "query": "alpha" });
+
+    let outcome = block_on(call_tool(
+        inputs(&map, "claude-desktop", "note_search", &arguments),
+        &source,
+    ));
+    let McpCallOutcome::Result(result) = outcome else {
+        panic!("expected a result, got {outcome:?}");
+    };
+
+    assert_eq!(result["isError"], false);
+    assert!(
+        result["content"][0]["text"].is_string(),
+        "the text half must be present: {result}"
+    );
+    let rows = result["structuredContent"]
+        .as_array()
+        .expect("structuredContent is the row array");
+    assert_eq!(rows.len(), 1, "the out-of-scope note came back: {rows:?}");
+    assert_eq!(rows[0]["noteId"], "in");
+    assert_eq!(rows[0]["folder"], "Projects");
+    assert!(
+        rows[0]["excerpt"]
+            .as_str()
+            .is_some_and(|e| e.contains("alpha")),
+        "an excerpt must carry the match: {rows:?}"
+    );
+}
+
+#[test]
+fn a_read_through_the_call_surface_hands_the_note_over_as_markdown() {
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let source = Source::new(&[("in", Some("Projects"), "---\nfolder: Projects\n---\nbody")]);
+    let arguments = json!({ "note_id": "in" });
+
+    let McpCallOutcome::Result(result) = block_on(call_tool(
+        inputs(&map, "claude-desktop", "note_read", &arguments),
+        &source,
+    )) else {
+        panic!("expected a result");
+    };
+    assert_eq!(
+        result["content"][0]["text"],
+        "---\nfolder: Projects\n---\nbody"
+    );
+    assert_eq!(result["structuredContent"]["noteId"], "in");
+}
+
+#[test]
+fn an_out_of_scope_read_is_refused_with_its_reason_and_one_sentence() {
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let source = Source::new(&[("out", Some("Private"), "x")]);
+    let arguments = json!({ "note_id": "out" });
+
+    let outcome = block_on(call_tool(
+        inputs(&map, "claude-desktop", "note_read", &arguments),
+        &source,
+    ));
+    let McpCallOutcome::Refused(error) = outcome else {
+        panic!("expected a refusal, got {outcome:?}");
+    };
+    assert_eq!(error.reason(), "out_of_scope");
+    assert!(error.message().contains("Myne"));
+}
+
+#[test]
+fn the_two_no_argument_tools_answer_only_the_empty_object() {
+    let map = grants(&[("claude-desktop", &["Projects"])]);
+    let source = Source::new(&[("a", Some("Projects"), "alpha")]);
+    let arguments = json!({});
+    // `vault_list` answers with the row array itself and `vault_state` with an
+    // object, so each is read through the field it actually carries rather than
+    // through a shape invented here.
+    let McpCallOutcome::Result(list) = block_on(call_tool(
+        inputs(&map, "claude-desktop", "vault_list", &arguments),
+        &source,
+    )) else {
+        panic!("vault_list refused an empty argument object");
+    };
+    assert_eq!(list["structuredContent"][0]["folder"], "projects/");
+
+    let McpCallOutcome::Result(state) = block_on(call_tool(
+        inputs(&map, "claude-desktop", "vault_state", &arguments),
+        &source,
+    )) else {
+        panic!("vault_state refused an empty argument object");
+    };
+    assert_eq!(state["structuredContent"]["noteCount"], 1);
+    assert_eq!(state["structuredContent"]["unlocked"], true);
 }

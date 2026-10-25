@@ -6251,6 +6251,103 @@ pub(crate) async fn revoke_mcp_connection_with_dir(
     Ok(removed)
 }
 
+/// How stale a connection's `last_used_at` must be before a call refreshes it.
+///
+/// **A call does not cost a write.** `vault.prefs` is an encrypted blob and every
+/// write re-encodes it and bumps the nonce, so stamping on every `tools/call`
+/// would turn an agent's search loop into hundreds of vault writes. The CLI door
+/// refuses the same trade for the same reason (`cli_bridge/activity.rs` keeps its
+/// stamp in RAM). Five minutes is the width that keeps the Settings row honest to
+/// the minute for a connection in use, at one write per connection per window
+/// rather than one per call.
+pub const MCP_LAST_USED_WRITE_INTERVAL_SECS: u64 = 300;
+
+/// Whether a call at `now` should refresh a stamp of `previous`.
+///
+/// Pure, so the throttle is testable without a clock: `None` (never used) always
+/// writes, and a stamp in the FUTURE (a clock that moved backwards) always
+/// writes, because a row reporting "last used in 3 hours" is worse than a write.
+fn last_use_needs_stamp(previous: Option<u64>, now: u64) -> bool {
+    match previous {
+        None => true,
+        Some(previous) => now < previous || now - previous >= MCP_LAST_USED_WRITE_INTERVAL_SECS,
+    }
+}
+
+/// Record that `name` reached the door, at most once per
+/// [`MCP_LAST_USED_WRITE_INTERVAL_SECS`].
+///
+/// Returns whether a write happened. **Every failure is `Ok(false)`**, and that
+/// is deliberate rather than sloppy: this runs AFTER a tool call has already been
+/// answered, so a failure here costs one stale Settings row and must never turn a
+/// successful read into an error the agent reports to the user. The `event` line
+/// says which failure it was, without naming the connection.
+///
+/// A name with no grant is not an error either: revocation and this stamp race by
+/// design (a revoked connection's next call is refused, and a refusal still
+/// counts as reaching the door), and re-creating a grant in order to stamp it
+/// would be a write nobody asked for.
+pub async fn touch_mcp_connection_last_used_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    touch_mcp_connection_last_used_with_dir(&dir, state, hooks, name, io, host).await
+}
+
+/// Testable core of [`touch_mcp_connection_last_used_from_host`].
+pub(crate) async fn touch_mcp_connection_last_used_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    name: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(name) = normalize_connection_name(&name) else {
+        return Ok(false);
+    };
+    // The decision costs a READ, on every call, and that is the cheap half: the
+    // prefs blob is already in the page cache and the door reads it anyway to
+    // resolve the grant. The write is the part that is throttled.
+    let prefs = match prefs_read_with_dir(vault_dir, state, io).await {
+        Ok(prefs) => prefs,
+        Err(_) => return Ok(false),
+    };
+    let Some(grant) = prefs.mcp_connections.get(&name) else {
+        return Ok(false);
+    };
+    let now = host.now_unix_secs();
+    if !last_use_needs_stamp(grant.last_used_at, now) {
+        return Ok(false);
+    }
+    let mut wrote = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            if let Some(grant) = prefs.mcp_connections.get_mut(&name) {
+                grant.last_used_at = Some(now);
+                wrote = true;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    if wrote {
+        // No connection name in the line: it is user text (AS3 class), and the
+        // one fact a reader of the log needs is that the stamp moved.
+        tracing::debug!(event = "mcp_last_use_stamped");
+    }
+    Ok(wrote)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -10416,6 +10513,151 @@ mod tests {
                 .await,
                 Err(PrefsWriteError::InvalidValue)
             ));
+        });
+    }
+
+    // ---- the last-use stamp (the Settings row's "last used") ---------------
+
+    /// The throttle, as arithmetic rather than as a clock: a fresh stamp is not
+    /// rewritten, a stale one is, and a stamp from the future is.
+    #[test]
+    fn the_last_use_stamp_is_throttled_to_the_interval() {
+        assert!(
+            last_use_needs_stamp(None, 1_000),
+            "never used always stamps"
+        );
+        assert!(
+            !last_use_needs_stamp(Some(1_000), 1_299),
+            "a call inside the window must not cost a vault write"
+        );
+        assert!(
+            last_use_needs_stamp(Some(1_000), 1_300),
+            "the boundary is inclusive, so the row cannot sit a window behind"
+        );
+        assert!(
+            last_use_needs_stamp(Some(1_000), 999),
+            "a clock that moved backwards must not leave a row claiming a future use"
+        );
+    }
+
+    /// End to end: the first call writes, the second inside the window does not,
+    /// and the value the Settings row renders is the host clock at the write.
+    #[test]
+    fn a_used_connection_is_stamped_once_per_window() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3a).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                vec![String::from("Work/")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve");
+
+            host.set_now(1_765_432_160);
+            let stamped = touch_mcp_connection_last_used_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("stamp the first call");
+            assert!(stamped, "a never-used connection's first call writes");
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert_eq!(
+                stored.mcp_connections["claude-desktop"].last_used_at,
+                Some(1_765_432_160),
+                "the stamp is the host's clock, in the grant's own seconds unit"
+            );
+
+            // Inside the window: no write, and the stamp does not move.
+            host.set_now(1_765_432_200);
+            let stamped = touch_mcp_connection_last_used_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("second call");
+            assert!(!stamped, "a call inside the window costs no vault write");
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after the throttled call");
+            assert_eq!(
+                stored.mcp_connections["claude-desktop"].last_used_at,
+                Some(1_765_432_160)
+            );
+
+            // Past the window: it writes again.
+            host.set_now(1_765_432_161 + MCP_LAST_USED_WRITE_INTERVAL_SECS);
+            let stamped = touch_mcp_connection_last_used_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("third call");
+            assert!(stamped);
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after the window");
+            assert_eq!(
+                stored.mcp_connections["claude-desktop"].last_used_at,
+                Some(1_765_432_161 + MCP_LAST_USED_WRITE_INTERVAL_SECS)
+            );
+        });
+    }
+
+    /// A name with no grant is stamped nowhere: revocation and this stamp race by
+    /// design, and the conservative direction is to write nothing rather than to
+    /// recreate an approval.
+    #[test]
+    fn an_unapproved_connection_stamps_nothing() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3b).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            let stamped = touch_mcp_connection_last_used_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("never-approved"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("nothing to stamp is not an error");
+            assert!(!stamped);
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert!(
+                stored.mcp_connections.is_empty(),
+                "a stamp must never mint a grant"
+            );
         });
     }
 }

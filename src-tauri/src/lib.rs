@@ -362,6 +362,11 @@ pub fn run() {
         .plugin(plugins::themes::init())
         .plugin(plugins::member_names::init())
         .plugin(plugins::device_binding::init())
+        // external-mcp-connection (myne-md/myne#923): the two read-only
+        // commands behind Settings > AI > External access. Registered
+        // unconditionally; the section that calls them renders only where the
+        // `externalMcp` capability exists, which is desktop only.
+        .plugin(plugins::mcp::init())
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::sync::init())

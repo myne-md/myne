@@ -114,6 +114,8 @@ pub mod framing;
 pub mod gate;
 #[cfg(test)]
 mod logging_discipline;
+#[cfg(all(test, unix))]
+mod mcp_door_test;
 pub mod path_shim;
 pub mod plugin;
 pub mod rate_limit;

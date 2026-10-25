@@ -2020,6 +2020,18 @@ export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> 
 }
 
 /**
+ * Revoke one external MCP connection. Its next call is refused, and the others are
+ * untouched.
+ *
+ * Returns whether a grant was actually removed. Revoking a name with no grant is a
+ * successful no-op rather than an error: the user's intent ("this name may not
+ * call") is already true, and the row they clicked was simply stale.
+ */
+export async function revokeMcpConnection(name: string): Promise<boolean> {
+  return await writePref<boolean>("plugin:prefs|revoke_mcp_connection", { name });
+}
+
+/**
  * Set (or clear) the active workspace slot id (MYND-308) — pass the slot id, or
  * `null` to clear back to the host default workspace policy. Disk-first; bumps
  * the prefs nonce on success so open consumers re-read disk truth. Same contract
