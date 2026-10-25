@@ -61,6 +61,27 @@ export interface McpExternalAccessView {
   noteCount: number;
 }
 
+/** What a candidate grant would cover. Mirrors `McpGrantPreview`. */
+export interface McpGrantPreview {
+  noteCount: number;
+  folderCount: number;
+  /**
+   * The candidate set itself, canonical and sorted: what the two counts describe
+   * and what the approval writes.
+   *
+   * It travels with the counts so the exclusion rule has ONE implementation (the
+   * host's): re-deriving the set here would be a second opinion about scope, and
+   * the number the user approves would eventually stop being the number counted.
+   */
+  folders: string[];
+  /**
+   * Exclusions that named a folder the vault actually has. An exclusion naming
+   * nothing changes nothing, so counting it would claim a decision the user did
+   * not make.
+   */
+  excludedCount: number;
+}
+
 /**
  * What a fresh render shows before the host answers: no connections, no folders.
  *
@@ -93,5 +114,28 @@ export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
     })),
     folders: wire?.folders ?? [],
     noteCount: wire?.noteCount ?? 0,
+  };
+}
+
+/**
+ * What the vault would share if the user approved now, with `excluded` taken out.
+ *
+ * Called on the approval screen as the exclusions change, so the number the user
+ * approves is the number the host resolved rather than one the dialog assembled.
+ * Excluding a folder also takes what is inside it, and the host applies that rule
+ * while building the candidate set, so this is the one place the exclusion's
+ * meaning is defined.
+ */
+export async function readMcpGrantPreview(
+  excluded: readonly string[],
+): Promise<McpGrantPreview> {
+  const wire = await invoke<McpGrantPreview>("plugin:mcp|mcp_grant_preview", {
+    excluded: [...excluded],
+  });
+  return {
+    noteCount: wire?.noteCount ?? 0,
+    folderCount: wire?.folderCount ?? 0,
+    excludedCount: wire?.excludedCount ?? 0,
+    folders: wire?.folders ?? [],
   };
 }
