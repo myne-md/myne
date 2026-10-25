@@ -53,6 +53,14 @@
 // keep resolving. The `init()` wiring stays desktop-side.
 pub use myne_core::plugins::prefs::{commands, error};
 
+/// The manifest export command. It lives here rather than in `myne-core`
+/// because it writes a FILE at a user-chosen path, and the core crate's
+/// filesystem ratchet (`scripts/check-core-io-seam.mjs`) exists to keep native
+/// IO on this side of the seam. The encode it performs is the shared
+/// `protocol::canonical_encode_saved_view`, so it adds no second opinion about
+/// the bytes.
+mod export;
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
@@ -158,6 +166,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // sync-protocol.md §10.2). Needs its own `allow-` entry in
             // permissions/prefs/default.toml, or it is a security regression.
             commands::set_view_approval,
+            // view-manifests: export ONE saved view as a `.myneview` manifest to
+            // a user-chosen path. Needs its own `allow-` entry in
+            // permissions/prefs/default.toml like every command above.
+            export::export_view_manifest,
         ])
         .build()
 }

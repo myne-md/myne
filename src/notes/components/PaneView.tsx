@@ -124,7 +124,7 @@ import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-quer
 import { TITLE_FIELD_TESTID } from "@myne/editor/decorations/frontmatter";
 import { resolveCoverAttachmentId } from "../views/cardsView";
 import { setNoteCover } from "../setNoteCover";
-import { upsertSavedView } from "../../lib/prefs";
+import { saveLocalViewEdit } from "../views/saveViewEdit";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { Toast } from "../../components/Toast";
@@ -2700,9 +2700,16 @@ function ViewHost({ viewId }: { viewId: string }) {
           // hand-copied its two lines.
           await settleFrontmatterWrite(sidebar, noteId as NoteId);
           // First cover on a view with no image property → adopt `cover` as the
-          // view's cover property so the card render picks it up.
+          // view's cover property so the card render picks it up. This is a LOCAL
+          // EDIT like any other (view-manifests task 8), so it goes through the
+          // one save helper: the version moves forward with the definition, and
+          // the approval of the version this device is already showing rides
+          // along in the same write.
           if (choice !== null && def !== null && def.image === undefined) {
-            await upsertSavedView({ ...def, image: coverPropertyKey });
+            // `approved` is this device's verdict on the definition in hand,
+            // already read by the hook that resolved it, so the adoption does not
+            // open a second prefs read to ask the same question.
+            await saveLocalViewEdit(def, { ...def, image: coverPropertyKey }, approved);
           }
         } catch (err) {
           // The two NEW rejection classes are constructed in the WebView and
@@ -2724,7 +2731,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         }
       })();
     },
-    [coverNoteId, coverPropertyKey, def, sidebar],
+    [coverNoteId, coverPropertyKey, def, sidebar, approved],
   );
   // The non-mutating card context menu (task 8) - the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy

@@ -185,6 +185,11 @@ export default defineConfig(async () => ({
       // `../lib/prefs` import is a TYPE import, erased at build), which is what
       // makes them safe to alias out of the Tauri-coupled `../src/notes/`.
       { find: /^@myne\/graph-overlay$/, replacement: sib("../src/notes/graphOverlay.ts") },
+      // The saved-view version rule (view-manifests). One implementation shared
+      // with the desktop: a mobile edit that changed a view's definition must
+      // move its version, or the desktop's approval keeps naming bytes that are
+      // no longer the ones it approved.
+      { find: /^@myne\/view-version$/, replacement: sib("../src/notes/views/viewVersion.ts") },
       { find: /^@myne\/graph-color-groups$/, replacement: sib("../src/notes/graphColorGroups.ts") },
       { find: /^@myne\/task-panel$/, replacement: sib("../src/notes/components/TaskListPanel.tsx") },
       { find: /^@myne\/task-filters$/, replacement: sib("../src/notes/taskFilters.ts") },
