@@ -85,6 +85,34 @@ pub fn load() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
     imp::load()
 }
 
+/// Read the device key for a call site that has a phrase path to fall back on.
+///
+/// `None` here means "sign with the person key instead", which is a legitimate state
+/// (rung 4) when the platform has no rung: `Unsupported` is therefore silent. The other
+/// two arm silently as well, and that was wrong: a keychain refusal or a corrupted item
+/// collapsed into the same `None` as an unsupported platform, so a device whose key had
+/// gone missing signed `0x02` heads forever with nothing in the log saying why, and the
+/// `Corrupt`/absent distinction this module deliberately draws was discarded at the very
+/// call sites that should act on it. They now warn, naming the site, and still fall back:
+/// refusing outright would strand a device whose keychain is merely locked.
+pub fn load_for_fallback(site: &'static str) -> Option<DeviceKeyPair> {
+    match load() {
+        Ok(pair) => pair,
+        Err(DeviceKeyStoreError::Unsupported) => None,
+        Err(err) => {
+            tracing::warn!(
+                stage = "device_identity",
+                event = "device_key_unavailable",
+                site,
+                reason = ?err,
+                "a device key exists on this platform but could not be read, so this \
+                 device signs with the person key (0x02) until it can be"
+            );
+            None
+        }
+    }
+}
+
 /// Read the device key, minting one on first use.
 ///
 /// Minting writes the item before it returns, so a caller that receives `Ok` holds a

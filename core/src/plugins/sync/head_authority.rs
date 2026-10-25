@@ -4,10 +4,10 @@
 //!
 //! Three formats exist, and a vault accepts the ones its own history can contain:
 //!
-//! * `0x01` — the `root_key` HMAC of a `NTV5` single-user vault;
-//! * `0x02` — the PERSON-key signature of a B2B vault, which is what every device
+//! * `0x01`: the `root_key` HMAC of a `NTV5` single-user vault;
+//! * `0x02`: the PERSON-key signature of a B2B vault, which is what every device
 //!   authors before it holds a device key;
-//! * `0x03` — the DEVICE-key signature (`decisions/protocol/0733`), authored once this
+//! * `0x03`: the DEVICE-key signature (`decisions/protocol/0733`), authored once this
 //!   device has a device key and a binding row that publishes its public halves.
 //!
 //! **A reader accepts both signed formats regardless of what it authors.** That is not

@@ -3664,6 +3664,21 @@ themselves yet, and a device re-signs its own row once, when it first holds a de
 cannot bump a version (which decides the merge) or flip a tombstone (which would
 resurrect a removed device).
 
+**The `format_version` byte is derived from the ROWS, and that rule is a downgrade rule
+rather than a tidiness one** (`format_for_map`; the answer `decisions/protocol/0733`
+gives). A store whose rows all still carry `0x01` signatures is written back as a `0x01`
+blob, so a vault that has adopted no device key keeps writing blobs the previous release
+can read, and a mixed-version fleet therefore breaks nothing by being mixed. The byte
+moves to `0x02` on the FIRST device-key adoption in that vault, and from that moment a
+build that predates device keys rejects the whole store as
+`DeviceBindingFormatUnsupported`. Stated plainly because the alternative is a surprise:
+downgrading a client after any device of that vault has adopted a key costs the binding
+store, not a re-read. It is acceptable because the store is derived from rows the peers
+still hold and the next sync re-fetches them, and because the blast radius of the
+downgrade is one vault at a time rather than the fleet. Nothing on a sync path assumes a
+peer can read `0x02`: every blob this family writes is read back through the same
+resolver, and a peer that cannot read it says so instead of merging a guess.
+
 A live row is verified on read against the public half of the person the row NAMES,
 which the owner-signed roster already carries, and the check additionally requires that
 the named fingerprint equal the verifying key's own fingerprint. That extra requirement
