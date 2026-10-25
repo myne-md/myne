@@ -2721,6 +2721,7 @@
         "apply": "Set on {{count}}",
         "field": "Field",
         "notRestorableLine": "{{title}} was written but has no snapshot from this action, so it cannot be restored from here.",
+        "nothingToRestore": "These notes keep their own change history, so this action has no restore point. The values it wrote are still there.",
         "refusedCannotDecrypt": "it could not be decrypted",
         "refusedFieldChanged": "that field changed somewhere else since this view was read",
         "refusedFieldNotDeclared": "the view does not declare that field",

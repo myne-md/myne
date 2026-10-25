@@ -435,6 +435,21 @@ export function TableView({
   }, [busy]);
 
   const restorable = lastBulkAction();
+  // **Only offer the restore when it can restore something.** A note in the
+  // current on-disk format is a CRDT note, whose change graph IS its history, so
+  // `note_set_field` captures no pre-write snapshot for it and every entry in the
+  // journal carries `snapshotId: null`. Rendering the button anyway offered an
+  // action that could only answer "Restored 0." on every vault created today,
+  // which is the offer-without-a-capability shape the design canon rules out.
+  const restoreAvailable =
+    restorable !== null && restorable.notes.some((n) => n.snapshotId !== null);
+  // ...and when it is absent, the report says WHY rather than leaving the reader
+  // to wonder where the button went.
+  const nothingToRestore =
+    outcome !== null &&
+    restored === null &&
+    outcome.writtenCount > 0 &&
+    !restoreAvailable;
 
   // Row styles depend only on the (stable) template + interactivity, so build
   // them once rather than per rendered row.
@@ -558,6 +573,11 @@ export function TableView({
           {t("notes.views.bulk.skippedListValues", { count: listSkipped.length })}
         </p>
       )}
+      {nothingToRestore && (
+        <p style={REPORT_LINE_STYLE} data-testid="view.bulk-nothing-to-restore">
+          {t("notes.views.bulk.nothingToRestore")}
+        </p>
+      )}
       {restored !== null && (
         <p style={REPORT_LINE_STYLE} data-testid="view.bulk-restored">
           {t("notes.views.bulk.restored", { count: restored.restoredCount })}
@@ -609,7 +629,7 @@ export function TableView({
           >
             {t("notes.views.bulk.apply", { count: selected.size })}
           </Button>
-          {restorable !== null && restored === null && (
+          {restoreAvailable && restored === null && (
             <Button
               variant="secondary"
               data-testid="view.bulk-restore"
