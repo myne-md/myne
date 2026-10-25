@@ -117,7 +117,7 @@ export interface SavedView {
   id: string;
   /** User-visible view name. */
   name: string;
-  /** Render type (`table` / `cards` / `list`). */
+  /** Render type (`table` / `cards` / `list` / `board`). */
   view_type: ViewType;
   /** The filter AST (an `{ kind: "all" }` leaf for an unfiltered view). */
   filters: FilterNode;
