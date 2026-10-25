@@ -6929,6 +6929,7 @@ export const ROSTER = Object.freeze([
       "e2e/cards-cover-picker.e2e.ts",
       "e2e/search-query-operators.e2e.ts",
       "e2e/view-manifests.e2e.ts",
+      "e2e/board-view.e2e.ts",
     ],
     manual: [
       {
