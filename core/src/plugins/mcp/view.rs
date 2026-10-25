@@ -92,7 +92,7 @@ pub struct McpExternalAccessView {
 }
 
 /// What a candidate grant would cover, before it is written.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct McpGrantPreview {
     /// Live notes inside the candidate set.
@@ -103,6 +103,15 @@ pub struct McpGrantPreview {
     /// exclusion naming a folder the vault does not have changes nothing, and
     /// counting it would tell the user they had excluded something they had not.
     pub excluded_count: usize,
+    /// The candidate set itself, canonical and sorted: exactly the folders the
+    /// counts above describe, and exactly what the approval writes.
+    ///
+    /// **It travels with the counts on purpose.** The exclusion rule (a folder
+    /// takes its subtree with it, the root takes only itself) is decided here, so
+    /// a caller that re-derived the set from the same inputs would be a second
+    /// implementation of the rule, and the number approved would eventually stop
+    /// being the number counted.
+    pub folders: Vec<String>,
 }
 
 /// The section's view: every grant, resolved against the vault as it is now.
@@ -195,6 +204,7 @@ pub fn grant_preview(
             .count(),
         folder_count: shared.len(),
         excluded_count: excluded_keys.len(),
+        folders: shared.into_iter().collect(),
     }
 }
 

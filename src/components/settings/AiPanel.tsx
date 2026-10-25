@@ -594,10 +594,14 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // **Only the provider consent is a dialog now** (myne-md/myne#885): the model
   // catalogue left its `ModalShell` for an inline table, so there is no second
   // dialog to gate the shell's Esc on.
+  // The external-access approval dialog is a second modal of ours, so the gate is
+  // the OR of the two. Its own effect reports into the same state, and both reset
+  // on unmount because the shell's flag outlives this panel.
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   useEffect(() => {
-    onDialogOpenChange?.(pendingProvider !== null);
+    onDialogOpenChange?.(pendingProvider !== null || mcpDialogOpen);
     return () => onDialogOpenChange?.(false);
-  }, [pendingProvider, onDialogOpenChange]);
+  }, [pendingProvider, mcpDialogOpen, onDialogOpenChange]);
   // The provider's own catalogue, and the three states it can be in. `null` is
   // "not asked yet" and is NOT the same as `[]` ("asked, and the provider
   // published none") — collapsing them would tell the user a provider has no
@@ -1891,6 +1895,7 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             void setCliEnabled(next);
           }}
           onShowToast={onShowToast}
+          onDialogOpenChange={setMcpDialogOpen}
         />
       )}
       </SettingsTopicPanel>

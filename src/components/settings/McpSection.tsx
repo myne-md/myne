@@ -47,12 +47,13 @@
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
-import { revokeMcpConnection } from "../../lib/prefs";
+import { revokeMcpConnection, setMcpConnectionGrant } from "../../lib/prefs";
 import {
   readMcpExternalAccess,
   type McpConnectionView,
   type McpExternalAccessView,
 } from "../../lib/mcp-access";
+import { McpGrantDialog } from "./McpGrantDialog";
 import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
@@ -124,6 +125,15 @@ export interface McpSectionProps {
   onSetEnabled: (next: boolean) => void;
   /** Panel toast surface (wired by `AiPanel`; omitted in dev and in stories). */
   onShowToast?: (message: string) => void;
+  /**
+   * Raised while the approval dialog is up.
+   *
+   * The Settings shell and `ModalShell` both listen for Esc on `window`, so an
+   * ungated shell closes itself and the child dialog on one press. The shell uses
+   * this to stand down while the dialog owns the key, the same contract
+   * `AiPanel`'s provider consent uses.
+   */
+  onDialogOpenChange?: (open: boolean) => void;
 }
 
 /** The config line a client pastes, naming the connection this row approves. */
@@ -137,12 +147,18 @@ export function McpSection({
   enabled,
   onSetEnabled,
   onShowToast,
+  onDialogOpenChange,
 }: McpSectionProps) {
   const { t } = useTranslation();
   const [view, setView] = useState<McpExternalAccessView | null>(null);
   const [failed, setFailed] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [snippetFor, setSnippetFor] = useState<string | null>(null);
+  // `null` = closed, `"new"` = declaring a connection, a row = extending one.
+  const [approving, setApproving] = useState<McpConnectionView | "new" | null>(
+    null,
+  );
+  const [extending, setExtending] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     let alive = true;
@@ -176,6 +192,53 @@ export function McpSection({
       setRevoking(null);
       // Re-read whatever happened: on success the row is gone, on failure the row
       // is unchanged, and the host is the only authority for both.
+      reload();
+    }
+  };
+
+  // Keep the shell's Esc gate in step with the dialog, and clear it on unmount:
+  // the shell's flag outlives this section, so an unmount with the dialog open
+  // would leave Esc gated for the rest of the session.
+  useEffect(() => {
+    onDialogOpenChange?.(approving !== null);
+    return () => onDialogOpenChange?.(false);
+  }, [approving, onDialogOpenChange]);
+
+  const approve = async (name: string, folders: string[]): Promise<boolean> => {
+    let accepted = false;
+    try {
+      accepted = await setMcpConnectionGrant(name, folders);
+    } catch {
+      onShowToast?.(t("settings.ai.externalAccess.grantFailed"));
+      return false;
+    }
+    if (!accepted) return false;
+    setApproving(null);
+    reload();
+    return true;
+  };
+
+  /**
+   * Extend one grant by the folders the delta row reported.
+   *
+   * The stored set keeps what the connection already held, INCLUDING granted
+   * paths whose folder has gone: extending a grant must never quietly remove an
+   * approval, and a folder that comes back is then still covered. Removal is the
+   * revoke, which is a different act with its own button.
+   */
+  const addDelta = async (row: McpConnectionView) => {
+    setExtending(row.name);
+    try {
+      const accepted = await setMcpConnectionGrant(row.name, [
+        ...row.readFolders,
+        ...row.missingFolders,
+        ...row.deltaFolders,
+      ]);
+      if (!accepted) onShowToast?.(t("settings.ai.externalAccess.grantRefused"));
+    } catch {
+      onShowToast?.(t("settings.ai.externalAccess.grantFailed"));
+    } finally {
+      setExtending(null);
       reload();
     }
   };
@@ -242,6 +305,30 @@ export function McpSection({
         </p>
       )}
 
+      {enabled && (
+        <div style={ACTIONS_STYLE} data-testid="settings.mcp-add-row">
+          <Button
+            variant="secondary"
+            onClick={() => setApproving("new")}
+            data-testid="settings.mcp-add"
+          >
+            {t("settings.ai.externalAccess.addConnection")}
+          </Button>
+        </div>
+      )}
+
+      <McpGrantDialog
+        open={approving !== null}
+        connection={
+          approving === null || approving === "new"
+            ? null
+            : { name: approving.name, folders: approving.readFolders }
+        }
+        folders={view?.folders ?? []}
+        onApprove={approve}
+        onClose={() => setApproving(null)}
+      />
+
       {!failed && view !== null && view.connections.length > 0 && (
         <div
           style={BLOCK_STYLE}
@@ -295,6 +382,37 @@ export function McpSection({
                     count: row.missingFolders.length,
                   })}
                 </p>
+              )}
+
+              {/* The delta row: the grant is a frozen set, so a folder created
+                  after approval is outside it. Only rendered when there IS a
+                  delta, and its action writes exactly the reported folders, so
+                  keeping the grant current is one click rather than an editing
+                  exercise. */}
+              {row.deltaFolders.length > 0 && (
+                <div
+                  style={BLOCK_STYLE}
+                  data-testid="settings.mcp-delta"
+                  data-delta-count={String(row.deltaFolders.length)}
+                >
+                  <p style={HELPER_STYLE}>
+                    {t("settings.ai.externalAccess.delta", {
+                      count: row.deltaFolders.length,
+                    })}
+                  </p>
+                  <div style={ACTIONS_STYLE}>
+                    <Button
+                      variant="secondary"
+                      disabled={extending !== null}
+                      onClick={() => void addDelta(row)}
+                      data-testid="settings.mcp-delta-add"
+                    >
+                      {t("settings.ai.externalAccess.deltaAdd", {
+                        count: row.deltaFolders.length,
+                      })}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {snippetFor === row.name && (

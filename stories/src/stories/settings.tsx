@@ -48,6 +48,7 @@ import { HotkeysPanel } from "@app/components/settings/HotkeysPanel";
 import { LanguageSelect } from "@app/components/settings/LanguageSelect";
 import { LineNumbersSettings } from "@app/components/settings/LineNumbersSettings";
 import { MemorySection } from "@app/components/settings/MemorySection";
+import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
 import { McpSection } from "@app/components/settings/McpSection";
 import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
@@ -173,7 +174,7 @@ const MCP_FIXTURE: Fixture = {
           approvedAt: 1_761_000_000,
           lastUsedAt: 1_761_000_600,
           noteCount: 412,
-          deltaFolders: [],
+          deltaFolders: ["Projects/New/"],
         },
         {
           name: "lm-studio",
@@ -193,6 +194,7 @@ const MCP_FIXTURE: Fixture = {
       noteCount: 512,
       folderCount: 5,
       excludedCount: 0,
+      folders: ["", "Archive/", "Projects/", "Projects/Deep/", "Projects/New/", "Work/"],
     }),
   },
 };
@@ -542,6 +544,36 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           enabled
           onSetEnabled={action("onSetEnabled")}
           onShowToast={action("onShowToast")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/mcpgrantdialog/default",
+    group: "settings",
+    surface: "McpGrantDialog",
+    state: "default",
+    description:
+      "The one-time approval screen for an external MCP connection: the counts the host resolved (notes, folders, exclusions) rather than a description of the rule, the folder exclusions chosen before approving, and the two bounds stated plainly. The set is frozen at approval, so a folder created later starts outside it; what the connected tool does with what it reads is outside Myne.",
+    tags: [
+      "settings",
+      "ai",
+      "mcp",
+      "external-access",
+      "consent",
+      "scope",
+      "exclusions",
+      "frozen-snapshot",
+    ],
+    fixture: MCP_FIXTURE,
+    render: () => (
+      <Frame>
+        <McpGrantDialog
+          open
+          connection={null}
+          folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
+          onApprove={async () => true}
+          onClose={action("onClose")}
         />
       </Frame>
     ),

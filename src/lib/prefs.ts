@@ -2020,6 +2020,32 @@ export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> 
 }
 
 /**
+ * Approve (or re-approve) one external MCP connection, freezing `folders` as what
+ * it may read (external-mcp-connection, myne-md/myne#923).
+ *
+ * Returns whether the grant was ACCEPTED. `false` is not an error: §9.5.4
+ * requires an over-budget addition to be declined rather than failing the whole
+ * write, so the caller says "this grant would not fit" and the stored grant is
+ * left exactly as it was.
+ *
+ * **The folder list is the whole scope**, so this is the one call that decides
+ * what an external program can read. The host canonicalizes and sorts it, stamps
+ * `approved_at` from its own clock, keeps a re-approval's `last_used_at`, and
+ * refuses an empty name. Nothing here can express "everywhere": a folder the user
+ * did not name is not in the set, and a folder created afterwards stays outside
+ * it until the user adds it again (the delta row on the section is that prompt).
+ */
+export async function setMcpConnectionGrant(
+  name: string,
+  folders: readonly string[],
+): Promise<boolean> {
+  return await writePref<boolean>("plugin:prefs|set_mcp_connection_grant", {
+    name,
+    folders: [...folders],
+  });
+}
+
+/**
  * Revoke one external MCP connection. Its next call is refused, and the others are
  * untouched.
  *

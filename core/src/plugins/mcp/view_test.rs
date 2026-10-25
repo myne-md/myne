@@ -177,6 +177,12 @@ fn the_preview_counts_every_folder_until_one_is_excluded() {
     assert_eq!(narrowed.folder_count, 1);
     assert_eq!(narrowed.note_count, 1);
     assert_eq!(narrowed.excluded_count, 1);
+    assert_eq!(
+        narrowed.folders,
+        strings(&["inbox/"]),
+        "the preview carries the SET its counts describe, so the approval writes \
+         the number the user read rather than re-deriving it"
+    );
 }
 
 #[test]
@@ -193,6 +199,7 @@ fn excluding_a_folder_takes_what_is_inside_it_too() {
     let preview = grant_preview(&prefs, &records, &strings(&["Projects"]));
     assert_eq!(preview.folder_count, 1, "only Inbox is left");
     assert_eq!(preview.note_count, 1);
+    assert_eq!(preview.folders, strings(&["inbox/"]));
     assert_eq!(
         preview.excluded_count, 1,
         "the parent counts once even though it took a child with it"
@@ -208,6 +215,7 @@ fn excluding_the_root_takes_the_root_notes_and_not_the_vault() {
     let prefs = PrefsView::default();
     let preview = grant_preview(&prefs, &records, &strings(&[""]));
     assert_eq!(preview.folder_count, 1, "Projects/ is still shared");
+    assert_eq!(preview.folders, strings(&["projects/"]));
     assert_eq!(preview.note_count, 1, "the root note is not");
     assert_eq!(preview.excluded_count, 1);
 }
