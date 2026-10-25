@@ -25,7 +25,7 @@
     "scripts/check-prefs-parity.mjs."
   ],
   "states": {
-    "revoke_mcp_connection": "never-bound|never-bound",
+    "revoke_mcp_connection": "called|never-bound",
     "set_active_workspace": "called|bound-no-caller",
     "set_auto_tag_enabled": "called|never-bound",
     "set_bar_items_order": "called|bound-no-caller",
@@ -55,7 +55,7 @@
     "set_view_approval": "called|never-bound"
   },
   "oneSided": {
-    "revoke_mcp_connection": "Desktop and mobile both LACK a caller today: the external-access Settings surface is a later task of the same feature (the section, the grant screen and their search-index entries), so these two writers exist ahead of their UI. The gap is deliberate and temporary rather than a defect: mobile is structurally Unsupported for external access (no shell from which a sidecar could be installed, and its capability set declares the surface absent rather than disabled), while desktop authors the grant once the section ships. Neither command is reachable from a WebView that has not been given the section, so nothing ships inert: the ACL is fail-closed and the commands are the host half of an approval screen the user must open.",
+    "revoke_mcp_connection": "Desktop calls it; mobile has nothing to call it from. The caller is the external-access section's per-connection Revoke (`src/components/settings/McpSection.tsx`, via `src/lib/prefs.ts`), which renders only under the `externalMcp` capability: mobile's descriptor answers that one false, because `myne-mcp` is a desktop sidecar installed on a PATH and a phone has neither a shell nor a PATH. The gap is therefore structural rather than temporary, and the verdict stays one-sided on purpose. Note the state columns: desktop went `never-bound` -> `called` when the section shipped, and the row's remaining absence is mobile's.",
     "set_active_workspace": "Desktop-shaped by nature, expected to stay desktop-only: workspaces are a desktop bottom-bar surface, and no mobile screen reads or writes the active workspace. The binding exists on mobile only so the twin prefs modules keep identical export names (myne-md/myne#486). Recorded rather than deleted for that reason, and recorded here so a future parity audit does not re-open it as a gap.",
     "set_auto_tag_enabled": "Whole feature absent on mobile: automatic tag suggestion has no mobile surface and no mobile reader, so the phone neither honours nor can set it. The remedy is a feature rather than a row, and it stays desktop-only until that feature is decided. Not a defect this branch introduces or can close.",
     "set_bar_items_order": "Desktop-shaped by nature: the bottom-bar reorder surface is desktop-only, since resolveBarOrder and reorderByDrop have no mobile caller, so the order is default-only on this client. Twin-parity binding, already recorded as dead in scripts/ipc-binding-callers.json for the same reason.",

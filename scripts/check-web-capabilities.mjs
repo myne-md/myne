@@ -210,6 +210,13 @@ const CAPABILITY_BACKING = {
   // NOT here: they write ordinary `vault.prefs` fields that sync to every
   // client, and a desktop that later reads them must see what the user chose.
   cliAccess: ["cli-bridge"],
+  // external-mcp-connection (myne-md/myne#923): the whole `mcp` plugin, which
+  // holds the section's two READS. The grant writers are `prefs` commands that
+  // stay dispatched here (a synced vault's prefs fields are ordinary content on
+  // this client), so this names the read surface rather than the whole feature:
+  // a page cannot approve what it cannot describe, and the section that would
+  // call these renders only where the capability exists.
+  externalMcp: ["mcp"],
   // myne-md/myne#411: the whole `vault-label` plugin, meaning the flag, the
   // setter that performs the erase, and the keychain probe. All three serve the locked
   // picker, which `check-web-screens.mjs` records as `excluded` on web, and all

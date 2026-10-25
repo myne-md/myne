@@ -267,6 +267,18 @@ fn main() {
             ]),
         )
         .plugin(
+            "mcp",
+            // external-mcp-connection (myne-md/myne#923): the two READ commands
+            // behind Settings > AI > External access. Declared here for the same
+            // reason as every other arm — without it `permissions/mcp/`
+            // flattens into `__app-acl__` and the grants never match
+            // `plugin:mcp|<cmd>`. Keep it lock-stepped with
+            // `permissions/mcp/default.toml`; neither command writes, so this
+            // namespace deliberately carries no mutating permission.
+            tauri_build::InlinedPlugin::new()
+                .commands(&["mcp_external_access", "mcp_grant_preview"]),
+        )
+        .plugin(
             "device-binding",
             // The B2B device-to-person binding commands over the encrypted
             // `vault.device-bindings` (`MYU5`) singleton, which is group-tier sealed

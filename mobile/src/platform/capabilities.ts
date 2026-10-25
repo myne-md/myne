@@ -138,6 +138,12 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   // Driving the running desktop over its local command socket. The `myne` CLI is
   // a desktop sidecar; no mobile equivalent exists.
   cliAccess: false,
+  // external-mcp-connection (myne-md/myne#923). `myne-mcp` is a stdio binary
+  // installed on a desktop's PATH; a phone has no shell and no PATH, so no MCP
+  // client could launch it here. The section is omitted rather than disabled,
+  // which is the PRD's own verdict for this client ("a capability omission, not
+  // a disabled control").
+  externalMcp: false,
   // Showing a vault's name while the vault is locked, from the sealed label
   // store.
   lockedVaultNames: true,

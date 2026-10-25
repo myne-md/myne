@@ -108,6 +108,10 @@ const V = {
     "Never rendered: the panel is a `developer`-group rail entry carrying `capability: \"cliAccess\"`, which is absent on web, so the rail drops it and nothing here ever mounts. It ships in the bundle (it is the composition root for the CLI block, one small file inside the settings chunk that does ship) and the block it renders carries the same capability gate. Moved out of PrivacyPanel by `decisions/ui/0678`; the web verdict is unchanged by the move, since the capability gate was already what kept the terminal surface off this client.",
   ],
   "src/components/settings/ControlBlock.tsx": ["ported", "Layout primitive."],
+  "src/components/settings/McpSection.tsx": [
+    "adapted",
+    "Never mounted: `AiPanel` renders it under `has(\"externalMcp\")`, which is absent on web, so the section is omitted rather than greyed (`decisions.md` 2026-07-26). It ships in the bundle and its two reads are `mcp_external_access` / `mcp_grant_preview`, which the wasm dispatcher refuses for the whole `mcp` plugin, so even a hand-reached invoke answers a typed refusal rather than nothing.",
+  ],
   "src/components/settings/HelperDisclosure.tsx": [
     "ported",
     "The question mark beside a setting's title and the popover it opens (myne-md/myne#885). No host call of any kind: it renders the copy the row's own panel already passed it, and the only outside contact is `IconButton`. It is mounted wherever a `SettingRow` carries an `explanation`, so it is reachable on web exactly where the rows that use it are.",
@@ -352,6 +356,10 @@ const V = {
   "src/lib/cli-access.ts": [
     "typed-unsupported",
     "The CLI door's session-state read. Reachable — the module ships and the binding is one `invoke` — and `cli-bridge` is `Unsupported` in the dispatcher, so a call that arrives by a path gating did not cover gets a typed refusal rather than a hang. No web path calls it: the only caller is the capability-gated Settings block.",
+  ],
+  "src/lib/mcp-access.ts": [
+    "typed-unsupported",
+    "The external-access section's two reads (`mcp_external_access` and `mcp_grant_preview`) plus their wire types. Reachable — the module ships and each binding is one `invoke` — and the whole `mcp` plugin is `Unsupported` in the dispatcher, so a call arriving by a path gating did not cover gets a typed refusal. No web path calls it: the only caller is `McpSection`, which `AiPanel` renders under `has(\"externalMcp\")`, absent on this client.",
   ],
   "src/lib/tor-routing.ts": [
     "typed-unsupported",

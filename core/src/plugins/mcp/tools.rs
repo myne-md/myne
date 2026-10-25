@@ -37,12 +37,14 @@
 //! long notes costs the caller a bounded number of bytes per call.
 
 use super::error::McpToolError;
-use super::scope::{folder_key_of, ConnectionScope, FolderCount};
+use super::scope::{existing_folders, folder_key_of, resolve_scope, ConnectionScope, FolderCount};
 use crate::folder_key::canonical_folder;
 use crate::plugins::agent::frontmatter::folder_of;
 use crate::plugins::agent::tools::SearchHit;
 use crate::plugins::vault_indices::state::NoteRecord;
+use protocol::McpConnectionGrant;
 use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
 /// Search results per call when the caller does not ask for a number.
@@ -211,6 +213,16 @@ pub async fn note_search(
         let Some(record) = records.get(&hit.note_id) else {
             continue;
         };
+        // The liveness rule every note surface in the app applies, at the one
+        // place a ranked hit becomes a row. A trashed, tombstoned, archived,
+        // template or conflict note is not part of the working set, so it is
+        // EXCLUDED here rather than refused — the set-addressed half of the same
+        // rule `note_read` applies to the one note it was asked for. The index
+        // carries these notes (its producer indexes every `.myn`), so without
+        // this a caller could search a note the sidebar would not show.
+        if !record.live {
+            continue;
+        }
         let key = folder_key_of(record);
         if !scope.covers_key(&key) {
             continue;
@@ -266,6 +278,17 @@ pub async fn note_read(
             note_id: note_id.to_string(),
         });
     };
+    // Liveness BEFORE scope, and answered as [`McpToolError::UnknownNote`]
+    // rather than as `out_of_scope`: a trashed, tombstoned or template note is
+    // not a note the user is working with, so it must be indistinguishable from
+    // one that does not exist. That is the exact pair the CLI door collapses for
+    // the same case (`ShowOutcome::NotFound`), and naming it here instead would
+    // tell a caller that a note it may not read nevertheless exists.
+    if !record.live {
+        return Err(McpToolError::UnknownNote {
+            note_id: note_id.to_string(),
+        });
+    }
     if !scope.covers_key(&folder_key_of(record)) {
         return Err(McpToolError::OutOfScopeNote {
             note_id: note_id.to_string(),
@@ -315,6 +338,254 @@ pub async fn vault_state(
         note_count: scope.note_count(&records),
         outside_folder_count: scope.delta().len(),
         missing_folder_count: scope.missing().len(),
+    })
+}
+
+/// The four verbs this build implements, as a closed set.
+///
+/// Declared here rather than imported from the shim's compiled catalog, because
+/// the two crates share no type by design (`mcp/` depends on neither
+/// `myne-core` nor `myne-desktop`), so a tool name is a wire contract with
+/// THREE holders: this enum, `mcp/src/tool_list.rs`, and the callers that read
+/// one and call the other. A verb the catalog offers and this build does not
+/// implement answers [`McpCallOutcome::UnknownTool`], which the door reports as
+/// version skew rather than silently accepting or inventing a scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolName {
+    NoteSearch,
+    NoteRead,
+    VaultList,
+    VaultState,
+}
+
+impl ToolName {
+    /// The verb a caller named, or `None` if this build does not implement it.
+    ///
+    /// The five write verbs the catalog also offers (`note_create`,
+    /// `note_append`, `note_set_field`, `note_move`, `note_edit`) land here as
+    /// their own tasks. Until then they are `None`, which is the honest answer:
+    /// a shim newer than its host is version skew, not a scope decision, and
+    /// `invalid_request` is the kind this door already uses for version skew.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        match name {
+            "note_search" => Some(Self::NoteSearch),
+            "note_read" => Some(Self::NoteRead),
+            "vault_list" => Some(Self::VaultList),
+            "vault_state" => Some(Self::VaultState),
+            _ => None,
+        }
+    }
+
+    /// The wire spelling of this verb.
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::NoteSearch => "note_search",
+            Self::NoteRead => "note_read",
+            Self::VaultList => "vault_list",
+            Self::VaultState => "vault_state",
+        }
+    }
+}
+
+/// What one `tools/call` decided, before the door puts it on the wire.
+///
+/// The door's reply envelope is a separate thing on purpose (`{"ok":true,
+/// "result":<CallToolResult>}` / `{"ok":false,"error":{kind,message}}`): this
+/// enum is what the HOST decided, and the two producers are [`call_tool`] (the
+/// tool surface) and `host_adapters::door_call` (the vault and prefs plumbing
+/// around it), which is why `VaultLocked` and `Io` exist here at all.
+#[derive(Debug, Clone, PartialEq)]
+pub enum McpCallOutcome {
+    /// A complete MCP `CallToolResult`, ready to relay verbatim.
+    Result(Value),
+    /// A host decision with a closed reason and one actionable sentence. The
+    /// door relays `reason` as the wire `kind`, so the shim's
+    /// `structuredContent.reason` and the door's error envelope cannot disagree
+    /// about what happened.
+    Refused(McpToolError),
+    /// This build does not implement that verb (version skew).
+    UnknownTool,
+    /// The arguments do not decode against the verb's schema.
+    Malformed,
+    /// The vault locked between the request arriving and the call running. The
+    /// narrow race only: while the vault is locked the socket does not exist, so
+    /// a client cannot ordinarily produce this.
+    VaultLocked,
+    /// The host could not read its own state (prefs, index) for this call.
+    Io,
+}
+
+/// The three fields a `tools/call` carries over the wire.
+///
+/// The connection name comes from the shim (`MYNE_MCP_CONNECTION`, else the
+/// handshake's `clientInfo.name`, else the shim's own `unnamed-client`), never
+/// from the arguments: a caller that could name its grant inside the payload
+/// would be resolving its own scope.
+#[derive(Debug, Clone, Copy)]
+pub struct WireCall<'a> {
+    /// The declared connection name. Trimmed by the caller; NOT normalized,
+    /// because normalization happens when a grant is WRITTEN (`scope.rs`).
+    pub connection: &'a str,
+    /// The verb, as the shim spelled it.
+    pub tool: &'a str,
+    /// The caller's arguments, verbatim.
+    pub arguments: &'a Value,
+}
+
+/// Everything [`call_tool`] resolves against: the call, plus the stored grants
+/// and the folder set it is clamped to.
+#[derive(Debug, Clone, Copy)]
+pub struct CallInputs<'a> {
+    /// The call itself.
+    pub call: WireCall<'a>,
+    /// The stored grants by name, read from `vault.prefs`. Never from the call.
+    pub grants: &'a BTreeMap<String, McpConnectionGrant>,
+    /// `deliberate_folders`, for "which folders exist now".
+    pub deliberate_folders: &'a [String],
+    /// `archived_folders`, subtracted by prefix like the sidebar does.
+    pub archived_folders: &'a [String],
+}
+
+/// One decoded call, kept typed so the dispatch below cannot re-parse.
+enum Parsed {
+    Search(NoteSearchRequest),
+    Read(NoteReadRequest),
+    List,
+    State,
+}
+
+/// `vault_list` and `vault_state` take no arguments; an object with anything in
+/// it is malformed rather than silently ignored, which is the same
+/// `deny_unknown_fields` rule the two argument-taking tools already carry.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NoArguments {}
+
+fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
+    match tool {
+        ToolName::NoteSearch => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Search),
+        ToolName::NoteRead => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Read),
+        ToolName::VaultList => serde_json::from_value::<NoArguments>(arguments.clone())
+            .ok()
+            .map(|_| Parsed::List),
+        ToolName::VaultState => serde_json::from_value::<NoArguments>(arguments.clone())
+            .ok()
+            .map(|_| Parsed::State),
+    }
+}
+
+/// Answer one `tools/call`: the whole host-side decision, in one function.
+///
+/// The order of the four steps is load-bearing and each was chosen against a
+/// specific failure.
+///
+/// 1. **No grant, no vault work.** A name with no grant learns nothing at all:
+///    not whether its arguments would have parsed, not how big the vault is, not
+///    that the index was touched. This is also what makes `no_grant` cheap to
+///    produce for a client nobody approved, which is the common case for a
+///    hand-configured connection (it arrives as the shim's `unnamed-client`).
+/// 2. **An unimplemented verb is version skew**, refused before the argument
+///    decode because there is no schema to decode against.
+/// 3. **Arguments decode before the vault is read.** A malformed call is a
+///    caller bug, and answering it from the schema is both cheaper and narrower
+///    than doing so after a snapshot.
+/// 4. **Scope resolves from the stored grant and the folders that exist NOW**,
+///    then the tool clamps to it. The folder set comes from the same source the
+///    tool reads, which is why this takes a source rather than a pre-resolved
+///    scope: the caller cannot hand one in, and there is no parameter through
+///    which it could name a folder it wants.
+pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> McpCallOutcome {
+    let call = inputs.call;
+    let connection = call.connection.trim();
+    if !inputs.grants.contains_key(connection) {
+        return McpCallOutcome::Refused(McpToolError::NoGrant);
+    }
+    let Some(tool) = ToolName::from_wire(call.tool) else {
+        return McpCallOutcome::UnknownTool;
+    };
+    let Some(parsed) = parse_arguments(tool, call.arguments) else {
+        return McpCallOutcome::Malformed;
+    };
+
+    // Snapshot #1: the folder set the grant is resolved against. The tool takes
+    // its own snapshot below through the same source; both are reads of one
+    // in-RAM index, and the tool's is the one every clamp is applied to.
+    let records = match source.records().await {
+        Ok(records) => records,
+        Err(error) => return McpCallOutcome::Refused(error),
+    };
+    let existing = existing_folders(&records, inputs.deliberate_folders, inputs.archived_folders);
+    drop(records);
+    let scope = resolve_scope(connection, inputs.grants, &existing);
+    // `resolve_scope` answered `granted` from the map checked above, so this
+    // cannot fail here; the tools call it again per verb, which is the one home
+    // of the rule and the reason it is not re-derived.
+    if let Err(error) = scope.require_granted() {
+        return McpCallOutcome::Refused(error);
+    }
+
+    let result = match parsed {
+        Parsed::Search(request) => note_search(&scope, request, source)
+            .await
+            .map(|rows| to_value(&rows)),
+        Parsed::Read(request) => note_read(&scope, request, source)
+            .await
+            .map(|note| to_value(&note)),
+        Parsed::List => vault_list(&scope, source)
+            .await
+            .map(|folders| to_value(&folders)),
+        Parsed::State => vault_state(&scope, source)
+            .await
+            .map(|state| to_value(&state)),
+    };
+    match result {
+        Ok(Ok(structured)) => McpCallOutcome::Result(call_tool_result(tool, structured)),
+        // Unreachable for these types (no map with non-string keys, no NaN), and
+        // answered rather than panicked because a serializer change must not
+        // become a crash in the process that holds the vault keys.
+        Ok(Err(())) => McpCallOutcome::Io,
+        Err(error) => McpCallOutcome::Refused(error),
+    }
+}
+
+/// Serialize one tool's answer. Split out so the match above stays readable and
+/// the failure is stated once.
+fn to_value<T: Serialize>(value: &T) -> Result<Value, ()> {
+    serde_json::to_value(value).map_err(|_| ())
+}
+
+/// The MCP `CallToolResult` for one successful call.
+///
+/// `content[0].text` is the human-readable half and `structuredContent` is the
+/// machine half, both carrying the same answer: a text-only client reads the
+/// block, a structured client reads the object, and neither has to parse the
+/// other's rendering. `isError` is stated rather than omitted so a client that
+/// only looks for it cannot read a success as a refusal.
+///
+/// Both halves are present for every read tool, including `note_read`, where
+/// that doubles the note. Uniformity wins here because a client that branches on
+/// `structuredContent` would otherwise have to special-case one verb; the cost
+/// is bounded by the shim's own 16 MiB frame cap, which already sizes what a
+/// single note can be.
+fn call_tool_result(tool: ToolName, structured: Value) -> Value {
+    let text = match tool {
+        // A note is markdown, and the text block is the one place it can be
+        // handed over as markdown rather than as JSON-escaped markdown.
+        ToolName::NoteRead => structured
+            .get("body")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        _ => serde_json::to_string_pretty(&structured).unwrap_or_default(),
+    };
+    json!({
+        "content": [{ "type": "text", "text": text }],
+        "structuredContent": structured,
+        "isError": false,
     })
 }
 

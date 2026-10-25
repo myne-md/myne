@@ -4643,6 +4643,31 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "settings.block.external-mcp",
+    title: "External MCP access: the connection list, the grant and revocation",
+    paths: [
+      "src/components/settings/McpSection.tsx",
+      "src/lib/mcp-access.ts",
+      "src/lib/prefs.ts",
+      "core/src/plugins/mcp/view.rs",
+      "core/src/plugins/mcp/commands.rs",
+      "src-tauri/src/plugins/mcp/mod.rs",
+      "src-tauri/permissions/mcp/default.toml",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+    automatedBy: [],
+    manual: [
+      {
+        see: "Install the shipped bundle, point a REAL MCP client at `myne-mcp` (Claude Desktop is the one to use, and LM Studio or any hand-configured client as the second), approve a scope for it, and then read the connection row and the approval screen as somebody who has not read the PRD. Three things have to be true on that first read: that the counts state what the tool can reach rather than describing a rule, that the row does not read as an authentication or safety mechanism, and that the sentence about what Myne does not control lands before the user clicks approve rather than after. Then lock the vault and have the client call a tool, and confirm the sentence that comes back tells you to unlock rather than reporting a broken app.",
+        whyNotAutomated: "Whether a consent screen is COMPREHENSIBLE to someone meeting it for the first time is a perceptual judgement with no assertion, and the client is a separately distributed program: driving it through tauri-driver would test the harness rather than the product, which is why the protocol half is covered by the shim's own integration tests instead. The counts themselves are asserted host-side (`core/src/plugins/mcp/view_test.rs`), so what is left for a human is the reading.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "settings.block.ai-provider",
     title: "Remote AI provider, consent gate, API key and model catalogue",
     paths: [
