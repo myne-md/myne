@@ -59,18 +59,18 @@ import * as allPrefs from "../../src/lib/prefs";
 // is gone: `tsconfig.tests.json` gained `allowJs`, so TypeScript reads the guard
 // and infers its exports instead of refusing the module, and the suppression
 // became an unused directive, which is itself an error.
-import {
-  needsNonceBump as needsNonceBumpUntyped,
-  READ_COMMANDS as READ_COMMANDS_UNTYPED,
-} from "../../scripts/check-prefs-nonce.mjs";
-
-const READ_COMMANDS = READ_COMMANDS_UNTYPED as Set<string>;
+import { needsNonceBump as needsNonceBumpUntyped } from "../../scripts/check-prefs-nonce.mjs";
 
 /**
  * The guard's own "does this command carry a prefs field" answer, reused rather
  * than re-derived: a `prefs` command that writes a FILE and no field has nothing
  * for a nonce bump to invalidate (view-manifests' manifest export), and a second
  * copy of that classification here is how the two would drift apart.
+ *
+ * `READ_COMMANDS` was imported beside this and never read: the export path's
+ * counter-example became `needsNonceBump` when the guard gained that answer, so
+ * the filter below stopped naming the set. Removed rather than left as a
+ * no-op import the ratchet counts as an error.
  */
 const needsNonceBump = needsNonceBumpUntyped as (command: string) => boolean;
 
