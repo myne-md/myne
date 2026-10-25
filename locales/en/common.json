@@ -2750,6 +2750,9 @@
       "board": {
         "emptyLane": "No cards",
         "dropRefused": "{{reason}}. The card is back in {{lane}}.",
+        "addCardTo": "Add a card to {{lane}}",
+        "addCardRefused": "The card was created, but it could not be placed: {{reason}}.",
+        "addCardFailed": "No card was created: the template could not be read.",
         "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
       },
       "cards": {

@@ -40,6 +40,11 @@ export const VIEW_TESTID = {
   laneCardSlot: "view.card-slot",
   /** The line a refused drag renders, where the gesture happened. */
   boardRefusal: "view.board-refusal",
+  /** One lane's add-card control. Repeated per lane, so E2E scopes it by the
+   *  lane's own `data-lane-value`. */
+  boardAddCard: "view.board-add-card",
+  /** The line an add-card gesture renders when it could not place the card. */
+  boardAddError: "view.board-add-error",
 } as const;
 
 /** Default cover aspect ratio (≈16:9) when a view sets no
