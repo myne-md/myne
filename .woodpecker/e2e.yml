@@ -460,7 +460,32 @@ steps:
     commands:
       - bash scripts/ci-e2e-lane.sh ai
 
-  # ─── E2E floor (the one part of this lane that BLOCKS) ───────
+  # ─── The AI lane's floor (blocking, like the stable one) ─────
+  # `e2e-ai` is `failure: ignore` for the same reason `e2e` is, and the
+  # relaxation has the identical hole: a lane that executes NOTHING exits 0 and
+  # reads green. So the count is gated while the results are not, and the
+  # recorded number is a CI measurement rather than an arithmetic guess —
+  # pipeline 949's AI lane executed 41 scenarios across 17 files, 41 passed, 0
+  # failed, 0 skipped, in 5.6 minutes.
+  #
+  # BLOCKING, deliberately, even though this lane gates no release. The
+  # distinction is the same one `e2e-floor` keeps: a red AI scenario is a known
+  # cost that must not stop a release, but a lane that silently ran nothing is a
+  # measurement that is not a measurement — and the nightly exists precisely to
+  # measure, so a nightly reporting "nothing ran" as green is worse than one that
+  # is red.
+  e2e-floor-ai:
+    image: node:25
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E_AI == "true"'
+    depends_on:
+      - name: e2e-ai
+        optional: true
+    commands:
+      - node scripts/check-e2e-floor.mjs --lane ai
+
+  # ─── E2E floor (the stable lane's blocking half) ─────────────
   # `e2e` above is `failure: ignore`, and that relaxation has a hole in it
   # nobody chose: it does not distinguish "some scenarios failed" from "no
   # scenarios ran". A suite that executes ZERO tests exits 0, and every
@@ -533,6 +558,13 @@ steps:
       - name: e2e-quarantine
         optional: true
       - name: e2e-floor
+        optional: true
+      - name: e2e-ai
+        optional: true
+      # Added with the AI lane's floor. This list is the notifier's whole
+      # coverage: a blocking step that is not named here goes red without paging
+      # anybody, which is the failure mode this file's comments keep returning to.
+      - name: e2e-floor-ai
         optional: true
     environment:
       PUSHOVER_TOKEN:
