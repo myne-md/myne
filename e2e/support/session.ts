@@ -163,6 +163,30 @@ export interface AppSession {
   waitForExit(timeoutMs?: number): Promise<void>;
   /** Save a failure artifact (base64 PNG screenshot + page source). */
   saveArtifacts(label: string): Promise<void>;
+  /**
+   * One bounded block describing WHAT THE APP WAS SHOWING when a scenario gave
+   * up, for the CI log.
+   *
+   * # Why this exists rather than "look at the artifacts"
+   *
+   * `saveArtifacts` writes a screenshot, the page source and the driver log into
+   * `e2e/artifacts/` — inside the runner's container, which is gone with the
+   * step. The pipeline log is the only thing that survives, so a red that does
+   * not describe itself there costs a local container build (eight minutes) to
+   * answer a question the harness already had in hand.
+   *
+   * Measured 2026-10-25: pipeline 946's roster named
+   * `waitUntil(Settings opened via the keyboard route) timed out after 30000 ms`
+   * and `waitUntil(waitForElement([data-testid="editor.tab"][data-active="true"]))
+   * timed out after 90000 ms`. Neither says whether the app was on the welcome
+   * screen, the picker, mid-unlock or in the editor; a 90 s budget expiring reads
+   * as "slow" when it means "the thing never rendered at all", and the difference
+   * decides whether the reader looks at the product or at the runner.
+   *
+   * Structural only: test ids, stage markers, the document title and the driver's
+   * last lines. No note text, no vault content (SYNC-13).
+   */
+  evidenceDigest(): Promise<string>;
 }
 
 export interface LaunchOptions {
@@ -596,6 +620,42 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       writeFileSync(join(dir, `${stamp}.driver.log`), driverLog);
     };
 
+    const evidenceDigest = async (): Promise<string> => {
+      const parts: string[] = [];
+      let title = "?";
+      let ids: string[] = [];
+      try {
+        const probe = await session.execute<string>(
+          "return JSON.stringify({" +
+            " title: document.title," +
+            " ids: Array.prototype.slice.call(document.querySelectorAll('[data-testid]'))" +
+            "   .map(function (el) { return el.getAttribute('data-testid'); })," +
+            "});",
+        );
+        const parsed = JSON.parse(probe) as { title?: string; ids?: string[] };
+        title = parsed.title ?? "?";
+        ids = parsed.ids ?? [];
+      } catch {
+        // A wedged app may answer no script at all, which is itself the reading.
+        parts.push("script: UNREACHABLE (the WebView did not answer)");
+      }
+      // Stage markers first: they answer "where was the app" in one word, and the
+      // roster of test ids answers "what had it drawn". Both bounded, because a
+      // catastrophic run would otherwise bury the counts the guard prints.
+      const stages = ids.filter((id) => /^(welcome|picker|unlock|editor|palette)\./.test(id));
+      const rest = ids.filter((id) => !stages.includes(id));
+      parts.push(`title=${JSON.stringify(title)}`);
+      parts.push(`stage=[${[...new Set(stages.map((id) => id.split(".")[0]))].join(",")}]`);
+      parts.push(
+        `ids(${ids.length})=[${rest.slice(0, 40).join(" ")}${rest.length > 40 ? " …" : ""}]`,
+      );
+      const driverTail = driverLog.trim().split("\n").slice(-8).join("\n    ");
+      if (parts.every((p) => !p.startsWith("script:"))) {
+        parts.push(`driver tail:\n    ${driverTail === "" ? "(empty)" : driverTail}`);
+      }
+      return parts.join("\n  ");
+    };
+
     return {
       session,
       dataHome,
@@ -606,6 +666,7 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       hardKill,
       waitForExit,
       saveArtifacts,
+    evidenceDigest,
     };
   } catch (e) {
     killTree(proc, "SIGKILL");
