@@ -156,6 +156,11 @@ INNER='export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/ru
 INNER="$INNER"' PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH CI=true'
 INNER="$INNER ${LANE_ENV}"
 INNER="$INNER MYNE_E2E_SERVER=\"${MYNE_E2E_SERVER}\""
+# `su` resets the environment, so a variable the STEP sets never reaches the
+# suite unless it is named here — and an unset scale is silently 1, which is the
+# number a loaded runner cannot honour. Passed through rather than hardcoded so a
+# developer running this script by hand keeps their own value.
+INNER="$INNER MYNE_E2E_TIMEOUT_SCALE=\"${MYNE_E2E_TIMEOUT_SCALE:-1}\""
 INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache'
 INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0'
 # fd soft limit -> hard cap (EMFILE guard): the Tauri app plus parallel cargo
