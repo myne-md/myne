@@ -123,6 +123,11 @@ describeDevice("person-scoped device enrolment (myne-md/myne#911 task 9)", () =>
         };
         expect(qr.payload.startsWith(`MYQR3|p|${srv.url}|`)).toBe(true);
         expect(qr.svg.length).toBeGreaterThan(0);
+        // The QR icon is an icon in the DEVICES section's header, and the publish
+        // above left Settings on CONNECTION — so the control was not in the tree
+        // at all and the click reported "nothing matches that selector", which
+        // reads as a missing affordance rather than as the other topic.
+        await selectSettingsTopic(a.session, "sync", "devices");
         await clickByTestId(a.session, "sync.device-join-qr.open", { timeoutMs: 20_000 });
         // The PERSON variant, not the account-number one: this vault has no
         // account number, and the dialog picks the variant from the vault's
