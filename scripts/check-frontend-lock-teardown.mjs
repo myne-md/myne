@@ -189,6 +189,24 @@ export const TEARDOWN_CALLS = [
     },
   },
   {
+    call: "clearBulkUndoForLock",
+    declaredIn: "src/notes/views/bulkUndoJournal.ts",
+    holds:
+      "the note ids and snapshot ids of the last bulk field action, which is a map of what was written in the vault being left",
+    // No note text, and it is still cleared on every leaving path: a restore
+    // offered in the NEXT session would name snapshots of a vault the reader is no
+    // longer in, so the map is a claim about a session that ended.
+    appliesTo: ["desktop-lock", "desktop-switch", "desktop-delete"],
+    skips: {
+      "desktop-create": SKIP_CREATE,
+      "mobile-lock": SKIP_DESKTOP_ONLY,
+      "mobile-background": SKIP_DESKTOP_ONLY,
+      "mobile-create": SKIP_DESKTOP_ONLY,
+      "mobile-join": SKIP_DESKTOP_ONLY,
+      "mobile-delete": SKIP_DESKTOP_ONLY,
+    },
+  },
+  {
     call: "clearAwareness",
     declaredIn: "src/notes/collab/awarenessStore.ts",
     holds:
