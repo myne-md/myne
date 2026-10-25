@@ -20,7 +20,7 @@ import {
   type ViewStreamItem,
 } from "./viewLayout";
 import { ViewEmpty, ViewGroupHeading, makeViewRowHandlers } from "./viewChrome";
-import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
+import type { CardContextMenuHandler, OpenNoteHandler } from "./card";
 import {
   HOVER_TRANSITION,
 } from "../../components/primitives/hoverSurface";

@@ -11,12 +11,12 @@
 
 import type { SavedView } from "../../lib/prefs";
 import type { ViewResult } from "../queryEngine";
-import {
-  CardsView,
-  type CardContextMenuHandler,
-  type OpenNoteHandler,
-  type SetCoverHandler,
-} from "./cardsView";
+import { CardsView } from "./cardsView";
+import type {
+  CardContextMenuHandler,
+  OpenNoteHandler,
+  SetCoverHandler,
+} from "./card";
 import { TableView } from "./tableView";
 import { ListView } from "./listView";
 
