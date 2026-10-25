@@ -1038,6 +1038,24 @@ export function PaneView({
         if (sc !== null) sc.scrollTop = 0;
         return;
       }
+      // **A remembered position of ZERO is the pane's default, so applying it can
+      // only ever MOVE somebody.** Every freshly opened note is already at the
+      // top, which means a `pos: 0` anchor adds nothing on the open it was
+      // recorded for — and it does damage on a later one: a body written through
+      // `note_update` re-runs this effect, the anchor from the moment the note was
+      // still empty is still `0`, and the deferred apply then fires after the
+      // reader (or a scenario) has scrolled, marks the restore window, and
+      // suppresses their own write-back for 500 ms.
+      //
+      // Measured 2026-10-25 on `scroll-memory` sm2: `liveTop=1200|pos=0|
+      // write=suppressed|restore=anchor|frames=3|stable=2|applied=0` — the apply
+      // landed three frames in over a pane already at 1200, and the position the
+      // reader had was never remembered. Skipping it leaves the pane where the
+      // reader put it and lets the settle remember write a real anchor.
+      if (anchor.pos === 0 && sc !== null && sc.scrollTop > 4) {
+        sc.dataset.scrollRestore = "skip-top";
+        return;
+      }
       applyScrollAnchor(v, anchor, noteId);
     };
 
