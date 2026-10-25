@@ -29,12 +29,16 @@ export function ViewRenderHost({
   onOpenNote,
   onCardContextMenu,
   onSetCover,
+  approved,
 }: {
   def: SavedView;
   result: ViewResult;
   onOpenNote?: OpenNoteHandler;
   onCardContextMenu?: CardContextMenuHandler;
   onSetCover?: SetCoverHandler;
+  /** This device's verdict on `def`, for the board's own definition writes (a
+   *  lane rename must not grant an approval the manager is still asking for). */
+  approved?: boolean;
 }) {
   switch (def.view_type) {
     case "cards":
@@ -55,6 +59,7 @@ export function ViewRenderHost({
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
+          approved={approved}
         />
       );
     case "table":

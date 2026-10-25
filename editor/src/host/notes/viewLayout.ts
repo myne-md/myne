@@ -45,6 +45,28 @@ export const VIEW_TESTID = {
   boardAddCard: "view.board-add-card",
   /** The line an add-card gesture renders when it could not place the card. */
   boardAddError: "view.board-add-error",
+  /** The bulk bar: select all, the target lane, the move, and the restore. */
+  boardBulkBar: "view.board-bulk-bar",
+  boardSelectAll: "view.board-select-all",
+  boardMoveTarget: "view.board-move-target",
+  boardMoveApply: "view.board-move-apply",
+  boardRestore: "view.board-restore",
+  /** One card's selection toggle, inside its slot. */
+  boardSelectCard: "view.board-select-card",
+  /** The report block after a move or a rename: counts, then one line per
+   *  refused card. */
+  boardBulkReport: "view.board-bulk-report",
+  /** The one-restore result, including the definition half a lane rename owes. */
+  boardRestored: "view.board-restored",
+  boardLaneOrderRestored: "view.board-lane-order-restored",
+  boardLaneOrderRestoreFailed: "view.board-lane-order-restore-failed",
+  /** A rename whose cards moved but whose lane order did not save. */
+  boardLanesNotSaved: "view.board-lanes-not-saved",
+  /** The lane header's rename control and its inline editor. */
+  boardRename: "view.board-rename",
+  boardRenameInput: "view.board-rename-input",
+  boardRenameSave: "view.board-rename-save",
+  boardRenameCancel: "view.board-rename-cancel",
 } as const;
 
 /** Default cover aspect ratio (≈16:9) when a view sets no

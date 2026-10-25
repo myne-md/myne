@@ -2753,6 +2753,17 @@
         "addCardTo": "Add a card to {{lane}}",
         "addCardRefused": "The card was created, but it could not be placed: {{reason}}.",
         "addCardFailed": "No card was created: the template could not be read.",
+        "moveSelected": "Move {{count}}",
+        "moveTo": "Move to lane",
+        "selectAll": "Select every card",
+        "selectCard": "Select {{title}}",
+        "renameLane": "Rename lane {{lane}}",
+        "newLaneName": "New lane name",
+        "saveLaneName": "Save lane name",
+        "cancelLaneRename": "Cancel",
+        "lanesNotSaved": "The cards moved, but the lane order could not be saved.",
+        "laneOrderRestored": "The lane order is back.",
+        "laneOrderRestoreFailed": "The lane order could not be restored.",
         "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
       },
       "cards": {

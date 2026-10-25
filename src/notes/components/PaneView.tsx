@@ -2794,6 +2794,7 @@ function ViewHost({ viewId }: { viewId: string }) {
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
+          approved={approved}
         />
       ) : (
         <div style={QUIET_WRAP_STYLE} />
