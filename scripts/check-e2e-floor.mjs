@@ -52,8 +52,15 @@ const RECORD = join(ROOT, "scripts/e2e-scenario-floor.json");
 const argv = process.argv.slice(2);
 const laneIdx = argv.indexOf("--lane");
 const lane = laneIdx === -1 ? "stable" : argv[laneIdx + 1];
-if (!["stable", "quarantine"].includes(lane)) {
-  console.error(`check-e2e-floor: unknown lane "${lane}" (expected stable|quarantine)`);
+// `ai` joined the list with the lane split of 2026-10-25: the sixteen inference
+// specs run on their own schedule and write their own report, so the guard needs
+// to be able to read it. A lane with no recorded floor still fails by name
+// (`no recorded floor for lane "ai"`), which is deliberate: `--record` once, on
+// the machine that runs it, and never invent the number.
+if (!["stable", "ai", "gate", "quarantine"].includes(lane)) {
+  console.error(
+    `check-e2e-floor: unknown lane "${lane}" (expected stable|ai|gate|quarantine)`,
+  );
   process.exit(2);
 }
 

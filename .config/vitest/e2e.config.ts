@@ -63,6 +63,21 @@ const timeoutScale = ((): number => {
   return Number.isFinite(n) && n > 0 ? n : 1;
 })();
 
+/**
+ * Which lane this run is. One name, read by three places: the report filename
+ * here, `scripts/ci-e2e-lane.sh` (which sets it) and
+ * `scripts/check-e2e-floor.mjs --lane <name>`.
+ *
+ * The lanes are not decoration: the gate runs `stable`, the AI inference suites
+ * run as `ai` on their own schedule, and `quarantine` runs the contended specs
+ * the gate skips. A shared report path would let whichever lane finished last
+ * overwrite the other's floor evidence, which is the failure the old
+ * `quarantine ? quarantine : stable` ternary only half-closed.
+ */
+const lane =
+  process.env.MYNE_E2E_LANE ??
+  (process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable");
+
 export default defineConfig({
   test: {
     include: ["e2e/**/*.e2e.ts"],
@@ -133,8 +148,8 @@ export default defineConfig({
     // the other's floor evidence.
     reporters: process.env.CI ? ["default", "json", "junit"] : ["verbose"],
     outputFile: {
-      json: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.json`,
-      junit: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.junit.xml`,
+      json: `.e2e-report/${lane}.json`,
+      junit: `.e2e-report/${lane}.junit.xml`,
     },
   },
 });

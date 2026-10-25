@@ -368,6 +368,34 @@ steps:
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
 
+  # ─── The AI lane (non-blocking, scheduled) ───────────────────
+  # The sixteen `MYNE_E2E_AI` spec files moved OUT of the gate, not out of the
+  # suite: inference scenarios are the slowest tests here (a model download, a
+  # chat stream, a transcription) and a release gate that spends a fifth of its
+  # wall clock proving the runner still answers is a gate people stop running.
+  # `scripts/ci-e2e-lane.sh ai` derives the file list from the specs themselves,
+  # so a new AI spec joins this lane the moment it lands.
+  #
+  # Gated on its OWN variable rather than on `RUN_E2E`, so a manual release run
+  # starts one suite and not two: two WebKit apps on one host is exactly the
+  # contention that made the gate untrustworthy (see `e2e` below). The scheduled
+  # entry point passes both.
+  e2e-ai:
+    image: rust:1.96.0-slim
+    when:
+      - event: manual
+        evaluate: 'RUN_E2E_AI == "true"'
+    depends_on:
+      - name: e2e-compile
+        optional: true
+      - name: myne-server-build
+        optional: true
+    failure: ignore
+    environment:
+      CI: "true"
+    commands:
+      - bash scripts/ci-e2e-lane.sh ai
+
   # ─── E2E floor (the one part of this lane that BLOCKS) ───────
   # `e2e` above is `failure: ignore`, and that relaxation has a hole in it
   # nobody chose: it does not distinguish "some scenarios failed" from "no
