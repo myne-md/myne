@@ -408,7 +408,6 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `wasm-core-graph-check.sh` | `myne-core`'s dependency graph resolves for wasm32 (the walls are in the graph, before… | CI `wasm-protocol` |
 | `wasm-repro-check.sh` | the wasm artefact rebuilds byte-identically (double build, `wasm-bindgen-cli` version… | CI `wasm-protocol` |
 | `check-web-third-party.mjs` | zero third-party origins in the web bundle | CI `web-build` |
-| `check-web-no-phrase.mjs` | the recovery phrase is absent from the served bundle, not merely hidden | CI `web-build` |
 | `check-web-no-test-hooks.mjs` | no production test hooks in the served bundle (a hook a scenario can call is a hook any… | CI `web-build` |
 | `check-web-bundle-budget.mjs` | first-load size ratchet, measured from a real build rather than invented | CI `web-build` |
 | `check-web-screens.mjs` / `check-web-surfaces.mjs` | every screen, and every `src/components/settings/`, `src/lib/`, `src/hooks/` module… | CI `web-build` |

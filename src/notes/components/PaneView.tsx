@@ -114,6 +114,8 @@ import { TabStrip, STRIP_HEIGHT, tabDomId } from "./TabStrip";
 import { TASK_KIND_VALUE } from "../../dialect";
 import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
+import type { BoardCardActions } from "../views/boardView";
+import { Button } from "../../components/primitives/Button";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
@@ -128,14 +130,13 @@ import type { TaskQueryRowEventDetail } from "@myne/editor/decorations/task-quer
 import { TITLE_FIELD_TESTID } from "@myne/editor/decorations/frontmatter";
 import { resolveCoverAttachmentId } from "../views/cardsView";
 import { setNoteCover } from "../setNoteCover";
-import { upsertSavedView } from "../../lib/prefs";
+import { saveLocalViewEdit } from "../views/saveViewEdit";
 import { isNoteAiExcluded } from "../../lib/aiExcludedFolders";
 import { CoverPicker, type CoverChoice } from "../../components/attachments/CoverPicker";
 import { Toast } from "../../components/Toast";
 import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { paneDimStyle } from "./sharedStyles";
-import { Button } from "../../components/primitives/Button";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { copyText } from "../../lib/clipboard";
@@ -2806,6 +2807,36 @@ function PaneLoading() {
   );
 }
 
+/** The centred quiet body a view host falls back to: a stale view id, a result
+ *  still in flight, or a definition this device has not approved. One shape for
+ *  all three so the surface does not jump between them. */
+const QUIET_WRAP_STYLE: CSSProperties = {
+  maxWidth: 420,
+  margin: "12vh auto 0",
+  padding: "0 var(--space-5)",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: "var(--space-3)",
+  textAlign: "center",
+  fontFamily: "var(--font-sans)",
+  lineHeight: 1.6,
+};
+
+const QUIET_TITLE_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-base)",
+  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
+  color: "var(--fg-1)",
+};
+
+const QUIET_BODY_STYLE: CSSProperties = {
+  margin: 0,
+  maxWidth: 360,
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-2)",
+};
+
 /**
  * Host for an open saved-view tab (MYND-275, Saved Views #5). Resolves the
  * `viewId` to its `SavedView` def via prefs, runs the query engine over the
@@ -2817,7 +2848,7 @@ function PaneLoading() {
  */
 function ViewHost({ viewId }: { viewId: string }) {
   const { t } = useTranslation();
-  const { def, result } = useViewResult(viewId);
+  const { def, result, approved, approve } = useViewResult(viewId);
   const ws = useWorkspace();
   const sidebar = useSelectedNote();
   const [cardMenu, setCardMenu] = useState<{
@@ -2835,8 +2866,16 @@ function ViewHost({ viewId }: { viewId: string }) {
     },
     [ws],
   );
-  const onCardContextMenu = useCallback(
-    (noteId: string, pos: { x: number; y: number }) =>
+  // A card the BOARD creates is outside the editor's autosave path, so nothing
+  // else tells the sidebar cache about it and the board that just added the card
+  // would be the one surface that cannot see it (its rows are built from this
+  // cache). The "+ New Note" action calls `refreshOne` after create for exactly
+  // this reason.
+  const onNoteCreated = useCallback(
+    (noteId: string) => sidebar.refreshOne(noteId as NoteId),
+    [sidebar],
+  );
+  const onCardContextMenu = useCallback(    (noteId: string, pos: { x: number; y: number }) =>
       setCardMenu({ noteId, x: pos.x, y: pos.y }),
     [],
   );
@@ -2897,9 +2936,16 @@ function ViewHost({ viewId }: { viewId: string }) {
           // hand-copied its two lines.
           await settleFrontmatterWrite(sidebar, noteId as NoteId);
           // First cover on a view with no image property → adopt `cover` as the
-          // view's cover property so the card render picks it up.
+          // view's cover property so the card render picks it up. This is a LOCAL
+          // EDIT like any other (view-manifests task 8), so it goes through the
+          // one save helper: the version moves forward with the definition, and
+          // the approval of the version this device is already showing rides
+          // along in the same write.
           if (choice !== null && def !== null && def.image === undefined) {
-            await upsertSavedView({ ...def, image: coverPropertyKey });
+            // `approved` is this device's verdict on the definition in hand,
+            // already read by the hook that resolved it, so the adoption does not
+            // open a second prefs read to ask the same question.
+            await saveLocalViewEdit(def, { ...def, image: coverPropertyKey }, approved);
           }
         } catch (err) {
           // The two NEW rejection classes are constructed in the WebView and
@@ -2921,7 +2967,7 @@ function ViewHost({ viewId }: { viewId: string }) {
         }
       })();
     },
-    [coverNoteId, coverPropertyKey, def, sidebar],
+    [coverNoteId, coverPropertyKey, def, sidebar, approved],
   );
   // The non-mutating card context menu (task 8) - the CLOSED four-item set
   // (`buildCardMenuItems`): Open · Open in new tab · Reveal in folder · Copy
@@ -2929,6 +2975,28 @@ function ViewHost({ viewId }: { viewId: string }) {
   // projection; deletion stays at the note's own location, the sidebar).
   // Reveal selects the note in the sidebar; Copy link writes a `[[title]]`
   // wikilink via the existing clipboard plugin (no new capability).
+  // Copying a card's link is the one menu action with no workspace seam of its
+  // own: it writes a `[[title]]` wikilink through the existing clipboard plugin
+  // (no new capability). Shared by the host's menu and the board's, so the two
+  // doors cannot disagree about what "copy link" puts on the clipboard.
+  const copyCardLink = useCallback(
+    (id: string) => {
+      const title = sidebar.cache.get(id)?.title ?? "";
+      // TRANSPORT MIGRATION ONLY (myne-md/myne#390). Both arms are silent
+      // because that is what this menu item does today: the rejection used to
+      // be dropped by a bare `void`, and an empty title is a no-op the user
+      // also never sees. Recorded rather than deleted so the follow-up task
+      // that gives it a toast is editing a decision, not discovering an
+      // absence.
+      if (title !== "") {
+        void copyText(clipboardWriteText, `[[${title}]]`, {
+          onSuccess: { kind: "silent", reason: "pre-fix behaviour (myne 390): the card menu reported nothing" },
+          onFailure: { kind: "silent", reason: "pre-fix behaviour (myne 390): the rejection was dropped by `void`" },
+        });
+      }
+    },
+    [sidebar],
+  );
   const cardMenuItems: ContextMenuItem[] = useMemo(() => {
     if (cardMenu === null) return [];
     const id = cardMenu.noteId;
@@ -2936,45 +3004,64 @@ function ViewHost({ viewId }: { viewId: string }) {
       open: () => ws.openInFocused(id),
       openInNewTab: () => ws.openNewTabInFocused(id),
       revealInFolder: () => sidebar.select(id),
-      copyLink: () => {
-        const title = sidebar.cache.get(id)?.title ?? "";
-        // TRANSPORT MIGRATION ONLY (myne-md/myne#390). Both arms are silent
-        // because that is what this menu item does today: the rejection used to
-        // be dropped by a bare `void`, and an empty title is a no-op the user
-        // also never sees. Recorded rather than deleted so the follow-up task
-        // that gives it a toast is editing a decision, not discovering an
-        // absence.
-        if (title !== "") {
-          void copyText(clipboardWriteText, `[[${title}]]`, {
-            onSuccess: { kind: "silent", reason: "pre-fix behaviour (myne 390): the card menu reported nothing" },
-            onFailure: { kind: "silent", reason: "pre-fix behaviour (myne 390): the rejection was dropped by `void`" },
-          });
-        }
-      },
+      copyLink: () => copyCardLink(id),
     });
-  }, [cardMenu, ws, sidebar]);
+  }, [cardMenu, ws, sidebar, copyCardLink]);
+  // The board's card actions (myne-md/myne#922 task 8). The board draws its own
+  // menu because it is the surface that offers the lifecycle verb, but every
+  // handler is the host's own path: opening goes through the workspace seam, and
+  // archive/trash go through the sidebar's rollback writers, which write the
+  // reserved markers the host owns. A manifest cannot ask for either.
+  const boardCardActions: BoardCardActions = useMemo(
+    () => ({
+      open: (id) => ws.openInFocused(id),
+      openInNewTab: (id) => ws.openNewTabInFocused(id),
+      revealInFolder: (id) => sidebar.select(id as NoteId),
+      copyLink: (id) => copyCardLink(id),
+      archive: (id) => sidebar.archiveWithRollback(id as NoteId),
+      trash: (id) => sidebar.trashWithRollback(id as NoteId),
+    }),
+    [ws, sidebar, copyCardLink],
+  );
   return (
     <div data-testid="editor.view-host" data-view-id={viewId}>
-      {def !== null && result !== null ? (
+      {def !== null && !approved ? (
+        // A definition this device has not approved. The tab stays open and says
+        // so rather than closing or hiding, because a view the reader cannot see
+        // is a decision they cannot make, and `useViewResult` has already
+        // refused to run the query, so nothing has been read on their behalf.
+        <div style={QUIET_WRAP_STYLE} data-testid="editor.view-pending">
+          <p style={QUIET_TITLE_STYLE}>
+            {t("notes.views.manager.pendingTitle", {
+              name: def.name.trim() === "" ? t("notes.views.untitledView") : def.name,
+            })}
+          </p>
+          <p style={QUIET_BODY_STYLE}>{t("notes.views.manager.pendingBody")}</p>
+          <Button
+            variant="primary"
+            data-testid="editor.view-pending-approve"
+            onClick={() => {
+              void approve(def.id, def.version);
+            }}
+          >
+            {t("notes.views.manager.approve")}
+          </Button>
+        </div>
+      ) : def !== null && result !== null ? (
         <ViewRenderHost
           def={def}
           result={result}
           onOpenNote={onOpenNote}
           onCardContextMenu={onCardContextMenu}
           onSetCover={onSetCover}
+          onNoteCreated={
+            def.view_type === "board" ? onNoteCreated : undefined
+          }
+          approved={approved}
+          cardActions={def.view_type === "board" ? boardCardActions : undefined}
         />
       ) : (
-        <div
-          style={{
-            maxWidth: 680,
-            margin: "12vh auto 0",
-            textAlign: "center",
-            color: "var(--fg-3)",
-            fontSize: "var(--text-sm)",
-            fontFamily: "var(--font-sans)",
-            lineHeight: 1.6,
-          }}
-        />
+        <div style={QUIET_WRAP_STYLE} />
       )}
       {cardMenu !== null && (
         <ContextMenu

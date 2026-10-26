@@ -405,16 +405,18 @@ describe("check-prefs-parity, the denominator floor", () => {
 describe("check-prefs-parity, the tree as it stands", () => {
   it("passes, with the measured roster and tally", () => {
     // The tally tracks the tree: it moves as rows converge, which is the record
-    // doing its job. 51 `both` / 23 `desktop-only` is the state after
-    // myne-md/myne#880's phase 3 rows landed (it was 42 / 32 when the projection
-    // was first seeded). The assertion is deliberately exact rather than a
-    // regex: `expect(out.code).toBe(0)` alone would pass over a guard that had
-    // stopped reading a whole client, which is the failure this suite exists to
-    // catch. Update the two numbers in the same change as a convergence.
+    // doing its job. 51 `both` / 24 `desktop-only` is the state after
+    // view-manifests' `set_view_approval` landed as a reasoned desktop-only row
+    // (51 / 23 was myne-md/myne#880's phase 3 shape, and 42 / 32 when the
+    // projection was first seeded). The assertion is deliberately exact rather
+    // than a regex: `expect(out.code).toBe(0)` alone would pass over a guard
+    // that had stopped reading a whole client, which is the failure this suite
+    // exists to catch. Update the two numbers in the same change as a
+    // convergence.
     const out = run();
     expect(out.code).toBe(0);
     expect(out.out).toContain(
-      "prefs-parity: ok (76 command(s): 51 both, 23 desktop-only, 0 mobile-only, 2 no-ui",
+      "prefs-parity: ok (77 command(s): 51 both, 24 desktop-only, 0 mobile-only, 2 no-ui",
     );
     // A real guard run over the whole tree: ~3.5 s alone, past the 5 s default
     // under a full `pnpm test`, so it carries the same budget as the three

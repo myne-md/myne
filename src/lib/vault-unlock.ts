@@ -9,6 +9,7 @@ import { resetVimStateOnLock } from "../editor/vim";
 import { releaseAttachmentUrls } from "../platform/attachments";
 import { resetTaskIndexCache } from "../notes/taskIndex";
 import { clearAgentForLock } from "../notes/agent/agentStore";
+import { clearBulkUndoForLock } from "../notes/views/bulkUndoJournal";
 import { clearAwareness } from "../notes/collab/awarenessStore";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
@@ -103,6 +104,11 @@ export async function lockVault(): Promise<void> {
   // session comes through here. `docs/decisions/ai/0276` rests its
   // no-new-blob-family argument on the transcript not outliving the session.
   teardownStep("clearChat", () => clearChat());
+  // The bulk field action's journal (`view-manifests`), on the same leg. It holds
+  // note ids and snapshot ids, not note text, but it is a map of what was written
+  // in THIS vault: carrying it into the next session would offer a restore of notes
+  // the reader can no longer see, against snapshots they did not just make.
+  teardownStep("clearBulkUndoForLock", () => clearBulkUndoForLock());
   // The persist module's write state, on the same leg: the last serialized
   // payload, one stashed failed append, and the lagging flag are the same
   // plaintext the transcript is, and module state survives the wipe above

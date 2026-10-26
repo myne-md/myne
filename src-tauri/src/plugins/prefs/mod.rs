@@ -53,6 +53,20 @@
 // keep resolving. The `init()` wiring stays desktop-side.
 pub use myne_core::plugins::prefs::{commands, error};
 
+/// The manifest export command. It lives here rather than in `myne-core`
+/// because it writes a FILE at a user-chosen path, and the core crate's
+/// filesystem ratchet (`scripts/check-core-io-seam.mjs`) exists to keep native
+/// IO on this side of the seam. The encode it performs is the shared
+/// `protocol::canonical_encode_saved_view`, so it adds no second opinion about
+/// the bytes.
+mod export;
+
+/// The manifest IMPORT reader. Same reasoning as `export`: it opens a file at a
+/// user-chosen path, which belongs on this side of the core seam, and it validates
+/// with the shared `protocol::parse_view_manifest` so the import path and the
+/// `vault.prefs` path cannot disagree about the grammar.
+mod import;
+
 use tauri::plugin::{Builder, TauriPlugin};
 use tauri::Runtime;
 
@@ -153,6 +167,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // color-group rule list — order is precedence, no separate
             // `*_order` field, same shape as `set_bar_items_order`.
             commands::set_color_groups,
+            // view-manifests: this device's approval of one saved view, keyed by
+            // view id and carrying the approved VERSION (device-local per
+            // sync-protocol.md §10.2). Needs its own `allow-` entry in
+            // permissions/prefs/default.toml, or it is a security regression.
+            commands::set_view_approval,
+            // view-manifests: export ONE saved view as a `.myneview` manifest to
+            // a user-chosen path. Needs its own `allow-` entry in
+            // permissions/prefs/default.toml like every command above.
+            export::export_view_manifest,
+            // view-manifests: read + strictly validate ONE `.myneview` file.
+            // Needs its own `allow-` entry like every command above.
+            import::read_view_manifest,
         ])
         .build()
 }
@@ -440,11 +466,21 @@ mod acl_registration_guard {
             + shim[gh_start..]
                 .find(']')
                 .expect("unterminated generate_handler!");
+        // The LAST path segment, not a `commands::` prefix. This extraction was
+        // blind to any command that lives in another module of the same plugin:
+        // it saw `commands::set_theme` and skipped `export::export_view_manifest`
+        // entirely, so the "permitted but not registered" comparison could not
+        // name the two commands that genuinely were registered. The prefix was
+        // never the subject; the command NAME is, and `::` is just the path to it.
         let mut registered: Vec<String> = shim[gh_start..gh_end]
             .lines()
-            .filter_map(|l| l.trim().strip_prefix("commands::"))
-            .map(|l| l.trim_end_matches(',').trim().to_string())
-            .filter(|l| !l.is_empty())
+            .filter_map(|l| {
+                let line = l.trim().trim_end_matches(',').trim();
+                if line.is_empty() || !line.contains("::") {
+                    return None;
+                }
+                Some(line.rsplit("::").next().unwrap_or(line).to_string())
+            })
             .collect();
         registered.sort();
         registered.dedup();

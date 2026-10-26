@@ -65,7 +65,8 @@ pub(crate) const MAX_JSON_DEPTH: usize = 64;
 
 /// View render type. `Map` is deliberately absent — a map view needs a Maps
 /// plugin and is not representable in v1 (SYNC-5). Serialized lowercase
-/// (`"table"` / `"cards"` / `"list"`) on both the IPC and canonical paths.
+/// (`"table"` / `"cards"` / `"list"` / `"board"`) on both the IPC and canonical
+/// paths.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ViewType {
@@ -75,6 +76,12 @@ pub enum ViewType {
     Cards,
     /// Note-list rows.
     List,
+    /// Grouped columns of cards (myne-md/myne#922). A `board` is a RENDERER,
+    /// not an object: there is no board file and no per-board state, its lanes
+    /// are the distinct values of `group_by` in the order [`SavedView::lanes`]
+    /// declares, and every card is a note. Adding the variant is what makes
+    /// such a view storable at all; the format gains no new key here.
+    Board,
 }
 
 /// Sort direction. Serialized lowercase (`"asc"` / `"desc"`).
@@ -195,6 +202,24 @@ pub struct SavedView {
     /// Optional groupBy property key. Omitted when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_by: Option<String>,
+
+    /// The declared LANE ORDER for a board view: the group values of `group_by`
+    /// in the order the user wants them read left to right (`board-view`;
+    /// §9.5.2). Omitted when empty.
+    ///
+    /// Sequence semantics, the `columns` discipline: order IS the payload,
+    /// preserved verbatim and NFC per element, never sorted and never
+    /// deduplicated, so an export then re-import is byte-identical.
+    ///
+    /// It is a DECLARATION, not the authoritative lane set. A board renders
+    /// every value the data carries, appending the ones this list omits in
+    /// first-appearance order, and a value listed here with no cards still
+    /// renders as an empty lane because "drop a card into Done" has to be
+    /// possible before anything is done. Keeping the list separate from the
+    /// data is what lets the view stay a projection: no card order and no lane
+    /// membership is stored anywhere but the note's own property.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lanes: Vec<String>,
     /// Ordered display columns (the `.base` `order` list). A SEQUENCE —
     /// element order is the payload (preserved verbatim, not sorted/deduped).
     /// Omitted when empty.
@@ -212,6 +237,105 @@ pub struct SavedView {
     /// Omitted when `None`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image_aspect_ratio: Option<String>,
+
+    /// Definition version: a non-negative integer, omitted when absent
+    /// (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
+    ///
+    /// The app maintains it, not the user: any local edit that changes the
+    /// canonical bytes increments it. It exists so an imported manifest can be
+    /// ordered against the definition this vault already holds (higher replaces,
+    /// identical is a no-op, same-version-different-bytes is a refusal naming
+    /// both, lower is refused), and so this device's APPROVAL can name exactly
+    /// the bytes it approved. Approval is an equality against this value, which
+    /// is what makes a version bump revoke it with no clear step.
+    ///
+    /// `None` is STORAGE compatibility and nothing else: a view authored before
+    /// this field existed has no version, and §9.5.2's additive discipline says
+    /// it must still decode. The import path does not tolerate it; see
+    /// [`crate::view_manifest`], which refuses a manifest with no `version`,
+    /// because a file whose version cannot be read cannot be ordered at all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<u32>,
+
+    /// The property keys this view's write intent covers: a sequence of
+    /// frontmatter keys, omitted when empty (`view-manifests`; §9.5.2).
+    ///
+    /// This is the ENTIRE write authority a shared view carries. A field absent
+    /// from the list may not be written through the view, and the host is what
+    /// checks the list (task 5's `note_set_field`), because write authority
+    /// resting on a renderer conditional is not authority at all.
+    ///
+    /// Two properties are load-bearing rather than incidental:
+    ///
+    /// - **Sequence semantics, preserved verbatim** (NFC per element, not sorted,
+    ///   not deduped), the `columns` discipline. The list is a declaration and
+    ///   its order carries no meaning, but keeping the author's bytes keeps the
+    ///   encoding a pure function of the value handed in, which is what makes an
+    ///   export then re-import byte-identical.
+    /// - **The host-owned markers are not writable.** `archived`, `trashed` and
+    ///   `deleted` are the frontmatter the app manages, and a view that could
+    ///   write them could hide notes from its own vault. They are refused by
+    ///   [`crate::view_manifest`] on the import path; this codec stores what it
+    ///   is given, because the stored blob is this same array and refusing there
+    ///   would fail a whole prefs parse over one view's declaration.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write_fields: Vec<String>,
+
+    /// Optional note id a board's "add a card" copies the BODY from
+    /// (`board-view`; §9.5.2). Omitted when unset.
+    ///
+    /// A note id and NOT a note: the format layer cannot resolve one, because
+    /// the vault is the only thing that knows what exists, so this is stored as
+    /// the opaque string the author picked and resolved (or reported missing) by
+    /// the import path that already resolves and reports everything else.
+    ///
+    /// Additive on purpose. The board creates the note and then sets the lane
+    /// value through the host-owned field command, and having no template is a
+    /// supported state rather than a setup step: a board with this key absent
+    /// creates the vault's default new note.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template: Option<String>,
+}
+
+/// One `saved_views` array element this build cannot REPRESENT, carried
+/// verbatim so a re-encode re-emits it instead of dropping it.
+///
+/// The motivating case is a newer client's `view_type` (`"timeline"`, …): the
+/// array decoder cannot build a [`SavedView`] for it, and §9.5.5's
+/// whole-blob fall-back-to-defaults would then treat the entire `vault.prefs`
+/// as unreadable — resetting the theme, keymap and favorites alongside the one
+/// view this build does not know. Worse, a prefs write is a whole-blob rewrite,
+/// so that older client's next save would push the defaults back to every
+/// device. Keeping the element's raw bytes turns "one unknown view type resets
+/// all preferences" into "one view this build does not render".
+///
+/// The same carrier covers every `Unrepresentable` arm (an unknown filter
+/// `kind`, an unknown comparison operator, an unknown sort direction), because
+/// the failure is the same one: well-formed content from a newer client that
+/// this schema cannot express. Structural damage is NOT retained — see
+/// [`parse_saved_views_array_with_opaque`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OpaqueSavedView {
+    /// The element's `id` when that value is a string, empty otherwise. Used
+    /// only to sort the re-emitted array; §9.5.2's order is a byte sort on id.
+    id: Vec<u8>,
+    /// The element's exact input bytes (no surrounding whitespace), re-emitted
+    /// unchanged.
+    raw: Vec<u8>,
+}
+
+impl OpaqueSavedView {
+    /// The id bytes this entry sorts under. Empty for an entry whose `id` is
+    /// absent or not a string — such an entry is still retained (see
+    /// [`parse_saved_views_array_with_opaque`]), it just sorts first.
+    pub fn id_bytes(&self) -> &[u8] {
+        &self.id
+    }
+
+    /// The entry's raw JSON bytes, exactly as they appeared in the input.
+    pub fn raw(&self) -> &[u8] {
+        &self.raw
+    }
 }
 
 /// Closed failure surface for [`canonical_decode_saved_view`]. The bytes are
@@ -255,7 +379,10 @@ pub fn canonical_encode_saved_view(view: &SavedView) -> Vec<u8> {
 
 fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
     // Canonical key order: card_size, columns, filters, group_by, id, image,
-    // image_aspect_ratio, name, sort, view_type.
+    // image_aspect_ratio, lanes, name, sort, template, version, view_type,
+    // write_fields.
+    // (`lanes` sorts after `image_aspect_ratio` on the first byte, `sort` <
+    // `template` < `version` on the second.)
     out.push(b'{');
     let mut first = true;
     if let Some(cs) = view.card_size {
@@ -289,6 +416,11 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
         out.extend_from_slice(b"\"image_aspect_ratio\":");
         push_string(out, &nfc(ar));
     }
+    if !view.lanes.is_empty() {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"lanes\":");
+        push_string_array(out, &view.lanes);
+    }
     sep(out, &mut first);
     out.extend_from_slice(b"\"name\":");
     push_string(out, &nfc(&view.name));
@@ -297,9 +429,24 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
         out.extend_from_slice(b"\"sort\":");
         encode_sort_into(out, s);
     }
+    if let Some(ref t) = view.template {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"template\":");
+        push_string(out, &nfc(t));
+    }
+    if let Some(v) = view.version {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"version\":");
+        push_uint(out, v);
+    }
     sep(out, &mut first);
     out.extend_from_slice(b"\"view_type\":");
     push_string(out, view_type_str(view.view_type));
+    if !view.write_fields.is_empty() {
+        sep(out, &mut first);
+        out.extend_from_slice(b"\"write_fields\":");
+        push_string_array(out, &view.write_fields);
+    }
     out.push(b'}');
 }
 
@@ -311,15 +458,57 @@ fn encode_view_into(out: &mut Vec<u8>, view: &SavedView) {
 /// (ASCII), so a raw byte sort is canonical. The caller omits the field
 /// entirely when the slice is empty, so this never emits `[]`.
 pub fn canonical_encode_saved_views(views: &[SavedView]) -> Vec<u8> {
-    let mut refs: Vec<&SavedView> = views.iter().collect();
-    refs.sort_by(|a, b| a.id.cmp(&b.id));
-    let mut out = Vec::with_capacity(128 * refs.len().max(1));
+    canonical_encode_saved_views_with_opaque(views, &[])
+}
+
+/// Encode the rendered set TOGETHER WITH the entries this build cannot
+/// represent, as one canonical JSON array — the form a `vault.prefs` re-write
+/// must emit, because dropping the opaque entries would delete a newer client's
+/// views from the shared blob.
+///
+/// Ordering is §9.5.2's byte sort on `id` across BOTH kinds, so the emitted
+/// array reads as one id-ordered set. An id tie between a represented and an
+/// opaque entry puts the represented one first (a stable sort, so equal ids
+/// within one kind keep their caller / input order), which keeps the ordering
+/// total and deterministic without letting an unrepresentable entry shadow a
+/// view this build does render.
+pub fn canonical_encode_saved_views_with_opaque(
+    views: &[SavedView],
+    opaque: &[OpaqueSavedView],
+) -> Vec<u8> {
+    enum Entry<'a> {
+        Represented(&'a SavedView),
+        Opaque(&'a OpaqueSavedView),
+    }
+    // `rank` is the tie position, not a property of the value: 0 wins over 1.
+    let mut entries: Vec<(u8, &[u8], Entry<'_>)> = Vec::with_capacity(views.len() + opaque.len());
+    entries.extend(
+        views
+            .iter()
+            .map(|v| (0u8, v.id.as_bytes(), Entry::Represented(v))),
+    );
+    entries.extend(
+        opaque
+            .iter()
+            .map(|o| (1u8, o.id.as_slice(), Entry::Opaque(o))),
+    );
+    // Stable: equal (rank, id) pairs keep their input order, which is what the
+    // rendered-only encoder did before this carrier existed.
+    entries.sort_by(|a, b| a.1.cmp(b.1).then(a.0.cmp(&b.0)));
+
+    let mut out = Vec::with_capacity(128 * entries.len().max(1));
     out.push(b'[');
-    for (i, v) in refs.iter().enumerate() {
+    for (i, (_, _, entry)) in entries.iter().enumerate() {
         if i > 0 {
             out.push(b',');
         }
-        encode_view_into(&mut out, v);
+        match entry {
+            Entry::Represented(v) => encode_view_into(&mut out, v),
+            // Raw bytes, deliberately: a canonical re-serialisation would
+            // require a generic encoder this codec does not have, and would
+            // rewrite the very fields it cannot represent.
+            Entry::Opaque(o) => out.extend_from_slice(&o.raw),
+        }
     }
     out.push(b']');
     out
@@ -344,6 +533,53 @@ pub fn parse_saved_views_array(
         views.push(saved_view_from_json(e)?);
     }
     Ok((views, p.i))
+}
+
+/// Parse a `saved_views` array keeping the elements this build cannot
+/// represent: returns the decoded views, those elements as opaque raw entries,
+/// and the bytes consumed. The `vault.prefs` codec uses THIS entry point, so a
+/// single unknown `view_type` no longer drives the §9.5.5 whole-blob fall-back
+/// (see [`OpaqueSavedView`]).
+///
+/// Only [`SavedViewParseError::Unrepresentable`] becomes an opaque entry. Every
+/// other arm stays fatal: a `Malformed` element is damaged bytes rather than a
+/// newer client's content, and silently retaining garbage under the banner of
+/// forward-compatibility would be a weaker promise than retaining a
+/// well-formed entry this schema happens not to express. An element carrying no
+/// usable `id` (absent, or not a string) is still retained — it just sorts
+/// first, and it is dropped only by a client that could never have shown it.
+pub fn parse_saved_views_array_with_opaque(
+    bytes: &[u8],
+) -> Result<(Vec<SavedView>, Vec<OpaqueSavedView>, usize), SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let elements = p.parse_top_level_array_spanned()?;
+    let mut views = Vec::with_capacity(elements.len());
+    let mut opaque = Vec::new();
+    for (value, start, end) in &elements {
+        match saved_view_from_json(value) {
+            Ok(view) => views.push(view),
+            Err(SavedViewParseError::Unrepresentable) => opaque.push(OpaqueSavedView {
+                id: opaque_id(value),
+                raw: bytes[*start..*end].to_vec(),
+            }),
+            Err(other) => return Err(other),
+        }
+    }
+    Ok((views, opaque, p.consumed()))
+}
+
+/// The sort id of an element this build cannot represent: its `id` bytes when
+/// that value is a string, empty otherwise. Deliberately lenient — the element
+/// is already unknown, so a malformed `id` is a reason to give it an empty sort
+/// key, never a reason to drop an entry we were asked to preserve verbatim.
+fn opaque_id(value: &JsonValue) -> Vec<u8> {
+    match value {
+        JsonValue::Object(obj) => match find(obj, "id") {
+            Some(JsonValue::Str(s)) => s.as_bytes().to_vec(),
+            _ => Vec::new(),
+        },
+        _ => Vec::new(),
+    }
 }
 
 fn encode_sort_into(out: &mut Vec<u8>, sort: &ViewSort) {
@@ -434,6 +670,7 @@ fn view_type_str(v: ViewType) -> &'static str {
         ViewType::Table => "table",
         ViewType::Cards => "cards",
         ViewType::List => "list",
+        ViewType::Board => "board",
     }
 }
 
@@ -477,6 +714,20 @@ pub fn canonical_decode_saved_view(bytes: &[u8]) -> Result<SavedView, SavedViewP
     saved_view_from_json(&v)
 }
 
+/// Decode exactly one JSON value from `bytes`, refusing any non-whitespace after
+/// it. The strict-entry-point counterpart of [`canonical_decode_saved_view`],
+/// shared with [`crate::view_manifest`] so both "decode one object" readers
+/// enforce the same trailing rule rather than each re-deriving it.
+pub(crate) fn parse_exactly_one(bytes: &[u8]) -> Result<JsonValue, SavedViewParseError> {
+    let mut p = JsonParser::new(bytes);
+    let v = p.parse_value()?;
+    p.skip_ws();
+    if p.i != bytes.len() {
+        return Err(SavedViewParseError::Malformed);
+    }
+    Ok(v)
+}
+
 /// A minimal, dependency-free JSON value tree — only what the `SavedView`
 /// schema needs. Keeps the recursive AST decode out of the substring-scanning
 /// idiom (infeasible for a recursive structure) without pulling `serde_json`
@@ -508,6 +759,62 @@ impl<'a> JsonParser<'a> {
     /// sibling `vault.prefs`-embedded array family) advances past.
     pub(crate) fn consumed(&self) -> usize {
         self.i
+    }
+
+    /// Parse a top-level JSON array, returning each element's value AND its
+    /// byte span in the INPUT — what a caller needs to keep an element it
+    /// cannot decode verbatim, without a generic canonical serialiser (which
+    /// this codec does not have, and inventing one would re-write exactly the
+    /// fields the caller could not represent).
+    ///
+    /// A non-array top level reports [`SavedViewParseError::WrongType`] once the
+    /// value parses, matching [`parse_saved_views_array`]'s pinned contract
+    /// (the `saved-view` vector family pins `non-array-top-level` as
+    /// `wrong_type`), while damaged bytes still report `Malformed`.
+    pub(crate) fn parse_top_level_array_spanned(
+        &mut self,
+    ) -> Result<Vec<(JsonValue, usize, usize)>, SavedViewParseError> {
+        self.skip_ws();
+        if self.b.get(self.i) != Some(&b'[') {
+            self.parse_value()?;
+            return Err(SavedViewParseError::WrongType);
+        }
+        self.parse_array_spanned()
+    }
+
+    fn parse_array_spanned(
+        &mut self,
+    ) -> Result<Vec<(JsonValue, usize, usize)>, SavedViewParseError> {
+        self.enter()?;
+        self.i += 1; // consume '['
+        let mut out: Vec<(JsonValue, usize, usize)> = Vec::new();
+        self.skip_ws();
+        if self.b.get(self.i) == Some(&b']') {
+            self.i += 1;
+            self.depth -= 1;
+            return Ok(out);
+        }
+        loop {
+            // The span brackets the VALUE, not the separator whitespace, so a
+            // retained element re-emits without the padding a pretty-printed
+            // input carried.
+            self.skip_ws();
+            let start = self.i;
+            let val = self.parse_value()?;
+            let end = self.i;
+            out.push((val, start, end));
+            self.skip_ws();
+            match self.b.get(self.i) {
+                Some(&b',') => self.i += 1,
+                Some(&b']') => {
+                    self.i += 1;
+                    break;
+                }
+                _ => return Err(SavedViewParseError::Malformed),
+            }
+        }
+        self.depth -= 1;
+        Ok(out)
     }
 
     fn skip_ws(&mut self) {
@@ -746,13 +1053,14 @@ pub(crate) fn opt_string(
     }
 }
 
-fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError> {
+pub(crate) fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError> {
     let obj = as_object(v)?;
 
     let view_type = match as_str(req(obj, "view_type")?)? {
         "table" => ViewType::Table,
         "cards" => ViewType::Cards,
         "list" => ViewType::List,
+        "board" => ViewType::Board,
         _ => return Err(SavedViewParseError::Unrepresentable), // `map` et al.
     };
 
@@ -762,7 +1070,44 @@ fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError>
         None => None,
     };
 
+    // `version` (view-manifests): a non-negative integer bounded by `u32`, and
+    // OPTIONAL here on purpose: a view authored before the field existed must
+    // still decode (§9.5.2 additive discipline). The import path's stricter
+    // "version required" rule lives in `crate::view_manifest`, because a stored
+    // view without one is readable while a FILE without one cannot be ordered
+    // against anything.
+    let version = match find(obj, "version") {
+        Some(JsonValue::Int(n)) if *n >= 0 && *n <= i64::from(u32::MAX) => Some(*n as u32),
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => None,
+    };
+
     let columns = match find(obj, "columns") {
+        Some(JsonValue::Array(a)) => a
+            .iter()
+            .map(|e| as_str(e).map(String::from))
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => Vec::new(),
+    };
+
+    // `write_fields`: sequence semantics, stored verbatim. The reserved-marker
+    // refusal is the strict reader's job (see the field's doc): the stored blob
+    // is a peer's bytes and must not fail a whole parse over a declaration this
+    // build would not honour.
+    let write_fields = match find(obj, "write_fields") {
+        Some(JsonValue::Array(a)) => a
+            .iter()
+            .map(|e| as_str(e).map(String::from))
+            .collect::<Result<Vec<_>, _>>()?,
+        Some(_) => return Err(SavedViewParseError::WrongType),
+        None => Vec::new(),
+    };
+
+    // `lanes`: the declared board lane order, stored verbatim. Nothing is
+    // validated against the data here, because this layer has no data: a lane
+    // value with no cards is legal and expected.
+    let lanes = match find(obj, "lanes") {
         Some(JsonValue::Array(a)) => a
             .iter()
             .map(|e| as_str(e).map(String::from))
@@ -787,6 +1132,10 @@ fn saved_view_from_json(v: &JsonValue) -> Result<SavedView, SavedViewParseError>
         card_size,
         image: opt_string(obj, "image")?,
         image_aspect_ratio: opt_string(obj, "image_aspect_ratio")?,
+        version,
+        write_fields,
+        lanes,
+        template: opt_string(obj, "template")?,
     })
 }
 
@@ -899,6 +1248,10 @@ mod tests {
             card_size: Some(300),
             image: Some("image".into()),
             image_aspect_ratio: Some("1.65".into()),
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -943,6 +1296,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let bytes = canonical_encode_saved_view(&v);
         assert_eq!(
@@ -985,6 +1342,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded, v);
@@ -1016,6 +1377,10 @@ mod tests {
                 card_size: None,
                 image: None,
                 image_aspect_ratio: None,
+                version: None,
+                write_fields: Vec::new(),
+                lanes: Vec::new(),
+                template: None,
             };
             assert_eq!(
                 canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap(),
@@ -1109,6 +1474,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.name, "\u{00e9}");
@@ -1152,6 +1521,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let bytes = canonical_encode_saved_views(&[a.clone(), b.clone()]);
         let (views, consumed) = parse_saved_views_array(&bytes).unwrap();
@@ -1188,7 +1561,162 @@ mod tests {
         assert_eq!(consumed, bytes.len());
     }
 
-    // ---- whitespace tolerance on decode (skip_ws) ----
+    // ---- opaque (unrepresentable) entries retained verbatim --------------
+    //
+    // §9.5.2 / §9.5.5: an array element from a NEWER client (an unknown
+    // `view_type`, an unknown filter kind, …) must not drive the whole-blob
+    // fall-back-to-defaults, because a prefs write rewrites the whole blob and
+    // would push those defaults to every device.
+
+    fn opaque_aware_round_trip(input: &[u8]) -> Vec<u8> {
+        let (views, opaque, _consumed) =
+            parse_saved_views_array_with_opaque(input).expect("opaque-aware parse");
+        canonical_encode_saved_views_with_opaque(&views, &opaque)
+    }
+
+    #[test]
+    fn unknown_view_type_is_retained_verbatim() {
+        // One `view_type: "timeline"` entry beside a represented one: the decode
+        // succeeds (it used to be Unrepresentable → the prefs codec's
+        // PlaintextParseFailed → every preference reset to its default), and
+        // the re-encode reproduces the input bytes exactly.
+        let input = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"}]"
+        )
+        .as_bytes();
+        let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert_eq!(consumed, input.len());
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].id, "a");
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"b");
+        let encoded = canonical_encode_saved_views_with_opaque(&views, &opaque);
+        assert_eq!(encoded, input);
+    }
+
+    #[test]
+    fn board_view_type_is_representable() {
+        // The other side of the retention rule (myne-md/myne#922): a `board`
+        // entry is decoded into a real view rather than retained as opaque,
+        // which is what makes a board storable at all. The opaque fixtures use
+        // `timeline` for exactly this reason.
+        let input = br#"[{"filters":{"kind":"all"},"group_by":"status","id":"b","lanes":["Doing","Done"],"name":"Board","view_type":"board"}]"#;
+        let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert_eq!(consumed, input.len());
+        assert!(opaque.is_empty(), "board must not be retained as opaque");
+        assert_eq!(views.len(), 1);
+        assert_eq!(views[0].view_type, ViewType::Board);
+        assert_eq!(
+            views[0].lanes,
+            alloc::vec![String::from("Doing"), String::from("Done")]
+        );
+        // Round trip: the enum value encodes back as its lowercase literal.
+        assert_eq!(canonical_encode_saved_views(&views), input);
+    }
+
+    #[test]
+    fn opaque_entry_sorts_by_id_among_the_represented_ones() {
+        // Input order is NOT canonical (the unknown entry's id sorts after the
+        // cards entry's). Both kinds share §9.5.2's byte sort on id, so the
+        // re-encode interleaves them rather than appending the raw tail.
+        let input = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"}]"
+        )
+        .as_bytes();
+        let encoded = opaque_aware_round_trip(input);
+        let expected = concat!(
+            "[{\"filters\":{\"kind\":\"all\"},\"id\":\"a\",\"name\":\"Cards\",",
+            "\"view_type\":\"cards\"},",
+            "{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"Timeline\",",
+            "\"view_type\":\"timeline\"}]"
+        );
+        assert_eq!(core::str::from_utf8(&encoded).unwrap(), expected);
+    }
+
+    #[test]
+    fn opaque_entry_with_malformed_id_is_retained() {
+        // An unknown entry whose `id` is not a string is still retained: the
+        // id is read leniently (empty sort key) rather than as a reason to drop
+        // content this build cannot represent.
+        let input = b"[{\"id\":7,\"name\":\"Timeline\",\"view_type\":\"timeline\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(views.is_empty());
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"");
+        assert_eq!(opaque[0].raw(), &input[1..input.len() - 1]);
+        assert_eq!(opaque_aware_round_trip(input), input);
+    }
+
+    #[test]
+    fn unknown_filter_kind_is_retained_not_fatal() {
+        // The fix is general, not board-specific: any Unrepresentable element
+        // (here a formula node the anti-eval AST cannot express) is kept.
+        let input = b"[{\"filters\":{\"kind\":\"formula\",\"expr\":\"x+1\"},\"id\":\"f\",\"name\":\"F\",\"view_type\":\"table\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(views.is_empty());
+        assert_eq!(opaque.len(), 1);
+        assert_eq!(opaque[0].id_bytes(), b"f");
+        assert_eq!(opaque_aware_round_trip(input), input);
+    }
+
+    #[test]
+    fn structurally_damaged_or_wrong_type_entry_stays_fatal() {
+        // Retaining a well-formed entry from a newer client is a different
+        // promise from retaining garbage: Malformed and WrongType stay fatal.
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"[{\"filters\":{\"kind\":\"all\"},\"id\":7,\"name\":\"n\",\"view_type\":\"table\"}]"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\""
+            ),
+            Err(SavedViewParseError::Malformed)
+        );
+        // A non-array top level keeps the strict entry point's WrongType,
+        // which the `saved-view` vector family pins.
+        assert_eq!(
+            parse_saved_views_array_with_opaque(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
+    #[test]
+    fn strict_entry_point_still_rejects_unknown_view_type() {
+        // `parse_saved_views_array` is unchanged on purpose: the `saved-view`
+        // vector family pins `map-view-type` as an `unrepresentable`
+        // `parse_fail`, and a caller that only wants the rendered set must not
+        // silently receive a shorter list.
+        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"b\",\"name\":\"B\",\"view_type\":\"timeline\"}]";
+        assert_eq!(
+            parse_saved_views_array(input),
+            Err(SavedViewParseError::Unrepresentable)
+        );
+    }
+
+    #[test]
+    fn pre_feature_array_is_byte_identical_through_the_opaque_aware_codec() {
+        // No opaque entry → the opaque-aware pair must emit exactly what the
+        // rendered-only pair emits, so existing vault.prefs goldens do not move.
+        let input = b"[{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"view_type\":\"table\"}]";
+        let (views, opaque, _) = parse_saved_views_array_with_opaque(input).unwrap();
+        assert!(opaque.is_empty());
+        assert_eq!(
+            canonical_encode_saved_views_with_opaque(&views, &opaque),
+            input
+        );
+        assert_eq!(canonical_encode_saved_views(&views), input);
+    }
 
     #[test]
     fn decode_tolerates_insignificant_whitespace() {
@@ -1466,6 +1994,85 @@ mod tests {
         );
     }
 
+    // ---- `lanes` / `template` (board-view, §9.5.2) -----------------------
+
+    #[test]
+    fn lanes_preserve_declared_order_and_are_not_deduplicated() {
+        // Order IS the payload: the lane sequence is the board's left-to-right
+        // reading order, so a sort or a dedup here would silently rewrite the
+        // view. Declared-but-empty lanes are the normal case, not a defect.
+        let v = SavedView {
+            lanes: vec![
+                "Done".into(),
+                "Backlog".into(),
+                "Doing".into(),
+                "Done".into(),
+            ],
+            template: Some("01J8ZTEMPLATE".into()),
+            ..sample()
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        let text = core::str::from_utf8(&bytes).unwrap();
+        assert!(text.contains("\"lanes\":[\"Done\",\"Backlog\",\"Doing\",\"Done\"]"));
+        assert!(text.contains("\"template\":\"01J8ZTEMPLATE\""));
+        assert_eq!(canonical_decode_saved_view(&bytes).unwrap(), v);
+    }
+
+    #[test]
+    fn lanes_and_template_are_omitted_when_unset() {
+        // Byte identity for every pre-board view: neither key may appear, which
+        // is what makes the format additive rather than a version bump.
+        let v = SavedView {
+            lanes: Vec::new(),
+            template: None,
+            ..sample()
+        };
+        let bytes = canonical_encode_saved_view(&v);
+        let text = core::str::from_utf8(&bytes).unwrap();
+        assert!(!text.contains("lanes"));
+        assert!(!text.contains("template"));
+        // The canonical slot each key occupies when present, pinned by position
+        // rather than by membership alone: `lanes` sits between
+        // `image_aspect_ratio` and `name`, `template` between `sort` and
+        // `version`.
+        let populated = canonical_encode_saved_view(&SavedView {
+            lanes: vec!["Backlog".into()],
+            template: Some("t".into()),
+            version: Some(1),
+            ..v
+        });
+        let populated = core::str::from_utf8(&populated).unwrap();
+        let lanes_at = populated.find("\"lanes\"").expect("lanes emitted");
+        let name_at = populated.find("\"name\"").expect("name emitted");
+        let sort_at = populated.find("\"sort\"").expect("sort emitted");
+        let template_at = populated.find("\"template\"").expect("template emitted");
+        let version_at = populated.find("\"version\"").expect("version emitted");
+        assert!(lanes_at < name_at, "lanes sorts before name");
+        assert!(sort_at < template_at && template_at < version_at);
+    }
+
+    #[test]
+    fn lanes_and_template_wrong_types_are_refused() {
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"lanes\":\"Done\",\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"lanes\":[1],\"name\":\"n\",\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+        assert_eq!(
+            canonical_decode_saved_view(
+                b"{\"filters\":{\"kind\":\"all\"},\"id\":\"x\",\"name\":\"n\",\"template\":7,\"view_type\":\"table\"}"
+            ),
+            Err(SavedViewParseError::WrongType)
+        );
+    }
+
     #[test]
     fn decode_rejects_unknown_sort_direction() {
         // sort.direction outside {asc,desc} → Unrepresentable (line 782).
@@ -1503,6 +2110,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.sort, v.sort);
@@ -1599,6 +2210,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let decoded = canonical_decode_saved_view(&canonical_encode_saved_view(&v)).unwrap();
         assert_eq!(decoded.filters, node);
@@ -1619,6 +2234,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let forward = canonical_encode_saved_views(&[mk("a"), mk("b"), mk("c")]);
         let shuffled = canonical_encode_saved_views(&[mk("c"), mk("a"), mk("b")]);
@@ -1748,6 +2367,10 @@ mod tests {
                 card_size: None,
                 image: None,
                 image_aspect_ratio: None,
+                version: None,
+                write_fields: Vec::new(),
+                lanes: Vec::new(),
+                template: None,
             },
         ]);
         emit_ok(&mut dump, "multi-sorted-by-id", "Two views: the array is emitted sorted by id (v0 before v1) regardless of caller order.", &two, true);
@@ -1811,5 +2434,370 @@ mod tests {
         std::fs::write("/tmp/myne_saved_view_vectors.json", dump.as_bytes())
             .expect("write saved-view vectors dump");
         std::eprintln!("[ok] wrote /tmp/myne_saved_view_vectors.json");
+    }
+
+    /// Generator for the `saved-view` cases this feature adds (`view-manifests`,
+    /// myne-md/myne#922): the two manifest sub-fields, and the entries a build
+    /// cannot represent but must not destroy.
+    ///
+    /// `cargo test -p protocol --lib emit_saved_view_opaque_vectors_for_paste -- --ignored`
+    ///
+    /// Writes `/tmp/myne_saved_view_opaque_vectors.json`, a JSON array fragment
+    /// SPLICED into the existing `cases` array. Deliberately not an extension of
+    /// [`emit_saved_view_vectors_for_paste`], which replaces the whole file: that
+    /// generator knows nothing about the cases nine later features added to this
+    /// family, so re-running it to pick up one new case would delete them. The
+    /// per-feature append generator is the shape `vault-prefs` settled on for the
+    /// same reason.
+    ///
+    /// **The manifest case pins the two fields' canonical SLOTS inside a view
+    /// object**, which is the half an encoder gets wrong: `version` sits between
+    /// `sort` and `view_type`, `write_fields` after `view_type`, and both are
+    /// omitted when unset so a pre-feature view's bytes are unchanged. The
+    /// existing `roundtrip-rich` case carries neither field.
+    ///
+    /// **The opaque cases pin that an entry this build cannot represent survives
+    /// a decode/encode round trip verbatim.** That is what keeps one newer
+    /// client's `view_type` from taking the whole `vault.prefs` blob down the
+    /// §9.5.5 fall-back path, and from being pushed back to every device as
+    /// defaults on the next write. Three properties, one case each:
+    /// the raw bytes come back unchanged (an entry is NOT re-serialised, so a
+    /// non-canonical key order in the input survives), the id-sort spans BOTH
+    /// kinds (an opaque entry can sort ahead of a represented one, which is why
+    /// the sort cannot be per-kind), and an unrepresentable entry whose `id` is
+    /// not a string is still retained, sorting first with an empty sort key
+    /// rather than being dropped.
+    #[test]
+    #[ignore]
+    fn emit_saved_view_opaque_vectors_for_paste() {
+        extern crate std;
+
+        let mut dump = String::new();
+        dump.push_str("[\n");
+
+        // ---- the manifest sub-fields (parse_ok, strict path) -------------
+        let with_manifest = SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000010"),
+            name: String::from("Review queue"),
+            view_type: ViewType::Table,
+            filters: FilterNode::All,
+            sort: Some(ViewSort {
+                key: String::from("due"),
+                direction: SortDirection::Asc,
+            }),
+            group_by: None,
+            columns: alloc::vec![String::from("status"), String::from("due")],
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+            version: Some(4),
+            write_fields: alloc::vec![String::from("status"), String::from("due")],
+            lanes: Vec::new(),
+            template: None,
+        };
+        let manifest_bytes = canonical_encode_saved_views(core::slice::from_ref(&with_manifest));
+        // Fixed point: the vector is only worth pinning if the bytes it pins are
+        // what this reader accepts back.
+        let (reparsed, consumed) =
+            parse_saved_views_array(&manifest_bytes).expect("manifest-fields fixture must parse");
+        assert_eq!(consumed, manifest_bytes.len());
+        assert_eq!(
+            canonical_encode_saved_views(&reparsed),
+            manifest_bytes,
+            "canonical encode must be a fixed point of the decode",
+        );
+        {
+            let canonical = canonical_encode_saved_views(&reparsed);
+            dump.push_str("    {\n");
+            dump.push_str("      \"vector_id\": \"saved-view/v0.1/manifest-fields-roundtrip\",\n");
+            dump.push_str("      \"description\": \"The two `view-manifests` sub-fields (myne-md/myne#922) in their canonical slots: `version` between `sort` and `view_type`, `write_fields` after `view_type`. A view's canonical bytes are a pure function of its value, so a port that emits either key in a different position produces an array this decoder rejects, and one that emits them when unset changes every pre-feature view's bytes. Generated by emit_saved_view_opaque_vectors_for_paste in protocol/src/saved_view.rs.\",\n");
+            dump.push_str("      \"case_kind\": \"parse_ok\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\",\n",
+                hex_lower(&manifest_bytes)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_consumed_len\": {consumed},\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\"\n",
+                hex_lower(&canonical)
+            ));
+            dump.push_str("    },\n");
+        }
+
+        // ---- opaque retention (parse_ok_opaque) --------------------------
+        let emit_opaque = |dump: &mut String, slug: &str, desc: &str, input: &[u8], last: bool| {
+            let (views, opaque, consumed) = parse_saved_views_array_with_opaque(input)
+                .unwrap_or_else(|e| panic!("[{slug}] opaque fixture did not parse: {e:?}"));
+            assert!(
+                !opaque.is_empty(),
+                "[{slug}] fixture was meant to carry at least one retained entry",
+            );
+            let canonical = canonical_encode_saved_views_with_opaque(&views, &opaque);
+            let ids: Vec<String> = opaque
+                .iter()
+                .map(|o| String::from_utf8_lossy(o.id_bytes()).into_owned())
+                .collect();
+            let ids_json = ids
+                .iter()
+                .map(|id| alloc::format!("\"{id}\""))
+                .collect::<Vec<_>>()
+                .join(",");
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"saved-view/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(desc)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_ok_opaque\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\",\n",
+                hex_lower(input)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_consumed_len\": {consumed},\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_opaque_ids\": [{ids_json}],\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\"\n",
+                hex_lower(&canonical)
+            ));
+            dump.push_str(if last { "    }\n" } else { "    },\n" });
+        };
+
+        // A newer client's view TYPE, carried verbatim. The element is authored
+        // with its keys OUT of canonical order on purpose: it must come back
+        // byte for byte rather than re-serialised, because this build does not
+        // know the field set that view type owns.
+        emit_opaque(
+            &mut dump,
+            "opaque-entry-preserved",
+            "One represented view plus one entry whose view_type this build cannot express: the decode succeeds, the unknown entry is retained RAW (its keys stay in the authored, non-canonical order, so an implementation that re-serialises it fails here), and the re-encode carries it alongside the represented view. This is the case that turns §9.5.5's whole-blob fall-back into 'one view this build does not render, and nothing else lost'.",
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"name":"Timeline","view_type":"timeline","id":"0190a000-0000-7000-8000-000000000002"}]"#,
+            false,
+        );
+
+        // The id-sort spans BOTH kinds. The opaque entry arrives second and
+        // sorts first, so a per-kind sort (represented, then opaque) emits the
+        // array in the wrong order and this case fails.
+        emit_opaque(
+            &mut dump,
+            "opaque-entry-sorts-among-represented",
+            "The id sort spans represented AND retained entries: the opaque entry arrives second in the input and sorts first by id, so the re-encode reorders the two. §9.5.2's array order is a byte sort on id with no notion of 'known entry first', and an implementation that sorted per kind produces an array this decoder would not have written.",
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":"0190a000-0000-7000-8000-000000000000","name":"Inbox timeline","view_type":"timeline"}]"#,
+            false,
+        );
+
+        // No usable id. Retained anyway, with an empty sort key.
+        emit_opaque(
+            &mut dump,
+            "opaque-entry-malformed-id-retained",
+            "An unrepresentable entry whose `id` is not a string is still retained, sorting first under an empty sort key rather than being dropped. The element is already unknown, so a malformed id is a reason to lose its place in the order and never a reason to delete an entry this build was asked to preserve: deletion is the one outcome the client cannot undo, because the bytes are not its to reconstruct.",
+            br#"[{"filters":{"kind":"all"},"id":"0190a000-0000-7000-8000-000000000001","name":"Cards","view_type":"cards"},{"id":7,"view_type":"timeline"}]"#,
+            false,
+        );
+
+        // The `Unrepresentable` arm is not view-type-specific: an unknown
+        // operator is retained by the same path. This case is what stops the
+        // retention being read as a board feature.
+        emit_opaque(
+            &mut dump,
+            "opaque-unknown-operator-retained",
+            "Retention covers every unrepresentable value, not just an unknown view type: a property comparison with an operator outside the closed set (a newer client's) is kept verbatim under its own id rather than failing the array. Structural damage stays fatal by contrast (see the parse_fail cases), because 'this build cannot express it' and 'these bytes are damaged' are different claims.",
+            br#"[{"filters":{"kind":"property","key":"rating","op":"~=","value":"1"},"id":"0190a000-0000-7000-8000-000000000003","name":"Fuzzy","view_type":"table"}]"#,
+            true,
+        );
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_saved_view_opaque_vectors.json", dump.as_bytes())
+            .expect("write saved-view opaque vectors dump");
+    }
+
+    /// Emit the `board-view` cases for this family (myne-md/myne#922): the two
+    /// optional sub-fields `lanes` and `template` in every presence combination.
+    ///
+    /// `cargo test -p protocol --lib emit_saved_view_board_vectors_for_paste -- --ignored`
+    ///
+    /// Writes `/tmp/myne_saved_view_board_vectors.json`, a JSON array fragment
+    /// SPLICED into the existing `cases` array, for the same reason
+    /// [`Self::emit_saved_view_opaque_vectors_for_paste`] is a fragment: the
+    /// whole-file writer would delete every case later features added.
+    ///
+    /// Four cases, and the combinations are the point rather than the count:
+    /// both keys, `lanes` alone, `template` alone, neither. A port that emitted
+    /// either key unconditionally passes the first two and fails the last, and a
+    /// port that hardcoded the pair (treating them as one optional object) fails
+    /// the middle two.
+    ///
+    /// `lanes` is authored in a NON-lexicographic order with a value that no
+    /// card carries in the fixture's data, because the order is the payload: a
+    /// sort or a dedup on either side of the wire is the divergence this case
+    /// exists to catch, and a sorted fixture would hide it.
+    #[test]
+    #[ignore]
+    fn emit_saved_view_board_vectors_for_paste() {
+        extern crate std;
+
+        let mut dump = String::new();
+        dump.push_str("[\n");
+
+        // `last` is threaded because the fragment is pasted as the tail of the
+        // array, so exactly one case omits its trailing comma.
+        let emit = |dump: &mut String, slug: &str, desc: &str, view: &SavedView, last: bool| {
+            let bytes = canonical_encode_saved_views(core::slice::from_ref(view));
+            // Fixed point: the bytes pinned here are the bytes this reader
+            // accepts back and re-emits unchanged.
+            let (reparsed, consumed) = parse_saved_views_array(&bytes)
+                .unwrap_or_else(|e| panic!("[{slug}] board fixture did not parse: {e:?}"));
+            assert_eq!(
+                consumed,
+                bytes.len(),
+                "[{slug}] cursor must cover the array"
+            );
+            let canonical = canonical_encode_saved_views(&reparsed);
+            assert_eq!(
+                canonical, bytes,
+                "[{slug}] encode must be a decode fixed point"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"saved-view/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                json_escape(desc)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_ok\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\",\n",
+                hex_lower(&bytes)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_consumed_len\": {consumed},\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\"\n",
+                hex_lower(&canonical)
+            ));
+            dump.push_str(if last { "    }\n" } else { "    },\n" });
+        };
+
+        let board = SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000020"),
+            name: String::from("Release board"),
+            view_type: ViewType::Cards,
+            filters: FilterNode::All,
+            sort: Some(ViewSort {
+                key: String::from("title"),
+                direction: SortDirection::Asc,
+            }),
+            group_by: Some(String::from("status")),
+            columns: alloc::vec![String::from("owner"), String::from("due")],
+            card_size: None,
+            image: None,
+            image_aspect_ratio: None,
+            version: Some(3),
+            write_fields: alloc::vec![String::from("status")],
+            lanes: Vec::new(),
+            template: None,
+        };
+        let lanes = alloc::vec![
+            String::from("Doing"),
+            String::from("Backlog"),
+            String::from("Done"),
+        ];
+        let template = String::from("0190a000-0000-7000-8000-000000000021");
+
+        emit(
+            &mut dump,
+            "board-fields-populated",
+            "Both board sub-fields (`board-view`, myne-md/myne#922) on one view: `lanes` in its canonical slot between `image_aspect_ratio` and `name`, `template` between `sort` and `version`. The declared lane order ('Doing', 'Backlog', 'Done') is authored NON-lexicographic and includes a lane no card carries, and it comes back verbatim: a conformant encoder sorts neither the sequence nor its elements, because the order is the board's left-to-right reading order, and an empty declared lane is the normal case that lets a card be dropped into 'Done' before anything is done.",
+            &SavedView {
+                lanes: lanes.clone(),
+                template: Some(template.clone()),
+                ..board.clone()
+            },
+            false,
+        );
+
+        emit(
+            &mut dump,
+            "board-lanes-only",
+            "`lanes` present with `template` unset: the lane declaration survives and `template` is ABSENT from the encoding rather than emitted as null or an empty string. The two keys are independently optional, so a port that modelled them as one object, or that emitted a placeholder for an unset template, diverges here.",
+            &SavedView {
+                lanes: lanes.clone(),
+                template: None,
+                ..board.clone()
+            },
+            false,
+        );
+
+        emit(
+            &mut dump,
+            "board-template-only",
+            "`template` present with `lanes` unset: the template note id survives and `lanes` is ABSENT from the encoding rather than emitted as an empty array. A board with no declared order is supported by definition (undeclared lanes append in first-appearance order), so an encoder that always writes `lanes` changes the bytes of every view that never declares one.",
+            &SavedView {
+                lanes: Vec::new(),
+                template: Some(template.clone()),
+                ..board.clone()
+            },
+            false,
+        );
+
+        // The new VIEW TYPE, which is the format-visible half of this task: a
+        // port that treats `board` as unknown retains the entry as opaque (the
+        // old behaviour) instead of decoding a view it can render.
+        emit(
+            &mut dump,
+            "board-view-type",
+            "The `board` view type (myne-md/myne#922), which joins table/cards/list as a representable value in the same family that pins `map` as unrepresentable. A port whose closed allow-list stops at `list` decodes this entry as an opaque retained element rather than a view with lanes, so the case pins the value's acceptance as well as its lowercase encoding.",
+            &SavedView {
+                view_type: ViewType::Board,
+                lanes: lanes.clone(),
+                template: None,
+                ..board.clone()
+            },
+            false,
+        );
+
+        // The absent case's expected bytes are spelled out as a literal rather
+        // than taken from the encoder, so the claim is about the BYTES and not
+        // about the encoder agreeing with itself.
+        let absent_bytes = canonical_encode_saved_views(core::slice::from_ref(&board));
+        assert_eq!(
+            core::str::from_utf8(&absent_bytes).unwrap(),
+            concat!(
+                "[{\"columns\":[\"owner\",\"due\"],\"filters\":{\"kind\":\"all\"},",
+                "\"group_by\":\"status\",\"id\":\"0190a000-0000-7000-8000-000000000020\",",
+                "\"name\":\"Release board\",",
+                "\"sort\":{\"direction\":\"asc\",\"key\":\"title\"},",
+                "\"version\":3,\"view_type\":\"cards\",\"write_fields\":[\"status\"]}]"
+            ),
+            "a view carrying neither board key must encode exactly as it did before the keys existed",
+        );
+        assert!(!core::str::from_utf8(&absent_bytes)
+            .unwrap()
+            .contains("lanes"));
+        assert!(!core::str::from_utf8(&absent_bytes)
+            .unwrap()
+            .contains("template"));
+        emit(
+            &mut dump,
+            "board-fields-absent",
+            "Neither board sub-field: the encoding is byte-identical to the same view before these keys existed, which is what makes the addition additive rather than a format bump. An older client decodes these bytes as it always did, and a newer one that emitted an empty `lanes` array or a null `template` would rewrite every pre-board view in the vault.",
+            &board,
+            true,
+        );
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_saved_view_board_vectors.json", dump.as_bytes())
+            .expect("write saved-view board vectors dump");
     }
 }

@@ -13,6 +13,18 @@
 // a cards view (table / list have no cover concept); their state is preserved
 // while hidden so switching type and back keeps the cover config.
 //
+// view-manifests (myne-md/myne#922 task 8) adds the three things a shared view
+// needs and a private one never did:
+//
+//   - **the writable-field set** (`write_fields`), the entire write authority a
+//     manifest carries. It is offered from the vault's property key universe with
+//     the host-owned markers REMOVED rather than offered-and-refused, so the form
+//     cannot compose a manifest the import path will reject;
+//   - **the version**, displayed and never editable. The app maintains it: a save
+//     that changes the definition moves it forward, a save that changes nothing
+//     leaves it alone (`viewVersion.ts` owns that rule, not this form);
+//   - **export**, one `.myneview` file on a user-chosen path.
+//
 // Pure / presentational: seeds local draft state from `initial` once (mounted
 // fresh per open, like FilterBuilder), and hands the parent a patch on Save.
 // Omit-when-default discipline mirrors the Rust `skip_serializing_if = "None"`.
@@ -34,6 +46,7 @@ import {
   MIN_CARD_WIDTH,
   MAX_CARD_WIDTH,
 } from "../views/cardsView";
+import { isReservedWriteField } from "../views/reservedWriteFields";
 
 /** The render fields this modal edits — the subset of `SavedView` beyond the
  *  filter AST, DERIVED from the schema so it tracks it by construction. All
@@ -48,6 +61,7 @@ export type ViewDisplayPatch = Partial<
     | "image"
     | "image_aspect_ratio"
     | "card_size"
+    | "write_fields"
   >
 >;
 
@@ -56,6 +70,12 @@ export interface ViewSettingsProps {
   title: string;
   /** Seed values from the view being edited. */
   initial: ViewDisplayPatch;
+  /** The definition's current version, shown read-only. Absent on a view
+   *  authored before the field existed; the app maintains it on save. */
+  version?: number;
+  /** Export this view as a `.myneview` file. Omitted where the host cannot
+   *  write one (no path-taking save dialog), which hides the action. */
+  onExport?: () => void;
   /** Every DISTINCT frontmatter property key in the vault (the
    *  `vault_indices_property_keys` universe) — the option set for the group / sort
    *  / column pickers and the cover-image suggestions. */
@@ -128,6 +148,21 @@ const CARD_SIZE_VALUE_STYLE: CSSProperties = {
   minWidth: 56,
 };
 
+const VERSION_VALUE_STYLE: CSSProperties = {
+  fontFamily: "var(--font-mono)",
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-1)",
+  fontVariantNumeric: "tabular-nums",
+  flex: "0 0 auto",
+};
+
+const VERSION_HINT_STYLE: CSSProperties = {
+  margin: 0,
+  fontSize: "var(--text-sm)",
+  color: "var(--fg-3)",
+  lineHeight: 1.5,
+};
+
 const FOOTER_STYLE: CSSProperties = {
   flex: "0 0 auto",
   display: "flex",
@@ -148,6 +183,8 @@ const NONE = "";
 export function ViewSettings({
   title,
   initial,
+  version,
+  onExport,
   propertyKeys,
   onCancel,
   onSave,
@@ -160,6 +197,7 @@ export function ViewSettings({
   const VIEW_TYPE_OPTIONS = useMemo<readonly { value: string; label: string }[]>(
     () => [
       { value: "cards", label: t("notes.viewSettings.viewTypeCards") },
+      { value: "board", label: t("notes.viewSettings.viewTypeBoard") },
       { value: "table", label: t("notes.viewSettings.viewTypeTable") },
       { value: "list", label: t("notes.viewSettings.viewTypeList") },
     ],
@@ -194,6 +232,15 @@ export function ViewSettings({
     () => propertyKeys.map((k) => ({ value: k, label: k })),
     [propertyKeys],
   );
+  // The writable set is offered WITHOUT the host-owned markers: `archived`,
+  // `deleted` and `trashed` are how the app takes a note out of the working set,
+  // so a view that could write one could hide notes from their own vault. The
+  // Rust reader refuses them outright; not offering them here is what keeps a
+  // user from composing a file the import path will reject.
+  const writableOptions: readonly SelectOption<string>[] = useMemo(
+    () => propertyKeys.filter((k) => !isReservedWriteField(k)).map((k) => ({ value: k, label: k })),
+    [propertyKeys],
+  );
 
   const [viewType, setViewType] = useState<string>(initial.view_type ?? "cards");
   const [groupBy, setGroupBy] = useState(initial.group_by ?? NONE);
@@ -203,6 +250,7 @@ export function ViewSettings({
   const [image, setImage] = useState(initial.image ?? "");
   const [aspect, setAspect] = useState(initial.image_aspect_ratio ?? ASPECT_DEFAULT);
   const [cardSize, setCardSize] = useState(initial.card_size ?? DEFAULT_CARD_WIDTH);
+  const [writeFields, setWriteFields] = useState<string[]>(initial.write_fields ?? []);
 
   // Only show cover suggestions the user hasn't already typed as the current
   // value. Not memoized — `image` changes every keystroke, so a memo buys nothing.
@@ -223,6 +271,7 @@ export function ViewSettings({
       image: trimmed === "" ? undefined : trimmed,
       image_aspect_ratio: aspect === ASPECT_DEFAULT ? undefined : aspect,
       card_size: cardSize === DEFAULT_CARD_WIDTH ? undefined : cardSize,
+      write_fields: writeFields.length === 0 ? undefined : writeFields,
     });
   };
 
@@ -301,8 +350,45 @@ export function ViewSettings({
           />
         </div>
 
-        {/* Cover settings — cards only -------------------------------------- */}
-        {viewType === "cards" && (
+        {/* Writable fields --------------------------------------------------
+            A shared view's ENTIRE write authority. Empty means none, which is
+            the safe default and the pre-feature behaviour for every view. */}
+        <div style={FIELD_STYLE}>
+          <span style={LABEL_STYLE}>{t("notes.viewSettings.writeFields")}</span>
+          <p style={HINT_STYLE}>{t("notes.viewSettings.writeFieldsHint")}</p>
+          <SearchableSelect
+            testId="view-settings.write-fields"
+            aria-label={t("notes.viewSettings.writeFields")}
+            multiple
+            options={writableOptions}
+            selected={writeFields}
+            onChange={setWriteFields}
+            placeholder={t("notes.viewSettings.writeFieldsPlaceholder")}
+            emptyText={t("notes.viewSettings.columnsEmpty")}
+          />
+        </div>
+
+        {/* Version + export -------------------------------------------------
+            The version is READ-ONLY on purpose: the app maintains it (a save
+            that changes the definition moves it forward), so there is no rule
+            for a user to remember and no way to forget one. */}
+        <div style={FIELD_STYLE}>
+          <span style={LABEL_STYLE}>{t("notes.viewSettings.version")}</span>
+          <div style={ROW_STYLE}>
+            <span style={VERSION_VALUE_STYLE} data-testid="view-settings.version">
+              {version === undefined
+                ? t("notes.viewSettings.versionNone")
+                : t("notes.viewSettings.versionValue", { version })}
+            </span>
+            <p style={VERSION_HINT_STYLE}>{t("notes.viewSettings.versionHint")}</p>
+          </div>
+        </div>
+
+        {/* Cover settings — the two card renderers ---------------------------
+            A board card is the same component as a gallery card, so a board
+            that hid these would be the one surface with a cover it cannot
+            choose. */}
+        {(viewType === "cards" || viewType === "board") && (
           <>
             <div style={FIELD_STYLE}>
               <label htmlFor="view-settings.image-input" style={LABEL_STYLE}>
@@ -378,6 +464,17 @@ export function ViewSettings({
       </div>
 
       <div style={FOOTER_STYLE}>
+        {onExport !== undefined && (
+          <Button
+            variant="ghost"
+            data-testid="view-settings.export"
+            title={t("notes.viewSettings.exportHint")}
+            onClick={onExport}
+            style={{ marginInlineEnd: "auto" }}
+          >
+            {t("notes.viewSettings.export")}
+          </Button>
+        )}
         <Button variant="ghost" data-testid="view-settings.cancel" onClick={onCancel}>
           {t("notes.viewSettings.cancel")}
         </Button>

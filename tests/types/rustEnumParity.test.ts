@@ -212,6 +212,28 @@ const MIRRORS: Mirror[] = [
     rsEnum: "NoteUpdateError",
   },
   {
+    ts: "client-core/src/types/note-set-field-error.ts",
+    tsType: "NoteSetFieldError",
+    rs: "core/src/plugins/notes/error.rs",
+    rsEnum: "NoteSetFieldError",
+  },
+  // view-manifests: the strict reader's refusal set, and the wrapper the import
+  // command answers with. Both reach the import dialog, which NAMES the reason, so
+  // a variant missing here would render as a generic sentence for a refusal the
+  // backend described precisely (the defect this file exists for).
+  {
+    ts: "src/types/view-manifest-error.ts",
+    tsType: "ViewManifestError",
+    rs: "protocol/src/view_manifest.rs",
+    rsEnum: "ViewManifestError",
+  },
+  {
+    ts: "src/types/view-manifest-error.ts",
+    tsType: "ViewManifestReadError",
+    rs: "src-tauri/src/plugins/prefs/import.rs",
+    rsEnum: "ViewManifestReadError",
+  },
+  {
     ts: "client-core/src/types/live-session-error.ts",
     tsType: "LiveSessionCommandError",
     rs: "core/src/plugins/live/commands.rs",

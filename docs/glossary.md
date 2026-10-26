@@ -605,6 +605,12 @@ The Layer-2 storage-reclamation outcome (`sync-protocol.md` §11.3): past the to
 
 Used in: `spec/sync-protocol.md` §11.3; `spec/server-protocol.md` §3.3, §7.2
 
+### **board** &nbsp; 📦 *Product*
+
+A [saved view](#saved-view) rendered as columns of cards (`board-view`, myne-md/myne#922): `view_type: "board"`, which is one more value in the [view type](#view-type) set and not a fourth kind of object. **A board is a saved view, never a container.** There is no board file, no board database and no per-board state that a gesture has to rewrite, so a card cannot be lost by a drag and two devices cannot overwrite each other's board. Its lanes are the distinct values of its `group_by` property ordered by the view's `lanes`, every card is an ordinary note, and the properties a card shows are the view's `columns`. A drag writes **one property on one note** through the host-owned field command a table edit uses (`spec/protocol.md` §6.5), which is what makes it mergeable, undoable and unable to touch a card it did not move; a refused write leaves the note byte-identical and the card returns to the lane the note reports. A [lane rename](#lane) and a multi-card move are **one host-owned action with one restore**, writing every affected card through that same single-note command and contributing each pre-write snapshot to the session journal. Card order inside a lane is the view's `sort`, never a stored rank, and WIP limits are deliberately absent: per-lane limits would need a declared lane object, which is a format decision rather than an addition. Adding a card is a create plus one field write, from the view's `template` body when one is declared. The board is one implementation for all three clients; the drag is pointer-event based so a phone can use it, and the device gesture itself is a manual test surface. See [lane](#lane), [saved view](#saved-view), [view type](#view-type).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions/storage/0730`; `src/notes/views/boardView.tsx`, `src/notes/views/lanes.ts`
+
 ### **bottom bar** &nbsp; 📦 *Product*
 
 The 28px status bar pinned to the bottom of the editor (`BottomBar`, `src/screens/Editor.tsx`). Hosts the connection/sync status text, the [save-status](#optimistic-ui-rollback) badge, and the persistent affordances for the [tag browser](#tag-browser), Saved Views, the whole-vault graph, Settings, vault Lock, and the live document-statistics readout (characters / words / spaces / paragraphs — selection-scoped when a non-empty selection exists, the full breakdown in its hover title; MYND-339, reusing the `word-count` item id). **Bottom-bar customization** (2026-06-15) lets the user hide/show each item via a right-click context menu; the hidden set persists per-vault in the `vault.prefs` `hidden_bar_items` field (set semantics, omitted-when-empty — a fully-visible bar is byte-identical to a pre-feature vault). The bar root stays right-clickable even when fully emptied, which is the only restore path (no Settings-panel mirror). There is deliberately **no** separate top bar — the top controls float into the OS title-bar row (MYND-166).
@@ -881,6 +887,12 @@ The key-committing AEAD construction defined by Chan & Rogaway (ESORICS 2022) th
 
 Used in: `spec/protocol.md` §5.1
 Reference: Chan & Rogaway, "On Committing Authenticated Encryption", ESORICS 2022.
+
+### **capability summary** &nbsp; 📦 *Product*
+
+The description of what a [view manifest](#view-manifest)'s definition actually does, rendered before the user approves it (myne-md/myne#922). It is **derived, never declared**: the read set is the union of the view's `columns`, its `image` cover property, its `group_by`, its `sort.key`, and every `property` key that appears anywhere in its [filter AST](#filter-ast), plus the `write_fields` it asks to write. There is deliberately no `fields` key in the format and no "all properties" case in the derivation, so an author cannot understate what their view reads and a view that selects the whole vault says so in words rather than in a wildcard. It is the mitigation for the residual risk the design accepts, deception (`threat-model.md` §7): it tells the truth about **this** definition, in concrete sentence-shaped copy rather than a capability vocabulary, and it omits an empty section rather than printing "none". What it does not do is state intent, and it is not a signature: a manifest is unsigned data, so approving one is trusting its author's purpose with the behaviour of the definition in front of you. See [view manifest](#view-manifest), [view approval](#view-approval), [write intent](#write-intent).
+
+Used in: `src/notes/views/capabilitySummary.ts`, `src/components/ViewConsent.tsx`; `decisions/security/0727`
 
 ### **cursor-aware reveal** &nbsp; 📦 *Product*
 
@@ -1914,6 +1926,12 @@ Used in: `spec/protocol.md` §11
 One of a fixed, bounded set of named, theme-aware colors a [color label](#color-label) may take — six muted hue-named slots (matched to Myne's iron/ochre/brick/forest register, not bright Finder tags) plus "none". Defined as `--label-*` design tokens in `docs/design/colors_and_type.css` with light/dark value pairs mirroring the state tokens; the dot is a solid fill (no `-soft` variant). Slots are fixed and hue-named, **not** user-renamable, and are **not** a repurpose of the semantic state colors (`--danger` etc.) — a label must not read as a state. See also [color label](#color-label). (MYND-184)
 
 Used in: `decisions.md` 2026-06-07
+
+### **lane** &nbsp; 📦 *Product*
+
+One column of a [board](#board) (`board-view`, myne-md/myne#922): a distinct value of the view's `group_by` property, not a stored object and not a folder. The view declares the order in its `lanes` sub-field, and that declaration is the only thing the format holds; the lane values themselves come from the notes. Three rules follow from that shape and each is a behaviour rather than a detail. A **declared lane renders even with no cards**, because dropping a card into an empty lane is the ordinary way to start using it. A **value in the data and absent from the declaration is appended in first-appearance order**, so a status added today cannot hide the cards carrying it. And the array **preserves a repeated value verbatim**, while the renderer draws one lane per distinct value, which keeps the format honest about what the user declared without drawing the same column twice. Renaming a lane writes the new value on every card in it and updates `lanes` as [one host-owned action with one restore](#board). See [board](#board), [saved view](#saved-view).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions/storage/0730`; `src/notes/views/lanes.ts`
 
 ### **language pack (Tier 1)** &nbsp; 🛠️ *Tooling*
 A per-language CodeMirror 6 grammar package (`@codemirror/lang-*`, or a CM5 stream-mode from `@codemirror/legacy-modes`) that provides syntax tokenization for a fenced code block's body. "Tier 1" distinguishes these from the Tier-0 core editor packs: they are **hand-curated** (not pulled via `@codemirror/language-data`) to keep the dependency tree minimal (TB9), and **eager-imported** (revised 2026-05-29 from the original lazy plan, which didn't color reliably in the Tauri WebView). Adopted in the 2026-05-29 decision (MYND-154).
@@ -3236,6 +3254,8 @@ Used in: `spec/protocol.md` §3.1
 
 A named, **read-only** derived view over a vault's own plain-markdown notes (Saved Views epic, MYND-271) — a filter (over [properties](#property), tags, folders) + a sort + an optional `groupBy`, rendered as one of a closed set of [view types](#view-type). The Obsidian-Bases analogue, deliberately narrowed: **no database, no formula/code-eval** — only a declarative, closed-allow-list query (the query-engine sub-feature) over the derived property index. The view *definition* is authored content persisted in `vault.prefs` / `MYP1` (not the index blob); the data it queries lives in the rebuildable [vault.indices](#vaultindices) / `MYI1` cache. Because it is read-only over plain markdown with `.myn` as the source of truth, it does **not** violate the `vision.md` "no databases" / "no proprietary format" anti-features (same precedent class as the [search index](#search-index)); see `decisions.md` 2026-06-14 "Saved Views is a read-only derived projection over plain markdown, not a database". The [filter AST](#filter-ast) is created and edited through the **filter builder** UI — single-level filter groups over tag / folder / search / [property](#property) conditions, a deliberate representable subset of the AST's full nesting (MYND-282 + its property-condition follow-up).
 
+**Not a lost view when an older client reads it.** An entry whose view type (or filter node, operator, or sort direction) a reader does not implement is kept **verbatim** and re-emitted on the next `vault.prefs` write rather than treated as a parse failure — otherwise one newer view type would trip the §9.5.5 whole-blob fall-back-to-defaults, and the older client's next save would push that loss (theme, keymap, favorites included) to every synced device. Structural damage is still a parse failure. `view-manifests`, `protocol.md` §9.5.2 / §9.5.5.
+
 Used in: Saved Views (MYND-271, MYND-282); `decisions.md` 2026-06-14
 
 ### **scheduled backup** &nbsp; 📦 *Product*
@@ -4410,6 +4430,18 @@ A per-device monotonic counter map (`device_id → count`) embedded in and MAC'd
 
 Used in: `spec/sync-protocol.md` (vault head)
 
+### **view approval** &nbsp; 📦 *Product*
+
+The per-device decision that a [saved view](#saved-view) may run here (myne-md/myne#922; `view-manifests`). Stored as one row per view id in the [vault.prefs](#vaultprefs) `view_approvals` map, whose value is the definition **`version`** that was approved — the approval is a decision about specific bytes, not about an id. **Approved is an equality, not a flag**: the stored number must equal the view's current version, so an edit or an arrival that moves the version forward revokes the approval with no clear step and nothing to forget, and deleting a view prunes its row so a re-import of the same id asks again. A view carrying no version at all counts as approved, which is reachable only for a view this vault authored before the field existed, since the import reader refuses a manifest without one. **Device-local for the merge, and that is the point**: a view that arrives by sync is visible and refuses to run until somebody at that device approves it, which is the lesson `ai_provider_consent` paid for when a freshly enrolled device inherited a consent and began sending with nobody there having been asked. The gate is enforced where a view is **run** (`useViewResult`), so it refuses before the query fires and no door into the renderer (the sidebar flyout, a restored tab, a tab opened before an update arrived) can route around it; the manager's disabled control is the UX, not the enforcement. See [view manifest](#view-manifest), [capability summary](#capability-summary), [saved view](#saved-view).
+
+Used in: `spec/protocol.md` §9.5.2; `src/notes/views/viewApproval.ts`; `decisions/security/0727`
+
+### **view manifest** &nbsp; 📦 *Product*
+
+One `.myneview` file: a single canonical JSON object holding a [saved view](#saved-view)'s definition plus its `version` and the `write_fields` it declares (myne-md/myne#922; `view-manifests`). Export writes exactly the bytes the `vault.prefs` encoder produces and import accepts only that object, so the two directions cannot disagree about canonical form; both file operations are host commands, and the WebView never holds the file's bytes as the authority on them. The import reader is deliberately **stricter than the synced codec**: an unknown top-level key is refused with the key named, a `write_fields` entry naming a host-owned marker (`archived`, `trashed`, `deleted`) is refused rather than dropped, a wrong type or an absent `version` is refused — tolerance is for a synced blob whose author may be a newer client, strictness is for a file somebody handed you. Importing is an **ordered comparison rather than an overwrite**: a higher version replaces the definition and leaves it unapproved, identical canonical bytes at the same version is a no-op success, and the same version with different content or a lower version is refused with both numbers named, because either is a different author reusing an id or a file changed after sign-off. It is **unsigned data**: there is no registry, no signature and no network access, which is why the consent surface and [per-device approval](#view-approval) carry the whole weight. See [capability summary](#capability-summary), [write intent](#write-intent).
+
+Used in: `spec/protocol.md` §9.5.2; `decisions/security/0727`; `myne-test-vectors` (`saved-view`, `vault-prefs`)
+
 ### **view mode** &nbsp; 📦 *Product*
 
 The per-tab live / reading / source axis for a note tab (MYND-299) — the three ways a note's buffer renders: **live** (today's default, the [cursor-aware reveal](#cursor-aware-reveal) live-preview surface), **[reading](#reading-view)** (rendered, read-only, no reveal), and **[source](#source-mode)** (raw markdown, decorations off). Stored per tab as an optional `viewMode?: "live" | "reading" | "source"` field on each tab's [workspace](#named-workspace) descriptor item — engine-opaque inside `MYW1`, omit-when-default (absent ≡ live), serialized exactly like the existing `pinned` flag, **no** `workspace_format_version` bump for the field itself. The vault-wide **default** for newly-opened tabs is the separate MYP1 `editor_default_view_mode` field (enum string, omit-when-default, `live` canonical default). The primary Edit ⇄ Reading toggle is `Mod-Shift-E`; the secondary live ↔ source toggle has no default chord (command palette + the bottom-bar **view-mode switcher**, which reflects the current mode in `data-view-mode`). A read-only **preview companion** can open a [Reading-view](#reading-view) mirror of the same buffer side-by-side without a second editable instance. See also [Reading view](#reading-view), [Source mode](#source-mode), [cursor-aware reveal](#cursor-aware-reveal).
@@ -4424,9 +4456,9 @@ Used in: `spec/protocol.md` §9.5.2; Saved Views (MYND-273 / MYND-274)
 
 ### **view type** &nbsp; 📦 *Product*
 
-The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** (Obsidian-Bases' `map` is dropped, SYNC-5); all three ship — cards (MYND-275), table (MYND-277), list (MYND-278) — behind one `viewRenderHost` dispatch. Every view type renders the **same** grouped query result read-only — no editable cells, no kanban drag-columns — so the choice is purely presentational (cards add a cover [`image:`](#attachment) + groupBy headers; table renders the view's property columns; list reuses the note-list row). The view type is one field of the view definition stored in `vault.prefs` / `MYP1`.
+The render shape of a [saved view](#saved-view) (Saved Views epic, MYND-271). The closed v0.1 set is **table / cards / list** plus **board** (`board-view`, myne-md/myne#922; Obsidian-Bases' `map` is dropped, SYNC-5); all four ship: cards (MYND-275), table (MYND-277), list (MYND-278), board (myne-md/myne#922), behind one `viewRenderHost` dispatch. **Three of the four are strictly read-only over the same grouped query result**: table renders the view's property columns, cards add a cover [`image:`](#attachment) plus groupBy headers, and list reuses the note-list row, with no editable cells. **[Board](#board) is the exception and the reason this entry changed**: it renders the same result as lanes of cards, and it can write, but only through the host-owned single-property command and only for a property the view declares in `write_fields`. The type is one field of the view definition stored in `vault.prefs` / `MYP1`.
 
-Used in: Saved Views (MYND-271)
+Used in: Saved Views (MYND-271); `spec/protocol.md` §9.5.2; `decisions/storage/0730`
 
 ### **vim mode** &nbsp; 📦 *Product*
 
@@ -4512,6 +4544,12 @@ Used in: `myne-agents/features/editor-mvp-baseline/prd.md`, `spec/wikilink.md` �
 The two 32-byte Argon2id outputs (`password_wrap_key`, `recovery_wrap_key`) derived from the master password and recovery phrase respectively, cached on a **vault creation session** between `begin` and `commit`. Argon2id at the v0.1 baseline (`m_kib = 262_144`, `t = 3`, `p = 2`) takes ~1–2 seconds per call; deriving once at `begin` time and reusing at `commit` time eliminates a second ~2-second pass through the recovery-phrase Argon2id. The wrap keys are `Zeroizing<[u8; 32]>`; they are wiped when the session is dropped (commit, cancel, or TTL eviction).
 
 Used in: `decisions.md` 2026-04-28 "Vault creation flow"
+
+### **write intent** &nbsp; 📦 *Product*
+
+The one shape in which a [view manifest](#view-manifest) may change a note: a tuple naming the note, the view, the property, the value the caller expected to find and the value to write (myne-md/myne#922). There is no second write path, no batch verb and no way for a definition to ask for "a write" in the abstract. The **host owns every check**, in this order: the view is approved on this device, the property is in its `write_fields`, the property is not one of the host-managed markers, the value on disk still equals the expected one, and the note is unlocked. Only then does a narrow Rust patcher replace that single key as a string scalar through the ordinary edit path, so the CRDT records a minimal splice and the pre-overwrite snapshot rule still runs. A refusal is a closed enum naming its reason (`NotApproved`, `FieldNotDeclared`, `FieldReserved`, `FieldChanged`, `VaultLocked`, and the rest) and **writes nothing**. The value-anchored precondition is the interesting part: a change anywhere else in the note does not block the write, which is what makes editing a note while a view is open usable, and a change to the property itself does block it, so a stale write is refused rather than silently overwriting somebody's newer value. That precondition is an application-level guard rather than a cryptographic freshness property (`spec/protocol.md` §6.5). See [view approval](#view-approval), [view manifest](#view-manifest).
+
+Used in: `spec/protocol.md` §6.5; `src/notes/setNoteField.ts`; `decisions/security/0727`
 
 ### **X25519** &nbsp; 🔐 *Primitive*
 

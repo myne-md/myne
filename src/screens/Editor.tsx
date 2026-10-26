@@ -121,6 +121,7 @@ import {
 } from "../lib/aiOnboardingSeen";
 import { has } from "../platform/capabilities";
 import { NewNoteFromTemplateModal } from "../components/NewNoteFromTemplateModal";
+import { ViewsManager } from "../components/ViewsManager";
 import { Toast, type ToastAction, type ToastVariant } from "../components/Toast";
 import { NoteExportModal } from "../components/export/NoteExportModal";
 import { ObsidianImportModal } from "../notes/import/ObsidianImportModal";
@@ -207,6 +208,7 @@ import { AiChatTab } from "../notes/components/AiChatTab";
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
+import { NOTE_FIELD_WRITE_EVENT } from "../notes/setNoteField";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
 import { AGENT_NOTES_CHANGED_EVENT } from "../lib/agent-events";
@@ -1140,6 +1142,17 @@ function EditorChrome({
     window.addEventListener(TASK_WRITE_EVENT, onWritten);
     return () => window.removeEventListener(TASK_WRITE_EVENT, onWritten);
   }, [ctx]);
+  // A saved view's field write (`setNoteField`, view-manifests) is the same
+  // shape one layer over: the host patches one frontmatter key on disk, out of
+  // band of any pane's autosave, so every open pane must re-read. Same blanket
+  // bump and the same per-pane dirty guard, which is why a bulk set that lands on
+  // a note this editor holds does not clobber keystrokes typed a moment later.
+  useEffect(() => {
+    const onFieldWritten = (): void => ctx.reloadOpenNote();
+    window.addEventListener(NOTE_FIELD_WRITE_EVENT, onFieldWritten);
+    return () =>
+      window.removeEventListener(NOTE_FIELD_WRITE_EVENT, onFieldWritten);
+  }, [ctx]);
   // Editor task-field chip activation (MYND-614 tasks 6 + 7): the chip
   // decoration dispatches a bubbling `myne-open-task-chip` event; open the
   // field editor anchored to that chip and write the result back through the
@@ -1153,6 +1166,11 @@ function EditorChrome({
   // SAME implementation (`installTaskChipEditor`) rather than two copies.
   useEffect(() => installTaskChipEditor(), []);
   const [newFromTemplateOpen, setNewFromTemplateOpen] = useState<boolean>(false);
+  // The Views manager (view-manifests): an Editor-local boolean, like every
+  // other desktop modal carve-out. It is reachable from the palette regardless
+  // of the device-local Views toggle, because that toggle hides the sidebar
+  // flyout and a hidden door must not strand the views behind it.
+  const [viewsManagerOpen, setViewsManagerOpen] = useState<boolean>(false);
   // Bottom-bar readout (save status + word count) - reported up by
   // whichever PaneView is currently focused (MYND-166). Per-pane PaneViews
   // own content load, autosave, word count, and the surgical sidebar
@@ -2953,6 +2971,10 @@ function EditorChrome({
           }}
         />
       ) : null}
+      <ViewsManager
+        open={viewsManagerOpen}
+        onClose={() => setViewsManagerOpen(false)}
+      />
       <NewNoteFromTemplateModal
         open={newFromTemplateOpen}
         onClose={() => setNewFromTemplateOpen(false)}
@@ -3034,6 +3056,10 @@ function EditorChrome({
         onManageTemplates={() => {
           setPaletteOpen(false);
           ws.openTemplates();
+        }}
+        onManageViews={() => {
+          setPaletteOpen(false);
+          setViewsManagerOpen(true);
         }}
         onNewNoteFromTemplate={() => {
           setPaletteOpen(false);
@@ -3477,6 +3503,7 @@ type CommandPaletteHostProps = {
   onOpenSettings: () => void;
   onOpenAttachments: () => void;
   onManageTemplates: () => void;
+  onManageViews: () => void;
   onNewNoteFromTemplate: () => void;
   onOpenSnapshots: () => void;
   onExportNoteMarkdown: () => void;
@@ -3531,6 +3558,7 @@ function CommandPaletteHost({
   onRestoreBackup,
   onOpenAttachments,
   onManageTemplates,
+  onManageViews,
   onNewNoteFromTemplate,
   onOpenSnapshots,
   onExportNoteMarkdown,
@@ -4057,6 +4085,7 @@ function CommandPaletteHost({
       paletteOpen: open,
       onOpenSettings,
       onManageTemplates,
+      onManageViews,
       onNewNoteFromTemplate,
       onOpenPeriodNote,
       onOpenRandomNote,
@@ -4125,6 +4154,7 @@ function CommandPaletteHost({
       open,
       onOpenSettings,
       onManageTemplates,
+      onManageViews,
       onNewNoteFromTemplate,
       onOpenPeriodNote,
       onOpenRandomNote,

@@ -23,6 +23,10 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { viewsEnabled, VIEWS_ENABLED_EVENT } from "../../lib/viewsEnabled";
+import { orderSavedViews } from "../views/orderSavedViews";
+import { isViewApproved } from "../views/viewApproval";
+import { saveLocalViewEdit } from "../views/saveViewEdit";
+import { canExportViewManifest, exportViewManifest } from "../exportViewManifest";
 import { VISUALLY_HIDDEN } from "../../components/primitives/visuallyHidden";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { SidebarSearchRow } from "./SidebarSearchRow";
@@ -805,21 +809,13 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
   // double read, and a save from a sibling surface like the Tag browser lands
   // here too).
   const { prefs: viewsPrefs } = usePrefs();
-  const orderedViews = useMemo<SavedView[]>(() => {
-    const byId = new Map(viewsPrefs.saved_views.map((v) => [v.id, v]));
-    const ordered: SavedView[] = [];
-    for (const id of viewsPrefs.view_order) {
-      const v = byId.get(id);
-      if (v !== undefined) {
-        ordered.push(v);
-        byId.delete(id);
-      }
-    }
-    for (const v of viewsPrefs.saved_views) {
-      if (byId.has(v.id)) ordered.push(v);
-    }
-    return ordered;
-  }, [viewsPrefs.saved_views, viewsPrefs.view_order]);
+  // The join of `saved_views` with `view_order` lives in one pure helper now
+  // that the Views manager needs the same order: two copies of "walk the order,
+  // then append the leftovers" are two answers waiting to disagree.
+  const orderedViews = useMemo<SavedView[]>(
+    () => orderSavedViews(viewsPrefs.saved_views, viewsPrefs.view_order),
+    [viewsPrefs.saved_views, viewsPrefs.view_order],
+  );
   // Views feature toggle (device-local): the "Views" entry shows only when
   // enabled. Effective = stored pref, else back-compat default (has any views).
   // Re-read on the change event so the sidebar reflects the Settings toggle live.
@@ -859,7 +855,16 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
       void (async () => {
         try {
           if (current?.mode === "edit") {
-            await upsertSavedView({ ...current.view, filters });
+            // A local edit: the definition and (where this device already
+            // approved the view) the approval of its new version land in ONE
+            // prefs write, so editing your own view never leaves it unapproved.
+            const stored = viewsPrefs.saved_views.find((v) => v.id === current.view.id);
+            const previous = stored ?? current.view;
+            await saveLocalViewEdit(
+              previous,
+              { ...current.view, filters },
+              isViewApproved(previous, viewsPrefs.view_approvals),
+            );
           } else {
             const id = crypto.randomUUID();
             await upsertSavedView({ id, name: "New view", view_type: "cards", filters });
@@ -870,7 +875,7 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
         }
       })();
     },
-    [builder, ws],
+    [builder, ws, viewsPrefs.saved_views, viewsPrefs.view_approvals],
   );
   // View display settings (cards cover image / aspect ratio / card size). A
   // sibling of the filter builder: a separate modal opened from the ViewsSection
@@ -895,13 +900,17 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
       // matching the Rust `skip_serializing_if = "None"` on these fields.
       void (async () => {
         try {
-          await upsertSavedView({ ...current, ...patch });
+          await saveLocalViewEdit(
+            current,
+            { ...current, ...patch },
+            isViewApproved(current, viewsPrefs.view_approvals),
+          );
         } catch {
           /* surfaced via backend tracing */
         }
       })();
     },
-    [viewSettings],
+    [viewSettings, viewsPrefs.view_approvals],
   );
   // The vault's frontmatter property-key universe — the option set for the view
   // settings' group / sort / column pickers + cover-image suggestions. Loaded
@@ -933,7 +942,11 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
       if (view === undefined) return;
       void (async () => {
         try {
-          await upsertSavedView({ ...view, name });
+          await saveLocalViewEdit(
+            view,
+            { ...view, name },
+            isViewApproved(view, viewsPrefs.view_approvals),
+          );
         } catch {
           /* surfaced via backend tracing */
         }
@@ -1382,7 +1395,19 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
             image: viewSettings.image,
             image_aspect_ratio: viewSettings.image_aspect_ratio,
             card_size: viewSettings.card_size,
+            write_fields: viewSettings.write_fields,
           }}
+          version={viewSettings.version}
+          // Export is offered only where the host has a path-taking save dialog
+          // (desktop). The web client cannot write the file and cannot import one
+          // either, so the action is absent there rather than half-present.
+          onExport={
+            canExportViewManifest()
+              ? () => {
+                  void exportViewManifest(viewSettings);
+                }
+              : undefined
+          }
           propertyKeys={viewPropertyKeys}
           onCancel={() => setViewSettings(null)}
           onSave={handleSaveViewSettings}

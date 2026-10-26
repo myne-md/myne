@@ -11,7 +11,7 @@ import type {
   ReactNode,
 } from "react";
 import { VIEW_TESTID } from "./viewLayout";
-import type { CardContextMenuHandler, OpenNoteHandler } from "./cardsView";
+import type { CardContextMenuHandler, OpenNoteHandler } from "./card";
 
 /**
  * The note-open click matrix shared by the table + list rows — identical to the

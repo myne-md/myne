@@ -39,6 +39,12 @@
       "@myne/ornaments/*": ["../ornaments/src/*"],
       "@myne/task-wire": ["../src/notes/taskWire.ts"],
       "@myne/graph-overlay": ["../src/notes/graphOverlay.ts"],
+      "@myne/view-version": ["../src/notes/views/viewVersion.ts"],
+      // The board renderer (myne-md/myne#922). ONE implementation for desktop
+      // and mobile: a board is a projection over notes, and a second copy would
+      // be a second answer to "which lane is this card in". Exact specifier,
+      // like the others here.
+      "@myne/board-view": ["../src/notes/views/boardView.tsx"],
       "@myne/graph-color-groups": ["../src/notes/graphColorGroups.ts"],
       "@myne/task-panel": ["../src/notes/components/TaskListPanel.tsx"],
       "@myne/task-filters": ["../src/notes/taskFilters.ts"],

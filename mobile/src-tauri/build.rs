@@ -164,6 +164,7 @@ fn main() {
                     "note_create",
                     "note_read",
                     "note_update",
+                    "note_set_field",
                     "note_write_batch_transactional",
                     "note_delete",
                     "note_list",

@@ -218,6 +218,16 @@ fn main() {
                 // belt-and-suspenders pattern).
                 "set_chat_history_budget",
                 "set_developer_mode",
+                // view-manifests: the device-local view approval map. Both this
+                // mirror and permissions/prefs/default.toml must name it, or the
+                // `plugin:prefs|set_view_approval` authorize form never matches.
+                "set_view_approval",
+                // view-manifests: the `.myneview` export. Both this mirror and
+                // permissions/prefs/default.toml must name it, or the
+                // `plugin:prefs|export_view_manifest` authorize form never
+                // matches.
+                "export_view_manifest",
+                "read_view_manifest",
             ]),
         )
         .plugin(
@@ -279,6 +289,7 @@ fn main() {
                 "note_create",
                 "note_read",
                 "note_update",
+                "note_set_field",
                 "note_write_batch_transactional",
                 "note_delete",
                 "note_list",

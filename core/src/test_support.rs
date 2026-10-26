@@ -396,6 +396,12 @@ pub struct RecordingHooks {
     purge_saw_live_note: std::sync::Mutex<Vec<bool>>,
     /// What `purge_note_snapshots` does after recording.
     purge_behaviour: PurgeBehaviour,
+    /// The snapshot id `capture_snapshot_reporting` reports. `None` means the
+    /// recorder behaves like a client with no snapshot subsystem: the capture
+    /// reports `Coalesced`, so a caller that groups writes learns it has no
+    /// restore point. Set it to prove the id-bearing path end to end without a
+    /// real snapshot store.
+    snapshot_id: Option<String>,
 }
 
 /// What [`RecordingHooks::purge_note_snapshots`] does after it records.
@@ -445,6 +451,20 @@ impl RecordingHooks {
             indices: None,
             purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
             purge_behaviour: PurgeBehaviour::Record,
+            snapshot_id: None,
+        })
+    }
+
+    /// A recorder that REPORTS a captured snapshot id, so a caller which groups
+    /// several writes into one undo can be tested for the ids it collects.
+    pub fn capturing_snapshots(snapshot_id: &str) -> std::sync::Arc<Self> {
+        std::sync::Arc::new(Self {
+            calls: std::sync::Mutex::new(Vec::new()),
+            index_calls: std::sync::Mutex::new(Vec::new()),
+            indices: None,
+            purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
+            purge_behaviour: PurgeBehaviour::Record,
+            snapshot_id: Some(snapshot_id.to_string()),
         })
     }
 
@@ -457,6 +477,7 @@ impl RecordingHooks {
             indices: None,
             purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
             purge_behaviour: PurgeBehaviour::Panic,
+            snapshot_id: None,
         })
     }
 
@@ -484,6 +505,7 @@ impl RecordingHooks {
             indices: Some(indices),
             purge_saw_live_note: std::sync::Mutex::new(Vec::new()),
             purge_behaviour: PurgeBehaviour::Record,
+            snapshot_id: None,
         })
     }
 
@@ -634,6 +656,20 @@ impl crate::hooks::VaultLifecycleHooks for RecordingHooks {
     fn invalidate_quick_unlock(&self, _: &Path) {}
     fn capture_snapshot(&self, _: &Path, _: &str, _: &[u8], _: u64, _: bool) -> bool {
         false
+    }
+    fn capture_snapshot_reporting(
+        &self,
+        _: &Path,
+        _: &str,
+        _: &[u8],
+        _: u64,
+        _: bool,
+    ) -> crate::snapshot_store::CaptureOutcome {
+        self.record("capture_snapshot_reporting");
+        match &self.snapshot_id {
+            Some(id) => crate::snapshot_store::CaptureOutcome::Captured(id.clone()),
+            None => crate::snapshot_store::CaptureOutcome::Coalesced,
+        }
     }
     fn purge_note_snapshots(&self, vault_root: &Path, note_uuid: &str) -> std::io::Result<usize> {
         // Recorded in its OWN vector rather than in `calls`: that one is compared

@@ -349,6 +349,12 @@ export interface MockConfig {
     string,
     Array<[string, { key: string; type: string; value?: string; elements?: Array<{ type: string; value: string }> }]>
   >;
+  /** Make `note_set_field` REFUSE with this host reason (`{ kind }`) instead of
+   *  answering. The board's drag is one field write, so this is how a spec
+   *  drives the arm the board exists to survive: a value that changed elsewhere
+   *  (or a view that no longer declares the field), the card going back where
+   *  the NOTE says it is, and the reason stated as a line. */
+  fieldWriteRefusal?: { kind: string };
   /** Make `vault_indices_all_edges` reject so the graph falls back to
    *  client-extracted wikilink edges over the seeded `notes` bodies (the graph
    *  flow's edge source — real extraction, no canned edge dump to drift). */
@@ -1828,6 +1834,23 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // editor takes as its record of what the session holds. With no peer in
         // this tier nothing merges, so it is the text that was sent.
         return text;
+      },
+      // The view-scoped field write a board's drag performs (myne-md/myne#922).
+      // It is answered HERE because the board is one module on both clients: the
+      // phone's gesture reaches the same `commitBoardDrop`, so a drop is one
+      // `note_set_field` naming the lane VALUE it was dropped on. The call is
+      // recorded under its own global, which is the only way a spec can assert
+      // WHICH lane a release resolved to: the board places the card
+      // optimistically, so the pixels agree whether or not the write was right.
+      // `fieldWriteRefusal` is the host's refusal arm (a conflicting value, an
+      // undeclared field), and throwing is how the real command rejects.
+      "plugin:notes|note_set_field": (args) => {
+        const w = window as unknown as { __noteSetFields?: unknown[] };
+        (w.__noteSetFields ??= []).push(args);
+        if (config.fieldWriteRefusal) throw config.fieldWriteRefusal;
+        // No snapshot in this tier: a grouped restore is the host's journal, and
+        // what a spec observes here is the write itself.
+        return null;
       },
       // The live-session commands (epic live-collab; mobile asks for them since
       // myne-md/myne#849). The EDITOR routes an open note's saves through the

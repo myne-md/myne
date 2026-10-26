@@ -31,6 +31,7 @@
 
 import { clearAgentForLock } from "../notes/agent/agentStore";
 import { clearAwareness } from "../notes/collab/awarenessStore";
+import { clearBulkUndoForLock } from "../notes/views/bulkUndoJournal";
 import { clearChat } from "../notes/ai/chatStore";
 import { clearChatPersistForLock } from "../notes/ai/chatPersist";
 import { resetDateTimeDisplayForLock } from "@myne/editor/host/lib/datetimeFormat";
@@ -127,6 +128,11 @@ export async function leaveActiveVault(deps: {
   // the previous one's participants. The `lockVault()` above clears it too; asserted
   // separately here for the same reason the two below are.
   clearAwareness();
+  // And the bulk field journal, for the reason that is specific to a CHANGE: the
+  // snapshots it names belong to the vault being left. `lockVault()` above clears
+  // it too; asserted separately here because a later refactor could stop routing
+  // through that call without anything noticing.
+  clearBulkUndoForLock();
   // And the chat transcript, for the reason that is specific to a CHANGE: the
   // questions and answers describe the vault being left, so carrying them into
   // the next one would show a second vault a first vault's conversation. The

@@ -126,6 +126,11 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_view_order",
     "plugin:prefs|set_bar_items_order",
     "plugin:prefs|set_color_groups",
+    // view-manifests: the device-local approval map. Dispatched rather than
+    // absent for the same reason as `set_developer_mode` below: the value lives in
+    // `vault.prefs`, which every client round-trips, even where the feature that
+    // consumes it has no affordance yet.
+    "plugin:prefs|set_view_approval",
     "plugin:prefs|set_right_panel_active_tab",
     "plugin:prefs|set_right_panel_hidden_tabs",
     "plugin:prefs|set_right_panel_tab_order",
@@ -409,6 +414,12 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:notes|note_titles_batch",
     "plugin:notes|note_create",
     "plugin:notes|note_update",
+    // view-manifests: the host-owned field write. Dispatched because the whole
+    // decision lives in `myne-core` and reads nothing a browser lacks — the
+    // approval map comes from `vault.prefs` (already dispatched), the splice is
+    // byte surgery on plaintext, and the snapshot reporting degrades to `None`
+    // where the web client captures none.
+    "plugin:notes|note_set_field",
     "plugin:notes|note_delete",
     "plugin:notes|note_write_batch_transactional",
     // Tasks 14 + 83 — the `MYS1` index, its lifecycle hooks and the query door.
