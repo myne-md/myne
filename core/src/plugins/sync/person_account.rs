@@ -263,6 +263,9 @@ pub async fn person_create_identity_from_host(
         kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
         ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
         mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: None,
+        device_salt_hex: None,
+        device_iterations: None,
     };
 
     // The vault-bound carrier is a NATIVE convenience and stays off wasm32
@@ -383,6 +386,9 @@ pub async fn person_recover_identity_from_host(
             kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
             ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
             mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+            device_secret_hex: None,
+            device_salt_hex: None,
+            device_iterations: None,
         },
     };
 
@@ -541,6 +547,9 @@ pub async fn person_register_with_path(
         kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
         ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
         mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: None,
+        device_salt_hex: None,
+        device_iterations: None,
     };
     let path = person_auth_path(host, io).await.map_err(|_| {
         // The credential write is the only act that could leave the device
@@ -4584,6 +4593,9 @@ mod tests {
                     kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
                     ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
                     mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+                    device_secret_hex: None,
+                    device_salt_hex: None,
+                    device_iterations: None,
                 },
             )
             .await
