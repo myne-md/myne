@@ -494,7 +494,7 @@ async fn create_notes(
     default_folder: Option<&str>,
     // **The same canonical set the MOVE verb is checked against** (myne-md/myne#913,
     // review round five). The prompt says a new note's folder must be one the vault
-    // has, and `decisions/ai/0720` states that the apply half is what makes a wrong
+    // has, and `decisions/ai/0741` states that the apply half is what makes a wrong
     // one impossible; without this the sibling verb could still create `Areas`
     // beside the user's `02 - AREAS`, which is the exact report that rule exists for.
     known_folders: &BTreeSet<String>,
@@ -2141,7 +2141,7 @@ mod tests {
     /// five). The move verb refused one and the create verb accepted any name,
     /// so `propose_note {folder: "Areas"}` still produced a top-level `Areas`
     /// beside the user's `02 - AREAS`, which is the report
-    /// `decisions/ai/0720` exists for. Refused, and nothing written.
+    /// `decisions/ai/0741` exists for. Refused, and nothing written.
     #[test]
     fn a_new_note_in_a_folder_the_vault_lacks_is_refused() {
         let runs = AgentRunState::default();

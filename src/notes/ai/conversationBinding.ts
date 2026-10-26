@@ -14,7 +14,7 @@
 //    the new note, the defect the note binding exists to remove.
 //
 // Module state is the level that matches the promise: both are SESSION scoped
-// (see `design-notes/ai/0719`), and the session outlives a tab switch. The
+// (see `design-notes/ai/0740`), and the session outlives a tab switch. The
 // vault does not: `resetConversationBinding()` runs on lock teardown, so a
 // pinned conversation does not survive into the next unlock.
 

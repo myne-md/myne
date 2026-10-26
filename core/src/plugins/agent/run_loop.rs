@@ -1881,17 +1881,18 @@ mod tests {
     /// The `remember` verb's test double: records actions, answers ids.
     struct MemStore {
         writes: Mutex<Vec<String>>,
-        entries: Mutex<Vec<(String, String)>>,
+        entries: Mutex<Vec<crate::plugins::agent::memory::MemoryInjectionEntry>>,
     }
 
     impl MemStore {
         fn new() -> Self {
             Self {
                 writes: Mutex::new(Vec::new()),
-                entries: Mutex::new(vec![(
-                    "0184a2b3c4d5e6f708192a3b4c5d6e7f".to_string(),
-                    "The user prefers concise answers.".to_string(),
-                )]),
+                entries: Mutex::new(vec![crate::plugins::agent::memory::MemoryInjectionEntry {
+                    id: "0184a2b3c4d5e6f708192a3b4c5d6e7f".to_string(),
+                    text: "The user prefers concise answers.".to_string(),
+                    from_seed: false,
+                }]),
             }
         }
     }
@@ -1899,7 +1900,9 @@ mod tests {
     #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
     #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
     impl MemoryStore for MemStore {
-        async fn memory_for_injection(&self) -> Result<Vec<(String, String)>, AgentError> {
+        async fn memory_for_injection(
+            &self,
+        ) -> Result<Vec<crate::plugins::agent::memory::MemoryInjectionEntry>, AgentError> {
             Ok(self.entries.lock().unwrap().clone())
         }
         async fn personality_for_injection(&self) -> Result<PersonalityView, AgentError> {

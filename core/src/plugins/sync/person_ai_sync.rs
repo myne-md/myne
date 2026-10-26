@@ -717,6 +717,7 @@ mod tests {
             updated_at: version,
             version,
             quarantined: false,
+            origin: None,
         };
 
         let seal_catalog = |map: &MemoryCatalogMap| {

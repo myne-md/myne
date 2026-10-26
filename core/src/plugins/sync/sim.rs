@@ -1506,6 +1506,7 @@ fn memory_entry_reaches_a_device_that_never_authored_one() {
     // A authors one memory the way the plugin does: the catalog singleton plus
     // one entry file, each sealed under its own family KEK.
     let row = MemoryEntryRow {
+        origin: None,
         created_at: 1,
         deleted_at: None,
         updated_at: 100,

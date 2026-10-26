@@ -272,6 +272,9 @@ export const ROSTER = Object.freeze([
       "src/notes/agent/agentStore.ts",
       "src/notes/components/MemoryPopover.tsx",
       "src/components/settings/MemorySection.tsx",
+      "src/components/settings/SeedMemoryWizard.tsx",
+      "src/notes/components/SeedMemoryCard.tsx",
+      "src/lib/seed-memory.ts",
       "src-tauri/src/plugins/local_inference/",
       "src-tauri/src/plugins/memory/",
       "core/src/plugins/memory/",
@@ -298,10 +301,18 @@ export const ROSTER = Object.freeze([
       "e2e/ai-remote-providers.e2e.ts",
       "e2e/chat-history.e2e.ts",
       "e2e/memory.e2e.ts",
+      "e2e/seed-memory.e2e.ts",
       "e2e-web/chat-history-reload.e2e.ts",
       "mobile/tests/flow-logic/ai/chat-history.flow.ts",
     ],
     manual: [
+      {
+        see: "On a DISPOSABLE vault with a real generation model side-loaded, open Settings → AI → Memory, start Teach Myne your vault, and read the scope step: confirm the counts match the vault, expand the payload and confirm it carries titles/folders/tags and no note body, then run it. On the review step confirm the three to ten entries are plausible summaries rather than copied titles, uncheck one, edit one, and save. Open the Memory panel and confirm the saved entries appear under From your vault, then press Remove all and confirm only those entries disappear. Repeat once with a remote provider and confirm the run refuses until the consent box names that provider.",
+        whyNotAutomated: "Whether a distilled entry is a fair summary of the vault, and whether an edited one reads the way the user meant, is a judgement about model output; the stub answers three fixed strings so every assertion around it is about the flow rather than about quality. The remote-consent half needs a real provider and a real key, which no test fake may occupy.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
       {
         see: "With a real generation model side-loaded, ask three questions whose answers are in the vault and one whose answer is not. For each: read the answer against the cited notes and confirm it is actually supported by them, click each citation and confirm it opens the note it names, and confirm the out-of-vault question is answered with an \"I don't know\" rather than an invented one. Check the visible scope count is plausible for the vault.",
         whyNotAutomated: "Every AI scenario runs StubEngine behind --features local-inference-stub, so no Candle/GGUF weights ever load; whether an answer is supported by the notes it cites is a judgement no assertion expresses.",

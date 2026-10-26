@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! `memory` Tauri plugin (mobile shim).
 //!
-//! Owns the six agent-memory storage commands (the `vault.agent-memory`
+//! Owns the agent-memory storage commands (the `vault.agent-memory`
 //! `MYN1` catalog + `memories/<id-hex>` `MYX1` per-entry files + the
 //! `vault.personality` `MYZ1` singleton, myne-md/myne#697,
 //! `protocol.md` § 9.25 / § 9.26 / § 9.27). All Slot::Unlocked-gated; all
@@ -11,7 +11,12 @@
 //!
 //! ## Capability ACL
 //!
-//! `memory:default` bundles the six allow-* permissions, main-window-only.
+//! `memory:default` bundles the six storage allow-* permissions,
+//! main-window-only. The reviewed seed's batch write
+//! (`memory_seed_apply`, myne-md/myne#915) is REGISTERED here for roster parity
+//! with the desktop shim and is deliberately NOT granted on this client: the
+//! seed is desktop-only by product decision, so the phone holds no permission
+//! for it and the command is unreachable rather than merely unrendered.
 //!
 //! See: `src-tauri/AGENTS.md` (main repo) "Secret-handling logging discipline".
 
@@ -34,6 +39,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::memory_read,
             commands::memory_write,
             commands::memory_delete,
+            // Desktop-only feature, registered for shim parity; the mobile
+            // capability grants no permission for it (see the module doc).
+            commands::memory_seed_apply,
             commands::personality_read,
             commands::personality_write,
         ])
