@@ -30,6 +30,7 @@ function summary(over: Partial<VaultSummary> & { id: string }): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
     ...over,
   };
 }
@@ -54,6 +55,61 @@ function renderSwitcher(
   const utils = render(<VaultSwitcher {...props} />);
   return { ...utils, props };
 }
+
+describe("VaultSwitcher: the invitations row", () => {
+  // The failure these pin: an invitation is addressed to a REGISTERED person
+  // account, so a device whose identity is `reserved` or `pending` lists nothing.
+  // A purely count-driven row therefore showed nothing at all, and the invitee
+  // waited in silence. The owner's invitation existed and no surface said why it
+  // could not appear. The row is still one row and one door; it just says which
+  // state it is in.
+
+  async function openMenu(over: Partial<Parameters<typeof VaultSwitcher>[0]>) {
+    renderSwitcher([summary({ id: "v1", label: "Solo", last_unlock: 2000 })], {
+      onInvites: vi.fn(),
+      ...over,
+    });
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await waitFor(() => expect(screen.getByTestId("switcher.invites-notice")).toBeTruthy());
+  }
+
+  it("shows a count when the identity can list its invitations", async () => {
+    await openMenu({ inviteCount: 2 });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("count");
+    expect(row.textContent).toBe("2 invitations waiting");
+  });
+
+  it("keeps the row for an unregistered identity, and opens the same door", async () => {
+    const onInvites = vi.fn();
+    await openMenu({ inviteCount: 0, invitesUnavailable: "not-enrolled", onInvites });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("not-enrolled");
+    expect(row.textContent).toBe("Register this identity to see invitations");
+    fireEvent.click(row);
+    expect(onInvites).toHaveBeenCalledTimes(1);
+  });
+
+  it("says a pending device is waiting for approval rather than offering a remedy", async () => {
+    await openMenu({ inviteCount: 0, invitesUnavailable: "pending" });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("pending");
+    expect(row.textContent).toBe("Invitations cannot be listed until this device is approved");
+  });
+
+  it("renders no row when there is no identity at all", async () => {
+    renderSwitcher([summary({ id: "v1", label: "Solo", last_unlock: 2000 })], {
+      inviteCount: 0,
+      invitesUnavailable: "no-identity",
+      onInvites: vi.fn(),
+    });
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await waitFor(() => expect(screen.getByTestId("switcher.create-cta")).toBeTruthy());
+    expect(screen.queryByTestId("switcher.invites-notice")).toBeNull();
+  });
+});
 
 describe("VaultSwitcher — render gates", () => {
   it("renders nothing once the probe returns zero vaults", async () => {
@@ -347,5 +403,32 @@ describe("VaultSwitcher — dropdown", () => {
     expect((screen.getByTestId("switcher.chip") as HTMLButtonElement).disabled).toBe(
       true,
     );
+  });
+});
+
+// Whether the vault in the row exists anywhere but this machine
+// (myne-md/myne#911 task 8). The switcher is how a user moves between vaults
+// mid-session, so it is a place the fact has to be readable; both directions are
+// asserted because a marker that never clears reads as "nothing is published".
+describe("VaultSwitcher: the publish state", () => {
+  it("marks only the rows that exist on this device alone", async () => {
+    renderSwitcher([
+      summary({ id: "v1", label: "Work" }),
+      summary({ id: "v2", label: "Home", published: true }),
+    ]);
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    const rows = await screen.findAllByTestId("switcher.vault-row");
+    const row = (id: string) => {
+      const found = rows.find((r) => r.getAttribute("data-vault-id") === id);
+      if (found === undefined) throw new Error(`no row for ${id}`);
+      return found;
+    };
+    // The state itself, not only its wording: a copy edit must not be able to
+    // make this test pass while the marker disappears.
+    expect(row("v1").getAttribute("data-publish")).toBe("device-only");
+    expect(row("v1").textContent).toContain("Device only");
+    expect(row("v2").getAttribute("data-publish")).toBe("published");
+    expect(row("v2").textContent).not.toContain("Device only");
   });
 });

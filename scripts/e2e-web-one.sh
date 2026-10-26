@@ -51,6 +51,10 @@ if [ ! -f "web/dist/index.html" ]; then
   echo "no built bundle at web/dist — run 'pnpm web:build' first." >&2
   exit 2
 fi
+# This runner reuses `web/dist` on purpose, and that is exactly where a stale
+# `web/wasm/pkg` hides: a rebuilt JS bundle over an older Rust binary. Same gate
+# as `e2e-web-local.sh`, same reason.
+node scripts/check-web-wasm-freshness.mjs || exit 2
 
 DRIVER_PORT=4544
 "$DRIVER_BIN" --port="$DRIVER_PORT" >/tmp/myne-web-e2e-driver.log 2>&1 &

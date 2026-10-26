@@ -1003,6 +1003,7 @@ function verifyInitialStageFromProbe(): void {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   });
   const corruptVault = (id: VaultId): VaultSummary => ({
     id,
@@ -1010,6 +1011,7 @@ function verifyInitialStageFromProbe(): void {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   });
   const okList = (...vaults: VaultSummary[]): VaultListResult => ({ ok: vaults });
   const errList = (ioKind: IoFailureKind): VaultListResult => ({

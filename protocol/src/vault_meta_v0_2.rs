@@ -76,8 +76,8 @@ pub struct B2bVaultMeta {
     pub signed_roster_envelope: Vec<u8>,
 }
 
-const B2B_ROSTER_ENVELOPE_CAP: usize = MEMBERSHIP_ROSTER_CT_CAP;
-const B2B_META_FIXED_LEN: usize =
+pub(crate) const B2B_ROSTER_ENVELOPE_CAP: usize = MEMBERSHIP_ROSTER_CT_CAP;
+pub(crate) const B2B_META_FIXED_LEN: usize =
     VAULT_META_LEN + AEAD_NONCE_LEN + VAULT_META_WRAPPED_ITEMS_KEY_LEN + 8 + 4;
 
 /// Serialize an `NTV6` B2B metadata frame. The caller supplies a previously
@@ -359,49 +359,122 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
     Ok(meta)
 }
 
-/// Classify a `vault.meta` blob by its magic — `MYV1` → [`MetaVersion::V0_1`],
-/// `NTV5` → [`MetaVersion::V0_2`], anything else → `None`. Every version-aware
-/// reader uses this to pick its crypto generation from the vault it just read.
+/// Classify a `vault.meta` blob by its magic, `MYV1` to [`MetaVersion::V0_1`],
+/// `NTV5` / `NTV6` / `NTV7` to [`MetaVersion::V0_2`], anything else to `None`.
+/// Every version-aware reader uses this to pick its crypto generation from the
+/// vault it just read.
 pub fn meta_version_of(bytes: &[u8]) -> Option<MetaVersion> {
     match bytes.get(0..4) {
         Some(m) if m == VAULT_META_MAGIC.as_slice() => Some(MetaVersion::V0_1),
         Some(m) if m == VAULT_META_V0_2_MAGIC.as_slice() => Some(MetaVersion::V0_2),
         Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => Some(MetaVersion::V0_2),
+        Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            Some(MetaVersion::V0_2)
+        }
         _ => None,
     }
 }
 
+/// Which generation of `vault.meta` a blob is, from its magic.
+///
+/// The `Ord` derive is load-bearing rather than incidental: generations only
+/// ever move FORWARD, so a writer that compares two of these can tell a peer's
+/// newer frame (adopt it) from its older one (never overwrite what we hold with
+/// it). Three consumers used to answer this question with `magic == NTV6`,
+/// which quietly classified the person-wrapped generation as "older than B2B"
+/// and let a sync cycle replace an `NTV7` frame with an `NTV6` one
+/// (myne-md/myne#911 review).
+///
+/// **Every generation-ORDERING or "which family is this" decision goes through
+/// this enum.** Two rules keep that true rather than aspirational. A magic
+/// comparison is still correct for a question this enum does not answer, such as
+/// "does this frame carry a recovery wrap" or "which parser accepts it", and
+/// those call sites name the magic they mean. And a NEW generation is added
+/// here first: until it is, it classifies as `Legacy`, which is the safe answer
+/// for a READER (the readers refuse bytes they do not know) but NOT for a write
+/// path, which would take `Legacy` to mean "no tail" and re-serialize a frame it
+/// should have preserved. `has_b2b_tail` is reader-side only for that reason.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum VaultMetaGeneration {
+    /// No B2B tail: the `MYV1` frame and the `NTV5` v0.2 frame, which carry the
+    /// password and recovery wraps and nothing else.
+    Legacy,
+    /// `NTV5` / `NTV6`: the v0.2 credential side, plus a B2B tail on `NTV6`.
+    B2b,
+    /// `NTV7`: the B2B tail plus the person wrap, and no recovery wrap.
+    Person,
+}
+
+/// Classify a `vault.meta` blob's generation. An unknown magic is `Legacy`,
+/// because every caller of this question treats `Legacy` as "not one of ours"
+/// and the readers that accept the bytes decide separately.
+pub fn vault_meta_generation(bytes: &[u8]) -> VaultMetaGeneration {
+    match bytes.get(0..4) {
+        Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            VaultMetaGeneration::Person
+        }
+        Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => VaultMetaGeneration::B2b,
+        // `NTV5` is v0.2 with NO tail: it belongs with `MYV1` on the "no group
+        // tier" side, and classifying it as `B2b` sent every `NTV5` credential
+        // path (change-password, recovery, quick-unlock) hunting for a tail that
+        // does not exist. The enum is about the TAIL, not about the protocol
+        // version.
+        _ => VaultMetaGeneration::Legacy,
+    }
+}
+
+/// Whether the frame carries the B2B tail (owner-wrapped group key, epoch,
+/// signed roster). True for `NTV6` and `NTV7`, which share that tail byte for
+/// byte, and false for `MYV1`/`NTV5`.
+///
+/// Use THIS where the question is "is `itemsKey` group-tier sealed and must the
+/// tail survive a rewrite". The magic comparison it replaces was correct for
+/// exactly one generation.
+pub fn has_b2b_tail(bytes: &[u8]) -> bool {
+    vault_meta_generation(bytes) >= VaultMetaGeneration::B2b
+}
+
+/// Parse the base prefix of a frame whose header is not the v0.1 one
+/// (`NTV6`, `NTV7`).
+///
+/// The base FIELDS are byte-identical across every generation; only bytes
+/// `[0..5]` differ and no extracted field lives there. Presenting the prefix
+/// under the v0.1 header means the one v0.1 parser owns their meaning, so a
+/// later field cannot be read two ways.
+fn base_prefix(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
+    let mut base = [0u8; VAULT_META_LEN];
+    base.copy_from_slice(
+        bytes
+            .get(..VAULT_META_LEN)
+            .ok_or(ProtocolError::InvalidVaultMeta)?,
+    );
+    base[0..4].copy_from_slice(&VAULT_META_MAGIC);
+    base[4] = VAULT_META_PROTOCOL_VERSION;
+    parse_vault_meta(&base)
+}
+
 /// Parse a `vault.meta` of ANY generation into its base [`VaultMeta`],
 /// dispatching on the magic: `NTV5` → [`parse_vault_meta_v0_2`], `NTV6` → the
-/// v0.2 base prefix of the B2B frame, otherwise the v0.1 [`parse_vault_meta`].
+/// v0.2 base prefix of the B2B frame, `NTV7` → the v0.2 base prefix of the
+/// person-wrapped frame, otherwise the v0.1 [`parse_vault_meta`].
 /// The extracted fields (`account_number_hash`, `kdf_params`, `items_key_id`,
 /// the wrapped keys) live at identical offsets in every layout, so a caller that
-/// only needs those fields is version-agnostic — which is exactly what lets
+/// only needs those fields is version-agnostic, which is exactly what lets
 /// every singleton/index/sync reader keep working on a migrated vault without a
 /// bespoke branch.
 ///
-/// An `NTV6` frame is the v0.2 base (345 bytes) plus a B2B tail, so this parses
-/// the base prefix and ignores the tail; the NTV6-specific fields (owner-wrapped
-/// group key, epoch, signed roster) go through [`parse_vault_meta_ntv6`]. This
-/// is a READ of the base only: it never treats the tail as a base field.
+/// An `NTV6` or `NTV7` frame is the v0.2 base (345 bytes) plus a tail, so this
+/// parses the base prefix and ignores the tail; the generation-specific fields
+/// go through [`parse_vault_meta_ntv6`] or
+/// [`crate::vault_meta_ntv7::parse_vault_meta_ntv7`]. This is a READ of the base
+/// only: it never treats a tail as a base field.
 pub fn parse_vault_meta_any(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
     match bytes.get(0..4) {
         Some(m) if m == VAULT_META_V0_2_MAGIC.as_slice() => parse_vault_meta_v0_2(bytes),
         Some(m) if m == VAULT_META_MAGIC.as_slice() => parse_vault_meta(bytes),
-        Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => {
-            // The frame's base prefix carries the NTV6 magic, so patch the
-            // header back to the shared base layout before parsing — exactly as
-            // `parse_vault_meta_ntv6` does. The base FIELDS are byte-identical
-            // across every generation; only the header differs.
-            let mut base = [0u8; VAULT_META_LEN];
-            base.copy_from_slice(
-                bytes
-                    .get(..VAULT_META_LEN)
-                    .ok_or(ProtocolError::InvalidVaultMeta)?,
-            );
-            base[0..4].copy_from_slice(&VAULT_META_MAGIC);
-            base[4] = VAULT_META_PROTOCOL_VERSION;
-            parse_vault_meta(&base)
+        Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => base_prefix(bytes),
+        Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            base_prefix(bytes)
         }
         _ => Err(ProtocolError::InvalidVaultMeta),
     }

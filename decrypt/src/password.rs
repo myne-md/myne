@@ -23,6 +23,10 @@ use zeroize::Zeroizing;
 pub enum Credential {
     Password(Zeroizing<String>),
     RecoveryPhrase(Zeroizing<String>),
+    /// The person identity's 24 words, which open an `NTV7` vault
+    /// (myne-md/myne#911). A different secret from a vault recovery phrase, with
+    /// the same BIP-39 shape, so it goes through the same validation.
+    IdentityPhrase(Zeroizing<String>),
 }
 
 impl core::fmt::Debug for Credential {
@@ -30,6 +34,7 @@ impl core::fmt::Debug for Credential {
         match self {
             Credential::Password(_) => f.write_str("Credential::Password([REDACTED])"),
             Credential::RecoveryPhrase(_) => f.write_str("Credential::RecoveryPhrase([REDACTED])"),
+            Credential::IdentityPhrase(_) => f.write_str("Credential::IdentityPhrase([REDACTED])"),
         }
     }
 }
@@ -40,21 +45,25 @@ impl core::fmt::Debug for Credential {
 /// read. In recovery mode the phrase is normalized (NFKD + lowercase + trim +
 /// whitespace coalesce, `protocol.md` §7.4) and its BIP-39 checksum is
 /// validated before returning.
-pub fn read_credential(recovery: bool) -> Result<Credential, String> {
-    let raw = read_secret(recovery)?;
-    if recovery {
+pub fn read_credential(recovery: bool, identity: bool) -> Result<Credential, String> {
+    let phrase_mode = recovery || identity;
+    let raw = read_secret(phrase_mode)?;
+    if phrase_mode {
         let normalized = protocol::phrase::normalize_user_phrase(&raw);
         validate_bip39(&normalized)?;
-        Ok(Credential::RecoveryPhrase(normalized))
-    } else {
-        Ok(Credential::Password(raw))
+        return Ok(if identity {
+            Credential::IdentityPhrase(normalized)
+        } else {
+            Credential::RecoveryPhrase(normalized)
+        });
     }
+    Ok(Credential::Password(raw))
 }
 
 /// Read a secret line from the TTY with echo off, or from stdin when stdin is
 /// not a TTY (scripting). A trailing newline is stripped.
-fn read_secret(recovery: bool) -> Result<Zeroizing<String>, String> {
-    let prompt = if recovery {
+fn read_secret(phrase_mode: bool) -> Result<Zeroizing<String>, String> {
+    let prompt = if phrase_mode {
         "Recovery phrase: "
     } else {
         "Master password: "

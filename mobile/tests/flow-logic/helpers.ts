@@ -150,3 +150,68 @@ export function noteDeletes(page: Page): Promise<string[]> {
     () => (window as unknown as { __noteDeletes?: string[] }).__noteDeletes ?? [],
   );
 }
+
+/**
+ * The word every cell of a mock-generated identity phrase carries
+ * (myne-md/myne#911 task 12).
+ *
+ * The identity ceremony ends with a FOUR-WORD type-back at random positions, and
+ * the positions are not predictable from the spec. A phrase of 24 identical words
+ * makes every position satisfiable by typing this one, which is the same device
+ * the create-vault spec has always used for the vault kit's type-back.
+ */
+export const IDENTITY_WORD = "ribbon";
+
+/** The `sync_person_setup` result a spec needs to drive the identity ceremony:
+ *  one generated phrase, 24 copies of {@link IDENTITY_WORD}. */
+export const IDENTITY_SETUP_RESULT = {
+  phrase: Array.from({ length: 24 }, () => IDENTITY_WORD).join(" "),
+  fingerprint_hex: "ab".repeat(32),
+  person_id_hex: "cd".repeat(16),
+  identity_code: "MYNE-PERSON-1:" + "cd".repeat(16),
+  approved: false,
+};
+
+/**
+ * Welcome → the identity ceremony → the identity home
+ * (myne-md/myne#911 task 12).
+ *
+ * The phone's first run is ONE door now, and the vault follows from the identity
+ * home rather than sitting beside it on the welcome screen: this helper walks the
+ * ceremony so a spec about VAULTS does not have to restate it. It ends on the home
+ * step with the create-vault action visible, which is where a vault spec continues.
+ *
+ * Caller owes `installMockIpc(page, { personSetupResult: IDENTITY_SETUP_RESULT })`.
+ */
+export async function createIdentityToHome(page: Page): Promise<void> {
+  await page.getByTestId("welcome.create-cta").click();
+  // The gate's one create door, which no longer fronts a server step: creating an
+  // identity is network-free.
+  await page.getByTestId("identity-flow.start").click();
+  await page.getByTestId("identity-flow.create").click();
+
+  // Step 1: the phrase, which must be REVEALED before Continue enables.
+  await page.getByTestId("identity-flow.phrase-reveal").click();
+  await page.getByTestId("identity-flow.phrase-continue").click();
+
+  // Step 2: the four-word type-back. Each cell is an input carrying a
+  // `identity-flow.typeback-<position>` testid; the positions are random, so the
+  // identical-word phrase is what makes this fillable.
+  const cells = page.locator('input[data-testid^="identity-flow.typeback-"]');
+  const count = await cells.count();
+  expect(count).toBe(4);
+  for (let i = 0; i < count; i += 1) {
+    await cells.nth(i).fill(IDENTITY_WORD);
+  }
+  await page.getByTestId("identity-flow.typeback-continue").click();
+
+  // The identity home, whose create-vault action is the exit into vault creation.
+  await expect(page.getByTestId("identity-flow.home-create-vault")).toBeVisible();
+}
+
+/** The identity home's create-vault action: the second half of the one-door first
+ *  run. Separate from {@link createIdentityToHome} because a spec may want to
+ *  assert something about the home before leaving it. */
+export async function startVaultFromIdentityHome(page: Page): Promise<void> {
+  await page.getByTestId("identity-flow.home-create-vault").click();
+}

@@ -307,7 +307,41 @@ export type Stage =
    * The only exit is the failure path, which is reprobe-based: the slot is
    * Empty by then, so boot routing lands on `unlock` without a second action.
    */
-  | { name: "updating" };
+  | { name: "updating" }
+  /**
+   * The first run (myne-md/myne#911 tasks 6 and 13): the identity, with its one
+   * phrase and its type-back, then vault creation.
+   *
+   * A stage rather than a modal over `welcome`, because it replaces what welcome
+   * used to offer rather than sitting on top of it: `welcome` keeps the restore
+   * and join doors and no longer has a "create" fork to draw.
+   *
+   * The ONE payload field says which door opened it, because the two doors want
+   * different landings after the same ceremony:
+   *
+   *  - `vault` (the default, and the create door): vault creation follows, which
+   *    is the first run `decisions/ui/0721` describes.
+   *  - `identity-home`: the "I was invited" door. A person who was invited to
+   *    someone else's vault needs an identity and NOT a vault, so finishing the
+   *    ceremony re-probes into the identity home, where invitations are listed
+   *    and accepted. Landing them on vault creation would ask them to make a
+   *    vault they do not want before they can accept (myne-md/myne#911
+   *    follow-up).
+   *
+   * It is a payload rather than a second stage because the ceremony is
+   * literally the same component: two stages would mean two mounts of
+   * `IdentitySetupPanel` and a place for their copy to drift. The ceremony's own
+   * progress still lives in the panel, so this is the only field here and it is
+   * fixed at dispatch time.
+   *
+   * Both in-repo front ends reach it: the desktop welcome screen dispatches
+   * `welcome.start` (create) or `welcome.invited-start` (invite), and the web
+   * client's create door on `account-entry` lands here through
+   * `create-vault.start` (all three rows are in `LEGAL` below). Mobile does not:
+   * its first run is `IdentityFlow`, built from its own components, and it
+   * routes through `mobile/src/lib/stage.ts` rather than this union.
+   */
+  | { name: "first-run"; after?: "vault" | "identity-home" };
 
 /**
  * Action type sent to `transition`. Each action corresponds to a
@@ -481,6 +515,25 @@ export type Action =
    * in the IPC layer (task 7), not here.
    */
   | { type: "picker.create-vault" }
+  /**
+   * welcome → first-run (myne-md/myne#911 task 6). The ONE create door: the
+   * identity comes first, and vault creation follows it.
+   *
+   * Distinct from `create-vault.start`, which still exists because the picker,
+   * the switcher and the web's account entry all use it to add a vault to an
+   * account that already exists. Only the desktop welcome screen stops using it.
+   */
+  | { type: "welcome.start" }
+  /**
+   * welcome → first-run, for the INVITED door: the same identity ceremony, whose
+   * completion lands on the identity home rather than on vault creation.
+   *
+   * A person invited to someone else's vault needs an identity (the owner
+   * addresses the invite to its code) and no vault of their own, so the create
+   * door's landing is the wrong one for them. Both doors create an identity, so
+   * this is one stage with a fixed `after`, not a second ceremony.
+   */
+  | { type: "welcome.invited-start" }
   /** welcome → restore-backup (fresh-install restore, user-guide UX contract). */
   | { type: "welcome.restore-backup" }
   /**
@@ -553,12 +606,44 @@ export function transition(prev: Stage, action: Action): Stage {
           // before password setup (MYND-114). Picker / switcher
           // "create another" entries skip it (briefing unset).
           return { name: "create-vault", briefing: true };
+        case "welcome.start":
+          // The one create door (myne-md/myne#911 task 6): the identity, then
+          // the vault.
+          return { name: "first-run" };
+        case "welcome.invited-start":
+          // The invited door: the same ceremony, landing on the identity home
+          // instead of on vault creation. See the Stage's `after` docblock.
+          return { name: "first-run", after: "identity-home" };
+        case "create-vault.start":
+          // KEPT, and this client's welcome screen no longer dispatches it.
+          // The row is `SHARED_LEGAL`'s (`@myne/client-core/stage-decision`),
+          // where mobile's one-door first run is a later task and its welcome
+          // still creates a vault directly. A shared transition cannot be
+          // retargeted from one client, and dropping the arm here would make
+          // the shared table describe a transition this client no longer
+          // performs, which is the drift `tests/lib/stageDecision.test.ts`
+          // exists to catch.
+          return { name: "create-vault", briefing: true };
         case "welcome.restore-backup":
           return { name: "restore-backup", entry: "welcome" };
         case "welcome.join-success":
           // Device-join bootstrapped + unlocked a fresh local vault — land in
           // the editor directly, vault-addressed (MYND-424).
           return { name: "editor", vaultId: action.vaultId };
+        default:
+          return rejectIllegal(prev, action);
+      }
+    case "first-run":
+      switch (action.type) {
+        // The ceremony finished. Vault creation follows, still opening on the
+        // safety briefing: the briefing is about the PASSWORD and the phrase,
+        // and the phrase it names is now the identity's (there is no vault
+        // phrase to retire for a person-born vault).
+        case "create-vault.start":
+          return { name: "create-vault", briefing: true };
+        // Every other action, including the reprobe-based abandon, is illegal:
+        // leaving is App's `reprobe()`, not a transition, because boot routing
+        // is the one place that knows whether an identity now exists.
         default:
           return rejectIllegal(prev, action);
       }
@@ -764,10 +849,18 @@ export function transition(prev: Stage, action: Action): Stage {
           // changed — the user is choosing a different door, not reporting a
           // new fact about disk.
           //
-          // `briefing: true`, matching `welcome`: this is a first-run entry,
-          // and the pre-create safety briefing (MYND-114) is exactly as owed to
-          // someone starting in a browser as to someone starting on a desktop.
-          return { name: "create-vault", briefing: true };
+          // Identity first, then the vault (myne-md/myne#911 task 13). This arm
+          // used to return `create-vault` directly, which is what made the
+          // browser the one client with no identity entry: the ceremony was
+          // unreachable from the front door and a vault created there carried
+          // its own phrase and number. It stays a stage change rather than a
+          // reprobe, because nothing about the container has changed; the user
+          // is choosing a different door.
+          //
+          // No `briefing` payload: `FirstRun` owns the identity step, and the
+          // vault creation it opens sets its own briefing (`first-run`'s arm
+          // below), so the safety text is read once, on the vault step.
+          return { name: "first-run" };
         default:
           // Otherwise the same posture as before: a validated account number is
           // not a stage change, it is the input to the unlock that follows
@@ -1021,10 +1114,25 @@ const LEGAL: Record<string, Stage["name"]> = {
   // a different origin. None of them is a different ANSWER to a shared
   // question, which is the distinction `SHARED_LEGAL`'s own docblock draws.
 
-  // `decisions.md` 2026-08-15. The web client's entry screen gained a "create an
-  // account" affordance, so `account-entry` has one legal exit that is a real
-  // stage change rather than a reprobe.
-  "account-entry|create-vault.start": "create-vault",
+  // myne-md/myne#911 task 6: the desktop welcome screen's ONE create door opens
+  // the first run, and the first run's only exit is vault creation. Desktop-only
+  // rows: the shared table still routes `welcome|create-vault.start` for mobile,
+  // whose one-door first run is task 12.
+  "welcome|welcome.start": "first-run",
+  // The invited door (myne-md/myne#911 follow-up): the same first run, opened by
+  // the welcome screen's "I was invited" row. Its landing differs by payload,
+  // not by name, so the row is the same as the create door's.
+  "welcome|welcome.invited-start": "first-run",
+  "first-run|create-vault.start": "create-vault",
+  // `decisions.md` 2026-08-15, retargeted by myne-md/myne#911 task 13. The web
+  // client's entry screen gained a "create an account" affordance, so
+  // `account-entry` has one legal exit that is a real stage change rather than a
+  // reprobe. It now opens the FIRST RUN, not vault creation directly: the
+  // browser's create path is identity first, then the vault, which is the same
+  // one the native clients run. Asked for by capability rather than by client
+  // (`vaultCreation`), so the row stays here beside the other account-entry
+  // rows rather than becoming a shared one.
+  "account-entry|create-vault.start": "first-run",
   // #535, the awaiting-approval verdict, taken after unlock rather than at
   // boot. The only inbound edge this stage has; its exit stays reprobe-based.
   "editor|editor.awaiting-approval": "pending-approval",
@@ -1092,9 +1200,20 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // The desktop self-update screen (myne-md/myne#870). Every (stage × action)
   // pair is illegal from here, which this entry asserts.
   { name: "updating" },
+  // The desktop first run (myne-md/myne#911 task 6). One legal exit
+  // (`create-vault.start`) and a reprobe for the abandon path, so this entry
+  // covers both directions.
+  { name: "first-run" },
+  // Coverage entry for the optional `after` payload field (myne-md/myne#911
+  // follow-up): which door opened the ceremony. Payload, not the `name`
+  // discriminator, so `transition` ignores it on every pair and this entry
+  // confirms its presence changes no transition outcome.
+  { name: "first-run", after: "identity-home" },
 ];
 
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
+  { type: "welcome.start" },
+  { type: "welcome.invited-start" },
   { type: "welcome.join-success" },
   { type: "picker.join-success" },
   { type: "unlock.join-success" },
@@ -1210,6 +1329,7 @@ function verifyInitialStageFromProbe(): void {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   });
   const corruptVault = (id: VaultId): VaultSummary => ({
     id,
@@ -1217,6 +1337,7 @@ function verifyInitialStageFromProbe(): void {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   });
   const okList = (...vaults: VaultSummary[]): VaultListResult => ({ ok: vaults });
   const errList = (ioKind: IoFailureKind): VaultListResult => ({

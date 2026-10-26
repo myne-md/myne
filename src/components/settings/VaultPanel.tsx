@@ -58,6 +58,7 @@ import { SettingsTopicPanel } from "./SettingsTabs";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { PasswordChangeForm } from "../PasswordChangeForm";
 import { DeleteVaultConfirmForm } from "../DeleteVaultConfirmForm";
+import { VaultFormatUpgrade } from "./VaultFormatUpgrade";
 import { changePassword } from "../../lib/vault-change-password";
 import { prefsRead, setVaultLabel, setVaultIcon } from "../../lib/prefs";
 import { memberVaultStatus } from "../../lib/personAccount";
@@ -614,6 +615,7 @@ export function VaultPanel({
         }}
         inFlight={inFlight}
         partialFailContext={deletePartialFail}
+        variant={memberVault ? "member" : "owner"}
       />
     );
   }
@@ -805,6 +807,17 @@ export function VaultPanel({
           ))}
         </div>
       </SettingsSection>
+
+      {/* The explicit format upgrade (myne-md/myne#911 task 10). A vault-level
+          credential change, so it belongs in this panel rather than beside the
+          v0.1 → v0.2 re-key in Sync: that one exists to make a vault current
+          with the generation sync already assumes, and this one retires a
+          credential. Gated on `vaultMigration` (desktop-only: a browser holds no
+          person identity to seal to). The section is the component's own,
+          because the row inside it renders nothing once the vault is `NTV7` or
+          while the probe is still out, and a heading over an empty body is a
+          claim that something is under it. */}
+      {capabilities.has("vaultMigration") && <VaultFormatUpgrade />}
       </SettingsTopicPanel>
 
       {/* **Danger zone**: the one control here that destroys the vault, on its
@@ -825,16 +838,23 @@ export function VaultPanel({
       <SettingsSection
         tone="danger"
         title={
-          capabilities.has("localOnlyVault")
+          memberVault || capabilities.has("localOnlyVault")
             ? t("settings.vault.dangerZoneHeading")
             : t("settings.vault.localEraseHeading")
         }
       >
-        <p style={HELPER_TEXT_MUTED_STYLE}>
-          {capabilities.has("localOnlyVault")
-            ? t("settings.vault.dangerZoneHelper")
-            : t("settings.vault.localEraseHelper")}
-        </p>
+        {/* A member vault's copy is not the vault. The owner sentence below
+            ("permanently delete ... recovery phrase will not restore") is false
+            for a member in the dangerous direction, so it is ABSENT rather than
+            corrected: the confirm form carries the shared-vault disclosure
+            verbatim, and this section only has to name the action. */}
+        {!memberVault && (
+          <p style={HELPER_TEXT_MUTED_STYLE}>
+            {capabilities.has("localOnlyVault")
+              ? t("settings.vault.dangerZoneHelper")
+              : t("settings.vault.localEraseHelper")}
+          </p>
+        )}
         <div>
           <Button
             variant="danger"
@@ -844,9 +864,11 @@ export function VaultPanel({
               setView("delete-vault");
             }}
           >
-            {capabilities.has("localOnlyVault")
-              ? t("settings.vault.deleteVaultButton")
-              : t("settings.vault.localEraseButton")}
+            {memberVault
+              ? t("settings.deleteVault.memberSubmit")
+              : capabilities.has("localOnlyVault")
+                ? t("settings.vault.deleteVaultButton")
+                : t("settings.vault.localEraseButton")}
           </Button>
         </div>
       </SettingsSection>

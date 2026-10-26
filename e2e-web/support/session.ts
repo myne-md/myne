@@ -3,7 +3,7 @@
 // # Why this is thirty lines and not a driver
 //
 // `e2e/support/webdriver.ts` is a hand-rolled zero-dependency W3C WebDriver
-// client that has driven 92 desktop scenario files. Exactly ONE function in it
+// client that has driven the desktop scenario files. Exactly ONE function in it
 // is tauri-driver-specific — `newSession`, which sends a `tauri:options`
 // capability naming an app binary. Everything else (`Session`, `Element`,
 // `byTestId`, `waitUntil`, the stale-element retries) is protocol, and protocol

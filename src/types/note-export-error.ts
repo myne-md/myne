@@ -1,7 +1,7 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
-//   - src-tauri/src/io_failure_kind.rs                  (IoFailureKind)
-//   - src-tauri/src/plugins/notes/error.rs              (NoteExportError)
+//   - core/src/io_failure_kind.rs                  (IoFailureKind)
+//   - core/src/plugins/notes/error.rs              (NoteExportError)
 
 import type { IoFailureKind } from "./vault-unlock-error";
 
@@ -87,7 +87,7 @@ export type NoteExportError =
  * Single error type returned across the IPC boundary by the `notes`
  * plugin's `note_export_attachments` command (MYND-115 task 4) — the
  * opt-in attachments-included export sibling. Rust source:
- * `src-tauri/src/plugins/notes/error.rs::NoteExportAttachmentsError`.
+ * `core/src/plugins/notes/error.rs::NoteExportAttachmentsError`.
  *
  * Same wire shape as `NoteExportError` (`tag = "kind"`,
  * `content = "detail"`); variant set is closed — adding a variant is an

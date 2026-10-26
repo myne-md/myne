@@ -35,6 +35,9 @@ const NAMES: ReadonlySet<string> = new Set<RouteName>([
   "account-entry",
   "pending-approval",
   "restore-backup",
+  // Reachable since myne-md/myne#911 task 13: the browser's create door opens
+  // the identity ceremony, so the stage is a real location here now.
+  "first-run",
 ]);
 
 /** Canonical 36-char lowercase hyphenated UUID. Anything else is not a note id. */

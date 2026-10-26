@@ -3943,7 +3943,6 @@
         "ribbon": "venstre linje skinne fest pin kommando kommandoer tilpass ordne løsne verktøylinje snarveier",
         "folderNotes": "mappe notat indeks folder_index landingsside dobbeltklikk mappelenke prosjekter av skru av deaktiver",
         "syncMembers": "medlemmer, del, inviter, team, samarbeid, vault",
-        "accountName": "kontonavn konto gruppe gruppering gi nytt navn etikett enhet lokal account name group grouping rename label device local",
         "accountVaults": "konto hvelv gruppert hvilke hvelv hører til gruppeliste account vaults grouped which vaults belong group list",
         "aiMeetingPrompt": "møte oppsummering ledetekst instruks egendefinert transkripsjon handlingspunkter beslutninger meeting summary prompt instruction custom transcript action items decisions",
         "update": "oppdatering oppgrader se etter oppdateringer ny versjon utgivelse nedlasting update upgrade check for updates new version release download",
@@ -4025,14 +4024,10 @@
       "atCap": "Listen er full, så ingenting nytt kan huskes. Slett en oppføring for å gi plass."
     },
     "account": {
-      "nameLabel": "Kontonavn",
-      "nameHelper": "Et navn på denne gruppen av hvelv på denne enheten. Hvelvvelgeren bruker det som overskrift for gruppen. Det blir værende på denne enheten og lagres aldri inne i et hvelv, så det synkroniseres ikke, og en annen enhet kan gruppere og navngi de samme hvelvene annerledes.",
-      "namePlaceholder": "Legg til et navn…",
-      "nameSave": "Lagre",
-      "nameSaving": "Lagrer…",
       "vaultsLabel": "Hvelv i denne kontoen",
       "vaultsHelper": "Hvelvene denne enheten grupperer under navnet ovenfor. Gruppering er et organisasjonsvalg per enhet, så det er ikke en del av innholdet i noe hvelv og følger ikke med det.",
-      "vaultsCount": "{{count}} hvelv",
+      "vaultsCount_one": "{{count}} hvelv",
+      "vaultsCount_other": "{{count}} hvelv",
       "currentVault": "Dette hvelvet",
       "unknownVault": "Et annet hvelv på denne enheten",
       "standaloneHelper": "Dette hvelvet er ikke gruppert under en konto på denne enheten, så det står for seg selv. Gruppering er per enhet: en annen enhet kan vise det inne i en konto.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Navn kan angis når dette hvelvet er delt.",
       "nameErrorLocked": "Lås opp hvelvet for å endre navnet ditt.",
       "nameErrorGeneric": "Kunne ikke lagre navnet ditt. Prøv igjen.",
-      "nameInvite": "Du har ikke noe visningsnavn ennå. De andre medlemmene ser fingeravtrykket ditt.",
       "nameInviteCta": "Angi et navn",
-      "nameInviteDismiss": "Ikke nå",
       "noInvitations": "Ingen invitasjoner sendt ennå.",
       "identityHeading": "Identiteten din",
       "membersHeading": "Medlemmer",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Gjenopprettingsfrase — hvis du glemmer passordet",
       "save": "Lagre gjenopprettingssett",
       "saveFailed": "Kunne ikke lagre filen. Kopier settet i stedet, eller skriv ned begge delene.",
-      "savedToFile": "Lagret. Det er en ren tekstfil som inneholder begge hemmelighetene, så oppbevar den et sted bare du kan lese.",
-      "whyEnglish": "Ordene er engelske på alle språk. De er en del av BIP-39-standarden, så enhver Myne-klient kan lese en frase skrevet av en annen. Ikke oversett dem: oversatte ord finnes ikke i ordlisten, og frasen ville slutte å virke."
+      "savedToFile": "Lagret. Det er en ren tekstfil som inneholder begge hemmelighetene, så oppbevar den et sted bare du kan lese."
     },
     "name": {
       "back": "Tilbake",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Konto",
     "moveToAccount": "Flytt til konto…",
     "moveToNewAccount": "Flytt til ny konto",
-    "renameAccount": "Gi konto nytt navn",
     "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
     "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
-    "labelTooLong": "Det navnet er for langt. Hold det under 512 tegn.",
-    "renameCancel": "Avbryt",
-    "renamePlaceholder": "Kontonavn",
-    "renameSave": "Gi nytt navn",
     "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret.",
     "createShort": "Nytt hvelv",
     "joinShort": "Legg til enhet",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Gjenværende filer fra en avbrutt sletting ({{n}}). Rydd dem opp før du oppretter et hvelv.",
     "cleanUpFiles": "Rydd opp gjenværende filer",
     "connect": "Koble til kontoen min",
-    "startIdentity": "Opprett en identitet",
-    "startLocal": "Opprett et lokalt hvelv i stedet",
     "tagline": "Krypterte markdown-notater. Ingen e-post ved registrering.",
-    "identityTitle": "Opprett en identitet",
-    "identityBody": "Én identitet for alle hvelvene dine, så folk kan invitere deg. Krever en synkroniseringsserver.",
-    "localTitle": "Opprett et lokalt hvelv",
-    "localBody": "Et kryptert hvelv på denne enheten. Legg til synkronisering eller en identitet senere.",
     "restoreTitle": "Gjenopprett fra sikkerhetskopi",
     "restoreBody": "Åpne en .myne-backup-fil du lagret tidligere.",
     "joinTitle": "Legg denne enheten til en konto",
     "joinBody": "Bruk et hvelv du allerede har på en annen enhet.",
-    "createAction": "Opprett",
     "restoreAction": "Gjenopprett",
     "joinAction": "Legg til enhet",
     "version": "Versjon {{version}} · pre-alfa"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "åpnet for {{count}} år siden",
     "corruptedBadge": "Skadet",
     "accountFallback": "Konto",
-    "renameAccount": "Gi konto nytt navn",
     "moveToNewAccount": "Flytt til ny konto",
     "moveToAccount": "Flytt til konto…",
     "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
     "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
-    "labelTooLong": "Det navnet er for langt. Hold det under 512 tegn.",
-    "renameCancel": "Avbryt",
-    "renamePlaceholder": "Kontonavn",
-    "renameSave": "Gi nytt navn",
     "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identitet gjenopprettet.",
     "title": "Opprett en identitet",
     "errorAlreadyHeld": "Denne enheten har allerede en identitet. Gjenopprett den med gjenopprettingsfrasen, eller glem den og opprett en ny.",
-    "errorNotConfigured": "Kunne ikke sette opp identiteten. Sjekk at en synkroniseringsserver er konfigurert, og prøv igjen.",
     "forgetCancel": "Behold den",
     "forgetConfirm": "Glem og opprett ny",
     "forgetCta": "Glem denne identiteten og opprett en ny",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Gjenopprett den på denne enheten med den 24 ord lange gjenopprettingsfrasen.",
     "recoverAction": "Gjenopprett",
     "back": "Tilbake",
-    "changeServer": "Endre eller verifiser synkroniseringsserver",
-    "errorTlsFailure": "Kunne ikke verifisere HTTPS-sertifikatet til serveren. Sjekk serveradressen og sertifikatet.",
     "phraseTitle": "Lagre identitetsfrasen din",
     "phraseContinue": "Fortsett",
     "confirmTitle": "Bekreft frasen din"
@@ -5509,15 +5481,6 @@
       "hint": "Å prøve igjen starter nedlastingen på nytt.",
       "retry": "Prøv igjen",
       "back": "Tilbake til opplåsing"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Velg en synkroniseringsserver",
-      "intro": "Myne trenger en server til å oppbevare de krypterte notatene dine og til å nå deg for invitasjoner. Notatene dine forblir kryptert på denne enheten før de forlater den; serveren lagrer bare chiffertekst.",
-      "notConfigured": "Skriv inn en serveradresse ovenfor og trykk Koble til for å fortsette.",
-      "back": "Tilbake",
-      "continue": "Fortsett"
     }
   },
   "identityFlow": {

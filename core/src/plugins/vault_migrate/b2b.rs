@@ -768,7 +768,7 @@ mod tests {
             )
             .expect("roster opens under the group key");
             let roster = protocol::person_invite::verify_group_roster(
-                &owner().public_half(),
+                protocol::person_invite::RosterTrust::person_only(&owner().public_half()),
                 &envelope,
                 &parsed.base.account_number_hash,
             )

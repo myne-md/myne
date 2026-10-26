@@ -6,7 +6,9 @@
 //! - [`cancel`] → drop a session (Task 14).
 
 use super::error::AppError;
-use super::state::{SessionLookup, VaultCreationSession, VaultCreationState};
+use super::state::{
+    CreationPerson, CreationPersonRequest, SessionLookup, VaultCreationSession, VaultCreationState,
+};
 use crate::host::HostCtx;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::vault_id::VaultId;
@@ -45,16 +47,20 @@ const BIRTH_GENERATION: MetaVersion = MetaVersion::V0_2;
 /// `phrase` is a clone of the session's 24-word BIP-39 phrase so the
 /// frontend can display it; the master copy stays in
 /// [`VaultCreationSession`] (Zeroizing) for the recovery-wrap-key
-/// computation in `commit`.
+/// computation in `commit`. It is `None` for a person-born vault: the vault
+/// phrase is retired there, so there is neither a wrap to derive nor words to
+/// show (myne-md/myne#911 task 5).
 ///
 /// `account_number` is the display form (`MY-XXXX-XXXX-XXXX-XXXX-XXXX`).
+/// For a person-born vault it is the PERSON's number, which is the same on
+/// every vault that person creates.
 ///
 /// `session_token` is an opaque UUID — not a secret. The frontend
 /// holds it across the confirmation challenge and replays it to
 /// `commit` / `cancel`.
 #[derive(Serialize)]
 pub struct BeginResult {
-    pub phrase: [String; 24],
+    pub phrase: Option<[String; 24]>,
     pub account_number: String,
     pub session_token: String,
 }
@@ -88,6 +94,7 @@ pub struct BeginResult {
 /// only to resolve `<app_data_dir>` for the collision scan; minting is cheap
 /// and runs before the slot reservation + Argon2id work.
 pub async fn begin_from_host(
+    person: CreationPersonRequest,
     password: String,
     state: &VaultCreationState,
     host: &dyn HostCtx,
@@ -103,7 +110,7 @@ pub async fn begin_from_host(
         kind: crate::plugins::vault_creation::error::IoErrorKind::Other,
     })?;
     let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
-    begin_with_vault_id(password, vault_id, state, host).await
+    begin_with_vault_id(person, password, vault_id, state, host).await
 }
 
 /// [`begin_from_host`] with the destination [`VaultId`] supplied by the caller.
@@ -121,11 +128,29 @@ pub async fn begin_from_host(
 /// the password floor, the slot reservation, the Argon2id derivation and the
 /// session are one implementation, not two.
 pub async fn begin_with_vault_id(
+    person: CreationPersonRequest,
     password: String,
     vault_id: crate::vault_id::VaultId,
     state: &VaultCreationState,
     host: &dyn HostCtx,
 ) -> Result<BeginResult, AppError> {
+    // A sealed-but-locked identity is refused BEFORE any work. The alternative the
+    // legacy path would take is a second recovery phrase for a user the product
+    // promises exactly one, which is why this is a refusal rather than a fallback
+    // (myne-md/myne#911 task 5).
+    //
+    // This lives HERE rather than in `begin_from_host`, and that placement is the
+    // guard rather than a tidy-up: `begin_with_vault_id` is the web client's entry
+    // point (`web/wasm/src/dispatch.rs` calls it directly with the raw
+    // `creation_person_from_host` answer), so a refusal only in `begin_from_host`
+    // was enforced on one of three client paths. A browser whose identity exists
+    // but whose session is not installed then silently minted an `NTV5` vault with
+    // a brand-new 24-word phrase.
+    //
+    // Below the wrap below on purpose: the password is already in hand when this
+    // guard fires, so an early return above it would drop a master password as an
+    // un-zeroized `String`, which is the exception the wrap's own comment says the
+    // pattern exists to avoid.
     // Wrap immediately so any early-return path (slot-cap rejection,
     // spawn_blocking join failure, build_session error) drops the
     // wrapper and zeroes the bytes. Plain `String` would drop without
@@ -135,6 +160,15 @@ pub async fn begin_with_vault_id(
     // unchanged); the deref chain `&Zeroizing<String>` → `&String` →
     // `&str` holds via standard deref coercion.
     let password = Zeroizing::new(password);
+
+    if matches!(person, CreationPersonRequest::Locked) {
+        tracing::error!(
+            stage = "begin_person",
+            error_kind = "PersonLocked",
+            "vault creation refused: a person identity is sealed but its session is locked"
+        );
+        return Err(AppError::PersonLocked);
+    }
 
     // Backend min-length floor — structural belt+suspenders against
     // frontend bypass per `decisions.md` 2026-05-06 "Auth-pipeline
@@ -166,8 +200,17 @@ pub async fn begin_with_vault_id(
     // (releasing the slot via SlotReservation::drop) and the closure-
     // captured wrapper drops in spawn_blocking's task pool. The minted
     // `vault_id` (Copy) moves into the closure and is stored on the session.
-    let session = crate::task::run_blocking(move || {
-        build_session(vault_id, &password, DEFAULT_V0_1_KDF_PARAMS)
+    let session = crate::task::run_blocking(move || match person {
+        CreationPersonRequest::Unlocked(who) => {
+            build_person_session(vault_id, &password, DEFAULT_V0_1_KDF_PARAMS, *who)
+        }
+        // `Absent` is the pre-change birth. `Locked` is refused at the top of this
+        // function, so it cannot reach the match; reading it as `Absent` would mint
+        // the second phrase the refusal exists to prevent.
+        CreationPersonRequest::Absent => {
+            build_session(vault_id, &password, DEFAULT_V0_1_KDF_PARAMS)
+        }
+        CreationPersonRequest::Locked => unreachable!("Locked is refused above"),
     })
     .await
     .map_err(|_| AppError::JoinFailure)??;
@@ -175,8 +218,11 @@ pub async fn begin_with_vault_id(
     // Take the visible parts out before moving the session into the
     // map. `phrase.words()` returns `&[String; 24]` from inside
     // `Zeroizing<...>`; we clone for the frontend response. The
-    // master phrase stays Zeroized in the session.
-    let phrase = session.phrase.words().clone();
+    // master phrase stays Zeroized in the session. A person-born session
+    // carries no phrase at all, and the response says so rather than
+    // sending an empty twenty-four-word array the UI would have to
+    // interpret.
+    let phrase = session.phrase.as_ref().map(|p| p.words().clone());
     let account_number = session.account.display.clone();
     let token = Uuid::new_v4();
 
@@ -205,9 +251,73 @@ pub async fn begin_with_vault_id(
 pub async fn begin<R: Runtime>(
     password: String,
     state: State<'_, VaultCreationState>,
+    runtime_state: State<'_, VaultRuntimeState>,
     app: tauri::AppHandle<R>,
 ) -> Result<BeginResult, AppError> {
-    begin_from_host(password, state.inner(), &TauriHost::new(app)).await
+    let host = TauriHost::new(app);
+    let person =
+        creation_person_from_host(&host, &crate::vault_io::StdVaultIo, runtime_state.inner()).await;
+    begin_from_host(person, password, state.inner(), &host).await
+}
+
+/// What the person plane says about a creation about to start.
+///
+/// Three answers, and the middle one is the load-bearing one. A device with a
+/// SEALED identity is refused rather than handed the legacy birth, because the
+/// legacy birth mints a second recovery phrase for a user the product promises
+/// exactly one. Absence is genuinely different from lockedness: with no identity
+/// at all the pre-change flow is the right answer, and it is what every client
+/// whose identity-first first run has not shipped yet still gets.
+///
+/// `Locked` also covers the mismatch case (a session installed for a DIFFERENT
+/// person than the credential names), which reads as locked on purpose: the one
+/// thing that must not happen there is sealing a vault to the wrong owner.
+/// Ungated, and taking an `io`, since myne-md/myne#911 task 13: the web client
+/// creates vaults on the person path too, and its person credential lives behind
+/// its own `VaultIo` (`web/wasm/src/person_io.rs`) rather than on a filesystem.
+/// The desktop passes `&StdVaultIo`; the browser passes its session-scoped one.
+pub async fn creation_person_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> CreationPersonRequest {
+    let Ok(status) =
+        crate::plugins::sync::person_account::person_status_from_host(host, io, state).await
+    else {
+        // A credential that cannot be read is not an identity we can seal to,
+        // and it is not evidence of absence either. Refusing is the safe arm.
+        return CreationPersonRequest::Locked;
+    };
+    if status.state.is_none() {
+        // `state: None` means "no identity is loaded in this session", which is
+        // NOT the same as "no identity exists here". On the web client the two
+        // person files are session-only by design, so every reload produces
+        // exactly this answer for a device whose identity is fine. Reading it as
+        // ABSENCE hands the user the legacy `NTV5` birth, which mints a second
+        // 24-word phrase and a vault the identity does not open (myne-md/myne#911
+        // review). The durable marker is what separates the two cases, and the
+        // remedy it points at is the phrase prompt, not a second identity.
+        if crate::plugins::sync::person_account::identity_marker_present(host, io).await {
+            return CreationPersonRequest::Locked;
+        }
+        return CreationPersonRequest::Absent;
+    }
+    if !status.identity_unlocked {
+        return CreationPersonRequest::Locked;
+    }
+    let (Some(pair), Some(person_id_hex)) =
+        (state.clone_person_identity().await, status.person_id_hex)
+    else {
+        return CreationPersonRequest::Locked;
+    };
+    let Some(person_id) = crate::plugins::sync::devices::hex16(&person_id_hex) else {
+        return CreationPersonRequest::Locked;
+    };
+    CreationPersonRequest::Unlocked(Box::new(CreationPerson {
+        pair,
+        person_id,
+        number: protocol::account_number_from_person_id(&person_id),
+    }))
 }
 
 /// Pure-function helper — no Tauri runtime, no async — that builds a
@@ -242,31 +352,88 @@ pub fn build_session(
     // wrap keys derive under the v0.2 salt domain (`myne.v0.2 argon2id-…|`).
     // v0.1 remains fully readable — it is what the §10.4 migration reads FROM —
     // but nothing produces it any more.
+    //
+    // The 16-byte binding in the salt is this vault's `account_number_hash`,
+    // which is also what §9.3 offset 6 carries, so the legacy birth is
+    // byte-identical to what it was before the person account existed.
+    let vault_binding = account.hash;
     let password_wrap_key = protocol::derive_password_wrap_key_v0_2(
         password,
         &salt_password,
-        &account.hash,
+        &vault_binding,
         &kdf_params,
     )?;
     let recovery_wrap_key = protocol::derive_recovery_wrap_key_v0_2(
         &phrase,
         &salt_recovery,
-        &account.hash,
+        &vault_binding,
         &kdf_params,
     )?;
 
     Ok(VaultCreationSession {
         vault_id,
+        vault_binding,
         account,
-        phrase,
+        phrase: Some(phrase),
         kdf_params,
         root_key,
         salt_password,
         salt_recovery,
         password_wrap_key,
-        recovery_wrap_key,
+        recovery_wrap_key: Some(recovery_wrap_key),
+        person: None,
         // Stamped by `commit_reservation` when the session enters the map;
         // `build_session` is pure and holds no clock. See the field's docs.
+        created_at: 0,
+    })
+}
+
+/// Build a **person-born** creation session: the `NTV7` generation
+/// (myne-md/myne#911 task 5).
+///
+/// Three differences from [`build_session`], and each is a retirement rather
+/// than an addition:
+///
+/// - **No vault phrase.** None is generated, so none is returned and none is
+///   wrapped. The person's identity phrase is the single recovery credential and
+///   it already exists on the device.
+/// - **No recovery salt or wrap key.** Their three §9.3 fields are written as
+///   zeros, which `NTV7`'s writer and parser both enforce structurally.
+/// - **A random per-vault binding** replaces `account_number_hash` as the salt
+///   input. The number is a property of the PERSON, so it can no longer
+///   separate one vault of that person from another, and the generation keeps it
+///   out of vault cryptography. The same 16 bytes are what §9.3 offset 6
+///   carries, so the frame needs no new field.
+pub fn build_person_session(
+    vault_id: VaultId,
+    password: &str,
+    kdf_params: KdfParams,
+    person: CreationPerson,
+) -> Result<VaultCreationSession, AppError> {
+    let root_key = protocol::generate_root_key()?;
+    let vault_binding: [u8; 16] = random_bytes()?;
+    let salt_password: [u8; ARGON2_SALT_LEN] = random_bytes()?;
+    let password_wrap_key = protocol::derive_password_wrap_key_v0_2(
+        password,
+        &salt_password,
+        &vault_binding,
+        &kdf_params,
+    )?;
+
+    Ok(VaultCreationSession {
+        vault_id,
+        vault_binding,
+        account: person.number.clone(),
+        phrase: None,
+        kdf_params,
+        root_key,
+        salt_password,
+        // All zero: there is no recovery wrap in this generation, and `NTV7`
+        // refuses to write a frame where they are anything else.
+        salt_recovery: [0u8; ARGON2_SALT_LEN],
+        password_wrap_key,
+        recovery_wrap_key: None,
+        person: Some(person),
         created_at: 0,
     })
 }
@@ -715,9 +882,18 @@ pub(crate) async fn commit_with_vault_path(
     let outcome: Result<(), Box<(AppError, VaultCreationSession)>> =
         crate::task::run_blocking(move || match serialize_meta(&session, &membership) {
             Err(e) => Err(Box::new((e, session))),
-            Ok(bytes) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
+            Ok((bytes, group_key)) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
                 Err(e) => Err(Box::new((AppError::from(e), session))),
                 Ok(()) => {
+                    // The tier the two eager singletons are sealed under. A
+                    // person-born (`NTV7`) vault follows its roster, so they go
+                    // under the GROUP key; every earlier generation derives them
+                    // from `root_key`. Sealing an `NTV7` vault's prefs under the
+                    // root tier would ship a blob the unlock path cannot open,
+                    // which reads as "all preferences silently reset".
+                    let group_key = group_key
+                        .as_ref()
+                        .map(|g| protocol::GroupKey::new(**g));
                     // MYND-160 Task 12: eager-write the default vault.prefs
                     // blob so every post-MYND-160 vault carries the closed
                     // invariant "vault.prefs exists immediately after
@@ -734,11 +910,16 @@ pub(crate) async fn commit_with_vault_path(
                     // is bounded; full atomic rollback would force the
                     // user to redo the entire Argon2id pipeline on every
                     // disk hiccup, which is the worse UX.
-                    let prefs_key = protocol::derive_subkey_versioned(
-                        BIRTH_GENERATION,
-                        &session.root_key,
-                        protocol::SubkeyRole::PrefsKey,
-                    );
+                    let prefs_key = match group_key {
+                        Some(ref group) => {
+                            protocol::derive_group_subkey_v0_2(group, protocol::GroupRole::PrefsKey)
+                        }
+                        None => protocol::derive_subkey_versioned(
+                            BIRTH_GENERATION,
+                            &session.root_key,
+                            protocol::SubkeyRole::PrefsKey,
+                        ),
+                    };
                     let prefs_path = vault_path
                         .parent()
                         .expect("vault_path has a parent (vault dir)")
@@ -746,7 +927,7 @@ pub(crate) async fn commit_with_vault_path(
                     match protocol::encode_prefs_blob_versioned(
                         BIRTH_GENERATION,
                         &prefs_key,
-                        &session.account.hash,
+                        &session.vault_binding,
                         &protocol::PrefsView::default(),
                     ) {
                         Ok(prefs_bytes) => {
@@ -783,11 +964,17 @@ pub(crate) async fn commit_with_vault_path(
                     // vault.prefs: if this write fails the next catalog read
                     // falls back to empty per spec § 9.10.4 (read_or_empty),
                     // so the vault stays usable — no rollback of vault.meta.
-                    let catalog_key = protocol::derive_subkey_versioned(
-                        BIRTH_GENERATION,
-                        &session.root_key,
-                        protocol::SubkeyRole::AttachmentsCatalogKey,
-                    );
+                    let catalog_key = match group_key {
+                        Some(ref group) => protocol::derive_group_subkey_v0_2(
+                            group,
+                            protocol::GroupRole::AttachmentsCatalogKey,
+                        ),
+                        None => protocol::derive_subkey_versioned(
+                            BIRTH_GENERATION,
+                            &session.root_key,
+                            protocol::SubkeyRole::AttachmentsCatalogKey,
+                        ),
+                    };
                     let catalog_path = vault_path
                         .parent()
                         .expect("vault_path has a parent (vault dir)")
@@ -795,7 +982,7 @@ pub(crate) async fn commit_with_vault_path(
                     match protocol::encode_attachments_catalog_versioned(
                         BIRTH_GENERATION,
                         &catalog_key,
-                        &session.account.hash,
+                        &session.vault_binding,
                         &protocol::AttachmentsCatalog::empty(),
                     ) {
                         Ok(catalog_bytes) => match crate::atomic_write::atomic_write(
@@ -895,17 +1082,196 @@ pub fn build_and_serialize_vault_meta_with_membership(
     Ok(protocol::serialize_vault_meta_v0_2(&meta))
 }
 
+/// [`build_and_serialize_vault_meta`] for a PERSON-BORN session: the `NTV7`
+/// frame (myne-md/myne#911 task 5).
+///
+/// Separate rather than folded into the function above because that one returns
+/// a fixed 345-byte array, which is exactly what this generation is not
+/// (`445 + roster_len + 1208`). Split on the session's own shape rather than on
+/// a caller flag, so a caller cannot ask for a generation the session was not
+/// built for.
+pub fn build_and_serialize_person_vault_meta(
+    session: &VaultCreationSession,
+) -> Result<(Vec<u8>, Zeroizing<[u8; 32]>), AppError> {
+    let person = session.person.as_ref().ok_or(AppError::Protocol(
+        protocol::ProtocolError::InvalidVaultMeta,
+    ))?;
+    build_person_vault_meta(session, person)
+}
+
+/// What `serialize_meta` hands the writer: the bytes, plus the group key the
+/// eager singleton writes need in a generation whose singletons follow the
+/// roster (`None` for every pre-`NTV7` birth).
+type SerializedMeta = (Vec<u8>, Option<Zeroizing<[u8; 32]>>);
+
 /// Commit-time serializer: the eager membership when creation resolved one,
 /// the base 345-byte layout otherwise. One return type (`Vec<u8>`) so both
 /// commit paths share the write below.
+///
+/// A person-born session answers differently in two ways, and both are
+/// structural rather than cosmetic. Its frame is `NTV7`, whose length is not a
+/// constant (`445 + roster_len + 1208`). And it carries its membership through
+/// the signed roster, not through the `NTV5` §9.3.1 field, so an eagerly sealed
+/// membership is DROPPED here rather than passed through: `NTV7`'s writer
+/// refuses a base carrying that field, and writing it anyway would shift every
+/// offset past the base.
+///
+/// The group key comes back with the bytes because the caller's eager singleton
+/// writes have to seal under the GROUP tier for this generation, exactly as the
+/// `NTV6` migration re-seals them.
 fn serialize_meta(
     session: &VaultCreationSession,
     membership: &Option<protocol::Membership>,
-) -> Result<Vec<u8>, AppError> {
-    match membership {
-        Some(m) => build_and_serialize_vault_meta_with_membership(session, m.clone()),
-        None => build_and_serialize_vault_meta(session).map(|b| b.to_vec()),
+) -> Result<SerializedMeta, AppError> {
+    if let Some(person) = session.person.as_ref() {
+        let (bytes, group_key) = build_person_vault_meta(session, person)?;
+        return Ok((bytes, Some(group_key)));
     }
+    let bytes = match membership {
+        Some(m) => build_and_serialize_vault_meta_with_membership(session, m.clone())?,
+        None => build_and_serialize_vault_meta(session)?.to_vec(),
+    };
+    Ok((bytes, None))
+}
+
+/// Build the `NTV7` frame for a person-born session: the `NTV6` tail `NTV7`
+/// extends, a zeroed phrase wrap, and `root_key` sealed to the owner's person
+/// key (myne-md/myne#911 task 5).
+///
+/// The shape mirrors `vault_migrate::b2b`'s owner migration, deliberately: that
+/// function is the worked example of "mint a group key, wrap it under the owner
+/// subkey, seal `items_key` under the group tier, sign a one-row owner roster,
+/// seal the roster". The differences are the ones this generation is FOR: no
+/// phrase wrap at all, and a `root_key` sealed to a person rather than only to a
+/// password.
+///
+/// Returns the group key alongside the bytes because the caller's eager
+/// `vault.prefs` / `vault.attachments` writes are sealed under the group tier in
+/// this generation (the shared singletons follow the roster, not `root_key`).
+fn build_person_vault_meta(
+    session: &VaultCreationSession,
+    person: &CreationPerson,
+) -> Result<(Vec<u8>, Zeroizing<[u8; 32]>), AppError> {
+    let aad_pw = protocol::aad_password_wrap_v0_2(&session.kdf_params);
+    let (nonce_password_wrap, enc_root_key_password) =
+        seal_32_byte_secret(&session.password_wrap_key, &session.root_key, &aad_pw)?;
+
+    // The group tier the `NTV6` tail carries: epoch 1, the group key wrapped
+    // under the owner subkey (`root_key` is the owner's), and the singleton
+    // `itemsKey` sealed under the GROUP key rather than under `root_key`.
+    let group_bytes = protocol::generate_root_key()?;
+    let epoch = 1u64;
+    let group_key_nonce: [u8; AEAD_NONCE_LEN] = random_bytes()?;
+    let enc_group_key = protocol::aead_seal_ctx(
+        &protocol::derive_owner_subkey_v0_2(
+            &protocol::OwnerKey::new(*session.root_key),
+            protocol::OwnerRole::GroupKeyWrap,
+        ),
+        &group_key_nonce,
+        group_bytes.as_ref(),
+        &protocol::aad_vault_group_key_wrap_v0_2(&session.vault_binding, epoch),
+    )?;
+
+    let items_uuid = Uuid::now_v7();
+    let items_key_id: [u8; VAULT_META_ITEMS_KEY_ID_LEN] = *items_uuid.as_bytes();
+    let items_key = protocol::generate_root_key()?;
+    let items_key_nonce: [u8; AEAD_NONCE_LEN] = random_bytes()?;
+    let enc_items_key = protocol::aead_seal_ctx(
+        &protocol::derive_group_subkey_v0_2(
+            &protocol::GroupKey::new(*group_bytes),
+            protocol::GroupRole::ItemsKeyWrap,
+        ),
+        &items_key_nonce,
+        items_key.as_ref(),
+        &protocol::aad_vault_items_key_wrap_v0_2(&items_key_id),
+    )?;
+
+    // The owner's own row, signed and sealed like any other roster row. This is
+    // why creation needs an UNLOCKED person session: the signature needs the
+    // private half, and the wrap alone would not.
+    let owner_public = person.pair.public_half();
+    let owner_fingerprint = crate::account::person_identity::hex_lower(owner_public.fingerprint());
+    let roster = protocol::person_invite::GroupRosterPayload {
+        account_number_hash_hex: crate::account::person_identity::hex_lower(&session.vault_binding),
+        group_key_epoch: epoch,
+        owner_fingerprint_hex: owner_fingerprint.clone(),
+        members: vec![protocol::person_invite::GroupRosterMember {
+            fingerprint_hex: owner_fingerprint,
+            person_id_hex: Some(crate::account::person_identity::hex_lower(
+                &person.person_id,
+            )),
+            display_name: String::new(),
+            role: protocol::person_invite::GroupRosterRole::Owner,
+            state: protocol::person_invite::GroupMemberState::Live,
+            wrapped_group_key_hex: None,
+            member_kem_ek_hex: crate::account::person_identity::hex_lower(owner_public.kem_ek()),
+            member_ed_pk_hex: crate::account::person_identity::hex_lower(owner_public.ed_pk()),
+            member_mldsa_vk_hex: crate::account::person_identity::hex_lower(
+                owner_public.mldsa_vk(),
+            ),
+            previous_fingerprint_hex: None,
+            continuity: protocol::person_invite::GroupKeyContinuity::Current,
+            transition_hex: None,
+        }],
+    };
+    let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+    let signed_roster = protocol::person_invite::sign_group_roster(&person.pair, &roster, &mut rng)
+        .map_err(|_| AppError::Protocol(protocol::ProtocolError::AeadFailure))?;
+    let roster_nonce: [u8; AEAD_NONCE_LEN] = random_bytes()?;
+    let signed_roster_envelope = protocol::person_invite::seal_group_roster(
+        &group_bytes,
+        &session.vault_binding,
+        epoch,
+        &roster_nonce,
+        &signed_roster,
+    )
+    .ok_or(AppError::Protocol(protocol::ProtocolError::AeadFailure))?;
+
+    // The retirement itself: `root_key` sealed to the owner's person key, in
+    // the same PQ-hybrid envelope the member group-key package uses.
+    let person_wrap = protocol::seal_root_key_to_person_raw(
+        &owner_public,
+        &session.root_key,
+        &items_key_id,
+        &mut rng,
+    )?;
+
+    let base = protocol::VaultMeta {
+        // The vault's own random namespace id, NOT the person's number hash:
+        // this generation keeps the number out of vault cryptography, and the
+        // salts bind this same value (§3.1).
+        account_number_hash: session.vault_binding,
+        kdf_params: session.kdf_params,
+        random_salt_password: session.salt_password,
+        // Zeroed, and structurally enforced on both the write and the read
+        // side by `serialize_vault_meta_ntv7` / `parse_vault_meta_ntv7`.
+        random_salt_recovery: [0u8; ARGON2_SALT_LEN],
+        nonce_password_wrap,
+        enc_root_key_password,
+        nonce_recovery_wrap: [0u8; AEAD_NONCE_LEN],
+        enc_root_key_recovery: [0u8; VAULT_META_WRAPPED_ROOT_KEY_LEN],
+        items_key_id,
+        items_key_nonce,
+        enc_items_key: enc_items_key
+            .try_into()
+            .expect("a 32-byte secret seals to 64 bytes"),
+        // Carried by the roster in this generation (§9.3.1's field would shift
+        // every offset past the base, which `NTV7`'s writer refuses).
+        membership: None,
+        person_binding: None,
+    };
+    let frame = protocol::PersonWrappedVaultMeta {
+        base,
+        group_key_nonce,
+        enc_group_key: enc_group_key
+            .try_into()
+            .expect("a 32-byte secret seals to 64 bytes"),
+        group_key_epoch: epoch,
+        signed_roster_envelope,
+        person_wrap,
+    };
+    let bytes = protocol::serialize_vault_meta_ntv7(&frame)?;
+    Ok((bytes, group_bytes))
 }
 
 /// Build the [`protocol::VaultMeta`] for a creation session, with an optional
@@ -919,10 +1285,19 @@ fn build_vault_meta(
     let (nonce_password_wrap, enc_root_key_password) =
         seal_32_byte_secret(&session.password_wrap_key, &session.root_key, &aad_pw)?;
 
-    // Wrap root_key under recovery_wrap_key.
+    // Wrap root_key under recovery_wrap_key. A person-born session has no
+    // recovery wrap at all, and never reaches this function (see
+    // `serialize_meta`), so the `None` here is a structural impossibility
+    // rather than a fallback.
+    let recovery_wrap_key = session
+        .recovery_wrap_key
+        .as_ref()
+        .ok_or(AppError::Protocol(
+            protocol::ProtocolError::InvalidVaultMeta,
+        ))?;
     let aad_rec = protocol::aad_recovery_wrap_v0_2(&session.kdf_params);
     let (nonce_recovery_wrap, enc_root_key_recovery) =
-        seal_32_byte_secret(&session.recovery_wrap_key, &session.root_key, &aad_rec)?;
+        seal_32_byte_secret(recovery_wrap_key, &session.root_key, &aad_rec)?;
 
     // Derive itemsKey_wrap_key, generate the singleton itemsKey + its
     // UUIDv7 identifier, and wrap.
@@ -944,7 +1319,11 @@ fn build_vault_meta(
     const _: () = assert!(VAULT_META_WRAPPED_ITEMS_KEY_LEN == VAULT_META_WRAPPED_ROOT_KEY_LEN);
 
     Ok(protocol::VaultMeta {
-        account_number_hash: session.account.hash,
+        // Byte-identical to what it was before the person account existed: a
+        // legacy session's binding IS `account.hash`. A person-born session
+        // never reaches here (its namespace id is written by
+        // `build_person_vault_meta`).
+        account_number_hash: session.vault_binding,
         kdf_params: session.kdf_params,
         random_salt_password: session.salt_password,
         random_salt_recovery: session.salt_recovery,
@@ -1089,13 +1468,16 @@ pub async fn commit_with_vault_path_io(
         }
     }
 
-    let bytes = match serialize_meta(&session, &membership) {
-        Ok(bytes) => bytes,
+    let (bytes, group_key) = match serialize_meta(&session, &membership) {
+        Ok(serialized) => serialized,
         Err(e) => {
             let _ = state.try_insert(token, session);
             return Err(e);
         }
     };
+    // Same tier rule as the native commit path: an `NTV7` vault's shared
+    // singletons follow its roster and are sealed under the GROUP key.
+    let group_key = group_key.as_ref().map(|g| protocol::GroupKey::new(**g));
     if let Err(e) = io
         .write(
             &vault_path,
@@ -1114,15 +1496,18 @@ pub async fn commit_with_vault_path_io(
     // invariants with a spec'd absence-fallback, so a failure warns and the
     // vault stays usable; the session is NOT restored, because restoring it
     // would invite a retry that the artefacts guard would now refuse.
-    let prefs_key = protocol::derive_subkey_versioned(
-        BIRTH_GENERATION,
-        &session.root_key,
-        protocol::SubkeyRole::PrefsKey,
-    );
+    let prefs_key = match group_key {
+        Some(ref group) => protocol::derive_group_subkey_v0_2(group, protocol::GroupRole::PrefsKey),
+        None => protocol::derive_subkey_versioned(
+            BIRTH_GENERATION,
+            &session.root_key,
+            protocol::SubkeyRole::PrefsKey,
+        ),
+    };
     match protocol::encode_prefs_blob_versioned(
         BIRTH_GENERATION,
         &prefs_key,
-        &session.account.hash,
+        &session.vault_binding,
         &protocol::PrefsView::default(),
     ) {
         Ok(prefs_bytes) => {
@@ -1151,15 +1536,20 @@ pub async fn commit_with_vault_path_io(
         ),
     }
 
-    let catalog_key = protocol::derive_subkey_versioned(
-        BIRTH_GENERATION,
-        &session.root_key,
-        protocol::SubkeyRole::AttachmentsCatalogKey,
-    );
+    let catalog_key = match group_key {
+        Some(ref group) => {
+            protocol::derive_group_subkey_v0_2(group, protocol::GroupRole::AttachmentsCatalogKey)
+        }
+        None => protocol::derive_subkey_versioned(
+            BIRTH_GENERATION,
+            &session.root_key,
+            protocol::SubkeyRole::AttachmentsCatalogKey,
+        ),
+    };
     match protocol::encode_attachments_catalog_versioned(
         BIRTH_GENERATION,
         &catalog_key,
-        &session.account.hash,
+        &session.vault_binding,
         &protocol::AttachmentsCatalog::empty(),
     ) {
         Ok(catalog_bytes) => {
@@ -1278,6 +1668,181 @@ mod tests {
         argon2_version: 0x13,
     };
 
+    /// A deterministic person fixture: the phrase is the only input, because
+    /// the identity keypair is derived from it (`decisions/protocol/0604`).
+    fn person_fixture(phrase: &str) -> CreationPerson {
+        let person_id = protocol::kdf::person_id_hash(phrase);
+        let seed = protocol::kdf::derive_person_identity_seed(phrase, &person_id, &FAST_TEST_KDF)
+            .expect("identity seed");
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        CreationPerson {
+            pair: protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa),
+            person_id,
+            number: protocol::account_number_from_person_id(&person_id),
+        }
+    }
+
+    const PERSON_PHRASE: &str = "abandon ability able about above absent absorb abstract          absurd abuse access accident account accuse achieve acid acoustic acquire across act          action actor actress actual";
+
+    #[test]
+    fn person_session_carries_no_phrase_and_a_random_vault_binding() {
+        let person = person_fixture(PERSON_PHRASE);
+        let expected_number = person.number.clone();
+        let a = build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
+            .expect("person session");
+        assert!(a.phrase.is_none(), "the vault phrase is retired here");
+        assert!(
+            a.recovery_wrap_key.is_none(),
+            "no key is derived for a wrap that does not exist"
+        );
+        assert_eq!(a.salt_recovery, [0u8; ARGON2_SALT_LEN]);
+        assert_eq!(a.account.canonical, expected_number.canonical);
+        // The binding is random and is NOT the person's number hash, which is
+        // what keeps the number out of vault cryptography.
+        assert_ne!(a.vault_binding, a.account.hash);
+        assert_ne!(a.vault_binding, [0u8; 16]);
+
+        let person = person_fixture(PERSON_PHRASE);
+        let b = build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
+            .expect("second person session");
+        assert_ne!(
+            a.vault_binding, b.vault_binding,
+            "two vaults of one person must not share a salt binding"
+        );
+    }
+
+    #[test]
+    fn person_born_meta_is_ntv7_with_a_zeroed_phrase_wrap() {
+        let person = person_fixture(PERSON_PHRASE);
+        let session =
+            build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
+                .expect("person session");
+        let (bytes, _group) =
+            build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
+        assert_eq!(&bytes[..4], &protocol::VAULT_META_NTV7_MAGIC);
+        let parsed = protocol::parse_vault_meta_ntv7(&bytes).expect("parse NTV7");
+        // The three fields the retired phrase wrap owned, all zero.
+        assert_eq!(parsed.base.random_salt_recovery, [0u8; ARGON2_SALT_LEN]);
+        assert_eq!(parsed.base.nonce_recovery_wrap, [0u8; AEAD_NONCE_LEN]);
+        assert_eq!(
+            parsed.base.enc_root_key_recovery,
+            [0u8; VAULT_META_WRAPPED_ROOT_KEY_LEN]
+        );
+        // The binding is what §9.3 offset 6 carries, so the frame needs no new
+        // field and the salts bind the same value.
+        assert_eq!(parsed.base.account_number_hash, session.vault_binding);
+        assert_eq!(parsed.group_key_epoch, 1);
+    }
+
+    #[test]
+    fn committing_a_person_born_vault_seals_its_singletons_under_the_group_tier() {
+        // Two claims in one end-to-end run, because they are one chain: the
+        // person wrap opens the `root_key`, that `root_key` unwraps the group
+        // key, and the group key is what the eagerly written `vault.prefs` is
+        // sealed under.
+        //
+        // The tier is load-bearing. Sealed under the ROOT tier instead, the
+        // first unlock would fail to open `vault.prefs` and fall back to
+        // defaults, which reaches the user as "all my settings were reset" with
+        // no error anywhere.
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let person = person_fixture(PERSON_PHRASE);
+            let owner_pair = person.pair.clone();
+            let session =
+                build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
+                    .expect("person session");
+            let state = VaultCreationState::default();
+            let token = Uuid::new_v4();
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
+                .await
+                .expect("commit person-born vault");
+
+            let vault_dir = scratch.path().parent().expect("vault dir");
+            let meta = std::fs::read(scratch.path()).expect("vault.meta");
+            assert_eq!(&meta[..4], &protocol::VAULT_META_NTV7_MAGIC);
+            let parsed = protocol::parse_vault_meta_ntv7(&meta).expect("parse NTV7");
+
+            // Acceptance 3, at the seam the phrase arm uses: the owner's own
+            // keypair opens the person wrap without the password.
+            let root_key = protocol::open_person_wrapped_root_key(
+                &owner_pair,
+                &parsed.person_wrap,
+                &parsed.base.items_key_id,
+            )
+            .expect("the person wrap opens with the owner's identity");
+            let owner_key = protocol::OwnerKey::new(*root_key);
+            let group_bytes = protocol::unlock_group_key_ntv6(&parsed.as_ntv6_tail(), &owner_key)
+                .expect("the owner subkey unwraps the group key");
+            let group_key = protocol::GroupKey::new(*group_bytes);
+
+            let prefs = std::fs::read(vault_dir.join("vault.prefs")).expect("vault.prefs");
+            let prefs_key =
+                protocol::derive_group_subkey_v0_2(&group_key, protocol::GroupRole::PrefsKey);
+            protocol::decode_prefs_blob_versioned(
+                BIRTH_GENERATION,
+                &prefs_key,
+                &parsed.base.account_number_hash,
+                &prefs,
+            )
+            .expect("vault.prefs opens under the GROUP tier");
+
+            // The root tier must NOT open it: that is the defect this asserts
+            // against, and the reason the tier is derived from the session
+            // rather than hardcoded.
+            let root_prefs_key = protocol::derive_subkey_versioned(
+                BIRTH_GENERATION,
+                &root_key,
+                protocol::SubkeyRole::PrefsKey,
+            );
+            assert!(
+                protocol::decode_prefs_blob_versioned(
+                    BIRTH_GENERATION,
+                    &root_prefs_key,
+                    &parsed.base.account_number_hash,
+                    &prefs,
+                )
+                .is_err(),
+                "vault.prefs must not be readable through a root-tier key"
+            );
+
+            // The catalog follows the same rule.
+            let catalog =
+                std::fs::read(vault_dir.join("vault.attachments")).expect("vault.attachments");
+            let catalog_key = protocol::derive_group_subkey_v0_2(
+                &group_key,
+                protocol::GroupRole::AttachmentsCatalogKey,
+            );
+            protocol::decode_attachments_catalog_versioned(
+                BIRTH_GENERATION,
+                &catalog_key,
+                &parsed.base.account_number_hash,
+                &catalog,
+            )
+            .expect("vault.attachments opens under the GROUP tier");
+        });
+    }
+
+    #[test]
+    fn a_legacy_session_still_emits_ntv5_and_keeps_its_phrase() {
+        // Acceptance 4 of task 5: a vault created before this change is
+        // untouched. The legacy birth is asserted by MAGIC, not by "it did not
+        // crash", because a silent flip to the new generation here would take
+        // the vault phrase away from every client that has not yet shipped an
+        // identity-first first run.
+        let session =
+            build_session(VaultId::mint(), "legacy-pw", FAST_TEST_KDF).expect("legacy session");
+        assert!(session.phrase.is_some());
+        assert!(session.recovery_wrap_key.is_some());
+        assert_eq!(session.vault_binding, session.account.hash);
+        let bytes = build_and_serialize_vault_meta(&session).expect("serialize NTV5");
+        assert_eq!(&bytes[..4], &protocol::VAULT_META_V0_2_MAGIC);
+    }
+
     #[test]
     fn build_session_populates_every_field() {
         let session = build_session(
@@ -1290,11 +1855,14 @@ mod tests {
         assert!(session.account.display.starts_with("MY-"));
         assert_eq!(session.account.canonical.len(), 20);
         assert_eq!(session.account.hash.len(), 16);
-        assert_eq!(session.phrase.words().len(), 24);
+        assert_eq!(session.phrase.as_ref().expect("phrase").words().len(), 24);
         assert_eq!(session.root_key.len(), AEAD_KEY_LEN);
         assert_ne!(*session.root_key, [0u8; AEAD_KEY_LEN]);
         assert_ne!(*session.password_wrap_key, [0u8; AEAD_KEY_LEN]);
-        assert_ne!(*session.recovery_wrap_key, [0u8; AEAD_KEY_LEN]);
+        assert_ne!(
+            **session.recovery_wrap_key.as_ref().expect("recovery wrap"),
+            [0u8; AEAD_KEY_LEN]
+        );
         assert_ne!(session.salt_password, session.salt_recovery);
         assert_eq!(session.kdf_params, FAST_TEST_KDF);
     }
@@ -1315,7 +1883,10 @@ mod tests {
     #[test]
     fn build_session_password_and_recovery_wrap_keys_differ() {
         let session = build_session(VaultId::mint(), "any password", FAST_TEST_KDF).unwrap();
-        assert_ne!(*session.password_wrap_key, *session.recovery_wrap_key);
+        assert_ne!(
+            *session.password_wrap_key,
+            **session.recovery_wrap_key.as_ref().expect("recovery wrap")
+        );
     }
 
     #[test]
@@ -1323,7 +1894,10 @@ mod tests {
         let a = build_session(VaultId::mint(), "same password", FAST_TEST_KDF).unwrap();
         let b = build_session(VaultId::mint(), "same password", FAST_TEST_KDF).unwrap();
         assert_ne!(a.account.canonical, b.account.canonical);
-        assert_ne!(a.phrase.words(), b.phrase.words());
+        assert_ne!(
+            a.phrase.as_ref().expect("phrase").words(),
+            b.phrase.as_ref().expect("phrase").words()
+        );
         assert_ne!(*a.root_key, *b.root_key);
         assert_ne!(a.salt_password, b.salt_password);
     }
@@ -1331,7 +1905,7 @@ mod tests {
     #[test]
     fn begin_result_serializes_with_expected_field_names() {
         let result = BeginResult {
-            phrase: core::array::from_fn(|i| format!("w{i}")),
+            phrase: Some(core::array::from_fn(|i| format!("w{i}"))),
             account_number: "MY-XXXX-XXXX-XXXX-XXXX-XXXX".to_string(),
             // secret-scan:allow — test stub, not a credential
             session_token: "deadbeef-0000-0000-0000-000000000000".to_string(),

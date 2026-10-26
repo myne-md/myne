@@ -171,6 +171,60 @@ pub struct SyncState {
     /// shared by hand), so it is stored in the clear like the account hash.
     #[serde(default)]
     pub owner_identity_code: Option<String>,
+    /// The OWNER's identity code as this device recorded it — its OWN code, when this
+    /// device is the owner's.
+    ///
+    /// A member stores the owner's code here at invite accept
+    /// ([`Self::owner_identity_code`]). The owner's own device had nowhere to read its
+    /// own public half from except the person keypair, which is phrase-sealed, so
+    /// verifying the roster (the panel, and every signed head) demanded the phrase on
+    /// every cold start even after the device key took over SIGNING (`0731` stages 1
+    /// and 2). The halves are public material and this device derived them itself the
+    /// last time the phrase was entered, so caching them costs no secrecy: it records
+    /// what this device already knew, and a tampered copy cannot forge a roster that
+    /// verifies against a key it substituted, because the roster's own signature is what
+    /// is checked.
+    ///
+    /// Absent until the first unlock on a device with an owner vault. Its absence is not
+    /// an error: the phrase path still works, and it is refreshed on every unlock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_identity_code: Option<String>,
+    /// The vault's server NAMESPACE when it is not the credential's own account
+    /// (myne-md/myne#911 task 8): the random binding an `NTV7` vault writes at
+    /// §9.3 offset 6, lowercase hex.
+    ///
+    /// Present only after an explicit publish. Its presence is what tells the
+    /// cycle to address this vault with `?account=<hex>` and authenticate with
+    /// the PERSON token, because a person-born vault has no vault SCRAM account
+    /// at all. Absent on every pre-existing vault, where the credential names the
+    /// namespace and no selector is sent.
+    #[serde(default)]
+    pub namespace_hex: Option<String>,
+    /// The OWNER's device, as the invite package attested it
+    /// (`decisions/protocol/0731` stage 2, `0733`).
+    ///
+    /// A roster signed by the owner's DEVICE key needs that device's public halves to
+    /// verify, and a member has no group key before the first accept, so the halves
+    /// travel INSIDE the package, person-signed by the owner. They are pinned here for
+    /// the same reason `owner_identity_code` is: verification must not depend on a
+    /// network round trip, and the value is public material only.
+    ///
+    /// Absent on every member device that accepted before the stage landed, and on every
+    /// package from an owner with no device key. Its absence is not an error: it means
+    /// "this owner signs rosters with the person key".
+    ///
+    /// Public material, so stored in the clear like the account hash and the identity
+    /// code beside it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_device: Option<protocol::person_invite::OwnerDeviceAttestation>,
+    /// Epoch-ms of the publish that recorded [`Self::namespace_hex`], or `None`
+    /// while the vault is device-only (myne-md/myne#911 task 8).
+    ///
+    /// Coarse for the same reason `last_success_at_ms` is: it is a device-local
+    /// fact about when a user acted, and a per-second stamp would make this file
+    /// a sharper activity log than the value it carries is worth.
+    #[serde(default)]
+    pub published_at_ms: Option<u64>,
     /// Whether the last completed cycle PROVED this device holds every content
     /// blob the server's head commits to (phase3-web-client task 89).
     ///
@@ -512,6 +566,25 @@ pub async fn vault_meta_is_dirty(io: &dyn crate::vault_io::VaultIo, dir: &Path) 
         .unwrap_or(false)
 }
 
+/// Record THIS device's own person identity code into the active vault's sync state.
+///
+/// Called on every successful identity unlock, so the cache is refreshed rather than
+/// trusted from the first time it was written. Best-effort on purpose: a readable sync
+/// state is a convenience here, and failing an unlock because a JSON file would not
+/// rewrite would trade a real capability for it.
+pub async fn remember_own_identity_code(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+    code: &str,
+) -> Result<(), SyncConfigError> {
+    let mut state = read_sync_state(io, dir).await?;
+    if state.own_identity_code.as_deref() == Some(code) {
+        return Ok(());
+    }
+    state.own_identity_code = Some(code.to_string());
+    write_sync_state(io, dir, &state).await
+}
+
 /// Persist the sync state to `<dir>/sync-state.json` (atomic replace).
 pub async fn write_sync_state(
     io: &dyn crate::vault_io::VaultIo,
@@ -566,7 +639,10 @@ pub async fn read_head_baseline(
         if blob[4] != protocol::VAULT_HEAD_PROTOCOL_VERSION {
             return Err(protocol::vault_head::VaultHeadError::ProtocolVersionMismatch);
         }
-        if blob[5] != head_authority.expected_format() {
+        // The baseline may hold a format this device no longer AUTHORS: a `0x03` head
+        // written before a device key was lost still has to be readable, or the device
+        // would forget its own version vector and re-author from zero.
+        if !head_authority.accepts_format(blob[5]) {
             return Err(protocol::vault_head::VaultHeadError::FormatUnsupported);
         }
         head_authority.open(&blob[header..])
@@ -719,6 +795,42 @@ mod tests {
                     slot,
                 ));
             }
+
+            // The OWNER's own code is remembered on unlock and REFRESHED on the next
+            // one (`0731` stages 1 and 2 moved signing to the device key, and this is what
+            // stops the panel and the cycle from still asking for the phrase to READ a
+            // roster). Refreshed rather than write-once: a device that re-derived its
+            // identity after a phrase change must not keep verifying against the old half.
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code,
+                None
+            );
+            super::remember_own_identity_code(&io, &dir, "MYNE-PERSON-1:aa")
+                .await
+                .unwrap();
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code
+                    .as_deref(),
+                Some("MYNE-PERSON-1:aa")
+            );
+            super::remember_own_identity_code(&io, &dir, "MYNE-PERSON-1:bb")
+                .await
+                .unwrap();
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code
+                    .as_deref(),
+                Some("MYNE-PERSON-1:bb"),
+                "a later unlock must replace the cached code, not keep the first one"
+            );
 
             // Generation 1: a real, enrolled device.
             let enrolled = SyncState {
@@ -899,6 +1011,10 @@ mod tests {
             owner_member_token_hex: Some("ff".repeat(32)),
             owner_member_person_id_hex: Some("12".repeat(16)),
             owner_identity_code: Some("MYNE-PERSON-1:aa".to_string()),
+            own_identity_code: None,
+            owner_device: None,
+            namespace_hex: None,
+            published_at_ms: None,
         };
         let defaulted = SyncState::default();
 

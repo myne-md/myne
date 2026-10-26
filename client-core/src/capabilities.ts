@@ -35,6 +35,58 @@ export type Capability =
   | "diagnosticLog"
   /** Legacy single-vault → multi-vault migration. */
   | "vaultMigration"
+  /**
+   * The owner's identity phrase as a credential for opening a vault
+   * (myne-md/myne#911 task 10).
+   *
+   * The person-wrapped (`NTV7`) generation ships two credentials: the vault
+   * password, unchanged, and the identity phrase, which replaces the per-vault
+   * recovery phrase the explicit upgrade retires. This flag is what decides
+   * whether the unlock screen's escape hatch can offer that second credential.
+   *
+   * **Present on all three clients since task 13**, which is what turned the web
+   * person plane on: the commands dispatch there now, so the arm has something to
+   * call. It was absent on web for one task, and the reason is worth keeping
+   * rather than deleting: the arm is only offered where the command answers.
+   */
+  | "personVaultCredential"
+  /**
+   * The person identity plane: creating an identity, registering it, unlocking
+   * it with the phrase, and joining an account from a scanned code
+   * (myne-md/myne#911 tasks 9 and 13).
+   *
+   * Split from `memberSharing` by task 13, and the split is the point even though
+   * NO client yet differs on it: both used to be one flag, which meant a client
+   * that shipped the identity could not have it without also shipping the member
+   * surface. They are different planes, the identity is the user's own keypair
+   * and token, while the member surface is invites, the roster, member names and
+   * the device-binding map, all of which need a group key and a SIGNED roster,
+   * and the split is what lets a client ship one without the other.
+   *
+   * **Present on all three clients since task 13**, which is what turned the web
+   * person plane on: `sync::person_account` is ungated for wasm32 (its member
+   * surface stays gated per function), the identity commands dispatch, and the
+   * two person files live in the Worker's memory rather than in OPFS.
+   */
+  | "personIdentity"
+  /**
+   * Whether this client keeps the person identity AT REST (myne-md/myne#911 task
+   * 13).
+   *
+   * A native client writes a phrase-derived sealed keypair and the device token
+   * to its app-config directory, so a reload finds the identity where it left it.
+   * A browser holds NEITHER on disk: the two files live in the Worker's memory
+   * for the session, because an origin's storage is readable by any script on
+   * that origin and a phrase-derived keypair at rest there is an offline cracking
+   * target that no password change rotates (threat-model A15/TB11, A18). The cost
+   * is that a reload asks for the 24 words again, so the caveat beside the phrase
+   * says so.
+   *
+   * A capability rather than a platform check at the call site, for the reason
+   * the descriptor exists: the phrase screens are shared code, and "does this
+   * client keep it" is a product fact, not a runtime probe.
+   */
+  | "personCredentialPersisted"
   /** Encrypted backup export and restore. */
   | "backup"
   /** Native Save-As to a user-chosen path. */
@@ -281,13 +333,12 @@ export type Capability =
    * Vault names on the LOCKED picker, and with them the device-local sealed
    * `MYL1` store that makes showing one possible (myne-md/myne#411).
    *
-   * **Absent on web, and already decided before this capability existed.** The
-   * picker is the whole subject: a name is cached so the pre-unlock screen can
-   * label a row, and `check-web-screens.mjs` records `VaultPicker.tsx` as
-   * `excluded` because an origin holds exactly one container, so the
-   * two-or-more-vault branch that produces that screen cannot be reached. The
-   * store behind it is sealed under an OS keychain `wrap_key`, and a page has
-   * no keychain, so there is no second half either.
+   * **Absent on web.** The locked picker itself now SHIPS there
+   * (`check-web-screens.mjs` records `VaultPicker.tsx` as `ported` since
+   * myne-md/myne#911 task 13), so the obstacle is not the screen: the name is
+   * cached in the device-local sealed `MYL1` store, and that store's wrap key
+   * lives in an OS keychain. A page has no keychain, so there is no carrier for
+   * the cache and nothing for the display to read.
    *
    * Named for the NAMES rather than for the Privacy switch that hides them,
    * because the switch is downstream: what a client without this capability
@@ -317,11 +368,12 @@ export type Capability =
   /**
    * Grouping vaults under an account (the account/vault split, myne-md/myne#684).
    *
-   * **Absent on web, and not as a port that is owed.** A browser holds exactly
-   * one vault per origin and has no OS keychain, so there is no grouping to
-   * render and nowhere to keep the wrap key whose seal is the account record.
-   * The picker grouping UI is omitted rather than rendered against commands
-   * that reject.
+   * **Absent on web, and not as a port that is owed.** A browser can now hold
+   * two containers under one origin (myne-md/myne#911 task 13), so the obstacle
+   * is not the vault count: the account record is sealed with a wrap key kept in
+   * an OS keychain, and a page has none, so there is nowhere to keep the seal
+   * the grouping is read from. The picker renders the rows standalone instead of
+   * failing the list (`KeychainUnavailable`).
    */
   | "accountGrouping"
   /** B2B member sharing: person identity, invite, roster, removal. */
@@ -398,6 +450,9 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   screenCaptureProtection: true,
   diagnosticLog: true,
   vaultMigration: true,
+  personVaultCredential: true,
+  personIdentity: true,
+  personCredentialPersisted: true,
   backup: true,
   nativeSaveAs: true,
   vaultCreation: true,

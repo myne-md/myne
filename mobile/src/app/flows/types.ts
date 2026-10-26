@@ -11,13 +11,22 @@ import type { StageVaultStatus, SuspicionReason, RecoverSubStep, VaultId } from 
  */
 
 export interface WelcomeFlowProps {
-  onCreate: () => void;
-  /** Enter the fresh-device sync-join flow ("Connect to my account"). */
+  /**
+   * Enter the fresh-device sync-join flow ("Connect to my account").
+   *
+   * The welcome screen has ONE create action (myne-md/myne#911 task 12), so
+   * there is no `onCreate` any more: the identity is created first and the vault
+   * follows from the identity home. A device that wants a vault without an
+   * identity is not a state this client offers, because the desktop does not
+   * offer it either and a client that invented one would be the only place the
+   * two-phrase model still existed.
+   */
   onJoin: () => void;
   /**
-   * Identity-first door (myne-md/myne#768). Opens the mobile identity flow,
-   * which fronts the sync-server step when none is configured and lands on the
-   * identity home once an identity exists.
+   * The one create door (myne-md/myne#768, narrowed by myne-md/myne#911 task 12).
+   * Opens the mobile identity flow, which fronts the sync-server step when none is
+   * configured, creates the identity, and lands on the identity home whose
+   * create-vault action is the next step of the same chain.
    */
   onIdentity: () => void;
 }
@@ -35,6 +44,14 @@ export interface IdentityFlowProps {
    */
   fromQr?: { endpointUrl: string; accountHashHex: string };
   /**
+   * A scanned PERSON code (myne-md/myne#911 task 9, wired on this client by task
+   * 12): the endpoint and the person this device is joining. When set, the flow
+   * opens at the person-join phrase step BEFORE any identity probe, because the
+   * device joining an account has no identity yet and the phrase it types is what
+   * creates one.
+   */
+  fromPersonQr?: { endpointUrl: string; personIdHex: string };
+  /**
    * An invite was accepted, this device has named itself, and the member vault
    * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell
    * closes the overlay and re-probes, which is how every other flow hands a new
@@ -47,6 +64,17 @@ export interface IdentityFlowProps {
    * callback is the name gate's completion, not the accept's.
    */
   onAccepted: () => void;
+  /**
+   * Create a vault from the identity home (myne-md/myne#911 task 12).
+   *
+   * Passed ONLY by the entry that knows there are zero vaults on this device
+   * (the welcome door), because the identity home is also reachable from Settings
+   * on a device that already holds vaults, where a create action would be a second
+   * door to a flow the picker and the editor already own. The flow renders the
+   * action only when it is given, so the caller stays authoritative and the flow
+   * needs no vault-list probe of its own.
+   */
+  onCreateVault?: () => void;
 }
 
 export interface JoinFlowProps {
@@ -71,6 +99,17 @@ export interface JoinFlowProps {
    * hands the target straight back to the shell instead.
    */
   onMemberJoin: (target: { endpointUrl: string; accountHashHex: string }) => void;
+  /**
+   * A scanned PERSON code (myne-md/myne#911 task 9, wired on this client by task
+   * 12): the shell closes this overlay and opens the identity flow's person-join
+   * wizard, which takes the phrase and waits for an existing device to approve.
+   *
+   * Same shape as `onMemberJoin` and for the same reason: this flow owns the
+   * account-number confirm step, and a person code has no account number. The
+   * credential a person join needs is the identity phrase, which lives in the
+   * identity flow rather than here.
+   */
+  onPersonJoin: (target: { endpointUrl: string; personIdHex: string }) => void;
 }
 
 export interface CreateVaultFlowProps {

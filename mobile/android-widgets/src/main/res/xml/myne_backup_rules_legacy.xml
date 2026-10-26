@@ -15,4 +15,5 @@
 -->
 <full-backup-content>
     <exclude domain="external" path="Documents" />
+    <exclude domain="file" path="person-auth.json" />
 </full-backup-content>

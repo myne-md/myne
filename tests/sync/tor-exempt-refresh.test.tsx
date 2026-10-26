@@ -118,7 +118,7 @@ describe("the Tor posture after an endpoint change", () => {
     render(
       <>
         <PostureProbe />
-        <JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />
+        <JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />
       </>,
     );
     await waitFor(() =>

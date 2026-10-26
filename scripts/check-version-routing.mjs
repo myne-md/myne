@@ -123,6 +123,23 @@ const CLASSES = {
     fix: "derive_subkey_versioned(version, ..) + aad_vault_items_key_wrap_v0_2 on the v0.2 arm (see `vault_recover::derive_items_key`)",
     why: "`protocol::derive_items_key` pins the v0.1 KEK context AND the v0.1 AAD, so on a v0.2 vault the `itemsKey` unwrap fails outright — every note unreadable through that path",
   },
+  // `protocol::parse_vault_meta_ntv6` is the `NTV6`-only tail reader. Its
+  // generation-agnostic sibling is `parse_b2b_tail_any`, which accepts BOTH tail
+  // generations because `NTV7` keeps the `NTV6` tail byte for byte.
+  //
+  // This class exists because that distinction cost a whole generation of member
+  // paths. When `NTV7` was owner-only, a member could never meet an `NTV7` frame, so
+  // every `parse_vault_meta_ntv6` on the member plane was correct-by-accident. The
+  // moment sharing a person-born vault shipped (`decisions/protocol/0730`), the
+  // member join, the six member-unlock entry points, the durable attribution join,
+  // the awareness epoch read, the rotation-outbox drain and the content-epoch
+  // stand-down all asked for the wrong frame and answered "not a shared vault" or
+  // `None` on it. Nothing failed loudly: `None` reads as "nothing to do".
+  ntv6: {
+    re: /\bparse_vault_meta_ntv6\s*\(/,
+    fix: "protocol::parse_b2b_tail_any(&bytes): the SAME tail on both generations",
+    why: "`parse_vault_meta_ntv6` rejects `NTV7`, and `NTV7` is the birth format: a member vault, a rotation, an awareness frame or an attribution join on one reads as absent rather than failing",
+  },
   metaw: {
     names: ["serialize_vault_meta"],
     fix: "match the generation: `serialize_vault_meta_v0_2` for V0_2 (see `sync::orchestrator`'s meta merge)",
@@ -253,6 +270,23 @@ const ALLOWED = new Map([
   // test, since it is the absence of v0.1 writes rather than the presence of
   // v0.2 ones. Do not re-add an entry here without the flip being reversed.
 
+  // ── legitimately `NTV6`-only: THE OLD GENERATION, BY CONSTRUCTION ─────────
+  // Each of these IS the `NTV6` side of something that deliberately names it: the
+  // upgrade's SOURCE frame, the NTV5→NTV6 migration's output check, and the arm of
+  // an explicit generation branch. A grep cannot see the branch, so they are
+  // recorded rather than rewritten; a bare-name match would report them as
+  // offenders while missing nothing real.
+  ["core/src/plugins/vault_migrate/ntv7.rs#ntv6", [1, "the upgrade reads the OLD `NTV6` frame it is about to replace"]],
+  ["core/src/plugins/vault_migrate/b2b.rs#ntv6", [1, "the NTV5→NTV6 migration validates the frame it just produced"]],
+  ["core/src/plugins/sync/commands.rs#ntv6", [1, "the `AlreadyMigrated` arm reports the epoch of the NTV6 frame that vault already is"]],
+  ["core/src/plugins/sync/cycle.rs#ntv6", [1, "the `NTV6` arm of the head-format dispatch (its `NTV7` arm sits beside it)"]],
+  ["core/src/plugins/vault_change_password/commands.rs#ntv6", [1, "the `VaultMetaGeneration::B2b` arm of an explicit match (the `Person` arm sits beside it)"]],
+  ["core/src/plugins/vault_unlock/commands.rs#ntv6", [3, "the `NTV6` arms of explicit generation branches: the preview's magic dispatch, the re-key recovery's `is_ntv7` else-arm, and the status probe's `||` chain that already names `NTV7`"]],
+  // A TEST FIXTURE, and recorded rather than skipped because the region tracker
+  // loses `mod tests` in this file part-way through (a brace inside the module's
+  // own string literals closes the region early). The count is what keeps this
+  // honest: the budget is 1, so a second site appearing here in production fires.
+  ["core/src/plugins/sync/member_removal.rs#ntv6", [1, "a rotation test's fixture read (`mod tests`), pinned by count because the region tracker drops the region part-way down this file"]],
   // ── DEBT lives in its own table below ──────────────────────────────────────
   // It used to be a section at the end of THIS table, and the count was derived
   // from a reason string (`why.startsWith("debt")`) that no entry in this file
@@ -446,7 +480,7 @@ const total = [...touching.values()].reduce((a, b) => a + b, 0);
 const debt = debtTotal();
 console.log(`version-routing: ok (${files.length} file(s) checked)`);
 console.log(
-  `  ${total} v0.1-only call site(s) across ${touching.size} (file, class) pair(s); ` +
+  `  ${total} single-generation call site(s) across ${touching.size} (file, class) pair(s); ` +
     `${debt} still debt. This number must only go down.`,
 );
 }

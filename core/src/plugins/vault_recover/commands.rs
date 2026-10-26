@@ -286,8 +286,8 @@ pub(crate) async fn recover_with_phrase_with_path(
             // root-tier derive fails there; recover the group key first.
             // items_key derivation drops `root_key` on early-return; the slot
             // stays empty (no half-state).
-            let items_key = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+            let items_key = if protocol::has_b2b_tail(&bytes) {
+                let b2b = protocol::parse_b2b_tail_any(&bytes)
                     .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
                 let g = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
                     .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
@@ -677,27 +677,45 @@ pub(crate) async fn complete_recovery_with_path(
             //     uses the same security parameters the vault was
             //     created under (parameter upgrade is a separate Phase
             //     2+ feature decision).
-            let rewrite = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-                // An `NTV6` rewrite must carry the B2B tail; the versioned v0.2
-                // rewrite would re-serialize as `NTV5` and drop it.
-                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
-                    .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
-                protocol::rewrite_vault_meta_password_side_ntv6(
-                    &b2b,
-                    &root_key_snapshot,
-                    new_password.as_str(),
-                    &fresh_salt,
-                    &fresh_nonce,
-                )
-            } else {
-                protocol::rewrite_vault_meta_password_side_versioned(
+            // An `NTV7` vault has no recovery wrap at all, so this flow cannot
+            // have opened one. The generation is dispatched rather than guessed
+            // from "has a tail": `NTV6` and `NTV7` both have a tail entry, and the
+            // `NTV6` writer re-serializes as `NTV6`, which would drop the person
+            // wrap (the vault's only second credential) and leave its recovery
+            // fields zeroed, with nothing on disk saying so.
+            let rewrite = match protocol::vault_meta_generation(&bytes) {
+                protocol::VaultMetaGeneration::Person => {
+                    let person_wrapped = protocol::vault_meta_ntv7::parse_vault_meta_ntv7(&bytes)
+                        .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv7(
+                        &person_wrapped,
+                        &root_key_snapshot,
+                        new_password.as_str(),
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
+                protocol::VaultMetaGeneration::B2b => {
+                    // A B2B rewrite must carry the tail; the versioned v0.2
+                    // rewrite would re-serialize as `NTV5` and drop it.
+                    let b2b = protocol::parse_b2b_tail_any(&bytes)
+                        .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv6(
+                        &b2b,
+                        &root_key_snapshot,
+                        new_password.as_str(),
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
+                _ => protocol::rewrite_vault_meta_password_side_versioned(
                     version,
                     &parsed,
                     &root_key_snapshot,
                     new_password.as_str(),
                     &fresh_salt,
                     &fresh_nonce,
-                )
+                ),
             };
             let new_bytes = rewrite.map_err(|e| {
                 tracing::error!(
@@ -804,8 +822,8 @@ pub(crate) async fn complete_recovery_with_path(
     let now_ms = host.monotonic_millis();
     // An `NTV6` vault's session carries the group tier, so the shared
     // singletons derive from the group key rather than the root key.
-    let group_key = if new_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        let b2b = protocol::parse_vault_meta_ntv6(&new_bytes)
+    let group_key = if protocol::has_b2b_tail(&new_bytes) {
+        let b2b = protocol::parse_b2b_tail_any(&new_bytes)
             .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
         Some(
             protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*recovering.root_key))
@@ -1315,7 +1333,12 @@ mod tests {
         let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
             .expect("build_session");
         let original_root_key: [u8; AEAD_KEY_LEN] = *session.root_key;
-        let phrase_string: String = (*session.phrase.join_normalized()).to_string();
+        let phrase_string: String = (*session
+            .phrase
+            .as_ref()
+            .expect("build_session always mints a phrase")
+            .join_normalized())
+        .to_string();
         let bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
         (bytes, original_root_key, phrase_string)
     }

@@ -64,9 +64,18 @@ if ! command -v "$DRIVER_BIN" >/dev/null 2>&1; then
   exit 2
 fi
 
+# Before ANY of the bundle work: the wasm is a build artefact `pnpm web:build`
+# does not produce. A lane that runs against a stale one measures an older
+# product and says green, which is how this lane spent 2026-10-22 reporting a bug
+# that the current binary does not have (see the script's header).
 if [ "$SKIP_BUILD" -eq 0 ]; then
+  node scripts/check-web-wasm-freshness.mjs || exit 1
   echo "== building the web bundle (the lane refuses to run without one) =="
   pnpm web:build || exit 1
+else
+  # `--skip-build` is about `web/dist`, not about the wasm: reusing a bundle is a
+  # deliberate speed choice, reusing a five-day-old Rust build is not.
+  node scripts/check-web-wasm-freshness.mjs || exit 1
 fi
 
 # ONE DRIVER PER SHARD, at the port band `e2e-web/support/worker-ports.ts`

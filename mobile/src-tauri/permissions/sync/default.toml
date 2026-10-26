@@ -33,11 +33,24 @@ permissions = [
     "allow-sync-now",
     "allow-sync-person-unlock",
     "allow-sync-person-setup",
+    # The person plane's own acts (myne-md/myne#911 task 12): publish, publish
+    # state, discovery, offline create, registration and the device join. All
+    # seven were registered in `generate_handler!` and absent here, so
+    # `sync:default` refused every one of them on the device while both mobile
+    # lanes stayed green behind a mocked IPC boundary.
+    "allow-sync-publish-vault",
+    "allow-sync-published-state",
+    "allow-sync-person-list-vaults",
+    "allow-sync-person-register",
+    "allow-sync-person-account-number",
+    "allow-sync-person-join-device",
+    "allow-sync-person-claim-device",
     "allow-sync-person-status",
     "allow-sync-person-list-invites",
     "allow-sync-person-lock",
     "allow-sync-person-create-invite",
     "allow-sync-list-vault-invites",
+    "allow-sync-person-decline-invite",
     "allow-sync-person-accept-invite",
     "allow-sync-member-join-vault",
     "allow-sync-person-unlock-member-vault",
@@ -107,6 +120,41 @@ description = "Allow invoking sync:sync_person_setup (B2B identity-only setup: g
 commands.allow = ["sync_person_setup"]
 
 [[permission]]
+identifier = "allow-sync-publish-vault"
+description = "Allow invoking sync:sync_publish_vault (publish the active vault to the sync server under the person session; binds the owner on first write, never rolls back)."
+commands.allow = ["sync_publish_vault"]
+
+[[permission]]
+identifier = "allow-sync-published-state"
+description = "Allow invoking sync:sync_published_state (read-only: whether the active vault is on the server or device-only)."
+commands.allow = ["sync_published_state"]
+
+[[permission]]
+identifier = "allow-sync-person-list-vaults"
+description = "Allow invoking sync:sync_person_list_vaults (discovery: materialise the frames of the vaults this person account is bound to; frames only, no keys, no corpus)."
+commands.allow = ["sync_person_list_vaults"]
+
+[[permission]]
+identifier = "allow-sync-person-register"
+description = "Allow invoking sync:sync_person_register (the explicit registration act: register this device's person account at the configured endpoint, proving possession with the phrase)."
+commands.allow = ["sync_person_register"]
+
+[[permission]]
+identifier = "allow-sync-person-account-number"
+description = "Allow invoking sync:sync_person_account_number (read-only: the person account number in canonical form, derived from the person id this device already holds. No phrase, no network, no key material)."
+commands.allow = ["sync_person_account_number"]
+
+[[permission]]
+identifier = "allow-sync-person-join-device"
+description = "Allow invoking sync:sync_person_join_device (bring this device into an account from a join code: the code names the person, the phrase proves it, the device lands pending)."
+commands.allow = ["sync_person_join_device"]
+
+[[permission]]
+identifier = "allow-sync-person-claim-device"
+description = "Allow invoking sync:sync_person_claim_device (poll for the approving device's approval of a pending join, and install the token once it lands)."
+commands.allow = ["sync_person_claim_device"]
+
+[[permission]]
 identifier = "allow-sync-person-status"
 description = "Allow invoking sync:sync_person_status (read-only: whether this device holds a person account, and its person_id; device-local, no network)."
 commands.allow = ["sync_person_status"]
@@ -131,6 +179,11 @@ commands.allow = ["sync_person_create_invite"]
 identifier = "allow-sync-list-vault-invites"
 description = "Allow invoking sync:sync_list_vault_invites (B2B owner-side: list the invitations this owner has sent for the active vault, with the recipient person id and the claimed flag. Authorized by the owner's per-vault token; no payload)."
 commands.allow = ["sync_list_vault_invites"]
+
+[[permission]]
+identifier = "allow-sync-person-decline-invite"
+description = "Allow invoking sync:sync_person_decline_invite (B2B: refuse an invitation addressed to this identity). The server drops the sealed payload, so the invitation can never be claimed, and the sender's own list reports it declined. Sends the device-scoped person token and the invite id and nothing else; no vault content, no key material, no vault access."
+commands.allow = ["sync_person_decline_invite"]
 
 [[permission]]
 identifier = "allow-sync-person-accept-invite"

@@ -76,10 +76,9 @@
     "tests/scripts/e2eEnterKey.test.ts": 1,
     "tests/scripts/token-adoption.test.ts": 1,
     "tests/stage/editor-mount-guard.test.tsx": 4,
-    "tests/stage/picker-unlock-targeting.test.ts": 1,
     "tests/web/css-data-images.test.ts": 4,
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 204
+  "total": 203
 }

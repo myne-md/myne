@@ -360,6 +360,51 @@ impl VaultCreationState {
 /// On drop — whether via `commit` consuming the session, `cancel`
 /// dropping it, or TTL eviction — every Zeroizing field's bytes are
 /// wiped.
+/// The person identity a creation session was opened under (myne-md/myne#911
+/// task 5).
+///
+/// Present only for a **person-born** vault: the `NTV7` generation, whose
+/// `root_key` is sealed to this person's key and whose recovery phrase is
+/// retired. A session without one is the pre-change path (`NTV5`, a vault
+/// phrase and a recovery wrap), which is what every client that has not yet
+/// shipped an identity-first first run still produces.
+///
+/// The keypair is held here because `commit` runs on the blocking pool with no
+/// access to [`crate::plugins::vault_unlock::state::VaultRuntimeState`], and the
+/// signed owner roster cannot be built without the private half. It is
+/// `ZeroizeOnDrop`, so the session's own drop wipes it exactly like `root_key`
+/// and the phrase.
+#[derive(Clone)]
+pub struct CreationPerson {
+    /// The owner's person keypair: seals the `root_key` wrap and signs the
+    /// roster the `NTV7` tail carries.
+    pub pair: protocol::PersonKeyPair,
+    /// The owner's `person_id_hash`, written onto the roster's owner row so the
+    /// member list can resolve the owner's own display name.
+    pub person_id: [u8; 16],
+    /// The person's account number. The number is a property of the PERSON, so
+    /// a vault created under an identity shows this one rather than minting a
+    /// per-vault number of its own.
+    pub number: AccountNumber,
+}
+
+/// What `begin` learned about the person plane before it minted a session.
+///
+/// Three cases, and the middle one is why this is an enum rather than an
+/// `Option`: a device whose identity is sealed but locked must be REFUSED
+/// rather than quietly handed the legacy flow, because the legacy flow mints a
+/// second recovery phrase for a user who was promised one.
+pub enum CreationPersonRequest {
+    /// No identity on this device. The pre-change birth, unchanged.
+    Absent,
+    /// An identity exists but its session is not installed (the phrase has not
+    /// been entered this launch). `begin` refuses with [`super::error::AppError::PersonLocked`].
+    Locked,
+    /// An unlocked identity. Boxed because the keypair is far larger than the
+    /// two empty variants, and the enum is moved once per creation.
+    Unlocked(Box<CreationPerson>),
+}
+
 pub struct VaultCreationSession {
     /// The fresh, collision-free [`VaultId`] minted at `begin` time
     /// (`vault_registry::mint_unique_vault_id`). `commit` resolves the
@@ -373,9 +418,18 @@ pub struct VaultCreationSession {
     pub vault_id: VaultId,
     /// User identifier; not secret-bearing in the cryptographic sense
     /// (bearer-token semantics) so no `Zeroizing`.
+    ///
+    /// For a person-born session this is the PERSON's number
+    /// ([`CreationPerson::number`]), and it never reaches vault cryptography:
+    /// the vault's own random [`Self::vault_binding`] is what the salts and the
+    /// AADs bind (myne-md/myne#911 task 5).
     pub account: AccountNumber,
     /// 24-word BIP-39 phrase (Zeroizing inside `RecoveryPhrase`).
-    pub phrase: RecoveryPhrase,
+    ///
+    /// `None` for a person-born session: the vault phrase is retired, so there
+    /// is nothing to show and nothing to wrap. `Some` on the legacy path, where
+    /// it is both returned to the UI and wrapped into `enc_root_key_recovery`.
+    pub phrase: Option<RecoveryPhrase>,
     /// Argon2id parameter set used to derive `password_wrap_key` and
     /// `recovery_wrap_key`. Stored on the session so `commit` builds
     /// the AADs and `vault.meta` under exactly the same params —
@@ -385,15 +439,30 @@ pub struct VaultCreationSession {
     /// 32-byte root key — NEVER crosses the IPC boundary; lives only
     /// here until `commit` AEAD-wraps it into `vault.meta`.
     pub root_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// The 16-byte value this vault's salts bind, and the value §9.3 offset 6
+    /// carries.
+    ///
+    /// For a legacy session it IS `account.hash`, byte for byte, so the
+    /// derivation is unchanged there. For a person-born session it is a random
+    /// per-vault namespace id: the account number is a property of the person,
+    /// so it can no longer separate one vault of that person from another, and
+    /// the generation keeps it out of vault cryptography altogether
+    /// (myne-md/myne#911 task 5).
+    pub vault_binding: [u8; 16],
     /// Per-vault Argon2id salt for the password path (spec § 3.1).
     pub salt_password: [u8; ARGON2_SALT_LEN],
-    /// Per-vault Argon2id salt for the recovery path (spec § 3.1).
+    /// Per-vault Argon2id salt for the recovery path (spec § 3.1). All zero on
+    /// a person-born session, where the wrap it belonged to does not exist.
     pub salt_recovery: [u8; ARGON2_SALT_LEN],
     /// Cached password-derived wrap key — Argon2id is expensive;
     /// derived once at `begin` time and reused at `commit` time.
     pub password_wrap_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
-    /// Cached recovery-phrase-derived wrap key.
-    pub recovery_wrap_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
+    /// Cached recovery-phrase-derived wrap key. `None` on a person-born
+    /// session: the phrase is retired and no key is ever derived for it.
+    pub recovery_wrap_key: Option<Zeroizing<[u8; AEAD_KEY_LEN]>>,
+    /// The identity this vault is being born under, if any. See
+    /// [`CreationPerson`].
+    pub person: Option<CreationPerson>,
     /// Monotonic milliseconds at which the session entered the state map,
     /// stamped by [`VaultCreationState::commit_reservation`]. Used by the TTL
     /// evictor.
@@ -413,14 +482,16 @@ mod tests {
         let phrase = protocol::generate_recovery_phrase().expect("getrandom works");
         VaultCreationSession {
             vault_id: VaultId::mint(),
+            vault_binding: account.hash,
             account,
-            phrase,
+            phrase: Some(phrase),
             kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
             root_key: Zeroizing::new([0u8; AEAD_KEY_LEN]),
             salt_password: [0u8; ARGON2_SALT_LEN],
             salt_recovery: [0u8; ARGON2_SALT_LEN],
             password_wrap_key: Zeroizing::new([0u8; AEAD_KEY_LEN]),
-            recovery_wrap_key: Zeroizing::new([0u8; AEAD_KEY_LEN]),
+            recovery_wrap_key: Some(Zeroizing::new([0u8; AEAD_KEY_LEN])),
+            person: None,
             created_at: 0,
         }
     }
