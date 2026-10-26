@@ -28,6 +28,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { useTranslation } from "react-i18next";
+import { useTitleReveal } from "./useTitleReveal";
 import { labelColorVar } from "../decorations";
 import type { TitleRecord } from "../loadNoteBatch";
 import { DRAWING_KIND_VALUE, TASK_KIND_VALUE } from "../../dialect";
@@ -579,6 +580,7 @@ export function NoteRow(props: NoteRowProps) {
           />
         ) : (
           <TitleLine
+            revealed={hovering}
             record={record}
             isIndexNote={isIndexNote}
             indexConflict={indexConflict}
@@ -647,16 +649,26 @@ export function NoteRow(props: NoteRowProps) {
 // so this renders text and trailing markers only.
 function TitleLine({
   record,
+  revealed = false,
   isIndexNote = false,
   indexConflict = false,
   showTaskMarker = true,
 }: {
   record: TitleRecord;
+  /** The row is hovered, so the title may reveal itself in place (myne-md/myne#908
+   *  item 6). Hovering also mounts the star, which NARROWS the title: the hook
+   *  measures one frame later so a title that only truncates on hover still
+   *  animates. */
+  revealed?: boolean;
   isIndexNote?: boolean;
   indexConflict?: boolean;
   showTaskMarker?: boolean;
 }) {
   const { t } = useTranslation();
+  const { boxRef: titleBoxRef, textRef: titleTextRef } = useTitleReveal(
+    revealed,
+    record.title ?? "",
+  );
   // Trailing markers (MYND-370) — the index badge on the folder's index note,
   // and the muted conflict dot on a claimant that lost the tiebreak. Both are
   // subtle, inline-after-title, and mutually exclusive in practice (a winner is
@@ -731,11 +743,26 @@ function TitleLine({
     );
   }
   return (
-    <div style={titleStyle}>
+    <div
+      ref={titleBoxRef}
+      // The ellipsis is dropped only while the reveal is running: it is painted
+      // by this box, and leaving it on would re-truncate the text as it moves.
+      style={revealed ? { ...titleStyle, textOverflow: "clip" } : titleStyle}
+    >
       {/* `<bdi>` isolates the user-authored title's bidi + auto-directions it,
           so a mixed-script or RTL title reads correctly and does not reorder the
           trailing markers or the surrounding row under RTL. */}
-      <bdi>{record.title}</bdi>
+      <span
+        ref={titleTextRef}
+        // `inline` unless the reveal is running. An inline-block child is an
+        // atomic box, and the parent's `text-overflow: ellipsis` does NOT reach
+        // inside one: wrapping the title unconditionally deleted the ellipsis
+        // from every truncated row (measured in the app). Transform needs the
+        // inline-block, so it is paid for only while the text is moving.
+        style={{ display: revealed ? "inline-block" : "inline" }}
+      >
+        <bdi>{record.title}</bdi>
+      </span>
       {markers}
     </div>
   );

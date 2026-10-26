@@ -616,14 +616,13 @@ fn main() {
         .plugin(
             "account",
             // myne-md/myne#684: the device-local account record (the
-            // account/vault split). `account_list` (read) + `account_rename` +
-            // `account_move` + `account_split` (writes). Same InlinedPlugin
+            // account/vault split). `account_list` (read) + `account_move` +
+            // `account_split` (writes). Same InlinedPlugin
             // discipline as the plugins above; without a matching
             // `commands.allow` entry in `permissions/account/default.toml` the
             // ACL resolver never authorizes the `plugin:account|<cmd>` invoke.
             tauri_build::InlinedPlugin::new().commands(&[
                 "account_list",
-                "account_rename",
                 "account_move",
                 "account_split",
             ]),
@@ -730,6 +729,9 @@ fn main() {
                 "sync_person_lock",
                 "sync_person_create_invite",
                 "sync_list_vault_invites",
+                // The recipient's refusal (myne-md/myne#911 follow-up):
+                // a real server-side delete of the invitation.
+                "sync_person_decline_invite",
                 "sync_person_accept_invite",
                 // member-devices task 7: a member's SECOND device joins the
                 // vault from the phrase alone. Takes no owner code from the

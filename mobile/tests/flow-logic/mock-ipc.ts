@@ -2010,12 +2010,19 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_status": () => config.syncStatus ?? { state: "not_enrolled" },
       "plugin:sync|sync_get_endpoint": () =>
         config.endpoint ?? { endpoint_url: null, cert_pin_hex: null, pin_source: null },
-      "plugin:sync|sync_set_endpoint": (args) =>
-        config.setEndpoint ?? {
+      "plugin:sync|sync_set_endpoint": (args) => {
+        // Recorded for the same reason `sync_person_register`'s argument is: the
+        // register step writes the address BEFORE any secret crosses IPC
+        // (2026-10-24), and "did it send the address, and before the phrase" is a
+        // question only this tier can answer.
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs ??= [];
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs!.push(args);
+        return config.setEndpoint ?? {
           fingerprint: null,
           pin_source: String(args.endpointUrl ?? "").startsWith("https://")
             ? "platform_trust_store" : null,
-        },
+        };
+      },
       // MYND-548 device naming. The setter mirrors the real one's contract: a
       // blank name is refused (no write), so an empty submit cannot blank a row.
       "plugin:prefs|set_device_name": (args) => {

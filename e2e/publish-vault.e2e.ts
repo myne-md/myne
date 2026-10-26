@@ -25,10 +25,24 @@
 // What is NOT proved here, and cannot be: "publishes and opens on a second
 // device". Opening it elsewhere is the person-scoped device-add flow (task 9), so
 // nothing in this file claims it.
+//
+// **And the register-from-Settings door ("this refusal's remedy") is not drivable
+// here either, stated rather than faked (2026-10-23).** It renders only for a
+// `reserved` identity, and this harness cannot construct "reserved identity plus a
+// vault": the first run enrols the identity whenever a server answers (see the
+// comment in the retry scenario below), while a vault cannot be created without
+// an endpoint. An offline first run stays reserved but never reaches a vault. The
+// flow is covered at the unit tier instead, where the state is a prop:
+// `tests/components/personRegisterForm.test.tsx` (submit, address-before-phrase
+// order, both failure arms, the beta-terms gate) and the Settings mount in
+// `tests/components/SyncPanel.identity-block.test.tsx`. The refusal-to-alert half
+// IS driven here, by the transport-failure scenario below, which is the same
+// `SettingRow.error` slot.
 
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import { testIdSelector } from "./support/webdriver";
 import { scenario } from "./support/scenario";
 import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
@@ -38,6 +52,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   openSettings,
+  registerPersonIdentity,
   selectSettingsTopic,
   startFirstRunIdentity,
 } from "./support/flows";
@@ -125,6 +140,11 @@ async function unlockIdentity(
   words: readonly string[],
 ): Promise<void> {
   await selectSettingsTopic(app.session, "sync", "connection");
+  // IDEMPOTENT, because REGISTERING already unlocked the identity for this
+  // session: the register dialog asks for the phrase as proof, so the unlock door
+  // is gone by the time this runs and a blind click waited its whole budget on a
+  // control the product had correctly removed. Measured 2026-10-24, in isolation.
+  if ((await app.session.byTestIdAll("sync.panel.identity-unlocked")).length > 0) return;
   await clickByTestId(app.session, "sync.panel.identity-unlock.open", { timeoutMs: 15_000 });
   for (const [index, word] of words.entries()) {
     const testId =
@@ -147,8 +167,14 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
         async (app) => {
           const phrase = await createIdentityAndVault(app);
 
+          // The identity exists on this device; it is not REGISTERED with the
+          // server, and a person-born vault can only be published under a
+          // registered identity (the panel says exactly that when asked). See
+          // `registerPersonIdentity` for why this is now its own act.
+          await registerPersonIdentity(app.session, phrase);
+
           await openSettings(app.session, "sync");
-          await selectSettingsTopic(app.session, "sync", "devices");
+          await selectSettingsTopic(app.session, "sync", "connection");
 
           // Device only, before anything is pressed. The row's own state line is
           // read from disk, so this is the durable answer and not this session's.
@@ -214,7 +240,7 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
           // the panel, so the reopened row can only have come from disk.
           await closeSettings(app.session);
           await openSettings(app.session, "sync");
-          await selectSettingsTopic(app.session, "sync", "devices");
+          await selectSettingsTopic(app.session, "sync", "connection");
           const reopened = await app.session.byTestId("sync.panel.publish-state", {
             timeoutMs: 15_000,
           });
@@ -235,7 +261,11 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
       // nothing to publish under). Getting a token is therefore not something
       // this scenario can skip to.
       await scenario("publish-vault-down", { seedConfig: syncConfigSeed(srv.url) }, async (app) => {
-        await createIdentityAndVault(app);
+        const downPhrase = await createIdentityAndVault(app);
+        // Registered against the LIVE server before the endpoint is broken: the
+        // device token is what a publish authenticates with, and a token cannot
+        // be minted from a refused connection.
+        await registerPersonIdentity(app.session, downPhrase);
 
         // Break the connection the way a user does: point the endpoint at a port
         // nothing listens on. Port 9 is the discard port, so the attempt is
@@ -248,15 +278,23 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
         await field.replaceText("http://127.0.0.1:9");
         await clickByTestId(app.session, "sync.endpoint-connect", { timeoutMs: 30_000 });
 
-        await selectSettingsTopic(app.session, "sync", "devices");
+        await selectSettingsTopic(app.session, "sync", "connection");
         await clickByTestId(app.session, "sync.panel.publish", { timeoutMs: 20_000 });
+        // The refusal has its OWN element now (`sync.panel.publish-row-error`),
+        // not a sentence folded into the row's state line: the state line is the
+        // durable fact read from disk ("exists only on this device") and the
+        // error is what this attempt said. Measured 2026-10-24 — the state line
+        // still carried the durable sentence while the refusal was on screen, so
+        // the assertion was reading the wrong element and reported a swallowed
+        // error that was not swallowed.
         await app.session.waitUntil(
-          async () =>
-            (await (await app.session.byTestId("sync.panel.publish-state")).textContent()).includes(
-              "Could not reach the server",
-            )
-              ? true
-              : null,
+          async () => {
+            const [el] = await app.session.findElements(
+              testIdSelector("sync.panel.publish-row-error"),
+            );
+            if (el === undefined) return null;
+            return (await el.textContent()).includes("Could not reach the server") ? true : null;
+          },
           { label: "the refused publish is reported, not swallowed", timeoutMs: 75_000 },
         );
 
@@ -276,7 +314,7 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
         await again.replaceText(srv.url);
         await clickByTestId(app.session, "sync.endpoint-connect", { timeoutMs: 30_000 });
 
-        await selectSettingsTopic(app.session, "sync", "devices");
+        await selectSettingsTopic(app.session, "sync", "connection");
         await clickByTestId(app.session, "sync.panel.publish", { timeoutMs: 20_000 });
         await app.session.waitUntil(
           async () =>
@@ -306,7 +344,7 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
       const a = fleet.a;
 
       await openSettings(a.session, "sync");
-      await selectSettingsTopic(a.session, "sync", "devices");
+      await selectSettingsTopic(a.session, "sync", "connection");
       // Enrolled, so its own token already puts it on the server.
       const line = await a.session.byTestId("sync.panel.publish-state", { timeoutMs: 15_000 });
       expect(await line.textContent()).toContain("on your sync server");

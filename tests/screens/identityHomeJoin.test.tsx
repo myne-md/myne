@@ -81,7 +81,7 @@ function renderHome(onAccepted: () => void = () => {}) {
       onCreateVault={() => {}}
       onAccepted={onAccepted}
       onForgotten={() => {}}
-      accountState={null}
+      accountState="enrolled"
       onRegistered={() => {}}
     />,
   );

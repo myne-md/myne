@@ -35,8 +35,8 @@
 //      the route around it.
 //
 // The FIVE-SITE ACL lockstep found during this work is a sibling property and
-// lives in `scripts/check-mobile-plugin-acl.mjs`, over all 27 mobile plugin
-// permission directories rather than this one. Its header carries why that is a
+// lives in `scripts/check-mobile-plugin-acl.mjs`, over every mobile plugin
+// permission directory rather than this one. Its header carries why that is a
 // separate file.
 //
 // SCOPE, deliberately narrower than `scripts/lib/shared-roots.mjs`: mobile files
@@ -872,8 +872,8 @@ export function analyse(io) {
 
   // ── 5. The chokepoint is wired, and the route around it stays shut ────────
   // Narrowed deliberately. The five-site ACL lockstep this rule used to carry
-  // moved to `scripts/check-mobile-plugin-acl.mjs`, where it covers all 27
-  // mobile plugin permission directories instead of this one. What stays here
+  // moved to `scripts/check-mobile-plugin-acl.mjs`, where it covers every mobile
+  // plugin permission directory instead of this one. What stays here
   // is the part about the export path.
   const invokeLiteral = `plugin:${PLUGIN_NAME}|${COMMAND}`;
   // Bounded, not `includes`. A substring match accepts

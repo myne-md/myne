@@ -469,6 +469,14 @@ function devDeploymentPlugin(): Plugin {
 export default defineConfig({
   root: path.join(repoRoot, "web"),
   publicDir: path.join(repoRoot, "public"),
+  // Its own dependency cache, for the reason the catalogue's config states at
+  // length: the web dev server (:1421), the desktop one (:1420) and the design
+  // catalogue (:1423) all resolve the same `node_modules/.vite/deps`, so whichever
+  // re-optimizes last leaves the others' pages asking for hashes that are gone
+  // (`504 Outdated Optimize Dep`). Running them together is documented, so their
+  // caches must not be shared. `mobile/` needs no entry: it is a workspace member
+  // with a `node_modules` of its own.
+  cacheDir: path.join(repoRoot, "node_modules", ".vite-web"),
   plugins: [
     platformSeamSubstitution(),
     emitCssDataImages(),

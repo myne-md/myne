@@ -685,7 +685,6 @@ mod tests {
 
         let outcome = migrate_legacy_vault(tmp.path()).unwrap();
 
-        // Old vault/ is gone.
         assert!(
             !tmp.path().join(LEGACY_VAULT_DIR_NAME).exists(),
             "old vault/ must be retired last"

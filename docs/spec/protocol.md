@@ -935,7 +935,7 @@ A Myne vault is a directory on the user's filesystem containing:
 ├── vault.chats           ← encrypted AI conversations catalog (MYM1, §9.23)
 ├── vault.agent-memory    ← encrypted agent-memory catalog (MYN1, §9.25)
 ├── vault.personality     ← encrypted agent-personality singleton (MYZ1, §9.27)
-├── vault.member-names    ← encrypted member display-name map (MYO5, §9.29; NTV6 only)
+├── vault.member-names    ← encrypted member display-name map (MYO5, §9.29; group tier, both generations)
 ├── notes/
 │   ├── 0184a2b3-...myn   ← one encrypted note per file
 │   ├── 0184a2b4-...myn
@@ -1200,6 +1200,26 @@ trailing-byte rejection. Both signatures cover the whole literal signature
 class `"myne.group-roster v1|"` followed by the payload bytes, and both MUST
 verify. A signature from any other record class MUST fail.
 
+**A roster MAY instead be signed by a DEVICE key**, under its own class
+`"myne.group-roster v2|"` (`decisions/protocol/0731` stage 2, `0733`). The frame and the
+payload are unchanged: the roster still names PEOPLE and still carries the owner's
+person fingerprint, so what moves is only the key that vouches for it. A reader MUST
+accept both classes, and it resolves the device from the same three sources the `0x03`
+head path uses (`sync-protocol.md` §3.6): the attestation a member pinned at accept
+(`owner_device` in `sync-state.json`), the reader's own device key, and the verified
+rows of `vault.device-bindings` that name the owner. A reader that has no reason to
+trust any device (`RosterTrust::person_only`) MUST refuse a `v2` roster.
+
+**The attestation, and why it rides in the package.** A member's first roster
+verification happens before it holds a group key, so it cannot read the binding store;
+the owner's device halves therefore travel INSIDE the person-signed group package, as an
+optional `owner_device` field carrying the device id and the owner's person-signed
+binding row. Carrying the whole row rather than the two halves is deliberate: the
+recipient verifies the person's signature over the row itself against the owner public
+half it pinned out of band, instead of trusting the package's word that those halves
+belong to the owner. The field is omitted when absent, so a package from a build with no
+device key encodes exactly the bytes the previous release reads.
+
 The payload is canonical JSON with `account_number_hash_hex`, positive
 `group_key_epoch`, `owner_fingerprint_hex`, and a `members` array strictly
 sorted by `fingerprint_hex`. Exactly one live owner row matches
@@ -1297,7 +1317,20 @@ writer emits
 the base through the shared §9.3 serializer and patches the header afterwards, so
 no byte past the header can drift from that contract.
 
-**A person-born vault is OWNER-ONLY in this revision.** The upgrade refuses a vault with a live second member (§10.4.2), the member plane is `NTV6`-only, and the two member-writable families (§9.29 member names, §9.30 device bindings) are therefore unreachable on it. Sharing a vault born under an identity is a later change, and it lands in one commit with those two sections rather than as a half-supported state.
+**A person-born vault is shareable, and the member plane reads this generation.**
+`NTV7` carries the `NTV6` tail byte for byte, so the roster, the group-key epoch and
+the two member-writable families (§9.29 member names, §9.30 device bindings) are the
+same objects on it; the readers resolve that tail through `parse_b2b_tail_any` rather
+than through the `NTV6` parser. The invite, the accept and the removal all write the
+generation they found, so a `NTV7` frame stays `NTV7` across a roster write and the
+person wrap is never dropped. What is the owner's alone on this generation is
+`root_key`: a member is granted the `group_key` and the `itemsKey` as on `NTV6`, and
+never the root, which is why membership needs no second credential design.
+
+The **upgrade** still refuses a vault with a live second member (§10.4.2). That is a
+rollout rule, not a capability one: a client predating this generation rejects the
+magic outright, and a shared vault's other devices belong to other people. It is not
+a statement that a person-born vault cannot be shared.
 
 **The phrase wrap is required to be absent, in both directions.** A writer MUST
 NOT emit a frame carrying a live phrase wrap and a parser MUST refuse one, both
@@ -3342,7 +3375,19 @@ as the empty map). A client MUST NOT write one into an `NTV5` vault, and a reade
 with the file there MUST treat the vault as malformed rather than guessing a root-tier KEK
 for it.
 
-**On `NTV7` the family is unreachable today, and that is stated rather than implied.** A person-born vault carries the `NTV6` group tier, so the seal itself would work, but the member plane that writes it (invite, removal, rotation adoption) is `NTV6`-only and the `NTV7` upgrade explicitly refuses a vault with a live second member (`decisions/storage/0723`, `Ntv7UpgradeError::SharedVault`). A person-born vault is therefore OWNER-ONLY on every client: it cannot be shared, so it has no co-members to name. This paragraph is the sentence that keeps the two facts consistent; when the member plane learns the generation, this paragraph and the "NTV6-only" claim above both change in the same commit.
+**On `NTV7` the family is readable and writable, sealed under the same group tier.** A
+person-born vault carries the `NTV6` group tail from birth, so the seal is the one
+§9.29.2 states; what made the family unreachable on it was the RESOLVER, which parsed
+`vault.meta` with the `NTV6` parser and answered `NotASharedVault` for an `NTV7` frame.
+The reader resolves the tail generation-agnostically (`parse_b2b_tail_any`), so the
+owner and every member read and write one map. The 16 bytes the AAD binds are offset 6
+of the base either way: an account-number hash on a migrated vault, the vault's
+namespace on one born this way.
+
+Only the `NTV7` **upgrade** keeps the refusal of a vault with a live second member
+(§10.4.2, `Ntv7UpgradeError::SharedVault`), and for a rollout reason: a client that
+predates this generation rejects the magic outright, so changing the generation under
+another person's device is not a change this client may make on their behalf.
 
 **Why the owner-signed roster does not carry this.** The owner-signed group roster
 (§9.3.2) has a `display_name` field, and it holds the vault label captured at
@@ -3359,7 +3404,7 @@ format's future.
 |---|---|---|---|
 | 0 | 4 | magic | ASCII `MYO5`, in the `MY?5` column only (§10.3) |
 | 4 | 1 | protocol_version | `0x01` (the shared-singleton family byte; the generation domain-separates on magic + AAD prefix + KEK, not on this byte) |
-| 5 | 1 | format_version | `0x01` = the canonical-JSON map below |
+| 5 | 1 | format_version | `0x01` = the canonical-JSON map below; `0x02` = the same map whose rows MAY carry the device public halves (§9.30.4). A writer emits `0x02`; a reader MUST accept both. |
 | 6 | 24 | nonce | XChaCha20-Poly1305 nonce, drawn from the OS CSPRNG |
 | 30 | 4 | ciphertext_len | big-endian `u32`, `plaintext_len + 32` |
 | 34 | M | ciphertext | AEAD ciphertext + 32-byte CTX tag |
@@ -3465,7 +3510,9 @@ root-tier KEK for it. It sits beside `vault.member-names` (§9.29) with the same
 family registers two, the KEK (§9.30.2) and the sync blob-id (§9.30.6), and neither has
 a root-tier counterpart.
 
-**On `NTV7` this map is likewise unreachable today**, for the reason §9.29 states one section up: the `NTV7` upgrade refuses a shared vault, so a person-born vault has exactly one device-claiming member and nothing to bind.
+**On `NTV7` this map is reachable, for the reason §9.29 states one section up**: the family
+resolves the group tail generation-agnostically, so the owner's own devices bind
+normally on a vault born under an identity and a member joining one binds the same way.
 
 **What a binding is worth, stated plainly.** The map is group-sealed, so every member
 can WRITE it, and that same seal is what stops the seal being an authority over who
@@ -3515,7 +3562,11 @@ family adds nothing past the ciphertext. `DEVICE_BINDING_BLOB_HEADER_LEN` is `34
 
 The inner plaintext is canonical JSON whose keys are `device_id` in lowercase hex and
 whose values are `{ "person_fingerprint": string, "version": u64, "tombstone": bool,
-"signature_hex": string }`. Canonical means a parser re-serializes and requires byte
+"device_ed_pk"?, "device_mldsa_vk"?, "signature_hex": string }`, where the two
+`device_*` fields are OPTIONAL and belong to the `format_version 0x02` schema. Both
+are omitted from the canonical bytes when absent, so a `0x01` row re-encodes
+byte-identically and a `0x01` blob stays readable; a row carrying one half and not the
+other is malformed rather than half-used. Canonical means a parser re-serializes and requires byte
 equality with its input, the discipline the owner-signed roster and the member
 display-name map already use, so two implementations agree on which byte strings are
 blobs of this family. The codec owns the map rather than leaving it opaque, because the
@@ -3593,9 +3644,40 @@ Every row carries a hybrid Ed25519 + ML-DSA-65 signature under the
 
 which is `23 + 16 + 32 + 8 + 1 = 80` bytes. Fixed widths rather than canonical JSON, so
 the signed message has exactly one encoding and there is no ambiguity about where a
-field ends. Version and tombstone are inside the message deliberately, so a co-member
+field ends.
+
+**A `0x02` row signs a LONGER message, under its own class** (`decisions/protocol/0733`):
+
+```text
+"myne.device-binding v2|" || device_id (16 raw) || person_fingerprint (32 raw) || version (8, big-endian) || tombstone (1) || device_ed_pk (32 raw) || device_mldsa_vk (1952 raw)
+```
+
+`23 + 16 + 32 + 8 + 1 + 32 + 1952 = 2064` bytes. The device's two public halves are
+inside the signed message on purpose: they are what a peer resolves to verify the heads
+that device authors (§3.6 of `sync-protocol.md`), and a substituted half that verified
+would let any member holding the group key point a person's binding at a key they
+control and then sign heads as that person's device. The class prefix differs as well as
+the length, so a `v1` signature can never be read as a `v2` one. Which class a row is in
+is decided by the ROW (it carries the halves or it does not), never by the blob's
+`format_version`: a `0x02` blob may still hold `0x01` rows that have not re-signed
+themselves yet, and a device re-signs its own row once, when it first holds a device key. Version and tombstone are inside the message deliberately, so a co-member
 cannot bump a version (which decides the merge) or flip a tombstone (which would
 resurrect a removed device).
+
+**The `format_version` byte is derived from the ROWS, and that rule is a downgrade rule
+rather than a tidiness one** (`format_for_map`; the answer `decisions/protocol/0733`
+gives). A store whose rows all still carry `0x01` signatures is written back as a `0x01`
+blob, so a vault that has adopted no device key keeps writing blobs the previous release
+can read, and a mixed-version fleet therefore breaks nothing by being mixed. The byte
+moves to `0x02` on the FIRST device-key adoption in that vault, and from that moment a
+build that predates device keys rejects the whole store as
+`DeviceBindingFormatUnsupported`. Stated plainly because the alternative is a surprise:
+downgrading a client after any device of that vault has adopted a key costs the binding
+store, not a re-read. It is acceptable because the store is derived from rows the peers
+still hold and the next sync re-fetches them, and because the blast radius of the
+downgrade is one vault at a time rather than the fleet. Nothing on a sync path assumes a
+peer can read `0x02`: every blob this family writes is read back through the same
+resolver, and a peer that cannot read it says so instead of merging a guess.
 
 A live row is verified on read against the public half of the person the row NAMES,
 which the owner-signed roster already carries, and the check additionally requires that
@@ -3880,6 +3962,17 @@ changes only `vault.meta`:
    that predates the generation, so the confirmation says every device must be
    updated first. No client can census devices, and the copy MUST NOT claim it
    can.
+
+9. **A vault with a live second member MUST be refused**
+   (`Ntv7UpgradeError::SharedVault`). This is a ROLLOUT rule and not a capability
+   one, and the distinction is worth stating because it was the opposite until the
+   member plane learned the generation: an `NTV7` frame is rejected outright by a
+   client that predates the magic (§9.3.5), and a shared vault's other devices
+   belong to other people, who this operator does not upgrade. Changing the
+   generation under them would revoke their access to a vault whose content they
+   are entitled to until each of them updates. Only LIVE rows count: a tombstoned
+   member is the normal post-removal shape, so treating `members.len()` as the test
+   would leave a legitimately owner-only vault permanently un-upgradable.
 
 A reader MUST keep accepting `MYV1`, `NTV5` and `NTV6` forever: this procedure
 ends production of the older generations, never their support (§10.3.1). A

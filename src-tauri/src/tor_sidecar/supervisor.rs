@@ -91,6 +91,18 @@ pub enum StartError {
     NoPort,
     /// `spawn` itself failed (no exec permission, wrong architecture, …).
     SpawnFailed,
+    /// This platform's bundle does not carry the sidecar at all.
+    ///
+    /// Distinct from [`SidecarMissing`], and the distinction is the user's: that
+    /// one means a build shipped without staging the binary (a defect in a build
+    /// that HAS the feature), while this one means the feature is not offered on
+    /// this platform. Windows is the first case: `tor-dirmgr` pulls `rusqlite`
+    /// non-bundled, so the sidecar has no `sqlite3.lib` to link against on
+    /// windows-msvc and the release stopped bundling it rather than shipping a
+    /// binary it could not build. A single sentence naming the platform is
+    /// worth more than an IO error about a file the user cannot install.
+    #[cfg_attr(not(windows), allow(dead_code))]
+    NotBuiltForThisPlatform,
 }
 
 /// The supervisor. Held in an `Arc` (Tauri managed state); all handles share
@@ -149,11 +161,22 @@ impl TorSidecar {
     /// The caller learns about readiness through the gate, never by blocking
     /// here.
     pub fn start(self: &Arc<Self>, exe_dir: &Path, app_data_dir: &Path) -> Result<(), StartError> {
-        let Some(port) = pick_loopback_port() else {
+        // Refused before any state is touched, so the phase never reads
+        // "starting" for a feature this platform does not have.
+        #[cfg(windows)]
+        {
+            let _ = (exe_dir, app_data_dir);
             self.fail();
-            return Err(StartError::NoPort);
-        };
-        self.start_on_port(exe_dir, app_data_dir, port)
+            return Err(StartError::NotBuiltForThisPlatform);
+        }
+        #[cfg(not(windows))]
+        {
+            let Some(port) = pick_loopback_port() else {
+                self.fail();
+                return Err(StartError::NoPort);
+            };
+            self.start_on_port(exe_dir, app_data_dir, port)
+        }
     }
 
     /// [`Self::start`] with the loopback port chosen by the caller. Split out

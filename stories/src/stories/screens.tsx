@@ -47,6 +47,7 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
       <Welcome
         onStart={action("onStart")}
         onRestoreBackup={action("onRestoreBackup")}
+        onInvited={action("onInvited")}
         onJoinDevice={action("onJoinDevice")}
       />
     ),

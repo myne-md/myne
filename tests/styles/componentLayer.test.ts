@@ -69,6 +69,27 @@ describe("every interactive primitive answers a pointer", () => {
       "var(--duration-instant)",
     );
   });
+
+  it("gives the ghost variant a resting fill, and keeps the disabled arm flat", () => {
+    // A control that paints nothing until it is hovered reads as a label, so the
+    // quietest action in a card or a dialog is the one a user cannot find
+    // (2026-10-23). Three assertions, and each guards a different arm:
+    //  - the fill exists on `:enabled`, so it never lights a disabled control;
+    //  - the base rule KEEPS `transparent`, which is what a disabled ghost falls
+    //    back to (dropping it painted the user agent's button face);
+    //  - `:not([role="menuitem"])` keeps a menu flat, because a list whose every
+    //    row is filled has no affordance left.
+    expect(SHEET).toContain(
+      '.myne-btn[data-variant="ghost"]:enabled:not([role="menuitem"]) {',
+    );
+    const fill = ruleBody(SHEET, '.myne-btn[data-variant="ghost"]:enabled');
+    expect(fill).toContain("background: color-mix(in srgb, var(--bg-3)");
+    const base = ruleBody(
+      SHEET,
+      '.myne-btn[data-variant="ghost"] {\n  background: transparent;',
+    );
+    expect(base).toContain("color: var(--fg-2)");
+  });
 });
 
 describe("state rules cannot fire on a disabled control", () => {

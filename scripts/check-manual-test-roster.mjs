@@ -7,9 +7,10 @@
 // this repository has ever been able to answer "what did a human look at before
 // we tagged, and what did nobody look at at all?".
 //
-// That question is not academic here. The desktop E2E suite is 133 files, and the
-// 301 scenarios `scripts/e2e-scenario-floor.json` requires to EXECUTE all run in a Linux container against WebKitGTK
-// through tauri-driver. So macOS desktop, Windows desktop, Safari, iOS and
+// That question is not academic here. The desktop E2E suite runs in a Linux
+// container against WebKitGTK through tauri-driver, and the count of scenarios
+// that must EXECUTE lives in `scripts/e2e-scenario-floor.json` rather than here.
+// So macOS desktop, Windows desktop, Safari, iOS and
 // Android have ZERO automated UI coverage, and until this roster existed nothing
 // in the tree stated that. Seven manual procedure documents did exist
 // (`docs/dev/accessibility-checklist.md`, `docs/dev/tor-verification.md`,
@@ -567,8 +568,8 @@ export function analyse(io) {
   // the whole forward rule: every future file dropped into that directory is
   // pre-claimed by an entry that has never seen it. Measured during review by
   // injecting `src/screens/vault-creation/ZZ.tsx`, which the guard reported `ok`
-  // on at exit 0 while the denominator count silently rose. The roster carries 158 prefix
-  // claims (91 distinct) and only three sat inside a denominator, so this costs almost
+  // on at exit 0 while the denominator count silently rose. The roster carries many
+  // prefix claims and only a handful sat inside a denominator, so this costs almost
   // nothing and it is what makes the headline claim, "a surface ENTERING the tree
   // fails by name", true rather than aspirational.
   //
@@ -888,7 +889,7 @@ afford to lose.** That covers every uninstall, factory reset, credential-store w
 a real container, disk filled to ENOSPC, and hard power cut in this roster, and several of them say
 so in their own text as well. Read it as binding even where an item forgets: this product keeps no
 server-side copy, so a vault destroyed on the release-testing machine is destroyed, and the roster
-is the one document with the standing to send somebody to do that quickly on a 163.7 h day. Where an
+is the one document with the standing to send somebody to do that quickly. Where an
 item needs a machine rather than just a vault, it says so; where it does not, a VM, a spare device
 or a fresh user account is the default reading.
 
@@ -971,8 +972,8 @@ The tier decides ordering, and together with the client it decides whether an it
 
 ## Why this exists
 
-The desktop E2E suite is 133 files, and the 301 scenarios \`scripts/e2e-scenario-floor.json\`
-requires to execute all run in a Linux container against WebKitGTK through tauri-driver. macOS
+The desktop E2E suite runs in a Linux container against WebKitGTK through tauri-driver; how many
+scenarios must execute is recorded in \`scripts/e2e-scenario-floor.json\`. macOS
 desktop, Windows desktop, Safari, iOS and Android have no automated UI coverage at all. Seven manual procedure documents already existed and four of them
 were reachable from no release step. The CI \`e2e\` step carries \`failure: ignore\`, and v0.4 shipped
 without the suite ever running with nothing recording that fact.
@@ -1144,9 +1145,9 @@ async function main() {
     walked[dir] = [...found].sort();
   }
 
-  // `existsSync` memoised. Rule 1 asks about 1104 distinct strings (952 `paths`
-  // plus the `automatedBy` scenarios), 381 of them more than once and
-  // `e2e/prefs.e2e.ts` fourteen times, for 1849 calls unmemoised.
+  // `existsSync` memoised. Rule 1 revisits the same paths across hundreds of
+  // entries — one scenario file recurs a dozen times — so unmemoised the calls
+  // run into the thousands.
   const statCache = new Map();
   const pathExists = (p) => {
     if (!statCache.has(p)) statCache.set(p, existsSync(join(ROOT, p)));

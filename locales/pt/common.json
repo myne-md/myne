@@ -4069,7 +4069,6 @@
         "ribbon": "fita esquerda trilho fixar pin comando comandos personalizar reordenar soltar barra de ferramentas atalhos",
         "folderNotes": "pasta nota índice folder_index página de destino duplo clique ligação pasta projetos desligar interruptor desativar",
         "syncMembers": "membros, partilhar, convidar, equipa, colaboração, cofre",
-        "accountName": "nome da conta grupo agrupamento mudar o nome etiqueta dispositivo local",
         "accountVaults": "conta cofres agrupados que cofres pertencem lista de grupo",
         "aiMeetingPrompt": "reunião resumo instrução personalizada transcrição itens de ação decisões",
         "update": "atualização atualizar verificar atualizações versão nova lançamento descarregar download",
@@ -4151,14 +4150,10 @@
       "atCap": "A lista está cheia, por isso não se pode memorizar nada novo. Apague uma entrada para libertar espaço."
     },
     "account": {
-      "nameLabel": "Nome da conta",
-      "nameHelper": "Um nome para este grupo de cofres neste dispositivo. O seletor de cofres usa-o como cabeçalho do grupo. Fica neste dispositivo e nunca é guardado dentro de um cofre, por isso não sincroniza e outro dispositivo pode agrupar e dar outro nome aos mesmos cofres.",
-      "namePlaceholder": "Adicionar um nome…",
-      "nameSave": "Guardar",
-      "nameSaving": "A guardar…",
       "vaultsLabel": "Cofres nesta conta",
       "vaultsHelper": "Os cofres que este dispositivo agrupa sob o nome acima. O agrupamento é uma escolha organizativa por dispositivo, por isso não faz parte do conteúdo de nenhum cofre nem viaja com ele.",
-      "vaultsCount": "{{count}} cofres",
+      "vaultsCount_one": "{{count}} cofres",
+      "vaultsCount_other": "{{count}} cofres",
       "currentVault": "Este cofre",
       "unknownVault": "Outro cofre neste dispositivo",
       "standaloneHelper": "Este cofre não está agrupado sob nenhuma conta neste dispositivo, por isso está isolado. O agrupamento é por dispositivo: outro dispositivo pode mostrá-lo dentro de uma.",
@@ -4170,7 +4165,8 @@
       "sections": {
         "extensions": "Extensões do navegador",
         "grouping": "Esta conta"
-      }
+      },
+      "vaultsCount_many": "{{count}} cofres"
     },
     "plainFile": {
       "errorSaveSetting": "Não foi possível guardar a definição de ficheiro simples.",
@@ -4604,9 +4600,7 @@
       "nameErrorUnshared": "Os nomes podem ser definidos depois de este cofre ser partilhado.",
       "nameErrorLocked": "Desbloqueie o cofre para alterar o seu nome.",
       "nameErrorGeneric": "Não foi possível guardar o seu nome. Tente novamente.",
-      "nameInvite": "Ainda não tem um nome a apresentar. Os outros membros veem a sua impressão digital.",
       "nameInviteCta": "Definir um nome",
-      "nameInviteDismiss": "Agora não",
       "noInvitations": "Ainda não foram enviados convites.",
       "identityHeading": "A sua identidade",
       "membersHeading": "Membros",
@@ -5109,8 +5103,7 @@
       "phraseFor": "Frase de recuperação — se se esquecer da palavra-passe",
       "save": "Guardar kit de recuperação",
       "saveFailed": "Não foi possível guardar o ficheiro. Copie antes o kit, ou anote as duas partes.",
-      "savedToFile": "Guardado. É um ficheiro de texto simples que contém os dois segredos, por isso guarde-o num sítio onde só você o possa ler.",
-      "whyEnglish": "As palavras são em inglês em todos os idiomas. Fazem parte da norma BIP-39, por isso qualquer cliente Myne consegue ler uma frase escrita por qualquer outro. Não as traduza: as palavras traduzidas não estão na lista de palavras e a frase deixaria de funcionar."
+      "savedToFile": "Guardado. É um ficheiro de texto simples que contém os dois segredos, por isso guarde-o num sítio onde só você o possa ler."
     },
     "name": {
       "back": "Voltar",
@@ -5136,13 +5129,8 @@
     "accountFallback": "Conta",
     "moveToAccount": "Mover para a conta…",
     "moveToNewAccount": "Mover para uma conta nova",
-    "renameAccount": "Renomear conta",
     "accountError": "Não foi possível atualizar o agrupamento de contas. Nada foi alterado.",
     "accountHidden": "As ações de conta estão indisponíveis enquanto os nomes dos cofres estão ocultos.",
-    "labelTooLong": "Esse nome é demasiado longo. Mantenha-o abaixo de 512 caracteres.",
-    "renameCancel": "Cancelar",
-    "renamePlaceholder": "Nome da conta",
-    "renameSave": "Renomear",
     "accountUnreadable": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado.",
     "createShort": "Novo cofre",
     "joinShort": "Adicionar dispositivo",
@@ -5340,15 +5328,10 @@
     "openedYearsAgo_other": "aberto há {{count}} anos",
     "corruptedBadge": "Corrompido",
     "accountFallback": "Conta",
-    "renameAccount": "Renomear conta",
     "moveToNewAccount": "Mover para uma conta nova",
     "moveToAccount": "Mover para a conta…",
     "accountError": "Não foi possível atualizar o agrupamento de contas. Nada foi alterado.",
     "accountHidden": "As ações de conta estão indisponíveis enquanto os nomes dos cofres estão ocultos.",
-    "labelTooLong": "Esse nome é demasiado longo. Mantenha-o abaixo de 512 caracteres.",
-    "renameCancel": "Cancelar",
-    "renamePlaceholder": "Nome da conta",
-    "renameSave": "Renomear",
     "accountUnreadable": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado."
   },
   "join": {

@@ -275,7 +275,7 @@ Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/d
 - **Shape:** rounded medium (6px). Pill radius is reserved for status pills **and inline editor chips**; small radius (3px) is reserved for inputs and for chips outside the editor. (The inline-chip exception is deliberate — see "Inline editor chips" below.)
 - **Primary:** iron-blue background (`#2c4a7a`), white text (`#ffffff`), 14px Inter, 10px×16px padding. Hover shifts the background to `#233b62`, press to `#1b2e4d`. **No scale or translate transforms**, and no inset shadow: the colour step is the whole signal, and the product is not playful. Focus ring is the standard 2px iron-blue stroke with a 1px paper offset.
 - **Secondary:** warm-paper background (`#fbfbfa`), ink-primary text (`#1a1a17`), 1px hairline border (`#e3e2dd`), same padding. Hover background shifts to `#ecebe7`.
-- **Ghost:** transparent background, ink-secondary text, no border. Used in dense toolbars only.
+- **Ghost:** a resting translucent step of the hover ramp (`--bg-3` at 70%), ink-secondary text, no border; hover advances to `--bg-3`. Used for tertiary actions in cards, dialogs and menus. Two exceptions: a disabled ghost is flat (no fill at all, only the disabled opacity), and a `role="menuitem"` ghost stays unfilled until hovered, so a menu does not read as a stack of filled bars. (2026-10-23, `decisions/ui/0726`.)
 - **Disabled:** opacity 0.4, control-disabled stroke for icons, no hover.
 
 ### Inputs

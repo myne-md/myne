@@ -27,7 +27,15 @@ export interface PersonSetupView {
   /** The out-of-band identity code an owner pastes to invite this person
    *  (public material only). */
   identity_code: string;
-  /** False when a second password-path device is awaiting approval. */
+  /**
+   * Always `false` on the two arms `personSetup` can take: create does not
+   * register and recover does not either, so neither knows whether a device is
+   * awaiting approval. Only `personRegister` computes it. A caller that needs
+   * the real lifecycle reads `personStatus().state` (`reserved` / `pending` /
+   * `enrolled`); the identity panel's pending note is gated on that, and gating
+   * it on this field is what once told every first device it was waiting for
+   * another device (myne-md/myne#911).
+   */
   approved: boolean;
 }
 
@@ -77,6 +85,59 @@ export async function personAccountNumber(): Promise<string | null> {
   return invoke<string | null>("plugin:sync|sync_person_account_number");
 }
 
+/** The device's sync-server configuration, as the register dialog must state it. */
+export interface SyncEndpointConfig {
+  /** The server this device would register against today, or `null` for none. */
+  endpoint_url: string | null;
+  /** The stored admission code for a gated server (`MYNE_INVITE_CODE`), or
+   *  `null`. Device-local, never synced, and the only copy of the word. */
+  invite_code: string | null;
+}
+
+/**
+ * The device-local sync endpoint and its admission code.
+ *
+ * Lives here, next to `personRegister`, because registration is the one person
+ * act that CANNOT work without a server and the identity home is reachable at
+ * zero vaults, where Settings (the endpoint's own home, `SyncPanel` →
+ * `EndpointConfig`) does not exist.
+ *
+ * It returns the CODE as well as the address (2026-10-24): the register dialog
+ * shows the server it is about to write this identity to, and a gated server's
+ * code has to be in that same row, because a self-hoster who restricts
+ * registration could otherwise never register from this surface at all. The
+ * address alone was enough while the field only appeared as a fallback.
+ */
+export async function readSyncConfig(): Promise<SyncEndpointConfig> {
+  const view = await invoke<SyncEndpointConfig | null>(
+    "plugin:sync|sync_get_endpoint",
+  );
+  return {
+    endpoint_url: view?.endpoint_url ?? null,
+    invite_code: view?.invite_code ?? null,
+  };
+}
+
+/**
+ * Point this device at a sync server, before registering against it.
+ *
+ * The host validates the address and its TLS trust as part of the write, so a
+ * failure here is the honest "that server is not reachable" rather than a
+ * refusal to register.
+ *
+ * `inviteCode` defaults to `null` on purpose: the backend reads `None` as "I
+ * know nothing about the admission code, preserve what is stored" and `Some("")`
+ * as an EXPLICIT CLEAR (`core/src/plugins/sync/config.rs::resolve_invite_code`).
+ * A caller that only wants to change the address must not erase a gated server's
+ * code, which is the only copy of the admission word and cannot be re-derived.
+ */
+export async function writeSyncEndpoint(
+  endpointUrl: string,
+  inviteCode: string | null = null,
+): Promise<void> {
+  await invoke("plugin:sync|sync_set_endpoint", { endpointUrl, inviteCode });
+}
+
 /** Whether this device holds a person account, and whose it is. */
 export interface PersonStatusView {
   enrolled: boolean;
@@ -96,6 +157,23 @@ export interface PersonStatusView {
   sealed_keypair_present: boolean;
 }
 
+/**
+ * Why the invitation list could not be produced.
+ *
+ * - `no-identity`: this device holds no person identity at all.
+ * - `not-enrolled`: it holds one, but the server does not know it yet, so there
+ *   is nothing for an owner to invite. Registering (identity home, Settings, or
+ *   the invitation dialog's own door) is the act.
+ * - `pending`: it is registered and waiting for this device's approval, so it has
+ *   an account and no token. Registration would not help and is not offered.
+ * - `error`: the relay call failed. The address is fine and a retry may work.
+ *
+ * It lives here rather than in the hook because three components read it
+ * (`VaultPicker`, `VaultSwitcher`, `InvitesDialog`) and none of them should have
+ * to import a hook module to name a state.
+ */
+export type InvitesUnavailable = "no-identity" | "not-enrolled" | "pending" | "error";
+
 /** Device-local probe; no network. Drives the identity-only home. */
 export async function personStatus(): Promise<PersonStatusView> {
   return invoke<PersonStatusView>("plugin:sync|sync_person_status");
@@ -112,6 +190,22 @@ export interface InviteSummary {
 /** List the invites addressed to this person account (sealed relay). */
 export async function personListInvites(): Promise<InviteSummary[]> {
   return invoke<InviteSummary[]>("plugin:sync|sync_person_list_invites");
+}
+
+/**
+ * Refuse an invitation addressed to this identity.
+ *
+ * The server DROPS the sealed payload, so the invitation can never be claimed and
+ * the sender's own list reports it declined instead of "not accepted yet". It is
+ * a real delete rather than a client-side hide, which is what makes "decline"
+ * mean something to the person who sent it (myne-md/myne#911 follow-up).
+ *
+ * Refused `DeviceNotFound` for an id this identity does not hold, and
+ * `BadRequest` once the invitation has already been accepted: ending that
+ * membership is the owner's removal, not a declined invitation.
+ */
+export async function personDeclineInvite(inviteIdHex: string): Promise<void> {
+  return invoke<void>("plugin:sync|sync_person_decline_invite", { inviteIdHex });
 }
 
 /** What a successful acceptance reports: public fields only. */

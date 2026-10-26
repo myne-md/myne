@@ -416,13 +416,14 @@ pub async fn vault_indices_by_tag(
 /// Rejected with [`VaultIndicesError::SlotNotUnlocked`] when no vault is
 /// unlocked.
 pub async fn vault_indices_tag_tree_from_host(
+    folder: Option<String>,
     runtime: &VaultRuntimeState,
     indices: &VaultIndicesState,
 ) -> Result<Vec<TagTreeNode>, VaultIndicesError> {
     if runtime.slot_kind_active().await != SlotKind::Unlocked {
         return Err(VaultIndicesError::SlotNotUnlocked);
     }
-    Ok(indices.tag_tree())
+    Ok(indices.tag_tree(folder.as_deref()))
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend
@@ -430,10 +431,13 @@ pub async fn vault_indices_tag_tree_from_host(
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
 #[tauri::command]
 pub async fn vault_indices_tag_tree(
+    // myne-md/myne#908 item 8: optional, so an older caller (mobile, or a build
+    // that predates this) keeps the whole-vault answer instead of a wire break.
+    folder: Option<String>,
     runtime: State<'_, VaultRuntimeState>,
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<TagTreeNode>, VaultIndicesError> {
-    vault_indices_tag_tree_from_host(runtime.inner(), indices.inner()).await
+    vault_indices_tag_tree_from_host(folder, runtime.inner(), indices.inner()).await
 }
 
 /// Vault-wide by-key property accessor (Task 7 / MYND-271) — `(noteId, entry)`

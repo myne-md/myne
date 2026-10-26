@@ -5,10 +5,11 @@
 // `plugin:<plugin>|<cmd>` form Tauri uses to authorize plugin invokes
 // (tauri-utils `acl/resolved.rs::resolve_command`). Mirror of the desktop
 // `src-tauri/build.rs`, covering the plugins registered on mobile: vault
-// lifecycle + notes (CRUD/list) + prefs + quick-unlock (PIN only) + vault-indices
-// + snapshots + attachments (no voice) + search + export + secret-export. The
-// still-desktop-only surfaces (biometric quick-unlock, attachment text
-// extraction / voice, native PDF capture) are not carried over.
+// lifecycle + notes (CRUD/list) + prefs + quick-unlock (PIN everywhere, biometric
+// on iOS) + vault-indices + snapshots + attachments (image OCR; no voice) +
+// search + export + secret-export + PDF capture (`pdf_export`). Not carried over:
+// voice capture, PDF/DOCX/text extraction on the attachment path, and clipper
+// pairing.
 fn main() {
     tauri_build::try_build(
         tauri_build::Attributes::new()
@@ -375,7 +376,7 @@ fn main() {
             )
             .plugin(
                 // Account record (the account/vault split, myne-md/myne#684):
-                // shared from `myne-core`; the same FOUR commands the desktop
+                // shared from `myne-core`; the same THREE commands the desktop
                 // registers. On iOS the keychain exists so grouping works; on
                 // Android `platform_keychain` has no backend, so the store holds
                 // nothing and vaults show standalone (never an error, never
@@ -384,7 +385,6 @@ fn main() {
                 "account",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "account_list",
-                    "account_rename",
                     "account_move",
                     "account_split",
                 ]),
@@ -445,6 +445,9 @@ fn main() {
                     "sync_person_lock",
                     "sync_person_create_invite",
                     "sync_list_vault_invites",
+                    // The recipient's refusal of an invitation
+                    // (decisions/protocol/0732): a real server-side delete.
+                    "sync_person_decline_invite",
                     "sync_person_accept_invite",
                     // member-devices task 7: a member's SECOND device joins the
                     // vault from the phrase alone. Takes no owner code from the

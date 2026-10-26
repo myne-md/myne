@@ -679,6 +679,10 @@ pub enum SyncDeviceError {
     /// The device is registered and still awaiting approval (server 403
     /// `pending_approval`, #268) — not a credential problem either.
     AwaitingApproval,
+    /// This device already holds a DIFFERENT credential on the account (server 409
+    /// `already_installed`, `decisions/protocol/0735`). Nothing is broken: the device is
+    /// already admitted, and the fix is to sign in on it rather than to admit it again.
+    AlreadyInstalled,
     /// Member removal is parked until the roster wire ships (B2B,
     /// myne-md/myne#698). The rotation the removal would run is local-only
     /// with no peer propagation and no tombstone convergence, so the entry
@@ -778,6 +782,7 @@ impl From<super::enroll::EnrollError> for SyncDeviceError {
             E::Frozen => SyncDeviceError::AccountFrozen,
             E::DeviceLimit => SyncDeviceError::DeviceLimitReached,
             E::PendingApproval => SyncDeviceError::AwaitingApproval,
+            E::AlreadyInstalled => SyncDeviceError::AlreadyInstalled,
             E::InviteCodeRequired => SyncDeviceError::InviteCodeRequired,
             E::InviteCodeInvalid => SyncDeviceError::InviteCodeInvalid,
             E::ServerSignatureMismatch => SyncDeviceError::FingerprintMismatch,
@@ -921,7 +926,7 @@ pub async fn account_plane_from_host(
 /// device **on that plane**, for the roster's "This device" marker.
 pub(crate) struct AccountPlaneCredential {
     /// Hex bearer token for the account routes. Never logged, never crosses IPC.
-    token_hex: String,
+    pub(crate) token_hex: String,
     /// The `device_id` this device is registered under on that plane. `None`
     /// when it cannot be read — the marker is cosmetic, so the roster still
     /// renders rather than failing over a label.

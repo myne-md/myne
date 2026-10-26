@@ -4,7 +4,7 @@
 // # Why this needs a script when the desktop convention does not have one
 //
 // `src/AGENTS.md` states the rule flatly — "a screen without testids is
-// invisible to E2E" — and 489 `data-testid` attributes in `src/` are held to it
+// invisible to E2E" — and every `data-testid` attribute in `src/` is held to it
 // by **review alone**. That works while every screen has an owner who reviews
 // it. The web client's screens do not: tasks 61/59/74/105/106 CONSUME testids
 // (`byTestId` is the only sanctioned selector in `e2e/AGENTS.md`), while the
@@ -494,6 +494,18 @@ export function preUnlockScope(roots) {
  */
 const ALLOWED_DYNAMIC = new Map([
   ["data-wall", "WebNoAccount's `no-account` / `no-sync` variant, a closed union."],
+  // The invitations row on the pre-unlock picker (`src/screens/VaultPicker.tsx`).
+  // A closed union the CODE controls (`"count" | "not-enrolled" | "pending"`), and
+  // each member says which of three FIXED sentences the row renders, so a test can
+  // tell "2 invitations waiting" from "register this identity to see invitations"
+  // without asserting copy. No user input reaches it and it carries no account
+  // value; the row exists on this screen at all because an unregistered identity
+  // cannot list invitations, and a count-only row would have rendered nothing
+  // (`docs/decisions/protocol/0732`, `decisions/ui/0725`).
+  [
+    "data-invites",
+    "Which arm of the invitations row is up: `count` / `not-enrolled` / `pending`.",
+  ],
   [
     "data-fade-top",
     "Scroll geometry on `CenteredCard`: is there content above the viewport. " +

@@ -4069,7 +4069,6 @@
         "ribbon": "bara stângă fixează pin comandă comenzi setează ordine desfixează panou instrumente taste rapide",
         "folderNotes": "dosar notă index folder_index pagină țintă dublu-clic link către dosar proiecte dezactivează",
         "syncMembers": "membri, partajează, invită, echipă, colaborare, depozit",
-        "accountName": "nume cont grup grupare redenumire etichetă dispozitiv local",
         "accountVaults": "cont seifuri grupate care seifuri aparțin grup listă",
         "aiMeetingPrompt": "ședință rezumat prompt instrucțiune personalizat transcriere puncte de acțiune decizii",
         "update": "actualizare upgrade verifică actualizări versiune nouă lansare descărcare",
@@ -4151,14 +4150,10 @@
       "atCap": "Lista este plină, așa că nimic nou nu mai poate fi reținut. Șterge o înregistrare pentru a face loc."
     },
     "account": {
-      "nameLabel": "Numele contului",
-      "nameHelper": "Un nume pentru acest grup de seifuri de pe acest dispozitiv. Selectorul de seifuri îl folosește ca titlu al grupului. Rămâne pe acest dispozitiv și nu este niciodată stocat într-un seif, așa că nu se sincronizează, iar alt dispozitiv poate grupa și numi aceleași seifuri altfel.",
-      "namePlaceholder": "Adaugă un nume…",
-      "nameSave": "Salvează",
-      "nameSaving": "Se salvează…",
       "vaultsLabel": "Seifuri din acest cont",
       "vaultsHelper": "Seifurile pe care acest dispozitiv le grupează sub numele de mai sus. Gruparea este o alegere organizatorică per dispozitiv, așa că nu face parte din conținutul niciunui seif și nu călătorește cu el.",
-      "vaultsCount": "{{count}} seifuri",
+      "vaultsCount_one": "{{count}} seifuri",
+      "vaultsCount_other": "{{count}} seifuri",
       "currentVault": "Acest seif",
       "unknownVault": "Alt seif de pe acest dispozitiv",
       "standaloneHelper": "Acest seif nu este grupat sub un cont pe acest dispozitiv, așa că stă de unul singur. Gruparea este per dispozitiv: alt dispozitiv îl poate afișa în interiorul unui cont.",
@@ -4170,7 +4165,8 @@
       "sections": {
         "extensions": "Extensii de browser",
         "grouping": "Acest cont"
-      }
+      },
+      "vaultsCount_few": "{{count}} seifuri"
     },
     "plainFile": {
       "errorSaveSetting": "Setarea pentru fișiere simple nu a putut fi salvată.",
@@ -4604,9 +4600,7 @@
       "nameErrorUnshared": "Numele pot fi setate odată ce acest seif este partajat.",
       "nameErrorLocked": "Deblochează seiful pentru a-ți schimba numele.",
       "nameErrorGeneric": "Numele tău nu a putut fi salvat. Încearcă din nou.",
-      "nameInvite": "Nu ai încă un nume afișat. Ceilalți membri îți văd amprenta.",
       "nameInviteCta": "Setează un nume",
-      "nameInviteDismiss": "Nu acum",
       "noInvitations": "Nicio invitație trimisă încă.",
       "identityHeading": "Identitatea ta",
       "membersHeading": "Membri",
@@ -5109,8 +5103,7 @@
       "phraseFor": "Fraza de recuperare — dacă îți uiți parola",
       "save": "Salvează kitul de recuperare",
       "saveFailed": "Fișierul nu a putut fi salvat. Copiază în schimb kitul sau notează ambele părți.",
-      "savedToFile": "Salvat. Este un fișier text simplu care conține ambele secrete, așa că păstrează-l undeva unde doar tu poți citi.",
-      "whyEnglish": "Cuvintele sunt în engleză în orice limbă. Ele fac parte din standardul BIP-39, așa că orice client Myne poate citi o frază scrisă de oricare altul. Nu le traduce: cuvintele traduse nu se află în lista de cuvinte, iar fraza ar înceta să funcționeze."
+      "savedToFile": "Salvat. Este un fișier text simplu care conține ambele secrete, așa că păstrează-l undeva unde doar tu poți citi."
     },
     "name": {
       "back": "Înapoi",
@@ -5136,13 +5129,8 @@
     "accountFallback": "Cont",
     "moveToAccount": "Mută în cont…",
     "moveToNewAccount": "Mută într-un cont nou",
-    "renameAccount": "Redenumiți contul",
     "accountError": "Gruparea conturilor nu a putut fi actualizată. Nimic nu s-a schimbat.",
     "accountHidden": "Acțiunile de cont nu sunt disponibile când numele depozitelor sunt ascunse.",
-    "labelTooLong": "Numele este prea lung. Scurtați la 512 de caractere.",
-    "renameCancel": "Anulează",
-    "renamePlaceholder": "Numele contului",
-    "renameSave": "Redenumiți",
     "accountUnreadable": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat.",
     "createShort": "Seif nou",
     "joinShort": "Adaugă dispozitiv",
@@ -5340,15 +5328,10 @@
     "openedYearsAgo_other": "deschis acum {{count}} ani",
     "corruptedBadge": "Corupt",
     "accountFallback": "Cont",
-    "renameAccount": "Redenumiți contul",
     "moveToNewAccount": "Mută într-un cont nou",
     "moveToAccount": "Mută în cont…",
     "accountError": "Gruparea conturilor nu a putut fi actualizată. Nimic nu s-a schimbat.",
     "accountHidden": "Acțiunile de cont nu sunt disponibile când numele depozitelor sunt ascunse.",
-    "labelTooLong": "Numele este prea lung. Scurtați la 512 de caractere.",
-    "renameCancel": "Anulează",
-    "renamePlaceholder": "Numele contului",
-    "renameSave": "Redenumiți",
     "accountUnreadable": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat."
   },
   "join": {

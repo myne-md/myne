@@ -73,13 +73,20 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-function renderPicker(list: { ok: VaultSummary[] } | { err: unknown }) {
+function renderPicker(
+  list: { ok: VaultSummary[] } | { err: unknown },
+  overrides: Partial<Parameters<typeof VaultPicker>[0]> = {},
+) {
   listVaults.mockResolvedValue(list);
   const props = {
     onSelect: vi.fn(),
     onCreateAnother: vi.fn(),
     onRestoreBackup: vi.fn(),
     onJoinDevice: vi.fn(),
+    // No invitation notices in these cases: the row renders only above zero.
+    inviteCount: 0,
+    onInvites: vi.fn(),
+    ...overrides,
   };
   const utils = render(<VaultPicker {...props} />);
   return { ...utils, props };
@@ -99,6 +106,37 @@ describe("VaultPicker — the action block", () => {
     expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
     // The join door is not a vault selection — the picker must not also route.
     expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  // The invitation notice (myne-md/myne#911 follow-up): a device with a vault
+  // had no surface on which an invitation could be accepted, because the list
+  // lives on the identity home and that screen renders only at ZERO vaults.
+  it("surfaces a waiting invitation, and only when there is one", async () => {
+    renderPicker({ ok: TWO });
+    await screen.findByTestId("picker.create-cta");
+    // Absence first: an uninvited picker must look exactly as it did before.
+    expect(screen.queryByTestId("picker.invites-notice")).toBeNull();
+    cleanup();
+
+    const { props } = renderPicker({ ok: TWO }, { inviteCount: 2 });
+    fireEvent.click(await screen.findByTestId("picker.invites-notice"));
+    expect(props.onInvites).toHaveBeenCalledTimes(1);
+    // A notice is not a selection: opening it must not open a vault.
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  // The unpublishable-count case: an identity this device created but never
+  // registered cannot list its invitations, so a zero count there means "cannot
+  // be known". The row stays, says which state it is in, and opens the same door.
+  it("keeps the invitation row for an identity that cannot list yet", async () => {
+    const { props } = renderPicker(
+      { ok: TWO },
+      { inviteCount: 0, invitesUnavailable: "not-enrolled" },
+    );
+    const row = await screen.findByTestId("picker.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("not-enrolled");
+    fireEvent.click(row);
+    expect(props.onInvites).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the join affordance on the defensive empty/failed surface", async () => {

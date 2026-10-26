@@ -131,5 +131,10 @@ export default defineConfig({
     include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     environment: "node",
     globals: false,
+    // A working `Storage` over Node 25's incomplete experimental global, which
+    // shadows jsdom's and breaks every spec that reads `localStorage`. The file
+    // carries the failure it prevents and the reason it is a setup file rather
+    // than a per-spec helper.
+    setupFiles: ["./tests/setup-usable-storage.ts"],
   },
 });
