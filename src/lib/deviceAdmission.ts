@@ -13,11 +13,6 @@
 // confirmed.
 import { invoke } from "../platform/core";
 
-/** The string the web build's surface roster looks for to prove this module was
- *  substituted OUT of the browser bundle rather than merely left unreachable
- *  (`scripts/check-web-surfaces.mjs`). Nothing else in the tree emits it. */
-export const DEVICE_ADMISSION_ABSENCE_MARKER = "device-admission-binding";
-
 /** What the joining device shows, and what it must be able to show again after a
  *  restart (`sync_pending_device_admission`). Snake_case: a returned struct
  *  serializes verbatim, the same convention every other view in `src/lib`

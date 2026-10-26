@@ -158,7 +158,7 @@ account's phrase-derived verifier, an account may carry one verifier per device,
 already authenticated against that account: `POST /auth/devices/credential` with
 `{device_id_hex, username, salt_hex, iterations, stored_key_hex, server_key_hex}`. The account is taken from the
 session and never from the body, so a device installs only into its own account; and the username is NOT
-caller-chosen, it is `dev:<device_id_hex>` — the `dev:` prefix is what keeps the two namespaces apart, since an
+caller-chosen: it is `dev:<device_id_hex>`. The `dev:` prefix is what keeps the two namespaces apart, since an
 account id and a device id are both 16 bytes and both encode to 32 lowercase hex characters. A credential
 authenticates through the SAME `/auth/scram/init` and `/auth/scram/final` pair, naming that username; `init`
 serves the DEVICE's salt rather than the account's. An unknown account, a wrong username and a non-canonical

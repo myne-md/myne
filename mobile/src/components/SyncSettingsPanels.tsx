@@ -774,7 +774,11 @@ function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
         if (live && view) setMine(view);
       })
       .catch(() => {
-        // Nothing pending is the ordinary answer.
+        // "Nothing pending" and "could not read" are different answers, and only the
+        // first is ordinary. Collapsing them made a failed call look like a successful
+        // one: a device whose pending admission could not be read starts a SECOND
+        // admission, and the admitting device then approves a row nobody can use.
+        if (live) setFailure(t("sync.phraseFree.resumeFailed"));
       });
     return () => {
       live = false;
