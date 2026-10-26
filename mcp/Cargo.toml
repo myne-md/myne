@@ -1,0 +1,31 @@
+[package]
+name = "myne-mcp"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0"
+publish = false
+description = "The `myne-mcp` sidecar: speaks MCP over stdio and forwards a fixed vault tool surface to the running, unlocked desktop (external-mcp-connection, myne-md/myne#923). Holds no key, opens no listener."
+
+[[bin]]
+name = "myne-mcp"
+path = "src/main.rs"
+
+[lib]
+name = "myne_mcp"
+path = "src/lib.rs"
+
+[dependencies]
+# The wire encoding only. Deliberately no MCP SDK crate, no async runtime and
+# no dependency on `myne-desktop`/`myne-core`/`protocol`: the JSON-RPC layer
+# here is a few hundred lines, and an SDK would be a third-party opinion about a
+# protocol whose two revisions this binary must select between itself
+# (`mcp/src/protocol.rs`). `serde_json` is already in the workspace and carries
+# the `Value` type and the `json!` macro this crate builds its whole surface
+# from; plain `serde` is not needed, so it is not declared.
+serde_json = "1"
+# Cross-platform data-dir resolution, matching Tauri's own `app_data_dir()`
+# exactly (`dirs::data_dir().join(identifier)`), the same edge `cli/Cargo.toml`
+# takes for the same reason: the shim computes the socket path independently of
+# the app, and this version is already resolved in the workspace `Cargo.lock`
+# through `tauri`, so it adds no new supply-chain surface.
+dirs = "6"

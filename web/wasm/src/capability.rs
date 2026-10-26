@@ -709,6 +709,14 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // port — the capability backing it (`cliAccess`) is absent by platform fact,
     // and the Settings block is omitted rather than greyed.
     ("cli-bridge", Class::Unsupported),
+    // external-mcp-connection (myne-md/myne#923): the two READ commands behind
+    // Settings > AI > External access. `Unsupported` because the thing they
+    // describe cannot exist here: `myne-mcp` is a sidecar installed from the
+    // desktop bundle, a page has no shell to install one from, and the section
+    // that calls these reads renders only where the `externalMcp` capability
+    // exists. `Unsupported` rather than `Pending` for the reason `cli-bridge`
+    // gives: there is nothing to port, and `Pending` would promise one.
+    ("mcp", Class::Unsupported),
     // myne#678 (epic #173): the pop-out spawn command. A detached note window is
     // a second host-spawned OS window; a browser page has one tab context and
     // cannot open one (the single-tab OPFS lock is the model). `Unsupported`

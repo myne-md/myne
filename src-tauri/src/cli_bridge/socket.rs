@@ -796,6 +796,12 @@ mod tests {
         fn open_plain_file(&self, _path: &str) -> crate::cli_bridge::dispatch::OpenFileOutcome {
             crate::cli_bridge::dispatch::OpenFileOutcome::Io
         }
+        fn mcp_call(
+            &self,
+            _request: crate::cli_bridge::dispatch::McpCallRequest,
+        ) -> crate::cli_bridge::dispatch::McpCallOutcome {
+            crate::cli_bridge::dispatch::McpCallOutcome::Io
+        }
     }
     fn test_lister() -> Arc<dyn NoteLister> {
         Arc::new(FixedLister)
@@ -1081,6 +1087,12 @@ mod tests {
             }
             fn open_plain_file(&self, _path: &str) -> crate::cli_bridge::dispatch::OpenFileOutcome {
                 crate::cli_bridge::dispatch::OpenFileOutcome::Io
+            }
+            fn mcp_call(
+                &self,
+                _request: crate::cli_bridge::dispatch::McpCallRequest,
+            ) -> crate::cli_bridge::dispatch::McpCallOutcome {
+                crate::cli_bridge::dispatch::McpCallOutcome::Io
             }
         }
 

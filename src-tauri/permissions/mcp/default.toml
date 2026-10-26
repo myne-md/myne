@@ -1,0 +1,27 @@
+# Permissions for the in-app `mcp` Tauri plugin.
+# Picked up under the `mcp:` ACL namespace only because `build.rs` declares this as
+# an `InlinedPlugin`. Capability files reference these as `mcp:default`.
+#
+# external-mcp-connection (myne-md/myne#923). Both commands are READS, and both are
+# Slot::Unlocked-gated: the section they answer for only exists while a vault is
+# open, and a locked vault answers with the refusal rather than with an empty list
+# that would read as "nothing is approved".
+#
+# What they answer is the stored grant (`vault.prefs` -> `mcp_connections`,
+# DeviceLocal) resolved against the vault index, plus a preview of a candidate
+# scope. Neither writes: the two writers are `prefs|set_mcp_connection_grant` and
+# `prefs|revoke_mcp_connection`, whose ACL and nonce discipline already exist.
+# There is deliberately no mutating permission in this bundle, so a window granted
+# `mcp:default` cannot change what any external client may reach.
+#
+# No scope object: neither command takes a path, and the vault they read is
+# resolved host-side from the unlocked slot.
+
+"$schema" = "../../gen/schemas/desktop-schema.json"
+
+[default]
+description = "Default permission set for the mcp plugin: read the external-access connection list and preview a candidate grant scope. Both are reads; no grant can be written through this namespace."
+permissions = [
+  "allow-mcp-external-access",
+  "allow-mcp-grant-preview",
+]

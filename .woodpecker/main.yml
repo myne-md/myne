@@ -772,6 +772,11 @@ steps:
       # socket/status basenames are duplicated by design — drift compiles clean
       # on both sides and only shows up as "app not running" against a running
       # app. Also asserts the sidecar is still in `bundle.externalBin`.
+      # The compiled MCP tool surface (external-mcp-connection, myne-md/myne#923):
+      # a constant expression over string literals that names no capability
+      # outside the vault, read from `mcp/src/tool_list.rs` itself. The Rust test
+      # asserts the same rule, and CI is the half that runs when it was not run.
+      - node scripts/check-mcp-tool-surface.mjs
       - node scripts/check-cli-sidecar.mjs
       # Declared-payload ratchet (ai-bundle-slim myne#190 task 2): the bytes
       # `bundle.resources` + `bundle.externalBin` + the release binary declare,

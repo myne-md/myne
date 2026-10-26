@@ -31,6 +31,7 @@
     "themes:default",
     "member-names:default",
     "device-binding:default",
+    "mcp:default",
     "notes:default",
     "snapshots:default",
     "sync:default",

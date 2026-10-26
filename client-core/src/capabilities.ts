@@ -330,6 +330,27 @@ export type Capability =
    */
   | "cliAccess"
   /**
+   * An external MCP client reaching this vault through the `myne-mcp` sidecar
+   * (external-mcp-connection, myne-md/myne#923).
+   *
+   * **A second capability rather than a reuse of `cliAccess`, and the split is
+   * deliberate.** Both doors open onto the same notes and both ship in the same
+   * bundle, but they are different offers: `cliAccess` governs a terminal the
+   * user drives, and this governs a program that reads on its own and whose
+   * output a model writes. A client that shipped one without the other would be
+   * mis-described by a shared flag, and the Settings copy for each names a
+   * different consequence.
+   *
+   * **Absent on web and on mobile, and not as a port that is owed.** `myne-mcp`
+   * is a stdio binary staged as a desktop `externalBin` and installed on the
+   * user's PATH by the same shim the `myne` CLI uses; a page has no shell to
+   * install one from, and a phone has no PATH to put it on. The section is
+   * OMITTED where this is absent rather than greyed (`decisions.md` 2026-07-26),
+   * and the web dispatcher classifies the whole `mcp` plugin `Unsupported`, so
+   * the backend half says the same thing.
+   */
+  | "externalMcp"
+  /**
    * Vault names on the LOCKED picker, and with them the device-local sealed
    * `MYL1` store that makes showing one possible (myne-md/myne#411).
    *
@@ -472,6 +493,7 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   attachmentTextSearch: true,
   imageCompression: true,
   cliAccess: true,
+  externalMcp: true,
   lockedVaultNames: true,
   torRouting: true,
   accountGrouping: true,

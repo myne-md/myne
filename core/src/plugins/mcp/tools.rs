@@ -1,0 +1,654 @@
+// SPDX-License-Identifier: AGPL-3.0
+//! The four read tools, each clamped to a connection's resolved scope.
+//!
+//! ## The clamp is inseparable from the operation
+//!
+//! None of these functions is a check a caller performs before doing the real
+//! thing; each one *is* the real thing, and takes the resolved
+//! [`ConnectionScope`] plus a [`McpNoteSource`] seam. The same reasoning as
+//! `super::super::agent::tools`: a shape where the clamp is its own
+//! `check_scope(..)` function is a shape where one call site forgets it, and no
+//! compiler says so.
+//!
+//! **No tool takes a scope from the request.** Every request type is
+//! `deny_unknown_fields`, so a payload that tries to carry a folder list or a
+//! note list is refused as malformed rather than parsed and ignored: there is no
+//! field for it, and inventing one is not silently tolerated. The scope comes
+//! from the stored grant, resolved by [`super::scope::resolve_scope`].
+//!
+//! ## Refuse versus exclude, per tool
+//!
+//! A NOTE-addressed tool refuses with a named cause (`out_of_scope`), because
+//! the caller asked for one specific note and "here is nothing" would be a lie.
+//! A SET-addressed tool excludes: `note_search` and `vault_list` omit what is
+//! outside the scope rather than refusing the whole call, because one
+//! out-of-scope note in the vault would otherwise make search and listing
+//! unusable, and a refusal that names the note would leak its existence to a
+//! caller that could not read it. `vault_state` reports the COUNT of folders
+//! outside the scope, which is the only fact about them the caller is given.
+//!
+//! ## Search is the one tool a caller can loop
+//!
+//! A loop of searches is how a caller approximates reading the whole vault, so
+//! search is the tool with a byte bound as well as a result bound: the excerpt
+//! is capped at [`MAX_EXCERPT_BYTES`], flattened to one line, and never the
+//! note. A note shorter than the cap comes back whole, which is a fact about the
+//! note rather than a clamp failure; what the cap guarantees is that a vault of
+//! long notes costs the caller a bounded number of bytes per call.
+
+use super::error::McpToolError;
+use super::scope::{existing_folders, folder_key_of, resolve_scope, ConnectionScope, FolderCount};
+use crate::folder_key::canonical_folder;
+use crate::plugins::agent::frontmatter::folder_of;
+use crate::plugins::agent::tools::SearchHit;
+use crate::plugins::vault_indices::state::NoteRecord;
+use protocol::McpConnectionGrant;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
+
+/// Search results per call when the caller does not ask for a number.
+pub const DEFAULT_SEARCH_LIMIT: usize = 20;
+
+/// The most results one search may ask for.
+///
+/// A ceiling rather than a default: `limit` is clamped INTO this range, so a
+/// caller that asks for 10 000 gets 50 rather than a refusal, and the loop cost
+/// of a search stays bounded by something the host chose.
+pub const MAX_SEARCH_LIMIT: usize = 50;
+
+/// Byte cap on one search excerpt.
+///
+/// Counted in BYTES, not characters, so the bound holds for a note written in a
+/// four-byte script as well as for ASCII. 320 bytes is roughly two short
+/// sentences: enough to recognise a hit, not enough to be a free read.
+pub const MAX_EXCERPT_BYTES: usize = 320;
+
+/// How much of the matching line to keep before the match itself, so the excerpt
+/// reads as context rather than starting mid-word.
+const EXCERPT_LEAD_BYTES: usize = 80;
+
+/// The marker put where the excerpt was cut, so a truncated one never reads as a
+/// note that simply ends.
+const ELLIPSIS: &str = "\u{2026}";
+
+/// Reading the vault for one tool call. The host supplies it.
+///
+/// Three questions in one seam because they must be answered about the SAME
+/// vault: an index snapshot, a note body, a ranked search. A host that could
+/// answer them from unrelated sources would be a host whose scope check and body
+/// read disagree about which vault is open.
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait McpNoteSource: Send + Sync {
+    /// The vault index as it is now: note id to the record the sidebar sees.
+    async fn records(&self) -> Result<BTreeMap<String, NoteRecord>, McpToolError>;
+    /// One note's plaintext (frontmatter and body), or
+    /// [`McpToolError::UnknownNote`] when it is gone.
+    async fn read_body(&self, note_id: &str) -> Result<String, McpToolError>;
+    /// Rank the vault against a query, scope-blind.
+    ///
+    /// Scope filtering is this module's job, not the index's: the index does not
+    /// know about connections, and teaching it would be a second place for the
+    /// clamp to be wrong.
+    async fn search(&self, query: &str, limit: usize) -> Result<Vec<SearchHit>, McpToolError>;
+}
+
+/// `note_search`'s arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoteSearchRequest {
+    /// Text to look for.
+    pub query: String,
+    /// Narrow the search to one folder. Must be inside the resolved scope.
+    #[serde(default)]
+    pub folder: Option<String>,
+    /// Maximum matches to return, clamped to `1..=`[`MAX_SEARCH_LIMIT`].
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+/// `note_read`'s arguments.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NoteReadRequest {
+    /// The id of the note to read.
+    pub note_id: String,
+}
+
+/// One search hit as the caller sees it: where to look, and a bounded taste.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchRow {
+    /// The note's id, to hand to `note_read`.
+    pub note_id: String,
+    /// The note's title, or `None` when it has none.
+    pub title: Option<String>,
+    /// The note's `folder:` as the note itself carries it, or `None` for a root
+    /// note. The RAW value rather than a canonical key, because it is what the
+    /// user sees and what a later `folder` argument would be written as.
+    pub folder: Option<String>,
+    /// A bounded, single-line window of the note's text. Never the whole note
+    /// when the note is longer than [`MAX_EXCERPT_BYTES`].
+    pub excerpt: String,
+}
+
+/// One note, in full.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadNote {
+    /// The note's id.
+    pub note_id: String,
+    /// The note's plaintext: frontmatter and markdown body, exactly as stored
+    /// (decrypted).
+    pub body: String,
+}
+
+/// What `vault_state` answers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultState {
+    /// True by construction: this call reached the host, and the host answers
+    /// only while the vault is unlocked. Reported because a caller that asks
+    /// "what state is the vault in" needs an answer rather than an inference.
+    pub unlocked: bool,
+    /// True by construction too: the local door exists only while external
+    /// access is enabled, so a call that arrives proves the switch is on.
+    pub external_access: bool,
+    /// How many folders the granted scope covers right now.
+    pub folder_count: usize,
+    /// How many live notes those folders hold right now.
+    pub note_count: usize,
+    /// How many folders exist that the scope does NOT cover. The count only:
+    /// names of unreadable folders are not the caller's business.
+    pub outside_folder_count: usize,
+    /// How many granted folders no longer exist. A rename shows up here, because
+    /// the grant stores paths.
+    pub missing_folder_count: usize,
+}
+
+/// Tool 1: search inside the scope.
+///
+/// Filtering happens AFTER ranking, so the index stays scope-blind and there is
+/// exactly one place the clamp lives. `limit` is applied to the clamped result,
+/// so the caller gets what it asked for rather than a silently short list.
+pub async fn note_search(
+    scope: &ConnectionScope,
+    request: NoteSearchRequest,
+    source: &dyn McpNoteSource,
+) -> Result<Vec<SearchRow>, McpToolError> {
+    scope.require_granted()?;
+    let query = request.query.trim();
+    if query.is_empty() {
+        return Err(McpToolError::EmptyQuery);
+    }
+    // A folder argument NARROWS the scope and can never widen it: asking for a
+    // folder outside the grant is refused rather than silently answered as an
+    // empty result, because "no matches" and "you may not look there" are
+    // different answers.
+    if let Some(folder) = request.folder.as_ref() {
+        if !scope.covers_folder(folder) {
+            return Err(McpToolError::OutOfScopeFolder {
+                folder: folder.clone(),
+            });
+        }
+    }
+    let narrow = request.folder.as_deref().map(canonical_folder);
+    let limit = request
+        .limit
+        .unwrap_or(DEFAULT_SEARCH_LIMIT)
+        .clamp(1, MAX_SEARCH_LIMIT);
+
+    let records = source.records().await?;
+    // Over-fetch so the clamp does not turn `limit` into a ceiling nobody
+    // reaches. The factor is a recall convenience with no security meaning: the
+    // clamp below is what bounds the result, not this number.
+    let ranked = source.search(query, limit.saturating_mul(4)).await?;
+
+    let mut out = Vec::new();
+    for hit in ranked {
+        // Fail closed on an id the snapshot does not carry: an id with no known
+        // folder cannot be proven inside the scope, so it is dropped rather than
+        // handed back with an unknown provenance.
+        let Some(record) = records.get(&hit.note_id) else {
+            continue;
+        };
+        // The liveness rule every note surface in the app applies, at the one
+        // place a ranked hit becomes a row. A trashed, tombstoned, archived,
+        // template or conflict note is not part of the working set, so it is
+        // EXCLUDED here rather than refused — the set-addressed half of the same
+        // rule `note_read` applies to the one note it was asked for. The index
+        // carries these notes (its producer indexes every `.myn`), so without
+        // this a caller could search a note the sidebar would not show.
+        if !record.live {
+            continue;
+        }
+        let key = folder_key_of(record);
+        if !scope.covers_key(&key) {
+            continue;
+        }
+        if let Some(narrow) = narrow.as_ref() {
+            if &key != narrow {
+                continue;
+            }
+        }
+        let body = match source.read_body(&hit.note_id).await {
+            Ok(body) => body,
+            // Deleted between the snapshot and the read: drop the hit rather
+            // than fail the whole search.
+            Err(McpToolError::UnknownNote { .. }) => continue,
+            Err(other) => return Err(other),
+        };
+        out.push(SearchRow {
+            note_id: hit.note_id,
+            title: record.title.clone(),
+            folder: record.folder.clone(),
+            excerpt: excerpt(&body, query),
+        });
+        if out.len() == limit {
+            break;
+        }
+    }
+    Ok(out)
+}
+
+/// Tool 2: read one note in full, if it is in scope.
+///
+/// The folder is checked TWICE, and the second check is the one that matters:
+/// once against the index snapshot (which refuses an out-of-scope id without
+/// touching a byte), and once against the body's own frontmatter after the read.
+/// The second catches a note MOVED into an out-of-scope folder since the
+/// snapshot, which the index cannot see yet, and this is the one tool that hands
+/// a caller a whole note, so it is worth the extra parse.
+pub async fn note_read(
+    scope: &ConnectionScope,
+    request: NoteReadRequest,
+    source: &dyn McpNoteSource,
+) -> Result<ReadNote, McpToolError> {
+    scope.require_granted()?;
+    let note_id = request.note_id.trim();
+    if note_id.is_empty() {
+        return Err(McpToolError::UnknownNote {
+            note_id: String::new(),
+        });
+    }
+    let records = source.records().await?;
+    let Some(record) = records.get(note_id) else {
+        return Err(McpToolError::UnknownNote {
+            note_id: note_id.to_string(),
+        });
+    };
+    // Liveness BEFORE scope, and answered as [`McpToolError::UnknownNote`]
+    // rather than as `out_of_scope`: a trashed, tombstoned or template note is
+    // not a note the user is working with, so it must be indistinguishable from
+    // one that does not exist. That is the exact pair the CLI door collapses for
+    // the same case (`ShowOutcome::NotFound`), and naming it here instead would
+    // tell a caller that a note it may not read nevertheless exists.
+    if !record.live {
+        return Err(McpToolError::UnknownNote {
+            note_id: note_id.to_string(),
+        });
+    }
+    if !scope.covers_key(&folder_key_of(record)) {
+        return Err(McpToolError::OutOfScopeNote {
+            note_id: note_id.to_string(),
+        });
+    }
+    let body = source.read_body(note_id).await?;
+    if !scope.covers_key(&folder_of(&body)) {
+        return Err(McpToolError::OutOfScopeNote {
+            note_id: note_id.to_string(),
+        });
+    }
+    Ok(ReadNote {
+        note_id: note_id.to_string(),
+        body,
+    })
+}
+
+/// Tool 3: the scope by folder, with counts.
+///
+/// Folders and numbers only. No note id and no title: a listing that answered
+/// with either would hand the caller a handle on notes it cannot open, or their
+/// content (a title is note text). The shape of the vault is what the caller
+/// needs to choose a query, and that is what this answers.
+pub async fn vault_list(
+    scope: &ConnectionScope,
+    source: &dyn McpNoteSource,
+) -> Result<Vec<FolderCount>, McpToolError> {
+    scope.require_granted()?;
+    let records = source.records().await?;
+    Ok(scope.folder_counts(&records))
+}
+
+/// Tool 4: what the scope covers, and the state the call itself proves.
+///
+/// Safe to call before anything else: it reads the index and the snapshot of the
+/// grant, never a note body, so it costs one pass and no decryption of content.
+pub async fn vault_state(
+    scope: &ConnectionScope,
+    source: &dyn McpNoteSource,
+) -> Result<VaultState, McpToolError> {
+    scope.require_granted()?;
+    let records = source.records().await?;
+    Ok(VaultState {
+        unlocked: true,
+        external_access: true,
+        folder_count: scope.folders().len(),
+        note_count: scope.note_count(&records),
+        outside_folder_count: scope.delta().len(),
+        missing_folder_count: scope.missing().len(),
+    })
+}
+
+/// The four verbs this build implements, as a closed set.
+///
+/// Declared here rather than imported from the shim's compiled catalog, because
+/// the two crates share no type by design (`mcp/` depends on neither
+/// `myne-core` nor `myne-desktop`), so a tool name is a wire contract with
+/// THREE holders: this enum, `mcp/src/tool_list.rs`, and the callers that read
+/// one and call the other. A verb the catalog offers and this build does not
+/// implement answers [`McpCallOutcome::UnknownTool`], which the door reports as
+/// version skew rather than silently accepting or inventing a scope.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ToolName {
+    NoteSearch,
+    NoteRead,
+    VaultList,
+    VaultState,
+}
+
+impl ToolName {
+    /// The verb a caller named, or `None` if this build does not implement it.
+    ///
+    /// The five write verbs the catalog also offers (`note_create`,
+    /// `note_append`, `note_set_field`, `note_move`, `note_edit`) land here as
+    /// their own tasks. Until then they are `None`, which is the honest answer:
+    /// a shim newer than its host is version skew, not a scope decision, and
+    /// `invalid_request` is the kind this door already uses for version skew.
+    pub fn from_wire(name: &str) -> Option<Self> {
+        match name {
+            "note_search" => Some(Self::NoteSearch),
+            "note_read" => Some(Self::NoteRead),
+            "vault_list" => Some(Self::VaultList),
+            "vault_state" => Some(Self::VaultState),
+            _ => None,
+        }
+    }
+
+    /// The wire spelling of this verb.
+    pub fn wire(self) -> &'static str {
+        match self {
+            Self::NoteSearch => "note_search",
+            Self::NoteRead => "note_read",
+            Self::VaultList => "vault_list",
+            Self::VaultState => "vault_state",
+        }
+    }
+}
+
+/// What one `tools/call` decided, before the door puts it on the wire.
+///
+/// The door's reply envelope is a separate thing on purpose (`{"ok":true,
+/// "result":<CallToolResult>}` / `{"ok":false,"error":{kind,message}}`): this
+/// enum is what the HOST decided, and the two producers are [`call_tool`] (the
+/// tool surface) and `host_adapters::door_call` (the vault and prefs plumbing
+/// around it), which is why `VaultLocked` and `Io` exist here at all.
+#[derive(Debug, Clone, PartialEq)]
+pub enum McpCallOutcome {
+    /// A complete MCP `CallToolResult`, ready to relay verbatim.
+    Result(Value),
+    /// A host decision with a closed reason and one actionable sentence. The
+    /// door relays `reason` as the wire `kind`, so the shim's
+    /// `structuredContent.reason` and the door's error envelope cannot disagree
+    /// about what happened.
+    Refused(McpToolError),
+    /// This build does not implement that verb (version skew).
+    UnknownTool,
+    /// The arguments do not decode against the verb's schema.
+    Malformed,
+    /// The vault locked between the request arriving and the call running. The
+    /// narrow race only: while the vault is locked the socket does not exist, so
+    /// a client cannot ordinarily produce this.
+    VaultLocked,
+    /// The host could not read its own state (prefs, index) for this call.
+    Io,
+}
+
+/// The three fields a `tools/call` carries over the wire.
+///
+/// The connection name comes from the shim (`MYNE_MCP_CONNECTION`, else the
+/// handshake's `clientInfo.name`, else the shim's own `unnamed-client`), never
+/// from the arguments: a caller that could name its grant inside the payload
+/// would be resolving its own scope.
+#[derive(Debug, Clone, Copy)]
+pub struct WireCall<'a> {
+    /// The declared connection name. Trimmed by the caller; NOT normalized,
+    /// because normalization happens when a grant is WRITTEN (`scope.rs`).
+    pub connection: &'a str,
+    /// The verb, as the shim spelled it.
+    pub tool: &'a str,
+    /// The caller's arguments, verbatim.
+    pub arguments: &'a Value,
+}
+
+/// Everything [`call_tool`] resolves against: the call, plus the stored grants
+/// and the folder set it is clamped to.
+#[derive(Debug, Clone, Copy)]
+pub struct CallInputs<'a> {
+    /// The call itself.
+    pub call: WireCall<'a>,
+    /// The stored grants by name, read from `vault.prefs`. Never from the call.
+    pub grants: &'a BTreeMap<String, McpConnectionGrant>,
+    /// `deliberate_folders`, for "which folders exist now".
+    pub deliberate_folders: &'a [String],
+    /// `archived_folders`, subtracted by prefix like the sidebar does.
+    pub archived_folders: &'a [String],
+}
+
+/// One decoded call, kept typed so the dispatch below cannot re-parse.
+enum Parsed {
+    Search(NoteSearchRequest),
+    Read(NoteReadRequest),
+    List,
+    State,
+}
+
+/// `vault_list` and `vault_state` take no arguments; an object with anything in
+/// it is malformed rather than silently ignored, which is the same
+/// `deny_unknown_fields` rule the two argument-taking tools already carry.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct NoArguments {}
+
+fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
+    match tool {
+        ToolName::NoteSearch => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Search),
+        ToolName::NoteRead => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Read),
+        ToolName::VaultList => serde_json::from_value::<NoArguments>(arguments.clone())
+            .ok()
+            .map(|_| Parsed::List),
+        ToolName::VaultState => serde_json::from_value::<NoArguments>(arguments.clone())
+            .ok()
+            .map(|_| Parsed::State),
+    }
+}
+
+/// Answer one `tools/call`: the whole host-side decision, in one function.
+///
+/// The order of the four steps is load-bearing and each was chosen against a
+/// specific failure.
+///
+/// 1. **No grant, no vault work.** A name with no grant learns nothing at all:
+///    not whether its arguments would have parsed, not how big the vault is, not
+///    that the index was touched. This is also what makes `no_grant` cheap to
+///    produce for a client nobody approved, which is the common case for a
+///    hand-configured connection (it arrives as the shim's `unnamed-client`).
+/// 2. **An unimplemented verb is version skew**, refused before the argument
+///    decode because there is no schema to decode against.
+/// 3. **Arguments decode before the vault is read.** A malformed call is a
+///    caller bug, and answering it from the schema is both cheaper and narrower
+///    than doing so after a snapshot.
+/// 4. **Scope resolves from the stored grant and the folders that exist NOW**,
+///    then the tool clamps to it. The folder set comes from the same source the
+///    tool reads, which is why this takes a source rather than a pre-resolved
+///    scope: the caller cannot hand one in, and there is no parameter through
+///    which it could name a folder it wants.
+pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> McpCallOutcome {
+    let call = inputs.call;
+    let connection = call.connection.trim();
+    if !inputs.grants.contains_key(connection) {
+        return McpCallOutcome::Refused(McpToolError::NoGrant);
+    }
+    let Some(tool) = ToolName::from_wire(call.tool) else {
+        return McpCallOutcome::UnknownTool;
+    };
+    let Some(parsed) = parse_arguments(tool, call.arguments) else {
+        return McpCallOutcome::Malformed;
+    };
+
+    // Snapshot #1: the folder set the grant is resolved against. The tool takes
+    // its own snapshot below through the same source; both are reads of one
+    // in-RAM index, and the tool's is the one every clamp is applied to.
+    let records = match source.records().await {
+        Ok(records) => records,
+        Err(error) => return McpCallOutcome::Refused(error),
+    };
+    let existing = existing_folders(&records, inputs.deliberate_folders, inputs.archived_folders);
+    drop(records);
+    let scope = resolve_scope(connection, inputs.grants, &existing);
+    // `resolve_scope` answered `granted` from the map checked above, so this
+    // cannot fail here; the tools call it again per verb, which is the one home
+    // of the rule and the reason it is not re-derived.
+    if let Err(error) = scope.require_granted() {
+        return McpCallOutcome::Refused(error);
+    }
+
+    let result = match parsed {
+        Parsed::Search(request) => note_search(&scope, request, source)
+            .await
+            .map(|rows| to_value(&rows)),
+        Parsed::Read(request) => note_read(&scope, request, source)
+            .await
+            .map(|note| to_value(&note)),
+        Parsed::List => vault_list(&scope, source)
+            .await
+            .map(|folders| to_value(&folders)),
+        Parsed::State => vault_state(&scope, source)
+            .await
+            .map(|state| to_value(&state)),
+    };
+    match result {
+        Ok(Ok(structured)) => McpCallOutcome::Result(call_tool_result(tool, structured)),
+        // Unreachable for these types (no map with non-string keys, no NaN), and
+        // answered rather than panicked because a serializer change must not
+        // become a crash in the process that holds the vault keys.
+        Ok(Err(())) => McpCallOutcome::Io,
+        Err(error) => McpCallOutcome::Refused(error),
+    }
+}
+
+/// Serialize one tool's answer. Split out so the match above stays readable and
+/// the failure is stated once.
+fn to_value<T: Serialize>(value: &T) -> Result<Value, ()> {
+    serde_json::to_value(value).map_err(|_| ())
+}
+
+/// The MCP `CallToolResult` for one successful call.
+///
+/// `content[0].text` is the human-readable half and `structuredContent` is the
+/// machine half, both carrying the same answer: a text-only client reads the
+/// block, a structured client reads the object, and neither has to parse the
+/// other's rendering. `isError` is stated rather than omitted so a client that
+/// only looks for it cannot read a success as a refusal.
+///
+/// Both halves are present for every read tool, including `note_read`, where
+/// that doubles the note. Uniformity wins here because a client that branches on
+/// `structuredContent` would otherwise have to special-case one verb; the cost
+/// is bounded by the shim's own 16 MiB frame cap, which already sizes what a
+/// single note can be.
+fn call_tool_result(tool: ToolName, structured: Value) -> Value {
+    let text = match tool {
+        // A note is markdown, and the text block is the one place it can be
+        // handed over as markdown rather than as JSON-escaped markdown.
+        ToolName::NoteRead => structured
+            .get("body")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_string(),
+        _ => serde_json::to_string_pretty(&structured).unwrap_or_default(),
+    };
+    json!({
+        "content": [{ "type": "text", "text": text }],
+        "structuredContent": structured,
+        "isError": false,
+    })
+}
+
+/// A bounded, single-line window of `body` around the first occurrence of
+/// `query`.
+///
+/// The window is anchored at the first LINE carrying the query, then moved
+/// [`EXCERPT_LEAD_BYTES`] back so the match has context in front of it. When
+/// nothing matches (a ranked hit whose term is not literal, which a semantic
+/// ranker produces), the window is the start of the note: a caller who gets an
+/// excerpt still learns what the note opens with, which is more useful than an
+/// empty string and no less bounded.
+///
+/// Newlines and other control characters become spaces, because this string is
+/// rendered into a client's transcript and a newline in it forges a line of
+/// output. The cap is in bytes and includes the ellipsis.
+///
+/// **One stated imprecision:** the match is located on a lower-cased copy of the
+/// line, so for a script whose lower-case form changes byte length the window
+/// can begin a few characters before the match. The bound and the single-line
+/// flattening hold either way, and the excerpt is decoration around an answer
+/// the ranker already gave.
+pub fn excerpt(body: &str, query: &str) -> String {
+    let needle = query.trim().to_lowercase();
+    let mut start = 0usize;
+    if !needle.is_empty() {
+        let mut offset = 0usize;
+        for line in body.split_inclusive('\n') {
+            if let Some(found) = line.to_lowercase().find(&needle) {
+                start = offset + found.saturating_sub(EXCERPT_LEAD_BYTES);
+                break;
+            }
+            offset += line.len();
+        }
+    }
+    // Start on a character boundary: a byte slice panics otherwise, and the
+    // subtraction above can land inside a multi-byte character.
+    if start > body.len() {
+        start = body.len();
+    }
+    while start > 0 && !body.is_char_boundary(start) {
+        start -= 1;
+    }
+
+    let mut out = String::new();
+    let mut cut = false;
+    if start > 0 {
+        out.push_str(ELLIPSIS);
+    }
+    let budget = MAX_EXCERPT_BYTES - ELLIPSIS.len();
+    for ch in body[start..].chars() {
+        let ch = if ch.is_control() { ' ' } else { ch };
+        if ch == ' ' && out.ends_with(' ') {
+            continue;
+        }
+        if out.len() + ch.len_utf8() > budget {
+            cut = true;
+            break;
+        }
+        out.push(ch);
+    }
+    if cut {
+        out.push_str(ELLIPSIS);
+    }
+    out.trim_end().to_string()
+}

@@ -182,6 +182,13 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // block is omitted rather than greyed. Absent by platform fact, not by
   // decision: there is nothing to port.
   "cliAccess",
+  // external-mcp-connection (myne-md/myne#923). `myne-mcp` is a stdio binary
+  // staged as a desktop `externalBin` and installed on the user's PATH by the
+  // same shim the `myne` CLI uses: a page has no filesystem to put one on and
+  // nothing on the machine that could launch it. Absent by platform fact, so the
+  // Settings section is omitted rather than greyed, and the dispatcher refuses
+  // the whole `mcp` namespace.
+  "externalMcp",
   // myne-md/myne#411. The picker is what a cached name exists to label, and it
   // now SHIPS here (`check-web-screens.mjs` records `VaultPicker.tsx` as
   // `ported` since myne-md/myne#911 task 13). What is still missing is the

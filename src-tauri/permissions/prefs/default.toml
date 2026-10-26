@@ -102,6 +102,10 @@ permissions = [
   "allow-set-view-approval",
   "allow-export-view-manifest",
   "allow-read-view-manifest",
+  # external-mcp-connection (myne-md/myne#923 task 3): the device-local
+  # `mcp_connections` grant map's two writers.
+  "allow-set-mcp-connection-grant",
+  "allow-revoke-mcp-connection",
 ]
 
 [[permission]]
@@ -697,3 +701,23 @@ commands.allow = ["export_view_manifest"]
 identifier = "allow-read-view-manifest"
 description = "Allow invoking prefs:read_view_manifest (opens ONE user-chosen `.myneview` file, reads at most MAX_MANIFEST_BYTES + 1 so an oversized file is detected rather than truncated, and validates it with protocol::parse_view_manifest, which is the only authority on the manifest grammar; returns the parsed SavedView or the reader's named refusal and writes nothing, approves nothing and reads no vault state, because validation is not permission; the OS open dialog is the access consent)."
 commands.allow = ["read_view_manifest"]
+
+# external-mcp-connection (myne-md/myne#923 task 3): approve (or re-approve) one
+# named external MCP connection. Device-local per sync-protocol.md §10.2, so it
+# never syncs and never merges: a new device inherits no approval. Host-stamps
+# the approval time, NFC-normalizes the name, and REFUSES an addition that would
+# push the canonical plaintext past the §9.5.4 budget rather than failing the
+# whole write. Logs the outcome and a folder COUNT, never the connection name or
+# a folder path (AS3-class user text).
+[[permission]]
+identifier = "allow-set-mcp-connection-grant"
+description = "Allow invoking prefs:set_mcp_connection_grant (Slot::Unlocked-gated approval/re-approval of one external MCP connection's frozen read scope; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2 — an approval given on one device must never be inherited by another; returns false when the grant did not fit the prefs plaintext budget, leaving the stored grant untouched)."
+commands.allow = ["set_mcp_connection_grant"]
+
+# external-mcp-connection (myne-md/myne#923 task 3): revoke one named connection.
+# Removing a name that holds no grant is a successful no-op (the intent is
+# already true). Same main-window-only invariant as every other allow-set-*.
+[[permission]]
+identifier = "allow-revoke-mcp-connection"
+description = "Allow invoking prefs:revoke_mcp_connection (Slot::Unlocked-gated revocation of one external MCP connection's grant; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; revoking an absent name is a successful no-op, and the other connections are untouched)."
+commands.allow = ["revoke_mcp_connection"]

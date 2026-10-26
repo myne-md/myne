@@ -88,6 +88,26 @@ enum Request {
     Open {
         path: String,
     },
+    /// external-mcp-connection (myne-md/myne#923). The `myne-mcp` sidecar's
+    /// `tools/call`, forwarded over the SAME socket as every CLI command.
+    ///
+    /// Three fields, and none of them is a scope: `connection` is the name the
+    /// client declared (the shim writes `MYNE_MCP_CONNECTION` into its config,
+    /// so this is the name the USER approved), `tool` is the verb and
+    /// `arguments` are the caller's own bytes. What may be read is resolved
+    /// host-side from the stored grant — see [`McpCallOutcome`].
+    McpCall {
+        /// The declared connection name. Required: a call that names nothing is
+        /// a malformed request, not an owner call, and the shim always fills
+        /// this in (`unnamed-client` when nothing names the connection).
+        connection: String,
+        /// The verb, as the shim spelled it.
+        tool: String,
+        /// The caller's arguments. `Value::Null` when the field is absent, which
+        /// decodes as a malformed request rather than as "no arguments".
+        #[serde(default)]
+        arguments: serde_json::Value,
+    },
 }
 
 /// One search hit on the wire: an id + its title, nothing else. No score,
@@ -223,6 +243,13 @@ pub enum OpenFileOutcome {
 /// The vault-state seam [`serve_connection`] dispatches through. `&dyn`,
 /// not `AppHandle<R>` — so a test can supply a fake with no Tauri runtime
 /// at all (mirrors `clipper::envelope::VaultStatusSource`).
+///
+/// **The name is historical.** It began as the note commands, and it now
+/// carries every command this door answers (`new`, `daily`, `open`, and the
+/// MCP surface's `mcp_call`), because one seam is what keeps the rate limiter,
+/// the reply envelope and the one-request-per-connection contract in ONE place.
+/// Renaming it is a mechanical change across this file and its doubles, worth
+/// doing on its own rather than folded into a feature slice.
 pub trait NoteLister: Send + Sync {
     fn list_notes(&self) -> ListOutcome;
     fn show_note(&self, id: &str) -> ShowOutcome;
@@ -238,7 +265,38 @@ pub trait NoteLister: Send + Sync {
     /// resolves it through the same gate-checked ingest every other ingress
     /// uses.
     fn open_plain_file(&self, path: &str) -> OpenFileOutcome;
+    /// One external MCP connection's `tools/call` (external-mcp-connection,
+    /// myne-md/myne#923). The implementation resolves the connection's stored
+    /// grant, clamps the verb to it and returns a complete MCP `CallToolResult`
+    /// — see [`McpCallOutcome`].
+    ///
+    /// Synchronous like every other command here: this trait is called from a
+    /// connection thread, and the production implementation is the one that
+    /// bridges to the async core (`tauri::async_runtime::block_on`), exactly as
+    /// the seven above do.
+    fn mcp_call(&self, request: McpCallRequest) -> McpCallOutcome;
 }
+
+/// One `mcp_call`, as the wire carried it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct McpCallRequest {
+    /// The connection name the shim declared. Trimmed and matched EXACTLY
+    /// against the stored grants: normalization happens when a grant is
+    /// written, so two spellings that differ only by composition are two names
+    /// here on purpose (`cli_bridge` has no opinion about names).
+    pub connection: String,
+    /// The verb, as the shim spelled it.
+    pub tool: String,
+    /// The caller's arguments, verbatim.
+    pub arguments: serde_json::Value,
+}
+
+/// What one `mcp_call` decided, as the door relays it.
+///
+/// Re-exported from `myne_core::plugins::mcp::tools` rather than mirrored: the
+/// host-side decision is core's, and a second enum here would be a second place
+/// for a refusal to gain or lose a case.
+pub use myne_core::plugins::mcp::tools::McpCallOutcome;
 
 /// WebView event fired after a CLI write lands (#258).
 ///
@@ -305,6 +363,34 @@ fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
             OpenFileOutcome::NotFound => encode_err("not_found", "no such file"),
             OpenFileOutcome::TooLarge => encode_err("too_large", "that file is too large to open"),
             OpenFileOutcome::Io => encode_err("io", "an internal error occurred"),
+        },
+        Request::McpCall {
+            connection,
+            tool,
+            arguments,
+        } => match lister.mcp_call(McpCallRequest {
+            connection,
+            tool,
+            arguments,
+        }) {
+            // A refusal names its own closed reason as the wire `kind`, so the
+            // shim's `structuredContent.reason` and this envelope cannot drift:
+            // the shim relays `kind` verbatim and validates only that it is a
+            // wire label.
+            McpCallOutcome::Result(result) => encode_ok_result(&result),
+            McpCallOutcome::Refused(error) => encode_err(error.reason(), error.message()),
+            // Version skew, not a scope decision: this build does not implement
+            // that verb. The same shape `period` uses for a period it does not
+            // know, because a newer client must be able to tell skew from a
+            // failing disk.
+            McpCallOutcome::UnknownTool => {
+                encode_err("invalid_request", "this app does not know that tool")
+            }
+            McpCallOutcome::Malformed => encode_err("invalid_request", "malformed request"),
+            McpCallOutcome::VaultLocked => {
+                encode_err("vault_locked", "the vault locked during this request")
+            }
+            McpCallOutcome::Io => encode_err("io", "an internal error occurred"),
         },
     }
 }
@@ -403,6 +489,17 @@ fn encode_ok() -> Vec<u8> {
     serde_json::to_vec(&serde_json::json!({ "ok": true })).expect("static ok shape always encodes")
 }
 
+/// `mcp_call`'s success reply: the complete MCP `CallToolResult` under `result`.
+///
+/// The shim checks only that `result` carries a `content` array before relaying
+/// it verbatim, so this is the one place a malformed success could reach a
+/// client's transcript — which is why the value came from a typed tool answer
+/// rather than from a string built here.
+fn encode_ok_result(result: &serde_json::Value) -> Vec<u8> {
+    serde_json::to_vec(&serde_json::json!({ "ok": true, "result": result }))
+        .unwrap_or_else(|_| encode_err("io", "response encode failure"))
+}
+
 fn encode_err(kind: &'static str, message: &'static str) -> Vec<u8> {
     serde_json::to_vec(&serde_json::json!({
         "ok": false,
@@ -475,8 +572,8 @@ mod app_seam {
     use tauri::{AppHandle, Manager, Runtime};
 
     use super::{
-        DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, OpenFileOutcome,
-        SearchHitWire, SearchOutcome, ShowOutcome,
+        DailyAppendOutcome, DailyOutcome, ListOutcome, McpCallOutcome, McpCallRequest, NewOutcome,
+        NoteLister, OpenFileOutcome, SearchHitWire, SearchOutcome, ShowOutcome,
     };
 
     /// Production [`NoteLister`] over the running app. Cheap to construct
@@ -788,6 +885,58 @@ mod app_seam {
                 Err(DailyError::Io) => DailyAppendOutcome::Io,
             }
         }
+
+        /// One external MCP connection's tool call (external-mcp-connection,
+        /// myne-md/myne#923).
+        ///
+        /// Everything that decides is in `myne_core::plugins::mcp`: the grant
+        /// read, the scope resolution and the four clamps all live there, and
+        /// this function's whole job is to hand them the app's own state. The
+        /// three `try_state` lookups are the only part the core cannot do —
+        /// they are Tauri's registry — and a missing one is `Io` rather than a
+        /// refusal, because a process that composed this door without those
+        /// states is a wiring bug, not something a caller can act on.
+        ///
+        /// No new socket, no listener and no second lifecycle: this is called
+        /// from the connection thread the CLI door already owns, after the
+        /// shared limiter has already counted the request.
+        fn mcp_call(&self, request: McpCallRequest) -> McpCallOutcome {
+            use myne_core::plugins::mcp::host_adapters::door_call;
+            use myne_core::plugins::mcp::tools::WireCall;
+            use myne_core::plugins::vault_indices::VaultIndicesState;
+            use myne_core::search::SearchIndexState;
+
+            let Some(state) = self
+                .app
+                .try_state::<crate::plugins::vault_unlock::state::VaultRuntimeState>()
+            else {
+                return McpCallOutcome::Io;
+            };
+            let Some(indices) = self.app.try_state::<VaultIndicesState>() else {
+                return McpCallOutcome::Io;
+            };
+            let Some(search) = self.app.try_state::<SearchIndexState>() else {
+                return McpCallOutcome::Io;
+            };
+            let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
+                return McpCallOutcome::Io;
+            };
+            let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
+            let io = myne_core::vault_io::StdVaultIo;
+            tauri::async_runtime::block_on(door_call(
+                &host,
+                state.inner(),
+                indices.inner(),
+                search.inner(),
+                hooks.inner(),
+                &io,
+                WireCall {
+                    connection: &request.connection,
+                    tool: &request.tool,
+                    arguments: &request.arguments,
+                },
+            ))
+        }
     }
 }
 
@@ -912,6 +1061,64 @@ mod tests {
         }
         fn open_plain_file(&self, path: &str) -> OpenFileOutcome {
             (self.open_file)(path)
+        }
+        // The parse/dispatch tests never send `mcp_call`; the command surface
+        // gets its own double below (`McpSeam`), because a fixed-arm field here
+        // would have to be threaded through eight constructors that do not care.
+        fn mcp_call(&self, _request: McpCallRequest) -> McpCallOutcome {
+            McpCallOutcome::Io
+        }
+    }
+
+    /// The seam a `mcp_call` test dispatches through: it records what it was
+    /// handed (so "the connection name and the arguments reached the seam
+    /// verbatim" is assertable) and answers from a `fn` pointer.
+    struct McpSeam {
+        requests: std::sync::Mutex<Vec<McpCallRequest>>,
+        outcome: Box<dyn Fn(&McpCallRequest) -> McpCallOutcome + Send + Sync>,
+    }
+
+    impl McpSeam {
+        fn new(
+            outcome: impl Fn(&McpCallRequest) -> McpCallOutcome + Send + Sync + 'static,
+        ) -> Self {
+            Self {
+                requests: std::sync::Mutex::new(Vec::new()),
+                outcome: Box::new(outcome),
+            }
+        }
+
+        fn seen(&self) -> Vec<McpCallRequest> {
+            self.requests.lock().expect("requests lock").clone()
+        }
+    }
+
+    impl NoteLister for McpSeam {
+        fn list_notes(&self) -> ListOutcome {
+            ListOutcome::Io
+        }
+        fn show_note(&self, _id: &str) -> ShowOutcome {
+            ShowOutcome::Io
+        }
+        fn search_notes(&self, _query: &str) -> SearchOutcome {
+            SearchOutcome::Io
+        }
+        fn create_note(&self, _body: &str, _folder: Option<&str>) -> NewOutcome {
+            NewOutcome::Io
+        }
+        fn period(&self, _period: &str) -> DailyOutcome {
+            DailyOutcome::Io
+        }
+        fn period_append(&self, _period: &str, _line: &str) -> DailyAppendOutcome {
+            DailyAppendOutcome::Io
+        }
+        fn open_plain_file(&self, _path: &str) -> OpenFileOutcome {
+            OpenFileOutcome::Io
+        }
+        fn mcp_call(&self, request: McpCallRequest) -> McpCallOutcome {
+            let outcome = (self.outcome)(&request);
+            self.requests.lock().expect("requests lock").push(request);
+            outcome
         }
     }
 
@@ -1039,6 +1246,9 @@ mod tests {
             fn open_plain_file(&self, _path: &str) -> OpenFileOutcome {
                 panic!("a throttled request must never reach the vault");
             }
+            fn mcp_call(&self, _request: McpCallRequest) -> McpCallOutcome {
+                panic!("a throttled request must never reach the vault");
+            }
         }
         let limiter = SharedRateLimiter::new(0, std::time::Duration::from_secs(60));
         for request in [
@@ -1049,6 +1259,7 @@ mod tests {
             br#"{"cmd":"daily"}"#,
             br#"{"cmd":"daily_append","line":"x"}"#,
             br#"{"cmd":"open","path":"/tmp/x.md"}"#,
+            br#"{"cmd":"mcp_call","connection":"c","tool":"note_search","arguments":{"query":"x"}}"#,
         ] {
             let reply = roundtrip_limited(request, &NeverCalled, &limiter);
             assert_eq!(reply["error"]["kind"], "rate_limited");
@@ -1631,5 +1842,233 @@ mod tests {
         let reply = roundtrip(br#"{"cmd":"open"}"#, &lister);
         assert_eq!(reply["ok"], false);
         assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    // ---- external-mcp-connection (myne-md/myne#923): `mcp_call` ----------
+
+    use myne_core::plugins::mcp::error::McpToolError;
+
+    /// What the seam is handed for one wire frame. Read out of the double rather
+    /// than inferred from the reply, because a reply of `ok` looks identical
+    /// whether the connection name arrived or was dropped.
+    fn mcp_request(frame: &[u8]) -> McpCallRequest {
+        let seam = McpSeam::new(|_| McpCallOutcome::Result(serde_json::json!({ "content": [] })));
+        let _ = roundtrip(frame, &seam);
+        seam.seen()
+            .pop()
+            .expect("the mcp_call request must reach the seam")
+    }
+
+    fn ok_result(_request: &McpCallRequest) -> McpCallOutcome {
+        McpCallOutcome::Result(serde_json::json!({
+            "content": [{ "type": "text", "text": "one row" }],
+            "structuredContent": [{ "noteId": "a" }],
+            "isError": false,
+        }))
+    }
+
+    #[test]
+    fn a_successful_mcp_call_relays_the_whole_call_tool_result() {
+        let seam = McpSeam::new(ok_result);
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"claude-desktop","tool":"note_search","arguments":{"query":"a"}}"#,
+            &seam,
+        );
+        assert_eq!(reply["ok"], true);
+        // The shim's `tool_success` forwards `result` only when it carries a
+        // `content` array, so this is the field a client actually reads.
+        assert_eq!(reply["result"]["content"][0]["text"], "one row");
+        assert_eq!(reply["result"]["structuredContent"][0]["noteId"], "a");
+        assert_eq!(reply["result"]["isError"], false);
+        // And nothing of the door's own vocabulary leaks into it: no `error`,
+        // no `notes`, no `body`.
+        let object = reply.as_object().expect("reply is an object");
+        assert_eq!(object.len(), 2, "exactly ok + result: {reply}");
+    }
+
+    #[test]
+    fn mcp_call_hands_the_connection_name_tool_and_arguments_through_verbatim() {
+        // The connection name is the KEY to a grant. A seam that received a
+        // blank, a lower-cased or a truncated name would look up a different
+        // grant than the one the user approved, so it is asserted as bytes.
+        let request = mcp_request(
+            br#"{"cmd":"mcp_call","connection":"Claude Desktop","tool":"note_read","arguments":{"note_id":"0192abcd","nested":{"k":[1,2]}}}"#,
+        );
+        assert_eq!(request.connection, "Claude Desktop");
+        assert_eq!(request.tool, "note_read");
+        assert_eq!(
+            request.arguments,
+            serde_json::json!({ "note_id": "0192abcd", "nested": { "k": [1, 2] } }),
+            "the arguments must arrive untouched, scope fields and all: the host \
+             refuses one it does not know rather than editing it"
+        );
+    }
+
+    #[test]
+    fn a_refused_mcp_call_carries_its_reason_as_the_wire_kind_and_its_sentence_as_the_message() {
+        // The shim relays `kind` into `structuredContent.reason` and `message`
+        // into the text block, so the two halves are the whole refusal a human
+        // ends up reading. Each refusal is asserted against the host's own
+        // closed vocabulary rather than against a string written here.
+        for error in [
+            McpToolError::NoGrant,
+            McpToolError::EmptyQuery,
+            McpToolError::OutOfScopeNote {
+                note_id: "a".into(),
+            },
+            McpToolError::OutOfScopeFolder {
+                folder: "Private/".into(),
+            },
+            McpToolError::VaultUnavailable,
+        ] {
+            let expected_kind = error.reason();
+            let expected_message = error.message();
+            let seam = McpSeam::new(move |_| McpCallOutcome::Refused(error.clone()));
+            let reply = roundtrip(
+                br#"{"cmd":"mcp_call","connection":"c","tool":"note_search","arguments":{"query":"a"}}"#,
+                &seam,
+            );
+            assert_eq!(reply["ok"], false);
+            assert_eq!(
+                reply["error"]["kind"], expected_kind,
+                "the wire kind and the reason must be one label"
+            );
+            assert_eq!(reply["error"]["message"], expected_message);
+        }
+    }
+
+    #[test]
+    fn an_unimplemented_mcp_verb_is_answered_as_version_skew() {
+        // `invalid_request`, not a scope refusal: the five write verbs the
+        // compiled catalog offers are tasks 13 to 16, and a client newer than
+        // its host must be able to tell skew from "you may not write there".
+        let seam = McpSeam::new(|_| McpCallOutcome::UnknownTool);
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"c","tool":"note_create","arguments":{}}"#,
+            &seam,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+        assert!(
+            reply["error"]["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("tool")),
+            "the message must name what was not known: {reply}"
+        );
+    }
+
+    #[test]
+    fn malformed_mcp_call_answers_invalid_request() {
+        for frame in [
+            // No `connection`: the shim always sends one, so a frame without it
+            // did not come from the shim.
+            &br#"{"cmd":"mcp_call","tool":"note_search","arguments":{"query":"a"}}"#[..],
+            // No `tool` at all.
+            br#"{"cmd":"mcp_call","connection":"c","arguments":{}}"#,
+            // A non-string tool.
+            br#"{"cmd":"mcp_call","connection":"c","tool":7,"arguments":{}}"#,
+        ] {
+            let seam = McpSeam::new(|_| McpCallOutcome::Result(serde_json::json!({})));
+            let reply = roundtrip(frame, &seam);
+            assert_eq!(reply["ok"], false, "accepted {frame:?}");
+            assert_eq!(reply["error"]["kind"], "invalid_request");
+        }
+
+        // And the ARM's own malformed answer, which is what a decoded frame with
+        // undecodable arguments produces (`deny_unknown_fields`, a wrong type,
+        // a missing required field). Asserted through the seam's outcome so the
+        // mapping is what is under test here; the decode itself is
+        // `core::plugins::mcp::tools`'s, tested there.
+        let seam = McpSeam::new(|_| McpCallOutcome::Malformed);
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"c","tool":"note_search","arguments":{"scope":["Private/"]}}"#,
+            &seam,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "invalid_request");
+    }
+
+    #[test]
+    fn an_absent_arguments_field_reaches_the_seam_as_null_rather_than_as_an_empty_object() {
+        // `{}` and "nothing at all" are different calls, and only the arm can
+        // tell them apart: defaulting an absent field to `{}` would make a
+        // truncated frame succeed against `vault_list`. The seam receives Null,
+        // which its argument decode refuses.
+        let request = mcp_request(br#"{"cmd":"mcp_call","connection":"c","tool":"vault_list"}"#);
+        assert_eq!(request.arguments, serde_json::Value::Null);
+    }
+
+    #[test]
+    fn an_mcp_call_while_locked_answers_vault_locked() {
+        let seam = McpSeam::new(|_| McpCallOutcome::VaultLocked);
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"c","tool":"vault_state","arguments":{}}"#,
+            &seam,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "vault_locked");
+    }
+
+    #[test]
+    fn an_mcp_call_io_failure_answers_the_io_kind() {
+        let seam = McpSeam::new(|_| McpCallOutcome::Io);
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"c","tool":"vault_state","arguments":{}}"#,
+            &seam,
+        );
+        assert_eq!(reply["ok"], false);
+        assert_eq!(reply["error"]["kind"], "io");
+    }
+
+    #[test]
+    fn a_refused_mcp_call_still_costs_a_rate_limiter_token() {
+        // The limiter gates the door, not the vault: it is checked BEFORE the
+        // request is dispatched (see `serve_connection`), so a call the host
+        // then refuses has already been counted. That is the property this test
+        // exists for — if a refusal were free, a caller could probe lock state,
+        // grant names and scope boundaries an unbounded number of times per
+        // window while every answer was "no".
+        //
+        // The budget is one. The first call is refused for having no grant; if
+        // that refusal had not consumed the token, the second request would be
+        // SERVED and the assertion below would see `ok: true`.
+        let seam = McpSeam::new(|_| McpCallOutcome::Refused(McpToolError::NoGrant));
+        let limiter = SharedRateLimiter::new(1, std::time::Duration::from_secs(60));
+
+        let refused = roundtrip_limited(
+            br#"{"cmd":"mcp_call","connection":"unnamed-client","tool":"note_search","arguments":{"query":"a"}}"#,
+            &seam,
+            &limiter,
+        );
+        assert_eq!(refused["ok"], false);
+        assert_eq!(refused["error"]["kind"], "no_grant");
+
+        // The second request is over budget. It is a plain `list` so the
+        // assertion cannot be satisfied by the mcp arm itself refusing again.
+        let throttled = roundtrip_limited(br#"{"cmd":"list"}"#, &seam, &limiter);
+        assert_eq!(
+            throttled["error"]["kind"], "rate_limited",
+            "a refused call must consume the token it was let through on: {throttled}"
+        );
+        assert_eq!(seam.seen().len(), 1, "only the first call reached the seam");
+    }
+
+    #[test]
+    fn an_mcp_call_does_not_log_or_echo_a_connection_name_into_the_reply() {
+        // The name is AS3-class user text and the refused reply is the only place
+        // it may appear — and it does not appear even there: a refusal names the
+        // reason, never the caller's own spelling of its name. This is a cheap
+        // regression guard on `encode_err`'s static-string signature, which is
+        // what makes it structurally true.
+        let seam = McpSeam::new(|_| McpCallOutcome::Refused(McpToolError::NoGrant));
+        let reply = roundtrip(
+            br#"{"cmd":"mcp_call","connection":"my-private-notes-client","tool":"note_search","arguments":{"query":"a"}}"#,
+            &seam,
+        );
+        let wire = reply.to_string();
+        assert!(
+            !wire.contains("my-private-notes-client"),
+            "the refusal echoed the connection name: {wire}"
+        );
     }
 }

@@ -31,8 +31,8 @@ use std::io::Cursor;
 use std::sync::{Arc, Mutex};
 
 use super::dispatch::{
-    self, DailyAppendOutcome, DailyOutcome, ListOutcome, NewOutcome, NoteLister, OpenFileOutcome,
-    SearchHitWire, SearchOutcome, ShowOutcome,
+    self, DailyAppendOutcome, DailyOutcome, ListOutcome, McpCallOutcome, McpCallRequest,
+    NewOutcome, NoteLister, OpenFileOutcome, SearchHitWire, SearchOutcome, ShowOutcome,
 };
 use super::rate_limit::SharedRateLimiter;
 
@@ -158,6 +158,12 @@ impl NoteLister for ScriptedLister {
     fn open_plain_file(&self, path: &str) -> OpenFileOutcome {
         (self.open_file)(path)
     }
+    /// Always `Io`: this double drives the CLI commands' failure classes, and the
+    /// MCP arm's own logging is covered by the `mcp_call` frame in
+    /// `every_request` reaching the same audit.
+    fn mcp_call(&self, _request: McpCallRequest) -> McpCallOutcome {
+        McpCallOutcome::Io
+    }
 }
 
 /// Every command, each carrying a sentinel in its arguments — so a log site
@@ -182,6 +188,17 @@ fn every_request() -> Vec<Vec<u8>> {
         serde_json::to_vec(&serde_json::json!({
             "cmd": "open",
             "path": format!("{SENTINEL_PATH}/sentinel-file-task13.md"),
+        }))
+        .expect("request encodes"),
+        // The MCP surface's arm (external-mcp-connection, myne-md/myne#923),
+        // carrying the same DENY-class values as its own fields: the connection
+        // name is user text, the query is a typed phrase and the note id is a
+        // vault-stable correlation tag.
+        serde_json::to_vec(&serde_json::json!({
+            "cmd": "mcp_call",
+            "connection": SENTINEL_FOLDER,
+            "tool": "note_read",
+            "arguments": { "note_id": SENTINEL_NOTE_ID, "scope": [SENTINEL_FOLDER] },
         }))
         .expect("request encodes"),
     ]
@@ -394,6 +411,11 @@ const SOURCES: &[(&str, &str)] = &[
     ("dispatch.rs", include_str!("dispatch.rs")),
     ("framing.rs", include_str!("framing.rs")),
     ("gate.rs", include_str!("gate.rs")),
+    // Test-only (declared `#[cfg(all(test, unix))]`), and audited anyway so the
+    // roster above cannot quietly lose it: it drives real sockets and a real
+    // child process, and a log site added here would be a log site in this
+    // directory whatever the gate says.
+    ("mcp_door_test.rs", include_str!("mcp_door_test.rs")),
     ("mod.rs", include_str!("mod.rs")),
     ("path_shim.rs", include_str!("path_shim.rs")),
     ("pipe.rs", include_str!("pipe.rs")),
@@ -426,6 +448,7 @@ const ALLOWED_VALUES: &[&str] = &[
     "e.label()",
     "outcome.label()",
     "ShimOutcome::Unsupported.label()",
+    "spec.stage.label()",
     "?kind",
     "on_path",
 ];
