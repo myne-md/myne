@@ -78,7 +78,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "DeviceAttributionPanel": { file: "src/components/sync/DeviceAttributionPanel.tsx", line: 147 },
   "DeviceJoinQr": { file: "src/components/sync/DeviceJoinQr.tsx", line: 153 },
   "DeviceJoinQrDialog": { file: "src/components/sync/DeviceJoinQrDialog.tsx", line: 19 },
-  "DeviceManagementPanel": { file: "src/components/sync/DeviceManagementPanel.tsx", line: 523 },
+  "DeviceManagementPanel": { file: "src/components/sync/DeviceManagementPanel.tsx", line: 266 },
   "DeviceRevoked": { file: "src/screens/DeviceRevoked.tsx", line: 67 },
   "DiagnosticsPanel": { file: "src/components/settings/DiagnosticsPanel.tsx", line: 117 },
   "DiffView": { file: "src/notes/components/DiffView.tsx", line: 91 },

@@ -726,24 +726,6 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // Their cores are gated `#[cfg(not(target_arch = "wasm32"))]` inside
     // `person_account` for the same reason.
     ("plugin:sync|sync_person_unlock", Class::Unsupported),
-    // Joining an account without the recovery phrase (`decisions/protocol/0735`) is
-    // refused here for two reasons rather than one, and both are structural. The
-    // ADMITTING direction needs an unlocked person identity and the active vault's group
-    // key, which is the same refusal as every other member-plane command above. The
-    // JOINING direction needs a device key at rest to be worth anything, and a browser has
-    // no storage rung at all (`device_identity::supported()` is false on wasm), so it would
-    // produce a code that admits a device which still cannot author a head. `Unsupported`
-    // rather than `Pending`: neither becomes reachable by porting more code.
-    ("plugin:sync|sync_device_admission_code", Class::Unsupported),
-    (
-        "plugin:sync|sync_pending_device_admission",
-        Class::Unsupported,
-    ),
-    ("plugin:sync|sync_admit_device", Class::Unsupported),
-    (
-        "plugin:sync|sync_claim_device_admission",
-        Class::Unsupported,
-    ),
     // Publishing a person-born vault (myne-md/myne#911 task 8) stays
     // `Unsupported`, and the reason is narrower than it used to be. The person
     // session EXISTS here since task 13; what a browser still lacks is the
