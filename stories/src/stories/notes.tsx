@@ -30,6 +30,8 @@ import { FilterBuilder } from "@app/notes/components/FilterBuilder";
 import { TaskListPanel } from "@app/notes/components/TaskListPanel";
 import { ViewSettings } from "@app/notes/components/ViewSettings";
 import { ViewsSection } from "@app/notes/components/ViewsSection";
+import { BoardView } from "@app/notes/views/boardView";
+import { ViewCard } from "@app/notes/views/card";
 import { DEFAULT_TASK_VIEW } from "@app/notes/taskView";
 import type { SavedView } from "@app/lib/prefs";
 import { PanelEmptyState } from "@app/notes/components/PanelEmptyState";
@@ -904,18 +906,131 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "notes/boardview/empty-lane",
+    group: "components",
+    surface: "BoardView",
+    state: "empty-lane",
+    description:
+      "The board a saved view renders: lanes left to right in the order the view declares, each one its own vertical scroller, and Done empty on purpose. An empty lane is the drop target for work that has not started, so it stays on screen; the card is the same component the cards gallery mounts, which is why a board card's cover, context menu and testids are the gallery's.",
+    tags: ["notes", "views", "board", "lanes", "layout"],
+    render: () => {
+      const view: SavedView = {
+        id: "v-board",
+        name: "Release board",
+        view_type: "board",
+        filters: { kind: "all" },
+        group_by: "status",
+        lanes: ["Backlog", "Doing", "Done"],
+        columns: ["owner", "due"],
+      };
+      const str = (key: string, value: string) => ({ key, type: "string" as const, value });
+      return (
+        <Frame>
+          <div style={{ width: "900px", height: "440px", display: "flex" }}>
+            <BoardView
+              def={view}
+              result={{
+                groups: [
+                  {
+                    key: "Backlog",
+                    type: "string",
+                    rows: [
+                      {
+                        noteId: "n1",
+                        title: "Pick a release name",
+                        folder: null,
+                        values: { owner: str("owner", "Ada"), due: str("due", "2026-11-02") },
+                      },
+                      {
+                        noteId: "n2",
+                        title: "Pin the changelog format",
+                        folder: null,
+                        values: { owner: str("owner", "Mei") },
+                      },
+                    ],
+                  },
+                  {
+                    key: "Doing",
+                    type: "string",
+                    rows: [
+                      {
+                        noteId: "n3",
+                        title: "Draft the upgrade guide",
+                        folder: null,
+                        values: { owner: str("owner", "Sam") },
+                      },
+                    ],
+                  },
+                ],
+              }}
+              onOpenNote={action("onOpenNote")}
+            />
+          </div>
+        </Frame>
+      );
+    },
+  },
+  {
+    id: "notes/viewcard/two-shapes",
+    group: "components",
+    surface: "ViewCard",
+    state: "two-shapes",
+    description:
+      "One saved-view card, mounted alone, in the two shapes the component actually has. The left card is openable, so its content block is a real button a keyboard can reach and clicking it opens the note; the right one is mounted by a host that passes no open handler, which is the read-only shape, so it renders as plain content and carries no control at all. Both are the same module the cards gallery and the board mount, which is why their cover resolution, context menu and `view.card` testid cannot drift between the two surfaces.",
+    tags: ["notes", "views", "cards", "board", "layout"],
+    render: () => {
+      const str = (key: string, value: string) => ({ key, type: "string" as const, value });
+      return (
+        <Frame>
+          <div style={{ display: "flex", gap: "var(--space-3)", padding: "var(--space-4)" }}>
+            <div style={{ width: "220px" }}>
+              <ViewCard
+                row={{
+                  noteId: "n1",
+                  title: "Pick a release name",
+                  folder: null,
+                  values: { owner: str("owner", "Ada"), due: str("due", "2026-11-02") },
+                }}
+                columns={["owner", "due"]}
+                coverAspectRatio="1.78"
+                onOpenNote={action("onOpenNote")}
+              />
+            </div>
+            <div style={{ width: "220px" }}>
+              <ViewCard
+                row={{
+                  noteId: "n2",
+                  title: "Pin the changelog format",
+                  folder: null,
+                  values: { owner: str("owner", "Mei") },
+                }}
+                columns={["owner"]}
+                coverAspectRatio="1.78"
+              />
+            </div>
+          </div>
+        </Frame>
+      );
+    },
+  },
+  {
     id: "notes/viewsettings/default",
     group: "components",
     surface: "ViewSettings",
     state: "default",
-    description: "The per-view display settings, seeded from the view being edited.",
-    tags: ["notes", "views", "settings", "display"],
+    description:
+      "The per-view settings, seeded from the view being edited: render type, grouping, sort, columns, the writable-field set a shared view carries, and the read-only version. Look for archived, deleted and trashed to be absent from the writable picker, because the import path refuses them outright.",
+    tags: ["notes", "views", "settings", "display", "sharing", "version"],
     render: () => (
       <Frame>
         <ViewSettings
           title="Reading list"
-          initial={{}}
-          propertyKeys={["status", "priority", "owner"]}
+          initial={{ write_fields: ["status"] }}
+          version={4}
+          onExport={action("onExport")}
+          // `archived` is in the vault's key universe on purpose: the picker
+          // filters it out rather than the fixture hiding it.
+          propertyKeys={["status", "priority", "owner", "archived", "trashed"]}
           onCancel={action("onCancel")}
           onSave={action("onSave")}
         />

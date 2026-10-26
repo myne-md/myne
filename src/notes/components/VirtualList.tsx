@@ -77,6 +77,12 @@ export type VirtualListProps<T> = {
    *  `"auto"` so a wide column set scrolls horizontally with its Name column
    *  pinned (`position:sticky; left:0`) to this scroll container. */
   overflowX?: "hidden" | "auto";
+  /** Optional `data-testid` for the SCROLL element. Off by default so the
+   *  sidebar and cards render byte-unchanged. The board passes one per lane
+   *  (myne-md/myne#922): a lane's scroll position is that lane's own state, and
+   *  asserting it survives a data change needs a handle on the element that
+   *  actually scrolls. */
+  testId?: string;
   /** Draw the app's own `ScrollArea` indicator instead of the native bar: it
    *  shows on hover, focus and scroll only, where the native bar follows the OS
    *  setting and never hides on a Mac set to always show scroll bars
@@ -103,6 +109,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     heightResetToken,
     overflowX = "hidden",
     overlayScrollbar = false,
+    testId,
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -327,6 +334,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
           style={{ flex: "1 1 auto", minWidth: 0 }}
           contentStyle={{ position: "relative" }}
           watchSubtree={false}
+          testId={testId}
         >
           <div data-vlist-content="">{content}</div>
         </ScrollArea>
@@ -338,6 +346,7 @@ export function VirtualList<T>(props: VirtualListProps<T>): ReactNode {
     <div
       ref={containerRef}
       style={containerStyle}
+      data-testid={testId}
       // MYND-622: scroll the list while a drag hovers its top/bottom edge, so a
       // note can be moved somewhere off-screen in one gesture. Additive — no
       // preventDefault, no dataTransfer access, so the rows' own drop handling

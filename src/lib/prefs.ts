@@ -77,7 +77,7 @@ export function normalizeStartupOpen(value: string | null): StartupOpen {
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
  *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
  *  `ViewType` (serde lowercase). */
-export type ViewType = "table" | "cards" | "list";
+export type ViewType = "table" | "cards" | "list" | "board";
 
 /** Sort direction. Mirrors Rust `SortDirection` (serde lowercase). */
 export type SortDirection = "asc" | "desc";
@@ -117,7 +117,7 @@ export interface SavedView {
   id: string;
   /** User-visible view name. */
   name: string;
-  /** Render type (`table` / `cards` / `list`). */
+  /** Render type (`table` / `cards` / `list` / `board`). */
   view_type: ViewType;
   /** The filter AST (an `{ kind: "all" }` leaf for an unfiltered view). */
   filters: FilterNode;
@@ -135,6 +135,30 @@ export interface SavedView {
   /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
    *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
   image_aspect_ratio?: string;
+  /** Definition version (view-manifests): a non-negative integer the APP
+   *  maintains, never a form field: a local edit that changes the canonical bytes
+   *  increments it. Absent on a view authored before the field existed, which is
+   *  storage compatibility rather than a state the import path accepts (it
+   *  refuses a manifest with no version). It is what an update is ordered
+   *  against, and what this device's approval names. */
+  version?: number;
+  /** The property keys this view may write: the ENTIRE write authority a shared
+   *  view carries, checked by the host rather than by the renderer. Sequence
+   *  semantics: order preserved verbatim, NFC per element. The host-owned markers
+   *  (`archived`, `trashed`, `deleted`) are refused by the import reader, so no
+   *  view can hide notes from its own vault. Absent → no write authority. */
+  write_fields?: string[];
+  /** A board's declared lane order (`board-view`): the `group_by` values in the
+   *  order they read left to right. Sequence semantics, order preserved verbatim
+   *  (never sorted, never deduplicated). It is a DECLARATION, not the lane set:
+   *  a value present in the data and absent here appends in first-appearance
+   *  order, and a value here with no cards still renders, so "drop a card into
+   *  Done" works before anything is done. Absent → derived order only. */
+  lanes?: string[];
+  /** A note id whose BODY a new board card copies (`board-view`). Resolved by the
+   *  import path, never by this type: the format layer cannot know the vault.
+   *  Absent → a new card is the vault's default new note. */
+  template?: string;
 }
 
 /** One color-group rule (graph-connection-ux-polish) — a stable id, a
@@ -805,6 +829,14 @@ export interface PrefsView {
    * sorted/deduped; stale ids are the caller's to prune). Absent → `[]`.
    */
   view_order: string[];
+  /**
+   * This DEVICE's approval of saved views (view-manifests) — `{view id: approved
+   * version}`, device-local per `sync-protocol.md` §10.2, so it never arrives by
+   * sync and a second device asks again. A view counts as approved when the value
+   * here EQUALS its `version` (Rust `is_view_approved`), so bumping a definition
+   * revokes approval with nothing to clear. Absent → `{}`.
+   */
+  view_approvals: Record<string, number>;
 }
 
 /**
@@ -2055,6 +2087,74 @@ export async function deleteSavedView(id: string): Promise<void> {
  */
 export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
+}
+
+/**
+ * Persist this DEVICE's approval of one saved view (view-manifests): a
+ * device-local map of `{view id: approved version}`, so approval never travels
+ * to another device (an approval is a decision somebody made HERE).
+ *
+ * Two shapes, one command:
+ *
+ * - `definition` omitted: the plain APPROVAL action. `version` is the definition
+ *   version being approved; pass `undefined` to CLEAR this device's approval of
+ *   `viewId`. Nothing else about the view changes.
+ * - `definition` present: a LOCAL EDIT, which writes the new definition and the
+ *   approval of its version in ONE prefs write. A local edit must never leave
+ *   the user's own view unapproved, and one write is the only way to promise
+ *   that. An IMPORTED update deliberately does not use this shape: new bytes
+ *   from elsewhere are a new decision.
+ *
+ * "Approved" is an equality against the stored version (Rust
+ * `is_view_approved`), so bumping a view's version revokes this device's
+ * approval with nothing to clear. The backend refuses (`InvalidValue`) when
+ * `definition.id` disagrees with `viewId`; a rejected promise means nothing was
+ * written, so an optimistic UI must revert.
+ */
+export async function setViewApproval(
+  viewId: string,
+  version: number | undefined,
+  definition?: SavedView,
+): Promise<void> {
+  await writePref("plugin:prefs|set_view_approval", { viewId, version, definition });
+}
+
+/**
+ * Read and strictly validate ONE `.myneview` manifest from `targetPath`
+ * (view-manifests). The host does both: the read is bounded by the manifest cap
+ * (so an oversized file is refused rather than truncated) and the parse is
+ * `protocol::parse_view_manifest`, the only authority on the grammar.
+ *
+ * A refusal arrives as `ViewManifestReadError` with the reader's named reason
+ * (`src/types/view-manifest-error.ts`), which the import dialog renders: the key
+ * this build does not know, the marker it will not let a view write, and so on.
+ * Nothing is written and nothing is approved here.
+ */
+export async function readViewManifest(targetPath: string): Promise<SavedView> {
+  return invoke<SavedView>("plugin:prefs|read_view_manifest", { targetPath });
+}
+
+/**
+ * Write ONE saved view as canonical `.myneview` manifest bytes to `targetPath`
+ * (view-manifests). The host encodes with the same canonical encoder
+ * `vault.prefs` uses, so the file an export writes is the file an import reads
+ * byte for byte; a WebView-side `JSON.stringify` would be a second opinion about
+ * those bytes.
+ *
+ * `targetPath` must come from the OS save dialog: the dialog IS the export
+ * consent, and its "Replace" prompt is what authorizes `overwrite=true` (SYNC-2).
+ * This does not touch `vault.prefs`, so nothing here bumps the prefs nonce.
+ */
+export async function exportViewManifestFile(
+  view: SavedView,
+  targetPath: string,
+  overwrite: boolean,
+): Promise<void> {
+  await invoke<void>("plugin:prefs|export_view_manifest", {
+    view,
+    targetPath,
+    overwrite,
+  });
 }
 
 /**

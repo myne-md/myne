@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11919,
+  "totalMinutesCeiling": 11935,
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",
@@ -1383,5 +1383,27 @@
     "model quality is a judgement and the remote arm needs a real provider and",
     "key; the stub returns three fixed strings, so every assertion around it is",
     "about the flow rather than about whether the memory is any good."
+  ],
+  "$comment27": [
+    "CEILING RAISED 11919 -> 11935 by the board view (myne-md/myne#922 task 11), on top of the four raises above rather than beside them:",
+    "The 16 minutes below were written against 11857, before $comment25 and $comment26 landed; the delta is unchanged and the base is theirs.",
+    "in the sanctioned direction: a gesture that did not exist before this change",
+    "now needs a finger on a handset. What added the minutes, named so the raise",
+    "is an argument:",
+    "",
+    "  + dragging a board card on ios and android, 8 minutes each = 16, standard.",
+    "    The drag is pointer-event based precisely so the same path can run under a",
+    "    finger, and the flow-logic tier now drives it end to end in desktop",
+    "    Chromium (mobile/tests/flow-logic/views/board-drag.flow.ts), asserting the",
+    "    one field write and the refusal arm. What no lane here produces is a TOUCH:",
+    "    whether a press becomes a drag instead of starting a lane scroll, and",
+    "    whether a long press raises WKWebView's or Android WebView's own selection",
+    "    and context menu, is touch arbitration performed by the OS and the engine.",
+    "    No CI lane builds for iOS or Android, and nothing in this tree generates a",
+    "    real touch contact.",
+    "",
+    "The item is standard and counts once per client, so gatedMinutes is unchanged",
+    "(3837): the rule is that gating may not fall by more than total does, and both",
+    "rose."
   ]
 }

@@ -1338,6 +1338,54 @@ pub struct PrefsView {
     #[serde(default)]
     pub saved_views: Vec<crate::saved_view::SavedView>,
 
+    /// `saved_views` entries this build CANNOT represent, carried verbatim from
+    /// the bytes it read so a whole-blob re-write re-emits them instead of
+    /// deleting a newer client's views (§9.5.2 / §9.5.5). A newer client's
+    /// `view_type` (`"timeline"`, …) is the motivating case: without this carrier
+    /// the array decode fails, §9.5.5 falls the WHOLE blob back to defaults, and
+    /// this client's next write pushes that loss to every device — the theme,
+    /// keymap and favorites gone because of one view it could not render.
+    ///
+    /// **Not a preference field, and deliberately NOT on the wire.**
+    /// `#[serde(skip)]` keeps it off the IPC/serde path — the host struct is
+    /// authoritative because prefs writes are per-field setters that read the
+    /// whole view and write it back, so the carrier survives a setter without
+    /// the WebView ever holding raw bytes it cannot interpret. It has no
+    /// canonical key, no clock and no §10.2 classification: it is part of the
+    /// `saved_views` encoding, not a field beside it, which is also why the
+    /// merge carries it along with whichever side wins the whole-value LWW.
+    #[serde(skip)]
+    pub opaque_saved_views: Vec<crate::saved_view::OpaqueSavedView>,
+
+    /// Device-local approval of saved views (`view-manifests`): one row per
+    /// view id this DEVICE has approved, holding the definition VERSION that was
+    /// approved. Canonical key `view_approvals`, after `transcription_enabled`
+    /// (`view_a` < `view_o`), before [`PrefsView::view_order`].
+    ///
+    /// **Device-local on purpose, and it is the whole point of the field.** An
+    /// approval is a decision a person makes at a device, so §10.2's merge keeps
+    /// the local map and a freshly enrolled device never inherits one. The
+    /// precedent is `ai_provider_consent` in this same section: it was shared
+    /// until a new device inherited the consent and began sending with nobody
+    /// there having been asked.
+    ///
+    /// "Approved" is an EQUALITY, not a flag: the value must equal the view's
+    /// current `version`, so a version bump revokes approval with no clear step
+    /// and nothing to forget. [`crate::view_manifest::is_view_approved`] is the
+    /// single comparison.
+    ///
+    /// Values are the same bare non-negative integers (and the same canonical
+    /// map encoding: NFC keys, lexicographic order) the `field_clocks` map uses,
+    /// so the framing has one implementation. A stored number no `version` can
+    /// hold simply never matches, which is the fail-closed direction.
+    ///
+    /// Keyed by an opaque view id and a number, and it says nothing about a
+    /// note, so it is not AS3-sensitive content; it is omitted entirely when
+    /// empty, so a vault that never approves anything stays byte-identical to a
+    /// pre-feature blob.
+    #[serde(default)]
+    pub view_approvals: BTreeMap<String, u64>,
+
     /// Saved-view display order (MYND-273) — an ordered list of view ids in the
     /// views-list / sidebar Views section order (SYNC-10). A **sequence** (order
     /// is the payload): preserved verbatim — NFC-normalized, NOT sorted, NOT
@@ -1436,6 +1484,8 @@ impl Default for PrefsView {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         }
     }
@@ -2229,11 +2279,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     // screen_capture_protection ['sav' < 'scr']). A nested array of canonical
     // SavedView objects, sorted by id (MYND-273); omitted entirely when empty so
     // a vault with no views is byte-identical to a pre-MYND-273 vault.prefs.
-    if !prefs.saved_views.is_empty() {
+    // Written through the opaque-aware encoder and gated on BOTH vecs: a blob
+    // whose only views are ones this build cannot represent must still be
+    // re-emitted, or this client's next write would delete them.
+    if !prefs.saved_views.is_empty() || !prefs.opaque_saved_views.is_empty() {
         out.extend_from_slice(b"\"saved_views\":");
-        out.extend_from_slice(&crate::saved_view::canonical_encode_saved_views(
-            &prefs.saved_views,
-        ));
+        out.extend_from_slice(
+            &crate::saved_view::canonical_encode_saved_views_with_opaque(
+                &prefs.saved_views,
+                &prefs.opaque_saved_views,
+            ),
+        );
         out.push(b',');
     }
 
@@ -2342,8 +2398,19 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b",\"transcription_enabled\":false");
     }
 
-    // view_order (canonical key 'v' — LAST, after theme ['t' < 'v']). The
-    // saved-view display sequence (MYND-273); same order-preserving discipline
+    // view_approvals (canonical key 'view_a…', after transcription_enabled
+    // ['t' < 'v'], BEFORE view_order ['view_a' < 'view_o']). The device-local
+    // approval map (view-manifests): `{view_id: approved_version}`. Same
+    // canonical integer-map framing as field_clocks (NFC keys, lexicographic
+    // order); omitted entirely when empty so a vault that never approves
+    // anything is byte-identical to a pre-feature blob.
+    if !prefs.view_approvals.is_empty() {
+        out.extend_from_slice(b",\"view_approvals\":");
+        push_canonical_u64_map(&mut out, &prefs.view_approvals);
+    }
+
+    // view_order (canonical key 'v', after view_approvals ['view_a' < 'view_o']).
+    // The saved-view display sequence (MYND-273); same order-preserving discipline
     // as item_order / favorites. Leading comma; omitted entirely when empty so a
     // vault that never reordered its views is byte-identical to a pre-MYND-273
     // vault.prefs.
@@ -3104,7 +3171,8 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // canonical SavedView objects; parsed from the same monotonic cursor so the
     // following screen_capture_protection find is never fooled by a view name /
     // filter value that literally contains the marker text.
-    let saved_views = parse_optional_saved_views_field(rest, &mut cursor, b"\"saved_views\":")?;
+    let (saved_views, opaque_saved_views) =
+        parse_optional_saved_views_field(rest, &mut cursor, b"\"saved_views\":")?;
 
     // ---- screen_capture_protection (required) ----
     let region = &rest[cursor..];
@@ -3170,9 +3238,28 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // non-load-bearing display settings, None ≡ host default `system`).
     let time_format = parse_optional_string_marker(after_key, b"\"time_format\":");
     let timezone = parse_optional_string_marker(after_key, b"\"timezone\":");
-    // view_order (key 'v' — LAST, after theme [t < v], MYND-273). A sequence
-    // array located by marker in the post-screen_capture_protection region, like
-    // theme/spell. Absent → empty; present-but-malformed → PlaintextParseFailed.
+    // view_approvals (key 'view_a…', between transcription_enabled [t] and
+    // view_order, view-manifests). A device-local integer map located by marker in
+    // the post-screen_capture_protection region, like view_order.
+    //
+    // TOLERANT on a malformed value (`.unwrap_or_default()`), which is the
+    // deliberate choice rather than a shortcut: this map is the gate a view has to
+    // pass before it may open, so the two failure directions are not symmetric.
+    // Reading damage as "no approvals" makes every pending view stay PENDING,
+    // which is the fail-closed direction and heals by approving again, while
+    // every other preference in the blob survives. Refusing the parse instead
+    // would drive §9.5.5's whole-blob fall-back to defaults, which clears the
+    // approvals AND the theme, keymap and favorites, and then a write pushes that
+    // loss to every device: the same class task 1 removed for `saved_views`.
+    let view_approvals = {
+        let mut approvals_cursor = 0usize;
+        parse_optional_u64_map_field(after_key, &mut approvals_cursor, b"\"view_approvals\":")
+            .unwrap_or_default()
+    };
+    // view_order (key 'v', after view_approvals and after theme [t < v], MYND-273). A
+    // sequence array located by marker in the post-screen_capture_protection
+    // region, like theme/spell. Absent → empty; present-but-malformed →
+    // PlaintextParseFailed.
     let view_order = parse_optional_array_marker(after_key, b"\"view_order\":")?;
     // startup_open + startup_open_note (keys 'sta…' — between spell_languages and
     // theme in canonical order, MYND-462). Located by marker in the
@@ -3260,34 +3347,47 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         spell_enabled,
         spell_languages,
         saved_views,
+        opaque_saved_views,
+        view_approvals,
         view_order,
     })
 }
 
 /// Parse the OPTIONAL `saved_views` nested-array-of-objects field (MYND-273),
 /// searching `rest` from `*cursor` onward. On a hit, decodes the canonical
-/// `SavedView` array via [`crate::saved_view::parse_saved_views_array`] and
-/// advances `*cursor` past the closing `]`; on a miss returns an empty `Vec`
-/// and leaves `*cursor` unchanged. A malformed array (a `SavedView` that fails
-/// to decode, or a non-array value) collapses to
-/// [`PrefsBlobError::PlaintextParseFailed`] (the caller falls back to defaults
-/// per § 9.5.5). The monotonic cursor keeps the canonical key-order discipline:
-/// the following `screen_capture_protection` find never matches inside a view's
-/// content.
+/// `SavedView` array via [`crate::saved_view::parse_saved_views_array_with_opaque`]
+/// and advances `*cursor` past the closing `]`; on a miss returns two empty
+/// `Vec`s and leaves `*cursor` unchanged.
+///
+/// The second vec is the entries this build cannot represent, which are carried
+/// rather than treated as a parse failure: a newer client's `view_type` used to
+/// collapse the WHOLE blob to defaults (§9.5.5) and then be overwritten by this
+/// client's next write. Structural damage is still fatal and still collapses to
+/// [`PrefsBlobError::PlaintextParseFailed`] (a non-array value, a malformed
+/// `SavedView`, damaged JSON). The monotonic cursor keeps the canonical
+/// key-order discipline: the following `screen_capture_protection` find never
+/// matches inside a view's content.
 fn parse_optional_saved_views_field(
     rest: &[u8],
     cursor: &mut usize,
     marker: &[u8],
-) -> Result<Vec<crate::saved_view::SavedView>, PrefsBlobError> {
+) -> Result<
+    (
+        Vec<crate::saved_view::SavedView>,
+        Vec<crate::saved_view::OpaqueSavedView>,
+    ),
+    PrefsBlobError,
+> {
     match find_top_level_marker(rest, *cursor, marker) {
         Some(rel_idx) => {
             let val_start = *cursor + rel_idx + marker.len();
-            let (views, consumed) = crate::saved_view::parse_saved_views_array(&rest[val_start..])
-                .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
+            let (views, opaque, consumed) =
+                crate::saved_view::parse_saved_views_array_with_opaque(&rest[val_start..])
+                    .map_err(|_| PrefsBlobError::PlaintextParseFailed)?;
             *cursor = val_start + consumed;
-            Ok(views)
+            Ok((views, opaque))
         }
-        None => Ok(Vec::new()),
+        None => Ok((Vec::new(), Vec::new())),
     }
 }
 
@@ -4373,6 +4473,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4458,6 +4560,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -4938,6 +5042,8 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
+                view_approvals: Default::default(),
                 view_order: Vec::new(),
             }
         );
@@ -5025,6 +5131,8 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
+                view_approvals: Default::default(),
                 view_order: Vec::new(),
             }
         );
@@ -6928,6 +7036,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7535,6 +7645,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7627,6 +7739,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7717,6 +7831,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7806,6 +7922,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -7958,6 +8076,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let blob =
@@ -8078,6 +8198,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8177,6 +8299,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8350,6 +8474,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let blob =
@@ -8457,6 +8583,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8804,6 +8932,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8893,6 +9023,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -8984,6 +9116,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -9143,6 +9277,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let blob =
@@ -9279,6 +9415,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let encoded = canonical_json_encode(&prefs);
@@ -9605,6 +9743,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let blob =
@@ -9698,6 +9838,8 @@ mod tests {
             startup_open: None,
             startup_open_note: None,
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let blob = encode_prefs_blob(&prefs_key, &account_hash, &original).unwrap();
@@ -10053,6 +10195,8 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
+                view_approvals: Default::default(),
                 view_order: Vec::new(),
             },
             &nonce_default,
@@ -10139,6 +10283,8 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
+                view_approvals: Default::default(),
                 view_order: Vec::new(),
             },
             &nonce_toggled,
@@ -10319,6 +10465,8 @@ mod tests {
                 "0190a000-0000-7000-8000-000000000006",
             )),
             saved_views: Vec::new(),
+            opaque_saved_views: Vec::new(),
+            view_approvals: Default::default(),
             view_order: Vec::new(),
         };
         let nonce_populated: [u8; AEAD_NONCE_LEN] = [0x99; AEAD_NONCE_LEN];
@@ -11481,9 +11629,17 @@ mod tests {
             card_size: Some(300),
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
+            // Neither manifest field set: this is the pre-feature view shape, and
+            // the golden bytes below are unchanged by this format's arrival:
+            // which is the byte-identity claim in the assertion's own message.
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let prefs = PrefsView {
             saved_views: alloc::vec![view],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000005")],
             ..PrefsView::default()
         };
@@ -13537,6 +13693,10 @@ mod tests {
             card_size: Some(300),
             image: Some(String::from("image")),
             image_aspect_ratio: Some(String::from("1.65")),
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         }
     }
 
@@ -13546,6 +13706,7 @@ mod tests {
         let hash = fixed_account_number_hash();
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("v2", "Books"), sample_view("v1", "Films")],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("v2"), String::from("v1")],
             ..PrefsView::default()
         };
@@ -13571,6 +13732,73 @@ mod tests {
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
 
+    // ---- view_approvals (view-manifests) -------------------------------
+
+    #[test]
+    fn empty_view_approvals_is_byte_identical_to_a_pre_feature_blob() {
+        // The whole point of omit-when-empty for this field: a vault that never
+        // approves a shared view must not gain a byte from the feature existing.
+        // Asserted on the SAME single-field form the two tests around this one
+        // pin, so a future field cannot make this pass by accident.
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert!(find_subslice(&encoded, b"view_approvals").is_none());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+
+        // …and a vault carrying views but no approvals is unchanged too: the
+        // map is independent of whether there are views to approve.
+        let with_views = PrefsView {
+            saved_views: alloc::vec![sample_view("v1", "Books")],
+            view_order: alloc::vec![String::from("v1")],
+            ..PrefsView::default()
+        };
+        let bytes = canonical_json_encode(&with_views);
+        assert!(find_subslice(&bytes, b"view_approvals").is_none());
+    }
+
+    #[test]
+    fn view_approvals_round_trip_in_canonical_key_order_before_view_order() {
+        let mut approvals = BTreeMap::new();
+        // Inserted out of order on purpose: the encoder sorts by NFC key.
+        approvals.insert(String::from("v2"), 7u64);
+        approvals.insert(String::from("v1"), 3u64);
+        let original = PrefsView {
+            view_approvals: approvals,
+            view_order: alloc::vec![String::from("v2"), String::from("v1")],
+            ..PrefsView::default()
+        };
+        let bytes = canonical_json_encode(&original);
+        let s = core::str::from_utf8(&bytes).unwrap();
+        // Canonical position and inner key order, asserted on the bytes rather
+        // than on the decoded struct: `transcription_enabled` < `view_approvals`
+        // < `view_order`, and the map's own keys are lexicographic.
+        assert!(
+            s.find("\"view_approvals\":{\"v1\":3,\"v2\":7}").is_some(),
+            "view_approvals must be an NFC-keyed, lexicographic integer map; got {s}"
+        );
+        assert!(s.find("\"view_approvals\"").unwrap() < s.find("\"view_order\"").unwrap());
+        // The encoded map's version is a BARE integer (no quotes, no `.0`).
+        assert!(!s.contains("\"v1\":\"3\""));
+
+        let decoded = canonical_json_decode(&bytes).expect("decode");
+        assert_eq!(decoded.view_approvals.len(), 2);
+        assert_eq!(decoded.view_approvals.get("v1"), Some(&3u64));
+        assert_eq!(decoded.view_approvals.get("v2"), Some(&7u64));
+        assert_eq!(decoded.view_order, alloc::vec!["v2", "v1"]);
+    }
+
+    #[test]
+    fn malformed_view_approvals_reads_as_empty_rather_than_defaulting_the_blob() {
+        // Tolerant on damage, and the DIRECTION is the assertion. A refused parse
+        // would drive §9.5.5's whole-blob fall-back to defaults, clearing the
+        // theme/keymap/favorites alongside the approvals and pushing that loss on
+        // the next write. Reading as "nothing approved" keeps every other field
+        // and leaves pending views pending, which heals by approving again.
+        let bytes = br#"{"screen_capture_protection":true,"view_approvals":{"v1":"not-a-number"}}"#;
+        let decoded = canonical_json_decode(bytes).expect("damaged map must not fail the blob");
+        assert!(decoded.view_approvals.is_empty());
+        assert!(decoded.screen_capture_protection);
+    }
+
     #[test]
     fn view_order_preserves_sequence_not_sorted_or_deduped() {
         // Sequence semantics (like item_order/favorites): order verbatim, dupes
@@ -13589,6 +13817,7 @@ mod tests {
         // order; the display order lives in view_order.
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("zzz", "Z"), sample_view("aaa", "A")],
+            opaque_saved_views: Vec::new(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&original);
@@ -13603,6 +13832,7 @@ mod tests {
         // saved_views sorts before screen_capture_protection; view_order is last.
         let original = PrefsView {
             saved_views: alloc::vec![sample_view("v1", "A")],
+            opaque_saved_views: Vec::new(),
             view_order: alloc::vec![String::from("v1")],
             ..PrefsView::default()
         };
@@ -13614,15 +13844,83 @@ mod tests {
         assert!(scp < vo, "view_order last");
     }
 
+    /// A canonical prefs plaintext carrying one view this build represents and
+    /// one it does not (`view_type: "timeline"`), plus a field beside them so the
+    /// "did the whole blob fall back?" question is observable.
+    fn prefs_plaintext_with_an_unsupported_view() -> &'static [u8] {
+        br#"{"label":"Work","saved_views":[{"filters":{"kind":"all"},"id":"a","name":"Cards","view_type":"cards"},{"filters":{"kind":"all"},"id":"b","name":"Timeline","view_type":"timeline"}],"screen_capture_protection":true}"#
+    }
+
     #[test]
-    fn malformed_saved_view_collapses_to_parse_failed() {
-        // A structurally-bad saved view (a `map` viewType) makes the whole prefs
-        // plaintext fail to parse — the caller falls back to defaults (§9.5.5).
-        let bad = br#"{"saved_views":[{"filters":{"kind":"all"},"id":"x","name":"n","view_type":"map"}],"screen_capture_protection":true}"#;
+    fn unsupported_view_type_no_longer_collapses_the_blob_to_defaults() {
+        // §9.5.5: an entry this build cannot REPRESENT is carried verbatim
+        // rather than failing the whole prefs plaintext. Before this, one
+        // `view_type: "timeline"` reset every preference in the blob (the label
+        // included), and because a prefs write is a whole-blob rewrite, this
+        // client would then push those defaults to every device.
+        let input = prefs_plaintext_with_an_unsupported_view();
+        let decoded = canonical_json_decode(input).expect("whole-blob parse must succeed");
+        assert_eq!(decoded.label.as_deref(), Some("Work"));
+        assert_eq!(decoded.saved_views.len(), 1);
+        assert_eq!(decoded.saved_views[0].id, "a");
+        assert_eq!(decoded.opaque_saved_views.len(), 1);
+        assert_eq!(decoded.opaque_saved_views[0].id_bytes(), b"b");
+        // ...and the re-encode reproduces the input bytes exactly, so the
+        // carried entry is neither lost nor rewritten.
+        assert_eq!(canonical_json_encode(&decoded), input);
+    }
+
+    #[test]
+    fn opaque_saved_views_survive_the_full_blob_round_trip() {
+        // The carry has to survive the actual `MYP1` envelope, not just the
+        // plaintext codec: the host reads a blob, sets an unrelated preference,
+        // and writes the whole view back.
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let hash = fixed_account_number_hash();
+        let carried =
+            canonical_json_decode(prefs_plaintext_with_an_unsupported_view()).expect("decode");
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &hash, &carried, &fixed_prefs_nonce()).unwrap();
+        let decoded = decode_prefs_blob(&prefs_key, &hash, &blob).unwrap();
+        assert_eq!(decoded, carried);
         assert_eq!(
-            canonical_json_decode(bad),
+            canonical_json_encode(&decoded),
+            prefs_plaintext_with_an_unsupported_view()
+        );
+    }
+
+    #[test]
+    fn structurally_broken_saved_views_still_collapse_to_parse_failed() {
+        // Only an Unrepresentable entry is carried. Structural damage stays
+        // fatal: retaining garbage is a weaker promise than retaining a
+        // well-formed entry this schema happens not to express.
+        let wrong_type = br#"{"saved_views":[{"filters":{"kind":"all"},"id":7,"name":"n","view_type":"table"}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(wrong_type),
             Err(PrefsBlobError::PlaintextParseFailed)
         );
+        let missing_required = br#"{"saved_views":[{"id":"x"}],"screen_capture_protection":true}"#;
+        assert_eq!(
+            canonical_json_decode(missing_required),
+            Err(PrefsBlobError::PlaintextParseFailed)
+        );
+    }
+
+    #[test]
+    fn pre_feature_saved_views_blob_is_byte_identical_after_round_trip() {
+        // No opaque entry → nothing about the encoding may move for existing
+        // vaults (the `saved_views` golden vectors are unmoved by this change).
+        let original = PrefsView {
+            label: Some(String::from("Work")),
+            saved_views: alloc::vec![sample_view("v2", "Books"), sample_view("v1", "Films")],
+            opaque_saved_views: Vec::new(),
+            view_order: alloc::vec![String::from("v2"), String::from("v1")],
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&original);
+        let decoded = canonical_json_decode(&encoded).expect("decode");
+        assert!(decoded.opaque_saved_views.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), encoded);
     }
 
     // ---- paired_extensions (MYND-443, browser-clipper pairing-token persistence) ----
@@ -13680,6 +13978,7 @@ mod tests {
             meeting_ai_prompt: None,
             paired_extensions: alloc::vec![sample_paired("e", "t", false)],
             saved_views: alloc::vec![sample_view("v1", "A")],
+            opaque_saved_views: Vec::new(),
             ..PrefsView::default()
         };
         let s = String::from_utf8(canonical_json_encode(&original)).unwrap();
@@ -13989,5 +14288,290 @@ mod tests {
 
         std::fs::write("/tmp/myne_periodic_notes_prefs_cases.json", dump.as_bytes())
             .expect("write periodic-notes prefs cases");
+    }
+
+    /// Generator for the `view_approvals` `vault-prefs` cases (`view-manifests`,
+    /// myne-md/myne#922).
+    ///
+    /// `cargo test -p protocol --lib emit_view_approval_prefs_vectors -- --ignored`
+    ///
+    /// Writes `/tmp/myne_view_approval_prefs_cases.json`, a JSON array fragment
+    /// spliced by hand into the companion repo's existing `cases` array.
+    ///
+    /// **Two halves, and the ABSENT half is the load-bearing one.**
+    /// `docs/spec/protocol.md` §9.5.2 says the map is omitted when empty, so a
+    /// vault that has approved nothing encodes byte-identically to a
+    /// pre-feature blob, and a freshly enrolled device's approval state cannot
+    /// be manufactured by re-writing the prefs. A suite that pinned only the
+    /// populated map would leave that claim untested, and "the bytes did not
+    /// change" is the claim most likely to be false on the one path nobody ran.
+    /// The absent case's expected bytes are asserted against the exact literal a
+    /// pre-feature encoder produced for the same vault.
+    ///
+    /// **Both canonical neighbours are present** in the populated fixture
+    /// (`transcription_enabled` < `view_approvals` < `view_order`), because
+    /// `vault.prefs` is canonical JSON and key ORDER is part of the bytes: a
+    /// port that emits the right map in the wrong slot produces a blob this
+    /// crate rejects, and a case that pinned the value alone would not notice.
+    ///
+    /// Two entries in the map, inserted in reverse id order, pin the
+    /// lexicographic key order inside it. Values are bare non-negative integers,
+    /// because the comparison against a view's `version` is an equality and a
+    /// float would never match.
+    ///
+    /// Nonces 0xFA (populated) and 0xFB (absent): free in this family's
+    /// registry (…0xF8 and 0xF9 are taken).
+    #[test]
+    #[ignore]
+    fn emit_view_approval_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce_populated: [u8; AEAD_NONCE_LEN] = [0xFA; AEAD_NONCE_LEN];
+        let nonce_absent: [u8; AEAD_NONCE_LEN] = [0xFB; AEAD_NONCE_LEN];
+
+        // Case 1/2: the map POPULATED, beside both canonical neighbours.
+        let prefs_populated = PrefsView {
+            // `false` because the field is omit-when-TRUE (its default is on),
+            // so this is the value that actually emits the left neighbour.
+            transcription_enabled: false,
+            view_approvals: BTreeMap::from([
+                // Inserted in the order opposite to their sorted order on
+                // purpose: the emitted map is ordered by the ENCODER, not by the
+                // caller.
+                (String::from("0190a000-0000-7000-8000-000000000006"), 1u64),
+                (String::from("0190a000-0000-7000-8000-000000000005"), 3u64),
+            ]),
+            view_order: alloc::vec![
+                String::from("0190a000-0000-7000-8000-000000000006"),
+                String::from("0190a000-0000-7000-8000-000000000005"),
+            ],
+            ..PrefsView::default()
+        };
+        let canonical_populated = canonical_json_encode(&prefs_populated);
+        assert_eq!(
+            canonical_populated.as_slice(),
+            br#"{"screen_capture_protection":true,"transcription_enabled":false,"view_approvals":{"0190a000-0000-7000-8000-000000000005":3,"0190a000-0000-7000-8000-000000000006":1},"view_order":["0190a000-0000-7000-8000-000000000006","0190a000-0000-7000-8000-000000000005"]}"#.as_slice(),
+            "canonical bytes must pin the slot transcription_enabled (t) < view_approvals (view_a) < view_order (view_o), the map's lexicographic key order, and bare-decimal integer values",
+        );
+        let blob_populated = encode_prefs_blob_raw(
+            &prefs_key_a,
+            &account_hash_a,
+            &prefs_populated,
+            &nonce_populated,
+        )
+        .expect("encode view_approvals populated");
+        assert_eq!(
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_populated).expect("decode"),
+            prefs_populated,
+            "populated view_approvals blob must round-trip exactly",
+        );
+
+        // Case 2/2: the map ABSENT from a vault that DOES carry views, which is
+        // the shape the spec's byte-identity sentence is about. The expected
+        // bytes below are the literal a pre-feature encoder produced for the
+        // same vault: no `view_approvals` key anywhere in the plaintext.
+        let books = crate::saved_view::SavedView {
+            id: String::from("0190a000-0000-7000-8000-000000000005"),
+            name: String::from("Books"),
+            view_type: crate::saved_view::ViewType::Cards,
+            filters: crate::saved_view::FilterNode::And {
+                children: alloc::vec![
+                    crate::saved_view::FilterNode::InFolder {
+                        path: String::from("Books/"),
+                    },
+                    crate::saved_view::FilterNode::Property {
+                        key: String::from("rating"),
+                        op: crate::saved_view::PropertyOp::Gt,
+                        value: String::from("4"),
+                    },
+                ],
+            },
+            sort: Some(crate::saved_view::ViewSort {
+                key: String::from("finished"),
+                direction: crate::saved_view::SortDirection::Desc,
+            }),
+            group_by: Some(String::from("status")),
+            columns: alloc::vec![String::from("author"), String::from("rating")],
+            card_size: Some(300),
+            image: Some(String::from("image")),
+            image_aspect_ratio: Some(String::from("1.65")),
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
+        };
+        let prefs_absent = PrefsView {
+            saved_views: alloc::vec![books],
+            view_order: alloc::vec![String::from("0190a000-0000-7000-8000-000000000005")],
+            ..PrefsView::default()
+        };
+        let canonical_absent = canonical_json_encode(&prefs_absent);
+        assert_eq!(
+            canonical_absent.as_slice(),
+            br#"{"saved_views":[{"card_size":300,"columns":["author","rating"],"filters":{"children":[{"kind":"inFolder","path":"Books/"},{"key":"rating","kind":"property","op":">","value":"4"}],"kind":"and"},"group_by":"status","id":"0190a000-0000-7000-8000-000000000005","image":"image","image_aspect_ratio":"1.65","name":"Books","sort":{"direction":"desc","key":"finished"},"view_type":"cards"}],"screen_capture_protection":true,"view_order":["0190a000-0000-7000-8000-000000000005"]}"#.as_slice(),
+            "a vault with views but NO approvals must encode byte-identically to its pre-feature self: this literal is the pre-view_approvals encoding of the same vault (the saved_views family's own fixture), so any emitted `view_approvals` key here is a format change",
+        );
+        assert!(
+            !core::str::from_utf8(&canonical_absent)
+                .expect("utf8")
+                .contains("view_approvals"),
+            "the omitted-when-empty rule is the whole sentence: an empty map must emit NO key at all, not `{{}}`",
+        );
+        let blob_absent =
+            encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_absent, &nonce_absent)
+                .expect("encode view_approvals absent");
+        let decoded_absent =
+            decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_absent).expect("decode");
+        assert_eq!(
+            decoded_absent, prefs_absent,
+            "absent-approval blob must round-trip exactly",
+        );
+        assert!(
+            decoded_absent.view_approvals.is_empty(),
+            "an absent map decodes as empty rather than as an error or a default entry",
+        );
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+
+        // case 1/2: encrypt-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Device-local saved-view approvals (view-manifests, myne-md/myne#922). PrefsView carries the additive view_approvals map (view id -> the definition version this DEVICE approved) beside transcription_enabled and view_order, pinning the canonical slot transcription_enabled (t) < view_approvals (view_a) < view_order (view_o), the map's lexicographic key order (two entries written here in reverse id order), and bare-decimal non-negative integer values. The approval is an EQUALITY against the view's current version rather than a flag, which is why the values are pinned as integers. Same vault-A inputs as the sibling cases; prefs_nonce=0xFAx24. Generated by emit_view_approval_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_populated)
+        ));
+        dump.push_str("    },\n");
+
+        // case 2/2: decrypt-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-view-approvals: the blob decodes back to a PrefsView carrying view_approvals under the same root_key + account_number_hash. A decoder that does not know the field (pre-#922) tolerates it per the §9.5.2 forward-compat rule and sees no approvals, which is the fail-closed direction: an unapproved view is not opened. Nothing here is a value a peer can be told to approve, which is why the field is device-local and never arrives by sync.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_populated)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_populated)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"transcription_enabled\": false,\n");
+        dump.push_str("        \"view_approvals\": { \"0190a000-0000-7000-8000-000000000005\": 3, \"0190a000-0000-7000-8000-000000000006\": 1 },\n");
+        dump.push_str(
+            "        \"view_order\": [\"0190a000-0000-7000-8000-000000000006\", \"0190a000-0000-7000-8000-000000000005\"]\n",
+        );
+        dump.push_str("      }\n");
+        dump.push_str("    },\n");
+
+        // case 3/4: encrypt-no-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-no-view-approvals\",\n");
+        dump.push_str("      \"description\": \"The ABSENT half of the approval pair, and the one that pins §9.5.2's sentence rather than a value: a vault carrying a saved view and no approvals encodes BYTE-IDENTICALLY to its pre-#922 self, and the expected bytes below are exactly that pre-feature encoding (the saved_views family's own fixture). An implementation that emitted an empty `view_approvals` object, or wrote a default entry for a view nobody approved, would produce a different blob for every existing vault and push it on the next write. Same vault-A inputs; prefs_nonce=0xFBx24. Generated by emit_view_approval_prefs_vectors in protocol/src/prefs.rs.\",\n");
+        dump.push_str("      \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_absent)
+        ));
+        dump.push_str("    },\n");
+
+        // case 4/4: decrypt-no-view-approvals
+        dump.push_str("    {\n");
+        dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-no-view-approvals\",\n");
+        dump.push_str("      \"description\": \"Round-trip with encrypt-no-view-approvals: the pre-feature blob decodes with NO `view_approvals` key in expected_prefs_view, so an absence and an empty map are the same value rather than two states a decoder has to distinguish. A port whose schema made the field required would fail here rather than on a live vault.\",\n");
+        dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_absent)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical_absent)
+        ));
+        dump.push_str("      \"expected_prefs_view\": {\n");
+        dump.push_str("        \"screen_capture_protection\": true,\n");
+        dump.push_str("        \"saved_views\": [{\n");
+        dump.push_str("          \"card_size\": 300,\n");
+        dump.push_str("          \"columns\": [\"author\", \"rating\"],\n");
+        dump.push_str("          \"filters\": { \"children\": [{ \"kind\": \"inFolder\", \"path\": \"Books/\" }, { \"key\": \"rating\", \"kind\": \"property\", \"op\": \">\", \"value\": \"4\" }], \"kind\": \"and\" },\n");
+        dump.push_str("          \"group_by\": \"status\",\n");
+        dump.push_str("          \"id\": \"0190a000-0000-7000-8000-000000000005\",\n");
+        dump.push_str("          \"image\": \"image\",\n");
+        dump.push_str("          \"image_aspect_ratio\": \"1.65\",\n");
+        dump.push_str("          \"name\": \"Books\",\n");
+        dump.push_str("          \"sort\": { \"direction\": \"desc\", \"key\": \"finished\" },\n");
+        dump.push_str("          \"view_type\": \"cards\"\n");
+        dump.push_str("        }],\n");
+        dump.push_str("        \"view_order\": [\"0190a000-0000-7000-8000-000000000005\"]\n");
+        dump.push_str("      }\n");
+        dump.push_str("    }\n");
+
+        dump.push_str("]\n");
+
+        std::fs::write("/tmp/myne_view_approval_prefs_cases.json", dump.as_bytes())
+            .expect("write view-approval prefs cases dump");
     }
 }

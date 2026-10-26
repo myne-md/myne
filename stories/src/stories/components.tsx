@@ -115,6 +115,9 @@ import { SyncBanners } from "@app/components/sync/SyncBanners";
 import { SyncStatusIndicator } from "@app/components/sync/SyncStatusIndicator";
 import { SyncUsageBlock } from "@app/components/sync/SyncUsageBlock";
 import { TemplatesManager } from "@app/components/TemplatesManager";
+import { ViewConsent } from "@app/components/ViewConsent";
+import { ViewsManager } from "@app/components/ViewsManager";
+import { ViewImportDialog } from "@app/components/ViewImportDialog";
 import { ThemeChiplet } from "@app/components/primitives/ThemeChiplet";
 import { ThemeInstallDialog } from "@app/components/ThemeInstallDialog";
 import { MeetingAiDialog } from "@app/components/meeting/MeetingAiDialog";
@@ -203,6 +206,46 @@ const UNLOCKED_FIXTURE = {
     ],
     "plugin:vault-unlock|vault_slot_kind": () => "Unlocked",
     "plugin:prefs|prefs_read": () => DEFAULT_PREFS,
+  },
+};
+
+/**
+ * One unlocked vault holding three saved views in a display order that differs
+ * from their storage order, with one pending approval among them: the state the
+ * Views manager exists to show, where a view is listed, visible and refused until
+ * the person at this device approves the version they were shown.
+ */
+const VIEWS_MANAGER_FIXTURE = {
+  description: "one unlocked vault with three saved views, one awaiting approval",
+  handlers: {
+    ...UNLOCKED_FIXTURE.handlers,
+    "plugin:prefs|prefs_read": () => ({
+      ...DEFAULT_PREFS,
+      saved_views: [
+        {
+          id: "v-books",
+          name: "Unread books",
+          view_type: "table",
+          filters: { kind: "hasTag", tag: "books" },
+          version: 2,
+        },
+        {
+          id: "v-reading",
+          name: "Reading list",
+          view_type: "list",
+          filters: { kind: "all" },
+          version: 5,
+        },
+        {
+          id: "v-legacy",
+          name: "Everything",
+          view_type: "cards",
+          filters: { kind: "all" },
+        },
+      ],
+      view_order: ["v-reading", "v-books", "v-legacy"],
+      view_approvals: { "v-reading": 5, "v-books": 1 },
+    }),
   },
 };
 
@@ -1751,6 +1794,109 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     fixture: "unlocked",
     render: () => (
       <TemplatesManager open onClose={action("onClose")} onOpenNote={action("onOpenNote")} />
+    ),
+  },
+  {
+    id: "components/viewimportdialog/default",
+    group: "components",
+    surface: "ViewImportDialog",
+    state: "default",
+    description:
+      "The import surface for a `.myneview` file: it asks for the file, then shows what the definition selects and reads before anything is stored. Look for the capability summary to appear before the store action, never after it.",
+    tags: ["components", "views", "import", "manifest", "consent", "sharing"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewImportDialog open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewimportdialog/ordered",
+    group: "components",
+    surface: "ViewImportDialog",
+    state: "ordered",
+    unreachable: {
+      what: "The ordered comparison arms (new, replace, identical, refused) after a file is validated.",
+      why: "They are reached through a native file-open dialog, which no catalogue frame can answer; the arms are covered by tests/components/viewImportDialog.test.tsx, one per arm.",
+    },
+    description:
+      "The same surface after a file was chosen. Recorded as unreachable here because the state begins at the OS file dialog; the four ordering arms are asserted in the component suite instead.",
+    tags: ["components", "views", "import", "manifest", "ordering", "unreachable"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewImportDialog open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewsmanager/default",
+    group: "components",
+    surface: "ViewsManager",
+    state: "default",
+    description:
+      "The Views manager modal: every saved view in display order with its type and whether this device has approved it. Look for the pending row to stay visible, refuse to open, and carry the one Approve action the decision needs.",
+    tags: ["components", "views", "manager", "approval", "modal", "sharing"],
+    fixture: VIEWS_MANAGER_FIXTURE,
+    render: () => <ViewsManager open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewsmanager/empty",
+    group: "components",
+    surface: "ViewsManager",
+    state: "empty",
+    description:
+      "The same manager with no saved views: a first-run empty state rather than a seeded example, so a screenshot of it never shows a view the vault does not have.",
+    tags: ["components", "views", "manager", "empty", "first-run", "modal"],
+    fixture: UNLOCKED_FIXTURE,
+    render: () => <ViewsManager open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/viewconsent/default",
+    group: "components",
+    surface: "ViewConsent",
+    state: "default",
+    description:
+      "The capability summary shown before a view someone else wrote is approved: the notes it selects, the properties it reads and the fields it can change. Look for the read set to be enumerated property by property, including a key no column shows, rather than summarised.",
+    tags: ["components", "views", "consent", "capability", "sharing", "import"],
+    render: () => (
+      <div style={{ padding: "var(--space-5)", maxWidth: 480, background: "var(--paper)" }}>
+        <ViewConsent
+          definition={{
+            id: "v-books",
+            name: "Unread books",
+            view_type: "table",
+            filters: {
+              kind: "and",
+              children: [
+                { kind: "hasTag", tag: "books" },
+                { kind: "property", key: "finished", op: "==", value: "no" },
+              ],
+            },
+            columns: ["author", "status"],
+            image: "cover",
+            group_by: "series",
+            sort: { key: "added", direction: "desc" },
+            version: 3,
+            write_fields: ["status"],
+          }}
+        />
+      </div>
+    ),
+  },
+  {
+    id: "components/viewconsent/readonly",
+    group: "components",
+    surface: "ViewConsent",
+    state: "readonly",
+    description:
+      "The same surface for a read-only view: no declared write fields, so the write section is omitted rather than shown empty. Look for the absence of a 'none' row, which would read as a field nobody filled in.",
+    tags: ["components", "views", "consent", "capability", "read-only"],
+    render: () => (
+      <div style={{ padding: "var(--space-5)", maxWidth: 480, background: "var(--paper)" }}>
+        <ViewConsent
+          definition={{
+            id: "v-everything",
+            name: "Everything",
+            view_type: "list",
+            filters: { kind: "all" },
+            version: 1,
+          }}
+        />
+      </div>
     ),
   },
   {

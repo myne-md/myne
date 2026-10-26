@@ -74,6 +74,23 @@ fn lww_field_keyed<T: Clone + PartialEq>(
     clocks: &mut BTreeMap<String, u64>,
     key: impl Fn(&T) -> Vec<u8>,
 ) -> T {
+    lww_field_keyed_with_winner(field, local, local_clock, remote, remote_clock, clocks, key).0
+}
+
+/// [`lww_field_keyed`] plus which side won (`true` = remote). A caller that
+/// carries a value ALONGSIDE a field needs this rather than re-deriving the
+/// decision: `saved_views`' opaque remainder is part of that field's encoding,
+/// so it must follow the winner, and a second copy of the tiebreak rule is a
+/// second thing that can drift from §10.2.
+fn lww_field_keyed_with_winner<T: Clone + PartialEq>(
+    field: &str,
+    local: &T,
+    local_clock: u64,
+    remote: &T,
+    remote_clock: u64,
+    clocks: &mut BTreeMap<String, u64>,
+    key: impl Fn(&T) -> Vec<u8>,
+) -> (T, bool) {
     let remote_wins = match remote_clock.cmp(&local_clock) {
         core::cmp::Ordering::Greater => true,
         core::cmp::Ordering::Less => false,
@@ -89,8 +106,19 @@ fn lww_field_keyed<T: Clone + PartialEq>(
     if winning_clock > 0 {
         clocks.insert(field.to_string(), winning_clock);
     }
-    winner.clone()
+    (winner.clone(), remote_wins)
 }
+
+/// The merge unit for the `saved_views` field: the rendered set plus the raw
+/// entries this build could not represent (§9.5.2). The two halves are one
+/// array on disk, so they race on ONE clock and tie-break on ONE canonical
+/// encoding — see the call site.
+#[derive(Clone, Copy, PartialEq)]
+struct SavedViewsField<'a> {
+    views: &'a [protocol::SavedView],
+    opaque: &'a [protocol::OpaqueSavedView],
+}
+
 /// The equal-clock tiebreak key of a value: its serde-JSON encoding, except
 /// that an unset value (`null`) sorts BELOW every present value (empty key).
 /// Without the exception, JSON's `null` (`n` = 0x6E) would byte-compare above
@@ -609,6 +637,33 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // reason the field is a flat map rather than a map of nested objects: a
     // per-period value would have put both edits on one clock and dropped one.
     let periodic_notes = per_key!("periodic_notes", periodic_notes);
+    // saved_views carries an opaque remainder alongside the rendered set: the
+    // array entries this build could not represent (§9.5.2), kept so a re-write
+    // does not delete a newer client's views. The two halves are ONE encoding
+    // and therefore ONE merge unit — the remainder follows whichever side wins
+    // the whole-value LWW, and the equal-clock tiebreak compares the full
+    // canonical array. Pairing one side's rendered set with the other's raw
+    // entries would emit an array neither device wrote; and tiebreaking on the
+    // rendered set alone would leave two peers whose sets match but whose
+    // remainders differ each keeping its own copy, re-pushing forever.
+    let saved_views_field = lww_field_keyed_with_winner(
+        "saved_views",
+        &SavedViewsField {
+            views: &local.saved_views,
+            opaque: &local.opaque_saved_views,
+        },
+        clock_of(local, "saved_views"),
+        &SavedViewsField {
+            views: &remote.saved_views,
+            opaque: &remote.opaque_saved_views,
+        },
+        clock_of(remote, "saved_views"),
+        &mut clocks,
+        |f| protocol::canonical_encode_saved_views_with_opaque(f.views, f.opaque),
+    )
+    .0;
+    let saved_views = saved_views_field.views.to_vec();
+    let opaque_saved_views = saved_views_field.opaque.to_vec();
 
     // The struct literal lists EVERY PrefsView field with no `..` — the same
     // compile-time drift lock as the classification conformance test: a new
@@ -741,18 +796,21 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // ---- shared: sequence-LWW-on-whole -------------------------------
         favorites: lww!("favorites", favorites),
         view_order: lww!("view_order", view_order),
+        // view_approvals (view-manifests): **device-local**, and the local side
+        // winning outright is the feature rather than a merge detail. An approval
+        // is a decision a person made AT a device, so a remote map may never
+        // arrive and open a view nobody here was asked about: the SYNC-22 defect
+        // that moved `ai_provider_consent` into this same block, wearing a
+        // different field name. Note the direction that costs something and is
+        // accepted: revoking on device A does not revoke on device B, because
+        // there is no remote vote to honour.
+        view_approvals: local.view_approvals.clone(),
         // ---- shared: whole-value LWW -------------------------------------
         // (saved_views / color_groups need their codec's canonical encoder —
         // serde would emit struct-declaration key order.)
-        saved_views: lww_field_keyed(
-            "saved_views",
-            &local.saved_views,
-            clock_of(local, "saved_views"),
-            &remote.saved_views,
-            clock_of(remote, "saved_views"),
-            &mut clocks,
-            |v| protocol::canonical_encode_saved_views(v),
-        ),
+        // computed above so the winning side's opaque remainder can follow it.
+        saved_views,
+        opaque_saved_views,
         // color_groups (MYND-604): order IS rule precedence, so — unlike
         // saved_views — the tiebreak key must NOT re-sort; the canonical
         // encoder already preserves slice order verbatim, which is exactly
@@ -1751,13 +1809,49 @@ mod tests {
     }
 
     #[test]
+    fn view_approvals_are_device_local_and_never_arrive_by_sync() {
+        // view-manifests: an approval is a decision a person made AT a device, so
+        // the merge keeps the LOCAL map and nothing a peer approved can arrive.
+        // This is the SYNC-22 lesson one field over (`ai_provider_consent`), and it
+        // is asserted in BOTH directions: a remote map is ignored, and a local one
+        // survives.
+        let remote_approving = PrefsView {
+            view_approvals: [(String::from("v1"), 3u64)].into_iter().collect(),
+            ..PrefsView::default()
+        };
+        let local_empty = PrefsView::default();
+
+        // A fresh device that syncs a peer's approvals keeps NONE of them: the
+        // view must ask the person at this device.
+        assert!(merge_prefs(&local_empty, &remote_approving)
+            .view_approvals
+            .is_empty());
+
+        // …and a local approval is never discarded by a peer that has none.
+        // Note the argument order carries the meaning here: `merge_prefs`'s first
+        // argument is the LOCAL side, so a device-local field is by design not
+        // symmetric, and asserting symmetry would be asserting the defect.
+        let kept = merge_prefs(&remote_approving, &local_empty);
+        assert_eq!(kept.view_approvals.get("v1"), Some(&3u64));
+
+        // Device-local also means it does not register on the §10.2.1 push gate:
+        // approving a view must not open a sync push window on its own.
+        assert_eq!(
+            shared_subset_hash(&local_empty),
+            shared_subset_hash(&remote_approving)
+        );
+    }
+
+    #[test]
     fn saved_views_tie_breaks_on_the_canonical_encoding() {
         // §10.2 makes the equal-clock tiebreak bytes normative: "the values'
         // canonical encodings" (the §9.5.2 codec) — NOT an implementation's
         // native serializer output. saved_views is the one shared field where
         // the two differ (serde emits struct-declaration key order), so pin
-        // that the winner is chosen by `canonical_encode_saved_views` bytes,
-        // from either side.
+        // that the winner is chosen by the canonical encoding, from either
+        // side. The merge keys on the FULL array (rendered set + opaque
+        // remainder); with no remainder that is byte-identical to
+        // `canonical_encode_saved_views`, which is what this fixture asserts.
         use protocol::{FilterNode, SavedView, ViewType};
         let view = |id: &str, name: &str| SavedView {
             id: id.into(),
@@ -1770,6 +1864,10 @@ mod tests {
             card_size: None,
             image: None,
             image_aspect_ratio: None,
+            version: None,
+            write_fields: Vec::new(),
+            lanes: Vec::new(),
+            template: None,
         };
         let mut a = PrefsView {
             saved_views: vec![view("0190-a", "Books")],
@@ -1791,6 +1889,74 @@ mod tests {
         };
         assert_eq!(merge_prefs(&a, &b).saved_views, expected);
         assert_eq!(merge_prefs(&b, &a).saved_views, expected);
+    }
+
+    /// The opaque remainder of a `saved_views` array, produced by the real
+    /// decoder so the fixture cannot hold a state the production path cannot.
+    fn opaque_views(id: &str) -> Vec<protocol::OpaqueSavedView> {
+        let raw = format!(
+            "[{{\"filters\":{{\"kind\":\"all\"}},\"id\":\"{id}\",\"name\":\"Board\",\"view_type\":\"board\"}}]"
+        );
+        protocol::parse_saved_views_array_with_opaque(raw.as_bytes())
+            .expect("fixture parses")
+            .1
+    }
+
+    #[test]
+    fn the_opaque_saved_views_carrier_follows_the_winning_side() {
+        // The opaque remainder is part of the `saved_views` ENCODING, not a
+        // preference beside it: the merged view must re-encode to exactly the
+        // array the winning side held, or a sync round would delete a newer
+        // client's views on every device that merged.
+        let mut a = PrefsView {
+            opaque_saved_views: opaque_views("0190-l"),
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "saved_views", 100);
+        let mut b = PrefsView {
+            opaque_saved_views: opaque_views("0190-r"),
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "saved_views", 200);
+
+        for merged in [merge_prefs(&a, &b), merge_prefs(&b, &a)] {
+            assert_eq!(merged.opaque_saved_views, b.opaque_saved_views);
+            assert_eq!(
+                protocol::canonical_encode_saved_views_with_opaque(
+                    &merged.saved_views,
+                    &merged.opaque_saved_views
+                ),
+                protocol::canonical_encode_saved_views_with_opaque(
+                    &b.saved_views,
+                    &b.opaque_saved_views
+                ),
+                "the merged field must re-encode to the winner's array, not a mixture"
+            );
+        }
+    }
+
+    #[test]
+    fn the_opaque_carrier_tiebreak_is_side_symmetric() {
+        // A tie on the clock AND on the rendered set, differing only in the
+        // remainder, is the case a rendered-set-only tiebreak gets wrong: each
+        // peer would keep its own array and re-push it. The full-array encoding
+        // decides, so both argument orders agree.
+        let mut a = PrefsView {
+            opaque_saved_views: opaque_views("0190-a"),
+            ..PrefsView::default()
+        };
+        stamped(&mut a, "saved_views", 500);
+        let mut b = PrefsView {
+            opaque_saved_views: opaque_views("0190-b"),
+            ..PrefsView::default()
+        };
+        stamped(&mut b, "saved_views", 500);
+
+        let ab = merge_prefs(&a, &b);
+        let ba = merge_prefs(&b, &a);
+        assert_eq!(ab.opaque_saved_views, ba.opaque_saved_views);
+        // Stated explicitly: the greater full encoding wins ("0190-b").
+        assert_eq!(ab.opaque_saved_views, b.opaque_saved_views);
     }
 
     #[test]

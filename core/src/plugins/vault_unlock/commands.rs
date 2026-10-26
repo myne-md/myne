@@ -3987,6 +3987,8 @@ mod tests {
                     startup_open: None,
                     startup_open_note: None,
                     saved_views: Vec::new(),
+                    opaque_saved_views: Vec::new(),
+                    view_approvals: Default::default(),
                     view_order: Vec::new(),
                 },
             )
@@ -4166,6 +4168,8 @@ mod tests {
                 startup_open: None,
                 startup_open_note: None,
                 saved_views: Vec::new(),
+                opaque_saved_views: Vec::new(),
+                view_approvals: Default::default(),
                 view_order: Vec::new(),
             },
         )

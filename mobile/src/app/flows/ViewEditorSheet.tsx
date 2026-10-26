@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Sheet, Banner, Segmented, Chip } from "../../components";
 import { upsertSavedView, deleteSavedView, setViewOrder, type SavedView, type PropertyOp } from "../../lib/prefs";
+import { withNextVersion } from "@myne/view-version";
 import { parseFilters, buildFilters, type ViewCondition } from "../../lib/view-filter";
 
 const CONDITION_TYPES: ViewCondition["type"][] = ["tag", "folder", "search", "property"];
@@ -101,7 +102,7 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
     setError(null);
     const isNew = initial === null;
     const id = initial?.id ?? crypto.randomUUID();
-    const view: SavedView = {
+    const edited: SavedView = {
       ...(initial ?? {}),
       id,
       name: trimmed,
@@ -111,6 +112,12 @@ export function ViewEditorSheet({ initial, tags, folders, propertyKeys, viewOrde
       sort: sortKey === "" ? undefined : { key: sortKey, direction: sortDir },
       columns: columns.length === 0 ? undefined : columns,
     };
+    // A change to an EXISTING view moves its version forward, by the same rule
+    // the desktop uses (view-manifests). Without it a mobile rename leaves the
+    // definition's bytes changed under the version a desktop approved, which is
+    // the one thing the per-version approval exists to catch. A NEW view keeps
+    // whatever it has (nothing), and a no-op save keeps the version it came with.
+    const view = initial === null ? edited : withNextVersion(initial, edited);
     try {
       await upsertSavedView(view);
       if (isNew) await setViewOrder([...viewOrder, id]);

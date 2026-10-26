@@ -802,6 +802,26 @@ const manageTemplatesAction: CommandAction = {
   },
 };
 
+const manageViewsAction: CommandAction = {
+  id: "views.manage",
+  get label() {
+    return i18n.t("commands.actions.manageViews.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  // Editor-only, and NOT gated on the device-local Views toggle the way
+  // `views.show` is. The toggle hides the sidebar flyout, which is a navigation
+  // preference; this action is how a reader reaches views at all when it is on
+  // the other side of that preference, including the first imported view that
+  // arrived before anyone could have flipped it. A door that closes with the
+  // window it leads to strands what is behind it.
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onManageViews();
+  },
+};
+
 const newNoteFromTemplateAction: CommandAction = {
   id: "templates.new-note",
   ribbon: { icon: "file-plus" },
@@ -1716,6 +1736,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   openThisMonthNoteAction,
   randomNoteAction,
   manageTemplatesAction,
+  manageViewsAction,
   openAttachmentsAction,
   attachFileAction,
   convertImportedAttachmentsAction,

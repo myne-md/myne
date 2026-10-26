@@ -18,6 +18,15 @@ export { noteExportAsMarkdown, noteExportAttachments } from "./exportNote";
 export { vaultExportMarkdown, vaultExportCancel } from "./vaultExport";
 export { noteRead } from "./readNote";
 export { noteUpdate } from "./updateNote";
+export {
+  NOTE_FIELD_WRITE_EVENT,
+  setNoteField,
+} from "./setNoteField";
+export type {
+  NoteFieldWriteDetail,
+  SetNoteFieldRequest,
+  SetNoteFieldResult,
+} from "./setNoteField";
 export { deleteNote, noteDelete } from "./deleteNote";
 export { noteList } from "./listNotes";
 export {

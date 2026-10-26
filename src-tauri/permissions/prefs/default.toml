@@ -96,6 +96,12 @@ permissions = [
   "allow-set-cli-excluded-folders",
   "allow-set-cli-rate-limit-disabled",
   "allow-set-color-groups",
+  # view-manifests: a write setter for this device's saved-view approval map, so
+  # it inherits the same main-window-only invariant as the other allow-set-*
+  # permissions — v0.2 multi-window MUST NOT grant this to any non-main window.
+  "allow-set-view-approval",
+  "allow-export-view-manifest",
+  "allow-read-view-manifest",
 ]
 
 [[permission]]
@@ -656,3 +662,38 @@ commands.allow = ["set_cli_rate_limit_disabled"]
 identifier = "allow-set-color-groups"
 description = "Allow invoking prefs:set_color_groups (Slot::Unlocked-gated whole-list-replace setter for the color_groups rule list — the graph pane's color-group editor; atomic-writes vault.prefs with no native side-effect, preserving element order verbatim since order is rule precedence; logs count only, never a rule name, color key or filter)."
 commands.allow = ["set_color_groups"]
+
+# view-manifests: THIS DEVICE's approval of one saved view, keyed by view id and
+# carrying the definition VERSION that was approved. Device-local per
+# sync-protocol.md §10.2: an approval is a decision a person makes at a device,
+# so a freshly enrolled device never inherits one (the `ai_provider_consent`
+# lesson). Inherits the same main-window-only invariant as the other allow-set-*
+# permissions, so v0.2 multi-window MUST NOT grant this to any non-main window.
+# Atomic-writes vault.prefs with no native side-effect; logs a boolean and a
+# count only, never a view id or a version.
+[[permission]]
+identifier = "allow-set-view-approval"
+description = "Allow invoking prefs:set_view_approval (Slot::Unlocked-gated setter for the device-local view_approvals map of view id to approved_version, omitted on disk when empty so a vault that never approves anything stays byte-identical to a pre-feature blob; a definition may be written in the same call so a local edit never leaves the user's own view unapproved; class DeviceLocal per sync-protocol.md §10.2)."
+commands.allow = ["set_view_approval"]
+
+# view-manifests: export ONE saved view as a `.myneview` manifest. NOT a
+# `vault.prefs` write and not unlock-gated: the definition is already in the
+# caller's hands, and the command only canonical-encodes it (with the same
+# encoder the prefs blob uses) and durably writes it to a path the OS save dialog
+# named — the dialog IS the consent source, exactly as it is for the note and
+# image exports. Main-window-only like every other prefs permission, because a
+# detached note window has no business writing user files.
+[[permission]]
+identifier = "allow-export-view-manifest"
+description = "Allow invoking prefs:export_view_manifest (writes ONE saved view as canonical `.myneview` manifest bytes to a user-chosen path; the definition arrives as a typed SavedView so the file is always a canonical manifest and never arbitrary content, bounded by MAX_MANIFEST_BYTES; atomic-writes at the USER destination via atomic_write_unclobbered and touches vault.prefs not at all; the OS save dialog is the export consent per TB3, and the command logs a closed error kind only, never a view name, id or path)."
+commands.allow = ["export_view_manifest"]
+
+# view-manifests: read ONE `.myneview` file from a user-chosen path and validate
+# it with the strict reader. A READ in the prefs namespace that touches no prefs
+# field, so `scripts/check-prefs-nonce.mjs` exempts it by name (`READ_COMMANDS`).
+# Main-window-only: the import dialog is an editor surface, and no detached note
+# window has business pulling a definition out of a file.
+[[permission]]
+identifier = "allow-read-view-manifest"
+description = "Allow invoking prefs:read_view_manifest (opens ONE user-chosen `.myneview` file, reads at most MAX_MANIFEST_BYTES + 1 so an oversized file is detected rather than truncated, and validates it with protocol::parse_view_manifest, which is the only authority on the manifest grammar; returns the parsed SavedView or the reader's named refusal and writes nothing, approves nothing and reads no vault state, because validation is not permission; the OS open dialog is the access consent)."
+commands.allow = ["read_view_manifest"]

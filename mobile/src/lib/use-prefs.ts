@@ -91,6 +91,7 @@ export const DEFAULT_PREFS: PrefsView = {
   icon: null,
   saved_views: [],
   view_order: [],
+  view_approvals: {},
 };
 
 export interface UsePrefs {

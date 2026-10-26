@@ -24,7 +24,73 @@ export const VIEW_TESTID = {
   listRow: "view.list-row",
   groupHeading: "view.group-heading",
   empty: "view.empty",
+  // The board (myne-md/myne#922). The lane ids are here rather than written
+  // inline because the board mounts from a second tree (mobile imports the
+  // shared module), and one E2E locator has to work on both.
+  board: "view.board",
+  boardLanes: "view.board-lanes",
+  boardNoGroupBy: "view.board-no-group-by",
+  lane: "view.lane",
+  laneScroll: "view.lane-scroll",
+  laneHeading: "view.lane-heading",
+  laneEmpty: "view.lane-empty",
+  /** The slot one card occupies inside a lane: the element that carries the
+   *  drag and keyboard gesture, so the pointer target and the card's own click
+   *  stay separate things. */
+  laneCardSlot: "view.card-slot",
+  /** The line a refused drag renders, where the gesture happened. */
+  boardRefusal: "view.board-refusal",
+  /** One lane's add-card control. Repeated per lane, so E2E scopes it by the
+   *  lane's own `data-lane-value`. */
+  boardAddCard: "view.board-add-card",
+  /** The line an add-card gesture renders when it could not place the card. */
+  boardAddError: "view.board-add-error",
+  /** The bulk bar: select all, the target lane, the move, and the restore. */
+  boardBulkBar: "view.board-bulk-bar",
+  boardSelectAll: "view.board-select-all",
+  boardMoveTarget: "view.board-move-target",
+  boardMoveApply: "view.board-move-apply",
+  boardRestore: "view.board-restore",
+  /** One card's selection toggle, inside its slot. */
+  boardSelectCard: "view.board-select-card",
+  /** The report block after a move or a rename: counts, then one line per
+   *  refused card. */
+  boardBulkReport: "view.board-bulk-report",
+  /** The one-restore result, including the definition half a lane rename owes. */
+  boardRestored: "view.board-restored",
+  boardLaneOrderRestored: "view.board-lane-order-restored",
+  boardLaneOrderRestoreFailed: "view.board-lane-order-restore-failed",
+  /** A rename whose cards moved but whose lane order did not save. */
+  boardLanesNotSaved: "view.board-lanes-not-saved",
+  /** The lane header's rename control and its inline editor. */
+  boardRename: "view.board-rename",
+  boardRenameInput: "view.board-rename-input",
+  boardRenameSave: "view.board-rename-save",
+  boardRenameCancel: "view.board-rename-cancel",
+  /** The line a refused archive or trash renders. */
+  boardActionError: "view.board-action-error",
+  /** The confirm button inside the trash confirmation. */
+  boardTrashConfirm: "view.board-trash-confirm",
 } as const;
+
+/** Default cover aspect ratio (≈16:9) when a view sets no
+ *  `image_aspect_ratio`. */
+export const DEFAULT_COVER_ASPECT_RATIO = "1.78";
+
+/**
+ * Resolve the cover aspect ratio (a CSS `aspect-ratio` string) from a view's
+ * `image_aspect_ratio` — a STRING in the schema (e.g. `"1.65"`) so the `.base`
+ * float never enters canonical JSON. Pure consumer: a finite positive parse is
+ * used verbatim; anything else falls back to the default.
+ *
+ * Shared by the cards gallery and the board (myne-md/myne#922), and reached by
+ * mobile through the same module: one cover rule, not one per renderer.
+ */
+export function resolveAspectRatio(ratio: string | undefined): string {
+  if (ratio === undefined) return DEFAULT_COVER_ASPECT_RATIO;
+  const n = Number.parseFloat(ratio.trim());
+  return Number.isFinite(n) && n > 0 ? ratio.trim() : DEFAULT_COVER_ASPECT_RATIO;
+}
 
 /**
  * Within-group dedupe by note id (query-engine fan-out constraint, lifted from

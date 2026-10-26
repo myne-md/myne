@@ -17,7 +17,7 @@
   "src/notes/components/TagBrowser.tsx": 1,
   "src/notes/components/UnlinkedMentionsSection.tsx": 1,
   "src/notes/components/ViewsSection.tsx": 1,
-  "src/notes/views/cardsView.tsx": 1,
+  "src/notes/views/card.tsx": 1,
   "src/screens/Editor.tsx": 6,
   "editor/src/host/notes/TaskRow.tsx": 1,
   "mobile/src/app/flows/AiChatFlow.tsx": 2,

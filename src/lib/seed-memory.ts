@@ -154,4 +154,3 @@ export function isSeedStale(
   const changed = dated.filter((n) => n.updatedAt!.getTime() > seededAt).length;
   return changed / dated.length >= SEED_STALE_RATIO;
 }
-

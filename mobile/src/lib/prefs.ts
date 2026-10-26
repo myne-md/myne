@@ -77,7 +77,7 @@ export function normalizeStartupOpen(value: string | null): StartupOpen {
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
  *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
  *  `ViewType` (serde lowercase). */
-export type ViewType = "table" | "cards" | "list";
+export type ViewType = "table" | "cards" | "list" | "board";
 
 /** Sort direction. Mirrors Rust `SortDirection` (serde lowercase). */
 export type SortDirection = "asc" | "desc";
@@ -154,6 +154,22 @@ export interface SavedView {
   /** Optional image aspect ratio, a STRING (e.g. `"1.65"`) so the `.base` float
    *  round-trips without a canonical-JSON float. #5 parses it for CSS. */
   image_aspect_ratio?: string;
+  /** Definition version (view-manifests): a non-negative integer the APP
+   *  maintains. Declared here even though this client has no editor for it: the
+   *  view sheet spreads the stored definition, so an optional field this type
+   *  did not name would still survive a save, but a typed access to it would not
+   *  compile and the next author would assume it is absent. */
+  version?: number;
+  /** The property keys this view may write: its ENTIRE write authority, checked
+   *  by the host. Same reasoning as `version`: declared so a mobile edit cannot
+   *  silently look like it cleared a desktop-authored declaration. */
+  write_fields?: string[];
+  /** A board's declared lane order and the template a new card copies, mirrored
+   *  because the board renders on this client through the SHARED renderer
+   *  (`@myne/board-view`), so a mobile save of a desktop-authored view must carry
+   *  both keys rather than drop what the board it just rendered depends on. */
+  lanes?: string[];
+  template?: string;
 }
 
 export interface PrefsView {
@@ -757,6 +773,12 @@ export interface PrefsView {
    * sorted/deduped; stale ids are the caller's to prune). Absent → `[]`.
    */
   view_order: string[];
+  /** This DEVICE's approval of saved views (view-manifests): `{view id: approved
+   *  version}`, device-local per `sync-protocol.md` §10.2. A view is approved when
+   *  the value equals its `version`. Declared for the same reason as the two
+   *  `SavedView` fields above: this client has no approval UI yet, and a field the
+   *  type does not name reads as absent to the next author. Absent → `{}`. */
+  view_approvals: Record<string, number>;
 }
 
 /** Read vault.prefs from the unlocked vault; defaults to safer state. */

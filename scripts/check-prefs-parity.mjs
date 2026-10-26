@@ -279,6 +279,10 @@ export const FIELD_OVERRIDES = {
   set_keymap_binding: "keymap",
   upsert_saved_view: "saved_views",
   delete_saved_view: "saved_views",
+  // view-manifests: the command acts on ONE view's approval, while the field is
+  // the map it writes. Named here rather than renaming either side, because
+  // `set_view_approval` reads as the action and `view_approvals` as the map.
+  set_view_approval: "view_approvals",
   set_periodic_note_setting: "periodic_notes",
   set_auto_lock_timeout: "auto_lock_seconds",
   set_device_name: "device_names",

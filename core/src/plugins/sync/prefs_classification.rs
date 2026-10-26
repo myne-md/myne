@@ -434,6 +434,20 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "transcription_enabled",
         PrefClass::Shared(SharedDiscipline::ScalarLww),
     ),
+    // view-manifests: **DeviceLocal**, and this row is the whole design decision
+    // rather than a detail of it. An approval says "the person at THIS device has
+    // read what this view can do and allowed it", so a shared map would mean a
+    // freshly enrolled device inheriting an approval nobody there gave: exactly
+    // the incident recorded for `ai_provider_consent` two rows up, and the reason
+    // this field exists as a separate map rather than as a flag on the view
+    // definition (which syncs).
+    //
+    // The cost is stated so the next reader does not rediscover it: the same view
+    // asks again on a second device, on purpose. The value is a version number,
+    // so a definition that changes anywhere also revokes the approval everywhere
+    // it was given, with no clear step. Preserved verbatim from the local side,
+    // which is what `.clone()` in `prefs_merge.rs` is doing.
+    ("view_approvals", PrefClass::DeviceLocal),
     (
         "view_order",
         PrefClass::Shared(SharedDiscipline::SequenceLww),
@@ -459,6 +473,13 @@ mod tests {
     /// compile the moment a new field lands in the protocol crate, forcing the
     /// author into this file — where `ALL_FIELDS` and the table must gain the
     /// matching row before the build goes green again.
+    ///
+    /// One field is deliberately NOT classified, and it is destructured here so
+    /// this lock stays exhaustive: `opaque_saved_views`, the carried raw
+    /// remainder of a `saved_views` array this build could not fully represent.
+    /// It has no canonical key and no clock — it is part of the `saved_views`
+    /// encoding and follows that field's whole-value LWW in the merge — so a
+    /// §10.2 row would invent a field the on-disk format does not have.
     #[test]
     fn every_prefs_field_is_classified_exactly_once() {
         #[allow(clippy::let_underscore_untyped)]
@@ -524,6 +545,9 @@ mod tests {
             right_panel_hidden_tabs: _,
             right_panel_tab_order: _,
             saved_views: _,
+            // Codec carrier, not a preference: no canonical key, no clock, and
+            // no §10.2 row (see this test's doc comment).
+            opaque_saved_views: _,
             screen_capture_protection: _,
             show_note_timestamps: _,
             reminders_enabled: _,
@@ -539,6 +563,7 @@ mod tests {
             time_format: _,
             timezone: _,
             transcription_enabled: _,
+            view_approvals: _,
             view_order: _,
         } = PrefsView::default();
 
@@ -622,6 +647,7 @@ mod tests {
             "time_format",
             "timezone",
             "transcription_enabled",
+            "view_approvals",
             "view_order",
         ];
 

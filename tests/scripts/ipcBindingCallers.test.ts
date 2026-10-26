@@ -542,6 +542,9 @@ function healthyFiles(): Record<string, string> {
     "editor/src/host/lib/datetimeFormat.ts": `export function resetDateTimeDisplayForLock(): void {}\n`,
     "src/components/sync/personIdentityState.ts": `export function resetPersonIdentityState(): void {}\n`,
     "src/notes/collab/awarenessStore.ts": `export function clearAwareness(): void {}\n`,
+    // view-manifests: the bulk field action's journal (ids only, still cleared on
+    // every leaving path).
+    "src/notes/views/bulkUndoJournal.ts": `export function clearBulkUndoForLock(): void {}\n`,
 
     // The two DELETE paths. Only the display store is asserted on them: what it
     // holds describes the READER, so erasing the vault erases the source of the
@@ -551,6 +554,7 @@ function healthyFiles(): Record<string, string> {
   resetDateTimeDisplayForLock();
   resetPersonIdentityState();
   clearAwareness();
+  clearBulkUndoForLock();
   await invoke("plugin:vault-unlock|vault_delete");
 }
 `,
@@ -586,6 +590,7 @@ export function resetMermaidZoom(): void {}\n`,
   resetMermaidZoom();
   resetDateTimeDisplayForLock();
   resetPersonIdentityState();
+  clearBulkUndoForLock();
 }
 `,
 
@@ -606,6 +611,7 @@ export function resetMermaidZoom(): void {}\n`,
   teardownMeetingSessionForLock();
   resetMermaidZoom();
   resetDateTimeDisplayForLock();
+  clearBulkUndoForLock();
 }
 `,
     "src/App.tsx": `const onCreateAutoUnlockSuccess = () => {

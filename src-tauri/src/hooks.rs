@@ -321,6 +321,19 @@ impl<R: Runtime> VaultLifecycleHooks for DesktopHooks<R> {
         )
     }
 
+    fn capture_snapshot_reporting(
+        &self,
+        vault_root: &std::path::Path,
+        note_uuid: &str,
+        old_blob: &[u8],
+        now_ms: u64,
+        force: bool,
+    ) -> myne_core::snapshot_store::CaptureOutcome {
+        myne_core::snapshot_store::capture_snapshot_reporting_uuid(
+            vault_root, note_uuid, old_blob, now_ms, force,
+        )
+    }
+
     fn purge_note_snapshots(
         &self,
         vault_root: &std::path::Path,

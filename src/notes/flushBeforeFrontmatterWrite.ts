@@ -48,9 +48,10 @@
 //
 // Callers today: `setNoteCover.ts`, both converts in `templates.ts`, the
 // trash/restore/delete writers `trashNote.ts` + `deleteNote.ts`
-// (myne-md/myne#819), and the archive pair `archiveNote`/`unarchiveNote`
+// (myne-md/myne#819), the archive pair `archiveNote`/`unarchiveNote`
 // (myne-md/myne#825's tab-close-on-archive made their losing direction a
-// silent un-archive). `folderActions.ts` and `renameInbound.ts` call
+// silent un-archive), and `setNoteField.ts` (a saved view's field write, which
+// is the same read-patch-write against disk with a table view as the caller). `folderActions.ts` and `renameInbound.ts` call
 // `renameFlushHooks().flushOpenPanes()` directly, because they flush once for a
 // BATCH rather than per note.
 //

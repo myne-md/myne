@@ -6942,7 +6942,7 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "views.saved-views",
-    title: "Saved views (list, table, cards)",
+    title: "Saved views (list, table, cards, board)",
     paths: [
       "src/notes/views/",
       "src/notes/components/ViewsSection.tsx",
@@ -6954,6 +6954,12 @@ export const ROSTER = Object.freeze([
       "src/notes/reorderViewOrder.ts",
       "src/notes/filterDraft.ts",
       "src/lib/viewsEnabled.ts",
+      "src/components/ViewsManager.tsx",
+      "src/components/ViewImportDialog.tsx",
+      "src/components/ViewConsent.tsx",
+      "src/notes/importViewManifest.ts",
+      "src/notes/exportViewManifest.ts",
+      "src/notes/bulkSetField.ts",
       "mobile/src/app/flows/editor/views/MobileViewRenderHost.tsx",
       "mobile/src/app/flows/editor/views/cardsView.tsx",
       "mobile/src/app/flows/editor/views/listView.tsx",
@@ -6969,6 +6975,9 @@ export const ROSTER = Object.freeze([
       "e2e/saved-view-display-settings.e2e.ts",
       "e2e/cards-cover-picker.e2e.ts",
       "e2e/search-query-operators.e2e.ts",
+      "e2e/view-manifests.e2e.ts",
+      "e2e/board-view.e2e.ts",
+      "mobile/tests/flow-logic/views/board-drag.flow.ts",
     ],
     manual: [
       {
@@ -6983,6 +6992,19 @@ export const ROSTER = Object.freeze([
         whyNotAutomated: "The back gesture is hand-rolled from capture-phase touch events competing with the OS edge gesture; no tier drives a real touch on a device.",
         clients: ["ios", "android"],
         estimateMin: 5,
+        tier: "standard",
+      },
+      {
+        // The board's drag is pointer-event based, which is the whole reason it
+        // can run under a finger at all: `mobile/tests/flow-logic/views/board-drag.flow.ts`
+        // drives the same path in desktop Chromium and asserts the write and the
+        // refusal. What no tier here produces is a TOUCH: whether the OS lets a
+        // press become a drag on a lane that also scrolls, without the finger
+        // starting a lane scroll or the WebView raising a long-press menu.
+        see: "On an iPhone and on an Android phone, open a board view that groups by a property the view may write, then press a card and hold for a moment before moving it to another lane. Confirm four things: the card lifts into the drag rather than the lane scrolling under the finger, a long press raises no text-selection or context menu, releasing over the lane places the card and the note's own value is the one the lane changed, and pressing a card WITHOUT moving still opens its note. Then repeat a drag into the empty declared lane, and a drag that the host refuses (edit the note's property on another device first, or with the note open in a second pane) and confirm the card returns to the lane the note carries with the reason stated.",
+        whyNotAutomated: "The drag itself is driven end to end in desktop Chromium by the flow-logic tier, and the desktop suite drives it against a real WebKitGTK with a mouse, but a finger is a different event source: whether a press becomes a drag instead of a lane scroll, and whether a long press raises WKWebView's or Android WebView's own selection and context menu, is touch arbitration performed by the OS and the engine. No CI lane builds for iOS or Android, and nothing in this tree generates a real touch contact.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
         tier: "standard",
       },
     ],
