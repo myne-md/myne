@@ -4750,6 +4750,32 @@
       "label": "Your display name",
       "checking": "Checking your name…",
       "save": "Continue"
+    },
+    "phraseFree": {
+      "joinTitle": "Add this device to your account",
+      "pasteIdentityCode": "Paste your identity code from a device that is already signed in. It starts with MYNE-PERSON-1: and carries no secret.",
+      "showMyCode": "Show this device's code",
+      "showCode": "Show this code on a device that is already signed in. It is a one-time credential: anyone who reads it can sign in as this device until it is admitted.",
+      "sasHere": "Both screens must show {{sas}}. If they differ, stop: the code did not come from this device.",
+      "copyCode": "Copy code",
+      "copied": "Copied",
+      "imApproved": "I approved it, sign in now",
+      "claimed": "This device is signed in with its own credential.",
+      "stillWaiting": "Not admitted yet. Approve this code on a device that is already signed in, then try again.",
+      "noDeviceKey": "This platform has no safe place to keep a signing key, so this device joins now and keeps signing with your recovery phrase.",
+      "badIdentityCode": "That does not look like an identity code. It should start with MYNE-PERSON-1:.",
+      "startFailed": "Could not prepare this device. Try again.",
+      "claimFailed": "Could not sign in yet. Try again.",
+      "admitTitle": "Add a device without your recovery phrase",
+      "admitHint": "On the new device, open Settings, Devices and members, and copy the code it shows. Paste it here with the eight-character code from its screen.",
+      "sasPlaceholder": "Code shown on the other device, e.g. 1a2b-3c4d",
+      "admit": "Add this device",
+      "admittedBound": "Device added. Both screens showed {{sas}}, and its signing key is bound in this vault.",
+      "admittedUnbound": "Device added and approved. It can sign in, but its signing key is not bound in this vault yet: unlock your identity here and add it again to finish that half.",
+      "sasMismatch": "The code does not match the other screen. Nothing was added. Check both screens and try again.",
+      "wrongAccount": "That code belongs to a different account. Nothing was added.",
+      "alreadyInstalled": "That device is already on this account with a different credential. Nothing was changed.",
+      "admitFailed": "Could not add the device. Try again."
     }
   },
   "tasks": {

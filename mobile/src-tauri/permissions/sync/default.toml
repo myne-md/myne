@@ -69,6 +69,13 @@ permissions = [
     "allow-sync-account-status",
     "allow-sync-approve-device",
     "allow-sync-remove-device",
+    # Joining an account without the recovery phrase (`decisions/protocol/0735`):
+    # show this device's code, read it back after an interruption, admit a device
+    # from its code, and sign in with the credential that admitted it.
+    "allow-sync-device-admission-code",
+    "allow-sync-pending-device-admission",
+    "allow-sync-admit-device",
+    "allow-sync-claim-device-admission",
     "allow-sync-pending-conflicts",
     "allow-sync-take-conflict",
     "allow-sync-resolve-conflict",
@@ -364,3 +371,23 @@ commands.allow = ["sync_verify_hold_end"]
 identifier = "allow-resolve-identity"
 description = "Allow invoking sync:resolve_identity (map an Automerge actor to a {Device, Person, Unknown} identity, so the presence roster and a peer's caret label carry a resolved name instead of the degraded device form; myne-md/myne#849 task 7). Read-only: it reads the vault's `device_names` pref and the device-binding join and returns a label. NO id hash crosses to the frontend and the WebView hashes or truncates nothing; where a device has no user-chosen name the BACKEND derives a six-character device code from the actor, so what arrives is a label rather than an identifier to interpret. The command is the only place that maps an actor to a person. Desktop has granted it since `collab-provenance` task 2; the desktop permission is byte-identical in intent."
 commands.allow = ["resolve_identity"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-code"
+description = "Allow invoking sync:sync_device_admission_code (mint this device's own server-auth secret and show the MYNE-DEVICE-1 code an already-signed-in device reads, decisions/protocol/0735). No phrase, no network, no vault-blob access: it writes a pending credential file and returns a code."
+commands.allow = ["sync_device_admission_code"]
+
+[[permission]]
+identifier = "allow-sync-pending-device-admission"
+description = "Allow invoking sync:sync_pending_device_admission (read back the admission this device already started, so an interrupted join resumes instead of minting a second device id)."
+commands.allow = ["sync_pending_device_admission"]
+
+[[permission]]
+identifier = "allow-sync-admit-device"
+description = "Allow invoking sync:sync_admit_device (admit a device from its code: install its SCRAM credential via POST /auth/devices/credential, which also approves it, then sign its binding row with this device's person key). Requires an unlocked active vault and an unlocked person identity for the row; the credential install alone needs only the stored token."
+commands.allow = ["sync_admit_device"]
+
+[[permission]]
+identifier = "allow-sync-claim-device-admission"
+description = "Allow invoking sync:sync_claim_device_admission (sign this device in with the credential an admitting device installed, via the ordinary SCRAM handshake under the device's own username). Returns false while the install has not landed."
+commands.allow = ["sync_claim_device_admission"]

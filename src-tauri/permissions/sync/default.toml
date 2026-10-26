@@ -79,6 +79,13 @@ permissions = [
     "allow-sync-account-status",
     "allow-sync-approve-device",
     "allow-sync-remove-device",
+    # Joining an account without the recovery phrase (`decisions/protocol/0735`):
+    # show this device's code, read it back after an interruption, admit a device
+    # from its code, and sign in with the credential that admitted it.
+    "allow-sync-device-admission-code",
+    "allow-sync-pending-device-admission",
+    "allow-sync-admit-device",
+    "allow-sync-claim-device-admission",
     "allow-sync-pending-conflicts",
     "allow-sync-awareness-stats",
     "allow-sync-take-conflict",
@@ -436,3 +443,23 @@ commands.allow = ["sync_verify_hold_begin"]
 identifier = "allow-sync-verify-hold-end"
 description = "Allow invoking sync:sync_verify_hold_end (myne#462 — release the push hold engaged by sync_verify_hold_begin, on match, on mismatch or on unmount). Idempotent; in-RAM flag only, no vault access, no IO, no server call. Releasing early only restores the ordinary push cadence."
 commands.allow = ["sync_verify_hold_end"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-code"
+description = "Allow invoking sync:sync_device_admission_code (mint this device's own server-auth secret and show the MYNE-DEVICE-1 code an already-signed-in device reads, decisions/protocol/0735). No phrase, no network, no vault-blob access: it writes a pending credential file and returns a code."
+commands.allow = ["sync_device_admission_code"]
+
+[[permission]]
+identifier = "allow-sync-pending-device-admission"
+description = "Allow invoking sync:sync_pending_device_admission (read back the admission this device already started, so an interrupted join resumes instead of minting a second device id)."
+commands.allow = ["sync_pending_device_admission"]
+
+[[permission]]
+identifier = "allow-sync-admit-device"
+description = "Allow invoking sync:sync_admit_device (admit a device from its code: install its SCRAM credential via POST /auth/devices/credential, which also approves it, then sign its binding row with this device's person key). Requires an unlocked active vault and an unlocked person identity for the row; the credential install alone needs only the stored token."
+commands.allow = ["sync_admit_device"]
+
+[[permission]]
+identifier = "allow-sync-claim-device-admission"
+description = "Allow invoking sync:sync_claim_device_admission (sign this device in with the credential an admitting device installed, via the ordinary SCRAM handshake under the device's own username). Returns false while the install has not landed."
+commands.allow = ["sync_claim_device_admission"]

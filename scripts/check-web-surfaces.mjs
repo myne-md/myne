@@ -588,6 +588,18 @@ const V = {
     "The person-account bindings are substituted out of the web bundle. The identity-only screens are absent and the backend is capability-refused there, so retaining these bindings would only preserve an unreachable path.",
     "person-account-binding",
   ],
+  // The phrase-free device admission (`decisions/protocol/0735`). `excluded`
+  // rather than `adapted`, and the marker is the module's own absence constant:
+  // the four bindings it exports are `Class::Unsupported` in
+  // `web/wasm/src/capability.rs`, and the reason is structural on both arms. The
+  // admitting arm needs the held person identity and the active vault's group
+  // key; the joining arm needs a device key at rest, and a browser has no storage
+  // rung at all. Nothing about this module becomes reachable by porting more.
+  "src/lib/deviceAdmission.ts": [
+    "excluded",
+    "Phrase-free device admission is refused on web: the admitting arm needs the held person identity and the vault's group key, and the joining arm needs a device key at rest, which a browser has no rung for.",
+    "device-admission-binding",
+  ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],
   "src/hooks/useOverlayInert.ts": [

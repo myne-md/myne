@@ -153,6 +153,37 @@ The B2B access model (`decisions/protocol/0603`) makes server accounts **person-
 
 **A person account is an account in the §3.1 SCRAM namespace, keyed by `person_id_hash`.** The person's server credential derives CLIENT-side from the normalized recovery phrase under the domain `"myne.v0.2 argon2id-person-server-auth|"` (plus `person_id_hash`), exactly as a vault account's derives from `root_key` under `server-auth`; the server is handed only a SCRAM verifier and never the secret. It registers and authenticates through `/auth/register`, `/auth/scram/init` and `/auth/scram/final` with `account_hash_hex = person_id_hash` and `username` the canonical lowercase hex of that same id. **There is deliberately no separate person-auth route**: the two ids are both 16 opaque bytes and the server cannot tell them apart, because it is blind to the difference. The id-typed namespace **is** the person namespace.
 
+**A device may hold its OWN SCRAM credential on the person account** (`decisions/protocol/0735`). Beside the
+account's phrase-derived verifier, an account may carry one verifier per device, installed by a device that is
+already authenticated against that account: `POST /auth/devices/credential` with
+`{device_id_hex, username, salt_hex, iterations, stored_key_hex, server_key_hex}`. The account is taken from the
+session and never from the body, so a device installs only into its own account; and the username is NOT
+caller-chosen, it is `dev:<device_id_hex>` — the `dev:` prefix is what keeps the two namespaces apart, since an
+account id and a device id are both 16 bytes and both encode to 32 lowercase hex characters. A credential
+authenticates through the SAME `/auth/scram/init` and `/auth/scram/final` pair, naming that username; `init`
+serves the DEVICE's salt rather than the account's. An unknown account, a wrong username and a non-canonical
+username are one `401`, and a device credential that is not installed answers that same `401`, so nothing here
+leaks whether a device id is installed. A repeat install of the SAME verifier is `200 {existing: true}` and a
+DIFFERENT verifier for an installed device is `409 already_installed`, so two devices admitting the same newcomer
+at once cannot race into two credentials for one id.
+
+**The install and the approval are one act, and revocation has to reach the verifier.** The route registers the
+device pending and approves it in the same call, because a credential nobody approved is a device that
+authenticates and then syncs nothing while an approval of a device that cannot authenticate is a promise. The
+operator gates (`frozen`, the device cap) apply exactly as they do at `/auth/scram/final`, so neither can be
+reached by pre-approving around them. `POST /auth/devices/revoke` now deletes the device's verifier as well as
+retiring its registry row: retiring the row refuses the TOKEN, and an unauthenticated device would otherwise run
+the handshake again and mint a new one, which would make "removed" mean "sign in again".
+
+**The out-of-band exchange, and the check that makes it safe.** The joining device shows
+`MYNE-DEVICE-1:<person_id_hex>:<device_id_hex>:<ed_pk_hex>:<mldsa_vk_hex>:<salt_hex>:<iterations>:<stored_key_hex>:<server_key_hex>`
+(empty `ed_pk`/`mldsa_vk` on a platform with no device-key rung). The code carries a CREDENTIAL-EQUIVALENT
+verifier, so it is handled as a one-time credential: the admitting device shows a short authentication string
+derived over the whole code (class `"myne.device-admission-sas v1|"`, eight hex characters, displayed `XXXX-XXXX`)
+for a human to compare between the two screens, and the write is bound to the string the user confirmed, so the
+code cannot change between display and signature. The verifier is one-way over the joining device's secret, so
+the admitting device forwards a value it cannot authenticate with.
+
 **The device-approval gate governs a person account unchanged (member-devices).** A person account is an account in the §3.1 namespace, so its devices are admitted by the §3.1 gate (SYNC-9) and by nothing else: the **first** device on the person account and any **recovery-path** device self-approve, and a **password-path** device lands pending until an already-approved device of that same account calls `/auth/devices/approve` (§3.1). `path` selects the gate and changes no cryptographic input (§3.1), and because the server cannot tell a person id from a vault id it cannot verify the declaration, so **`path` is a client posture rather than an enforced rule**. Two shipped paths use it differently, deliberately. A person setup that supplies an existing phrase (the recovery-in-place path) declares `"recovery"` and self-approves. A device being ADDED to an account by a scanned code (`person_join_device_from_host`) declares `"password"`, so it lands pending until an already-approved device of that account calls `/auth/devices/approve`; the "no releaser" dead end is the FIRST-device case only, and it is why the join path never takes the recovery gate. A client is free to declare `"recovery"` instead, which is why `threat-model.md` §5 states the bound as "the phrase alone is enough": the gate is what an honest client honours, not what the server can demand. The exception grants the person plane no authority a vault account lacks, because the phrase is full account takeover on both (the accepted hole §3.1 records).
 
 **A person session is a sync authorization class (myne-md/myne#911 task 7).** A person authenticates exactly as §3.1 says, on its person account, and the resulting device token is the **person token**: the single credential a client needs, because it addresses a vault with an `?account=<account_number_hash>` query parameter instead of holding one token per vault. Authorization is per request: the server MUST resolve the parameter against the membership table and allow the request only when the caller is bound to that vault (`403 forbidden` otherwise, never a silent fall back to the caller's own namespace and never a `404` that distinguishes "unknown vault" from "not yours"). A request without the parameter keeps the pre-existing behaviour exactly, so a vault device token and a per-vault membership token are unaffected. What the server learns is unchanged: the same person-to-vault mapping the membership table already holds, read on every request rather than once at issuance.

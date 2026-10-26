@@ -88,6 +88,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_account_status,
             commands::sync_approve_device,
             commands::sync_remove_device,
+            commands::sync_device_admission_code,
+            commands::sync_pending_device_admission,
+            commands::sync_admit_device,
+            commands::sync_claim_device_admission,
             commands::sync_pending_conflicts,
             // Read-only awareness transport counters for the leak budget
             // (`collab-verification` task 3); desktop-only (the web client has no
