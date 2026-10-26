@@ -17340,15 +17340,18 @@ mod tests {
 
             // 600 = 2 full windows + 88, so the split is exercised and asymmetric.
             const N: usize = 600;
+            let mut written = Vec::with_capacity(N);
             for i in 0..N {
+                let id = NoteId::new_v7();
                 write_note(
                     &notes_a,
                     &items_key,
                     &items_key_id,
-                    &NoteId::new_v7(),
+                    &id,
                     format!("note-{i}").as_bytes(),
                     false,
                 );
+                written.push(id);
             }
             let (ta, dev_a, tok_a) = enroll_device(
                 &url,
@@ -17411,50 +17414,68 @@ mod tests {
             );
 
             // The control arm, and the reason the assertion above is meaningful:
-            // a THIRD device doing the identical cold sync one-GET-per-blob — the
-            // pre-#240 shape, still live as the old-server fallback — hammers the
-            // very limiter the batch path did not touch. Without this the "0 429s"
-            // above could just mean the corpus was too small to bind.
-            let dir_c = std::env::temp_dir().join(format!("myne-bb-C-{}", std::process::id()));
-            let notes_c = dir_c.join("notes");
-            std::fs::create_dir_all(&notes_c).unwrap();
-            let (_tc, dev_c, tok_c) = enroll_device(
+            // the same account, against the same limiter, must still bind when the
+            // blob bodies are asked for ONE GET at a time — the pre-#240 shape,
+            // still live as the old-server fallback. Without this, the "0 429s"
+            // above could just mean the corpus was too small to exhaust the burst.
+            //
+            // CONCURRENT, and that is a robustness fix rather than a shortcut.
+            // Driving this through a second `run_cycle_legacy` bound nothing on a
+            // loaded machine: the full `cargo test --workspace` run failed here on
+            // a tree where the same test passed alone, with 600 single GETs and 0
+            // refusals. The bucket refills at 16 tokens a second, so the control
+            // only binds when requests arrive faster than that, and one sequential
+            // loop's rate is loopback latency — which under full-suite load fell
+            // below the refill, so the refill covered the whole corpus. The claim
+            // is a property of the SERVER ("this many single GETs exhaust a
+            // 256-token bucket"), so the requests only have to arrive faster than
+            // the refill; 32 threads give that by construction (384 requests at
+            // even a 1 s latency is 32/s), and the slow-path COMPLETION is pinned
+            // by `a_server_without_the_batch_route_falls_back_to_single_blob`,
+            // which is where it belongs.
+            let (_tc, _dev_c, tok_c) = enroll_device(
                 &url,
                 &account_hash,
                 secret.as_slice(),
                 "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
                 false,
             );
-            let legacy = PullObserver::new(Box::new(RouteAbsentTransport {
-                inner: crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
-                status: 404,
-            }));
-            run_cycle_legacy(
-                &legacy,
-                &root_key,
-                account_hash,
-                dev_c,
-                &tok_c,
-                &notes_c,
-                &dir_c,
-                true,
-            )
-            .expect("the fallback path still completes, just slowly");
-            // `>=` rather than `==`: every 429 the backoff swallows is itself
-            // another GET the observer counts, which is the cost being measured.
-            assert!(
-                legacy.single_count() >= N,
-                "the control really did one GET per blob: {}",
-                legacy.single_count()
+            let control = PullObserver::new(
+                crate::plugins::sync::http_transport::build_transport(&url).unwrap(),
+            );
+            // 384 = the 256-token burst + 128, i.e. 8 s of refill, so arriving
+            // faster than 16/s cannot be absorbed.
+            let hammer: Vec<[u8; 16]> = written
+                .iter()
+                .take(384)
+                .map(|id| *id.as_uuid().as_bytes())
+                .collect();
+            std::thread::scope(|scope| {
+                for chunk in hammer.chunks(12) {
+                    let control = &control;
+                    let token = tok_c.as_str();
+                    scope.spawn(move || {
+                        for id in chunk {
+                            // The refusal IS the observation; a 200 or a 404 is
+                            // noise here, and both are counted by the observer.
+                            let _ = engine::download_blob(control, token, id);
+                        }
+                    });
+                }
+            });
+            assert_eq!(
+                control.single_count(),
+                hammer.len(),
+                "the control asked for every blob one GET at a time"
             );
             assert!(
-                legacy.rate_limited() > 0,
-                "the control arm did not bind the limiter, so the 0-429 assertion \
-                 above proves nothing — raise N"
+                control.rate_limited() > 0,
+                "the control arm did not bind the limiter ({} single GETs, 0 refusals), \
+                 so the 0-429 assertion above proves nothing",
+                control.single_count()
             );
             std::fs::remove_dir_all(&dir_a).ok();
             std::fs::remove_dir_all(&dir_b).ok();
-            std::fs::remove_dir_all(&dir_c).ok();
         }
 
         /// A server without the route (404, or 405 behind a proxy that knows the
