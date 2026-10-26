@@ -47,3 +47,35 @@ export const SIDEBAR_CARD_STYLE: CSSProperties = {
   cursor: "pointer",
   fontFamily: "inherit",
 };
+
+/**
+ * The unfocused-pane scrim (myne-md/myne#908 item 3).
+ *
+ * A split workspace had no visual difference between the pane holding the caret
+ * and the others; the only cue was a 2px accent line on the focused pane, which
+ * is easy to miss at a glance. The treatment is deliberately NOT a text dim: in
+ * a notes app the other pane is usually there to be READ, so its note text keeps
+ * full contrast. What dims is the pane's chrome and a very light wash over the
+ * whole section, both of which the eye reads as "not the active one" without
+ * making a line of prose harder to read.
+ *
+ * Returns `null` when there is nothing to contrast with (a single pane) or when
+ * this pane IS the focused one, so the caller can render nothing at all rather
+ * than an invisible overlay.
+ */
+export function paneScrimStyle(
+  focused: boolean,
+  paneCount: number,
+): CSSProperties | null {
+  if (focused || paneCount < 2) return null;
+  return {
+    position: "absolute",
+    inset: 0,
+    background: "var(--scrim)",
+    // `--scrim` is the modal wash (0.4–0.6 alpha); at 6% of it the effect is a
+    // few percent of ink, enough to separate the panes and far too little to
+    // move a contrast ratio that matters.
+    opacity: 0.06,
+    pointerEvents: "none",
+  };
+}

@@ -137,8 +137,49 @@ class TagSuggestionBandWidget extends WidgetType {
     label.textContent = i18n.t("editor.tagSuggestion.label");
     root.appendChild(label);
 
-    for (const chip of this.chips) root.appendChild(this.chipDom(chip));
+    const existing: TagSuggestionChip[] = [];
+    const fresh: TagSuggestionChip[] = [];
+    for (const chip of this.chips) {
+      if (chip.isNew) fresh.push(chip);
+      else existing.push(chip);
+    }
+
+    // myne-md/myne#908 item 1: the solid/dashed border was the whole
+    // distinction, and the only place it was explained was a source comment.
+    // Render the two kinds as labelled groups when BOTH are present, and keep
+    // the flat row when only one kind is, so a single-kind band does not grow a
+    // header it has nothing to contrast with. The border stays as a secondary
+    // cue; it is no longer the only one.
+    if (existing.length > 0 && fresh.length > 0) {
+      root.appendChild(
+        this.groupDom("editor.tagSuggestion.groupExisting", existing),
+      );
+      root.appendChild(this.groupDom("editor.tagSuggestion.groupNew", fresh));
+    } else {
+      for (const chip of this.chips) root.appendChild(this.chipDom(chip));
+    }
     return root;
+  }
+
+  /** A labelled run of chips. Its own flex box, because the band's wrap must
+   *  wrap WITHIN a group rather than scattering one group's chips around the
+   *  other's label. */
+  private groupDom(
+    labelKey: string,
+    chips: readonly TagSuggestionChip[],
+  ): HTMLElement {
+    const group = document.createElement("span");
+    group.className = "cm-tag-suggestion-group";
+    group.setAttribute("data-testid", "editor.tag-suggestion-group");
+    group.setAttribute("data-group-kind", labelKey.endsWith("New") ? "new" : "existing");
+
+    const label = document.createElement("span");
+    label.className = "cm-tag-suggestion-group-label";
+    label.textContent = i18n.t(labelKey);
+    group.appendChild(label);
+
+    for (const chip of chips) group.appendChild(this.chipDom(chip));
+    return group;
   }
 
   private chipDom(chip: TagSuggestionChip): HTMLElement {

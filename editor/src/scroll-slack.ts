@@ -65,6 +65,41 @@ export function slackFor(hostHeight: number): number {
   return Math.round(Math.min(hostHeight * SLACK_FRACTION, SLACK_CAP_PX));
 }
 
+/** Slack that a note actually needs (myne-md/myne#908 item 10).
+ *
+ *  The slack exists so the tail of a LONG note can be lifted off the bottom edge
+ *  (#375). Applied unconditionally it also gave a two-line note a scrollable
+ *  empty region, because 60% of the viewport is a lot of space below three
+ *  lines. Reserve it only when the content is taller than the host, which is
+ *  the only case where there is a tail to lift.
+ *
+ *  `naturalContentHeight` must EXCLUDE the slack already applied, or the padding
+ *  feeds itself and the branch latches on forever: the caller subtracts what it
+ *  wrote last pass. */
+export function slackForOverflow(
+  hostHeight: number,
+  naturalContentHeight: number,
+): number {
+  if (!Number.isFinite(naturalContentHeight)) return 0;
+  return naturalContentHeight > hostHeight + 1 ? slackFor(hostHeight) : 0;
+}
+
+/** The content height with the slack we wrote last pass removed. Split out so
+ *  the anti-feedback arithmetic is testable: `scrollHeight` INCLUDES the
+ *  padding, so a plugin that measured it raw would see its own slack, decide the
+ *  note overflows, and latch on forever. A review found the subtraction was
+ *  unasserted, which is a claim with no test behind it. */
+export function naturalContentHeight(
+  scrollHeight: number,
+  appliedSlack: number,
+): number {
+  if (!Number.isFinite(scrollHeight)) return 0;
+  // Clamped at 0: a stale `applied` larger than the measured height means the
+  // document shrank, and a negative natural height would read as "fits" through
+  // arithmetic nobody intended.
+  return Math.max(0, scrollHeight - Math.max(0, appliedSlack));
+}
+
 // A stable key so a burst of updates coalesces to ONE measure per frame.
 const slackMeasureKey = {};
 
@@ -116,11 +151,21 @@ const slackPlugin = ViewPlugin.fromClass(
       }
       this.view.requestMeasure({
         key: slackMeasureKey,
-        read: () => slackFor(host.clientHeight),
+        read: () => {
+          const hostHeight = host.clientHeight;
+          // Subtract what we wrote last pass: `scrollHeight` includes the
+          // padding, so measuring it raw would make the slack feed itself and
+          // the overflow branch would latch on forever.
+          const natural = naturalContentHeight(
+            this.view.contentDOM.scrollHeight,
+            this.applied,
+          );
+          return slackForOverflow(hostHeight, natural);
+        },
         write: (slack) => {
           if (slack === this.applied) return;
           this.applied = slack;
-          this.view.contentDOM.style.paddingBottom = `${slack}px`;
+          this.view.contentDOM.style.paddingBottom = slack === 0 ? "" : `${slack}px`;
         },
       });
     }

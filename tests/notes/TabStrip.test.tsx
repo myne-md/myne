@@ -200,3 +200,21 @@ describe("the strip never ends flush against the window edge", () => {
     expect(screen.getByTestId("editor.tab-strip").style.paddingInlineEnd).toBe("76px");
   });
 });
+
+describe("tab title reveal (myne-md/myne#908 item 6)", () => {
+  it("carries no native title tooltip on the tab", () => {
+    setup();
+    const tabs = screen.getAllByTestId("editor.tab");
+    for (const tab of tabs) expect(tab.getAttribute("title")).toBeNull();
+  });
+
+  it("marks the label box so the reveal has a measurable target", () => {
+    setup();
+    const label = screen.getAllByTestId("editor.tab-label")[0];
+    expect(label).toBeTruthy();
+    expect(label?.style.overflow).toBe("hidden");
+    // Ellipsis is gone: the marquee is what reveals the rest, and an ellipsis
+    // would re-truncate the moving text.
+    expect(label?.style.textOverflow).toBe("");
+  });
+});

@@ -179,7 +179,7 @@ fn index_budget_report() {
             .collect());
 
         let t = Instant::now();
-        let tree = state.tag_tree();
+        let tree = state.tag_tree(None);
         let tag_tree_us = t.elapsed().as_micros();
 
         // MYND-612 task 10: the whole-vault task fetch. The design deliberately
