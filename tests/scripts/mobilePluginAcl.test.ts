@@ -219,7 +219,7 @@ describe("the discovery: a grant that resolves to an empty permission set", () =
 
   it("does not require a command build.rs never declared, which is optional there", () => {
     // ONE direction only. Naming a command in `InlinedPlugin::commands` is
-    // optional (`src-tauri/CLAUDE.md`), so a permission may allow more than
+    // optional (`src-tauri/AGENTS.md`), so a permission may allow more than
     // `build.rs` lists. Requiring the reverse would fail `prefs`, most of whose
     // commands appear in no list.
     const files = healthyFiles();

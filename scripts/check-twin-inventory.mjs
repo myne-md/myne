@@ -6,9 +6,8 @@
 //
 // Desktop and mobile compile from trees meant to share their decisions and
 // sharing almost none of them. The measurement that opened this epic was 90
-// same-relative-path twins, 19 byte-identical, 71 drifted; it is 104 and 80 now
-// (the platform seam, myne-md/myne#492, plus two more pairs), and the numbers
-// live in the projection rather than here precisely because they move. `scripts/check-twin-drift.mjs` (#261) warns when a change touches
+// same-relative-path twins, 19 byte-identical, 71 drifted. The counts move, so
+// they live in the projection rather than here. `scripts/check-twin-drift.mjs` (#261) warns when a change touches
 // one side and leaves the other alone, which covers a NEW one-sided change and
 // says nothing about the drift that already exists. So "fix the drift" is an
 // unbounded ask that never starts, and the seven sibling sub-features have no

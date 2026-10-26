@@ -26,12 +26,12 @@ import {
   openSettings,
   selectSettingsTopic,
   unlockToEditor,
+  waitForStatusText,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { testIdSelector } from "./support/webdriver";
-import { KEY, pressKey } from "./support/keyboard";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
-import { httpsConfigSeed, syncConfigSeed } from "./support/multi-device";
+import { syncConfigSeed } from "./support/multi-device";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -144,14 +144,17 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await selectSettingsTopic(app.session, "sync", "devices");
         await app.session.byTestId("member-roster.person-ready");
         await (await app.session.byTestId("member-roster.copy-owner-code")).click();
-        await app.session.waitUntil(
-          async () => {
-            const toasts = await app.session.byTestIdAll("editor.toast-message");
-            if (toasts.length === 0) return null;
-            const message = (await toasts[0].text()).trim();
-            return message === IDENTITY_CODE_COPIED ? true : null;
-          },
-          { label: "identity code copy reports success", timeoutMs: 10_000 },
+        // The copy reports on the CONTROL that was pressed, not in a toast
+        // (2026-10-24). The tick is the sighted half and the visually hidden
+        // `role="status"` line beside the field is the assistive one, so the
+        // assertion reads the line: a screen reader is the audience that must
+        // be able to tell a copy worked, and the toast that used to carry this
+        // sentence is gone by design.
+        await waitForStatusText(
+          app.session,
+          "member-roster.copy-status",
+          IDENTITY_CODE_COPIED,
+          "identity code copy reports success",
         );
         // The invite button is a TWO-STEP door on an unshared vault: the
         // NTV5 -> NTV6 migration is permanent, so a confirmation precedes the
@@ -201,11 +204,15 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
            await unlockToEditor(app.session, "CanaryPass-9-animals!");
            await dismissImporterOffer(app.session);
            await openSettings(app.session, "sync");
-           // The roster lives on the Devices topic since the Sync panel split (myne-md/myne#885).
+           // The roster lives on the Devices topic since the Sync panel split
+           // (myne-md/myne#885), and the IDENTITY block lives on Connection, one
+           // topic over. Waiting for the unlock row on the roster's own topic is
+           // what made this spec fail: the control had moved, and nothing said
+           // so. Re-sited rather than given more budget.
            await selectSettingsTopic(app.session, "sync", "devices");
           await app.session.byTestId("member-roster");
-          // The identity unlock now lives in the Sync panel's Identity block
-          // (myne-md/myne#831); it is collapsed by default.
+          await selectSettingsTopic(app.session, "sync", "connection");
+          // The identity unlock is collapsed by default (myne-md/myne#831).
           await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
           for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
             const testId =
@@ -215,6 +222,9 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
             await (await app.session.byTestId(testId)).replaceText(word);
           }
           await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
+          // Back to the roster's topic: `person-ready` and the invite door are
+          // the roster's, not the connection block's.
+          await selectSettingsTopic(app.session, "sync", "devices");
            await app.session.byTestId("member-roster.person-ready");
            // The sent-invitation fetch is gated on a SHARED vault
            // (myne-md/myne#783): an `NTV5` vault has no roster, so the hook
@@ -252,44 +262,48 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         "mr3-identity-home",
         { seedConfig: syncConfigSeed(server.url) },
         async (app) => {
-          await app.session.byTestId("welcome.identity-cta");
-          await (await app.session.byTestId("welcome.identity-cta")).click();
-          await (await app.session.byTestId("identity-setup.create-cta")).click();
-          await app.session.byTestId("identity-setup.phrase");
+          // The first run's ONE door (myne-md/myne#911 task 6): the identity
+          // ceremony is inline on its own stage, not a dialog over Welcome.
+          await (await app.session.byTestId("welcome.create-cta")).click();
+          await (await app.session.byTestId("first-run.identity.create-cta")).click();
+          await app.session.byTestId("first-run.identity.phrase");
           // The ceremony is TWO steps since myne-md/myne#869: reveal the grid on
           // the phrase step, read the words off it, Continue to the challenge, and
           // answer the four positions it draws. Done is gated on all four, so
-          // without this the scenario can never leave the dialog.
-          await (await app.session.byTestId("identity-setup.phrase-reveal")).click();
-          const cells = await app.session.byTestIdAll("identity-setup.phrase-word");
+          // without this the scenario can never leave the ceremony.
+          await (await app.session.byTestId("first-run.identity.phrase-reveal")).click();
+          const cells = await app.session.byTestIdAll("first-run.identity.phrase-word");
           const words = (
             await Promise.all(cells.map(async (c) => (await c.text()).trim()))
           ).map((t) => t.replace(/^\d+/, "").trim());
-          await (await app.session.byTestId("identity-setup.phrase-continue")).click();
-          // The HARD BLOCK (#869): with the challenge unanswered, Esc must NOT
-          // dismiss the dialog: the phrase is shown once and the ceremony holds
-          // until the type-back proves it was saved. `canDismiss` answers false
-          // here, so the wait that follows is the assertion that it stayed open.
-          await pressKey(app.session, KEY.ESCAPE);
-          await app.session.byTestId("identity-setup.confirm-input");
+          await (await app.session.byTestId("first-run.identity.phrase-continue")).click();
           // Elements go STALE on step remount, so the confirm handles are fetched
           // AFTER the transition, not before it.
-          for (const input of await app.session.byTestIdAll("identity-setup.confirm-input")) {
+          for (const input of await app.session.byTestIdAll("first-run.identity.confirm-input")) {
             const pos = Number(await input.attribute("data-index"));
             await input.sendKeys(words[pos - 1]);
           }
-          await (await app.session.byTestId("identity-setup.close-cta")).click();
+          await (await app.session.byTestId("first-run.identity.close-cta")).click();
+          // Done hands off to vault creation, so reaching the identity home is
+          // the ABANDON path: Back from the briefing re-probes, and boot routing
+          // answers "identity, no vault" with the home (myne-md/myne#911 task 4).
+          // The Esc-block assertion that used to live here moved with the
+          // ceremony's own suite (`tests/components/identitySetupTypeBack.test.tsx`
+          // refuses all three dismissal routes; the first run has no modal to
+          // dismiss).
+          await (await app.session.byTestId("create.briefing-back")).click();
           await app.session.byTestId("identity-home.identity-code");
           const code = await app.session.byTestId("identity-home.identity-code");
           expect(await code.attribute("readonly")).not.toBeNull();
           await (await app.session.byTestId("identity-home.copy-code")).click();
-          await app.session.waitUntil(
-            async () => {
-              const toasts = await app.session.byTestIdAll("editor.toast-message");
-              if (toasts.length === 0) return null;
-              return (await toasts[0].text()).trim() === IDENTITY_CODE_COPIED ? true : null;
-            },
-            { label: "identity home code copy reports success", timeoutMs: 10_000 },
+          // The control reports the copy (2026-10-24): the hidden `role="status"`
+          // line beside it is what a screen reader hears, and the success toast
+          // that used to say the same sentence is gone.
+          await waitForStatusText(
+            app.session,
+            "identity-home.copy-status",
+            IDENTITY_CODE_COPIED,
+            "identity home code copy reports success",
           );
         },
       );
@@ -298,25 +312,11 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
     }
   });
 
-  it("a vault-less device with a saved server can still reach the server step", async () => {
-    // Vault-count precondition: 0. A saved endpoint is not a vault or an identity.
-    await scenario(
-      "mr4-first-run-server-recovery",
-      { seedConfig: httpsConfigSeed() },
-      async (app) => {
-        await (await app.session.byTestId("welcome.identity-cta")).click();
-        await app.session.byTestId("identity-setup.create-cta");
-        await (await app.session.byTestId("identity-setup.change-server")).click();
-        await app.session.byTestId("sync.endpoint-config");
-        await app.session.byTestId("sync.pin-source");
-        // One door, no hosted one, and nothing pre-fills the address.
-        expect(await app.session.byTestIdAll("first-run-server.myne-sync")).toHaveLength(0);
-        expect(await app.session.byTestIdAll("sync.endpoint-reverify")).toHaveLength(0);
-        const continueButton = await app.session.byTestId("first-run-server.continue");
-        expect(await continueButton.attribute("disabled")).not.toBeNull();
-        await (await app.session.byTestId("first-run-server.back")).click();
-        await app.session.byTestId("identity-setup.create-cta");
-      },
-    );
-  });
+  // RETIRED (myne-md/myne#911 task 6): "a vault-less device with a saved server
+  // can still reach the server step" tested `FirstRunServerStep` as mounted by
+  // the identity dialog. Onboarding no longer configures a server at all, so
+  // that surface is unreachable by design and the scenario had nothing left to
+  // assert. The endpoint form itself still exists under Settings, and it is
+  // exercised there by the sync scenarios that drive `sync.endpoint-input`.
+
 });

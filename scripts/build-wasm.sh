@@ -277,4 +277,10 @@ EOF
 # shellcheck disable=SC2086
 $HASHER "$OUT"/myne_web_wasm_bg.wasm "$OUT"/myne_web_wasm.js >> "$OUT/artefact-hashes.txt"
 
+# Record which sources this artefact was built from, so the browser lane can
+# refuse a bundle carrying an older binary (`pnpm web:build` does NOT rebuild the
+# wasm; it bundles whatever is here). See the checker's header for the session
+# that cost.
+node scripts/check-web-wasm-freshness.mjs --write
+
 echo "ok"

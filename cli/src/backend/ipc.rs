@@ -4,14 +4,25 @@
 //! (`src-tauri/src/cli_bridge/`). Never opens the vault, never holds a
 //! key, never prompts for a password.
 //!
-//! Unix-only today (`std::os::unix::net::UnixStream`), matching the
-//! desktop-side command socket's own posture (`cli_bridge::socket`'s bind
-//! is `#[cfg(unix)]`-only; the Windows named-pipe transport is a documented
-//! seam there, not yet implemented, and this crate's dev/CI target is
-//! Linux like the rest of this feature).
+//! Two transports, one protocol: a Unix domain socket on macOS and Linux, and a
+//! Windows named pipe, which is what `docs/threat-model.md`'s CLI-door entry
+//! already promises ("a local Unix domain socket (macOS/Linux) or named pipe
+//! (Windows)"). The framing, the wire types and every request below are shared;
+//! only `connect` and the name of the thing it connects to differ.
 
-use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
+
+#[cfg(windows)]
+use crate::windows_pipe::{pipe_path, PipeClient};
+#[cfg(unix)]
+use std::os::unix::net::UnixStream;
+
+/// What a successful connect yields, per platform. Both ends of the seam only
+/// need `Read + Write`, which is all `framing` asks for.
+#[cfg(unix)]
+type Connection = UnixStream;
+#[cfg(windows)]
+type Connection = PipeClient;
 
 use super::{BackendError, MyneBackend, SearchHit};
 use crate::status::DoorState;
@@ -43,11 +54,17 @@ impl IpcBackend {
         }
     }
 
-    fn connect(&self) -> Result<UnixStream, BackendError> {
+    fn connect(&self) -> Result<Connection, BackendError> {
         let Some(dir) = &self.app_data_dir else {
             return Err(BackendError::AppNotRunning);
         };
-        match UnixStream::connect(paths::socket_path(dir)) {
+        // A pipe name is not a path, so the two arms resolve the target
+        // differently and then share everything else.
+        #[cfg(unix)]
+        let attempt = UnixStream::connect(paths::socket_path(dir));
+        #[cfg(windows)]
+        let attempt = PipeClient::connect(&pipe_path(dir));
+        match attempt {
             Ok(stream) => Ok(stream),
             Err(_) => Err(self.classify_unreachable(dir)),
         }
@@ -259,7 +276,7 @@ fn map_wire_error(error: Option<wire::WireError>) -> BackendError {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
 

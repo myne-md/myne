@@ -20,7 +20,16 @@
 import { expect } from "vitest";
 import { type AppSession } from "./session";
 import { launchDevice, syncConfigSeed } from "./multi-device";
-import { closeSettings, ipcOk, openSettings, unlockToEditor, dismissImporterOffer } from "./flows";
+import {
+  closeSettings,
+  ipcOk,
+  openSyncConnection,
+  openSyncDevices,
+  registerPersonIdentityIn,
+  selectSettingsTopic,
+  unlockToEditor,
+  dismissImporterOffer,
+} from "./flows";
 import { seedVault } from "./fixtures";
 
 /** A session, as every helper below takes it. */
@@ -104,28 +113,44 @@ export async function typePhrase(
  * second-device join is built on.
  */
 export async function createMemberIdentity(member: AppSession): Promise<string> {
-  await (await member.session.byTestId("welcome.identity-cta")).click();
-  await (await member.session.byTestId("identity-setup.recover-open")).click();
+  // The first run's ONE door (myne-md/myne#911 task 6): the identity ceremony is
+  // inline on its own stage, so the ids are the first-run panel's rather than
+  // the Settings dialog's. The RECOVER arm itself is unchanged.
+  await (await member.session.byTestId("welcome.create-cta")).click();
+  await (await member.session.byTestId("first-run.identity.recover-open")).click();
   await typePhrase(
     member.session,
-    "identity-setup.phrase-input",
-    "identity-setup.phrase-cell",
+    "first-run.identity.phrase-input",
+    "first-run.identity.phrase-cell",
     MEMBER_PHRASE,
   );
-  await (await member.session.byTestId("identity-setup.recover-cta")).click();
+  await (await member.session.byTestId("first-run.identity.recover-cta")).click();
   // The recover arm echoes no phrase and generated nothing to prove possession of,
   // so the type-back challenge does not apply and the dialog goes straight to the
   // recovered result (`identitySetup.recovered`), whose only exit is Done.
-  await member.session.byTestId("identity-setup.close-cta", { timeoutMs: 90_000 });
-  // Asserted, not assumed: a device awaiting approval holds no token, and the invite
-  // listing a caller is about would then fail rather than show anything. The FIRST
-  // device of a person account is approved, which is the arm a fresh server puts this
-  // device in.
+  await member.session.byTestId("first-run.identity.close-cta", { timeoutMs: 90_000 });
+  // Asserted, not assumed, and for a different reason than the note it reads:
+  // the identity ceremony does not register this device, so a fresh device is
+  // `reserved` and there is no approval for anyone to give. The note is gated on
+  // the disk lifecycle (`pending`), so its absence here is the proof that the
+  // panel stopped answering from `PersonSetupView.approved`, which is
+  // hardcoded false and used to show the wait on every first device.
   expect(
-    await member.session.byTestIdAll("identity-setup.pending"),
-    "the member's first device is approved without a second-device wait",
+    await member.session.byTestIdAll("first-run.identity.pending"),
+    "a freshly created device is reserved, so nothing is awaiting approval",
   ).toHaveLength(0);
-  await (await member.session.byTestId("identity-setup.close-cta")).click();
+  // Done hands off to vault creation; the identity home is the ABANDON path
+  // (Back from the briefing re-probes, and "identity, no vault" routes home).
+  await (await member.session.byTestId("first-run.identity.close-cta")).click();
+  await (await member.session.byTestId("create.briefing-back")).click();
+  await member.session.byTestId("identity-home.root");
+  // **REGISTER, at the identity home's own door.** Since 2026-10-24 a person is
+  // reachable only once their identity is written to a NAMED server, and the
+  // invitee reads its invitations over the relay with the token that act mints.
+  // Without it the home polls for an invitation that has nowhere to be delivered:
+  // measured 2026-10-24 as a 120 s timeout on `identity-home.invite-row` in
+  // `member-onboarding` and `member-devices`.
+  await registerPersonIdentityIn(member.session, "identity-home.register", MEMBER_PHRASE.split(" "));
   await member.session.byTestId("identity-home.root");
   return readValue(member.session, "identity-home.identity-code");
 }
@@ -138,7 +163,7 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   await owner.session.byTestId("unlock.password-input", { timeoutMs: 20_000 });
   await unlockToEditor(owner.session, OWNER_PASSWORD);
   await dismissImporterOffer(owner.session);
-  await openSettings(owner.session, "sync");
+  await openSyncDevices(owner.session);
   await owner.session.byTestId("sync.enroll.account-input", { timeoutMs: 10_000 });
   // The relay post needs an authenticated device: enrolling registers this vault at
   // the endpoint and self-approves the first device, which is the credential
@@ -151,7 +176,19 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   await closeSettings(owner.session);
   // The identity is unlocked from the Sync panel's Identity block, which is collapsed
   // by default (myne-md/myne#831); the roster no longer carries its own grid.
-  await openSettings(owner.session, "sync");
+  await openSyncConnection(owner.session);
+  // **Two acts, in this order, and the panel's own ternary is why.** A seeded
+  // vault has NO identity, so the block offers Add and Unlock; the unlock door is
+  // the one that DERIVES an identity from an existing phrase. That identity is
+  // then `reserved` — on this device, on no server — and a reserved identity has
+  // no Unlock control at all (`SyncPanel`: `identityUnlocked || needsRegistration
+  // ? null : …`), because `person_register` installs the person session itself.
+  // Waiting for `identity-unlocked` straight after the derive is therefore
+  // waiting for a word the panel only prints once the identity is also
+  // REGISTERED, which an invite needs anyway: the relay only knows an identity
+  // written to a NAMED server, and an invite addressed to an unregistered person
+  // has nowhere to land (measured 2026-10-24 as a 120 s timeout on
+  // `identity-home.invite-row`).
   await (await owner.session.byTestId("sync.panel.identity-unlock.open")).click();
   await typePhrase(
     owner.session,
@@ -160,6 +197,12 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
     OWNER_PHRASE,
   );
   await (await owner.session.byTestId("sync.panel.identity-unlock.submit")).click();
+  await owner.session.byTestId("sync.panel.identity-unregistered", { timeoutMs: 20_000 });
+  await registerPersonIdentityIn(owner.session, "sync.panel.register", OWNER_PHRASE.split(" "));
+  await owner.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 30_000 });
+  // The roster is a DEVICES-topic surface and registration happened on
+  // CONNECTION, so the section it waits for is not mounted until the topic moves.
+  await selectSettingsTopic(owner.session, "sync", "devices");
   await owner.session.byTestId("member-roster.person-ready", { timeoutMs: 90_000 });
   return readValue(owner.session, "member-roster.owner-code");
 }

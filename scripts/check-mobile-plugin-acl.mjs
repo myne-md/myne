@@ -25,8 +25,8 @@
 // why it is a different file, and this is the copy of that argument to keep
 // current. That guard is about confidentiality: plaintext must not reach a
 // platform backup. This one is about availability: a grant must resolve to
-// something. Mixing them is what took one file to 898 lines while covering one
-// plugin of 27.
+// something. Mixing them is what took one file to 898 lines while covering a
+// single plugin.
 //
 // Scope: the mobile client only. Desktop has the same lockstep shape and is not
 // covered here; generalising is a separate change with its own denominator, and
@@ -256,8 +256,8 @@ export function analyse(io) {
       // which is the same inert outcome one level down. It is the shape a
       // commented-out `commands.allow` leaves behind: the `identifier` line
       // survives, so the permission still exists and is still granted, and the
-      // plugin is refused at runtime anyway. Measured against all 27
-      // directories before this check was added: zero legitimate cases.
+      // plugin is refused at runtime anyway. Measured against every directory
+      // before this check was added: zero legitimate cases.
       if (commandsNothing.has(id)) {
         fail(
           `${file}: the \`[default]\` set includes \`${id}\`, which names no command in either ` +
@@ -291,7 +291,7 @@ export function analyse(io) {
     // produces 49 failures across TWO directories, `prefs` (47) and
     // `vault-unlock` (2). So a declared command must be allowed, and an allowed
     // command need not be declared.
-    // Measured against all 27 directories before this check landed: zero
+    // Measured against every directory before this check landed: zero
     // pre-existing gaps in the direction that IS checked.
     const allowed = new Set();
     for (const { header, body } of tables) {

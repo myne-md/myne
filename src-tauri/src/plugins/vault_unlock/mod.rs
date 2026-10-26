@@ -32,11 +32,20 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-unlock")
         .invoke_handler(tauri::generate_handler![
             commands::unlock,
+            // The `NTV7` generation's second credential (myne-md/myne#911 task 10):
+            // the identity phrase opens a vault whose saved vault phrase was
+            // retired by the explicit upgrade.
+            commands::unlock_with_person_phrase,
             commands::lock,
             commands::vault_status,
             commands::vault_storage_health,
             commands::vault_list,
             commands::vault_is_unlocked,
+            // Whether this vault accepts the owner's identity phrase
+            // (myne-md/myne#911 task 10): the unlock screen's one-bit discriminator
+            // between "recover with your vault phrase" and "unlock with your
+            // identity phrase".
+            commands::vault_is_person_wrapped,
             commands::vault_slot_kind,
             commands::vault_active_id,
             commands::report_user_activity,

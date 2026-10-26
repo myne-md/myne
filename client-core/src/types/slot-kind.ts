@@ -1,6 +1,6 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust type lives at:
-//   - src-tauri/src/plugins/vault_unlock/state.rs (SlotKind)
+//   - core/src/plugins/vault_unlock/state.rs (SlotKind)
 //
 // Plan: derive `ts_rs::TS` on the enum, run `cargo test` to emit the
 // file at this path, and have CI fail if `git diff --exit-code` shows
@@ -11,9 +11,9 @@
 
 /**
  * Discriminator for the three-state slot machine in
- * `src-tauri/src/plugins/vault_unlock/state.rs::Slot`. Returned by
+ * `core/src/plugins/vault_unlock/state.rs::Slot`. Returned by
  * the `vault_unlock:vault_slot_kind` Tauri command (see
- * `src-tauri/src/plugins/vault_unlock/commands.rs::vault_slot_kind`)
+ * `core/src/plugins/vault_unlock/commands.rs::vault_slot_kind`)
  * for frontend routing decisions:
  *
  * - `"Empty"`, no vault unlocked, no recovery in flight. Frontend

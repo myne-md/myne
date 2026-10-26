@@ -35,6 +35,13 @@ use thiserror::Error;
 pub struct DeviceJoinQr {
     /// A self-contained SVG string rendering the join payload as a QR.
     pub svg: String,
+    /// The encoded payload the QR renders (myne-md/myne#911 task 9).
+    ///
+    /// The same bytes the image carries, exposed because two callers need the
+    /// STRING rather than a picture: a desktop with no camera pastes it, and a
+    /// scenario asserts what a code actually said. It is public by construction
+    /// (a QR is meant to be read), and it carries no secret in any variant.
+    pub payload: String,
     /// Seconds this payload stays fresh (the WebView regenerates before it lapses).
     pub ttl_secs: u64,
 }
@@ -66,6 +73,11 @@ pub enum DeviceJoinQrError {
     /// completed. Refused rather than emitting a QR that names no vault.
     #[error("this member vault has no account recorded")]
     VaultAccountUnknown,
+    /// This device holds no identity, so there is no person for a join code to
+    /// name (myne-md/myne#911 task 9). Refused rather than minting a code that
+    /// carries an empty id.
+    #[error("this device holds no identity")]
+    NoIdentity,
 }
 
 /// Build the SVG QR for adding a device, from the user-pasted `account_number`.
@@ -92,6 +104,39 @@ pub async fn sync_device_join_qr<R: Runtime>(
     )
     .map_err(|_| DeviceJoinQrError::InvalidAccountNumber)?;
 
+    render_payload(&payload)
+}
+
+/// Build the SVG QR that admits another device to this PERSON's account
+/// (myne-md/myne#911 task 9).
+///
+/// Takes **no argument**: the person id comes from the identity this device
+/// holds, and the endpoint from its own sync config, so a caller cannot ask for a
+/// code describing somebody else. The payload names the person and nothing else;
+/// the scanning device proves the 24-word phrase and waits for one approval.
+///
+/// This is the owner's device-join on the identity model, and it exists because a
+/// vault born under an identity has no account number to put in the legacy code:
+/// `sync_device_join_qr` takes one as an argument, which is the whole reason this
+/// command cannot reuse it.
+#[tauri::command]
+pub async fn sync_person_join_qr<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<DeviceJoinQr, DeviceJoinQrError> {
+    use myne_core::plugins::sync::person_auth::{person_auth_path_for_read, read_person_auth};
+
+    let host = myne_core::host::tauri_host::TauriHost::new(app.clone());
+    let endpoint_url = endpoint_url_from_host(&app).await?;
+    let path = person_auth_path_for_read(&host).map_err(|_| DeviceJoinQrError::NoIdentity)?;
+    let auth = read_person_auth(&myne_core::vault_io::StdVaultIo, &path)
+        .await
+        .map_err(|_| DeviceJoinQrError::NoIdentity)?
+        .ok_or(DeviceJoinQrError::NoIdentity)?;
+    if auth.person_id_hex.is_empty() {
+        return Err(DeviceJoinQrError::NoIdentity);
+    }
+    let payload = QrJoinPayload::person(endpoint_url, &auth.person_id_hex, host.now_unix_secs())
+        .map_err(|_| DeviceJoinQrError::NoIdentity)?;
     render_payload(&payload)
 }
 
@@ -185,6 +230,7 @@ fn render_payload(payload: &QrJoinPayload) -> Result<DeviceJoinQr, DeviceJoinQrE
     let svg = render_qr_svg(&encoded).ok_or(DeviceJoinQrError::Render)?;
     Ok(DeviceJoinQr {
         svg,
+        payload: encoded,
         ttl_secs: QR_JOIN_TTL_SECS,
     })
 }

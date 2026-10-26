@@ -21,10 +21,12 @@
 description = "Default permission set for the vault-unlock plugin."
 permissions = [
     "allow-unlock",
+    "allow-unlock-with-person-phrase",
     "allow-lock",
     "allow-vault-status",
     "allow-vault-list",
     "allow-vault-is-unlocked",
+    "allow-vault-is-person-wrapped",
     "allow-vault-slot-kind",
     "allow-vault-active-id",
     "allow-report-user-activity",
@@ -34,6 +36,11 @@ permissions = [
 identifier = "allow-unlock"
 description = "Allow invoking vault_unlock:unlock (open an existing vault with master password)."
 commands.allow = ["unlock"]
+
+[[permission]]
+identifier = "allow-unlock-with-person-phrase"
+description = "Allow invoking vault_unlock:unlock_with_person_phrase: open an NTV7 vault with the owner's identity phrase (myne-md/myne#911 task 10). The second credential the person-wrapped generation ships, replacing the saved vault phrase the explicit upgrade retires. The core normalizes the phrase, derives the person and opens the person wrap; a vault of any other generation refuses with the same non-distinguishing InvalidCredentialOrVault a wrong password gets."
+commands.allow = ["unlock_with_person_phrase"]
 
 [[permission]]
 identifier = "allow-lock"
@@ -69,3 +76,8 @@ commands.allow = ["vault_active_id"]
 identifier = "allow-report-user-activity"
 description = "Allow invoking vault_unlock:report_user_activity (lock-free activity heartbeat for the auto-lock-on-idle timer — MYND-121; no secret material, no slot-lock acquisition)."
 commands.allow = ["report_user_activity"]
+
+[[permission]]
+identifier = "allow-vault-is-person-wrapped"
+description = "Allow invoking vault_unlock:vault_is_person_wrapped: a read-only one-bit probe answering whether the active vault carries the NTV7 person wrap, i.e. whether the owner's identity phrase is a credential for it (myne-md/myne#911 task 10). The unlock screen uses it to decide whether its recovery escape hatch says \"unlock with your vault recovery phrase\" or \"unlock with your identity phrase\", because the explicit upgrade retires the first. Not a secret: it reads the first four magic bytes of vault.meta, which any reader of the directory already has. No permit, no Argon2id, no slot peek, no key material."
+commands.allow = ["vault_is_person_wrapped"]

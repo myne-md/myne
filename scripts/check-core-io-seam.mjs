@@ -10,10 +10,11 @@
 //
 // # Why a RATCHET and not a ban
 //
-// 38 production files under `core/src` reach the filesystem directly today, and
-// migrating them is the body of tasks 12, 13, 14 and 44–48 — one plugin at a
-// time, each verifiable on its own. A hard ban would have to be landed in one
-// 38-file change, which is exactly the shape of change nobody can review.
+// The production files under `core/src` that reach the filesystem directly today
+// are recorded below, and migrating them is the body of tasks 12, 13, 14 and
+// 44–48 — one plugin at a time, each verifiable on its own. A hard ban would have
+// to land every one of them in a single change, which is exactly the shape of
+// change nobody can review.
 //
 // So the current set is recorded below and the rule is one-directional: **a file
 // not on the list may not start using `std::fs`, and a file that leaves the list

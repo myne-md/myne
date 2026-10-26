@@ -15,6 +15,7 @@ permissions = [
   "allow-vault-migrate-confirm",
   "allow-vault-migrate-settle-status",
   "allow-vault-migrate-progress",
+  "allow-vault-upgrade-to-ntv7",
 ]
 
 [[permission]]
@@ -41,3 +42,8 @@ commands.allow = ["vault_migrate_settle_status"]
 identifier = "allow-vault-migrate-progress"
 description = "Allow invoking vault-migrate:vault_migrate_progress — read the running migration's per-blob progress (protocol.md §10.4.1 point 2). Counts only: done, total, a generation counter and an active flag. No percentage and no ETA, because the migration's cost is dominated by four Argon2id derivations that happen BEFORE the counted loop and vary by an order of magnitude across machines. Reads three atomics; touches no vault data."
 commands.allow = ["vault_migrate_progress"]
+
+[[permission]]
+identifier = "allow-vault-upgrade-to-ntv7"
+description = "Allow invoking vault-migrate:vault_upgrade_to_ntv7: the explicit NTV6 (and, chained, NTV5) upgrade to the person-wrapped NTV7 generation (myne-md/myne#911 task 10). Appends the person envelope over root_key sealed to the owner's person public half and ZEROES the three recovery-phrase-wrap fields in ONE atomic metadata write, so the saved vault phrase stops opening the vault. Irreversible, and it makes the vault unreadable to any client that predates NTV7 once the frame syncs. Owner-only (a member has no root_key), refused while a member session is active, and it never runs on an unlock. An NTV5 source first runs the owner B2B migration, which needs the identity keypair in session. A refusal leaves the previous metadata byte-identical."
+commands.allow = ["vault_upgrade_to_ntv7"]

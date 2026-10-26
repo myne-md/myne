@@ -3943,7 +3943,6 @@
         "ribbon": "dải bên trái ghim lệnh lệnh thứ tự bỏ ghim thanh công cụ phím tắt",
         "folderNotes": "thư mục ghi chú chỉ mục folder_index trang đích nhấp đúp liên kết tới thư mục dự án tắt",
         "syncMembers": "thành viên, chia sẻ, mời, nhóm, cộng tác, kho",
-        "accountName": "tên tài khoản nhóm phân nhóm đổi tên nhãn thiết bị cục bộ",
         "accountVaults": "tài khoản các kho được nhóm những kho nào thuộc danh sách nhóm",
         "aiMeetingPrompt": "cuộc họp tóm tắt câu lệnh chỉ dẫn tùy chỉnh bản chép lời việc cần làm quyết định",
         "update": "cập nhật nâng cấp kiểm tra cập nhật phiên bản mới phát hành tải xuống",
@@ -4025,14 +4024,10 @@
       "atCap": "Danh sách đã đầy, nên không thể ghi nhớ thêm gì mới. Hãy xóa một mục để có chỗ."
     },
     "account": {
-      "nameLabel": "Tên tài khoản",
-      "nameHelper": "Tên cho nhóm kho này trên thiết bị. Bộ chuyển kho dùng nó làm tiêu đề của nhóm. Nó ở lại trên thiết bị này và không bao giờ được lưu bên trong kho, nên nó không đồng bộ và một thiết bị khác có thể nhóm và đặt tên cho cùng các kho đó theo cách khác.",
-      "namePlaceholder": "Thêm một tên…",
-      "nameSave": "Lưu",
-      "nameSaving": "Đang lưu…",
       "vaultsLabel": "Các kho trong tài khoản này",
       "vaultsHelper": "Các kho mà thiết bị này nhóm dưới tên ở trên. Việc nhóm là một lựa chọn tổ chức theo từng thiết bị, nên nó không thuộc nội dung của kho nào và không đi kèm theo kho.",
-      "vaultsCount": "{{count}} kho",
+      "vaultsCount_one": "{{count}} kho",
+      "vaultsCount_other": "{{count}} kho",
       "currentVault": "Kho này",
       "unknownVault": "Một kho khác trên thiết bị này",
       "standaloneHelper": "Kho này không được nhóm dưới một tài khoản trên thiết bị này, nên nó đứng riêng. Việc nhóm là theo từng thiết bị: một thiết bị khác có thể hiển thị nó bên trong một nhóm.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Tên có thể được đặt sau khi kho này được chia sẻ.",
       "nameErrorLocked": "Hãy mở khóa kho để đổi tên của bạn.",
       "nameErrorGeneric": "Không lưu được tên của bạn. Hãy thử lại.",
-      "nameInvite": "Bạn chưa có tên hiển thị. Các thành viên khác thấy dấu vân tay của bạn.",
       "nameInviteCta": "Đặt một tên",
-      "nameInviteDismiss": "Không phải bây giờ",
       "noInvitations": "Chưa gửi lời mời nào.",
       "identityHeading": "Danh tính của bạn",
       "membersHeading": "Thành viên",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Cụm từ khôi phục — nếu bạn quên mật khẩu",
       "save": "Lưu bộ công cụ khôi phục",
       "saveFailed": "Không lưu được tệp. Hãy sao chép bộ công cụ thay thế, hoặc ghi lại cả hai phần.",
-      "savedToFile": "Đã lưu. Đây là một tệp văn bản thuần chứa cả hai bí mật, nên hãy giữ nó ở nơi chỉ bạn đọc được.",
-      "whyEnglish": "Các từ này là tiếng Anh trong mọi ngôn ngữ. Chúng thuộc tiêu chuẩn BIP-39, nên bất kỳ ứng dụng Myne nào cũng đọc được cụm từ do ứng dụng khác viết. Đừng dịch chúng: các từ đã dịch không có trong danh sách từ, và cụm từ sẽ ngừng hoạt động."
+      "savedToFile": "Đã lưu. Đây là một tệp văn bản thuần chứa cả hai bí mật, nên hãy giữ nó ở nơi chỉ bạn đọc được."
     },
     "name": {
       "back": "Quay lại",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Tài khoản",
     "moveToAccount": "Chuyển vào tài khoản…",
     "moveToNewAccount": "Chuyển vào tài khoản mới",
-    "renameAccount": "Đổi tên tài khoản",
     "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
     "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
-    "labelTooLong": "Tên quá dài. Rút gọn còn 512 ký tự.",
-    "renameCancel": "Hủy",
-    "renamePlaceholder": "Tên tài khoản",
-    "renameSave": "Đổi tên",
     "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi.",
     "createShort": "Kho mới",
     "joinShort": "Thêm thiết bị",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Các tệp còn sót lại từ một lần xóa bị gián đoạn ({{n}}). Dọn dẹp chúng trước khi tạo kho lưu trữ.",
     "cleanUpFiles": "Dọn dẹp tệp còn sót lại",
     "connect": "Kết nối tới tài khoản của tôi",
-    "startIdentity": "Tạo một danh tính",
-    "startLocal": "Tạo một kho cục bộ thay thế",
     "tagline": "Ghi chú markdown được mã hóa. Không cần email khi đăng ký.",
-    "identityTitle": "Tạo một danh tính",
-    "identityBody": "Một danh tính cho mọi kho của bạn, để người khác có thể mời bạn. Cần một máy chủ đồng bộ.",
-    "localTitle": "Tạo một kho cục bộ",
-    "localBody": "Một kho được mã hóa trên thiết bị này. Thêm đồng bộ hoặc một danh tính sau.",
     "restoreTitle": "Khôi phục từ bản sao lưu",
     "restoreBody": "Mở một tệp .myne-backup bạn đã lưu trước đó.",
     "joinTitle": "Thêm thiết bị này vào một tài khoản",
     "joinBody": "Dùng một kho bạn đã có trên thiết bị khác.",
-    "createAction": "Tạo",
     "restoreAction": "Khôi phục",
     "joinAction": "Thêm thiết bị",
     "version": "Phiên bản {{version}} · tiền alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "đã mở {{count}} năm trước",
     "corruptedBadge": "Bị hỏng",
     "accountFallback": "Tài khoản",
-    "renameAccount": "Đổi tên tài khoản",
     "moveToNewAccount": "Chuyển vào tài khoản mới",
     "moveToAccount": "Chuyển vào tài khoản…",
     "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
     "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
-    "labelTooLong": "Tên quá dài. Rút gọn còn 512 ký tự.",
-    "renameCancel": "Hủy",
-    "renamePlaceholder": "Tên tài khoản",
-    "renameSave": "Đổi tên",
     "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Đã khôi phục danh tính.",
     "title": "Tạo danh tính",
     "errorAlreadyHeld": "Thiết bị này đã giữ một danh tính. Hãy khôi phục nó bằng cụm từ khôi phục, hoặc quên nó và tạo một danh tính mới.",
-    "errorNotConfigured": "Không thiết lập được danh tính. Hãy kiểm tra xem đã cấu hình máy chủ đồng bộ chưa rồi thử lại.",
     "forgetCancel": "Giữ lại",
     "forgetConfirm": "Quên và tạo mới",
     "forgetCta": "Quên danh tính này và tạo một danh tính mới",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Hãy khôi phục nó trên thiết bị này bằng cụm từ khôi phục 24 từ của nó.",
     "recoverAction": "Khôi phục",
     "back": "Quay lại",
-    "changeServer": "Đổi hoặc xác minh máy chủ đồng bộ",
-    "errorTlsFailure": "Không xác minh được chứng chỉ HTTPS của máy chủ. Hãy kiểm tra địa chỉ máy chủ và chứng chỉ của nó.",
     "phraseTitle": "Lưu cụm từ danh tính của bạn",
     "phraseContinue": "Tiếp tục",
     "confirmTitle": "Xác nhận cụm từ của bạn"
@@ -5509,15 +5481,6 @@
       "hint": "Thử lại sẽ bắt đầu tải xuống từ đầu.",
       "retry": "Thử lại",
       "back": "Quay lại màn hình mở khóa"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Chọn một máy chủ đồng bộ",
-      "intro": "Myne cần một máy chủ để giữ ghi chú đã mã hóa của bạn và để liên lạc với bạn cho các lời mời. Ghi chú của bạn vẫn được mã hóa trên thiết bị này trước khi rời khỏi nó; máy chủ chỉ lưu bản mã.",
-      "notConfigured": "Hãy nhập địa chỉ máy chủ ở trên và nhấn Kết nối để tiếp tục.",
-      "back": "Quay lại",
-      "continue": "Tiếp tục"
     }
   },
   "identityFlow": {

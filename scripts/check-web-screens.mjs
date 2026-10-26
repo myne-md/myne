@@ -73,25 +73,42 @@ const VERDICTS = {
       "are the shared implementation, unchanged: what the core gained was the IO seam on its read " +
       "and write paths, threaded as ONE implementation rather than a wasm twin.",
   },
+  "FirstRun.tsx": {
+    verdict: "ported",
+    note:
+      "SHIPS since myne-md/myne#911 task 13. The browser's create door on `account-entry` opens " +
+      "this stage, and the shared screen runs unmodified: the ceremony's commands dispatch in wasm, " +
+      "and its phrase step carries the session-only caveat because `personCredentialPersisted` is " +
+      "absent on this client. `ported` rather than `adapted` because the difference is a " +
+      "capability answer the screen already reads, not a web shape of the screen.",
+  },
     "Welcome.tsx": {
     verdict: "excluded",
     marker: "welcome.create-cta",
     note: "Unreachable on web (an empty client routes to account-entry, task 85) and every door it offers — create, join, fresh-install restore — is an absent capability.",
   },
   "IdentityHome.tsx": {
-    verdict: "gated",
+    verdict: "ported",
     note:
-      "SHIPS since decisions.md 2026-10-18 (entry 0704) retired the phrase restriction that kept " +
-      "this screen substituted out of the bundle. It is still unreachable on web, and that half is " +
-      "unchanged: person status is unsupported, so the capability descriptor refuses the flow and no " +
-      "route renders it. `gated` rather than `ported`, because nothing here has been shown to work on " +
-      "web; rather than `adapted`, because the shared module ships unmodified; and rather than " +
-      "`excluded`, because it is IN the artefact now and claiming absence would be false.",
+      "SHIPS and is REACHABLE since myne-md/myne#911 task 13. The person plane dispatches in wasm " +
+      "(`personIdentity` is present here), and this client renders the home from BOTH zero-vault " +
+      "stages: `welcome` on the clients whose empty state is 'make something', `account-entry` on " +
+      "the browser, whose empty state is 'tell me which account to pull', a question an existing " +
+      "identity makes moot, because a vault born under the person plane has no account number to " +
+      "type. Previously `gated`, with a note saying person status was unsupported, which task 13 " +
+      "made false.",
   },
+  // No `marker`: `marker` is the excluded arm's proof of absence, and the guard
+  // fails any entry whose marker is found in the bundle. This screen ships now,
+  // so the only thing left to say about it is what it answers on web.
   "VaultPicker.tsx": {
-    verdict: "excluded",
-    marker: "picker.vault-row",
-    note: "An origin holds exactly one container (constant vault id, task 85), so the >=2-vault branch that produces the picker stage cannot be reached.",
+    verdict: "ported",
+    note:
+      "SHIPS since myne-md/myne#911 task 13. It was excluded while an origin held exactly one " +
+      "container, which made the >=2-vault branch unreachable; the io-seam walk makes two " +
+      "containers real, so the shared screen ships unmodified. The one thing a browser cannot " +
+      "answer, the device-local account grouping, is already handled by the screen itself: a " +
+      "`KeychainUnavailable` answer leaves the rows standalone rather than failing the list.",
   },
   "RestoreBackup.tsx": {
     verdict: "excluded",

@@ -2828,6 +2828,7 @@
   "password": {
     "createForm": {
       "checkingStrength": "Checking strength…",
+      "strengthUnavailable": "The strength check could not load, so only the minimum length is checked.",
       "confirmLabel": "Confirm master password",
       "defaultEmptyCaption": "Choose something you can remember. It cannot be reset.",
       "mismatch": "Passwords do not match.",
@@ -3087,20 +3088,30 @@
         "extensions": "Browser extensions",
         "grouping": "This account"
       },
-      "nameLabel": "Account name",
-      "nameHelper": "A name for this group of vaults on this device. The vault picker uses it as the group's heading. It stays on this device and is never stored inside a vault, so it does not sync and another device may group and name the same vaults differently.",
-      "namePlaceholder": "Add a name…",
-      "nameSave": "Save",
-      "nameSaving": "Saving…",
       "vaultsLabel": "Vaults in this account",
-      "vaultsHelper": "The vaults this device groups under the name above. Grouping is a per-device organisational choice, so it is not part of any vault's content and does not travel with it.",
-      "vaultsCount": "{{count}} vaults",
+      "vaultsHelper": "The vaults this device groups together. Grouping is a per-device organisational choice, so it is not part of any vault's content and does not travel with it.",
+      "vaultsHelperShort": "Grouping stays on this device and does not travel with a vault.",
+      "vaultsCount_one": "{{count}} vault",
+      "vaultsCount_other": "{{count}} vaults",
+      "vaultActions": "Vault actions",
+      "splitLastConfirm": "This is the only vault in the account. Moving it out deletes this account.",
+      "vaultCorrupted": "This vault's metadata could not be read",
+      "vaultUnreadable": "Not read on this device",
+      "vaultDeviceOnly": "Device only",
       "currentVault": "This vault",
       "unknownVault": "Another vault on this device",
+      "numberLabel": "Account number",
+      "numberHelper": "Your identity's number, not a vault's. Derived from your identity phrase, so it cannot be lost and needs no saving. It is not a secret; use it for support or for a server operator handoff.",
+      "numberUnavailable": "Could not read the account number on this device. Reopen Settings to try again.",
+      "numberEmpty": "No identity on this device. Add or recover one in Sync to get an account number.",
+      "numberCopy": "Copy",
+      "numberCopied": "Account number copied",
+      "numberCopyFailed": "Couldn't copy the account number",
+      "copyAccountNumber": "Copy account number",
       "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
       "unresolvedHelper": "Working out which vault is open…",
       "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",
-      "groupingHidden": "Account names are unavailable while vault names are hidden. Turn that option off in Privacy to manage this account.",
+      "groupingHidden": "Account grouping is unavailable while vault names are hidden. Turn that option off in Privacy to manage it.",
       "groupingUnreadable": "This device's account grouping could not be read. Nothing was changed.",
       "groupingError": "Could not read the account grouping on this device. Nothing was changed."
     },
@@ -3150,6 +3161,29 @@
       },
       "sections": {
         "identity": "Vault identity"
+      },
+      "format": {
+        "heading": "Vault format",
+        "intro": "This vault still uses its own recovery phrase. Upgrading moves it to your identity phrase, so one phrase recovers every vault you own.",
+        "cta": "Upgrade to one-phrase recovery",
+        "confirm": "Retire my vault phrase and upgrade",
+        "cancel": "Keep my vault phrase for now",
+        "running": "Upgrading…",
+        "warningPhrase": "Your saved vault recovery phrase will stop opening this vault. Your vault password still works, and your identity phrase becomes the way back in.",
+        "warningDevices": "Every device you use must be updated first. An older version cannot open this vault once the upgrade syncs.",
+        "done": "This vault now uses your identity phrase (upgraded from {{from}}).",
+        "error": {
+          "migrationRequired": "This vault is still in the old v0.1 format. Finish the vault upgrade in Sync settings first.",
+          "personRequired": "This device has no identity yet. Create your identity first, then come back.",
+          "identityLocked": "Your identity is locked. Unlock it with your identity phrase, then upgrade.",
+          "personMismatch": "This vault belongs to a different identity than the one on this device.",
+          "notOwner": "This is a shared vault. Only its owner can change its format.",
+          "notUnlocked": "Open the vault before upgrading its format.",
+          "inProgress": "Another security operation is running. Try again in a moment.",
+          "alreadyUpgraded": "This vault already uses your identity phrase.",
+          "generic": "The upgrade did not complete. Nothing was changed.",
+          "sharedVault": "This vault is shared with someone else. One-phrase recovery is for a vault only you own, because the shared member handling does not support it yet."
+        }
       }
     },
     "appearance": {
@@ -3256,6 +3290,7 @@
     "changePassword": {
       "cancel": "Cancel",
       "checkingStrength": "Checking strength…",
+      "strengthUnavailable": "The strength check could not load, so only the minimum length is checked.",
       "confirmLabel": "Confirm new password",
       "currentLabel": "Current password",
       "mismatch": "Passwords do not match.",
@@ -3917,6 +3952,7 @@
         "appearance": "Appearance",
         "cli": "CLI",
         "data": "Data",
+        "diagnostics": "Diagnostics",
         "editor": "Editor",
         "files": "Files",
         "transcription": "Transcription",
@@ -4070,7 +4106,7 @@
       "empty": "No settings match “{{query}}”",
       "resultsLabel": "Search results",
       "keywords": {
-        "accountName": "account name group grouping rename label device local",
+        "accountNumber": "account number person identity support handoff copy",
         "accountVaults": "account vaults grouped which vaults belong group list",
         "aiAutoTag": "auto tag tags suggest suggestions labels ai",
         "aiHistoryBudget": "conversation history context memory budget characters agent chat carried request",
@@ -4150,7 +4186,9 @@
         "timezone": "timezone time zone tz utc iana region today",
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
         "syncMembers": "members, share, invite, team, collaboration, vault",
-        "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs"
+        "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs",
+        "vaultFormat": "vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",
+        "publishVault": "publish published vault server device only sync"
       },
       "emptyBody": "Try a shorter word, or the name of a panel."
     },
@@ -4283,7 +4321,7 @@
       "invalidAccount": "That doesn’t look like a valid account number.",
       "notConfigured": "Configure a sync server first, then make a QR.",
       "scanWithApp": "Scan with the iOS app",
-      "title": "Add a device with a QR"
+      "title": "Sign in another device"
     },
     "memberJoinQr": {
       "error": "Couldn’t make the code.",
@@ -4295,7 +4333,19 @@
       "stepIdentity": "On your other device, open Myne and choose “I already have an identity”.",
       "stepJoin": "This shared vault will be waiting in your invitations. Open it to join.",
       "stepPhrase": "Enter your 24-word recovery phrase there.",
-      "title": "Add your own device"
+      "title": "Sign in your second device"
+    },
+    "personJoinQr": {
+      "title": "Add a device to your identity",
+      "hint": "On the other device, choose “I have a join code” and paste what this code says. That device will ask for your 24 words, then wait for you to approve it here.",
+      "notConfigured": "A code names a server, so set yours first in Sync above, then make this code.",
+      "noIdentity": "This device holds no identity, so there is no account for a code to name. Create or recover your identity first.",
+      "error": "Could not make the code. Try again.",
+      "image": "Join code",
+      "stepCode": "On the other device, open Myne and paste this code where it asks for one.",
+      "stepPhrase": "Enter your 24-word identity phrase there. It never leaves that device.",
+      "stepApprove": "Approve that device here, on a device that already has your identity.",
+      "stepVaults": "Your account’s vaults then appear on the new device. Open one with that vault’s own password."
     },
     "devices": {
       "approve": "Approve",
@@ -4303,7 +4353,7 @@
       "awaitingApproval_other": "{{count}} devices awaiting approval",
       "loading": "Loading…",
       "noDevices": "No other devices yet",
-      "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "notEnrolled": "This device isn’t signed in yet. If you just added it, wait for approval from a device that is already on your account; otherwise sign it in with “Sign in this device”.",
       "platform": {
         "android": "Android phone",
         "androidTablet": "Android tablet",
@@ -4402,7 +4452,25 @@
     },
     "join": {
       "accountLabel": "Account number",
+      "back": "Back",
       "backToWaiting": "Back to waiting",
+      "codeBody": "Paste the code the other device is showing. A code from an identity adds this device to that whole account.",
+      "codeContinue": "Continue",
+      "codeExpired": "That code has expired. Ask the other device to show a fresh one.",
+      "codeInvalid": "That is not a Myne join code.",
+      "codeLabel": "Join code",
+      "codeMemberUnsupported": "That code is for a shared vault. Add this device from the identity screen instead, where the vault appears under your invites.",
+      "codeOpen": "I have a join code",
+      "codeTitle": "Add this device with a code",
+      "personMismatch": "That code is for a different identity than the phrase you entered. Check both and try again.",
+      "personPendingBody": "One of your other devices has to approve this one. Until it does, this device cannot open any of the account's vaults.",
+      "personPendingHint": "Waiting for approval. This finishes on its own once the other device approves.",
+      "personPendingPhraseAgain": "This device was restarted before the approval arrived, so the phrase is needed once more.",
+      "personPendingPhraseCta": "Enter the phrase again",
+      "personPendingTitle": "Waiting for approval",
+      "personPhraseBody": "The code named the identity; the 24 words prove it. This device will ask for each vault's own password when you open it.",
+      "personPhraseSubmit": "Add this device",
+      "personPhraseTitle": "Enter your identity phrase",
       "cancel": "Cancel",
       "error": "Couldn’t add this device. Check the server URL, account number, and password, and that the server is reachable.",
       "errorPhrase": "Couldn’t add this device. Check the server URL, account number, and recovery phrase, and that the server is reachable.",
@@ -4428,12 +4496,13 @@
       "verifyTitle": "Verify this device",
       "waitingHint": "Keep this window open. Once approved, a verification code appears here to compare with your other device.",
       "waitingTitle": "Waiting for approval",
-      "back": "Back"
+      "personListFailed": "You are on this account, but listing its vaults did not finish, so none are shown yet. Retry, or reopen this screen later.",
+      "personListRetry": "List the vaults again"
     },
     "panel": {
       "addDevice": {
         "helper": "Sign in on a new device with your account number and password or recovery phrase. A device stays pending until an existing device approves it.",
-        "label": "Add a device"
+        "label": "Sign in this device"
       },
       "awaitingApproval": {
         "label": "Awaiting approval"
@@ -4443,7 +4512,8 @@
         "label": "Conflicts"
       },
       "devices": {
-        "label": "Devices"
+        "label": "Devices",
+        "helper": "One approval signs a device in to your account. It then sees every vault you own, and each vault still opens with its own password."
       },
       "recovered": {
         "close": "Close",
@@ -4465,6 +4535,7 @@
         "cta": "Add an identity",
         "codeLabel": "Your identity code",
         "lockedHelper": "This device holds an identity. It is locked for this session; unlock it with your recovery phrase to sign sync and invites.",
+        "unregisteredHelper": "This identity exists on this device only. Registering writes it to your sync server, which is what lets an invitation reach you.",
         "unlockedHelper": "This device holds an identity, unlocked for this session."
       },
       "server": {
@@ -4488,7 +4559,27 @@
       "sections": {
         "account": "Account",
         "server": "Server",
-        "devices": "Enrolled devices"
+        "devices": "Devices on your account"
+      },
+      "publish": {
+        "label": "Publish to your server",
+        "cta": "Publish this vault",
+        "republishCta": "Publish again",
+        "deviceOnlyHelper": "This vault exists only on this device. Publishing binds it to your identity so your other devices can open it.",
+        "publishedHelper": "Published {{when}}. This vault is on your sync server, so your other devices can reach it.",
+        "publishedHelperNoDate": "Published. This vault is on your sync server, so your other devices can reach it.",
+        "error": {
+          "NotConfigured": "Set a sync server first, in Sync above.",
+          "PersonSessionRequired": "Unlock your identity first. Publishing needs the identity that owns this vault.",
+          "PersonNotRegistered": "Register your identity first, in the Identity block above. This device holds the identity but has never registered it with a server, so there is no account to publish under.",
+          "NotEnrolled": "This vault belongs to an account this device is not enrolled on. Add the device to that account first.",
+          "NotOwner": "This vault already belongs to another identity, so it cannot be published here.",
+          "Unauthenticated": "The server refused this device. Try again, and re-enrol if it keeps happening.",
+          "Transport": "Could not reach the server. The vault is unchanged; try again.",
+          "TlsFailure": "Could not establish a trusted connection. The vault is unchanged; try again.",
+          "BadRequest": "This vault's metadata could not be read. Nothing was sent.",
+          "Other": "Publishing failed. The vault is unchanged; try again."
+        }
       }
     },
     "reconcile": {
@@ -4515,6 +4606,7 @@
       "errorTooLarge": "A file is too large to upload",
       "loading": "Sync status…",
       "notEnrolled": "Not enrolled",
+      "notRegistered": "Not registered",
       "off": "Sync off",
       "synced": "Synced",
       "syncing": "Syncing…",
@@ -4527,7 +4619,10 @@
       "devices": "Devices",
       "frozen": "This account is frozen. New changes can't be uploaded; your notes still download.",
       "ofTotal": "{{used}} of {{total}}",
-      "storage": "Storage"
+      "storage": "Storage",
+      "storageAcrossVaults": "Stored, across your vaults",
+      "vaultCount_one": "{{count}} vault",
+      "vaultCount_other": "{{count}} vaults"
     },
     "settings": {
       "serverSection": "Server",
@@ -4590,9 +4685,7 @@
       "nameErrorUnshared": "Names can be set once this vault is shared.",
       "nameErrorLocked": "Unlock the vault to change your name.",
       "nameErrorGeneric": "Could not save your name. Try again.",
-      "nameInvite": "You have no display name yet. The other members see your fingerprint.",
       "nameInviteCta": "Set a name",
-      "nameInviteDismiss": "Not now",
       "invite": "Invite member",
       "remove": "Remove",
       "removeConfirm": "Remove {{name}}? Once the key rotation completes they lose access to future changes. This cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
@@ -4607,17 +4700,19 @@
       "identityHeading": "Your identity",
       "membersHeading": "Members",
       "personUnlock": "Unlock member identity",
-      "personReady": "Member identity unlocked.",
+      "personReady": "Your identity is unlocked for this session.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
-      "personLock": "Lock member identity",
+      "personLock": "Lock identity",
       "personError": "That phrase did not open a member identity.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
-      "inviteCodeLabel": "Member identity code",
+      "inviteCodeLabel": "Your identity code",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
+      "inviteNotOnServer": "This vault is not on your sync server yet. Publish it, and register your identity, then invite again.",
       "removeFailed": "The member could not be removed.",
       "emptyTitle": "No members yet",
       "personUnlockOpen": "Unlock",
+      "identityLockedNotice": "Unlock your identity for this session to manage members and invitations.",
       "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
       "shareConfirmTitle": "Share this vault?",
       "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
@@ -4628,11 +4723,11 @@
       "identityForgetConfirm": "Forget identity",
       "identityForgetCancel": "Keep it",
       "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
-      "identityForgetError": "Could not forget the identity. Try again."
+      "identityForgetError": "Could not forget the identity. Try again.",
+      "invitationDeclined": "Declined"
     },
     "deviceBindings": {
-      "title": "Devices and members",
-      "heading": "Claimed devices",
+      "heading": "Member devices",
       "hint": "Each device that has claimed itself in this vault, with the member whose own signature claims it. A claim is not proof of ownership: it says which member signed the statement, not that the device is theirs.",
       "loading": "Loading devices…",
       "emptyTitle": "No devices claimed yet",
@@ -4919,7 +5014,20 @@
     "failClosedEyebrow": "Can't open vault",
     "restoreHint": "Restoring from a backup isn't available on mobile yet.",
     "restoreCta": "Restore from a backup",
-    "ioErrorHint": "Try again, or reopen Myne."
+    "ioErrorHint": "Try again, or reopen Myne.",
+    "identityPhraseLink": "Use your identity phrase",
+    "identityPhrase": {
+      "title": "Unlock with your identity phrase",
+      "body": "This vault opens with its password or with your identity phrase. If you saved a separate vault phrase for it, that one was retired and no longer opens it. Opening it with the 24 words you wrote down for your identity also unlocks your identity for this session, so sync runs without a second prompt.",
+      "label": "Identity phrase",
+      "hint": "24 words, in order.",
+      "submit": "Unlock with identity phrase",
+      "decrypting": "Opening…",
+      "cancel": "Back to password",
+      "recoveryInProgress": "A recovery is already in progress. Return to the password form and continue it.",
+      "generic": "That phrase did not open this vault."
+    },
+    "personWrapProbeFailed": "Myne could not check whether this vault also opens with an identity phrase. If you created it from your identity, try that phrase first."
   },
   "vault": {
     "ioBanner": {
@@ -5018,6 +5126,14 @@
         "body": "Make sure Myne has permission to write to your application data folder.",
         "title": "Couldn't write to vault folder"
       },
+      "personLocked": {
+        "body": "Unlock your identity with its 24 words, then create the vault again. Your identity phrase is the only recovery credential for this vault, so creating it while the identity is locked would leave it unrecoverable.",
+        "title": "Unlock your identity first"
+      },
+      "plaintextTooLarge": {
+        "title": "That note is too large to encrypt",
+        "body": "Try again with less content."
+      },
       "sessionExpired": {
         "body": "For your security, vault creation times out after 10 minutes. Start over.",
         "title": "Session expired"
@@ -5037,10 +5153,6 @@
       "vaultBusyAuth": {
         "body": "Another vault operation is in progress. Try again in a moment.",
         "title": "Vault busy"
-      },
-      "plaintextTooLarge": {
-        "title": "That note is too large to encrypt",
-        "body": "Try again with less content."
       }
     },
     "kit": {
@@ -5059,8 +5171,7 @@
       "phraseFor": "Recovery phrase — if you forget your password",
       "save": "Save recovery kit",
       "saveFailed": "Couldn't save the file. Copy the kit instead, or write both parts down.",
-      "savedToFile": "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read.",
-      "whyEnglish": "The words are English in every language. They are part of the BIP-39 standard, so any Myne client can read a phrase written by any other one. Do not translate them: translated words are not in the wordlist, and the phrase would stop working."
+      "savedToFile": "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read."
     },
     "name": {
       "back": "Back",
@@ -5105,11 +5216,13 @@
       "reveal": "Reveal phrase",
       "saveAsFile": "Save as file",
       "saveFailed": "Couldn't save the file. Copy the words instead, or write them down.",
-      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read."
+      "savedToFile": "Saved. It is a plain text file, so keep it somewhere only you can read.",
+      "sessionOnlyNotice": "This browser does not keep your phrase after a reload, so you will be asked for the 24 words again. Keep them somewhere safe."
     },
     "provisioning": {
       "heading": "Creating your account",
       "caption": "Registering this vault with the sync server. Your recovery phrase comes next.",
+      "captionNoPhrase": "Registering this vault with the sync server. This takes a moment.",
       "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "ready": {
@@ -5133,6 +5246,7 @@
   "vaultPicker": {
     "accountFallback": "Account",
     "createAnother": "Create another vault",
+    "deviceOnly": "Device only",
     "heading": "Choose a vault",
     "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
@@ -5140,16 +5254,11 @@
     "moveToNewAccount": "Move to new account",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
-    "renameAccount": "Rename account",
     "restoreFromBackup": "Restore from backup",
     "subline": "You have more than one vault on this device. Pick one to unlock.",
     "vaultFallback": "Vault {{n}}",
     "accountError": "Could not update the account grouping. Nothing was changed.",
     "accountHidden": "Account actions are unavailable while vault names are hidden.",
-    "labelTooLong": "That name is too long. Keep it under 512 characters.",
-    "renameCancel": "Cancel",
-    "renamePlaceholder": "Account name",
-    "renameSave": "Rename",
     "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed.",
     "createShort": "New vault",
     "joinShort": "Add device",
@@ -5212,19 +5321,34 @@
   "vaultSwitcher": {
     "chipFallback": "Vault",
     "createAnother": "Create another vault",
+    "deviceOnly": "Device only",
     "joinDevice": "Add this device to an account",
     "switching": "switching…",
     "switchVaultLabel": "Switch vault",
     "vaultFallback": "Vault {{n}}"
   },
+  "invites": {
+    "title": "Invitations",
+    "loading": "Loading invitations…",
+    "empty": "No invitations yet.",
+    "pendingHeading": "Waiting for you",
+    "pendingHint": "The vault owner invited your identity. Accepting asks for their identity code and your recovery phrase.",
+    "error": "Could not load invitations. Check your connection and sync server.",
+    "retry": "Try again",
+    "noIdentity": "This device holds no identity yet, so no invitation can be addressed to it.",
+    "notEnrolled": "This identity is not registered yet, so invitations addressed to it cannot be listed. Registering it is the act that lets them arrive.",
+    "notice_one": "{{count}} invitation waiting",
+    "notice_other": "{{count}} invitations waiting",
+    "decline": "Decline",
+    "declineTitle": "Decline this invitation?",
+    "declineBody": "The invitation is deleted on your server, so it can never be accepted, and the owner sees that you declined rather than that they are still waiting. Getting it back means the owner inviting you again.",
+    "declineCta": "Decline invitation",
+    "declineFailed": "The invitation could not be declined. Try again.",
+    "noticeUnregistered": "Register this identity to see invitations",
+    "noticePending": "Invitations cannot be listed until this device is approved"
+  },
   "firstRun": {
-    "server": {
-      "heading": "Choose a sync server",
-      "intro": "Myne needs a server to hold your encrypted notes and to reach you for invites. Your notes stay encrypted on this device before they leave it; the server only stores ciphertext.",
-      "notConfigured": "Enter a server address above and press Connect to continue.",
-      "back": "Back",
-      "continue": "Continue"
-    }
+    "heading": "Create your identity"
   },
   "identityFlow": {
     "title": "Create an identity",
@@ -5232,15 +5356,7 @@
     "start": "Create an identity",
     "skip": "Not now, use this device only",
     "back": "Back",
-    "serverUnreachable": "Couldn't reach that server. Check the address and try again.",
     "createFailed": "Could not create the identity. Check the sync server and try again.",
-    "server": {
-      "title": "Choose a sync server",
-      "lead": "Your notes stay encrypted on this device before they leave it. The server only stores ciphertext.",
-      "urlLabel": "Server address",
-      "connect": "Connect",
-      "connecting": "Connecting…"
-    },
     "held": {
       "title": "An identity is already on this device",
       "lead": "This device already holds an identity. Forgetting it makes this device lose access to any vault it owns or joined until you recover it with its 24-word phrase. If you have not saved that phrase, it cannot be recovered.",
@@ -5284,14 +5400,51 @@
       "inviteHint": "Open this invite from the vault picker to join with your identity phrase.",
       "forgetHeading": "This device",
       "forget": "Forget this identity on this device",
-      "forgetCheckbox": "I understand this identity will be removed from this device. The server account survives and the phrase recovers it."
+      "forgetCheckbox": "I understand this identity will be removed from this device. The server account survives and the phrase recovers it.",
+      "vaultHeading": "Your vaults",
+      "vaultHint": "Your identity can own as many vaults as you like. Each one has its own password.",
+      "registerHeading": "Registration",
+      "registerHint": "This identity is not registered yet, so nobody can invite you and nothing syncs."
+    },
+    "register": {
+      "title": "Register this identity",
+      "open": "Register this identity",
+      "cta": "Register",
+      "working": "Registering…",
+      "failed": "Could not register this identity. It stays on this device and you can try again."
+    },
+    "personJoin": {
+      "title": "Add this phone to your account",
+      "lead": "Type the 24 words of the account this code came from. An existing device then approves this phone, so a phrase on its own cannot add one.",
+      "phraseLabel": "Identity phrase",
+      "phraseHint": "24 words, in order.",
+      "cta": "Add this phone",
+      "working": "Adding this phone…",
+      "mismatch": "Those words belong to a different identity than this code.",
+      "failed": "That did not add this phone. Check the words and try again.",
+      "pendingTitle": "Waiting for approval",
+      "pendingLead": "This phone is added and waiting. Approve it on a device that already has your account, and this screen finishes on its own.",
+      "pendingHint": "Nothing to do here until the other device approves.",
+      "sessionEnded": "The waiting ended when the app closed. Enter your 24 words again to continue.",
+      "reenter": "Enter your words again",
+      "finishingTitle": "Finishing this device",
+      "finishingLead": "This phone is added to your account. Its vaults are being fetched now; each one still asks for its own password.",
+      "listFailed": "This phone was added, but your account’s vaults did not arrive. Check your connection and try again.",
+      "listRetry": "Fetch the vaults again"
+    },
+    "unlock": {
+      "title": "Unlock your identity",
+      "lead": "Your identity is sealed on this device for this session. Its 24-word recovery phrase opens it; nothing is sent anywhere.",
+      "open": "Unlock identity",
+      "cta": "Unlock",
+      "working": "Unlocking…",
+      "failed": "That phrase did not open this identity. Check the 24 words and try again."
     }
   },
   "identitySetup": {
     "doneCta": "Done",
     "error": "Could not set up the identity. Try again.",
     "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
-    "errorNotConfigured": "Could not set up the identity. Check that a sync server is configured, then try again.",
     "forgetCancel": "Keep it",
     "forgetConfirm": "Forget and create new",
     "forgetCta": "Forget this identity and create a new one",
@@ -5315,9 +5468,7 @@
     "recoverTitle": "I already have one",
     "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
     "recoverAction": "Recover",
-    "back": "Back",
-    "changeServer": "Change or verify sync server",
-    "errorTlsFailure": "Couldn’t verify the server’s HTTPS certificate. Check the server address and its certificate."
+    "back": "Back"
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -5326,11 +5477,13 @@
   },
   "identityHome": {
     "createVaultCta": "Create a vault",
+    "createVaultLocked": "Unlock your identity to create a vault. It signs the vault's first member list, which is what makes the vault yours, and this device has it sealed for this session.",
     "invitesError": "Could not load invites. Check your connection and sync server.",
     "invitesHeading": "Invitations",
     "invitesLoading": "Checking for invitations…",
+    "invitesPending": "This device is waiting for approval. Invitations appear here once another device of yours approves it.",
+    "invitesUnregistered": "This identity is not registered with a sync server yet, so no invitation can reach it.",
     "noInvites": "No invitations yet.",
-    "subtitle": "You have an identity on this device, so people can invite you to a vault. You do not need to create one to be invited.",
     "stepIndicator": "Step {{n}} of {{total}} · {{label}}",
     "stepVerifyOwner": "Verify the owner",
     "stepRecoveryPhrase": "Recovery phrase",
@@ -5373,11 +5526,23 @@
     "forgetConfirm": "Forget identity",
     "forgetCta": "Forget this identity on this device",
     "forgetError": "Could not forget the identity. Try again.",
-    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it."
+    "forgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. If you have not saved that phrase, this device will not be able to recover it.",
+    "registerCta": "Register this identity",
+    "registerContinue": "Continue",
+    "registerSubmit": "Register",
+    "registerError": "Could not register. Check the phrase and the server address, then try again.",
+    "registerServerLabel": "Sync server address",
+    "registerServerPlaceholder": "https://sync.example.com",
+    "registerServerHint": "Its operator will be able to see that this identity exists.",
+    "registerInviteCodeLabel": "Server invitation code",
+    "registerInviteCodeHint": "Only if your server asks for one.",
+    "registerServerError": "That server could not be reached. Check the address and try again. Your words are still here.",
+    "accountNumberHeading": "Account number",
+    "accountNumberHint": "Derived from your identity phrase, so it cannot be lost, and it is not a secret. Use it for support or for a server operator handoff.",
+    "copyAccountNumber": "Copy account number",
+    "registerPhraseLabel": "Your identity phrase, 24 words"
   },
   "welcome": {
-    "startIdentity": "Create an identity",
-    "startLocal": "Create a local vault instead",
     "createCta": "Create new vault",
     "repairResidue": {
       "cancel": "Cancel",
@@ -5409,18 +5574,19 @@
     "cleanUpFiles": "Clean up leftover files",
     "connect": "Connect to my account",
     "tagline": "Encrypted markdown notes. No email at signup.",
-    "identityTitle": "Create an identity",
-    "identityBody": "One identity for all your vaults, so people can invite you. Needs a sync server.",
-    "localTitle": "Create a local vault",
-    "localBody": "An encrypted vault on this device. Add sync or an identity later.",
+    "startAction": "Create your identity and vault",
+    "startBody": "Start fresh on this device: a new identity, then the vault that belongs to it.",
     "restoreTitle": "Restore from backup",
     "restoreBody": "Open a .myne-backup file you saved earlier.",
     "joinTitle": "Add this device to an account",
     "joinBody": "Use a vault you already have on another device.",
-    "createAction": "Create",
+    "invitedTitle": "I was invited to a vault",
+    "invitedBody": "Set up the identity the invite was addressed to. You do not need a vault of your own.",
+    "invitedAction": "I was invited",
     "restoreAction": "Restore",
     "joinAction": "Add device",
-    "version": "Version {{version}} · pre-alpha"
+    "version": "Version {{version}} · pre-alpha",
+    "createAction": "Create"
   },
   "wikiGraph": {
     "canvasLabel": "Knowledge graph of {{count}} notes",
@@ -5499,15 +5665,10 @@
     "openedYearsAgo_other": "opened {{count}} years ago",
     "corruptedBadge": "Corrupted",
     "accountFallback": "Account",
-    "renameAccount": "Rename account",
     "moveToNewAccount": "Move to new account",
     "moveToAccount": "Move to account…",
     "accountError": "Could not update the account grouping. Nothing was changed.",
     "accountHidden": "Account actions are unavailable while vault names are hidden.",
-    "labelTooLong": "That name is too long. Keep it under 512 characters.",
-    "renameCancel": "Cancel",
-    "renamePlaceholder": "Account name",
-    "renameSave": "Rename",
     "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
   },
   "join": {

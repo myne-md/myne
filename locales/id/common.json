@@ -3943,7 +3943,6 @@
         "ribbon": "pita kiri rel semat pin perintah perintah sesuaikan susun lepas bilah alat pintasan",
         "folderNotes": "folder catatan indeks folder_index halaman muka klik ganda tautan folder proyek mati nonaktif",
         "syncMembers": "anggota, bagikan, undang, tim, kolaborasi, brankas",
-        "accountName": "nama akun grup pengelompokan ganti nama label perangkat lokal",
         "accountVaults": "akun brankas dikelompokkan brankas mana yang termasuk daftar grup",
         "aiMeetingPrompt": "rapat ringkasan perintah instruksi kustom transkrip item tindakan keputusan",
         "update": "pembaruan peningkatan periksa pembaruan versi baru rilis unduh",
@@ -4025,14 +4024,10 @@
       "atCap": "Daftar sudah penuh, jadi tidak ada hal baru yang dapat diingat. Hapus satu entri untuk memberi ruang."
     },
     "account": {
-      "nameLabel": "Nama akun",
-      "nameHelper": "Nama untuk kelompok brankas ini di perangkat ini. Pemilih brankas memakainya sebagai judul kelompok. Nama ini tetap di perangkat ini dan tidak pernah disimpan di dalam brankas, jadi tidak disinkronkan dan perangkat lain dapat mengelompokkan serta menamai brankas yang sama dengan cara berbeda.",
-      "namePlaceholder": "Tambahkan nama…",
-      "nameSave": "Simpan",
-      "nameSaving": "Menyimpan…",
       "vaultsLabel": "Brankas di akun ini",
       "vaultsHelper": "Brankas yang dikelompokkan perangkat ini di bawah nama di atas. Pengelompokan adalah pilihan organisasi per perangkat, jadi bukan bagian dari konten brankas mana pun dan tidak ikut berpindah dengannya.",
-      "vaultsCount": "{{count}} brankas",
+      "vaultsCount_one": "{{count}} brankas",
+      "vaultsCount_other": "{{count}} brankas",
       "currentVault": "Brankas ini",
       "unknownVault": "Brankas lain di perangkat ini",
       "standaloneHelper": "Brankas ini tidak dikelompokkan di bawah akun mana pun di perangkat ini, jadi berdiri sendiri. Pengelompokan bersifat per perangkat: perangkat lain mungkin menampilkannya di dalam salah satunya.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Nama dapat disetel setelah brankas ini dibagikan.",
       "nameErrorLocked": "Buka kunci brankas untuk mengubah nama Anda.",
       "nameErrorGeneric": "Nama Anda tidak dapat disimpan. Coba lagi.",
-      "nameInvite": "Anda belum punya nama tampilan. Anggota lain melihat sidik jari Anda.",
       "nameInviteCta": "Setel nama",
-      "nameInviteDismiss": "Jangan sekarang",
       "noInvitations": "Belum ada undangan yang dikirim.",
       "identityHeading": "Identitas Anda",
       "membersHeading": "Anggota",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Frasa pemulihan — jika Anda lupa kata sandi",
       "save": "Simpan kit pemulihan",
       "saveFailed": "Berkas tidak dapat disimpan. Salin kit-nya saja, atau tuliskan kedua bagiannya.",
-      "savedToFile": "Tersimpan. Ini berkas teks biasa yang memuat kedua rahasia itu, jadi simpan di tempat yang hanya Anda yang dapat membacanya.",
-      "whyEnglish": "Kata-katanya berbahasa Inggris di setiap bahasa. Kata-kata itu bagian dari standar BIP-39, sehingga klien Myne mana pun dapat membaca frasa yang ditulis klien lain. Jangan menerjemahkannya: kata yang diterjemahkan tidak ada di daftar kata, dan frasanya akan berhenti berfungsi."
+      "savedToFile": "Tersimpan. Ini berkas teks biasa yang memuat kedua rahasia itu, jadi simpan di tempat yang hanya Anda yang dapat membacanya."
     },
     "name": {
       "back": "Kembali",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Akun",
     "moveToAccount": "Pindah ke akun…",
     "moveToNewAccount": "Pindah ke akun baru",
-    "renameAccount": "Ganti nama akun",
     "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
     "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
-    "labelTooLong": "Nama itu terlalu panjang. Batasi di bawah 512 karakter.",
-    "renameCancel": "Batal",
-    "renamePlaceholder": "Nama akun",
-    "renameSave": "Ganti nama",
     "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah.",
     "createShort": "Brankas baru",
     "joinShort": "Tambah perangkat",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Berkas sisa dari penghapusan yang terputus ({{n}}). Bersihkan sebelum membuat brankas.",
     "cleanUpFiles": "Bersihkan berkas sisa",
     "connect": "Hubungkan ke akun saya",
-    "startIdentity": "Buat identitas",
-    "startLocal": "Buat brankas lokal saja",
     "tagline": "Catatan markdown terenkripsi. Tanpa email saat mendaftar.",
-    "identityTitle": "Buat identitas",
-    "identityBody": "Satu identitas untuk semua brankas Anda, agar orang dapat mengundang Anda. Memerlukan server sinkronisasi.",
-    "localTitle": "Buat brankas lokal",
-    "localBody": "Brankas terenkripsi di perangkat ini. Tambahkan sinkronisasi atau identitas nanti.",
     "restoreTitle": "Pulihkan dari cadangan",
     "restoreBody": "Buka berkas .myne-backup yang Anda simpan sebelumnya.",
     "joinTitle": "Tambahkan perangkat ini ke akun",
     "joinBody": "Gunakan brankas yang sudah Anda miliki di perangkat lain.",
-    "createAction": "Buat",
     "restoreAction": "Pulihkan",
     "joinAction": "Tambah perangkat",
     "version": "Versi {{version}} · pra-alfa"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "dibuka {{count}} tahun lalu",
     "corruptedBadge": "Rusak",
     "accountFallback": "Akun",
-    "renameAccount": "Ganti nama akun",
     "moveToNewAccount": "Pindah ke akun baru",
     "moveToAccount": "Pindah ke akun…",
     "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
     "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
-    "labelTooLong": "Nama itu terlalu panjang. Batasi di bawah 512 karakter.",
-    "renameCancel": "Batal",
-    "renamePlaceholder": "Nama akun",
-    "renameSave": "Ganti nama",
     "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identitas dipulihkan.",
     "title": "Buat identitas",
     "errorAlreadyHeld": "Perangkat ini sudah menyimpan sebuah identitas. Pulihkan dengan frasa pemulihannya, atau lupakan lalu buat yang baru.",
-    "errorNotConfigured": "Identitas tidak dapat disiapkan. Periksa apakah server sinkronisasi sudah dikonfigurasi, lalu coba lagi.",
     "forgetCancel": "Simpan",
     "forgetConfirm": "Lupakan dan buat baru",
     "forgetCta": "Lupakan identitas ini dan buat yang baru",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Pulihkan di perangkat ini dengan frasa pemulihan 24 katanya.",
     "recoverAction": "Pulihkan",
     "back": "Kembali",
-    "changeServer": "Ubah atau verifikasi server sinkronisasi",
-    "errorTlsFailure": "Tidak dapat memverifikasi sertifikat HTTPS server. Periksa alamat server dan sertifikatnya.",
     "phraseTitle": "Simpan frasa identitas Anda",
     "phraseContinue": "Lanjutkan",
     "confirmTitle": "Konfirmasi frasa Anda"
@@ -5509,15 +5481,6 @@
       "hint": "Mencoba lagi akan memulai ulang unduhannya.",
       "retry": "Coba lagi",
       "back": "Kembali ke buka kunci"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Pilih server sinkronisasi",
-      "intro": "Myne memerlukan server untuk menyimpan catatan terenkripsi Anda dan menjangkau Anda untuk undangan. Catatan Anda tetap terenkripsi di perangkat ini sebelum meninggalkannya; server hanya menyimpan ciphertext.",
-      "notConfigured": "Masukkan alamat server di atas dan tekan Sambungkan untuk melanjutkan.",
-      "back": "Kembali",
-      "continue": "Lanjutkan"
     }
   },
   "identityFlow": {

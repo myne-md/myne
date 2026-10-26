@@ -33,7 +33,7 @@ import { seedVault, type SeededVault } from "./support/fixtures";
 const PERSON_PHRASE = `${"abandon ".repeat(23).trim()} about`;
 
 describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
-  it("renders the block, offers Add when no identity exists, and flips to unlocked after the roster unlock", async () => {
+  it("renders the block, offers Add when no identity exists, and reports a reserved identity as unregistered", async () => {
     // Vault-count precondition: 1.
     let fixture!: SeededVault;
     await scenario(
@@ -53,10 +53,9 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
         // empty state (before this change the whole block was absent).
         await app.session.byTestId("sync.panel.add-identity", { timeoutMs: 10_000 });
 
-         // Unlock the identity through the block's own inline phrase entry
-         // (moved here from the member roster, myne-md/myne#831). The block is on
-         // the Connection topic; the roster is on Devices (myne-md/myne#885).
-         // The recovery-phrase grid is collapsed by default.
+         // Derive the identity from an existing phrase through the block's own
+         // door (myne-md/myne#831). The vault has NO identity yet, so Add and
+         // Unlock are both offered; the unlock door is the one that takes words.
          await (await app.session.byTestId("sync.panel.identity-unlock.open")).click();
          for (const [index, word] of PERSON_PHRASE.split(" ").entries()) {
           const testId =
@@ -67,12 +66,22 @@ describeE2E("SYNC-IDENTITY identity block (myne-md/myne#792)", () => {
         }
         await (await app.session.byTestId("sync.panel.identity-unlock.submit")).click();
 
-        // The block reflects the unlock through the shared store, without a
-        // Settings reopen, and the Add CTA is gone.
-        await app.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 10_000 });
+        // **The identity this creates is `reserved`, and that state has its OWN
+        // surface (2026-10-25): the block says the identity is not on a server
+        // yet and the control beside that sentence is Register.** It used to be
+        // asserted as `identity-unlocked`, which the panel no longer prints for a
+        // reserved identity — `person_register` installs the person session
+        // itself, so the two doors asked for the same 24 words while only one of
+        // them led anywhere. A no-server scenario can only ever reach `reserved`.
+        await app.session.byTestId("sync.panel.identity-unregistered", { timeoutMs: 20_000 });
+        await app.session.byTestId("sync.panel.register-cta");
+        expect(
+          await app.session.byTestIdAll("sync.panel.identity-unlock.open"),
+          "a reserved identity offers Register, never Unlock",
+        ).toHaveLength(0);
         expect(await app.session.byTestIdAll("sync.panel.add-identity")).toHaveLength(0);
 
-        // And the roster, one topic over, sees the same unlocked person.
+        // And the roster, one topic over, sees the same person.
         await selectSettingsTopic(app.session, "sync", "devices");
         await app.session.byTestId("member-roster", { timeoutMs: 10_000 });
         await app.session.byTestId("member-roster.person-ready");

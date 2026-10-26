@@ -1,7 +1,9 @@
 // Mobile member display-name binding (myne-md/myne#851 task 15).
 //
 // The store is the same `myne-core` codec the desktop writes: `vault.member-names`,
-// magic `MYO5`, group-tier sealed and `NTV6`-only (`decisions/protocol/0666`), reached
+// magic `MYO5`, group-tier sealed and readable on BOTH tail generations
+// (`decisions/protocol/0666`, widened by `0730`: a born `NTV7` vault carries the same
+// tail), reached
 // through this client's own `member-names` plugin shim
 // (`mobile/src-tauri/src/plugins/member_names/mod.rs`). One `invoke` per command, the
 // desktop module's discipline: the writers can only ever write the CALLER'S OWN row,

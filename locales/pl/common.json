@@ -4195,7 +4195,6 @@
         "ribbon": "lewy pasek szyna przypnij pin polecenia polecenia dostosuj uporządkuj odepnij pasek narzędzi skróty",
         "folderNotes": "folder notatka indeks folder_index strona główna dwuklik odnośnik folderu projekty wyłącz zablokuj",
         "syncMembers": "członkowie, udostępnij, zaproś, zespół, współpraca, skarbiec",
-        "accountName": "nazwa konta grupa grupowanie zmiana nazwy etykieta urządzenie lokalne",
         "accountVaults": "konto skarbce pogrupowane które skarbce należą lista grupy",
         "aiMeetingPrompt": "spotkanie podsumowanie polecenie instrukcja własne transkrypcja zadania do wykonania decyzje",
         "update": "aktualizacja aktualizuj sprawdź aktualizacje nowa wersja wydanie pobierz",
@@ -4277,14 +4276,10 @@
       "atCap": "Lista jest pełna, więc nic nowego nie da się zapamiętać. Usuń wpis, aby zwolnić miejsce."
     },
     "account": {
-      "nameLabel": "Nazwa konta",
-      "nameHelper": "Nazwa dla tej grupy skarbców na tym urządzeniu. Ekran wyboru skarbca używa jej jako nagłówka grupy. Pozostaje na tym urządzeniu i nigdy nie jest zapisywana wewnątrz skarbca, więc nie jest synchronizowana, a inne urządzenie może pogrupować i nazwać te same skarbce inaczej.",
-      "namePlaceholder": "Dodaj nazwę…",
-      "nameSave": "Zapisz",
-      "nameSaving": "Zapisywanie…",
       "vaultsLabel": "Skarbce na tym koncie",
       "vaultsHelper": "Skarbce, które to urządzenie grupuje pod powyższą nazwą. Grupowanie to wybór organizacyjny na poziomie urządzenia, więc nie jest częścią treści żadnego skarbca i nie wędruje razem z nim.",
-      "vaultsCount": "{{count}} skarbców",
+      "vaultsCount_one": "{{count}} skarbców",
+      "vaultsCount_other": "{{count}} skarbców",
       "currentVault": "Ten skarbiec",
       "unknownVault": "Inny skarbiec na tym urządzeniu",
       "standaloneHelper": "Ten skarbiec nie jest pogrupowany pod żadnym kontem na tym urządzeniu, więc występuje samodzielnie. Grupowanie działa na poziomie urządzenia: inne urządzenie może pokazywać go wewnątrz jakiegoś konta.",
@@ -4296,7 +4291,9 @@
       "sections": {
         "extensions": "Rozszerzenia przeglądarki",
         "grouping": "To konto"
-      }
+      },
+      "vaultsCount_few": "{{count}} skarbców",
+      "vaultsCount_many": "{{count}} skarbców"
     },
     "plainFile": {
       "errorSaveSetting": "Nie udało się zapisać ustawienia plików lokalnych.",
@@ -4736,9 +4733,7 @@
       "nameErrorUnshared": "Nazwy można ustawić, gdy ten skarbiec zostanie udostępniony.",
       "nameErrorLocked": "Odblokuj skarbiec, aby zmienić swoją nazwę.",
       "nameErrorGeneric": "Nie udało się zapisać Twojej nazwy. Spróbuj ponownie.",
-      "nameInvite": "Nie masz jeszcze nazwy wyświetlanej. Inni członkowie widzą Twój odcisk palca.",
       "nameInviteCta": "Ustaw nazwę",
-      "nameInviteDismiss": "Nie teraz",
       "noInvitations": "Nie wysłano jeszcze żadnych zaproszeń.",
       "identityHeading": "Twoja tożsamość",
       "membersHeading": "Członkowie",
@@ -5244,8 +5239,7 @@
       "phraseFor": "Fraza odzyskiwania — jeśli zapomnisz hasła",
       "save": "Zapisz zestaw odzyskiwania",
       "saveFailed": "Nie udało się zapisać pliku. Skopiuj zestaw albo zapisz obie części ręcznie.",
-      "savedToFile": "Zapisano. To zwykły plik tekstowy zawierający oba sekrety, więc trzymaj go w miejscu, w którym tylko Ty możesz go odczytać.",
-      "whyEnglish": "Słowa są angielskie w każdym języku. Są częścią standardu BIP-39, więc każdy klient Myne potrafi odczytać frazę zapisaną przez dowolny inny. Nie tłumacz ich: przetłumaczone słowa nie występują na liście słów, więc fraza przestałaby działać."
+      "savedToFile": "Zapisano. To zwykły plik tekstowy zawierający oba sekrety, więc trzymaj go w miejscu, w którym tylko Ty możesz go odczytać."
     },
     "name": {
       "back": "Wstecz",
@@ -5271,13 +5265,8 @@
     "accountFallback": "Konto",
     "moveToAccount": "Przenieś na konto…",
     "moveToNewAccount": "Przenieś na nowe konto",
-    "renameAccount": "Zmień nazwę konta",
     "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
     "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
-    "labelTooLong": "Ta nazwa jest za długa. Trzymaj ją poniżej 512 znaków.",
-    "renameCancel": "Anuluj",
-    "renamePlaceholder": "Nazwa konta",
-    "renameSave": "Zmień nazwę",
     "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło.",
     "createShort": "Nowy skarbiec",
     "joinShort": "Dodaj urządzenie",
@@ -5388,18 +5377,11 @@
     "residueBanner": "Pozostałe pliki z przerwanego usuwania ({{n}}). Wyczyść je przed utworzeniem sejfu.",
     "cleanUpFiles": "Wyczyść pozostałe pliki",
     "connect": "Połącz z moim kontem",
-    "startIdentity": "Utwórz tożsamość",
-    "startLocal": "Utwórz zamiast tego lokalny skarbiec",
     "tagline": "Zaszyfrowane notatki w Markdownie. Bez e-maila przy rejestracji.",
-    "identityTitle": "Utwórz tożsamość",
-    "identityBody": "Jedna tożsamość do wszystkich Twoich skarbców, aby inni mogli Cię zapraszać. Wymaga serwera synchronizacji.",
-    "localTitle": "Utwórz lokalny skarbiec",
-    "localBody": "Zaszyfrowany skarbiec na tym urządzeniu. Synchronizację lub tożsamość dodasz później.",
     "restoreTitle": "Przywróć z kopii zapasowej",
     "restoreBody": "Otwórz plik .myne-backup zapisany wcześniej.",
     "joinTitle": "Dodaj to urządzenie do konta",
     "joinBody": "Użyj skarbca, który masz już na innym urządzeniu.",
-    "createAction": "Utwórz",
     "restoreAction": "Przywróć",
     "joinAction": "Dodaj urządzenie",
     "version": "Wersja {{version}} · pre-alfa"
@@ -5495,15 +5477,10 @@
     "openedYearsAgo_other": "otwarto {{count}} lat temu",
     "corruptedBadge": "Uszkodzony",
     "accountFallback": "Konto",
-    "renameAccount": "Zmień nazwę konta",
     "moveToNewAccount": "Przenieś na nowe konto",
     "moveToAccount": "Przenieś na konto…",
     "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
     "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
-    "labelTooLong": "Ta nazwa jest za długa. Trzymaj ją poniżej 512 znaków.",
-    "renameCancel": "Anuluj",
-    "renamePlaceholder": "Nazwa konta",
-    "renameSave": "Zmień nazwę",
     "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
   },
   "join": {
@@ -5640,7 +5617,6 @@
     "recovered": "Tożsomość odzyskana.",
     "title": "Utwórz tożsamość",
     "errorAlreadyHeld": "To urządzenie ma już tożsamość. Odzyskaj ją jej frazą odzyskiwania albo zapomnij ją i utwórz nową.",
-    "errorNotConfigured": "Nie udało się skonfigurować tożsamości. Sprawdź, czy skonfigurowano serwer synchronizacji, i spróbuj ponownie.",
     "forgetCancel": "Zachowaj ją",
     "forgetConfirm": "Zapomnij i utwórz nową",
     "forgetCta": "Zapomnij tę tożsamość i utwórz nową",
@@ -5655,8 +5631,6 @@
     "recoverHint": "Odzyskaj ją na tym urządzeniu jej 24-słowną frazą odzyskiwania.",
     "recoverAction": "Odzyskaj",
     "back": "Wstecz",
-    "changeServer": "Zmień lub zweryfikuj serwer synchronizacji",
-    "errorTlsFailure": "Nie udało się zweryfikować certyfikatu HTTPS serwera. Sprawdź adres serwera i jego certyfikat.",
     "phraseTitle": "Zapisz swoją frazę tożsamości",
     "phraseContinue": "Kontynuuj",
     "confirmTitle": "Potwierdź swoją frazę"
@@ -5805,15 +5779,6 @@
       "hint": "Ponowna próba rozpoczyna pobieranie od nowa.",
       "retry": "Spróbuj ponownie",
       "back": "Powrót do odblokowania"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Wybierz serwer synchronizacji",
-      "intro": "Myne potrzebuje serwera, który przechowuje Twoje zaszyfrowane notatki i pozwala dotrzeć do Ciebie z zaproszeniami. Twoje notatki są szyfrowane na tym urządzeniu, zanim je opuszczą; serwer przechowuje wyłącznie szyfrogram.",
-      "notConfigured": "Wprowadź powyżej adres serwera i naciśnij Połącz, aby kontynuować.",
-      "back": "Wstecz",
-      "continue": "Kontynuuj"
     }
   },
   "identityFlow": {

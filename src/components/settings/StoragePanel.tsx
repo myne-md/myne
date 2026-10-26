@@ -1,7 +1,7 @@
 // Settings → Storage panel: read-only vaults-location path display +
 // Backup/Restore actions (MYND-56; engines MYND-32/MYND-218).
 //
-// Path resolution mirrors `src-tauri/src/paths.rs` post-MYND-165:
+// Path resolution mirrors `core/src/paths.rs` post-MYND-165:
 // vaults live under `appDataDir()/vaults/<id>/`; the panel shows the
 // `vaults/` root (the per-id directory name is an opaque UUID — showing
 // the root is the useful, stable path). No new IPC, no capability ACL

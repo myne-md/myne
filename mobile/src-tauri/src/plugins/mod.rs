@@ -4,13 +4,14 @@
 //! Mirror of the desktop `src-tauri/src/plugins/` set, trimmed to the
 //! flows that compile on mobile. Each plugin is a self-contained module
 //! under `plugins/` with its own commands, state, and error type. The
-//! still-desktop-only plugins (clipper pairing, importer, pdf-export,
-//! spell) are intentionally absent — mobile reuses the audited
-//! `protocol/` crate and the same secret-handling discipline, landing the
-//! rest in later phases.
+//! plugins still desktop-only (clipper pairing, importer, spell) are
+//! intentionally absent — mobile reuses the audited `protocol/` crate and
+//! the same secret-handling discipline. PDF capture is not one of them: it
+//! ships as the top-level `pdf_export` module rather than a plugin.
 //!
-//! `quick_unlock` (PIN path) is registered here — the core moved to
-//! `myne-core`; biometric stays desktop-only. `search` (MYS1) runs
+//! `quick_unlock` is registered here — the core moved to `myne-core`, and the
+//! biometric commands ship too (the iOS provider; Android answers
+//! `Unsupported`). `search` (MYS1) runs
 //! Rust-side (frontend-fed BM25), not TS-side.
 //!
 //! `sync` (MYND-458) is the mobile shim over `myne_core::plugins::sync`:

@@ -283,6 +283,18 @@ export function CreateVault({
 
   const handlePasswordSubmit = (password: string) => {
     passwordRef.current = password;
+    // A live token here means the previous attempt left a session behind, which
+    // is exactly what a person-born vault's failed commit does: it has no kit
+    // and no confirm step to retry from, so the reducer sends the user back to
+    // this screen. Dropping the session keeps the four-slot cap from being spent
+    // on attempts nobody will finish (myne-md/myne#911 task 5).
+    const stale = sessionTokenRef.current;
+    if (stale) {
+      sessionTokenRef.current = null;
+      invoke("plugin:vault-creation|cancel", { sessionToken: stale }).catch(
+        (e: unknown) => logErrorKind(e, "cancel-failed"),
+      );
+    }
     dispatch({ type: "BEGIN_REQUESTED" });
   };
 
@@ -600,7 +612,7 @@ export function CreateVault({
     // with `confirm`, so a case inserted between them silently steals the
     // confirm step's return. This one stands alone.
     case "provisioning":
-      return <ProvisioningStep />;
+      return <ProvisioningStep expectsPhrase={state.phrase !== null} />;
     case "kit":
       return (
         <KitStep
@@ -630,6 +642,13 @@ export function CreateVault({
       );
     case "confirm":
     case "committing":
+      // A person-born vault has no phrase, so there is nothing to type back and
+      // no challenge screen to render: `committing` arrived straight from
+      // `BEGIN_OK` and the wait surface is the honest one (myne-md/myne#911
+      // task 5). The `confirm` arm is unchanged for every phased flow.
+      if (state.step === "committing" && state.phrase === null) {
+        return <EncryptingStep />;
+      }
       return (
         <ConfirmStep
           phrase={state.phrase ?? []}

@@ -90,6 +90,12 @@ export function SyncUsageBlock({
   const storageUnlimited = isUnlimited(status.quota_bytes);
   const devicesUnlimited = isUnlimited(status.max_devices);
   const ratio = fillRatio(status.stored_bytes, status.quota_bytes);
+  // A person account's figure is a SUM over several vaults (myne-md/myne#911
+  // task 11), and the ceiling beside it is reported rather than enforced
+  // (server-protocol §7.1). So this arm renders the total and what it spans, and
+  // deliberately renders NO meter: a meter against a ceiling no vault is judged
+  // against would claim an enforcement the server does not perform.
+  const person = status.person === true;
 
   return (
     <div
@@ -99,9 +105,11 @@ export function SyncUsageBlock({
       {showStorage && (
         <>
           <div style={ROW_STYLE} data-testid="sync.usage-storage">
-            <span style={TERM_STYLE}>{t("sync.usage.storage")}</span>
+            <span style={TERM_STYLE}>
+              {person ? t("sync.usage.storageAcrossVaults") : t("sync.usage.storage")}
+            </span>
             <span style={VALUE_STYLE}>
-              {storageUnlimited
+              {person || storageUnlimited
                 ? formatBytes(status.stored_bytes)
                 : t("sync.usage.ofTotal", {
                     used: formatBytes(status.stored_bytes),
@@ -110,8 +118,17 @@ export function SyncUsageBlock({
             </span>
           </div>
 
+          {person && (
+            <div
+              style={TERM_STYLE}
+              data-testid="sync.usage-vault-count"
+            >
+              {t("sync.usage.vaultCount", { count: status.vault_count ?? 0 })}
+            </div>
+          )}
+
           {/* Unlimited renders no meter — there is nothing to measure against. */}
-          {!storageUnlimited && (
+          {!person && !storageUnlimited && (
             <div
               style={METER_TRACK_STYLE}
               role="progressbar"

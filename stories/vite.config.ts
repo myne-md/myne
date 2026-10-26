@@ -57,6 +57,17 @@ function branchName(): string {
 export default defineConfig({
   root: storiesRoot,
   plugins: [react()],
+  // **Its OWN dependency cache** (2026-10-24). Vite's optimizer is per-project
+  // but every target in this repository resolves the SAME `node_modules/.vite`
+  // directory, so the catalogue (:1423) and the app (`pnpm dev`, :1420) evict
+  // each other's pre-bundled chunks: the server that re-optimizes last wins, and
+  // the other one's page keeps requesting hashes that are no longer served, which
+  // Vite answers with `504 Outdated Optimize Dep`. The damage is not the 504 —
+  // it is what a lazy chunk import does with it, and the password step's strength
+  // meter was the surface where it showed: `Checking strength…` forever. Separate
+  // directories make the two servers independent; running them at once is the
+  // documented workflow, so they have to be.
+  cacheDir: fileURLToPath(new URL("../node_modules/.vite-stories", import.meta.url)),
   publicDir: fileURLToPath(new URL("../public", import.meta.url)),
   resolve: {
     alias: {
