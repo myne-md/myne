@@ -139,6 +139,11 @@ pub enum EnrollError {
     /// The device is registered but still awaiting approval (server 403
     /// `pending_approval`).
     PendingApproval,
+    /// The device already holds a DIFFERENT SCRAM verifier (server 409
+    /// `already_installed`, `decisions/protocol/0735`). Distinct because the remedy is
+    /// distinct and nothing is broken: the device is already on the account, and the user
+    /// should sign in with its own secret rather than admit it a second time.
+    AlreadyInstalled,
     /// The server gates new accounts behind an invite code and none was sent
     /// (server 403 `invite_code_required`). Distinct because the remedy is: the
     /// user must type the code the operator gave them, and re-typing their
@@ -278,6 +283,101 @@ pub fn register_verifier_with_code(
     }
 }
 
+/// The SCRAM username a DEVICE credential is addressed by (`decisions/protocol/0735`).
+///
+/// The `dev:` prefix is load-bearing rather than cosmetic, and it matches the server's own
+/// rule exactly: an account id and a device id are both 16 bytes and both encode to 32
+/// lowercase hex characters, so without a prefix the handshake could not tell which
+/// namespace a username came from.
+pub fn device_credential_username(device_id: &[u8; 16]) -> String {
+    format!("dev:{}", hex_encode(device_id))
+}
+
+/// A device credential, minted on the joining device and installed by an admitting one.
+///
+/// Only the VERIFIER travels. The secret it was derived from stays on the joining device,
+/// which is what keeps this from being "copy the account password across": the admitting
+/// device forwards a one-way value and never learns anything it could authenticate with.
+#[derive(Debug, Clone)]
+pub struct DeviceCredential {
+    /// The salt the joining device chose (lowercase hex).
+    pub salt_hex: String,
+    /// The PBKDF2 iteration count the joining device used.
+    pub iterations: u32,
+    pub stored_key_hex: String,
+    pub server_key_hex: String,
+}
+
+impl DeviceCredential {
+    /// Rebuild the verifier halves for `secret`. The verifier is a function of
+    /// `(secret, salt, iterations)` only, so the nonces and the username are passed empty
+    /// here, exactly as `register_verifier` does.
+    #[must_use]
+    pub fn verifier(&self, secret: &[u8]) -> (String, String) {
+        let salt = hex_decode(&self.salt_hex).unwrap_or_default();
+        let v = scram_client_proof(secret, &salt, self.iterations, "", "", "", &[]);
+        (hex_encode(&v.stored_key), hex_encode(&v.server_key))
+    }
+}
+
+/// Mint a credential for `secret` with a fresh CSPRNG salt.
+pub fn mint_device_credential(secret: &[u8]) -> Result<DeviceCredential, EnrollError> {
+    let mut salt = [0u8; 16];
+    getrandom::getrandom(&mut salt).map_err(|_| EnrollError::BadResponse)?;
+    let iterations = SCRAM_REGISTER_ITERATIONS;
+    let draft = DeviceCredential {
+        salt_hex: hex_encode(&salt),
+        iterations,
+        stored_key_hex: String::new(),
+        server_key_hex: String::new(),
+    };
+    let (stored_key_hex, server_key_hex) = draft.verifier(secret);
+    Ok(DeviceCredential {
+        stored_key_hex,
+        server_key_hex,
+        ..draft
+    })
+}
+
+/// Install `credential` for `device_id` into the account the `token` belongs to
+/// (`POST /auth/devices/credential`, authed).
+///
+/// The account comes from the session and never from the body: an admitting device may
+/// install only into the account it already authenticated against. The install also
+/// APPROVES the device server-side, because a credential nobody approved is a device that
+/// authenticates and then syncs nothing, so the two halves are one act on the server.
+pub fn install_device_credential(
+    transport: &dyn SyncTransport,
+    token: &str,
+    device_id: &[u8; 16],
+    credential: &DeviceCredential,
+) -> Result<(), EnrollError> {
+    let body = serde_json::json!({
+        "device_id_hex": hex_encode(device_id),
+        "username": device_credential_username(device_id),
+        "salt_hex": credential.salt_hex,
+        "iterations": credential.iterations,
+        "stored_key_hex": credential.stored_key_hex,
+        "server_key_hex": credential.server_key_hex,
+    });
+    let body = serde_json::to_vec(&body).map_err(|_| EnrollError::BadResponse)?;
+    let resp = transport.request(
+        HttpMethod::Post,
+        "/auth/devices/credential",
+        &body,
+        Some(token),
+    )?;
+    match resp.status {
+        200 => Ok(()),
+        401 => Err(EnrollError::Unauthenticated),
+        // A device that already holds a DIFFERENT verifier. Its own arm rather than a
+        // generic bad response, because the admitting device has something specific to
+        // tell the user: this device is already on the account under another secret.
+        409 => Err(EnrollError::AlreadyInstalled),
+        _ => Err(EnrollError::BadResponse),
+    }
+}
+
 /// Replace the account's SCRAM verifier (`POST /auth/verifier`, **authed**).
 ///
 /// A whole-vault re-key (`protocol.md` §10.4) mints a new `root_key`, so
@@ -351,9 +451,38 @@ pub fn enroll(
     client_nonce: &str,
     device_id: [u8; 16],
 ) -> Result<EnrollOutcome, EnrollError> {
+    enroll_with_username(
+        transport,
+        account_hash,
+        secret,
+        path,
+        client_nonce,
+        device_id,
+        None,
+    )
+}
+
+/// [`enroll`] with an explicit SCRAM username, for a device that authenticates with its
+/// OWN credential rather than the account's (`decisions/protocol/0735`).
+///
+/// `username` is `None` for the account credential, which keeps the derivation in one
+/// place: the AS9 rule (the username IS the account-hash hex) is applied here and nowhere
+/// else, so a device-credential caller cannot accidentally send a raw account number and a
+/// future caller cannot accidentally stop deriving it.
+#[allow(clippy::too_many_arguments)]
+pub fn enroll_with_username(
+    transport: &dyn SyncTransport,
+    account_hash: &[u8; 16],
+    secret: &[u8],
+    path: EnrollPath,
+    client_nonce: &str,
+    device_id: [u8; 16],
+    username: Option<&str>,
+) -> Result<EnrollOutcome, EnrollError> {
     let account_hash_hex = hex_encode(account_hash);
-    // AS9 username (see module doc): hex(account_hash), derived here.
-    let username: &str = &account_hash_hex;
+    // AS9 username (see module doc): hex(account_hash), derived here unless the caller
+    // named a device credential explicitly.
+    let username: &str = username.unwrap_or(&account_hash_hex);
 
     // 1. client-first → server-first.
     let init_body = serde_json::to_vec(&ScramInitReq {

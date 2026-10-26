@@ -30,7 +30,7 @@
     "mobile:android": "pnpm --filter myne-mobile tauri android dev",
     "tauri": "tauri",
     "sidecar": "node scripts/build-cli-sidecar.mjs --profile debug && node scripts/build-mcp-sidecar.mjs --profile debug && node scripts/build-tor-sidecar.mjs --profile debug",
-    "sidecar:release": "node scripts/build-cli-sidecar.mjs --profile release && node scripts/build-mcp-sidecar.mjs --profile release && node scripts/build-tor-sidecar.mjs --profile release",
+    "sidecar:release": "node scripts/build-cli-sidecar.mjs --profile release && node scripts/build-mcp-sidecar.mjs --profile release && node scripts/build-tor-sidecar.mjs --profile release && node scripts/build-clipper-host.mjs --profile release",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:seam:desktop": "vitest run tests/platform/tauri-seam.test.ts",

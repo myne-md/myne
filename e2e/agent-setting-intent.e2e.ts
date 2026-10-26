@@ -46,6 +46,7 @@ import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
   clickByTestId,
+  clickNthByTestId,
   createNote,
   dismissImporterOffer,
   enableAi,
@@ -193,7 +194,7 @@ aiDescribe("ag8 setting change → review → approve one → the value is writt
         // of this scenario applied 0 and 1 and asserted monthly was untouched, and
         // the runner reported `monthly.folder` written, which was the test being
         // wrong rather than the app.
-        await (await s.byTestIdAll("agentReview.settingApply"))[0].click();
+        await clickNthByTestId(s, "agentReview.settingApply", 0);
         // A landed setting counts in the headline with the note edits
         // (myne-md/myne#894): one figure for "what this run has written", and the
         // per-row flag still says which row it was.
@@ -202,7 +203,7 @@ aiDescribe("ag8 setting change → review → approve one → the value is writt
         });
         // Re-found rather than reused: the row above re-rendered, so a captured
         // handle is stale (`e2e/AGENTS.md`).
-        await (await s.byTestIdAll("agentReview.settingApply"))[2].click();
+        await clickNthByTestId(s, "agentReview.settingApply", 2);
         // **The poll's success condition IS the assertion.** The first version
         // returned the element's text as soon as it was non-null, which it already
         // was ("1 setting changed." from the first apply), so the wait resolved

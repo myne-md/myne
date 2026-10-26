@@ -62,6 +62,15 @@ pub const VAULT_HEAD_FORMAT_V1: u8 = 0x01;
 /// apply to a sync-wire record.
 pub const VAULT_HEAD_FORMAT_V2: u8 = 0x02;
 
+/// The **device-signed** head format (`decisions/protocol/0731` + `0733`).
+///
+/// `0x02` keeps meaning "signed by the person key", so a device signature can
+/// never be read as a person signature. The record is the `0x02` record with the
+/// signer slot replaced: `ed25519_sig || mldsa_sig || device_id || canonical`,
+/// i.e. byte-identical in LENGTH, with the device id where `0x02` carries the
+/// vault-scoped pseudonymous author id.
+pub const VAULT_HEAD_FORMAT_V3: u8 = 0x03;
+
 /// The vault-scoped pseudonymous author id length (`myne.head-author v1|`).
 pub const HEAD_AUTHOR_ID_LEN: usize = 16;
 
@@ -72,6 +81,14 @@ const HEAD_SIGNATURE_PREFIX: &[u8] = b"myne.head-signature v1|";
 /// Hash domain for the vault-scoped pseudonymous author id. Distinct from the
 /// person fingerprint so the id cannot be linked across vaults.
 const HEAD_AUTHOR_ID_PREFIX: &[u8] = b"myne.head-author v1|";
+
+/// Signature-class prefix for a DEVICE-signed head (`0x03`).
+///
+/// Distinct from the person class on purpose: the class prefix is what says which
+/// key type may have produced a signature, and the version byte alone would only
+/// half-prevent a person signature being read as a device one. Changing this
+/// string invalidates every `0x03` head signature.
+const DEVICE_HEAD_SIGNATURE_PREFIX: &[u8] = b"myne.head-signature v2|";
 
 /// Length of `account_number_hash` bound into the head (§3.2).
 pub const VAULT_HEAD_ACCOUNT_HASH_LEN: usize = 16;
@@ -185,6 +202,11 @@ pub enum VaultHeadError {
     /// `MYH1` baseline magic mismatch.
     #[error("vault.head-state magic mismatch (expected MYH1)")]
     StateMagicMismatch,
+    /// This device holds no key that can author a head: no device key (`0x03`) and no
+    /// person identity (`0x02`). Not a corruption, and not something a peer sent: it is
+    /// the client telling its caller that the head it was asked for needs a signer first.
+    #[error("vault head has no signing authority on this device")]
+    NoAuthority,
 }
 
 impl VaultHead {
@@ -587,6 +609,110 @@ pub fn open_signed_vault_head(
 
     let head = parse_head_canonical(canonical, VAULT_HEAD_FORMAT_V2)?;
     Ok((head, author_id))
+}
+
+/// One device a `0x03` head may have been signed by, as a verifier supplies it:
+/// the device id and the public halves its binding row carries.
+#[derive(Clone, Copy)]
+pub struct DeviceHeadSigner {
+    /// The 16-byte VV-actor id this device authors under (`sync-state.json`).
+    pub device_id: [u8; DEVICE_ID_LEN],
+    /// The device's signing public halves (`MYU5` row, `0733` decision 3).
+    pub public: crate::device_key::DevicePublicHalf,
+}
+
+fn device_head_signature_message(device_id: &[u8; DEVICE_ID_LEN], canonical: &[u8]) -> Vec<u8> {
+    let mut m =
+        Vec::with_capacity(DEVICE_HEAD_SIGNATURE_PREFIX.len() + DEVICE_ID_LEN + canonical.len());
+    m.extend_from_slice(DEVICE_HEAD_SIGNATURE_PREFIX);
+    m.extend_from_slice(device_id);
+    m.extend_from_slice(canonical);
+    m
+}
+
+/// Author a device-signed (`0x03`) head: build the canonical input (the
+/// `VaultHead` must carry [`VAULT_HEAD_FORMAT_V3`]), double-sign
+/// `"myne.head-signature v2|" || device_id || canonical` with the device keypair,
+/// and frame the record as `ed25519_sig || mldsa_sig || device_id || canonical`.
+/// `head_id` is `SHA-256(record)` as for every other head.
+///
+/// **What this buys and what it costs.** The head no longer says "this person
+/// signed it": it says "a device this person bound to themselves signed it", and
+/// a verifier resolves the device through the binding store. A stolen device key
+/// can sign as that device until its binding is revoked, which is the bound
+/// `0731` states in exchange for removing the per-session phrase from sync.
+pub fn sign_device_vault_head(
+    head: &VaultHead,
+    device_id: &[u8; DEVICE_ID_LEN],
+    device: &crate::device_key::DeviceKeyPair,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<SealedHead, VaultHeadError> {
+    if head.head_format_version != VAULT_HEAD_FORMAT_V3 {
+        return Err(VaultHeadError::FormatUnsupported);
+    }
+    let canonical = head.encode_mac_input()?;
+    let message = device_head_signature_message(device_id, &canonical);
+    let signature = device
+        .sign(&message, rng)
+        .map_err(|_| VaultHeadError::SignatureMismatch)?;
+    let sig_len =
+        crate::device_key::DEVICE_ED25519_SIG_LEN + crate::device_key::DEVICE_MLDSA_SIG_LEN;
+    let mut record = Vec::with_capacity(sig_len + DEVICE_ID_LEN + canonical.len());
+    record.extend_from_slice(&signature.ed25519_sig);
+    record.extend_from_slice(&signature.mldsa_sig);
+    record.extend_from_slice(device_id);
+    record.extend_from_slice(&canonical);
+    let head_id = compute_head_id(&record);
+    Ok(SealedHead { record, head_id })
+}
+
+/// Verify a device-signed (`0x03`) head peer-side against the device public
+/// halves the caller resolved from the vault's binding store.
+///
+/// Resolution is by the `device_id` the record names, so the caller's set is what
+/// authorizes the signer: a device absent from the set is
+/// [`VaultHeadError::AuthorUnknown`] rather than a verification failure, which is
+/// the distinction an operator needs (unbound device versus a bad signature).
+/// The parsed head's `account_number_hash` must equal the caller's, so a head
+/// framed for another vault cannot be accepted here.
+pub fn open_device_signed_vault_head(
+    record: &[u8],
+    device_signers: &[DeviceHeadSigner],
+    account_number_hash: &[u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
+) -> Result<(VaultHead, [u8; DEVICE_ID_LEN]), VaultHeadError> {
+    let sig_len =
+        crate::device_key::DEVICE_ED25519_SIG_LEN + crate::device_key::DEVICE_MLDSA_SIG_LEN;
+    if record.len() < sig_len + DEVICE_ID_LEN + 2 {
+        return Err(VaultHeadError::RecordTooShort);
+    }
+    let mut ed25519_sig = [0u8; crate::device_key::DEVICE_ED25519_SIG_LEN];
+    ed25519_sig.copy_from_slice(&record[..crate::device_key::DEVICE_ED25519_SIG_LEN]);
+    let mldsa_sig = record[crate::device_key::DEVICE_ED25519_SIG_LEN..sig_len].to_vec();
+    let mut device_id = [0u8; DEVICE_ID_LEN];
+    device_id.copy_from_slice(&record[sig_len..sig_len + DEVICE_ID_LEN]);
+    let canonical = &record[sig_len + DEVICE_ID_LEN..];
+
+    let signer = device_signers
+        .iter()
+        .find(|s| s.device_id == device_id)
+        .ok_or(VaultHeadError::AuthorUnknown)?;
+    let message = device_head_signature_message(&device_id, canonical);
+    signer
+        .public
+        .verify(
+            &message,
+            &crate::device_key::DeviceSigned {
+                ed25519_sig,
+                mldsa_sig,
+            },
+        )
+        .map_err(|_| VaultHeadError::SignatureMismatch)?;
+
+    let head = parse_head_canonical(canonical, VAULT_HEAD_FORMAT_V3)?;
+    if &head.account_number_hash != account_number_hash {
+        return Err(VaultHeadError::AuthorUnknown);
+    }
+    Ok((head, device_id))
 }
 
 /// Look up a device's counter in a version vector (absent ⇒ 0).
@@ -1516,6 +1642,105 @@ mod tests {
         }
     }
     impl rand_core::TryCryptoRng for TestRng {}
+
+    #[test]
+    fn device_signed_head_round_trips_and_rejects_an_unbound_or_wrong_device() {
+        use crate::device_key::DeviceKeyPair;
+        let device = DeviceKeyPair::generate_raw(&[0x21; 32], &[0x22; 32]);
+        let other = DeviceKeyPair::generate_raw(&[0x23; 32], &[0x24; 32]);
+        let mut account = [0u8; VAULT_HEAD_ACCOUNT_HASH_LEN];
+        account[0] = 0x5a;
+        let device_id = [0x33u8; DEVICE_ID_LEN];
+        let head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V3,
+            account_number_hash: account,
+            manifest_hash: [7u8; 32],
+            seq: 3,
+            prev_head_hash: vec![],
+            version_vector: vec![VvEntry {
+                device_id,
+                counter: 3,
+            }],
+        };
+        let mut rng = TestRng(0);
+        let sealed = sign_device_vault_head(&head, &device_id, &device, &mut rng).expect("sign");
+        assert_eq!(sealed.head_id, compute_head_id(&sealed.record));
+
+        // Length parity with `0x02`: the signer slot is the same 16 bytes, so a
+        // device signature does not grow the head the server relays.
+        let signer = DeviceHeadSigner {
+            device_id,
+            public: device.public_half(),
+        };
+        let (opened, resolved) =
+            open_device_signed_vault_head(&sealed.record, &[signer], &account).expect("open");
+        assert_eq!(resolved, device_id);
+        assert_eq!(opened, head);
+
+        // An UNBOUND device id is a distinct answer from a bad signature: the
+        // caller must be able to tell "nobody bound this device" from "this
+        // device's signature is wrong".
+        assert!(matches!(
+            open_device_signed_vault_head(&sealed.record, &[], &account),
+            Err(VaultHeadError::AuthorUnknown)
+        ));
+
+        // The binding names the device but carries ANOTHER device's public half:
+        // resolution succeeds and verification refuses.
+        let wrong = DeviceHeadSigner {
+            device_id,
+            public: other.public_half(),
+        };
+        assert!(matches!(
+            open_device_signed_vault_head(&sealed.record, &[wrong], &account),
+            Err(VaultHeadError::SignatureMismatch)
+        ));
+
+        // A `0x03` head framed for another vault is refused even with the right
+        // signer, so a head cannot be moved between vaults.
+        let mut other_vault = account;
+        other_vault[0] ^= 1;
+        assert!(matches!(
+            open_device_signed_vault_head(&sealed.record, &[signer], &other_vault),
+            Err(VaultHeadError::AuthorUnknown)
+        ));
+
+        // Tampering the canonical body breaks the signature.
+        let mut tampered = sealed.record.clone();
+        let n = tampered.len();
+        tampered[n - 1] ^= 1;
+        assert!(matches!(
+            open_device_signed_vault_head(&tampered, &[signer], &account),
+            Err(VaultHeadError::SignatureMismatch)
+        ));
+
+        // Cross-class replay: a `0x02` head's message class differs, so a person
+        // signature cannot be read as a device one.
+        let author =
+            crate::person_key::PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
+        let author_id = head_author_id(&author.public_half(), &account);
+        let person_head = VaultHead {
+            head_format_version: VAULT_HEAD_FORMAT_V2,
+            ..head.clone()
+        };
+        let person_sealed =
+            sign_vault_head(&person_head, &author_id, &author, &mut rng).expect("sign v2");
+        // The `0x02` record's signer slot holds the AUTHOR ID, which names no
+        // bound device here, so the opener's first answer is `AuthorUnknown`.
+        assert!(matches!(
+            open_device_signed_vault_head(&person_sealed.record, &[signer], &account),
+            Err(VaultHeadError::AuthorUnknown)
+                | Err(VaultHeadError::SignatureMismatch)
+                | Err(VaultHeadError::FormatUnsupported)
+        ));
+
+        // And a `0x03` head is refused by the `0x02` opener, so the two formats
+        // cannot be confused in either direction.
+        assert!(matches!(
+            open_signed_vault_head(&sealed.record, &[author.public_half()], &account),
+            Err(VaultHeadError::SignatureMismatch) | Err(VaultHeadError::AuthorUnknown)
+        ));
+    }
 
     #[test]
     fn signed_head_round_trips_and_rejects_a_wrong_signer() {

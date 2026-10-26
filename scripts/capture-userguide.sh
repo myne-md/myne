@@ -73,7 +73,7 @@ E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HO
 # `e2e/AGENTS.md` documents as the fix for `rustc … (signal: 9, SIGKILL)` on
 # `myne_desktop_lib` was unreachable from the one runner that does a full
 # release build as its normal job — `e2e-local.sh` had it, this did not.
-E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS"
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS $E2E_CARGO_OPT_LEVEL $E2E_SIDECAR_FEATURES"
 # Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS

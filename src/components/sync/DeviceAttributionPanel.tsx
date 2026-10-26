@@ -177,9 +177,17 @@ export function DeviceAttributionPanel() {
     );
   }
 
-  // An unshared vault is a STATE, not a failure: the family is `NTV6`-only, so
-  // there is no group key to seal the map under and nobody to bind a device to.
-  // Say so once, in the roster panel's own words for the same vault.
+  // An unshared vault is a STATE, not a failure: with no group tier there is no
+  // key to seal the map under and nobody to bind to a device.
+  //
+  // **One state wears this refusal now, and it used to wear three.** An `NTV5`
+  // vault is the only vault with no group tier: a person-born `NTV7` vault carries
+  // one from birth (epoch 1, a one-row owner roster) and the family resolves its
+  // tail (`protocol.md` §9.30), so it renders rows like any shared vault. The
+  // generation branch that used to live here said that vault "cannot be shared",
+  // which the member plane stopped making true, and a panel that keeps claiming a
+  // limit after it is lifted is the same defect as offering a control that cannot
+  // act.
   if (view === null && !hook.shared) {
     return (
       <p data-testid="device-bindings.unshared" style={HELPER_STYLE}>

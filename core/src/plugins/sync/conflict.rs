@@ -171,9 +171,16 @@ fn merge_attachment_entry(a: &AttachmentMeta, b: &AttachmentMeta) -> AttachmentM
 /// (a true concurrent re-add-vs-delete). **Remove-wins**: a tombstone outranks
 /// a live entry. Within a class it compares every retained field so the order
 /// is total (`Equal` only when byte-identical): tombstones on
-/// `(deleted_at, created_at, updated_at, filename, content_type, size)`, live
-/// on `(ts, filename, created_at, updated_at, content_type, size)` with
-/// `ts = updated_at.unwrap_or(created_at)`.
+/// `(deleted_at, created_at, updated_at, filename, content_type, size, scope)`,
+/// live on `(ts, filename, created_at, updated_at, content_type, size, scope)`
+/// with `ts = updated_at.unwrap_or(created_at)`.
+///
+/// **`scope` is in the tuple because leaving it out makes the order partial**
+/// (myne-md/myne#913): two entries equal in every other retained field and
+/// differing only in placement compared `Equal`, so the join kept whichever
+/// argument arrived first and the merge stopped being commutative. `Chat` sorts
+/// above `Library` (`AttachmentScope`'s `Ord`), so a disagreement settles on the
+/// conversation's claim rather than on arrival order.
 fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
     match (a.is_tombstone(), b.is_tombstone()) {
         (true, false) => Ordering::Greater, // remove-wins
@@ -185,6 +192,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
             &a.filename,
             &a.content_type,
             a.size,
+            a.scope,
         )
             .cmp(&(
                 b.deleted_at,
@@ -193,6 +201,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
                 &b.filename,
                 &b.content_type,
                 b.size,
+                b.scope,
             )),
         (false, false) => {
             let ts_a = a.updated_at.unwrap_or(a.created_at);
@@ -204,6 +213,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
                 a.updated_at,
                 &a.content_type,
                 a.size,
+                a.scope,
             )
                 .cmp(&(
                     ts_b,
@@ -212,6 +222,7 @@ fn attachment_tie_break(a: &AttachmentMeta, b: &AttachmentMeta) -> Ordering {
                     b.updated_at,
                     &b.content_type,
                     b.size,
+                    b.scope,
                 ))
         }
     }
@@ -641,6 +652,7 @@ pub fn merge_vault_meta(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use protocol::AttachmentScope;
     use protocol::{
         VAULT_META_ITEMS_KEY_ID_LEN, VAULT_META_NONCE_LEN, VAULT_META_SALT_RANDOM_LEN,
         VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
@@ -1099,12 +1111,45 @@ mod tests {
         for &version in &[0u64, 1, 2, 3] {
             for &ts in &[1u64, 2] {
                 for name in &["a.png", "b.png"] {
-                    states.push(live_v(version, ts, name)); // live
+                    states.push(live_v(version, ts, name)); // live, library
+                                                            // The SAME entry in a conversation (myne-md/myne#913). It
+                                                            // belongs in the state space rather than in a test of its
+                                                            // own: `scope` is one of the retained fields the tie-break
+                                                            // compares, so a state space without it would pass the join
+                                                            // laws while the order was silently partial.
+                    let mut chat = live_v(version, ts, name);
+                    chat.scope = AttachmentScope::Chat;
+                    states.push(chat);
                     states.push(catalog_tomb(version, ts, ts + 5)); // tombstone
                 }
             }
         }
         assert_join_laws(&states, merge_attachment_entry);
+    }
+
+    /// **Two peers that disagree only about placement converge**, and they
+    /// converge on the conversation's claim (myne-md/myne#913).
+    ///
+    /// Without `scope` in the tie-break these two entries compare `Equal`, the
+    /// join keeps whichever argument arrived first, and the merge is no longer
+    /// commutative: the same fleet reconciles to two different catalogs
+    /// depending on sync order. The property test above would not catch it,
+    /// which is why its state space carries the chat twin.
+    #[test]
+    fn catalog_merge_scope_disagreement_converges_on_the_conversation() {
+        let library = live_v(1, 10, "a.png");
+        let mut chat = live_v(1, 10, "a.png");
+        chat.scope = AttachmentScope::Chat;
+
+        assert_eq!(
+            merge_attachment_entry(&library, &chat),
+            chat,
+            "chat outranks library regardless of argument order"
+        );
+        assert_eq!(merge_attachment_entry(&chat, &library), chat);
+        // Control: the two inputs really do differ, so the assertion above is
+        // about the tie-break rather than about them being the same value.
+        assert_ne!(library, chat);
     }
 
     #[test]
@@ -2481,18 +2526,34 @@ fn memory_entry_tie_break(a: &MemoryEntryRow, b: &MemoryEntryRow) -> Ordering {
     match (a.deleted_at.is_some(), b.deleted_at.is_some()) {
         (true, false) => Ordering::Greater, // remove-wins
         (false, true) => Ordering::Less,
-        (true, true) => (a.deleted_at, a.created_at, a.updated_at, a.quarantined).cmp(&(
-            b.deleted_at,
-            b.created_at,
-            b.updated_at,
-            b.quarantined,
-        )),
-        (false, false) => (a.updated_at, a.version, a.created_at, a.quarantined).cmp(&(
-            b.updated_at,
-            b.version,
-            b.created_at,
-            b.quarantined,
-        )),
+        (true, true) => (
+            a.deleted_at,
+            a.created_at,
+            a.updated_at,
+            a.quarantined,
+            &a.origin,
+        )
+            .cmp(&(
+                b.deleted_at,
+                b.created_at,
+                b.updated_at,
+                b.quarantined,
+                &b.origin,
+            )),
+        (false, false) => (
+            a.updated_at,
+            a.version,
+            a.created_at,
+            a.quarantined,
+            &a.origin,
+        )
+            .cmp(&(
+                b.updated_at,
+                b.version,
+                b.created_at,
+                b.quarantined,
+                &b.origin,
+            )),
     }
 }
 

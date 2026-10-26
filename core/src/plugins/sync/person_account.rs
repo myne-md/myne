@@ -263,6 +263,9 @@ pub async fn person_create_identity_from_host(
         kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
         ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
         mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: None,
+        device_salt_hex: None,
+        device_iterations: None,
     };
 
     // The vault-bound carrier is a NATIVE convenience and stays off wasm32
@@ -383,6 +386,9 @@ pub async fn person_recover_identity_from_host(
             kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
             ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
             mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+            device_secret_hex: None,
+            device_salt_hex: None,
+            device_iterations: None,
         },
     };
 
@@ -541,6 +547,9 @@ pub async fn person_register_with_path(
         kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
         ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
         mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: None,
+        device_salt_hex: None,
+        device_iterations: None,
     };
     let path = person_auth_path(host, io).await.map_err(|_| {
         // The credential write is the only act that could leave the device
@@ -1025,6 +1034,13 @@ pub async fn forget_person_from_host(
             Err(_) => return Err(SyncDeviceError::BadRequest),
         }
     }
+    // The DEVICE signing key goes with the identity that bound it
+    // (`decisions/protocol/0731`): left behind, it is a signing key for a person
+    // this device no longer claims, and the next claim would mint another one over
+    // a binding the vault still holds. Best-effort, like its own store: a keychain
+    // that refuses the delete must not leave the device with an identity it failed
+    // to forget.
+    super::device_identity::destroy();
     // Last, and only once the credential is gone: the marker exists to tell a
     // later session that an identity is present but not loaded, so clearing it
     // before the credential would turn a half-forgotten device into one that
@@ -1078,7 +1094,6 @@ pub struct InviteSummary {
     pub vault_account_hash_hex: String,
     pub claimed: bool,
 }
-
 #[derive(serde::Deserialize)]
 struct InvitesResp {
     #[serde(default)]
@@ -1192,16 +1207,72 @@ struct BindMemberResp {
     token_hex: String,
 }
 
+/// The vault's 16-byte selector on the wire: the field at offset 6 of `vault.meta`.
+///
+/// One value with two provenances, and the server cannot tell them apart because it
+/// is the same bytes in the same slot (`protocol.md` §9.3):
+///
+/// - a vault enrolled under an account carries its `account_number_hash`, which is
+///   what `sync-state.json` records as `account_hash_hex`;
+/// - a vault born under a person identity carries a random NAMESPACE, recorded as
+///   `namespace_hex` at publish time. Such a vault never enrols under an account, so
+///   `account_hash_hex` stays empty forever and every route that needs a selector has
+///   to read this instead.
+///
+/// `None` means "this device cannot address the vault on the wire yet" (nothing
+/// published, nothing enrolled), which every caller already has a typed refusal for.
+pub fn vault_selector_hex(sync_state: &super::state::SyncState) -> Option<String> {
+    sync_state
+        .account_hash_hex
+        .clone()
+        .filter(|s| !s.is_empty())
+        .or_else(|| sync_state.namespace_hex.clone().filter(|s| !s.is_empty()))
+}
+
+/// The person session's device token, as the lowercase hex an HTTP `Bearer` header
+/// takes. `None` when this device holds no person account, or holds one that never
+/// registered (an empty token).
+///
+/// Read per call rather than cached: re-registration and a person-key rotation both
+/// rotate it, and a cached copy would outlive the credential it names. Same reason
+/// `cycle::person_token_bytes` reads it per cycle.
+///
+/// **An IO failure is `Err`, not `None`.** The caller turns "no credential" into
+/// `NotEnrolled`, which is an honest answer for a device that holds no person
+/// account and a lie for a filesystem that failed to produce one. On a born vault
+/// this token is the ONLY credential that can bind the owner, so collapsing the two
+/// would report a transient read error as "you have no identity" on the one path
+/// where the user cannot tell the difference.
+async fn person_device_token_hex(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+) -> Result<Option<String>, SyncDeviceError> {
+    let path = super::person_auth::person_auth_path_for_read(host)
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    Ok(auth.and_then(|a| (!a.token_hex.is_empty()).then_some(a.token_hex)))
+}
+
 /// Bind the owner person to the active vault once and return the **per-vault
 /// owner membership token** (myne-md/myne#711 task 11).
 ///
-/// The first B2B admin call needs the owner bound: `POST /b2b/vaults/{hash}/members`
-/// with `role: "owner"` is authorized by the vault's OWN device session
-/// ("owner at registration", `server-protocol.md` §3.1a), and issues a token
-/// scoped to (owner person, vault). The token is stored in the vault-scoped
-/// device-local [`super::state::SyncState`], so a second invite skips the
-/// round-trip. A stored token for a DIFFERENT person id (a re-bound owner after
-/// a migration) is re-bound rather than reused.
+/// The first B2B admin call needs the owner bound. Two credentials can do it, and
+/// which one applies is decided by the vault's generation rather than by a setting:
+///
+/// - **An account-enrolled vault** (`NTV5`/`NTV6`): `POST /b2b/vaults/{hash}/members`
+///   with `role: "owner"`, authorized by the vault's OWN device session ("owner at
+///   registration", `server-protocol.md` §3.1a).
+/// - **A person-born vault** (`NTV7`): the same route and body, authorized by the
+///   person's own device session instead, because that vault has no vault account to
+///   enrol. Without this arm nothing could bind an owner on the birth format that
+///   `decisions/storage/0723` makes the only one, so the invite, the roster and the
+///   removal would all stay unreachable on every new vault.
+///
+/// The token is stored in the vault-scoped device-local [`super::state::SyncState`],
+/// so a second invite skips the round-trip. A stored token for a DIFFERENT person id
+/// (a re-bound owner after a migration) is re-bound rather than reused.
 pub async fn ensure_owner_member_token(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
@@ -1224,27 +1295,39 @@ pub async fn ensure_owner_member_token(
         }
     }
 
-    let account_hash_hex = sync_state
+    let selector_hex = vault_selector_hex(&sync_state).ok_or(SyncDeviceError::NotEnrolled)?;
+    // Which credential may bind the owner is the vault's generation, read off the
+    // one durable fact that distinguishes them: an account-enrolled vault writes
+    // `account_hash_hex`, a person-born one writes only its namespace. Both arms end
+    // at the same route with the same body, so the server's answer (the per-vault
+    // token) is the same shape either way and nothing downstream branches.
+    let person_born = sync_state
         .account_hash_hex
-        .clone()
-        .filter(|s| !s.is_empty())
-        .ok_or(SyncDeviceError::NotEnrolled)?;
-    // The vault's own device session authorizes the owner registration. Its
-    // transport is discarded; the relay token below is the owner's, not the
-    // device's.
-    let (device_token, _device_transport) =
-        super::devices::authed_transport_from_host(host, io, state).await?;
-    let url = endpoint_from_host(host, io).await?;
-
-    let account_hash_for_req = account_hash_hex.clone();
+        .as_deref()
+        .is_none_or(str::is_empty);
     let owner_hex = owner_person_id_hex.to_string();
+    let (credential, url) = if person_born {
+        let token = person_device_token_hex(host, io)
+            .await?
+            .ok_or(SyncDeviceError::NotEnrolled)?;
+        (token, endpoint_from_host(host, io).await?)
+    } else {
+        // The vault's own device session authorizes the owner registration. Its
+        // transport is discarded; the relay token below is the owner's, not the
+        // device's.
+        let (device_token, _device_transport) =
+            super::devices::authed_transport_from_host(host, io, state).await?;
+        (device_token, endpoint_from_host(host, io).await?)
+    };
+
+    let selector_for_req = selector_hex;
     let issued = crate::task::run_blocking(move || {
         let transport =
             super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
         bind_owner_request(
             transport.as_ref(),
-            &device_token,
-            &account_hash_for_req,
+            &credential,
+            &selector_for_req,
             &owner_hex,
         )
     })
@@ -1356,6 +1439,12 @@ pub struct VaultInviteSummary {
     pub invite_id_hex: String,
     pub recipient_person_id_hex: String,
     pub claimed: bool,
+    /// The recipient refused it (myne-md/myne#911 follow-up). The server dropped
+    /// the sealed payload, so this row can never become a member; it exists so the
+    /// sender is told what happened rather than watching an invitation that is
+    /// never accepted.
+    #[serde(default)]
+    pub declined: bool,
 }
 
 #[derive(serde::Deserialize)]
@@ -1407,27 +1496,50 @@ pub async fn list_vault_invites_from_host(
         return Ok(None);
     }
 
-    let token = ensure_owner_member_token(
+    // The "nothing to list" gates come BEFORE any credential work, and the
+    // order is load-bearing rather than cosmetic. `ensure_owner_member_token`
+    // mints a per-vault owner token from `account_hash_hex`, so on a vault that
+    // has none it answers `NotEnrolled`. This function then returned that as an
+    // error, and the panel painted "Could not load your invitations" over a
+    // vault whose only sin is being published under a person identity (born
+    // `NTV7`: `namespace_hex` recorded, no vault account). Two states reach
+    // here legitimately and neither is a failure: the frame has no B2B tail at
+    // all, and the frame has a tail but this device has not enrolled the vault
+    // under an account. Both answer `Ok(None)`.
+    let sync_state = super::state::read_sync_state(io, &root)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let Some(selector_hex) = vault_selector_hex(&sync_state) else {
+        // Neither enrolled nor published: there is no vault-side invite list to ask
+        // for, and reaching for one asks the server a question this device cannot
+        // yet address.
+        return Ok(None);
+    };
+    // A person-born vault (`NTV7`) has no `account_hash_hex`; its selector is the
+    // namespace it was published under, and its credential is the person session.
+    let person_born = sync_state
+        .account_hash_hex
+        .as_deref()
+        .is_none_or(str::is_empty);
+
+    // An unregistered identity cannot have sent an invite, and `NotEnrolled` here
+    // would otherwise paint a relay failure over that state (the panel's identity
+    // gate already says what the state IS, `decisions/ui/0725`). On an enrolled
+    // vault the same error stays an error: it means a token the vault should hold.
+    let token = match ensure_owner_member_token(
         host,
         io,
         state,
         &crate::account::person_identity::hex_lower(&owner_person_id),
     )
-    .await?;
-    let sync_state = super::state::read_sync_state(io, &root)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    let Some(account_hash_hex) = sync_state
-        .account_hash_hex
-        .clone()
-        .filter(|s| !s.is_empty())
-    else {
-        // A shared vault with no synced account is a device that has not
-        // enrolled: nothing to list, and not a relay failure either.
-        return Ok(None);
+    .await
+    {
+        Ok(token) => token,
+        Err(SyncDeviceError::NotEnrolled) if person_born => return Ok(None),
+        Err(err) => return Err(err),
     };
     let url = endpoint_from_host(host, io).await?;
-    let path = format!("/b2b/vaults/{account_hash_hex}/invites");
+    let path = format!("/b2b/vaults/{selector_hex}/invites");
 
     crate::task::run_blocking(move || {
         let transport =
@@ -1475,6 +1587,87 @@ pub struct ClaimedInvite {
     pub payload_b64: String,
     pub vault_account_hash_hex: String,
     pub token_hex: String,
+}
+
+/// Decline an invitation (`DELETE /b2b/invites/{id}`, myne-md/myne#911
+/// follow-up) via an explicit transport, the shape a unit test drives.
+///
+/// The server drops the sealed payload on the spot, so this is the recipient's
+/// real exit rather than a client-side hide, and the sender's own list reports
+/// the invitation as declined. A retry is idempotent (the server answers `200`
+/// for a slot the same recipient already declined), which matters because the
+/// caller cannot tell a lost response from a lost request.
+///
+/// The status mapping matches [`claim_invite_request`] deliberately: `404` is
+/// what an unknown id and somebody else's id both answer, and `409` means the
+/// invitation was already accepted. The recipient is a member, and ending that
+/// is the owner's removal rather than a declined invite.
+pub fn decline_invite_request(
+    transport: &dyn SyncTransport,
+    person_token_hex: &str,
+    invite_id_hex: &str,
+) -> Result<(), SyncDeviceError> {
+    let path = format!("/b2b/invites/{invite_id_hex}");
+    let resp = transport
+        .request(HttpMethod::Delete, &path, &[], Some(person_token_hex))
+        .map_err(|_| SyncDeviceError::Transport)?;
+    match resp.status {
+        200 => Ok(()),
+        401 | 403 => Err(SyncDeviceError::Unauthenticated),
+        404 => Err(SyncDeviceError::DeviceNotFound),
+        409 => Err(SyncDeviceError::BadRequest),
+        _ => Err(SyncDeviceError::Transport),
+    }
+}
+
+/// Decline one invite addressed to this person account. Reads the same
+/// device-scoped token, endpoint and lifecycle as
+/// [`person_list_invites_from_host`], and answers `NotEnrolled` for the same
+/// honest reason: an identity the server has never seen has no invitation it
+/// could have accepted.
+pub async fn decline_invite_from_host(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    invite_id_hex: &str,
+) -> Result<(), SyncDeviceError> {
+    let auth_path = person_auth_path_for_read(host).map_err(|_| SyncDeviceError::Internal)?;
+    let auth = read_person_auth(io, &auth_path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .filter(|a| !a.token_hex.is_empty())
+        .ok_or(SyncDeviceError::NotEnrolled)?;
+
+    let cfg_path = super::config::config_path_from_host(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let cfg = super::config::read_config(io, &cfg_path)
+        .await
+        .map_err(|_| SyncDeviceError::NotConfigured)?;
+    let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+
+    let invite_id = invite_id_hex.to_string();
+    let token = auth.token_hex;
+    crate::task::run_blocking(move || {
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
+        decline_invite_request(transport.as_ref(), &token, &invite_id)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn sync_person_decline_invite<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    invite_id_hex: String,
+) -> Result<(), SyncDeviceError> {
+    decline_invite_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        &invite_id_hex,
+    )
+    .await
 }
 
 /// Claim one invite addressed to this person (`POST /b2b/invites/{id}/claim`)
@@ -1811,9 +2004,14 @@ pub async fn accept_invite_from_host(
             SyncDeviceError::BadRequest
         })?;
 
-    let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|e| {
+    // The tail, whichever generation carries it: a member accepting an invite to a
+    // vault born under the owner's identity receives an `NTV7` frame, whose tail is
+    // `NTV6`'s byte for byte. Parsing only `NTV6` here made an `NTV7` invite
+    // unclaimable, which would have been an invite the product sends and cannot
+    // honour.
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|e| {
         tracing::warn!(
-            stage = "accept_parse_ntv6",
+            stage = "accept_parse_b2b_tail",
             protocol_error_kind = crate::protocol_error_kind::protocol_error_kind(&e),
             "b2b accept failed"
         );
@@ -1864,6 +2062,11 @@ pub async fn accept_invite_from_host(
         password,
     )
     .await?;
+    // The owner's device attestation, pinned for later roster verification.
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    pin_owner_device_attestation(io, &vault_dir, &owner.public, &package).await;
 
     Ok(AcceptedInviteView {
         vault_id: vault_id.to_string(),
@@ -2107,9 +2310,9 @@ pub async fn member_join_vault_from_host(
         .await
         .map_err(|_| SyncDeviceError::Internal)??
     };
-    let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|e| {
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|e| {
         tracing::warn!(
-            stage = "join_parse_ntv6",
+            stage = "join_parse_b2b_tail",
             protocol_error_kind = crate::protocol_error_kind::protocol_error_kind(&e),
             "b2b join failed"
         );
@@ -2220,12 +2423,63 @@ pub async fn member_join_vault_from_host(
         password,
     )
     .await?;
+    // Same pin on the second-device path: it re-claims the retained package, so it sees
+    // the same attestation and owes the same stored copy.
+    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    pin_owner_device_attestation(io, &vault_dir, &owner.public, &package).await;
     Ok(AcceptedInviteView {
         vault_id: vault_id.to_string(),
         vault_account_hash_hex: vault_account_hash_hex.to_string(),
         owner_fingerprint_hex,
         group_key_epoch: epoch,
     })
+}
+
+/// Pin the OWNER's device attestation a package carried, so this member can verify later
+/// rosters without a network round trip (`decisions/protocol/0731` stage 2).
+///
+/// Called on BOTH paths that install a member vault (a fresh accept and a second device's
+/// join), because both re-claim the same package. An attestation that does not verify
+/// against the owner public half this device pinned is DROPPED rather than stored: a
+/// tampered pin would otherwise choose the key that verifies every future roster, which is
+/// the whole trust decision.
+async fn pin_owner_device_attestation(
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+    owner_public: &protocol::person_key::PersonPublicHalf,
+    package: &protocol::person_invite::SignedGroupPackage,
+) {
+    let Ok(payload) = protocol::person_invite::verify_group_package(owner_public, package) else {
+        return;
+    };
+    let Some(attestation) = payload.owner_device else {
+        return;
+    };
+    if !attestation.verifies_against(owner_public) {
+        tracing::warn!(
+            stage = "accept_owner_device",
+            "the package's owner-device attestation does not verify; not pinned"
+        );
+        return;
+    }
+    let Ok(mut st) = super::state::read_sync_state(io, vault_dir).await else {
+        return;
+    };
+    st.owner_device = Some(attestation);
+    if super::state::write_sync_state(io, vault_dir, &st)
+        .await
+        .is_err()
+    {
+        // Best effort: without the pin this member falls back to the person-key class,
+        // which a device-signed roster will refuse, so the failure is logged rather than
+        // swallowed silently.
+        tracing::warn!(
+            stage = "accept_owner_device",
+            "the owner-device attestation could not be pinned"
+        );
+    }
 }
 
 /// Whether this device already holds a vault for `account_hash`.
@@ -2325,8 +2579,7 @@ pub async fn unlock_member_vault_from_host(
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let stored = super::member_key_store::read_member_key_store(
         io,
         &vault_dir,
@@ -2581,8 +2834,7 @@ async fn member_seal_material(
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     Ok(MemberSealMaterial {
         vault_id: active,
         vault_dir,
@@ -2932,8 +3184,7 @@ pub async fn unlock_member_vault_with_password_from_host(
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let cred = super::member_unlock_store::read_member_unlock_password(
         io,
         &vault_dir,
@@ -3121,8 +3372,7 @@ pub async fn unlock_member_vault_with_pin_from_host(
         .read(&vault_dir.join("vault.meta"))
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let header = super::member_unlock_store::member_unlock_header(
         io,
         &vault_dir,
@@ -3243,8 +3493,8 @@ pub async fn unlock_member_vault_with_biometric_from_host(
             .read(&vault_dir.join("vault.meta"))
             .await
             .map_err(|_| SyncDeviceError::BadRequest)?;
-        let b2b = protocol::parse_vault_meta_ntv6(&meta_bytes)
-            .map_err(|_| SyncDeviceError::BadRequest)?;
+        let b2b =
+            protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
         let header = super::member_unlock_store::member_unlock_header(
             io,
             &vault_dir,
@@ -4236,6 +4486,47 @@ mod tests {
         );
     }
 
+    // The recipient's refusal (myne-md/myne#911 follow-up). The status mapping is
+    // the whole contract this function has, and each arm means something different
+    // to the caller: `NotFound` is "this identity does not hold that invitation" (a
+    // stale row in a dialog that has been open), `Conflict` is "already a member",
+    // and `Unauthenticated` is the token, not the invitation.
+    #[test]
+    fn decline_request_maps_each_status_to_its_own_answer() {
+        let cases = [
+            (200u16, None),
+            (401, Some("Unauthenticated")),
+            (403, Some("Unauthenticated")),
+            (404, Some("DeviceNotFound")),
+            (409, Some("BadRequest")),
+            (500, Some("Transport")),
+        ];
+        for (status, want) in cases {
+            let t = FakeTransport::new();
+            t.on(
+                HttpMethod::Delete,
+                "/b2b/invites/aa11",
+                status,
+                b"{}".to_vec(),
+            );
+            let got = decline_invite_request(&t, "tok", "aa11");
+            match want {
+                None => assert!(got.is_ok(), "status {status} should succeed"),
+                Some(kind) => {
+                    let err = got.expect_err("a refusal must not be Ok");
+                    assert_eq!(format!("{err:?}"), kind, "status {status}");
+                }
+            }
+            // The id travels in the PATH and the credential in the token: the
+            // invitation is deleted by address, with no body for a proxy to alter.
+            let reqs = t.requests();
+            assert_eq!(reqs[0].0, HttpMethod::Delete);
+            assert_eq!(reqs[0].1, "/b2b/invites/aa11");
+            assert!(reqs[0].2.is_empty(), "DELETE carries no body");
+            assert_eq!(reqs[0].3.as_deref(), Some("tok"));
+        }
+    }
+
     // The identity home is shown on `enrolled: true`, so the status probe must
     // flip exactly when a usable token lands, and must be false (not an error)
     // on a device with no person account.
@@ -4302,6 +4593,9 @@ mod tests {
                     kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
                     ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
                     mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+                    device_secret_hex: None,
+                    device_salt_hex: None,
+                    device_iterations: None,
                 },
             )
             .await
@@ -4895,6 +5189,107 @@ mod tests {
                 out.map(|v| v.len())
             );
         });
+    }
+
+    /// **A person-born (`NTV7`) vault answers "nothing to list", not a failure.**
+    ///
+    /// This is the red line from the 2026-10-25 owner report ("I cannot share this
+    /// vault, and it says it could not load my invitations"): the panel's invites
+    /// section asked for a list on a vault whose `shared` flag is true (a born-`NTV7`
+    /// vault carries epoch 1 and an owner roster from birth), the backend minted an
+    /// owner token FIRST and that mint needs `account_hash_hex`, which such a vault
+    /// never writes. So the reader errored `NotEnrolled` and the UI reported a relay
+    /// failure over a legitimate state.
+    ///
+    /// The fixture is a real serialized `NTV7` frame with a populated
+    /// `sync-state.json`, so the frame reaches the account-hash guard rather than
+    /// short-circuiting earlier: reverting the guard above the mint makes this fail
+    /// with a `NotEnrolled` error instead of `None`.
+    #[test]
+    fn a_person_born_vault_lists_no_invites_and_is_not_a_failure() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-born-invites").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultRuntimeState::default();
+            crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+
+            let phrase = protocol::generate_recovery_phrase()
+                .expect("csprng")
+                .join_normalized();
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            let (pair, _) =
+                crate::account::person_identity::unlock_person_identity(&host, &io, &normalized)
+                    .await
+                    .expect("seed a sealed keypair");
+            let person_id = protocol::person_id_hash(&normalized);
+            state.set_person_identity_and_id(pair, person_id).await;
+
+            let vault_root = tmp
+                .path()
+                .join("data")
+                .join("vaults")
+                .join(crate::vault_id::VaultId::mint().to_string());
+            std::fs::create_dir_all(&vault_root).expect("vault root");
+            let meta = crate::test_support::person_born_meta_frame(0x7c);
+            assert_eq!(&meta[..4], b"NTV7", "the fixture must be an NTV7 vault");
+            std::fs::write(vault_root.join("vault.meta"), &meta).expect("write meta");
+
+            // Published under the person plane: a namespace is recorded and the
+            // vault account hash is not. This is the shape that used to error.
+            let sync_state = crate::plugins::sync::state::SyncState {
+                namespace_hex: Some("5fbdbc0c92d5cad63eefe32c59b811e7".to_string()),
+                ..Default::default()
+            };
+            crate::plugins::sync::state::write_sync_state(&io, &vault_root, &sync_state)
+                .await
+                .expect("write sync-state");
+
+            let out = list_vault_invites_from_host(&host, &io, &state)
+                .await
+                .expect("a vault with no vault account is not a relay failure");
+            assert!(
+                out.is_none(),
+                "a person-born vault has no vault-side invite list: {:?}",
+                out.map(|v| v.len())
+            );
+        });
+    }
+
+    /// The vault selector is the account hash when there is one and the namespace
+    /// when there is not, and never an empty string.
+    ///
+    /// This one function decides which credential binds the owner (vault device
+    /// session or person session) and which path the invite list is fetched from, so
+    /// the two provenances have to be asserted together rather than inferred from a
+    /// caller.
+    #[test]
+    fn the_vault_selector_prefers_the_account_hash_and_falls_back_to_the_namespace() {
+        let account = "aa".repeat(16);
+        let namespace = "bb".repeat(16);
+
+        let mut st = crate::plugins::sync::state::SyncState::default();
+        assert_eq!(vault_selector_hex(&st), None, "nothing recorded yet");
+
+        // A person-born vault: published under a namespace, never enrolled under an
+        // account.
+        st.namespace_hex = Some(namespace.clone());
+        assert_eq!(vault_selector_hex(&st).as_deref(), Some(namespace.as_str()));
+
+        // An enrolled vault: the account hash wins, even when a namespace is also on
+        // record (a vault that migrated or was discovered).
+        st.account_hash_hex = Some(account.clone());
+        assert_eq!(vault_selector_hex(&st).as_deref(), Some(account.as_str()));
+
+        // An empty string is absence, not a selector: the sync state is written by
+        // several routes and one of them has written `""` before.
+        st.account_hash_hex = Some(String::new());
+        assert_eq!(vault_selector_hex(&st).as_deref(), Some(namespace.as_str()));
+        st.namespace_hex = Some(String::new());
+        assert_eq!(vault_selector_hex(&st), None);
     }
 
     // ---- collab-b2b-sessions task 1: the rotation-package delivery route ----

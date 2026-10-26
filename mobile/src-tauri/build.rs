@@ -377,7 +377,7 @@ fn main() {
             )
             .plugin(
                 // Account record (the account/vault split, myne-md/myne#684):
-                // shared from `myne-core`; the same FOUR commands the desktop
+                // shared from `myne-core`; the same THREE commands the desktop
                 // registers. On iOS the keychain exists so grouping works; on
                 // Android `platform_keychain` has no backend, so the store holds
                 // nothing and vaults show standalone (never an error, never
@@ -386,7 +386,6 @@ fn main() {
                 "account",
                 tauri_build::InlinedPlugin::new().commands(&[
                     "account_list",
-                    "account_rename",
                     "account_move",
                     "account_split",
                 ]),
@@ -447,6 +446,9 @@ fn main() {
                     "sync_person_lock",
                     "sync_person_create_invite",
                     "sync_list_vault_invites",
+                    // The recipient's refusal of an invitation
+                    // (decisions/protocol/0732): a real server-side delete.
+                    "sync_person_decline_invite",
                     "sync_person_accept_invite",
                     // member-devices task 7: a member's SECOND device joins the
                     // vault from the phrase alone. Takes no owner code from the

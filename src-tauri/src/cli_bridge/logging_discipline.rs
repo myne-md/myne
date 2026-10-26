@@ -418,6 +418,7 @@ const SOURCES: &[(&str, &str)] = &[
     ("mcp_door_test.rs", include_str!("mcp_door_test.rs")),
     ("mod.rs", include_str!("mod.rs")),
     ("path_shim.rs", include_str!("path_shim.rs")),
+    ("pipe.rs", include_str!("pipe.rs")),
     ("plugin.rs", include_str!("plugin.rs")),
     ("rate_limit.rs", include_str!("rate_limit.rs")),
     ("scope.rs", include_str!("scope.rs")),

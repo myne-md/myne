@@ -18,6 +18,8 @@ mod cli_bridge;
 // of the WebView (`run_native_messaging_host_if_requested` below, called
 // from `main.rs` before the Tauri app builds).
 mod clipper;
+#[cfg(windows)]
+mod win_pipe;
 // The shared export-naming vocabulary (filename sanitization, `" (1)"` suffix
 // dedup, the §6 sanctioned embed/HTML rewrite) moved to `myne-core` (shared with
 // mobile). Re-exported so existing `crate::export_naming::…` paths keep resolving
@@ -151,9 +153,64 @@ pub fn run_native_messaging_host_if_requested() -> bool {
     if !clipper::host::is_host_mode(std::env::args().skip(1)) {
         return false;
     }
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     run_host_relay();
     true
+}
+
+/// Run the host loop with no argv check, for the dedicated Windows launcher.
+///
+/// The browser passes no arguments, so `run_native_messaging_host_if_requested`
+/// answers `false` there; `myne-clipper-host` exists to be launched exactly that
+/// way and calls this instead. Everything it can do is what the desktop binary
+/// does when launched with the flag: the function contains no protocol of its
+/// own.
+#[cfg(desktop)]
+pub fn run_native_messaging_host() {
+    run_host_relay();
+}
+
+/// The Windows host-mode relay pump: connect to the running app's clipper pipe
+/// and forward stdin/stdout frames over it.
+///
+/// Same shape as the Unix arm, against a named pipe instead of `clipper.sock`.
+/// The app side needs two mutable views of one duplex handle, which
+/// [`crate::win_pipe::PipeReader`] and [`crate::win_pipe::PipeWriter`] provide
+/// without duplicating it; the [`crate::win_pipe::Client`] owns and closes it.
+///
+/// A connect failure ends cleanly, like Unix: the host writes nothing and exits,
+/// and the extension surfaces its honest "open Myne to clip" state.
+#[cfg(all(desktop, windows))]
+fn run_host_relay() {
+    let Some(app_data_dir) = host_mode_app_data_dir() else {
+        return;
+    };
+    let name = clipper::relay_app::clipper_pipe_name(&app_data_dir);
+    let Ok(connection) = crate::win_pipe::Client::connect(&name) else {
+        return;
+    };
+    let mut app_reader = crate::win_pipe::PipeReader(connection.raw());
+    let mut app_writer = crate::win_pipe::PipeWriter(connection.raw());
+    let stdin = std::io::stdin();
+    let stdout = std::io::stdout();
+    let mut host_reader = stdin.lock();
+    let mut host_writer = stdout.lock();
+    let _ = clipper::relay::forward_stdio_over_socket(
+        &mut host_reader,
+        &mut host_writer,
+        &mut app_reader,
+        &mut app_writer,
+    );
+}
+
+/// `<app_data_dir>` in host mode on Windows: Tauri resolves
+/// `%APPDATA%\<identifier>` there, and the host process has no `AppHandle`, so
+/// the same convention is applied by hand.
+#[cfg(all(desktop, windows))]
+fn host_mode_app_data_dir() -> Option<std::path::PathBuf> {
+    const BUNDLE_ID: &str = "md.myne.desktop";
+    let appdata = std::env::var_os("APPDATA")?;
+    Some(std::path::PathBuf::from(appdata).join(BUNDLE_ID))
 }
 
 /// The Unix host-mode relay pump: connect to the running app's local IPC

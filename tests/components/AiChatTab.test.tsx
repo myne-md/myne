@@ -115,6 +115,7 @@ vi.mock("react-i18next", () => ({
 import { AI_CHAT_HONESTY_NOTE } from "../../src/lib/load-bearing-copy";
 import type { ResolverNote } from "../../src/notes/resolveWikilink";
 import { AiChatTab } from "../../src/notes/components/AiChatTab";
+import { resetConversationBinding } from "../../src/notes/ai/conversationBinding";
 import { CHIP_KEY } from "../../src/notes/ai/restingCause";
 import type { ProviderErrorCause } from "../../src/lib/engine-error";
 
@@ -153,6 +154,9 @@ beforeEach(() => {
   resolverNoteSet = [];
   openNewTabInFocused.mockClear();
   clearAgent();
+  // The conversation binding is MODULE state now (it has to outlive the tab), so
+  // a test that pins would otherwise hand the pin to the next one.
+  resetConversationBinding();
   agentLastRun.mockReset().mockResolvedValue(null);
   agentUndo.mockReset().mockResolvedValue({ reverted: 0, failed: [], notesCreatedNotReverted: 0 });
   agentCapability.mockReset();
@@ -859,7 +863,7 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
   // carries a diff icon that opens one read-only modal. Read-only still: a
   // frozen proposal may quote a note that has since changed, so NOTHING in the
   // modal may write: no insert control, no apply button.
-  it("opens a settled run's frozen proposal in a read-only diff modal", () => {
+  it("opens a settled run's frozen proposal inline, under its own turn", () => {
     sendAgentTurn("tidy the headings", "Projects");
     settleAgentTurn({
       ...SUMMARY,
@@ -870,25 +874,30 @@ describe("AiChatTab: the agent run is a turn in the same transcript", () => {
     });
     render(<AiChatTab />);
 
-    expect(screen.queryByTestId("ai.proposal-diff")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.turn-diff"));
+    // Collapsed at rest: a settled proposal is a record, not a decision.
+    expect(screen.queryByTestId("ai.proposal-diff-body")).toBeNull();
+    const trigger = screen.getByTestId("ai.turn-diff");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
 
-    const modal = screen.getByTestId("ai.proposal-diff-body");
-    expect(modal.textContent).toContain("old words");
-    expect(modal.textContent).toContain("new words");
-    expect(modal.textContent).toContain("Scratch");
-    expect(modal.textContent).toContain("fresh text");
+    const body = screen.getByTestId("ai.proposal-diff-body");
+    expect(body.textContent).toContain("old words");
+    expect(body.textContent).toContain("new words");
+    expect(body.textContent).toContain("Scratch");
+    expect(body.textContent).toContain("fresh text");
     expect(
       screen
         .getAllByTestId("ai.proposal-edit")[0]!
         .getAttribute("data-note-id"),
     ).toBe("n1");
-    // Read-only in the strong sense: the ONLY button in the modal is its close.
-    // `ai.insert-turn` alone would pass even if a write control were added.
-    expect(
-      screen.getByTestId("ai.proposal-diff").querySelectorAll("button").length,
-    ).toBe(1);
-    expect(screen.getByTestId("ai.proposal-diff-close")).toBeTruthy();
+    // **Inline, under the turn that proposed it** (myne-md/myne#913): the whole
+    // point of the change is that it is not painted somewhere else.
+    expect(body.closest('[data-testid="ai.turn"]')).not.toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Read-only in the strong sense: nothing in the body writes. `ai.insert-turn`
+    // alone would pass even if a write control were added.
+    expect(body.querySelectorAll("button").length).toBe(0);
     expect(screen.queryByTestId("ai.insert-turn")).toBeNull();
   });
 
@@ -1738,5 +1747,135 @@ describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", ()
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
     expect(screen.getByTestId("ai.honesty-note").textContent).toBe(AI_CHAT_HONESTY_NOTE);
+  });
+});
+
+// ── The scope card and note-bound conversations (myne-md/myne#913) ──────────
+//
+// Two behaviours the issue names, each with the failure it prevents. Both are
+// asserted on what the surface SAYS or DOES rather than on an internal flag:
+// the card's failure was that a user could not read it, and the conversation
+// binding's failure was that the transcript beside a note was about a different
+// note.
+describe("AiChatTab: scope card and note binding", () => {
+  it("states the scope's question and what the choice never covers", async () => {
+    render(<AiChatTab folders={["Work", "Journal"]} />);
+    fireEvent.click(screen.getByTestId("ai.composer-scope"));
+    const menu = await screen.findByTestId("ai.composer-scope-menu");
+
+    // The three answers the old menu did not give: what the choice is about,
+    // that the folders are a section of their own, and what it applies to.
+    expect(
+      within(menu).getByTestId("ai.composer-scope-heading").textContent,
+    ).toBe("agent.composer.scopeQuestion");
+    expect(
+      within(menu).getByTestId("ai.composer-scope-footer").textContent,
+    ).toBe("agent.composer.scopeApplies");
+    expect(
+      within(menu).getAllByTestId("ai.composer-scope-group")[0]?.textContent,
+    ).toBe("agent.composer.scopeFolders");
+
+    // Exactly ONE option reads as the current one. A menu where every row looks
+    // alike makes the user re-read the trigger to find out where they are.
+    expect(
+      menu.querySelectorAll(
+        '[data-testid="ai.composer-scope-option"][data-active="true"]',
+      ).length,
+    ).toBe(1);
+  });
+
+  it("starts a fresh conversation when the open note changes", () => {
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    // The previous note's transcript is gone: the panel is about note-b now.
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("keeps the conversation when the user has pinned it, and says so", () => {
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+
+    fireEvent.click(screen.getByTestId("ai.keep-conversation"));
+    expect(screen.getByTestId("ai.keep-conversation-mark")).toBeTruthy();
+    expect(
+      screen
+        .getByTestId("ai.keep-conversation")
+        .getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    // Pinned: the escape hatch the issue asks for. The transcript survives the
+    // switch for the session, which is what driving one conversation across two
+    // notes requires.
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+  });
+
+  it("starts fresh when a note is CLOSED and another opened", () => {
+    // Closing A and opening B is a switch between two notes, and the first
+    // version read it as a first mount because it compared against the last note
+    // the panel SAW, which the close had already set to nothing. The transcript
+    // for A then sat beside B.
+    sendAgentTurn("what is in this note", "This note");
+    const { rerender } = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+
+    rerender(<AiChatTab openNoteId={null} />);
+    rerender(<AiChatTab openNoteId="note-b" />);
+
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("starts fresh when the note changes while the tab was unmounted", () => {
+    // The panel only mounts while its tab is the AI one, so the note can move
+    // while it is away. A component-local "which note is this conversation
+    // about" ref died with the unmount, and the remount adopted the NEW note as
+    // the conversation's note, so A's transcript continued under B (review round
+    // three). The ref is module state now.
+    sendAgentTurn("what is in this note", "This note");
+    const first = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+    first.unmount();
+
+    render(<AiChatTab openNoteId="note-b" />);
+
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("keeps the pin across a tab switch, because the tab unmounts", () => {
+    // The pin was `useState`, and the right panel mounts this component only
+    // while its tab is the AI one: switching tabs reset the pin silently, so the
+    // very next note switch cleared a conversation the user had pinned.
+    sendAgentTurn("what is in this note", "This note");
+    const first = render(<AiChatTab openNoteId="note-a" />);
+    fireEvent.click(screen.getByTestId("ai.keep-conversation"));
+    first.unmount();
+
+    const second = render(<AiChatTab openNoteId="note-a" />);
+    expect(
+      screen.getByTestId("ai.keep-conversation").getAttribute("aria-pressed"),
+    ).toBe("true");
+
+    second.rerender(<AiChatTab openNoteId="note-b" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+  });
+});
+
+describe("AiChatTab: a sent message carries its files (myne-md/myne#913)", () => {
+  it("draws the files the message sent, and names them", () => {
+    // The composer's chips used to be the only record of what was attached, and
+    // they were cleared on send. The turn keeps them, so a question read back
+    // later still says what it was about and the file is one click away.
+    sendAgentTurn("what is in this picture", "This note", [
+      { id: "aa11bb22", name: "screenshot.png", contentType: "image/png" },
+    ]);
+    render(<AiChatTab />);
+    const chip = screen.getByTestId("ai.turn-attachment");
+    expect(chip.getAttribute("data-attachment-id")).toBe("aa11bb22");
+    expect(chip.textContent).toContain("screenshot.png");
   });
 });

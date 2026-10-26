@@ -206,18 +206,10 @@ export const WRITABILITY_WRITABLE: AgentWritability = { verdict: "writable" };
 export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Account ────────────────────────────────────────────────────────────────
   // The account-level panel. Its namespace is the account grouping: which
-  // vaults this device treats as one account, and what that group is called.
-  // Everything that acts on a vault's own container lives under `vault.*`
-  // below.
-  {
-    id: "account.name",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "account",
-    testid: "settings.account-name-input",
-    titleKey: "settings.account.nameLabel",
-    descriptionKey: "settings.account.nameHelper",
-    keywordsKey: "settings.search.keywords.accountName",
-  },
+  // vaults this device treats as one account. An account has no name
+  // (`design-notes/ui/0728`), so there is no entry for one: the group heading
+  // is derived from the group's own vault names. Everything that acts on a
+  // vault's own container lives under `vault.*` below.
   {
     id: "account.vaults",
     agentWritability: WRITABILITY_NONE,
@@ -228,9 +220,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.accountVaults",
   },
   {
-    // The person account number (2026-10-23). It is derived from the identity
-    // phrase, so this entry is a READ: the copy button is the only control, and
-    // the value itself is never in the index (it is generated, not authored).
+    // The person account number (2026-10-23), and the panel's first block since
+    // `design-notes/ui/0728` replaced the account name with it. It is derived
+    // from the identity phrase, so this entry is a READ: the copy button is the
+    // only control, and the value itself is never in the index (it is generated,
+    // not authored).
     id: "account.number",
     agentWritability: WRITABILITY_NONE,
     panelId: "account",
@@ -471,7 +465,10 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.panel.devices.label",
+    // The section's own title, not the shorter `devices.label` the mobile panel
+    // still uses: a search result that lands on a heading has to name the
+    // heading the reader arrives at (2026-10-25, the same pass that renamed it).
+    titleKey: "sync.panel.sections.devices",
     keywordsKey: "settings.search.keywords.syncDevices",
   },
   {
@@ -490,7 +487,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     capability: "localOnlyVault",
     panelId: "sync",
-    topic: "devices",
+    // `connection`, not `devices` (2026-10-25): the row moved into the account
+    // section, under the identity and the server, because publishing is an identity
+    // act and a devices heading over it read as a device operation. Search lands on
+    // the topic the row actually renders in; this registry is what says so.
+    topic: "connection",
     testid: "sync.panel.publish",
     titleKey: "sync.panel.publish.label",
     descriptionKey: "sync.panel.publish.deviceOnlyHelper",
@@ -515,7 +516,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.deviceBindings.title",
+    titleKey: "sync.deviceBindings.heading",
     descriptionKey: "sync.deviceBindings.hint",
     keywordsKey: "settings.search.keywords.syncDeviceBindings",
     // Same gate as `sync.members` above, and for the same reason: the block is
@@ -1095,7 +1096,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
       reason:
         "consent control: it decides whether a plaintext log is written to disk, not how the app behaves, so it is not an agent-settable setting",
     },
-    panelId: "about",
+    // `panelId` follows the ROW, not the key prefix: the row moved to its own
+    // Diagnostics panel on 2026-10-25 and its i18n keys kept the `settings.about.`
+    // prefix, because a key name is a catalog id that no user reads and renaming it
+    // would move thirty-three catalogs for a naming preference.
+    panelId: "diagnostics",
     titleKey: "settings.about.diagnosticLogLabel",
     descriptionKey: "settings.about.diagnosticLogHelper",
     keywordsKey: "settings.search.keywords.diagnosticLog",
@@ -1325,6 +1330,17 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     topic: "advanced",
     titleKey: "settings.memory.heading",
     descriptionKey: "settings.memory.helper",
+    keywordsKey: "settings.search.keywords.aiMemory",
+  },
+  {
+    id: "ai.memorySeed",
+    agentWritability: WRITABILITY_NONE,
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    topic: "advanced",
+    titleKey: "settings.memory.seed.rowTitle",
+    descriptionKey: "settings.memory.seed.rowHelper",
     keywordsKey: "settings.search.keywords.aiMemory",
   },
   {

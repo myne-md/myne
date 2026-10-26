@@ -78,7 +78,7 @@ const ACCEPT_POLL: Duration = Duration::from_millis(50);
 /// nothing. That type's doc records what happened when it was briefly armed on
 /// every connection.
 #[cfg(not(test))]
-const IO_DEADLINE: Duration = Duration::from_secs(10);
+pub(super) const IO_DEADLINE: Duration = Duration::from_secs(10);
 
 /// The same deadline under `cfg(test)`, and it is LONG rather than short.
 ///
@@ -151,18 +151,44 @@ pub fn socket_path(app_data_dir: &Path) -> PathBuf {
 /// app-data dir is hashed into the name to keep two installs/profiles
 /// (e.g. a second dev profile) from colliding on the same pipe.
 ///
-/// Pure, portable string logic (no `windows-sys` dependency), so it is
-/// typed and tested on every host including this repo's Linux dev/CI
-/// target, even though the actual Windows named-pipe BIND is a documented
-/// seam (see module docs) — `allow(dead_code)` in non-test builds until a
-/// Windows bind consumes it.
-#[cfg_attr(not(test), allow(dead_code))]
+/// **The hash is FNV-1a written out here, not `DefaultHasher`, and that is a
+/// wire contract rather than a preference.** `DefaultHasher` is documented as
+/// unstable across Rust releases, so a version-skewed pair (a newer desktop, an
+/// older sidecar) could derive two different names for one directory and every
+/// command would report "the app is not running" against a running app.
+/// `cli/src/windows_pipe.rs` carries the same function; `scripts/check-cli-sidecar.mjs`
+/// holds the two copies together, and the pinned vector in the tests below is
+/// what fails when they drift.
+///
+/// Pure, portable string logic (no `windows-sys` dependency), so it is typed
+/// and tested on every host including this repo's Linux dev/CI target.
+// Named only by the Windows arm and by the tests that pin its derivation, so the
+// host build without tests has no reader for it.
+#[cfg(any(windows, test))]
+pub const PIPE_PREFIX: &str = "myne-cli-";
+
+#[cfg(any(windows, test))]
 pub fn windows_pipe_name(app_data_dir: &Path) -> String {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    app_data_dir.hash(&mut hasher);
-    format!(r"\\.\pipe\myne-cli-{:016x}", hasher.finish())
+    format!(
+        r"\\.\pipe\{}{:016x}",
+        PIPE_PREFIX,
+        fnv1a64(app_data_dir.to_string_lossy().as_bytes())
+    )
 }
+
+/// FNV-1a, 64-bit. Frozen arithmetic: see [`windows_pipe_name`].
+#[cfg(any(windows, test))]
+fn fnv1a64(bytes: &[u8]) -> u64 {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in bytes {
+        hash ^= *byte as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash
+}
+
+#[cfg(windows)]
+pub use super::pipe::{spawn, teardown, ListenerHandle};
 
 /// A running command-socket listener, own by the lifecycle supervisor.
 #[cfg(unix)]
@@ -682,6 +708,19 @@ mod tests {
         let a = windows_pipe_name(Path::new("/profile/a"));
         let b = windows_pipe_name(Path::new("/profile/b"));
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn windows_pipe_name_matches_the_pinned_vector() {
+        // Pinned arithmetic, not a round trip through the same function: this
+        // is the half that notices `cli/src/windows_pipe.rs` drifting away from
+        // this copy, which no compiler compares.
+        assert_eq!(
+            windows_pipe_name(Path::new("/some/app/data")),
+            format!(r"\\.\pipe\myne-cli-{:016x}", 0x4863_0ff4_3b5c_b6b3u64)
+        );
+        assert_eq!(fnv1a64(b""), 0xcbf2_9ce4_8422_2325);
+        assert_eq!(fnv1a64(b"a"), 0xaf63_dc4c_8601_ec8c);
     }
 
     #[test]

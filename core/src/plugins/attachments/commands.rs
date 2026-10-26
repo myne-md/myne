@@ -39,8 +39,8 @@ use base64::Engine as _;
 use protocol::{
     compute_attachment_id, decode_attachment_blob, decode_attachments_catalog,
     encode_attachments_catalog_versioned, meta_version_of, parse_vault_meta_any,
-    read_or_empty_versioned, AttachmentMeta, AttachmentsCatalog, MetaVersion, SubkeyRole,
-    ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
+    read_or_empty_versioned, AttachmentMeta, AttachmentScope, AttachmentsCatalog, MetaVersion,
+    SubkeyRole, ATTACHMENT_ID_LEN, CATALOG_BLOB_ACCOUNT_HASH_LEN, MAX_ATTACHMENT_LEN,
     VAULT_META_ACCOUNT_HASH_LEN,
 };
 use serde::Serialize;
@@ -333,10 +333,13 @@ pub async fn attachment_import_from_host(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     source: ImportSource,
+    // Where the file lands (myne-md/myne#913). `Library` for every caller that
+    // is not pasting into a conversation.
+    scope: AttachmentScope,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = vault_dir_from_host(host, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
-    let result = attachment_import_with_dir(io, host, &dir, state, source).await;
+    let result = attachment_import_with_dir(io, host, &dir, state, source, scope).await;
     // MYND-468: a fresh import (not a dedup hit) is a local sync change — the
     // blob + catalog must push on the next coalesced cycle.
     if matches!(&result, Ok(imported) if !imported.deduplicated) {
@@ -354,6 +357,12 @@ pub async fn attachment_import<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
     source: ImportSource,
+    // Where the file lands (myne-md/myne#913): `None` is the attachment library,
+    // `Some("chat")` a conversation's own file. A string rather than the enum so
+    // the wire shape is stable if a third placement ever appears; an unknown
+    // value is refused by mapping to the library, which is the placement that
+    // lists the file rather than one that hides it from the user who imported it.
+    scope: Option<String>,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     attachment_import_from_host(
         &TauriHost::new(app),
@@ -361,8 +370,19 @@ pub async fn attachment_import<R: Runtime>(
         state.inner(),
         hooks.inner(),
         source,
+        scope_for_wire(scope.as_deref()),
     )
     .await
+}
+
+/// Map the wire's scope string to the enum. Anything unrecognised is the
+/// library: a file the user imported must never become invisible because a
+/// client sent a word this build does not know.
+pub fn scope_for_wire(raw: Option<&str>) -> AttachmentScope {
+    match raw {
+        Some("chat") => AttachmentScope::Chat,
+        _ => AttachmentScope::Library,
+    }
 }
 
 /// Testable core of [`attachment_import`] — the **extraction-free** import
@@ -383,6 +403,7 @@ pub async fn attachment_import_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     source: ImportSource,
+    scope: AttachmentScope,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     attachment_import_with_dir_ext(
         io,
@@ -390,7 +411,10 @@ pub async fn attachment_import_with_dir(
         vault_dir,
         state,
         source,
-        IngestPolicy::fresh(),
+        IngestPolicy {
+            scope,
+            ..IngestPolicy::fresh()
+        },
         no_op_extract,
     )
     .await
@@ -456,6 +480,15 @@ pub struct IngestPolicy {
     /// would be deleted again on the next sync.
     pub created_at_override: Option<u64>,
     pub compression: IngestCompression,
+    /// Which surface the new entry belongs to (myne-md/myne#913).
+    ///
+    /// `Library` for every ordinary import: file picker, drop, the attachment
+    /// library's own "add". `Chat` only for a file pasted into a conversation,
+    /// which stores it encrypted and keeps it out of the library listing. It
+    /// lives on the policy rather than in the function signature because an
+    /// import has exactly one placement and every caller already builds one of
+    /// these.
+    pub scope: AttachmentScope,
 }
 
 impl IngestPolicy {
@@ -465,6 +498,7 @@ impl IngestPolicy {
         Self {
             created_at_override: None,
             compression: IngestCompression::Apply,
+            scope: AttachmentScope::Library,
         }
     }
 }
@@ -969,6 +1003,13 @@ where
     let mut meta =
         AttachmentMeta::live(content_type.to_string(), created_at, filename.clone(), size);
     meta.version = version;
+    // **The placement is the importer's, not the file's** (myne-md/myne#913).
+    // A dedup hit returned earlier, so this is a new id (or a revived tombstone),
+    // and the only question left is which surface asked for it. A file already in
+    // the library that gets pasted into a conversation dedups to that existing
+    // library entry: it was theirs before the paste, and quietly re-filing it
+    // would hide a file the user had curated.
+    meta.scope = policy.scope;
     catalog.entries.insert(id_hex.clone(), meta);
     let catalog_bytes = encode_attachments_catalog_versioned(
         meta_version,
@@ -1094,8 +1135,11 @@ pub(crate) async fn catalog_list_with_dir(
         .entries
         .into_iter()
         // A tombstoned entry is a sync deletion marker (MYND-468), not a
-        // library item — never listed.
-        .filter(|(_, meta)| !meta.is_tombstone())
+        // library item, never listed. And a chat attachment belongs to the
+        // conversation that owns it (myne-md/myne#913): it is stored, encrypted
+        // and synced like any other, and it is not one of the files the user
+        // curated into their library.
+        .filter(|(_, meta)| !meta.is_tombstone() && meta.scope == AttachmentScope::Library)
         .map(|(id, meta)| CatalogEntry {
             id,
             content_type: meta.content_type,
@@ -1159,6 +1203,53 @@ pub async fn attachment_unused_list<R: Runtime>(
     .await
 }
 
+/// Whether this vault's conversations may live in a store the running session
+/// cannot read (myne-md/myne#913, review round seven).
+///
+/// **A chat-scoped attachment's only reference is a conversation turn, and on a
+/// B2B vault the conversations are person-scoped**: a member's live in their
+/// private container, and an owner cannot read any member's. So the reference
+/// scan proves completeness for ONE person, while the catalog row and the blob
+/// it protects are shared (the catalog decodes under the group key both tiers
+/// derive). A sweep that treats a successful partial scan as authoritative would
+/// offer, and then crypto-erase, a file another person's conversation still
+/// names, with no confirmation that person ever sees.
+///
+/// Any `vault.meta` that carries a membership is therefore treated as
+/// possibly-shared, and every chat-scoped row is withheld from the sweep. The
+/// cost is stated rather than hidden: on a B2B vault a chat-scoped attachment is
+/// not offered for cleanup until the sweep can enumerate every participant's
+/// conversations. A meta that is ABSENT answers `None` rather than "shared",
+/// because an absent one means a locked or absent vault and the caller's slot
+/// check owns that answer; a meta that is present but does not parse also answers
+/// `None`, and the catalog read on the same bytes refuses a line later.
+pub(crate) async fn vault_conversations_may_be_person_scoped(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+) -> Option<bool> {
+    // `None` means "no vault.meta to read", which is a LOCKED or absent vault
+    // rather than a shared one: the caller's slot guard answers that with
+    // `Locked`, and turning it into "refuse because shared" would replace the
+    // one error that tells the user what to do (review round eight).
+    let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
+    // **`NTV6` FIRST, and this is the half that was missing** (review round
+    // eight): the B2B frame is the one generation whose conversations are
+    // person-private, and its base prefix carries `membership: None` by
+    // construction (`serialize_vault_meta_ntv6` REJECTS a base with one), so
+    // asking `membership.is_some()` answered `false` on exactly the vaults this
+    // predicate exists for. A test seeded with an `NTV5` meta could never have
+    // caught it.
+    if bytes.get(0..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+        return Some(true);
+    }
+    match protocol::parse_vault_meta_any(&bytes) {
+        Ok(meta) => Some(meta.membership.is_some()),
+        // A meta that does not parse is not evidence of sharing; the caller's
+        // catalog read refuses on the same bytes a line later.
+        Err(_) => None,
+    }
+}
+
 /// Testable core of [`attachment_unused_list`]. `now` is the current UNIX time
 /// (the wrapper passes [`now_unix_secs`]); entries added within
 /// [`UNUSED_CLEANUP_GRACE_SECS`] of it are withheld (SYNC-10). Pass
@@ -1188,6 +1279,29 @@ pub(crate) async fn attachment_unused_list_with_dir(
         );
         return Err(AttachmentUnusedListError::CorpusIncomplete);
     }
+
+    // **The conversation scan runs BEFORE the slot guard is taken** (myne-md/myne#913,
+    // review round seven). The chats read takes its own `slots.read()`, and
+    // re-entering this `RwLock`'s read side while `hold_unlocked_attachment_material`
+    // holds a guard is the reentrant-lock hazard this file already documents on the
+    // import path: with a writer queued between the two, the second read waits
+    // behind it and the writer waits for the first guard, which cannot drop. A hang,
+    // not an error. Nothing here needs the attachment material, so it moves up.
+    //
+    // The result is a superset of ids (every 64-hex run in a live
+    // conversation), which is fine: its only use is "do not offer this id".
+    // **A shared vault cannot produce a correct list at all**, and returning an
+    // empty one would read as "nothing to clean" (review round eight). A LIBRARY
+    // attachment picked with `+` is referenced only by a turn as well, and on an
+    // `NTV6` vault a member's turns live in their private container, so no row can
+    // be shown to be unused by this session. Refused, with a reason the UI can
+    // say out loud, rather than silently narrowed to the chat rows.
+    if vault_conversations_may_be_person_scoped(io, vault_dir).await == Some(true) {
+        return Err(AttachmentUnusedListError::ConversationsNotProvable);
+    }
+    let chat_refs =
+        crate::plugins::chats::commands::referenced_attachment_ids_with_dir(io, vault_dir, state)
+            .await;
 
     // Hold the slot guard across the whole compute (catalog read + note
     // scan) — the import/delete writer-guard pattern. Clone the material
@@ -1232,6 +1346,46 @@ pub(crate) async fn attachment_unused_list_with_dir(
         &items_key_id,
     )
     .await?;
+    // **The conversation references are older than the note references by the
+    // length of the note scan**, because they had to be read before the slot guard
+    // (the reentrancy hazard above). A file attached to a conversation inside that
+    // window is in `requested` and would be erased. The note half documents the
+    // same class of residual as sub-millisecond; this one is wider and is stated
+    // rather than left to be discovered (myne-md/myne#913, review round ten).
+    // Closing it needs the conversation scan to be re-runnable under the guard,
+    // which means giving it a seal the sweep already holds instead of acquiring
+    // one.
+
+    // **Conversations are the second reference source** (myne-md/myne#913). A
+    // chat-scoped row's reference is a conversation turn, which the note scan
+    // cannot see; reading only notes made every pasted file look unreferenced
+    // seven days later, and the first version of this fix answered that by
+    // refusing to offer chat rows AT ALL, which turned an over-eager erase into
+    // a file with no erasure path: a discarded paste, or a file whose
+    // conversation was deleted, stayed on disk, in the backup and on the sync
+    // server forever. Counting the reference is the honest middle, and a read
+    // failure falls back to the conservative side (offer none).
+    let mut referenced = referenced;
+    match chat_refs {
+        Ok(chat_ids) => referenced.extend(chat_ids),
+        Err(error) => {
+            // Fail SAFE rather than open: an unreadable conversation proves
+            // nothing about what it names, so every chat-scoped row stays out of
+            // the list.
+            tracing::debug!(
+                target: "myne_core::attachments",
+                event = "unused_list_chat_scan_failed",
+                error_kind = ?error
+            );
+            referenced.extend(
+                catalog
+                    .entries
+                    .iter()
+                    .filter(|(_, meta)| meta.scope == AttachmentScope::Chat)
+                    .map(|(id, _)| id.clone()),
+            );
+        }
+    }
 
     let rows: Vec<CatalogEntry> = catalog
         .entries
@@ -1322,7 +1476,11 @@ pub(crate) async fn rewrite_catalog_dropping_unused(
             Some(meta) if !meta.is_tombstone() && !referenced.contains(id) => {
                 survivors.push((id.clone(), meta.size))
             }
-            // Absent / already tombstoned (gone) OR now referenced (TOCTOU) → skip.
+            // Absent / already tombstoned (gone) / now referenced (TOCTOU) →
+            // skip. **`referenced` is the whole guard** (myne-md/myne#913): the
+            // ids arrive from the caller, so this re-reads the live references
+            // itself. A chat-scoped id reaches here only when its conversations
+            // were read and none of them names it.
             _ => skipped += 1,
         }
     }
@@ -1439,6 +1597,45 @@ pub async fn attachment_clean_unused_with_dir(
         return Err(AttachmentCleanUnusedError::CorpusIncomplete);
     }
 
+    // **The conversation scan runs BEFORE the slot guard is taken**
+    // (myne-md/myne#913, review round seven): the chats read takes its own
+    // `slots.read()`, and re-entering that `RwLock` under a held guard deadlocks
+    // against a queued writer. A conversation that cannot be read aborts the whole
+    // sweep, before anything is held or written.
+    // **The session first**: a locked NTV6 vault has a `vault.meta` on disk, so
+    // the shared-vault predicate below would answer "shared" and the user would be
+    // told the conversations could not be read instead of being asked to unlock
+    // (review round ten).
+    if !matches!(
+        &*state.slot_read_active().await,
+        crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+    ) {
+        return Err(AttachmentCleanUnusedError::Locked);
+    }
+    // **A shared vault refuses the sweep** (myne-md/myne#913, review round
+    // eight): a LIBRARY row can be referenced only by a turn too, and another
+    // person's turns are unreadable here, so no row can be shown to be unused.
+    // Refusing is the only safe side; the library half is NOT still correct,
+    // which is what the narrower withhold got wrong.
+    if vault_conversations_may_be_person_scoped(io, vault_dir).await == Some(true) {
+        return Err(AttachmentCleanUnusedError::ConversationScanFailed);
+    }
+    let chat_refs = match crate::plugins::chats::commands::referenced_attachment_ids_with_dir(
+        io, vault_dir, state,
+    )
+    .await
+    {
+        Ok(ids) => ids,
+        Err(error) => {
+            tracing::debug!(
+                target: "myne_core::attachments",
+                event = "clean_unused_chat_scan_failed",
+                error_kind = ?error
+            );
+            return Err(AttachmentCleanUnusedError::ConversationScanFailed);
+        }
+    };
+
     let (_slots_guard, items_key, items_key_id, shared) = state
         .hold_unlocked_attachment_material()
         .await
@@ -1458,13 +1655,15 @@ pub async fn attachment_clean_unused_with_dir(
     // window between this scan and the catalog write below is not covered —
     // there is no vault-wide write lock in v0.1; Phase 2 sync revisit.)
     let notes_dir = vault_dir.join("notes");
-    let referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
+    let mut referenced = crate::plugins::attachments::ref_scan::collect_referenced_attachment_ids(
         io,
         &notes_dir,
         &items_key,
         &items_key_id,
     )
     .await?;
+    // The conversation half, read before the guard above.
+    referenced.extend(chat_refs);
 
     // Serialize the catalog RMW + unlinks against concurrent import/delete.
     let _write_guard = catalog_write_mutex().lock().await;
@@ -2701,6 +2900,86 @@ mod tests {
         .expect("seed NTV5 vault.meta");
     }
 
+    /// **The predicate must answer TRUE for `NTV6`, and that is the half the
+    /// round-seven version got wrong** (review round eight): the B2B frame is the
+    /// one generation whose conversations are person-private, and its base prefix
+    /// carries `membership: None` BY CONSTRUCTION
+    /// (`serialize_vault_meta_ntv6` refuses a base with one), so a predicate that
+    /// only asked about membership answered `false` on exactly the vaults it
+    /// exists for. A fixture seeded with an `NTV5` meta could never have caught it.
+    #[test]
+    fn an_ntv6_vault_is_treated_as_person_scoped() {
+        let tmp = ScopedTempDir::new("attach-ntv6-scope").expect("scoped tempdir");
+        let base = protocol::VaultMeta {
+            account_number_hash: [SEED_ACCOUNT_HASH; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            // `NTV6` cannot carry one, which is the whole point.
+            membership: None,
+            person_binding: None,
+        };
+        let ntv6 = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base,
+            group_key_nonce: [0x0C; 24],
+            enc_group_key: [0x0D; 64],
+            group_key_epoch: 1,
+            signed_roster_envelope: vec![0x0E; 200],
+        })
+        .expect("serialize NTV6");
+        std::fs::write(tmp.path().join("vault.meta"), ntv6).unwrap();
+
+        assert_eq!(
+            rt().block_on(vault_conversations_may_be_person_scoped(io(), tmp.path())),
+            Some(true),
+            "an NTV6 vault keeps conversations per person, so the sweep cannot prove completeness"
+        );
+
+        // Control: the same fixture without the B2B frame is not withheld, or the
+        // assertion above would pass for every vault.
+        seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
+        assert_eq!(
+            rt().block_on(vault_conversations_may_be_person_scoped(io(), tmp.path())),
+            Some(false)
+        );
+    }
+
+    /// The same vault, carrying a MEMBERSHIP: the shape of a B2B vault whose base
+    /// carries the single-account field (review round seven).
+    fn seed_vault_meta_with_membership(dir: &Path, seed: u8) {
+        let meta = protocol::VaultMeta {
+            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
+            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
+            random_salt_password: [1u8; 16],
+            random_salt_recovery: [2u8; 16],
+            nonce_password_wrap: [3u8; 24],
+            enc_root_key_password: [4u8; 64],
+            nonce_recovery_wrap: [5u8; 24],
+            enc_root_key_recovery: [6u8; 64],
+            items_key_id: [7u8; 16],
+            items_key_nonce: [8u8; 24],
+            enc_items_key: [9u8; 64],
+            membership: Some(protocol::Membership {
+                nonce: [0x0A; 24],
+                enc: [0x0B; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+                roster: None,
+            }),
+            person_binding: None,
+        };
+        std::fs::write(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta_v0_2(&meta),
+        )
+        .expect("seed membership-bearing vault.meta");
+    }
+
     async fn temp_vault_v0_2() -> (ScopedTempDir, VaultRuntimeState) {
         let tmp = ScopedTempDir::new("attach-it-v0-2").expect("scoped tempdir");
         seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
@@ -2748,7 +3027,15 @@ mod tests {
         state: &VaultRuntimeState,
         source: ImportSource,
     ) -> Result<ImportedAttachment, AttachmentImportError> {
-        super::attachment_import_with_dir(io(), &host(), vault_dir, state, source).await
+        super::attachment_import_with_dir(
+            io(),
+            &host(),
+            vault_dir,
+            state,
+            source,
+            super::IngestPolicy::fresh().scope,
+        )
+        .await
     }
 
     // Unused by this module's own tests (the desktop crate's `import_desktop`
@@ -2775,6 +3062,7 @@ mod tests {
             super::IngestPolicy {
                 created_at_override,
                 compression: super::IngestCompression::Apply,
+                scope: AttachmentScope::Library,
             },
             extract,
         )
@@ -2793,6 +3081,16 @@ mod tests {
         state: &VaultRuntimeState,
         now: u64,
     ) -> Result<Vec<CatalogEntry>, AttachmentUnusedListError> {
+        // **The session first**: a locked NTV6 vault has a `vault.meta` on disk, so
+        // the shared-vault predicate below would answer "shared" and the user would be
+        // told the conversations could not be read instead of being asked to unlock
+        // (review round ten).
+        if !matches!(
+            &*state.slot_read_active().await,
+            crate::plugins::vault_unlock::state::Slot::Unlocked(_)
+        ) {
+            return Err(AttachmentUnusedListError::Locked);
+        }
         super::attachment_unused_list_with_dir(io(), vault_dir, state, now).await
     }
 
@@ -4246,6 +4544,30 @@ mod tests {
         .id
     }
 
+    /// Import with an explicit scope: the `Chat` arm is the paste path, whose
+    /// row no note refers to (myne-md/myne#913).
+    async fn import_tagged_scoped(
+        tmp: &ScopedTempDir,
+        state: &VaultRuntimeState,
+        tag: u8,
+        scope: AttachmentScope,
+    ) -> String {
+        super::attachment_import_with_dir(
+            io(),
+            &host(),
+            tmp.path(),
+            state,
+            ImportSource::Bytes {
+                bytes: png_with_tag(tag),
+                filename: Some(format!("a{tag}.png")),
+            },
+            scope,
+        )
+        .await
+        .expect("import")
+        .id
+    }
+
     async fn create_note(notes_dir: &Path, state: &VaultRuntimeState, body: &str) -> String {
         std::fs::create_dir_all(notes_dir).unwrap();
         crate::plugins::notes::commands::note_create_with_dir(
@@ -4578,6 +4900,215 @@ mod tests {
             // Nothing erased — the corrupt note aborted the whole sweep.
             assert!(catalog_ids(&tmp, &state).await.contains(&a));
             assert!(blob_exists(&tmp, &a));
+        });
+    }
+
+    /// **A conversation counts as a reference** (myne-md/myne#913).
+    ///
+    /// The note scan cannot see a chat attachment's only reference, so reading
+    /// notes alone made every pasted file look unreferenced seven days later.
+    /// The sweep now reads the conversations too, which is what makes BOTH
+    /// directions true: a file a live conversation names is never offered, and a
+    /// file nothing names (a discarded paste, or one whose conversation was
+    /// deleted) is not stranded forever with no erasure path.
+    #[test]
+    fn unused_list_counts_a_conversation_as_a_reference() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let named = import_tagged_scoped(&tmp, &state, 31, AttachmentScope::Chat).await;
+            let orphan = import_tagged_scoped(&tmp, &state, 32, AttachmentScope::Chat).await;
+            // The payload is the client's own shape; this crate only needs it to
+            // be an object with `turns`, and the id is found by the hex scan.
+            let payload = format!("{{\"turns\":[{{\"attachments\":[{{\"id\":\"{named}\"}}]}}]}}");
+            crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: &payload,
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
+            )
+            .await
+            .expect("create conversation");
+
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + UNUSED_CLEANUP_GRACE_SECS
+                + 1;
+            let listed = attachment_unused_list_with_dir(tmp.path(), &state, now)
+                .await
+                .expect("list");
+            let ids: Vec<&str> = listed.iter().map(|entry| entry.id.as_str()).collect();
+
+            assert!(
+                !ids.contains(&named.as_str()),
+                "a file a live conversation names is never offered: {ids:?}"
+            );
+            assert!(
+                ids.contains(&orphan.as_str()),
+                "a chat row nothing names is offered, or it can never be erased: {ids:?}"
+            );
+        });
+    }
+
+    /// And the sweep itself makes the same call, because the ids come back from
+    /// the caller: a named file is skipped, an orphan is erased.
+    #[test]
+    fn clean_unused_skips_a_chat_attachment_a_conversation_names() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let named = import_tagged_scoped(&tmp, &state, 33, AttachmentScope::Chat).await;
+            let orphan = import_tagged_scoped(&tmp, &state, 34, AttachmentScope::Chat).await;
+            let payload = format!("{{\"turns\":[{{\"attachments\":[{{\"id\":\"{named}\"}}]}}]}}");
+            crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: &payload,
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
+            )
+            .await
+            .expect("create conversation");
+
+            let result = attachment_clean_unused_with_dir(
+                tmp.path(),
+                &state,
+                vec![named.clone(), orphan.clone()],
+            )
+            .await
+            .expect("clean");
+
+            assert_eq!(result.deleted, 1, "only the orphan is erased");
+            assert_eq!(result.skipped, 1);
+            assert!(blob_exists(&tmp, &named), "the named file survives");
+            assert!(!blob_exists(&tmp, &orphan), "the orphan is erased");
+        });
+    }
+
+    /// **A conversation that cannot be read withholds every chat row**
+    /// (myne-md/myne#913, review round four).
+    ///
+    /// The round-three fix added a fail-safe flag, and the round-three code still
+    /// defeated it: the candidate set came from a catalog read whose failure was
+    /// swallowed into an empty set, the scan answered "nothing referenced", and
+    /// the flag stayed true. The candidates are the REQUESTED ids now, so the
+    /// only way to reach "could not establish references" is an unreadable
+    /// conversation, which this test constructs. The erase is irreversible, so
+    /// the assertion is that it does not happen.
+    #[test]
+    fn clean_unused_refuses_chat_rows_when_conversations_cannot_be_read() {
+        rt().block_on(async {
+            let (tmp, state) = temp_vault().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 35, AttachmentScope::Chat).await;
+            let conversation = crate::plugins::chats::commands::chats_create_with_dir(
+                io(),
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                crate::plugins::chats::commands::ChatsCreateRequest {
+                    first_turn_payload: "{\"turns\":[]}",
+                    now_unix_millis: 1_700_000_000_000,
+                    requested_id_hex: None,
+                    note_id: None,
+                    folder: None,
+                },
+            )
+            .await
+            .expect("create conversation");
+            std::fs::write(
+                tmp.path().join("chats").join(&conversation),
+                b"not a MYJ1 blob",
+            )
+            .unwrap();
+
+            // **A library row too**, named only by the (unreadable) conversation:
+            // a file picked with `+` and never embedded in a note. Narrowing the
+            // refusal to chat-scoped rows is what round five fixed.
+            let library = import_tagged(&tmp, &state, 36).await;
+            let result = attachment_clean_unused_with_dir(
+                tmp.path(),
+                &state,
+                vec![pasted.clone(), library.clone()],
+            )
+            .await;
+
+            assert!(
+                matches!(
+                    result,
+                    Err(AttachmentCleanUnusedError::ConversationScanFailed)
+                ),
+                "the sweep refuses rather than erasing against a corpus it could not read"
+            );
+            assert!(blob_exists(&tmp, &pasted));
+            assert!(blob_exists(&tmp, &library));
+        });
+    }
+
+    /// **A shared vault refuses the sweep entirely** (myne-md/myne#913, review
+    /// rounds seven and eight).
+    ///
+    /// A conversation turn is the only reference an attachment picked with `+`
+    /// has, and on a B2B (`NTV6`) vault the conversations are person-scoped: a
+    /// member's live in a private container and an owner cannot read any
+    /// member's. So a successful scan proves ONE person's references while the
+    /// catalog row and the blob are shared. The first version of this guard
+    /// withheld only CHAT-scoped rows, which left a LIBRARY row picked into a
+    /// conversation erasable on another person's confirmation; the sweep refuses
+    /// for every row now.
+    ///
+    /// Reddens against the narrower guard: the library row would be deleted.
+    #[test]
+    fn a_shared_vault_refuses_the_sweep_for_every_scope() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("attach-shared").expect("scoped tempdir");
+            seed_vault_meta_with_membership(tmp.path(), SEED_ACCOUNT_HASH);
+            let state = unlocked_state().await;
+            let pasted = import_tagged_scoped(&tmp, &state, 41, AttachmentScope::Chat).await;
+            let picked = import_tagged(&tmp, &state, 42).await;
+
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + UNUSED_CLEANUP_GRACE_SECS
+                + 1;
+            let listed = attachment_unused_list_with_dir(tmp.path(), &state, now).await;
+            assert!(
+                matches!(
+                    listed,
+                    Err(AttachmentUnusedListError::ConversationsNotProvable)
+                ),
+                "a shared vault must refuse the list, not narrow it"
+            );
+
+            let cleaned = attachment_clean_unused_with_dir(
+                tmp.path(),
+                &state,
+                vec![pasted.clone(), picked.clone()],
+            )
+            .await;
+            assert!(
+                matches!(
+                    cleaned,
+                    Err(AttachmentCleanUnusedError::ConversationScanFailed)
+                ),
+                "a shared vault must refuse the sweep: {cleaned:?}"
+            );
+            assert!(blob_exists(&tmp, &pasted));
+            assert!(blob_exists(&tmp, &picked));
         });
     }
 

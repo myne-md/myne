@@ -44,6 +44,53 @@ export interface EditorLayoutController extends EditorLayoutState {
   toggleLeftCollapsed: () => void;
   /** Collapse/expand the right sidebar (independent of the left). */
   toggleRightCollapsed: () => void;
+  /**
+   * Whether the persisted layout has been read yet (myne-md/myne#913).
+   *
+   * **A caller that changes the layout on its own must wait for this.** The
+   * initial read REPLACES the whole state when it lands, so anything set before
+   * it is silently undone: a collapse written during the first render came back
+   * expanded the moment `vault.prefs` answered, and the surface that asked for
+   * it had no way to tell. Exposed rather than assumed, because "it is
+   * hydrated by now" is exactly the assumption that failed.
+   */
+  hydrated: boolean;
+}
+
+/**
+ * Which sidebars to close for the agent tab (myne-md/myne#913).
+ *
+ * Pure so the cases can be asserted without mounting the Editor, the largest
+ * component in the tree. **Both sides, not just the left**: the report was about
+ * the RIGHT one, which is the AI chat's home, and an agent pane beside an AI chat
+ * is the same surface twice with different transcripts. The left goes with it
+ * because the agent has its own conversation rail, so two rails were asking the
+ * user to pick something twice.
+ *
+ * The cases are the whole rule:
+ *
+ *  - the agent tab is showing and the workspace is a SINGLE pane: close whatever
+ *    is open. A SPLIT workspace is left alone: there the note tree and the
+ *    backlinks pane are the other pane's context, and closing them hides the
+ *    selection being worked from.
+ *  - the layout has not hydrated: do nothing. The persisted read REPLACES the
+ *    state, so a collapse written before it lands is undone silently.
+ *  - `handledForEntry` already true: do nothing, which is what lets the user
+ *    reopen either side without being fought for the rest of the visit.
+ */
+export function agentTabCollapse(input: {
+  agentTabFocused: boolean;
+  paneCount: number;
+  hydrated: boolean;
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
+  handledForEntry: boolean;
+}): { left: boolean; right: boolean } {
+  const none = { left: false, right: false };
+  if (!input.agentTabFocused || input.paneCount !== 1) return none;
+  if (!input.hydrated) return none;
+  if (input.handledForEntry) return none;
+  return { left: !input.leftCollapsed, right: !input.rightCollapsed };
 }
 
 /** Debounce window for persisting layout changes to `vault.prefs`. Long
@@ -59,6 +106,9 @@ const DEFAULT_STATE: EditorLayoutState = {
 
 export function useEditorLayout(): EditorLayoutController {
   const [state, setState] = useState<EditorLayoutState>(DEFAULT_STATE);
+  // Mirror of `hydratedRef` as STATE, because the ref alone cannot wake a
+  // consumer's effect. See `EditorLayoutController.hydrated`.
+  const [hydrated, setHydrated] = useState(false);
 
   // `hydratedRef` flips true once the initial prefs read resolves (or
   // fails). `dirtyRef` flips true on the first real user change, gating
@@ -92,7 +142,10 @@ export function useEditorLayout(): EditorLayoutController {
           console.warn("[editorLayout] prefs load failed; using defaults:", err);
         }
       } finally {
-        if (!cancelled) hydratedRef.current = true;
+        if (!cancelled) {
+          hydratedRef.current = true;
+          setHydrated(true);
+        }
       }
     })();
     return () => {
@@ -162,6 +215,7 @@ export function useEditorLayout(): EditorLayoutController {
 
   return {
     ...state,
+    hydrated,
     setLeftWidth,
     setRightWidth,
     toggleLeftCollapsed,

@@ -87,6 +87,18 @@ export async function scenario(
     await body(app);
   } catch (e) {
     await app.saveArtifacts(label);
+    // **The evidence block goes to the LOG, not only to `e2e/artifacts/`.** Those
+    // files live inside the runner's container and are gone with the step, so a
+    // red that does not describe itself here costs a local rebuild to explain.
+    // Printed before the rethrow so it lands whether or not the message is
+    // truncated by whichever reporter is active.
+    try {
+      // eslint-disable-next-line no-console
+      console.error(`\n[e2e evidence] ${label}\n  ${await app.evidenceDigest()}`);
+    } catch {
+      // A dead session cannot produce a digest; the failure being reported is the
+      // one that matters, and losing it to a diagnostic would be worse.
+    }
     // **What the app could SEE, appended to what it DID.** The boot probe added
     // to `unlockToEditor` reported that six scenarios were sitting on the
     // WELCOME screen, which `initialStageFromProbe` reaches on exactly one

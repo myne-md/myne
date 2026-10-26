@@ -29,6 +29,7 @@ import {
   ipcOk,
   openSettings,
   pageSeatInvoke,
+  selectSettingsTopic,
   typeIntoEditor,
   waitForSaved,
   unlockAndEnroll,
@@ -36,10 +37,21 @@ import {
 
 const supported = harnessSupported().ok && syncServerSupported().ok;
 
-/** Re-open Settings → Sync so the usage block re-mounts and re-fetches. */
+/** Re-open Settings → Sync so the usage block re-mounts and re-fetches.
+ *
+ * **The topic has to be named, and clicking the rail is not enough.** Settings
+ * REMEMBERS the active topic across a reopen (`settings-tabs`: "selects a topic,
+ * keeps it across a reopen"), and `unlockAndEnroll` leaves the panel on
+ * `devices` because that is where the enrolment form lives. Clicking
+ * `settings.tab-sync` therefore restored the DEVICES topic, the usage block (a
+ * CONNECTION-topic row) never mounted, and su1/su2 reported a 20 s timeout on a
+ * `sync.usage` that was working: measured 2026-10-24 in isolation, 2 of 3 red.
+ * `sync_account_status` itself answered correctly in the same run, which is what
+ * separated "the block is missing" from "the fetch failed". */
 async function openSyncSettings(session: Session): Promise<void> {
   await openSettings(session);
   await (await session.byTestId("settings.tab-sync")).click();
+  await selectSettingsTopic(session, "sync", "connection");
 }
 
 describe.skipIf(!supported)("su · Settings → Sync usage block (MYND-570)", () => {

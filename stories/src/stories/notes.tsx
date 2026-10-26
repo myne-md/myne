@@ -69,7 +69,8 @@ import { NoteList } from "@app/notes/components/NoteList";
 import { OutlineTab } from "@app/notes/components/OutlineTab";
 import { PaneTree } from "@app/notes/components/PaneTree";
 import { PaneView } from "@app/notes/components/PaneView";
-import { ProposalDiffModal } from "@app/notes/components/ProposalDiffModal";
+import { ProposalDiffBody } from "@app/notes/components/ProposalDiffBody";
+import { AttachmentPickerDialog } from "@app/notes/components/AttachmentPickerDialog";
 import { SidebarSearchRow } from "@app/notes/components/SidebarSearchRow";
 import { SnapshotFailedIndicator } from "@app/notes/components/SnapshotFailedIndicator";
 import { SnapshotsPanel } from "@app/notes/components/SnapshotsPanel";
@@ -1396,16 +1397,14 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     },
   },
   {
-    id: "notes/proposaldiffmodal/default",
+    id: "notes/proposaldiffbody/default",
     group: "components",
-    surface: "ProposalDiffModal",
+    surface: "ProposalDiffBody",
     state: "default",
-    description: "A frozen agent proposal: one edit diffed and one new note.",
-    tags: ["notes", "agent", "proposal", "diff", "modal"],
+    description: "A frozen agent proposal inline under its turn: one edit diffed and one new note.",
+    tags: ["notes", "agent", "proposal", "diff", "inline"],
     render: () => (
-      <ProposalDiffModal
-        open
-        onClose={action("onClose")}
+      <ProposalDiffBody
         proposal={{
           edits: [
             {
@@ -1423,6 +1422,39 @@ export const NOTES_STORIES: StoryDescriptor[] = [
             },
           ],
         }}
+      />
+    ),
+  },
+  {
+    id: "notes/attachmentpickerdialog/open",
+    group: "components",
+    surface: "AttachmentPickerDialog",
+    state: "open",
+    description:
+      "The document picker for an agent run: one file already chosen, one more available, and the cap stated.",
+    tags: ["notes", "agent", "attachments", "picker", "modal"],
+    render: () => (
+      <AttachmentPickerDialog
+        open
+        onClose={action("onClose")}
+        onPick={action("onPick")}
+        selectedIds={["0184a2b3c4d5e6f708192a3b4c5d6e7f"]}
+        load={async () => [
+          {
+            id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+            content_type: "application/pdf",
+            created_at: 1700000000,
+            filename: "lecture-04.pdf",
+            size: 482_304,
+          },
+          {
+            id: "0184a2b3c4d5e6f708192a3b4c5d6e80",
+            content_type: "text/markdown",
+            created_at: 1700000100,
+            filename: "reading-list.md",
+            size: 3_200,
+          },
+        ]}
       />
     ),
   },

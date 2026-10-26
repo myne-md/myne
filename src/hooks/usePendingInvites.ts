@@ -26,18 +26,10 @@ import {
   personListInvites,
   personStatus,
   type InviteSummary,
+  type InvitesUnavailable,
 } from "../lib/personAccount";
 
-/**
- * Why the list could not be produced.
- *
- * - `no-identity`: this device holds no person identity at all.
- * - `not-enrolled`: it holds one, but the server does not know it yet, so there
- *   is nothing for an owner to invite. Registering (identity home or Settings)
- *   is the door, not this surface.
- * - `error`: the relay call failed. The address is fine and a retry may work.
- */
-export type InvitesUnavailable = "no-identity" | "not-enrolled" | "error";
+export type { InvitesUnavailable } from "../lib/personAccount";
 
 export interface PendingInvites {
   /** Every invitation addressed to this identity, claimed rows included. */
@@ -84,7 +76,7 @@ export function usePendingInvites(enabled = true): PendingInvites {
         }
         if (status.state !== "enrolled") {
           setInvites([]);
-          setUnavailable("not-enrolled");
+          setUnavailable(status.state === "pending" ? "pending" : "not-enrolled");
           return;
         }
         const list = await personListInvites();

@@ -547,17 +547,23 @@ export function IdentitySetupPanel({
             )
           ) : null}
 
-          {/* The host's own way out, when it has one. Omitted inside a modal,
-              whose × and backdrop already do this and whose refusal rules the
-              dialog keeps. */}
+          {/* The host's own way out, when it has one, and in the shape every
+              other first-run step gives it: `ghost` with the arrow, on the LEFT of
+              the footer, at its natural width (`vault-creation/*`, and
+              `RestoreBackup`'s own exit, which is the same door one flow over).
+              A way OUT of the flow is a step back, not a sentence under the card.
+              Omitted inside a modal, whose × and backdrop already do this and
+              whose refusal rules the dialog keeps. */}
           {onCancel ? (
             <Button
               variant="ghost"
+              icon="arrow-left"
               disabled={busy}
               onClick={onCancel}
+              style={{ alignSelf: "flex-start" }}
               data-testid={testId("cancel")}
             >
-              {t("identitySetup.notNow")}
+              {t("identitySetup.back")}
             </Button>
           ) : null}
         </div>

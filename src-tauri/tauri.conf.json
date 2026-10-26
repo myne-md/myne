@@ -94,7 +94,7 @@
         }
       }
     },
-    "externalBin": ["binaries/myne", "binaries/myne-mcp", "binaries/myne-tor"],
+    "externalBin": ["binaries/myne", "binaries/myne-mcp", "binaries/myne-tor", "binaries/myne-clipper-host"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

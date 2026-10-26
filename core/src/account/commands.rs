@@ -2,21 +2,25 @@
 //! The account-record command surface (the account/vault split,
 //! `decisions.md` 2026-09-07).
 //!
-//! Commands over [`super::store`]: list the account grouping, rename the
-//! account label, move a vault between accounts, and split a vault into a new
-//! account. All are reachable **pre-unlock** (the picker is the surface they
-//! govern), and none touches vault content.
+//! Commands over [`super::store`]: list the account grouping, move a vault
+//! between accounts, and split a vault into a new account. All are reachable
+//! **pre-unlock** (the picker is the surface they govern), and none touches vault
+//! content.
 //!
-//! ## No path here writes a label in the clear
+//! There is no rename: an account has no name (`design-notes/ui/0728`), and the
+//! heading a client draws for a group comes from that group's own vault names.
+//! The account number a user shows on this surface is the person identity's,
+//! derived from the phrase, not a property of this record.
 //!
-//! The label crosses IPC as an ordinary `String` (the user's own text, exactly
-//! as `vault.prefs.label` does), but it is never logged, never put in an error
-//! variant, and never written anywhere but the sealed record.
+//! ## No path here writes user text
+//!
+//! The only values that cross IPC are hex account ids, canonical vault ids and
+//! the hide-vault-names refusal. Nothing is user-authored, so there is no string
+//! that could be logged, quoted in an error, or written in the clear.
 
 use crate::account::error::AccountError;
 use crate::account::store::{
     hex, hide_names_on, load_account, load_account_tracked, write_account, Account, ACCOUNT_ID_LEN,
-    ACCOUNT_LABEL_MAX_LEN,
 };
 use crate::io_failure_kind::IoFailureKind;
 use crate::vault_id::VaultId;
@@ -26,14 +30,12 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-/// One account in the grouping view: the account id, its label, and its member
-/// vault ids. The DENY-list-clean IPC projection of an [`Account`].
+/// One account in the grouping view: the account id and its member vault ids.
+/// The DENY-list-clean IPC projection of an [`Account`].
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AccountView {
     /// The account id, hex-encoded (16 bytes → 32 hex chars).
     pub id: String,
-    /// The account label (empty means unlabelled).
-    pub label: String,
     /// The member vault ids, canonical 36-char strings.
     pub vaults: Vec<String>,
 }
@@ -42,14 +44,13 @@ impl From<&Account> for AccountView {
     fn from(a: &Account) -> Self {
         AccountView {
             id: hex(a.account_id),
-            label: a.label.clone(),
             vaults: a.vaults.iter().map(|v| v.to_string()).collect(),
         }
     }
 }
 
 /// Failure surface for the command set. No `String` and no path, and **no
-/// variant can carry a label**.
+/// variant can carry user text** (there is none to carry).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error, Serialize)]
 #[serde(tag = "kind", content = "detail")]
 pub enum AccountCommandError {
@@ -66,9 +67,6 @@ pub enum AccountCommandError {
     /// Opaque backend failure.
     #[error("account record backend failure")]
     Backend,
-    /// The account label exceeds `ACCOUNT_LABEL_MAX_LEN` bytes.
-    #[error("account label too long")]
-    LabelTooLong,
     /// Account grouping is suppressed while hide-vault-names is on.
     #[error("account actions unavailable while vault names are hidden")]
     Hidden,
@@ -77,10 +75,9 @@ pub enum AccountCommandError {
     /// refused; the caller keeps the in-memory view.
     #[error("account record unreadable, refusing to overwrite")]
     RecordUnreadable,
-    /// No vault is unlocked. Rename, move and split are refused on a locked
-    /// device: a locked-screen observer may read labels and grouping but must
-    /// not persist a regrouping without any vault password (myne-md/myne#684
-    /// land gate).
+    /// No vault is unlocked. Move and split are refused on a locked device: a
+    /// locked-screen observer may read the grouping but must not persist a
+    /// regrouping without any vault password (myne-md/myne#684 land gate).
     #[error("account mutations require an unlocked vault")]
     Locked,
 }
@@ -92,7 +89,6 @@ impl From<AccountError> for AccountCommandError {
             AccountError::Io(kind) => AccountCommandError::Io {
                 io_error_kind: kind,
             },
-            AccountError::LabelTooLong => AccountCommandError::LabelTooLong,
             AccountError::Hidden => AccountCommandError::Hidden,
             AccountError::RecordUnreadable => AccountCommandError::RecordUnreadable,
             _ => AccountCommandError::Backend,
@@ -117,41 +113,6 @@ pub async fn list_accounts_at(
     }
     let record = load_account(io, config_dir, base, keychain).await?;
     Ok(record.accounts.iter().map(AccountView::from).collect())
-}
-
-/// Rename the account owning `vault_id`.
-///
-/// Rejected while hide-vault-names is on (a mutation applied invisibly would be
-/// worse than an honest refusal), and rejected when the label exceeds
-/// `ACCOUNT_LABEL_MAX_LEN` bytes.
-pub async fn rename_account_at(
-    io: &dyn VaultIo,
-    config_dir: &Path,
-    base: &Path,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-    label: String,
-) -> Result<AccountView, AccountCommandError> {
-    if hide_names_on(io, config_dir).await {
-        return Err(AccountCommandError::Hidden);
-    }
-    if label.len() > ACCOUNT_LABEL_MAX_LEN {
-        return Err(AccountCommandError::LabelTooLong);
-    }
-    let mut loaded = load_account_tracked(io, config_dir, base, keychain).await?;
-    if !loaded.writable() {
-        return Err(AccountCommandError::RecordUnreadable);
-    }
-    let record = &mut loaded.record;
-    let account = record
-        .accounts
-        .iter_mut()
-        .find(|a| a.vaults.contains(&vault_id))
-        .ok_or(AccountCommandError::VaultNotFound)?;
-    account.label = label;
-    let view = AccountView::from(&*account);
-    write_account(io, config_dir, keychain, &*record).await?;
-    Ok(view)
 }
 
 /// Move `vault_id` into the account owning `target_vault_id`. Both must be
@@ -240,7 +201,6 @@ pub async fn split_vault_at(
     getrandom::getrandom(&mut new_id).map_err(|_| AccountCommandError::Backend)?;
     record.accounts.push(Account {
         account_id: new_id,
-        label: String::new(),
         vaults: vec![vault_id],
     });
 
@@ -258,18 +218,6 @@ pub async fn list_accounts_from_host(
 ) -> Result<Vec<AccountView>, AccountCommandError> {
     let (base, config_dir) = dirs(host)?;
     list_accounts_at(io, &config_dir, &base, keychain).await
-}
-
-/// [`rename_account_at`] against the device's own directories.
-pub async fn rename_account_from_host(
-    host: &dyn crate::host::HostCtx,
-    io: &dyn VaultIo,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-    label: String,
-) -> Result<AccountView, AccountCommandError> {
-    let (base, config_dir) = dirs(host)?;
-    rename_account_at(io, &config_dir, &base, keychain, vault_id, label).await
 }
 
 /// [`move_vault_at`] against the device's own directories.
@@ -318,35 +266,6 @@ pub async fn account_list<R: tauri::Runtime>(
         &host,
         &crate::vault_io::StdVaultIo,
         crate::vault_label::key::platform_keychain(),
-    )
-    .await
-}
-
-/// Rename the account owning `vault_id`.
-///
-/// Refused while hide-vault-names is on (a mutation applied invisibly would be
-/// worse than an honest refusal), when the label exceeds
-/// `ACCOUNT_LABEL_MAX_LEN` bytes, and when no vault is unlocked (a locked
-/// observer reads grouping but never regroups).
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn account_rename<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
-    vault_id: String,
-    label: String,
-) -> Result<AccountView, AccountCommandError> {
-    if state.inner().active_vault_id().await.is_none() {
-        return Err(AccountCommandError::Locked);
-    }
-    let host = crate::host::tauri_host::TauriHost::new(app);
-    let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
-    rename_account_from_host(
-        &host,
-        &crate::vault_io::StdVaultIo,
-        crate::vault_label::key::platform_keychain(),
-        vault_id,
-        label,
     )
     .await
 }
@@ -460,30 +379,6 @@ mod tests {
     }
 
     #[test]
-    fn rename_round_trips() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        block_on(async {
-            let view = rename_account_at(
-                &StdVaultIo,
-                &d.config,
-                &d.base,
-                &keychain,
-                a,
-                "Personal".to_string(),
-            )
-            .await
-            .expect("rename");
-            assert_eq!(view.label, "Personal");
-            let views = list_accounts_at(&StdVaultIo, &d.config, &d.base, &keychain)
-                .await
-                .expect("list");
-            assert_eq!(views[0].label, "Personal");
-        });
-    }
-
-    #[test]
     fn split_moves_a_vault_into_a_fresh_account() {
         let d = device();
         let a = seed_vault(&d.base);
@@ -545,27 +440,33 @@ mod tests {
         );
     }
 
+    /// The grouping is the only secret this file holds, so that is what the
+    /// sealing claim is asserted on. Until `design-notes/ui/0728` the record
+    /// also carried an account label and this test named it; a check whose
+    /// subject has been deleted passes forever, so the assertion moved to the
+    /// values a write still produces: the account id and the member vault ids.
     #[test]
-    fn the_record_file_carries_no_label_substring() {
+    fn the_record_file_carries_no_plaintext_grouping() {
         let d = device();
         let a = seed_vault(&d.base);
+        let b = seed_vault(&d.base);
         let keychain = FakeKeychain::empty();
         block_on(async {
-            rename_account_at(
-                &StdVaultIo,
-                &d.config,
-                &d.base,
-                &keychain,
-                a,
-                "Tax Returns".to_string(),
-            )
-            .await
-            .expect("rename");
+            // A split is what persists a record: listing deliberately does not.
+            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
+                .await
+                .expect("split");
         });
         let bytes = std::fs::read(crate::account::store::account_path(&d.config)).expect("read");
+        for id in [a.to_string(), b.to_string()] {
+            assert!(
+                !bytes.windows(id.len()).any(|w| w == id.as_bytes()),
+                "a plaintext member vault id must not appear anywhere in the file"
+            );
+        }
         assert!(
-            !bytes.windows(11).any(|w| w == b"Tax Returns"),
-            "the plaintext label must not appear anywhere in the file"
+            !bytes.windows(8).any(|w| w == b"account_"),
+            "the plaintext record JSON must not appear anywhere in the file"
         );
     }
 
@@ -629,18 +530,6 @@ mod tests {
         block_on(async {
             // No keychain key for these bytes: the source is Unreadable.
             assert_eq!(
-                rename_account_at(
-                    &StdVaultIo,
-                    &d.config,
-                    &d.base,
-                    &keychain,
-                    a,
-                    "Personal".to_string(),
-                )
-                .await,
-                Err(AccountCommandError::RecordUnreadable)
-            );
-            assert_eq!(
                 split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a).await,
                 Err(AccountCommandError::RecordUnreadable)
             );
@@ -680,18 +569,14 @@ mod tests {
     fn list_returns_empty_while_names_are_hidden() {
         let d = device();
         let a = seed_vault(&d.base);
+        seed_vault(&d.base);
         let keychain = FakeKeychain::empty();
         block_on(async {
-            rename_account_at(
-                &StdVaultIo,
-                &d.config,
-                &d.base,
-                &keychain,
-                a,
-                "Personal".to_string(),
-            )
-            .await
-            .expect("rename");
+            // A split persists a record, so the suppression below is proved
+            // against a stored grouping rather than against a rebuild.
+            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
+                .await
+                .expect("split");
         });
         hide_the_names(&d.config);
         block_on(async {
@@ -710,46 +595,8 @@ mod tests {
         hide_the_names(&d.config);
         block_on(async {
             assert_eq!(
-                rename_account_at(
-                    &StdVaultIo,
-                    &d.config,
-                    &d.base,
-                    &keychain,
-                    a,
-                    "Personal".to_string(),
-                )
-                .await,
-                Err(AccountCommandError::Hidden)
-            );
-            assert_eq!(
                 split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a).await,
                 Err(AccountCommandError::Hidden)
-            );
-        });
-    }
-
-    #[test]
-    fn rename_rejects_an_overlong_label() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        block_on(async {
-            // First call bootstraps membership through the mutation path.
-            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
-                .await
-                .expect("split");
-            let too_long = "x".repeat(crate::account::store::ACCOUNT_LABEL_MAX_LEN + 1);
-            assert_eq!(
-                rename_account_at(&StdVaultIo, &d.config, &d.base, &keychain, a, too_long).await,
-                Err(AccountCommandError::LabelTooLong)
-            );
-            let at_cap = "x".repeat(crate::account::store::ACCOUNT_LABEL_MAX_LEN);
-            let view = rename_account_at(&StdVaultIo, &d.config, &d.base, &keychain, a, at_cap)
-                .await
-                .expect("exactly-at-cap label writes");
-            assert_eq!(
-                view.label.len(),
-                crate::account::store::ACCOUNT_LABEL_MAX_LEN
             );
         });
     }

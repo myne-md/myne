@@ -37,6 +37,7 @@ import {
   createTagSuggestionTrigger,
   type TagSuggestionTrigger,
 } from "./ai/tagSuggestionTrigger";
+import { TAG_HINT_MAX } from "./ai/suggestTags";
 import { tagTree } from "./vaultIndices";
 
 const NO_CHIPS: readonly TagSuggestionChip[] = [];
@@ -93,6 +94,21 @@ export function useTagSuggestions(input: TagSuggestionInput): TagSuggestionBandS
         // The vault's existing vocabulary, read at fire time — it grows as the
         // user accepts, and an existing tag ranks ahead of a new one.
         existingTags: async () => (await tagTree()).map((n) => n.display),
+        // The PROMPT's vocabulary is the note's own folder, ranked by how many
+        // notes there carry the tag (myne-md/myne#908 item 8). The ranker still
+        // sees the whole vault, so a tag that exists elsewhere keeps rendering
+        // as an existing tag rather than being reclassified as new. A folder
+        // with no tagged notes yields an empty hint, deliberately: falling back
+        // to the vault is what offered one project's tag to another project's
+        // note.
+        folderTags: async (folder) => {
+          const nodes = await tagTree(folder);
+          return nodes
+            .slice()
+            .sort((a, b) => b.subtreeCount - a.subtreeCount || a.key.localeCompare(b.key))
+            .slice(0, TAG_HINT_MAX)
+            .map((n) => n.display);
+        },
         excludedFolders: () => excludedRef.current,
         onResult: (result) => {
           // A result that landed after the pane moved on belongs to a note that

@@ -322,7 +322,9 @@ fn mutate_error_of(e: MemoryMutateError) -> AgentError {
 
 #[async_trait::async_trait]
 impl MemoryStore for MemoryAdapter<'_> {
-    async fn memory_for_injection(&self) -> Result<Vec<(String, String)>, AgentError> {
+    async fn memory_for_injection(
+        &self,
+    ) -> Result<Vec<crate::plugins::agent::memory::MemoryInjectionEntry>, AgentError> {
         let rows = memory_list_from_host(self.host, &StdVaultIo, self.state)
             .await
             .map_err(read_error_of)?;
@@ -345,8 +347,13 @@ impl MemoryStore for MemoryAdapter<'_> {
             if row.entry.quarantined {
                 continue;
             }
+            let from_seed = row.entry.is_seed();
             match memory_read_from_host(self.host, &StdVaultIo, self.state, &row.id).await {
-                Ok(text) => out.push((row.id, text)),
+                Ok(text) => out.push(crate::plugins::agent::memory::MemoryInjectionEntry {
+                    id: row.id,
+                    text,
+                    from_seed,
+                }),
                 Err(e) => {
                     // One corrupt file skips with a warn; the row stays and
                     // the run continues (the module doc states why).
@@ -519,8 +526,9 @@ mod tests {
             let id = outcome.entry_id;
             let entries = adapter.memory_for_injection().await.expect("inject reads");
             assert_eq!(entries.len(), 1);
-            assert_eq!(entries[0].0, id);
-            assert_eq!(entries[0].1, "The user prefers terse answers.");
+            assert_eq!(entries[0].id, id);
+            assert_eq!(entries[0].text, "The user prefers terse answers.");
+            assert!(!entries[0].from_seed);
         });
     }
 

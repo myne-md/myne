@@ -27,8 +27,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
 import {
+  clickByTestId,
   closeSettings,
+  dismissImporterOffer,
   openSettings,
+  openSyncConnection,
   pageSeatInvoke,
   selectSettingsTopic,
   unlockToEditor,
@@ -45,18 +48,22 @@ import i18n from "../src/i18n";
  * The panel's own prefix (`identity-setup`) is the dialog's default.
  */
 async function createIdentityFromSettings(session: Session): Promise<string[]> {
-  await openSettings(session, "sync");
-  await selectSettingsTopic(session, "sync", "connection");
-  await (
-    await session.byTestId("sync.panel.add-identity", { timeoutMs: 20_000 })
-  ).click();
+  await openSyncConnection(session);
+  // `clickByTestId`, not a raw `.click()`, and the difference is the whole
+  // failure. Settings' scrolling body is a nested `overflow: auto` container,
+  // WebKit's own scroll-into-view does not reliably reach one, and this control
+  // is now below the fold: the raw click sat at `element not interactable` for
+  // its full 10 s and reported the ELEMENT, which reads as a missing control.
+  // `clickByTestId` scrolls inside the container on every poll (the same fix
+  // `sync-replication` needed for the SAS button).
+  await clickByTestId(session, "sync.panel.add-identity", { timeoutMs: 20_000 });
   await session.byTestId("identity-setup.root", { timeoutMs: 15_000 });
-  await (
-    await session.byTestId("identity-setup.create-cta", { timeoutMs: 20_000 })
-  ).click();
+  // Same reason as the line above: a dialog is its own scrolling container, and
+  // the create gate sits below the fold of it.
+  await clickByTestId(session, "identity-setup.create-cta", { timeoutMs: 20_000 });
 
   await session.byTestId("identity-setup.phrase", { timeoutMs: 120_000 });
-  await (await session.byTestId("identity-setup.phrase-reveal")).click();
+  await clickByTestId(session, "identity-setup.phrase-reveal");
   const words = await session.execute<string[]>(
     "var words = [];" +
       "for (var i = 1; i <= 24; i++) {" +
@@ -91,11 +98,20 @@ async function createIdentityFromSettings(session: Session): Promise<string[]> {
   });
   await done.click();
 
-  // The upgrade needs the identity's KEYPAIR in the session, not merely the
-  // sealed file on disk: an `NTV5` source signs its first roster. This is the
-  // assertion that the ceremony installed it, so a regression here fails as
-  // `IdentityLocked` in the next step rather than as a mystery.
-  await session.waitForElement(testIdSelector("sync.panel.identity-unlocked"), {
+  // **The block reports `unregistered`, not `unlocked`, and this scenario has no
+  // server, so that is the state it can honestly name (2026-10-25).** The panel's
+  // helper is one ternary — `needsRegistration ? unregistered : identityUnlocked
+  // ? unlocked : locked` — and a `reserved` identity (on this device, on no
+  // server) takes the FIRST arm however unlocked its session is, because
+  // `person_register` is what installs the person session and it needs a named
+  // endpoint. Waiting for `identity-unlocked` here was waiting for a word the
+  // panel deliberately stops printing.
+  //
+  // What the upgrade itself needs is the identity's KEYPAIR in the session, and
+  // that is still asserted, by its consequence: an `NTV5` source signs its first
+  // roster, so a ceremony that failed to install the keypair fails the upgrade
+  // step below as `IdentityLocked` rather than as a mystery.
+  await session.waitForElement(testIdSelector("sync.panel.identity-unregistered"), {
     timeoutMs: 20_000,
   });
   return words;
@@ -137,6 +153,12 @@ describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", ()
             .subarray(0, 4)
             .toString("ascii"),
         ).toBe("NTV5");
+
+        // The first editor mount on a fresh vault offers the importer, and the
+        // offer makes the page `inert` (`useOverlayInert`), so EVERY control
+        // below it — including the Settings gear — is refused as "element not
+        // interactable" while it is up. Dismissing it is not cosmetic.
+        await dismissImporterOffer(session);
 
         // 2. The identity, created after the fact.
         const identityWords = await createIdentityFromSettings(session);
