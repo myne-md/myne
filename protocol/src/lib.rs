@@ -178,9 +178,9 @@ pub use attachments_catalog::{
     aad_attachments_catalog, decode_attachments_catalog, decode_attachments_catalog_versioned,
     encode_attachments_catalog, encode_attachments_catalog_raw,
     encode_attachments_catalog_versioned, read_or_empty, read_or_empty_versioned, AttachmentMeta,
-    AttachmentsCatalog, CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN, CATALOG_BLOB_HEADER_LEN,
-    CATALOG_BLOB_MAGIC, CATALOG_BLOB_PROTOCOL_VERSION, CATALOG_BLOB_RESERVED,
-    CATALOG_BLOB_V0_2_MAGIC, MAX_CATALOG_PLAINTEXT_LEN,
+    AttachmentScope, AttachmentsCatalog, CatalogBlobError, CATALOG_BLOB_ACCOUNT_HASH_LEN,
+    CATALOG_BLOB_HEADER_LEN, CATALOG_BLOB_MAGIC, CATALOG_BLOB_PROTOCOL_VERSION,
+    CATALOG_BLOB_RESERVED, CATALOG_BLOB_V0_2_MAGIC, MAX_CATALOG_PLAINTEXT_LEN,
 };
 pub use awareness_frame::{
     awareness_room_id, awareness_room_id_group, decode_payload_canonical, encode_payload_canonical,

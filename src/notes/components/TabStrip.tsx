@@ -23,6 +23,7 @@ import {
   TITLE_BAR_RIGHT_EDGE,
 } from "../../screens/titlebar";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -32,7 +33,6 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
-  type RefObject,
 } from "react";
 import { useTranslation } from "react-i18next";
 import i18n from "../../i18n";
@@ -52,7 +52,7 @@ import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
 import { MIN_TARGET } from "../../components/primitives/targetSize";
 import { useTitleReveal } from "./useTitleReveal";
-import { prefersReducedMotion } from "./tabTitleReveal";
+import { centreScrollLeft, prefersReducedMotion } from "./tabTitleReveal";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -93,6 +93,55 @@ const stripStyle: CSSProperties = {
   position: "relative",
 };
 
+/**
+ * Whether a horizontally scrolling row has content off either edge.
+ *
+ * **A local hook rather than `useScrollEdges`** (myne-md/myne#913): that one is
+ * vertical by contract (`top`/`bottom`, and a mask whose gradient runs down the
+ * block axis), and the strip needs the inline axis. Generalising it would touch
+ * five adopters whose measurement is not the same question. The measurement
+ * here is three integers read on scroll, the same shape the vertical one uses.
+ */
+function useStripOverflow<T extends HTMLElement>(): {
+  ref: (node: T | null) => void;
+  left: boolean;
+  right: boolean;
+} {
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const nodeRef = useRef<T | null>(null);
+  const measure = useCallback(() => {
+    const el = nodeRef.current;
+    if (el === null) return;
+    const next = {
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    };
+    setEdges((prev) =>
+      prev.left === next.left && prev.right === next.right ? prev : next,
+    );
+  }, []);
+  const ref = useCallback(
+    (node: T | null) => {
+      nodeRef.current = node;
+      if (node === null) return;
+      node.addEventListener("scroll", measure, { passive: true });
+      // Feature-detected, the `useScrollEdges` discipline: jsdom has no
+      // `ResizeObserver`, and an unguarded construction there takes the screen
+      // down during render. The fade is a nicety; the strip is not.
+      const ro =
+        typeof ResizeObserver === "function" ? new ResizeObserver(measure) : null;
+      ro?.observe(node);
+      measure();
+      return () => {
+        node.removeEventListener("scroll", measure);
+        ro?.disconnect();
+      };
+    },
+    [measure],
+  );
+  return { ref, ...edges };
+}
+
 const scrollAreaStyle: CSSProperties = {
   display: "flex",
   alignItems: "stretch",
@@ -119,6 +168,11 @@ const scrollAreaStyle: CSSProperties = {
 const STRIP_BUTTON_HEIGHT = TITLE_BAR_CONTROL_HEIGHT;
 
 const TITLE_MAX = 160;
+/** The narrowest a tab may get before the row scrolls instead (myne-md/myne#913).
+ *  Sized from the label: a 16px icon, the 6px gap, the close control's hit area,
+ *  and roughly a dozen characters of the title. Below this a tab stops naming
+ *  anything, which is what the strip looked like before the row could scroll. */
+const TAB_MIN_WIDTH = 132;
 
 /**
  * Stable DOM id for a tab element (myne#728). The pane body carries
@@ -228,7 +282,42 @@ export function TabStrip({
   // its result. `dropLeft` is the seam, measured against the strip so it can be
   // drawn absolutely; `null` means "not dragging over this strip".
   const stripRef = useRef<HTMLDivElement | null>(null);
+  // **The row scrolls, and says so** (myne-md/myne#913). The tabs used to shrink
+  // until the titles were unreadable and then scroll with no signal that anything
+  // was off-screen; the mask fades whichever edge still has content beyond it,
+  // and nothing when the row fits. That is the browser convention, and the reason
+  // it is a convention is that it is the only affordance a scrollbar-less row
+  // has.
+  const stripOverflow = useStripOverflow<HTMLDivElement>();
+  // The same node, for the centring below. `stripOverflow` measures edges; this
+  // one scrolls, and keeping them separate means neither hook grows a second job.
+  const scrollRowRef = useRef<HTMLDivElement | null>(null);
   const [dropLeft, setDropLeft] = useState<number | null>(null);
+  /**
+   * **The active tab is centred whenever it changes** (myne-md/myne#913, on the
+   * report that the strip left the open note half off-screen after a switch).
+   *
+   * Every navigation lands here: opening a note, a pane switch, a restored
+   * session, the agent tab. Centring rather than `scrollIntoView({inline:
+   * "nearest"})` because "nearest" is satisfied by a tab already visible at the
+   * very edge, which is exactly the case that reads as "where did my note go".
+   * Clamped by the browser at both ends, so the first and last tabs do not
+   * scroll past their own edge into blank space.
+   */
+  useEffect(() => {
+    const row = scrollRowRef.current;
+    if (row === null || activeTab === null) return;
+    const tab = Array.from(
+      row.querySelectorAll<HTMLElement>('[role="tab"][data-tab-id]'),
+    ).find((el) => el.getAttribute("data-tab-id") === activeTab);
+    if (tab === undefined) return;
+    // jsdom has no layout and no `scrollTo`; a real host has both.
+    if (typeof row.scrollTo !== "function") return;
+    row.scrollTo({
+      left: centreScrollLeft(tab.offsetLeft, tab.offsetWidth, row.clientWidth),
+      behavior: prefersReducedMotion() ? "auto" : "smooth",
+    });
+  }, [activeTab, tabs.join("\u0000")]);
   // Pre-drag rects for the FLIP pass. Captured on dragstart because by the time
   // the drop lands, the old layout is gone.
   const flipRectsRef = useRef<Map<string, DOMRect> | null>(null);
@@ -355,6 +444,25 @@ export function TabStrip({
     onMoveTab(parsed.fromPaneId, parsed.tabId, toIndex);
   };
 
+  // **The cleanup the overflow hook returns must survive the wrapper** (review
+  // round seven). An inline arrow ref changed identity on every render, so React
+  // called it with `null` and then with the node each time; the hook returns
+  // early on `null` before any teardown, and a NEW `ResizeObserver` was built for
+  // the live node while the previous one stayed attached: an unbounded leak of
+  // observers and listeners for the life of the session, on a component rendered
+  // per pane and re-rendered on every save-status and cursor change. A stable
+  // callback that RETURNS the cleanup is what lets React call it.
+  const attachRow = useCallback(
+    (node: HTMLDivElement | null) => {
+      // Three refs on one node: the roving-focus hook owns the tablist, the
+      // overflow measurement reads its edges, and the centring scrolls it.
+      (roving.containerRef as { current: HTMLDivElement | null }).current = node;
+      scrollRowRef.current = node;
+      return stripOverflow.ref(node);
+    },
+    [roving.containerRef, stripOverflow.ref],
+  );
+
   return (
     <div
       // The tab strip is CHROME for ornament purposes (myne#394). Ornament here
@@ -414,8 +522,16 @@ export function TabStrip({
         // (myne#728).
         role="tablist"
         aria-label={t("notes.tabStrip.openNotes")}
-        ref={roving.containerRef as RefObject<HTMLDivElement>}
+        ref={attachRow}
         onKeyDown={roving.onKeyDown}
+        // The fade is a MASK, not a gradient overlay, for the reason
+        // `useScrollEdges` gives: an overlay has to be painted in the strip's own
+        // colour, which is wrong the moment a theme changes it and wrong over a
+        // hovered tab. The gradient lives in `src/styles/tokens.css` with the
+        // vertical one, so its stops stay unreachable to a theme.
+        className="myne-tabstrip-fade"
+        data-fade-left={stripOverflow.left ? "true" : "false"}
+        data-fade-right={stripOverflow.right ? "true" : "false"}
         style={
           stacked
             ? // Stacked deck (tab-modes / MYND-319): tabs overlap (negative
@@ -758,8 +874,20 @@ function Tab({
     height: "100%",
     padding: "0 6px 0 10px",
     maxWidth: TITLE_MAX + 56,
-    minWidth: 0,
-    flexShrink: stacked ? 0 : 1,
+    // **Every tab stays readable, and the row scrolls instead** (myne-md/myne#913,
+    // two reports in a row: first the active tab squeezed to "Ag", then the
+    // inactive ones squeezing to an icon). Shrinking is what produced both: a
+    // strip that ellipsizes to fit can always be made to fit, and the titles are
+    // the only thing that pays. The floor is a readable label (icon + a dozen
+    // characters + the close control) and the ceiling is the title cap, so a tab
+    // is sized by its own name and an overflowing strip scrolls with the fade at
+    // the edge saying so.
+    //
+    // `max-content` for the active tab rather than a measured width: the browser
+    // already knows the label's width and a measurement here would have to be
+    // redone on every rename.
+    minWidth: active ? "max-content" : TAB_MIN_WIDTH,
+    flexShrink: stacked ? 0 : 0,
     borderTopLeftRadius: 8,
     borderTopRightRadius: 8,
     // In a stacked deck every card carries a full hairline (the cards overlap,

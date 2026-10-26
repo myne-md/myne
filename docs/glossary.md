@@ -369,9 +369,15 @@ A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleto
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **attached document** &nbsp; 📦 *Product*
+
+A file a message carries so the run can READ it (myne-md/myne#913), as opposed to an attachment the run may propose a write to. Chosen per message, through the composer's `+` picker or a paste, and limited to four per message; the run receives the text extracted from each (the device-local [`MYE1`](#mye1) cache, §9.15), cut at 20,000 unicode scalar values per document by the host (`core/src/plugins/agent/prompt.rs`). The bytes never leave: only that text, carried as untrusted content beside note text, so the same sanitizer and the same off-device character count apply. A chosen document with no extracted text refuses the send by name rather than entering the run empty. `threat-model.md` TB12/TB13 carries it as a payload class because the file need not be the user's own: a received PDF is a third party's words.
+
+Used in: `spec/protocol.md` §9.10.2, §9.15; `threat-model.md` TB12, TB13; `decisions/protocol/0718`
+
 ### **attachment** &nbsp; 📋 *Protocol*
 
-An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
+An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). Every attachment has a **placement** (myne-md/myne#913): the [attachment library](#attachment-library) unless its catalog row carries `scope: "chat"`, which is the [chat-scoped attachment](#chat-scoped-attachment). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
 
 ### **attachment catalog tombstone** &nbsp; 📋 *Protocol*
 
@@ -393,7 +399,7 @@ The custom WebView protocol scheme that serves a decrypted [attachment](#attachm
 
 ### **attachment_import** &nbsp; 📋 *Protocol*
 
-The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
+The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). It also takes a `scope` (`None` / `Some("chat")`): a file pasted into a conversation is stored the same way and kept out of the library listing (myne-md/myne#913, [chat-scoped attachment](#chat-scoped-attachment)). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
 
 ### **attachment_export** &nbsp; 📋 *Protocol*
 
@@ -402,6 +408,12 @@ The Tauri command that writes one [attachment](#attachment)'s **decrypted** byte
 ### **attachment file-card** &nbsp; 📦 *Product*
 
 The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content never auto-renders; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Text-like files (`.txt`/code/`.csv`) and `.docx`/`.xlsx` cards can additionally expand an inline read-only [attachment text preview](#attachment-text-preview) (MYND-268; `.pptx` and the rest stay export-only). (MYND-173; `decisions.md` 2026-06-14)
+
+### **attachment library** &nbsp; 📦 *Product*
+
+The surface that lists the vault's [attachments](#attachment) as files a user can browse, open, rename, export and clean up, and the default placement of every attachment that is not a [chat-scoped attachment](#chat-scoped-attachment) (myne-md/myne#913). It is a VIEW over the one [`vault.attachments`](#vaultattachments) catalog, not a directory and not a second store: the rows it omits (`scope: "chat"`) are still stored, encrypted, synced and backed up exactly like the ones it shows, and its listing command (`catalog_list`) is where the omission is enforced. The same list is what a message's document picker offers, so a pasted conversation file is not re-offered as a document.
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`
 
 ### **attachment search doc** &nbsp; 📋 *Protocol*
 
@@ -634,9 +646,15 @@ A test whose assertions pin the code's **current** behaviour rather than the beh
 Used in: `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#750
 
 
+### **chat-scoped attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) whose [`vault.attachments`](#vaultattachments) row carries the optional `scope: "chat"` (§9.10.2, myne-md/myne#913): it was pasted into one conversation and belongs to that surface. It is **not a second store**: the file is the same encrypted [`MYA1`](#mya1) blob, under the same key lineage, synced and backed up like any other attachment; the field only says which surface lists it, and the [attachment library](#attachment-library) filters it out (`catalog_list`). `library` is never emitted (the absent value IS the library), so every pre-#913 catalog encodes byte-identically and [`MYC1`](#myc1) keeps its magic. Decode tolerates an unknown scope value by reading it as library rather than failing the catalog, and a tombstone carries none. Its reference is a conversation turn rather than a note, so the unused-attachment sweep reads the conversations too and offers the row only when no live conversation names it; if a conversation cannot be read, or the vault is a B2B one (`NTV6`, so some conversations belong to another person and cannot be enumerated here), the sweep refuses outright rather than erasing, because a library file picked into a message is referenced only by a turn too (`decisions/protocol/0718`). On such a vault the marker is a library-listing fact rather than a confidentiality boundary: the blob and its catalog row are group-tier and readable by every member.
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`; `myne-test-vectors` `attachments-catalog/v0.1/encrypt-chat-scope`
+
 ### **chat turn** &nbsp; 📦 *Product*
 
-One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic. A user turn may also carry `attachments` (myne-md/myne#913): the files that message sent into the run, as `{id, name, contentType}` referencing [attachments](#attachment), absent when it carried none, so the transcript names what a question was about after the composer's chips are gone.
 
 Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
 
@@ -652,7 +670,9 @@ Used in: `spec/protocol.md` §9.5.2
 
 One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0581`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0583`).
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`
+**A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
+
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0719`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 

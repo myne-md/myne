@@ -76,6 +76,9 @@
       "scopeLabel": "Working on",
       "scopeOpenNote": "This note",
       "scopeAllVault": "All notes",
+      "scopeQuestion": "What the agent can read",
+      "scopeFolders": "Folders",
+      "scopeApplies": "Applies to your next message. Trashed, archived and template notes are always left out.",
       "blockedScope": "Nothing for the agent to work on yet: every note is excluded from AI, or the vault is empty.",
       "checking": "Checking",
       "preparing": "Getting ready…",
@@ -92,11 +95,27 @@
       "permissionLabel": "When the run finishes",
       "permissionAsk": "Review first",
       "permissionAuto": "Apply automatically",
+      "keepConversation": "Keep this conversation when I switch notes",
+      "keepConversationPinned": "Kept for this session",
       "providerRejected": "The provider would not accept this request, so the run stopped. Nothing was written. This is a fault in what Myne sent, not in your notes or your setup.",
       "unchecked": "The edit check could not be completed, so the agent is unavailable for now. Check that your model or provider is reachable, then try again.",
       "unsupported": "This model cannot make precise edits reliably, so the agent is unavailable. Choose a larger model or a provider.",
       "unsupportedDetail": "It passed {{passes}} of {{attempts}} checks; {{required}} are needed.",
       "unsupportedProvisional": "That pass mark has not been measured across models yet, so it may be stricter or looser than it should be."
+    },
+    "attachments": {
+      "title": "Attach a document",
+      "attach": "Attach a document",
+      "empty": "No attachments in this vault yet. Add a file to the attachment library first.",
+      "failed": "The attachment library could not be read. Try again.",
+      "pasteFailed": "The pasted file could not be added to this conversation.",
+      "pasting": "Pasting…",
+      "pastedFile": "Pasted file",
+      "cap": "You can attach up to {{count}} files.",
+      "confirm_one": "Attach {{count}} file",
+      "confirm_other": "Attach {{count}} files",
+      "remove": "Remove {{name}}",
+      "noText": "{{name}} has no text the agent can read. Only files whose text could be extracted can be attached."
     },
     "progress": {
       "working": "Working",
@@ -161,6 +180,7 @@
       },
       "largeDeletion": "Removes a lot of text",
       "rejectEdit": "Reject",
+      "createdBadge": "Created",
       "restoreEdit": "Keep",
       "applyRemoval": "Apply on its own",
       "rejectAll": "Reject all",
@@ -190,6 +210,7 @@
         "appendEmpty": "Could not be applied: there was nothing to add.",
         "appendWouldWriteFrontmatter": "Could not be applied: that text would have become the note's properties block.",
         "moveToSameFolder": "Not moved: the note is already in that folder.",
+        "unknownFolder": "Not moved: this vault has no folder by that name, so nothing was written.",
         "moveIntoExcludedFolder": "Not moved: that folder is excluded from AI."
       },
       "applyFailed": "The changes could not be applied.",
@@ -250,6 +271,9 @@
       },
       "appliedSummary": "Changes applied.",
       "settingsApplied": "Settings applied."
+    },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
     },
     "undo": {
       "action": "Undo the run",
@@ -350,6 +374,7 @@
       "colType": "Type",
       "colUsedIn": "Used in",
       "corpusIncompleteNotice": "Finish syncing first. This device doesn't have all your notes yet, so it can't tell which attachments are unused.",
+      "sharedVaultNotice": "This is a shared vault, so conversations are kept per person. Myne cannot tell which files another member is still using, so it will not offer any for cleanup.",
       "decrypting": "Decrypting attachments…",
       "emptyClearSearch": "Clear search",
       "emptyFilteredBody": "Nothing here matches the current type filter. Clear it to see the whole library again.",
@@ -1346,7 +1371,7 @@
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
-          "noticeLeaves": "The words you type, the notes a turn reads, the titles, identifiers and folder paths of every note the run may read (the whole vault minus your excluded folders, unless you narrow it), and what the AI remembers about you are sent to whatever is answering. Nothing else on this device is sent.",
+          "noticeLeaves": "The words you type, the notes a turn reads, the titles, identifiers and folder paths of every note the run may read (the whole vault minus your excluded folders, unless you narrow it), the text Myne extracted from any files you attach to a message (up to four, each cut at 20,000 characters; the file itself stays here), and what the AI remembers about you are sent to whatever is answering. Nothing else on this device is sent.",
           "noticeReceiver": "It is answering: {{provider}}, which Myne does not run.",
           "noticeReceiverLocal": "It is answering: a program running on this device. Nothing leaves the machine, but that program is not part of Myne and Myne cannot see what it does with them.",
           "noticeRevoke": "To stop it, switch AI off in Settings, or change what is answering there. Revoking a provider key stops that provider immediately.",

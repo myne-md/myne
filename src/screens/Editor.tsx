@@ -60,6 +60,7 @@ import { catalogDefaults } from "../commands/bindableCatalog";
 import { asViewMode, type ViewMode } from "../editor/view-mode";
 import { VIM_MODE_EVENT, type VimModeEventDetail } from "../editor/vim";
 import { CLOSE_ACTIVE_TAB_EVENT } from "../notes/closeActiveTabSignal";
+import { listFolderPaths } from "../notes/listFolderPaths";
 import { topRightFloatsShown as topRightFloats } from "../notes/topRightFloats";
 import { requestGraphViewFilter } from "../notes/graphViewFilter";
 import {
@@ -208,6 +209,7 @@ import { NoteTasksPanel } from "../notes/components/TasksPane";
 import { TASK_WRITE_EVENT } from "../notes/toggleTask";
 import { NOTE_REMOVED_EVENT, type NoteRemovedDetail } from "../notes/noteRemoved";
 import { CLI_NOTES_CHANGED_EVENT } from "../lib/cli-access";
+import { AGENT_NOTES_CHANGED_EVENT } from "../lib/agent-events";
 import { clearChat } from "../notes/ai/chatStore";
 import { runSummarizeToChat } from "../notes/ai/aiToChat";
 import { appendSummaryBlock, SUMMARIZE_BUDGET_CHARS } from "../notes/ai/summarize";
@@ -247,7 +249,7 @@ import { useBackupScheduler } from "../hooks/useBackupScheduler";
 import { BACKUP_SCHEDULE_FAILED_TOAST } from "../lib/load-bearing-copy";
 import { ResizeHandle } from "../components/primitives/ResizeHandle";
 import { VaultSwitcher } from "../components/VaultSwitcher";
-import { useEditorLayout } from "./editorLayout";
+import { agentTabCollapse, useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
 import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
@@ -1256,6 +1258,62 @@ function EditorChrome({
     layout.leftCollapsed || forced.forceLeftCollapsed || focusActive || detached;
   const rightCollapsed =
     layout.rightCollapsed || forced.forceRightCollapsed || focusActive || detached;
+  // **The agent tab carries its own rail** (myne-md/myne#913, on the report that
+  // the conversation list and the note tree sat side by side saying "pick
+  // something" twice). Entering the agent tab in a SINGLE-pane workspace closes
+  // the left sidebar once.
+  //
+  // Once, and not as a forced collapse: the user can reopen it and it stays
+  // open, because the effect only fires on the ENTRY (the previous value is the
+  // one it compares against) and never on `leftCollapsed` coming back to false.
+  // A split workspace is left alone: there the note tree is what the other pane
+  // is for, and closing it would hide the selection you are working from.
+  // A restored session that opens ON the agent tab does not collapse anything:
+  // the ref starts at the current value, so there is no entry to react to.
+  const agentTabFocused = ws.focusedLeaf.activeTab?.kind === "agent";
+  // **Once per ENTRY, not once per transition** (myne-md/myne#913, second
+  // report). The transition-only version missed the case that matters most: a
+  // session restored ON the agent tab never transitions into it, so the sidebar
+  // stayed open for as long as the tab did. `collapsedForEntry` is reset by
+  // leaving the tab, which is what keeps a manual reopen working: the user can
+  // open the sidebar again while the tab is active and this will not fight them.
+  //
+  // **And it waits for the layout to hydrate.** The persisted layout REPLACES
+  // the state when its read lands, so a collapse written before it came back
+  // was undone silently: visible as "it collapses and then opens again", or, on
+  // a restored session, as never closing at all.
+  const collapsedForEntry = useRef(false);
+  useEffect(() => {
+    // Leaving the tab (or splitting the pane) starts a new entry, so coming back
+    // collapses again. A split is not an entry: the note tree is in use there.
+    if (!agentTabFocused || ws.leaves.length !== 1) {
+      collapsedForEntry.current = false;
+      return;
+    }
+    const collapse = agentTabCollapse({
+      agentTabFocused,
+      paneCount: ws.leaves.length,
+      hydrated: layout.hydrated,
+      leftCollapsed: layout.leftCollapsed,
+      rightCollapsed: layout.rightCollapsed,
+      handledForEntry: collapsedForEntry.current,
+    });
+    if (!collapse.left && !collapse.right) {
+      // Both already shut, or the layout is not hydrated yet.
+      if (layout.hydrated) collapsedForEntry.current = true;
+      return;
+    }
+    collapsedForEntry.current = true;
+    if (collapse.left) layout.toggleLeftCollapsed();
+    if (collapse.right) layout.toggleRightCollapsed();
+  }, [
+    agentTabFocused,
+    ws.leaves.length,
+    layout.hydrated,
+    layout.leftCollapsed,
+    layout.rightCollapsed,
+    layout,
+  ]);
   // macOS floats the traffic lights over the top-left, so windowed builds inset
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
@@ -1272,7 +1330,12 @@ function EditorChrome({
       : ribbonShown
         ? (RAIL_WIDTH - TITLE_BAR_TOGGLE_WIDTH) / 2
         : 12;
-  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
+  // The strip's own `STRIP_BASE_PADDING_LEFT` already separates the first tab
+  // from whatever ends here, so the old `+ 8` was a SECOND gap on top of it: two
+  // insets that both said "leave room", visible as a dead strip of chrome with
+  // nothing in it (myne-md/myne#913). One gap, owned by the strip. Kept beside
+  // the base's fullscreen centring, which is what positions the toggle itself.
+  const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + STRIP_GAP_AFTER_CONTROLS;
   // Is anything FLOATED in the top-right corner? Two things can be, the
   // note-actions "…" menu and the right-sidebar toggle, and they share one
   // condition, because both act on the OPEN NOTE: a non-note tab (the graph, the
@@ -1443,6 +1506,19 @@ function EditorChrome({
   // loss - the overwriting save coalesces with the pane's earlier ones, so the
   // CLI's line never gets a revision of its own to restore from.
   //
+  // "A writer outside this WebView changed the vault" is ONE condition with one
+  // recovery, whatever the writer was (the CLI, the agent, a sync pull). The chain
+  // is here rather than inlined at each listener so two of them cannot drift into
+  // refreshing different things.
+  const refreshAfterExternalWrite = useCallback(() => {
+    void noteList()
+      .then((ids) => syncCtxRef.current.refreshAll(ids))
+      .then(() => syncCtxRef.current.reloadOpenNote())
+      .catch(() => {
+        /* a manual refresh catches up */
+      });
+  }, []);
+
   // Same listener shape and same handler as the sync pull above, deliberately:
   // "someone else wrote to this vault" is one condition, and the CLI is just
   // another writer. The pane applies its own dirty guard on reload, so this
@@ -1454,15 +1530,23 @@ function EditorChrome({
       try {
         const handle = await listen(CLI_NOTES_CHANGED_EVENT, () => {
           if (cancelled) return;
-          void noteList()
-            .then((ids) => syncCtxRef.current.refreshAll(ids))
-            .then(() => syncCtxRef.current.reloadOpenNote())
-            .catch(() => {
-              /* a manual refresh catches up */
-            });
+          refreshAfterExternalWrite();
         });
-        if (cancelled) handle();
-        else unlisten = handle;
+        // The agent is the second writer outside this WebView (myne-md/myne#913):
+        // same condition, same refresh, its own event name.
+        const agentHandle = await listen(AGENT_NOTES_CHANGED_EVENT, () => {
+          if (cancelled) return;
+          refreshAfterExternalWrite();
+        });
+        if (cancelled) {
+          handle();
+          agentHandle();
+        } else {
+          unlisten = () => {
+            handle();
+            agentHandle();
+          };
+        }
       } catch {
         // Not inside Tauri (browser dev shim) → there is no CLI either.
       }
@@ -2535,7 +2619,12 @@ function EditorChrome({
           node={ws.root}
           focusedPaneId={ws.focusedPaneId}
           onReadout={onReadout}
-          leftInset={leftCollapsed ? leftClearance : 0}
+          // **No clearance for chrome that is not drawn** (myne-md/myne#913,
+          // on the report that a dead gap sat left of the first tab). Focus mode
+          // fades the floated controls to zero opacity, and the inset stayed:
+          // the strip reserved room for a toggle and two arrows nobody could see.
+          // The same rule the right inset already states for its own controls.
+          leftInset={leftCollapsed && !focusActive ? leftClearance : 0}
           // The clearance is reserved for the two controls that FLOAT in the
           // top-right corner, so it is only owed when they are there. On a
           // non-note tab (the graph, the task list, a saved view) neither is
@@ -2545,7 +2634,11 @@ function EditorChrome({
           // (myne-md/myne#727). The strip's padding already transitions on the
           // sidebar's own curve, so the caret slides rather than jumping when
           // the focused tab changes kind.
-          rightInset={rightCollapsed && topRightFloatsShown ? RIGHT_CLEARANCE : 0}
+          rightInset={
+            rightCollapsed && topRightFloatsShown && !focusActive
+              ? RIGHT_CLEARANCE
+              : 0
+          }
         />
         </div>
         {/* A non-note tab has no note for the NOTE-SCOPED tabs to describe, so the
@@ -3214,6 +3307,9 @@ const TITLE_BAR_BUTTON_BASE: CSSProperties = {
 /** Right toggle's x offset from the right edge — shared with the tab strip's
  *  trailing inset, so the two end the row on one line. */
 const RIGHT_TOGGLE_X = TITLE_BAR_RIGHT_EDGE;
+/** The single gap between the floated controls and whatever the strip's inset
+ *  clears for them. Small on purpose: see `leftClearance`. */
+const STRIP_GAP_AFTER_CONTROLS = 4;
 /** Full width of the top-left control cluster: the sidebar toggle plus the
  *  back + forward nav buttons (MYND-260), each preceded by a cluster gap. */
 const LEFT_CONTROLS_WIDTH =
@@ -4925,20 +5021,46 @@ function RightSidebar({
     manualActivation: true,
   });
 
-  // Folders the composer can attach as a scope. Derived from the notes the
-  // resolver already holds, so it needs no second load; the authoritative
-  // resolution and the excluded-folder clamp are host-side either way.
+  // **Folders the composer can attach as a scope, from the ONE derivation the
+  // sidebar and every other folder picker use** (myne-md/myne#913, review round
+  // four). Walking `notes` alone offered only folders a live note sat directly
+  // in: a deliberately created empty folder was missing (`deliberate_folders`),
+  // a parent was missing unless a note sat in it, and a folder that survived only
+  // on a trashed note was OFFERED while the sidebar hides it. The first two deny
+  // the user a scope the tree shows; the third offers one that resolves to zero
+  // notes, so the composer then says "nothing in scope" about a folder it just
+  // suggested. `listFolderPaths` unions the live note set with the deliberate
+  // folders, synthesizes ancestors and filters archived ones.
   //
-  // Gated on the AI tab being open. `notes` changes identity on every note save,
-  // so without the gate this sort ran for every user on every save, including
-  // everyone who never opens the tab it feeds.
-  const agentFolders = useMemo(
+  // Gated on the AI tab being open, and keyed on the SET rather than on `notes`
+  // (which changes identity on every save), so a user who never opens the tab
+  // pays nothing and a save in an unchanged folder set does not re-read.
+  const [agentFolders, setAgentFolders] = useState<readonly string[]>(EMPTY_FOLDERS);
+  const folderSignature = useMemo(
     () =>
-      active === "ai-chat"
-        ? [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort()
-        : EMPTY_FOLDERS,
-    [notes, active],
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))]
+        .sort()
+        .join("\u0000"),
+    [notes],
   );
+  // **The prefs half of the key** (review round five): `listFolderPaths` also
+  // unions `deliberate_folders` and filters `archived_folders`, and both change
+  // with no note write at all. Keyed on the note signature alone, the session in
+  // which the user creates an empty folder or archives one kept the old list
+  // until an unrelated save.
+  const deliberateKey = (prefs.deliberate_folders ?? []).join("\u0000");
+  const archivedKey = (prefs.archived_folders ?? []).join("\u0000");
+  useEffect(() => {
+    if (active !== "ai-chat") return;
+    let cancelled = false;
+    void listFolderPaths().then((options) => {
+      if (cancelled) return;
+      setAgentFolders([...new Set(options.map((option) => option.path))].sort());
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [active, folderSignature, deliberateKey, archivedKey]);
 
 
   const [draggedId, setDraggedId] = useState<string | null>(null);

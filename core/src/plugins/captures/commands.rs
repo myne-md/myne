@@ -586,6 +586,9 @@ pub async fn drain_pending_meetings<R: Runtime>(
                 &dir,
                 state.inner(),
                 source,
+                // A capture / shared file drains into the LIBRARY: it has no
+                // conversation to belong to (myne-md/myne#913).
+                crate::plugins::attachments::commands::scope_for_wire(None),
             )
             .await
             {
