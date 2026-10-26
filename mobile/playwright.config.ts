@@ -49,7 +49,7 @@ export default defineConfig({
       // into the tablet layout and silently change what every phone spec exercises.
       // `screen` is pinned too — the size-class phone guard reads window.screen.
       name: "chromium",
-      testIgnore: "tablet/**",
+      testIgnore: ["tablet/**", "duo/**"],
       use: { ...devices["Desktop Chrome"], viewport: { width: 390, height: 844 }, screen: { width: 390, height: 844 } },
     },
     // Tablet tier — the same specs run at each form factor; they branch on
@@ -71,6 +71,44 @@ export default defineConfig({
       name: "tablet-android",
       testMatch: "tablet/**/*.flow.ts",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 800 }, screen: { width: 1280, height: 800 }, hasTouch: true },
+    },
+    // Folded-band tier (myne-md/myne#918). `screen` and `viewport` are pinned
+    // independently here on purpose: the size class reads both, the guard reads
+    // `screen`, and a foldable's two panels mean the platform can report either
+    // one. The second project exists precisely because nobody knows yet which
+    // one WebKit reports on an unfolded iPhone Duo, so both answers are kept
+    // green rather than the design depending on the answer.
+    {
+      // Unfolded, platform reporting the unfolded panel: 626 x 890 pt.
+      name: "duo-unfolded",
+      testMatch: "duo/**/*.flow.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 626, height: 890 }, screen: { width: 626, height: 890 }, hasTouch: true },
+    },
+    {
+      // Unfolded, platform still reporting the FOLDED panel: 626 x 890 window
+      // over a 466 x 618 screen. This is the row the stale-screen exception in
+      // SizeClassContext exists for.
+      name: "duo-unfolded-stale-screen",
+      testMatch: "duo/**/*.flow.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 626, height: 890 }, screen: { width: 466, height: 618 }, hasTouch: true },
+    },
+    {
+      // Folded: the phone layout, and it must stay that.
+      name: "duo-folded",
+      testMatch: "duo/**/*.flow.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 466, height: 618 }, screen: { width: 466, height: 618 }, hasTouch: true },
+    },
+    {
+      // Unfolded landscape: 890 wide takes the iPad's `medium` two-pane.
+      name: "duo-landscape",
+      testMatch: "duo/**/*.flow.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 890, height: 626 }, screen: { width: 890, height: 626 }, hasTouch: true },
+    },
+    {
+      // The Duo running beside another app: half the unfolded width, same screen.
+      name: "duo-half-width",
+      testMatch: "duo/**/*.flow.ts",
+      use: { ...devices["Desktop Chrome"], viewport: { width: 313, height: 890 }, screen: { width: 626, height: 890 }, hasTouch: true },
     },
   ],
   webServer: {
