@@ -28,7 +28,7 @@ import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { startBundleServer } from "./support/server";
 import { newBrowserSession } from "./support/session";
-import { openApp, waitForAnyTestId } from "./support/flows";
+import { openApp, waitForAnyTestId, createFirstRunIdentity } from "./support/flows";
 import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import type { Session } from "./support/session";
@@ -88,14 +88,35 @@ async function passBriefing(session: Session): Promise<void> {
  * which one is showing rather than assuming an order is what this whole suite
  * does at every entry, because the browser client's route into creation depends
  * on what the container already holds.
+ *
+ * A THIRD one stands in front of them since myne-md/myne#768: the first-run
+ * identity ceremony. The create door now lands on `/first-run`, not on vault
+ * creation, because an identity covers every vault a person makes. This
+ * scenario used to wait straight for `create.briefing`/`create.name-input` and
+ * timed out at 30 s on a screen that had simply moved one step earlier, which
+ * reads as the creation flow being broken rather than as one ceremony being
+ * inserted; the ceremony itself is covered separately by
+ * `identity-first-entry.e2e.ts`.
+ *
+ * The ceremony is completed rather than skipped (`first-run.identity.cancel`
+ * exists) because abandoning it re-probes to the identity home and never
+ * reaches vault creation. It is network-free, so it completes against this
+ * file's unreachable origin.
  */
 async function reachPasswordStep(session: Session): Promise<void> {
   const first = await waitForAnyTestId(
     session,
-    ["create.briefing", "create.name-input"],
+    ["first-run.root", "create.briefing", "create.name-input"],
     30_000,
   );
-  if (first === "create.briefing") {
+  if (first === "first-run.root") {
+    await createFirstRunIdentity(session);
+  }
+  const stage =
+    first === "first-run.root"
+      ? await waitForAnyTestId(session, ["create.briefing", "create.name-input"], 30_000)
+      : first;
+  if (stage === "create.briefing") {
     await passBriefing(session);
   }
   // The name step. A name is typed rather than skipped: it heads the recovery

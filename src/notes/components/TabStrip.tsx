@@ -23,6 +23,8 @@ import {
   TITLE_BAR_RIGHT_EDGE,
 } from "../../screens/titlebar";
 import {
+  useEffect,
+  useRef,
   useState,
   type ButtonHTMLAttributes,
   type CSSProperties,
@@ -49,6 +51,8 @@ import { getCurrentWindow } from "../../platform/window";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
 import { MIN_TARGET } from "../../components/primitives/targetSize";
+import { useTitleReveal } from "./useTitleReveal";
+import { prefersReducedMotion } from "./tabTitleReveal";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -219,6 +223,18 @@ export function TabStrip({
     null,
   );
 
+  // Drag landing indicator (myne-md/myne#908 item 5). The strip had a drop
+  // handler and no visible target, so a wrong drop could only be discovered by
+  // its result. `dropLeft` is the seam, measured against the strip so it can be
+  // drawn absolutely; `null` means "not dragging over this strip".
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const [dropLeft, setDropLeft] = useState<number | null>(null);
+  // Pre-drag rects for the FLIP pass. Captured on dragstart because by the time
+  // the drop lands, the old layout is gone.
+  const flipRectsRef = useRef<Map<string, DOMRect> | null>(null);
+  const tabsKey = tabs.join("\u0000");
+  const prevTabsKeyRef = useRef(tabsKey);
+
   // The strip is one Tab stop (myne#728): arrow keys move between tabs and
   // activate them (automatic activation, the WAI-ARIA tablist convention), so a
   // pane with a dozen open notes costs one stop instead of a dozen. Focus is
@@ -234,9 +250,87 @@ export function TabStrip({
     manualActivation: true,
   });
 
+  /** Snapshot the tab rects for the FLIP pass. Called on dragstart, because by
+   *  the time the order changes the old layout is gone. Without this the FLIP
+   *  block below had nothing to measure from and was dead code (a review caught
+   *  it): the ref it reads was only ever written as `null`. */
+  const captureDragRects = () => {
+    const strip = stripRef.current;
+    if (strip === null) return;
+    const map = new Map<string, DOMRect>();
+    for (const el of Array.from(
+      strip.querySelectorAll<HTMLElement>('[role="tablist"] [role="tab"][data-tab-id]'),
+    )) {
+      const id = el.getAttribute("data-tab-id");
+      if (id !== null) map.set(id, el.getBoundingClientRect());
+    }
+    flipRectsRef.current = map;
+  };
+
+  /** Where the seam sits, in strip coordinates: the midpoint rule the drop
+   *  handler already uses, so the line and the landing agree by construction. */
+  const seamLeftFor = (clientX: number): number | null => {
+    const strip = stripRef.current;
+    if (strip === null) return null;
+    const stripRect = strip.getBoundingClientRect();
+    const els = Array.from(
+      strip.querySelectorAll<HTMLElement>('[role="tablist"] [role="tab"][data-tab-id]'),
+    );
+    for (const el of els) {
+      const r = el.getBoundingClientRect();
+      if (clientX < r.left + r.width / 2) return r.left - stripRect.left;
+    }
+    const last = els[els.length - 1];
+    return last === undefined
+      ? null
+      : last.getBoundingClientRect().right - stripRect.left;
+  };
+
+  const handleDragOver = (e: ReactDragEvent<HTMLDivElement>) => {
+    if (!e.dataTransfer.types.includes(TAB_DRAG_MIME)) return;
+    e.preventDefault();
+    setDropLeft(seamLeftFor(e.clientX));
+  };
+
+  const handleDragLeave = (e: ReactDragEvent<HTMLDivElement>) => {
+    // `relatedTarget` inside the strip is a move between its own children, not
+    // a leave: clearing then would blink the seam on every tab crossed.
+    const next = e.relatedTarget as Node | null;
+    if (next !== null && e.currentTarget.contains(next)) return;
+    setDropLeft(null);
+  };
+
+  // FLIP: after the order changes, move each tab from where it WAS to where it
+  // now is. Reduced motion skips the animation and leaves the final layout,
+  // which is the same end state without movement.
+  useEffect(() => {
+    if (prevTabsKeyRef.current === tabsKey) return;
+    prevTabsKeyRef.current = tabsKey;
+    const before = flipRectsRef.current;
+    flipRectsRef.current = null;
+    const strip = stripRef.current;
+    if (before === null || strip === null || prefersReducedMotion()) return;
+    const els = Array.from(
+      strip.querySelectorAll<HTMLElement>('[role="tablist"] [role="tab"][data-tab-id]'),
+    );
+    for (const el of els) {
+      const id = el.getAttribute("data-tab-id");
+      const was = id === null ? undefined : before.get(id);
+      if (was === undefined) continue;
+      const now = el.getBoundingClientRect();
+      const dx = was.left - now.left;
+      if (Math.abs(dx) < 1 || typeof el.animate !== "function") continue;
+      el.animate(
+        [{ transform: `translateX(${dx}px)` }, { transform: "translateX(0)" }],
+        { duration: 150, easing: "ease-out" },
+      );
+    }
+  }, [tabsKey]);
+
   const handleDrop = (e: ReactDragEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
+    setDropLeft(null);
     const parsed = readTabDrag(e.dataTransfer);
     if (parsed === null) return;
     const tabEls = Array.from(
@@ -285,17 +379,33 @@ export function TabStrip({
         transition:
           "padding-left var(--duration-base) var(--ease-standard), padding-right var(--duration-base) var(--ease-standard)",
       }}
+      ref={stripRef}
       data-editor-chrome
       data-testid="editor.tab-strip"
       data-pane-id={paneId}
       data-stacked={stacked}
       // Whole strip is a drop target (reorder / move / open) — dropping in the
       // empty trailing space appends, dropping among the tabs inserts.
-      onDragOver={(e) => {
-        if (e.dataTransfer.types.includes(TAB_DRAG_MIME)) e.preventDefault();
-      }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
+      {dropLeft === null ? null : (
+        <span
+          aria-hidden="true"
+          data-testid="editor.tab-drop-seam"
+          style={{
+            position: "absolute",
+            top: 6,
+            bottom: 6,
+            left: dropLeft,
+            width: 2,
+            background: "var(--accent)",
+            borderRadius: "var(--radius-1, 4px)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
       <div
         // The row IS the tablist, and it holds ONLY tabs (the open notes plus
         // the transient new-tab chip). The `+` and `…` controls live outside
@@ -339,6 +449,7 @@ export function TabStrip({
                 : undefined
             }
             onDetachNote={onDetachNote}
+            onDragStartSnapshot={captureDragRects}
           />
         ))}
         {pendingNewTab && <NewTabChip onClose={onCloseNewTab} />}
@@ -511,6 +622,9 @@ type TabProps = {
   /** Drag this tab OUT of the window to pop its note out (myne#678/#681, SYNC-6);
    *  the workspace opens the pop-out and closes this tab. Absent off desktop. */
   onDetachNote?: (noteId: string) => void;
+  /** Snapshot every tab's rect BEFORE the drag moves anything, so the strip can
+   *  run its FLIP pass once the order changes (myne-md/myne#908 item 5). */
+  onDragStartSnapshot?: () => void;
 };
 
 function Tab({
@@ -530,16 +644,70 @@ function Tab({
   onClose,
   onContextMenu,
   onDetachNote,
+  onDragStartSnapshot,
 }: TabProps) {
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
+  const [keyboardFocus, setKeyboardFocus] = useState(false);
+  // True while the focus about to arrive came from the pointer. A click focuses
+  // the tab too, and the reveal is meant for a reader who is LOOKING at a title,
+  // not for the tab they just selected.
+  const pointerFocusRef = useRef(false);
   const { text, italic } = tabLabel(title);
+  // In-place reveal (myne-md/myne#908 item 6), shared with the sidebar rows.
+  // HOVER ONLY, plus a keyboard focus that the pointer did not cause: clicking a
+  // tab focuses it, and an active tab that keeps scrolling its own title is
+  // exactly the "tiring" case this avoids.
+  const revealed = hovering || keyboardFocus;
+  const { boxRef: labelBoxRef, textRef: labelTextRef } = useTitleReveal(revealed, text);
   // A pinned tab is close-protected — its × is hidden (unpin to close).
   const showClose = !pinned && (hovering || active);
 
   const handleDragStart = (e: ReactDragEvent<HTMLDivElement>) => {
+    // BEFORE anything moves: the FLIP pass needs the geometry the drop will
+    // destroy.
+    onDragStartSnapshot?.();
     writeTabDrag(e.dataTransfer, { tabId: id, fromPaneId: paneId });
     e.dataTransfer.effectAllowed = "move";
+    // A translucent ghost of the tab under the pointer (myne-md/myne#908 item
+    // 5): the browser's default drag image is a snapshot at full opacity, which
+    // reads as "the tab is still there". The clone goes off-screen only long
+    // enough for the platform to take it, then is removed. `setDragImage` is
+    // absent in jsdom, which is why this is guarded rather than assumed.
+    if (typeof e.dataTransfer.setDragImage !== "function") return;
+    // A built ghost, NOT a clone of the tab. The clone carried the tab's flex
+    // rules into a fixed-position box, where `flex: 1 1 auto` had no row to
+    // shrink against and it grew to a strip-wide rectangle (measured in the
+    // app: a translucent band across the pane instead of a small tab). Its own
+    // explicit width and height is the only shape that stays predictable.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ghost = document.createElement("div");
+    ghost.textContent = text;
+    ghost.style.cssText = [
+      "position:fixed",
+      "top:-10000px",
+      "left:-10000px",
+      `width:${rect.width}px`,
+      `height:${rect.height}px`,
+      "display:flex",
+      "align-items:center",
+      "box-sizing:border-box",
+      "padding:0 10px",
+      "overflow:hidden",
+      "white-space:nowrap",
+      "text-overflow:ellipsis",
+      "background:var(--bg-2)",
+      "border:1px solid var(--line-1)",
+      "border-radius:var(--radius-1, 4px)",
+      "font-family:var(--font-sans)",
+      "font-size:var(--text-xs)",
+      "color:var(--fg-2)",
+      "opacity:0.85",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, rect.width / 2, rect.height / 2);
+    setTimeout(() => ghost.remove(), 0);
   };
 
   // Drag-tab-out (myne#173): a tab dropped OUTSIDE the window (no valid drop
@@ -701,14 +869,18 @@ function Tab({
       data-tab-id={id}
       data-active={active}
       data-pinned={pinned}
-      title={text}
       draggable
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       style={style}
       onClick={() => onActivate(id)}
       onAuxClick={handleAux}
-      onKeyDown={handleTabKeyDown}
+      onKeyDown={(e) => {
+        // Keyboard focus from here on is a reader navigating, not a click that
+        // happens to focus the tab.
+        pointerFocusRef.current = false;
+        handleTabKeyDown(e);
+      }}
       onContextMenu={
         onContextMenu
           ? (e) => {
@@ -720,6 +892,14 @@ function Tab({
       }
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
+      onMouseDown={() => {
+        pointerFocusRef.current = true;
+      }}
+      onFocus={() => setKeyboardFocus(!pointerFocusRef.current)}
+      onBlur={() => {
+        pointerFocusRef.current = false;
+        setKeyboardFocus(false);
+      }}
     >
       <span
         aria-hidden="true"
@@ -749,19 +929,35 @@ function Tab({
         )}
       </span>
       <span
+        ref={labelBoxRef}
+        data-testid="editor.tab-label"
         style={{
           flex: "1 1 auto",
           minWidth: 0,
           maxWidth: TITLE_MAX,
           overflow: "hidden",
-          textOverflow: "ellipsis",
+          // The ellipsis stays for the resting state and is dropped only while
+          // the reveal runs: it is painted by this box, so leaving it on would
+          // re-truncate the text as it moves. Removing it outright deleted every
+          // truncation mark in the strip (myne-md/myne#908, third pass).
+          textOverflow: revealed ? "clip" : "ellipsis",
           whiteSpace: "nowrap",
           fontStyle: italic ? "italic" : "normal",
           color: italic ? "var(--fg-3)" : undefined,
         }}
       >
         {/* Isolate the user-authored tab title's direction (RTL/bidi). */}
-        <bdi>{text}</bdi>
+        <bdi
+          ref={labelTextRef}
+          // `inline` at rest for the same reason as the sidebar rows: an
+          // inline-block is an atomic box and swallows the parent's ellipsis.
+          style={{
+            display: revealed ? "inline-block" : "inline",
+            willChange: revealed ? "transform" : undefined,
+          }}
+        >
+          {text}
+        </bdi>
       </span>
       {pinned ? (
         // Pinned: a static pin glyph stands in for the × — the tab is

@@ -601,6 +601,21 @@ export const myneTheme = EditorView.theme({
   // scroller. With the `.cm-scroller { overflow-x: hidden }` floor now in place
   // that shows up as a clip rather than a sideways swipe, which is the failure
   // the floor's own comment says it converts silence into.
+  // Two labelled runs when the band carries both kinds (myne-md/myne#908
+  // item 1). The group owns its own wrap so one group's chips never scatter
+  // around the other's label.
+  ".cm-tag-suggestion-group": {
+    display: "inline-flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "6px",
+    minWidth: 0,
+  },
+  ".cm-tag-suggestion-group-label": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    letterSpacing: "0.02em",
+  },
   ".cm-tag-suggestion-chip": {
     display: "inline-flex",
     alignItems: "center",
@@ -686,11 +701,11 @@ export const myneTheme = EditorView.theme({
     maxWidth: "100%",
     boxSizing: "border-box",
     overflowX: "auto",
-    backgroundColor: "var(--paper)",
+    backgroundColor: "var(--diagram-surface)",
     border: "1px solid var(--line-1)",
     borderRadius: "var(--radius-2, 6px)",
     padding: "16px",
-    color: "var(--ink-1)",
+    color: "var(--diagram-ink)",
   },
   ".cm-mermaid-fallback .cm-mermaid-card": {
     display: "block",
@@ -718,7 +733,7 @@ export const myneTheme = EditorView.theme({
     // deliberately non-theme-aware `--diagram-surface`, so the theme token would
     // put pale salmon on near-white at roughly 2.5:1. That is the exact drift
     // #629 is about, one element over: the surface fixed and the ink moving.
-    color: "var(--danger)",
+    color: "var(--diagram-danger)",
   },
 
   // The bounded, interactive mermaid viewer (myne-md/myne#708). The frame is the

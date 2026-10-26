@@ -41,7 +41,7 @@ import type { ImportSource, ImportedAttachment } from "../host";
 
 /** Mirror of the Rust `AttachmentImportError` closed taxonomy (tag = "kind",
  *  content = "detail"). Hand-kept in lockstep with
- *  `src-tauri/src/plugins/attachments/error.rs`. */
+ *  `core/src/plugins/attachments/error.rs`. */
 export type AttachmentImportError =
   | { readonly kind: "Locked" }
   | { readonly kind: "Oversize"; readonly detail: { readonly cap_bytes: number } }

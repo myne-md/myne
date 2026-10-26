@@ -3,7 +3,7 @@
 //
 // Honest copy discipline: strings stay inside threat-model §7 — plain
 // statements of what happened, no "tamper-proof"/"safe forever". The enum
-// is closed on the Rust side (`src-tauri/src/plugins/notes/error.rs`); the
+// is closed on the Rust side (`core/src/plugins/notes/error.rs`); the
 // exhaustive switch makes a new variant a compile error here, and
 // `tests/notes/exportFlow.test.ts` pins non-empty, pairwise-distinct copy
 // per variant at runtime.

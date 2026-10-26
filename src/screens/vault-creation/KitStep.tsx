@@ -300,28 +300,6 @@ export function KitStep({
         message={outcome === null ? null : message[outcome.action](outcome.ok)}
       />
 
-      {/* Why the words are not in the reader's language, said once, where the
-          question occurs (myne-md/myne#468). The wordlist is frozen English by
-          `protocol.md` §7 so any client can read a phrase any other client
-          wrote; without this line an untranslated grid in a translated UI looks
-          like a missing translation, and a user "helpfully" translating the
-          words back has destroyed their only backup.
-          Restored (myne-md/myne#911 review): the identity-phrase screen carries
-          this note, but the vault kit still renders a 24-word phrase for every
-          vault that is not person-born, so dropping it here left the older path
-          with no warning at all. */}
-      <p
-        style={{
-          fontSize: "var(--text-sm)",
-          lineHeight: 1.6,
-          color: "var(--fg-3)",
-          margin: 0,
-        }}
-        data-testid="create.kit-english-note"
-      >
-        {t("vaultCreation.kit.whyEnglish")}
-      </p>
-
       <SecretDisplayCaveats testIdPrefix="create.kit" secret="vault" />
 
       <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>

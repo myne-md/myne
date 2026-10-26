@@ -87,6 +87,43 @@ export async function personRegister(phrase: string): Promise<PersonSetupView> {
   return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
 }
 
+/** The browser's sync-server configuration, as the register dialog states it. */
+export interface SyncEndpointConfig {
+  endpoint_url: string | null;
+  invite_code: string | null;
+}
+
+/**
+ * The sync endpoint and its admission code, as this browser holds them.
+ *
+ * The twin of the shared module's wrapper (2026-10-23; the code returned too on
+ * 2026-10-24, when the register dialog started naming the server it writes the
+ * identity to): this client's endpoint is fixed by the deployment, so the read
+ * usually answers it rather than `null`, and a gated deployment's admission code
+ * is shown in the same row so the dialog can carry it.
+ */
+export async function readSyncConfig(): Promise<SyncEndpointConfig> {
+  const view = await invoke<SyncEndpointConfig | null>(
+    "plugin:sync|sync_get_endpoint",
+  );
+  return {
+    endpoint_url: view?.endpoint_url ?? null,
+    invite_code: view?.invite_code ?? null,
+  };
+}
+
+/**
+ * Point this browser at a sync server. `inviteCode: null` PRESERVES a stored
+ * admission code; the backend reads `Some("")` as an explicit clear, and the
+ * shared module's docblock carries the whole reason.
+ */
+export async function writeSyncEndpoint(
+  endpointUrl: string,
+  inviteCode: string | null = null,
+): Promise<void> {
+  await invoke("plugin:sync|sync_set_endpoint", { endpointUrl, inviteCode });
+}
+
 /**
  * The person's account number, in canonical form, or `null` when this device
  * holds no identity (myne-md/myne#911 review).
@@ -161,6 +198,20 @@ export interface InviteSummary {
 
 export async function personListInvites(): Promise<InviteSummary[]> {
   return [];
+}
+
+/**
+ * The recipient's refusal of an invitation (`DELETE /b2b/invites/{id}`,
+ * `decisions/protocol/0732`).
+ *
+ * Refused here for the reason the list above returns empty: the invitation
+ * commands need the device-scoped person token held in a carrier outside browser
+ * storage, so this page has no invitation to decline. It throws rather than
+ * resolving, because a decline that silently "succeeds" would tell the user the
+ * owner had been notified when nothing left the tab.
+ */
+export async function personDeclineInvite(_inviteIdHex: string): Promise<void> {
+  throw new Error("member vaults are unavailable on web");
 }
 
 export interface AcceptedInviteView {

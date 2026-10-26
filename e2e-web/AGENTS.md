@@ -25,8 +25,8 @@ What belongs here:
 - the browser refusals: unsupported environment, quota precheck
 
 **If you find yourself writing the same scenario twice, the thing that actually
-needs a test is the seam contract.** Dual-driving the desktop suite — 93
-scenario files today (`e2e/*.e2e.ts`) — against a browser would roughly double
+needs a test is the seam contract.** Dual-driving the desktop suite
+(`e2e/*.e2e.ts`) against a browser would roughly double
 the pipeline's slowest step to re-assert identical source, and a second suite
 that duplicates the first decays into the one nobody fixes.
 
@@ -218,7 +218,7 @@ browser reports that, even when the bundle is also missing.
 Landed, and the tree is the authority (`git ls-files e2e-web scripts/e2e-web-*`
 settles any argument with this section):
 
-- **Support layer**, eight modules — `support/harness.ts` (the gate),
+- **Support layer** — `support/harness.ts` (the gate),
   `support/scenario.ts` (`describeE2E` + the quarantine gate),
   `support/server.ts` (the bundle server with production headers),
   `support/worker-ports.ts` (per-slot driver + bundle bands),

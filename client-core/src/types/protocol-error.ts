@@ -1,7 +1,7 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
 //   - protocol/src/error.rs        (ProtocolError)
-//   - src-tauri/src/plugins/vault_creation/error.rs  (AppError, IoErrorKind)
+//   - core/src/plugins/vault_creation/error.rs  (AppError, IoErrorKind)
 //
 // Plan: derive `ts_rs::TS` on those enums, run `cargo test` to emit
 // the file at this path, and have CI fail if `git diff --exit-code`
@@ -41,7 +41,7 @@ export type ProtocolError =
  * Bounded categorization of file-system failures.
  *
  * No `String` field (path leakage prevention, see
- * `src-tauri/src/plugins/vault_creation/error.rs`). Frontend i18n
+ * `core/src/plugins/vault_creation/error.rs`). Frontend i18n
  * maps each variant to a user-facing message.
  */
 export type IoErrorKind =
@@ -166,7 +166,7 @@ export function isIoError(e: AppError): e is { kind: "Io"; detail: IoErrorKind }
 /**
  * Result returned by the `vault-creation:begin` command.
  *
- * Mirrors `BeginResult` in `src-tauri/src/plugins/vault_creation/commands.rs`.
+ * Mirrors `BeginResult` in `core/src/plugins/vault_creation/commands.rs`.
  */
 export interface BeginResult {
   /**

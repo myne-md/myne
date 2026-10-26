@@ -26,6 +26,7 @@ import {
   openSettings,
   selectSettingsTopic,
   unlockToEditor,
+  waitForStatusText,
 } from "./support/flows";
 import { seedVault, type SeededVault } from "./support/fixtures";
 import { testIdSelector } from "./support/webdriver";
@@ -143,14 +144,17 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
         await selectSettingsTopic(app.session, "sync", "devices");
         await app.session.byTestId("member-roster.person-ready");
         await (await app.session.byTestId("member-roster.copy-owner-code")).click();
-        await app.session.waitUntil(
-          async () => {
-            const toasts = await app.session.byTestIdAll("editor.toast-message");
-            if (toasts.length === 0) return null;
-            const message = (await toasts[0].text()).trim();
-            return message === IDENTITY_CODE_COPIED ? true : null;
-          },
-          { label: "identity code copy reports success", timeoutMs: 10_000 },
+        // The copy reports on the CONTROL that was pressed, not in a toast
+        // (2026-10-24). The tick is the sighted half and the visually hidden
+        // `role="status"` line beside the field is the assistive one, so the
+        // assertion reads the line: a screen reader is the audience that must
+        // be able to tell a copy worked, and the toast that used to carry this
+        // sentence is gone by design.
+        await waitForStatusText(
+          app.session,
+          "member-roster.copy-status",
+          IDENTITY_CODE_COPIED,
+          "identity code copy reports success",
         );
         // The invite button is a TWO-STEP door on an unshared vault: the
         // NTV5 -> NTV6 migration is permanent, so a confirmation precedes the
@@ -292,13 +296,14 @@ describeE2E("MR-1 member roster panel renders (myne-md/myne#698)", () => {
           const code = await app.session.byTestId("identity-home.identity-code");
           expect(await code.attribute("readonly")).not.toBeNull();
           await (await app.session.byTestId("identity-home.copy-code")).click();
-          await app.session.waitUntil(
-            async () => {
-              const toasts = await app.session.byTestIdAll("editor.toast-message");
-              if (toasts.length === 0) return null;
-              return (await toasts[0].text()).trim() === IDENTITY_CODE_COPIED ? true : null;
-            },
-            { label: "identity home code copy reports success", timeoutMs: 10_000 },
+          // The control reports the copy (2026-10-24): the hidden `role="status"`
+          // line beside it is what a screen reader hears, and the success toast
+          // that used to say the same sentence is gone.
+          await waitForStatusText(
+            app.session,
+            "identity-home.copy-status",
+            IDENTITY_CODE_COPIED,
+            "identity home code copy reports success",
           );
         },
       );

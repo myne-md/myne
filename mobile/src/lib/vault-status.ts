@@ -1,7 +1,7 @@
 // Tauri IPC wrapper for `vault_status` (read-only `vault.meta` probe).
 //
 // The Rust command lives at `plugin:vault-unlock|vault_status` (see
-// `src-tauri/src/plugins/vault_unlock/commands.rs`); permission entry
+// `core/src/plugins/vault_unlock/commands.rs`); permission entry
 // in `src-tauri/permissions/vault-unlock/default.toml` allows it via
 // the existing `vault-unlock:default` capability.
 //

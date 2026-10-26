@@ -4069,7 +4069,6 @@
         "ribbon": "nastro sinistro rotaia fissa pin comando comandi personalizza riordina sblocca barra strumenti scorciatoie",
         "folderNotes": "cartella nota indice folder_index pagina di destinazione doppio clic collegamento cartella progetti off interruttore disattiva",
         "syncMembers": "membri, condividi, invita, team, collaborazione, caveau",
-        "accountName": "nome account nome gruppo raggruppamento rinomina etichetta dispositivo locale account name group grouping rename label device local",
         "accountVaults": "account casseforti raggruppate quali casseforti appartengono gruppo elenco vaults grouped which vaults belong group list",
         "aiMeetingPrompt": "riunione riepilogo prompt istruzione personalizzato trascrizione attività da svolgere decisioni",
         "update": "aggiornamento aggiorna controllo aggiornamenti nuova versione rilascio download",
@@ -4151,14 +4150,10 @@
       "atCap": "L'elenco è pieno, quindi non si può più memorizzare nulla. Elimina una voce per fare spazio."
     },
     "account": {
-      "nameLabel": "Nome dell'account",
-      "nameHelper": "Un nome per questo gruppo di casseforti su questo dispositivo. Il selettore delle casseforti lo usa come intestazione del gruppo. Resta su questo dispositivo e non viene mai memorizzato dentro una cassaforte, quindi non si sincronizza e un altro dispositivo può raggruppare e nominare le stesse casseforti in modo diverso.",
-      "namePlaceholder": "Aggiungi un nome…",
-      "nameSave": "Salva",
-      "nameSaving": "Salvataggio…",
       "vaultsLabel": "Casseforti in questo account",
       "vaultsHelper": "Le casseforti che questo dispositivo raggruppa sotto il nome qui sopra. Il raggruppamento è una scelta organizzativa per dispositivo, quindi non fa parte del contenuto di alcuna cassaforte e non viaggia con essa.",
-      "vaultsCount": "{{count}} casseforti",
+      "vaultsCount_one": "{{count}} casseforti",
+      "vaultsCount_other": "{{count}} casseforti",
       "currentVault": "Questa cassaforte",
       "unknownVault": "Un'altra cassaforte su questo dispositivo",
       "standaloneHelper": "Questa cassaforte non è raggruppata sotto un account su questo dispositivo, quindi è a sé stante. Il raggruppamento è per dispositivo: un altro dispositivo potrebbe mostrarla dentro un gruppo.",
@@ -4170,7 +4165,8 @@
       "sections": {
         "extensions": "Estensioni del browser",
         "grouping": "Questo account"
-      }
+      },
+      "vaultsCount_many": "{{count}} casseforti"
     },
     "plainFile": {
       "errorSaveSetting": "Non è stato possibile salvare l'impostazione dei file in chiaro.",
@@ -4604,9 +4600,7 @@
       "nameErrorUnshared": "I nomi possono essere impostati dopo che questa cassaforte è stata condivisa.",
       "nameErrorLocked": "Sblocca la cassaforte per cambiare il tuo nome.",
       "nameErrorGeneric": "Non è stato possibile salvare il tuo nome. Riprova.",
-      "nameInvite": "Non hai ancora un nome visualizzato. Gli altri membri vedono la tua impronta.",
       "nameInviteCta": "Imposta un nome",
-      "nameInviteDismiss": "Non ora",
       "noInvitations": "Ancora nessun invito inviato.",
       "identityHeading": "La tua identità",
       "membersHeading": "Membri",
@@ -5109,8 +5103,7 @@
       "phraseFor": "Frase di recupero — se dimentichi la password",
       "save": "Salva kit di recupero",
       "saveFailed": "Impossibile salvare il file. Copia invece il kit, oppure annota entrambe le parti.",
-      "savedToFile": "Salvato. È un file di testo in chiaro che contiene entrambi i segreti, quindi conservalo in un luogo che solo tu puoi leggere.",
-      "whyEnglish": "Le parole sono in inglese in ogni lingua. Fanno parte dello standard BIP-39, così qualsiasi client Myne può leggere una frase scritta da qualsiasi altro. Non tradurle: le parole tradotte non sono nell'elenco delle parole e la frase smetterebbe di funzionare."
+      "savedToFile": "Salvato. È un file di testo in chiaro che contiene entrambi i segreti, quindi conservalo in un luogo che solo tu puoi leggere."
     },
     "name": {
       "back": "Indietro",
@@ -5136,13 +5129,8 @@
     "accountFallback": "Account",
     "moveToAccount": "Sposta sull'account…",
     "moveToNewAccount": "Sposta su un nuovo account",
-    "renameAccount": "Rinomina account",
     "accountError": "Impossibile aggiornare il raggruppamento account. Nulla è cambiato.",
     "accountHidden": "Le azioni account non sono disponibili mentre i nomi dei caveau sono nascosti.",
-    "labelTooLong": "Quel nome è troppo lungo. Tienilo sotto 512 caratteri.",
-    "renameCancel": "Annulla",
-    "renamePlaceholder": "Nome account",
-    "renameSave": "Rinomina",
     "accountUnreadable": "Impossibile leggere il raggruppamento account su questo dispositivo. Nulla è cambiato.",
     "createShort": "Nuova cassaforte",
     "joinShort": "Aggiungi dispositivo",
@@ -5340,15 +5328,10 @@
     "openedYearsAgo_other": "aperta {{count}} anni fa",
     "corruptedBadge": "Danneggiata",
     "accountFallback": "Account",
-    "renameAccount": "Rinomina account",
     "moveToNewAccount": "Sposta su un nuovo account",
     "moveToAccount": "Sposta sull'account…",
     "accountError": "Impossibile aggiornare il raggruppamento account. Nulla è cambiato.",
     "accountHidden": "Le azioni account non sono disponibili mentre i nomi dei caveau sono nascosti.",
-    "labelTooLong": "Quel nome è troppo lungo. Tienilo sotto 512 caratteri.",
-    "renameCancel": "Annulla",
-    "renamePlaceholder": "Nome account",
-    "renameSave": "Rinomina",
     "accountUnreadable": "Impossibile leggere il raggruppamento account su questo dispositivo. Nulla è cambiato."
   },
   "join": {

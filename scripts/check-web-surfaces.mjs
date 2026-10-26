@@ -43,6 +43,10 @@ const V = {
     "ported",
     "Build identity and links; no host call. Carries the Developer mode toggle, which since #181 renders here too — it used to be withheld on a `localAi`-less capability set, which on web left the mode's other members (the Vim row) unreachable.",
   ],
+  "src/components/settings/DiagnosticsPanel.tsx": [
+    "adapted",
+    "Ships, and it is the one settings panel whose WEB arm is the point rather than a compromise. The report block and its Copy button render on every client on purpose: a browser user cannot open a devtools panel and read a failure back to anyone, so the copy is the half that matters most there. The logging half (the switch, the crash record, the folder reveal and the saved bundle) is capability-gated on `diagnosticLog`, which the web descriptor does not carry because a served bundle installs no `tracing` subscriber, so those rows are absent rather than disabled. Split out of AboutPanel on 2026-10-25; the verdict is unchanged in kind, because it is the same code with the same gate.",
+  ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
     "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",
@@ -244,6 +248,7 @@ const V = {
   "src/components/settings/search/foldAccents.ts": ["ported", "Pure Unicode folding."],
 
   // ── src/lib ─────────────────────────────────────────────────────────────
+  "src/lib/autoApplyTags.ts": ["ported", "Device-local automatic-tagging permission (localStorage), same shape as aiOnboardingSeen. Runs as written on web, where it is inert: the tag pass this gates is local-inference only, so no web build reaches a write."],
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/aiOnboardingSeen.ts": ["ported", "Device-local first-run AI-onboarding seen flag (localStorage), same shape as accentColor/viewsEnabled; runs as written. On web the surface it gates is only reachable with `downloads: false`, but this module holds no host call."],
   "src/lib/ai-model-download.ts": [
@@ -510,7 +515,7 @@ const V = {
   ],
   "src/lib/account.ts": [
     "adapted",
-    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
+    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the three `plugin:account|...` wrappers, plus the pure grouping and heading helpers every picker shares. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/vaultDisplayName.ts": [
@@ -527,7 +532,7 @@ const V = {
   "src/lib/vault-status.ts": ["ported", "Boot probe."],
   "src/lib/vault-switch.ts": ["adapted", "Reachable only with ≥2 vaults, which one origin cannot have."],
   "src/lib/vault-unlock.ts": ["ported", "The unlock IPC — the one path web needs most."],
-  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` one line up documents."],
+  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` documents."],
   "src/lib/voice-record.ts": ["adapted", "Voice capture is desktop-only; the editor host omits the recorder."],
   "src/lib/workspace-persist.ts": ["ported", "`MYW1` IPC; ported into core and dispatched in task 65."],
   "src/lib/writing-assistant.ts": ["adapted", "Unreachable where `localAi` is absent."],
@@ -591,6 +596,10 @@ const V = {
     "Pure DOM: the React binding for the shared overlay `inert` owner (myne#728). No host call, and the browser client renders the same overlays from the same `src/` tree.",
   ],
   "src/hooks/useIdleAutoLock.ts": ["adapted", "Same signal difference as useActivityHeartbeat."],
+  "src/hooks/usePendingInvites.ts": [
+    "ported",
+    "Runs, and does nothing where `personIdentity` is absent: the effect returns before any invoke. That is the correct web answer rather than a gap, because an invitation is addressed to a person identity and the browser has no person-identity carrier, so neither the picker nor the switcher notice can appear there.",
+  ],
   "src/hooks/useIsFullscreen.ts": [
     "adapted",
     "Answers the Fullscreen API on web — the seam's `isFullscreen` is `document.fullscreenElement !== null`, which is the question the caller is asking.",

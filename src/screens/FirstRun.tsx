@@ -23,12 +23,14 @@
 //
 // # Abandoning
 //
-// "Not now" is not a cancel. An identity created a moment ago exists, sealed on
-// this device, and its phrase is on screen; treating the exit as a rollback
-// would be a lie the disk contradicts. So the exit re-probes, and boot routing
-// sends a device with an identity and no vault to the identity home
-// (`myne-md/myne#911` task 4), which is exactly where an abandoned first run
-// should land.
+// The way out is NOT a cancel, and it is not labelled as one. An identity created
+// a moment ago exists, sealed on this device, and its phrase is on screen;
+// treating the exit as a rollback would be a lie the disk contradicts. So the exit
+// re-probes, and boot routing sends a device with an identity and no vault to the
+// identity home (`myne-md/myne#911` task 4), which is exactly where an abandoned
+// first run should land. It is drawn as the back arrow every other first-run step
+// uses (bottom-left, `ghost` + `arrow-left`), because a way out of the flow is a
+// step back rather than a sentence under the card.
 import { useTranslation } from "react-i18next";
 import { MyneMark } from "../components/primitives/MyneMark";
 import { stageRootStyle } from "../components/primitives/stageRoot";
@@ -82,17 +84,10 @@ export function FirstRun({ onIdentityCreated, onAbandon }: FirstRunProps) {
         </div>
         <div
           style={{
-            marginTop: "var(--space-2)",
-            fontSize: "var(--text-base)",
-            color: "var(--fg-2)",
-            textAlign: "center",
-            lineHeight: 1.6,
+            marginTop: "var(--space-5)",
+            width: "100%",
           }}
         >
-          {t("firstRun.lead")}
-        </div>
-
-        <div style={{ width: "100%", marginTop: "var(--space-5)" }}>
           <IdentitySetupPanel
             testIdPrefix="first-run.identity"
             onDone={onIdentityCreated}

@@ -333,13 +333,12 @@ export type Capability =
    * Vault names on the LOCKED picker, and with them the device-local sealed
    * `MYL1` store that makes showing one possible (myne-md/myne#411).
    *
-   * **Absent on web, and already decided before this capability existed.** The
-   * picker is the whole subject: a name is cached so the pre-unlock screen can
-   * label a row, and `check-web-screens.mjs` records `VaultPicker.tsx` as
-   * `excluded` because an origin holds exactly one container, so the
-   * two-or-more-vault branch that produces that screen cannot be reached. The
-   * store behind it is sealed under an OS keychain `wrap_key`, and a page has
-   * no keychain, so there is no second half either.
+   * **Absent on web.** The locked picker itself now SHIPS there
+   * (`check-web-screens.mjs` records `VaultPicker.tsx` as `ported` since
+   * myne-md/myne#911 task 13), so the obstacle is not the screen: the name is
+   * cached in the device-local sealed `MYL1` store, and that store's wrap key
+   * lives in an OS keychain. A page has no keychain, so there is no carrier for
+   * the cache and nothing for the display to read.
    *
    * Named for the NAMES rather than for the Privacy switch that hides them,
    * because the switch is downstream: what a client without this capability
@@ -369,11 +368,12 @@ export type Capability =
   /**
    * Grouping vaults under an account (the account/vault split, myne-md/myne#684).
    *
-   * **Absent on web, and not as a port that is owed.** A browser holds exactly
-   * one vault per origin and has no OS keychain, so there is no grouping to
-   * render and nowhere to keep the wrap key whose seal is the account record.
-   * The picker grouping UI is omitted rather than rendered against commands
-   * that reject.
+   * **Absent on web, and not as a port that is owed.** A browser can now hold
+   * two containers under one origin (myne-md/myne#911 task 13), so the obstacle
+   * is not the vault count: the account record is sealed with a wrap key kept in
+   * an OS keychain, and a page has none, so there is nowhere to keep the seal
+   * the grouping is read from. The picker renders the rows standalone instead of
+   * failing the list (`KeychainUnavailable`).
    */
   | "accountGrouping"
   /** B2B member sharing: person identity, invite, roster, removal. */

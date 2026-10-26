@@ -111,7 +111,8 @@ const surfaces = [
     code: OWNER_CODE,
     codeTestId: "member-roster.owner-code",
     copyTestId: "member-roster.copy-owner-code",
-    feedbackTestId: "member-roster.copy-feedback",
+    statusTestId: "member-roster.copy-status",
+    copyLabel: "personIdentityCode.copy",
     render: () => render(<MemberRosterPanel />),
 
     prepare: async () => {
@@ -124,7 +125,8 @@ const surfaces = [
     code: IDENTITY_CODE,
     codeTestId: "identity-home.identity-code",
     copyTestId: "identity-home.copy-code",
-    feedbackTestId: "identity-home.copy-feedback",
+    statusTestId: "identity-home.copy-status",
+    copyLabel: "personIdentityCode.copy",
     render: () =>
 
       render(
@@ -134,7 +136,7 @@ const surfaces = [
           onCreateVault={() => {}}
           onAccepted={() => {}}
           onForgotten={() => {}}
-          accountState={null}
+          accountState="enrolled"
           onRegistered={() => {}}
         />,
       ),
@@ -207,10 +209,18 @@ describe.each(surfaces)("$name", (surface) => {
     });
 
     await waitFor(() => expect(writeTextMock).toHaveBeenCalledWith(surface.code));
-    expect(getToasts()).toHaveLength(1);
-    expect(getToasts()[0].variant).toBe("info");
-    expect(getToasts()[0].message).toBe("personIdentityCode.copied");
-    expect(screen.getByTestId(surface.feedbackTestId).textContent).toBe("personIdentityCode.copied");
+    // The report lives on the BUTTON, not in a toast and not under the field
+    // (2026-10-24): a tick, one pop, and a visually hidden live region saying the
+    // same words. Nothing is drawn that repeats it.
+    expect(getToasts()).toHaveLength(0);
+    expect(screen.getByTestId(surface.copyTestId).getAttribute("data-confirmed")).toBe("true");
+    expect(screen.getByTestId(surface.statusTestId).textContent).toBe("personIdentityCode.copied");
+    expect(screen.queryByText("personIdentityCode.copied", { selector: "p:not([role])" })).toBeNull();
+    // The control is ICON-ONLY, so its accessible label is the only thing that
+    // says what it copies.
+    expect(screen.getByTestId(surface.copyTestId).getAttribute("aria-label")).toBe(
+      surface.copyLabel,
+    );
   });
 
   it("reports a clipboard failure instead of presenting it as success", async () => {
@@ -225,7 +235,7 @@ describe.each(surfaces)("$name", (surface) => {
     await waitFor(() => expect(getToasts()).toHaveLength(1));
     expect(getToasts()[0].variant).toBe("error");
     expect(getToasts()[0].message).toBe("personIdentityCode.copyFailed");
-    expect(screen.getByTestId(surface.feedbackTestId).textContent).toBe("personIdentityCode.copyFailed");
+    expect(screen.queryByText("personIdentityCode.copyFailed")).toBeNull();
   });
 });
 
@@ -269,7 +279,7 @@ describe("identity-code textareas are themed", () => {
             onCreateVault={() => {}}
             onAccepted={() => {}}
             onForgotten={() => {}}
-            accountState={null}
+            accountState="enrolled"
             onRegistered={() => {}}
           />,
         );
@@ -309,7 +319,7 @@ describe("IdentityHome invite phrase", () => {
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
-        accountState={null}
+        accountState="enrolled"
         onRegistered={() => {}}
       />,
     );

@@ -1,5 +1,5 @@
 // TS mirror of the Rust `SearchResult` DTO returned by `note_search`
-// (src-tauri/src/plugins/notes/commands.rs). Manually kept in sync — there is
+// (core/src/plugins/notes/commands.rs). Manually kept in sync — there is
 // no codegen (see src/AGENTS.md "Tauri command bindings"). Field names match
 // serde's serialization exactly (snake_case `note_id` / `matched_in`).
 

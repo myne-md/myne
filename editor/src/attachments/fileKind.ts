@@ -4,7 +4,7 @@
 // Why TS-side and extension-driven: a generic (non-image/PDF) attachment is
 // stored with `content_type = "application/octet-stream"` (the Rust sniffer
 // only recognizes the render allowlist; see
-// `src-tauri/src/plugins/attachments/sniff.rs`). So the catalog carries no
+// `core/src/plugins/attachments/sniff.rs`). So the catalog carries no
 // useful type for a generic file — the human-facing type label is derived here
 // from the display filename's extension. The card filename itself is the
 // catalog filename (the single source of truth; MYND-173).

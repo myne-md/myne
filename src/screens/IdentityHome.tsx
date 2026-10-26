@@ -15,22 +15,22 @@
 // rather than the bare column it shipped with, so the invite list scrolls
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
-import { useCallback, useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
+import { IconButton } from "../components/primitives/IconButton";
 import { Input } from "../components/primitives/Input";
+import { ModalShell } from "../components/primitives/ModalShell";
 import {
-  CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
   CenteredCard,
 } from "../components/primitives/CenteredCard";
 import { DestructiveBanner } from "../components/DestructiveBanner";
-import { BetaTermsConsent } from "../components/sync/BetaTermsConsent";
-import { useBetaTermsGate } from "../hooks/useBetaTermsGate";
 import { MyneMark } from "../components/primitives/MyneMark";
+import { VISUALLY_HIDDEN } from "../components/primitives/visuallyHidden";
 import {
   personListInvites,
-  personRegister,
   type InviteSummary,
   type PersonAccountState,
 } from "../lib/personAccount";
@@ -42,6 +42,9 @@ import { writeText as clipboardWriteText } from "../platform/clipboardManager";
 import { toast } from "../components/toast/toastStore";
 import { AcceptInviteWizard, JoinVaultWizard } from "../components/sync/InviteWizard";
 import { MemberNameGate } from "../components/sync/MemberNameGate";
+import { PersonRegisterDialog } from "../components/sync/PersonRegisterDialog";
+import { PersonIdentityUnlock } from "../components/sync/PersonIdentityUnlock";
+import { usePersonIdentityState } from "../components/sync/personIdentityState";
 
 /** How often the pending-invite list re-polls while the identity home is
  *  mounted and visible. The relay has no push channel for a person account, so
@@ -88,6 +91,18 @@ const BLOCK_STYLE: CSSProperties = {
   gap: "var(--space-2)",
 };
 
+/** A field with its action BESIDE it, the `EndpointConfig` server-URL row's shape
+ *  (`MemberRosterPanel`'s owner-code row is the same one): the value takes the
+ *  flexible width and the control keeps its label on one line. It replaced the
+ *  full-width field with a full-width button under it, which made two of those
+ *  read as a pair of banners rather than as "this value, and what you can do with
+ *  it" (2026-10-24). */
+const FIELD_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "var(--space-2)",
+};
+
 const BRAND_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -120,18 +135,6 @@ const BODY_SMALL_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-sm)",
   lineHeight: "var(--leading-normal)",
-  color: "var(--fg-2)",
-};
-
-const COPY_ERROR_STYLE: CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-xs)",
-  color: "var(--danger)",
-};
-
-const COPY_SUCCESS_STYLE: CSSProperties = {
-  margin: 0,
-  fontSize: "var(--text-xs)",
   color: "var(--fg-2)",
 };
 
@@ -175,24 +178,30 @@ const CHECKBOX_STYLE: CSSProperties = {
   flexShrink: 0,
 };
 
-const FORGET_BOX_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-2)",
-  border: "1px solid var(--danger)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-3)",
-};
-
 const FORGET_ERROR_STYLE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-sm)",
   color: "var(--danger)",
 };
 
-const ACTIONS_ROW_STYLE: CSSProperties = {
+/** The forget dialog's body. `ModalShell`'s `.myne-modal-body` carries no
+ *  padding of its own, so the warning and the acknowledgement set their own
+ *  rhythm here rather than inheriting the card's. */
+const DIALOG_BODY_STYLE: CSSProperties = {
   display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-3)",
+  padding: "var(--space-4) var(--space-5)",
+};
+
+/** The dialog's footer: the destructive press right-most with the benign one
+ *  beside it, in the order `DeleteAttachmentDialog` uses so every confirmation in
+ *  the app is answered the same way. */
+const DIALOG_FOOTER_STYLE: CSSProperties = {
+  display: "flex",
+  justifyContent: "flex-end",
   gap: "var(--space-2)",
+  padding: "0 var(--space-5) var(--space-4)",
 };
 
 interface IdentityHomeProps {
@@ -219,6 +228,18 @@ interface IdentityHomeProps {
   onRegistered: () => void;
 }
 
+/** Whether a rejected `sync_person_list_invites` means "the server does not know
+ *  this identity yet" rather than a real failure. `NotEnrolled` is the backend's
+ *  answer for a person credential with no device token; the copy that follows it
+ *  points at the register block below instead of at the connection. */
+function invitesRefusal(error: unknown): boolean {
+  const kind =
+    typeof error === "object" && error !== null && "kind" in error
+      ? (error as { kind?: unknown }).kind
+      : undefined;
+  return kind === "NotEnrolled";
+}
+
 export function IdentityHome({
   identityCode,
   accountNumber,
@@ -229,8 +250,31 @@ export function IdentityHome({
   onRegistered,
 }: IdentityHomeProps) {
   const { t } = useTranslation();
+  // Whether this SESSION holds the identity's private half. It decides the one
+  // action this screen exists for: a vault born under an identity signs its first
+  // member list with that key, so creating one while the identity is sealed needs
+  // the phrase first (`vault_creation::commands` refuses with `PersonLocked`, and
+  // `decisions/protocol/0717` is why it refuses rather than degrading to a
+  // phrase-bearing vault).
+  //
+  // The door that satisfies it used to live only inside Settings, which a device
+  // with zero vaults cannot open: this screen offered "Create a vault", the flow
+  // answered "unlock your identity first", and there was nowhere to do that
+  // (2026-10-25 owner report). Same shape as the register door `decisions/ui/0725`
+  // item 2 added here for the same reason: a refusal must not name an act the
+  // surface cannot perform.
+  const { ready: identityReady } = usePersonIdentityState();
+  const [unlockOpen, setUnlockOpen] = useState(false);
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
   const [failed, setFailed] = useState(false);
+  // The identity the server does not know yet, as a state rather than an error
+  // (2026-10-23). An invitation is addressed to a `person_id_hash` a server
+  // holds, so a `reserved` identity (nothing sent) or a `pending` one (no token
+  // yet) has none to miss, and asking the relay can only be refused. The same
+  // rule is `usePendingInvites`' and its own comment states it; this screen is
+  // the surface that was skipping it.
+  const [notEnrolled, setNotEnrolled] = useState(false);
+  const invitesReadable = accountState === "enrolled";
   // Which invite each wizard is open for (myne-md/myne#871), or null for none.
   // The screen owns only that choice: the wizard owns its own step, its own
   // fields and its own secrets, so unmounting it (Cancel, or the accept
@@ -247,92 +291,71 @@ export function IdentityHome({
   // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
-  const [copyFeedback, setCopyFeedback] = useState<"success" | "error" | null>(null);
-  // Registration (myne-md/myne#911). The phrase is the proof of possession, so
-  // it lives in this screen's state only until the call returns and is never
-  // persisted here: the backend derives the SCRAM secret and forgets the phrase.
+  // Registration (myne-md/myne#911). The host owns one boolean; the dialog owns
+  // the phrase, the address, the admission code and the beta-terms gate, so two
+  // surfaces cannot drift about any of them (2026-10-23 review). It is a DIALOG
+  // rather than a block that expands here (2026-10-24 owner report): the card
+  // already carries the account number, the code and the invitation list, and the
+  // 24-cell grid added to that same scroll region is what pushed it past the
+  // window. A dialog says what it asks for, names the server, and offers Cancel.
   const [registerOpen, setRegisterOpen] = useState(false);
-  const [registerPhrase, setRegisterPhrase] = useState("");
-  const [registerBusy, setRegisterBusy] = useState(false);
-  const [registerError, setRegisterError] = useState(false);
-  // Forget-this-identity-on-this-device (myne-md/myne#782). A short
-  // acknowledgement gates the destructive button; the warning above it is the
-  // only place the consequence is stated.
+  // Forget-this-identity-on-this-device (myne-md/myne#782). Only whether the
+  // confirmation is UP lives here: the acknowledgement, the in-flight state and
+  // the failure are the dialog's own, so closing it discards all three with it
+  // instead of leaving a ticked box behind for the next opening.
   const [forgetOpen, setForgetOpen] = useState(false);
-  const [forgetAck, setForgetAck] = useState(false);
-  const [forgetBusy, setForgetBusy] = useState(false);
-  const [forgetError, setForgetError] = useState(false);
-
-  const betaTerms = useBetaTermsGate();
-  const [termsOpen, setTermsOpen] = useState(false);
-
-  /**
-   * The beta-terms gate (operations#15, myne-md/myne#911 review).
-   *
-   * Registration is a server-facing act: it creates the account the phrase derives
-   * and enrols this device on it. `useBetaTermsGate` stands in front of the three
-   * other doors that turn sync on, and `SyncPanel` states the rule this closes: a
-   * consent screen at one door is not a consent screen. The identity screen was the
-   * fourth door and had none.
-   */
-  const doRegister = async () => {
-    setRegisterBusy(true);
-    setRegisterError(false);
-    try {
-      await personRegister(registerPhrase);
-      setRegisterOpen(false);
-      setRegisterPhrase("");
-      onRegistered();
-    } catch {
-      // The phrase is not kept across a failure: the user retypes it on the
-      // retry, which the copy already asks for, and a mounted component holding
-      // it is one devtools panel away from exposure (myne-md/myne#911 review).
-      setRegisterPhrase("");
-      setRegisterError(true);
-    } finally {
-      setRegisterBusy(false);
-    }
+  // Which copy just landed, for the tick on the button itself (2026-10-24). The
+  // report lives on the control that was pressed rather than in a toast at the
+  // corner of the screen, and the live region below it says the same thing out
+  // loud, because a tick reaches nobody with a screen reader. A failure still
+  // goes to the toast: a control cannot show "that did not work" by looking
+  // happy, and a silent failure is the one report this app never makes
+  // (`lib/clipboard.ts`).
+  const [copied, setCopied] = useState<"code" | "account" | null>(null);
+  const copyTimer = useRef<number | null>(null);
+  const flashCopied = (kind: "code" | "account") => {
+    setCopied(kind);
+    if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    copyTimer.current = window.setTimeout(() => {
+      setCopied(null);
+      copyTimer.current = null;
+    }, 1600);
   };
-
-  const register = async () => {
-    if (betaTerms.needed) {
-      setTermsOpen(true);
-      return;
-    }
-    await doRegister();
-  };
-
-  const forgetIdentity = async () => {
-    setForgetBusy(true);
-    setForgetError(false);
-    try {
-      // Erases the sealed keypair and the device token; the server account
-      // survives and is recoverable with the phrase on another device.
-      await personLock(true);
-      onForgotten();
-    } catch {
-      setForgetError(true);
-      setForgetBusy(false);
-    }
-  };
+  useEffect(
+    () => () => {
+      if (copyTimer.current !== null) window.clearTimeout(copyTimer.current);
+    },
+    [],
+  );
 
   const copyIdentityCode = () => {
     if (!identityCode) return;
-    setCopyFeedback(null);
     void copyText(clipboardWriteText, identityCode, {
       onSuccess: {
         kind: "toast",
-        run: () => {
-          setCopyFeedback("success");
-          toast({ message: t("personIdentityCode.copied"), variant: "info" });
-        },
+        run: () => flashCopied("code"),
       },
       onFailure: {
         kind: "toast",
-        run: () => {
-          setCopyFeedback("error");
-          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
-        },
+        run: () => toast({ message: t("personIdentityCode.copyFailed"), variant: "error" }),
+      },
+    });
+  };
+
+  // The same number Settings shows, so it reports the same words:
+  // `settings.account.numberCopied` / `numberCopyFailed` are reused rather than
+  // copied, because one value described two different ways is the drift
+  // `check-i18n-duplicates.mjs` exists to catch.
+  const copyAccountNumber = () => {
+    if (!accountNumber) return;
+    void copyText(clipboardWriteText, accountNumber, {
+      onSuccess: {
+        kind: "toast",
+        run: () => flashCopied("account"),
+      },
+      onFailure: {
+        kind: "toast",
+        run: () => toast({ message: t("settings.account.numberCopyFailed"), variant: "error" }),
       },
     });
   };
@@ -345,7 +368,17 @@ export function IdentityHome({
       const list = await personListInvites();
       setInvites((previous) => (sameInvites(previous, list) ? previous : list));
       setFailed(false);
-    } catch {
+      setNotEnrolled(false);
+    } catch (e) {
+      // A stale `accountState` (registered on another surface this session) can
+      // still reach the relay through a prop that has not reprobed yet. The
+      // refusal is the same fact as the prop's, so it lands in the same place
+      // rather than in the error banner.
+      if (invitesRefusal(e)) {
+        setNotEnrolled(true);
+        setFailed(false);
+        return;
+      }
       if (!silent) setFailed(true);
     }
   }, []);
@@ -356,6 +389,7 @@ export function IdentityHome({
   // that arrives while the identity home is already mounted never appears until
   // the app is restarted (myne-md/myne#794).
   useEffect(() => {
+    if (!invitesReadable) return;
     let alive = true;
     const run = (silent: boolean) => {
       if (alive) void loadInvites(silent);
@@ -373,7 +407,7 @@ export function IdentityHome({
       window.removeEventListener("focus", onVisible);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [loadInvites]);
+  }, [loadInvites, invitesReadable]);
 
   // Unclaimed and claimed are two different offers, not one list with a filter. An
   // unclaimed invite is an identity that is not a member yet and is accepted with the
@@ -428,6 +462,15 @@ export function IdentityHome({
   return (
     <CenteredCard>
       <div data-testid="identity-home.root" style={{ display: "contents" }}>
+        {/* The tick's screen-reader half. One region for both copy controls,
+            because only one copy can be in flight at a time. */}
+        <p role="status" aria-live="polite" data-testid="identity-home.copy-status" style={VISUALLY_HIDDEN}>
+          {copied === "code"
+            ? t("personIdentityCode.copied")
+            : copied === "account"
+              ? t("settings.account.numberCopied")
+              : ""}
+        </p>
         <div style={BRAND_ROW_STYLE}>
           <MyneMark size={36} />
           <span style={WORDMARK_STYLE}>Myne</span>
@@ -435,28 +478,38 @@ export function IdentityHome({
 
         <h1 style={CARD_TITLE_STYLE}>{t("identityHome.title")}</h1>
 
-        <p style={CARD_BODY_STYLE}>{t("identityHome.subtitle")}</p>
-
         {/* The account number, where the identity is named: one value for
             support and for a self-host handoff, derived rather than generated so
             losing it costs nothing (myne-md/myne#911 review). */}
         {accountNumber ? (
           <div style={BLOCK_STYLE}>
             <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.accountNumberHeading")}</h2>
-            <Input
-              data-testid="identity-home.account-number"
-              aria-label={t("identityHome.accountNumberHeading")}
-              autoComplete="off"
-              readOnly
-              value={accountNumber}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-base)",
-                color: "var(--fg-1)",
-                width: "100%",
-                userSelect: "all",
-              }}
-            />
+            <div style={FIELD_ROW_STYLE}>
+              <Input
+                data-testid="identity-home.account-number"
+                aria-label={t("identityHome.accountNumberHeading")}
+                autoComplete="off"
+                readOnly
+                value={accountNumber}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-base)",
+                  color: "var(--fg-1)",
+                  flex: 1,
+                  minWidth: 0,
+                  userSelect: "all",
+                }}
+              />
+              <IconButton
+                icon="copy"
+                label={t("identityHome.copyAccountNumber")}
+                bordered
+                tooltip
+                confirmed={copied === "account"}
+                testId="identity-home.copy-account-number"
+                onClick={copyAccountNumber}
+              />
+            </div>
             <p style={BODY_SMALL_STYLE}>{t("identityHome.accountNumberHint")}</p>
           </div>
         ) : null}
@@ -472,54 +525,74 @@ export function IdentityHome({
         {identityCode ? (
           <div style={BLOCK_STYLE}>
             <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.shareCodeHeading")}</h2>
-            <Input
-              data-testid="identity-home.identity-code"
-              aria-label={t("identityHome.shareCodeHeading")}
-              autoComplete="off"
-              readOnly
-              value={identityCode}
-              style={{
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-xs)",
-                color: "var(--fg-2)",
-                width: "100%",
-                userSelect: "all",
-              }}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              data-testid="identity-home.copy-code"
-              onClick={copyIdentityCode}
-            >
-              {t("personIdentityCode.copy")}
-            </Button>
-            {copyFeedback === "error" ? (
-              <p
-                data-testid="identity-home.copy-feedback"
-                role="status"
-                aria-live="polite"
-                style={COPY_ERROR_STYLE}
-              >
-                {t("personIdentityCode.copyFailed")}
-              </p>
-            ) : copyFeedback === "success" ? (
-              <p
-                data-testid="identity-home.copy-feedback"
-                role="status"
-                aria-live="polite"
-                style={COPY_SUCCESS_STYLE}
-              >
-                {t("personIdentityCode.copied")}
-              </p>
-            ) : null}
+            <div style={FIELD_ROW_STYLE}>
+              <Input
+                data-testid="identity-home.identity-code"
+                aria-label={t("identityHome.shareCodeHeading")}
+                autoComplete="off"
+                readOnly
+                value={identityCode}
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-xs)",
+                  color: "var(--fg-2)",
+                  flex: 1,
+                  minWidth: 0,
+                  userSelect: "all",
+                }}
+              />
+              <IconButton
+                icon="copy"
+                label={t("personIdentityCode.copy")}
+                bordered
+                tooltip
+                confirmed={copied === "code"}
+                testId="identity-home.copy-code"
+                onClick={copyIdentityCode}
+              />
+            </div>
+            {/* The copy reports on the BUTTON (2026-10-24): a tick and one pop,
+                announced through the live region at the top of the card. Nothing
+                is written under the field — that line repeated the toast's own
+                sentence, and the toast repeated it again in the corner. */}
             <p style={HINT_STYLE}>{t("identityHome.shareCodeHint")}</p>
           </div>
         ) : null}
 
         <div style={BLOCK_STYLE}>
           <h2 style={SECTION_HEADING_STYLE}>{t("identityHome.invitesHeading")}</h2>
-          {failed ? (
+          {accountState === null ? (
+            // The lifecycle probe has not answered (a failed status read falls
+            // back to Welcome, so this is a transient). Claiming "not
+            // registered" here would be a guess about the one fact the section
+            // depends on, so the section stays empty until the answer exists.
+            null
+          ) : !invitesReadable || notEnrolled ? (
+            // The state AND the action that ends it, once. This section used to say
+            // "this identity is not registered, so no invitation can reach it" and
+            // then explain the same state again in a block of its own below the
+            // list, with the register control down there (2026-10-24 pass over the
+            // panel: the same fact twice, five hundred pixels apart). The question
+            // "why is there nothing here?" is asked HERE, so the answer belongs
+            // here. `pending` states a wait and has no action.
+            <div data-testid="identity-home.account-state" style={BLOCK_STYLE}>
+              <p data-testid="identity-home.invites-unavailable" style={HINT_STYLE}>
+                {t(
+                  accountState === "pending"
+                    ? "identityHome.invitesPending"
+                    : "identityHome.invitesUnregistered",
+                )}
+              </p>
+              {accountState === "pending" ? null : (
+                <Button
+                  onClick={() => setRegisterOpen(true)}
+                  data-testid="identity-home.register-cta"
+                >
+                  {t("identityHome.registerCta")}
+                </Button>
+              )}
+            </div>
+          ) : failed ? (
             <DestructiveBanner testId="identity-home.error">
               {t("identityHome.invitesError")}
             </DestructiveBanner>
@@ -577,130 +650,192 @@ export function IdentityHome({
           )}
         </div>
 
-        {/* The account lifecycle (myne-md/myne#911). A `reserved` identity is
-            complete and offline; registering is an explicit act that asks for
-            the phrase, so "I exist locally" and "a server knows me" cannot be
-            confused. `pending` needs no action, only an explanation. */}
-        {accountState === "reserved" ? (
-          <div style={BLOCK_STYLE} data-testid="identity-home.account-state">
-            <p style={BODY_SMALL_STYLE}>{t("identityHome.accountStateReserved")}</p>
-            <BetaTermsConsent
-              open={termsOpen}
-              testId="identity.register.beta-terms"
-              onAccept={() => {
-                setTermsOpen(false);
-                // `accept()` then the body directly, because `needed` is still
-                // true for this render and `register()` would reopen the dialog.
-                void betaTerms.accept().then(() => doRegister());
-              }}
-              // Declining closes the dialog and leaves the gate standing: nothing
-              // was sent, so there is nothing to take back.
-              onCancel={() => setTermsOpen(false)}
-            />
-            {registerOpen ? (
-              <div data-testid="identity-home.register-form">
-                <p style={BODY_SMALL_STYLE}>{t("identityHome.registerPrompt")}</p>
-                <Input
-                  type="password"
-                  value={registerPhrase}
-                  onChange={(e) => setRegisterPhrase(e.target.value)}
-                  aria-label={t("identityHome.registerPhraseLabel")}
-                  data-testid="identity-home.register-phrase"
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {registerError ? (
-                  <p role="alert" data-testid="identity-home.register-error">
-                    {t("identityHome.registerError")}
-                  </p>
-                ) : null}
-                <Button
-                  variant="primary"
-                  onClick={() => void register()}
-                  disabled={registerBusy || registerPhrase.trim() === ""}
-                  data-testid="identity-home.register-submit"
-                >
-                  {t("identityHome.registerSubmit")}
-                </Button>
-              </div>
-            ) : (
-              <Button
-                onClick={() => setRegisterOpen(true)}
-                data-testid="identity-home.register-cta"
-              >
-                {t("identityHome.registerCta")}
-              </Button>
-            )}
-          </div>
-        ) : null}
-        {accountState === "pending" ? (
-          <p style={BODY_SMALL_STYLE} data-testid="identity-home.account-state">
-            {t("identityHome.accountStatePending")}
-          </p>
-        ) : null}
+        {/* The account lifecycle (myne-md/myne#911) lives with the invitation list
+            above: its `reserved` arm IS the invitations empty state's explanation
+            and carries the register control, and its `pending` arm is what
+            `invitesPending` already says. No second block here. */}
 
         <div style={BLOCK_STYLE}>
-          <Button variant="primary" onClick={onCreateVault} data-testid="identity-home.create-vault-cta">
-            {t("identityHome.createVaultCta")}
-          </Button>
+          {/* **Absent, not disabled** (the rule `decisions/ui/0729` states for a
+              control the state cannot honour). While the identity is locked the
+              primary action is the UNLOCK, and the sentence above it says why:
+              the alternative was a "Create a vault" button whose only outcome was
+              a refusal that pointed at a door this screen did not have. */}
+          {identityReady ? (
+            <Button
+              variant="primary"
+              onClick={onCreateVault}
+              data-testid="identity-home.create-vault-cta"
+            >
+              {t("identityHome.createVaultCta")}
+            </Button>
+          ) : (
+            <div
+              style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "var(--space-3)" }}
+              data-testid="identity-home.create-vault-locked"
+            >
+              <p style={HINT_STYLE}>{t("identityHome.createVaultLocked")}</p>
+              <PersonIdentityUnlock open={unlockOpen} onOpenChange={setUnlockOpen} />
+            </div>
+          )}
         </div>
 
         {/* Forget this identity on this device. Device-local only: the server
             account and any vault it owns or joined are untouched, and the
-            phrase recovers the identity elsewhere. */}
-        {forgetOpen ? (
-          <div data-testid="identity-home.forget-confirm" style={FORGET_BOX_STYLE}>
-            <p style={BODY_SMALL_STYLE}>{t("identityHome.forgetWarning")}</p>
-            <label style={CHECKBOX_LABEL_STYLE}>
-              <input
-                type="checkbox"
-                data-testid="identity-home.forget-ack"
-                checked={forgetAck}
-                onChange={(e) => setForgetAck(e.target.checked)}
-                style={CHECKBOX_STYLE}
-              />
-              {t("identityHome.forgetCheckbox")}
-            </label>
-            {forgetError ? (
-              <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
-                {t("identityHome.forgetError")}
-              </p>
-            ) : null}
-            <div style={ACTIONS_ROW_STYLE}>
-              <Button
-                variant="ghost"
-                disabled={forgetBusy}
-                onClick={() => {
-                  setForgetOpen(false);
-                  setForgetAck(false);
+            phrase recovers the identity elsewhere. The confirmation is a DIALOG
+            rather than a box that expands here (2026-10-24): a destructive action
+            whose consequence needs this much stating deserves the chrome every
+            other destructive confirmation in the app has (`ModalShell`: backdrop,
+            Esc, focus trap, an inert page), and the card goes on saying what it
+            said before the press. */}
+        <div style={BLOCK_STYLE}>
+          <Button
+            variant="ghost"
+            onClick={() => setForgetOpen(true)}
+            data-testid="identity-home.forget-cta"
+          >
+            {t("identityHome.forgetCta")}
+          </Button>
+        </div>
+
+        {/* PORTALLED out of the card for the same reason the forget dialog
+            below is: `CenteredCard` masks its scroll region with `mask-image`
+            once the content outgrows the window, and a mask clips its whole
+            rendered subtree, a fixed-position backdrop included. */}
+        {registerOpen
+          ? createPortal(
+              <PersonRegisterDialog
+                open
+                testIdPrefix="identity-home.register"
+                onRegistered={() => {
+                  // Closed before the reprobe: the probe re-renders this screen
+                  // with the identity now `enrolled`, and a dialog left open over
+                  // it would be asking for a phrase that has already been used.
+                  setRegisterOpen(false);
+                  onRegistered();
                 }}
-                data-testid="identity-home.forget-cancel"
-              >
-                {t("identityHome.forgetCancel")}
-              </Button>
-              <div style={{ flex: 1 }} />
-              <Button
-                variant="danger"
-                disabled={!forgetAck || forgetBusy}
-                onClick={() => void forgetIdentity()}
-                data-testid="identity-home.forget-confirm-cta"
-              >
-                {t("identityHome.forgetConfirm")}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div style={BLOCK_STYLE}>
-            <Button
-              variant="ghost"
-              onClick={() => setForgetOpen(true)}
-              data-testid="identity-home.forget-cta"
-            >
-              {t("identityHome.forgetCta")}
-            </Button>
-          </div>
-        )}
+                onClose={() => setRegisterOpen(false)}
+              />,
+              document.body,
+            )
+          : null}
+
+        {/* PORTALLED out of the card, not merely rendered at the end of it.
+            `CenteredCard` masks its scroll region with `mask-image` once the
+            content outgrows the window, and a mask clips its whole rendered
+            subtree, a fixed-position backdrop included, so a dialog mounted in
+            there is faded and cut at the edges exactly on the screens long enough
+            to need scrolling (this one, with an invite list). The portal keeps the
+            REACT tree and with it every provider and the translation context, and
+            moves only the DOM. */}
+        {forgetOpen
+          ? createPortal(
+              <ForgetIdentityDialog
+                onCancel={() => setForgetOpen(false)}
+                onForgotten={onForgotten}
+              />,
+              document.body,
+            )
+          : null}
       </div>
     </CenteredCard>
+  );
+}
+
+/** The forget confirmation (myne-md/myne#782), on the shared `ModalShell` instead
+ *  of the bordered box that used to expand inside the card.
+ *
+ *  **The acknowledgement still gates the destructive button.** The warning above
+ *  it is the only place the consequence is stated, and it states three things at
+ *  once: what survives (the server account and any vault it owns or joined), what
+ *  does not (this device's sealed keypair and its token), and the way back (the
+ *  24-word phrase, on another device). The tick is what separates "a button I
+ *  might hit" from "a consequence I read".
+ *
+ *  **It owns its own in-flight and failure state**, so the dialog and the erase
+ *  live in one place: closing it discards the acknowledgement, the error and any
+ *  half-run attempt with it, and the screen above decides only whether it is up.
+ *
+ *  **`canDismiss` closes the three ways out while the erase is in flight.** Esc, a
+ *  backdrop click and the × would each report "cancelled" for an erase the backend
+ *  has already committed, which is the one report this surface must never make. */
+function ForgetIdentityDialog({
+  onCancel,
+  onForgotten,
+}: {
+  onCancel: () => void;
+  /** Called once the erase succeeds, so the app re-probes to the Welcome screen
+   *  rather than trusting a local copy of the identity's state. */
+  onForgotten: () => void;
+}) {
+  const { t } = useTranslation();
+  const [ack, setAck] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+
+  const confirm = async () => {
+    setBusy(true);
+    setError(false);
+    try {
+      // Erases the sealed keypair and the device token; the server account
+      // survives and is recoverable with the phrase on another device.
+      await personLock(true);
+      onForgotten();
+    } catch {
+      setError(true);
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell
+      open
+      title={t("identityHome.forgetCta")}
+      labelId="identity-home-forget-title"
+      closeLabel={t("identityHome.forgetCancel")}
+      canDismiss={() => !busy}
+      onClose={onCancel}
+      testId="identity-home.forget-confirm"
+    >
+      <div style={DIALOG_BODY_STYLE}>
+        <p data-testid="identity-home.forget-warning" style={BODY_SMALL_STYLE}>
+          {t("identityHome.forgetWarning")}
+        </p>
+        <label style={CHECKBOX_LABEL_STYLE}>
+          <input
+            type="checkbox"
+            data-testid="identity-home.forget-ack"
+            checked={ack}
+            disabled={busy}
+            onChange={(e) => setAck(e.target.checked)}
+            style={CHECKBOX_STYLE}
+          />
+          {t("identityHome.forgetCheckbox")}
+        </label>
+        {error ? (
+          <p data-testid="identity-home.forget-error" role="alert" style={FORGET_ERROR_STYLE}>
+            {t("identityHome.forgetError")}
+          </p>
+        ) : null}
+      </div>
+      <div style={DIALOG_FOOTER_STYLE}>
+        <Button
+          variant="ghost"
+          disabled={busy}
+          onClick={onCancel}
+          data-testid="identity-home.forget-cancel"
+        >
+          {t("identityHome.forgetCancel")}
+        </Button>
+        <Button
+          variant="danger"
+          disabled={!ack || busy}
+          onClick={() => void confirm()}
+          data-testid="identity-home.forget-confirm-cta"
+        >
+          {t("identityHome.forgetConfirm")}
+        </Button>
+      </div>
+    </ModalShell>
   );
 }

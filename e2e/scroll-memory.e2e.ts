@@ -395,7 +395,13 @@ describeE2E("sm2 a split keeps the reading position it was split from (myne#600)
             "return 'liveTop=' + Math.round(found.scrollTop)" +
             " + '|pos=' + (ds.scrollAnchorPos || 'none')" +
             " + '|write=' + (ds.scrollAnchorWrite || '-')" +
-            " + '|rememberTop=' + (ds.scrollAnchorTop || '-');",
+            " + '|rememberTop=' + (ds.scrollAnchorTop || '-')" +
+            " + '|ro=' + (ds.scrollRo || '-')" +
+            " + '|roW=' + (ds.scrollRoWidth || '-')" +
+            " + '|restore=' + (ds.scrollRestore || '-')" +
+            " + '|frames=' + (ds.scrollRestoreFrames || '-')" +
+            " + '|stable=' + (ds.scrollStable || '-')" +
+            " + '|applied=' + (ds.scrollAnchorApplied || '-');",
         );
         const preAnchor = await s.execute<string>(
           resolveHostJs({ needScrollable: false }) +
