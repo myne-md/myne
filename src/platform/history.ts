@@ -39,7 +39,14 @@ export type RouteName =
   // It carries nothing — the pending fact lives on disk and is re-derived on
   // every boot, so there is no session state a URL could assert.
   | "pending-approval"
-  | "restore-backup";
+  | "restore-backup"
+  /**
+   * The first run (myne-md/myne#911 task 6; table 13 gave it to the web client).
+   * Both clients reach it now: `welcome.start` on desktop, and the browser's
+   * create door on `account-entry`. On desktop `readRoute()` is always `null`, so
+   * the name is inert there; the web client parses it.
+   */
+  | "first-run";
 
 /**
  * A bookmarkable location.

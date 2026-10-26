@@ -53,6 +53,34 @@ pub(crate) fn vault_io() -> &'static dyn VaultIo {
     &myne_core::vault_io::StdVaultIo
 }
 
+/// The io the PERSON commands use (myne-md/myne#911 task 13): the same store,
+/// with the two person files held in the Worker's memory for the session.
+///
+/// A separate accessor rather than a change to [`vault_io`], because the split is
+/// the whole decision: a browser must not keep a phrase-derived keypair or a
+/// bearer token at rest (threat-model A15/TB11), while every other file the app
+/// writes must keep persisting. See `crate::person_io` for the rules and the
+/// allowlist.
+pub(crate) fn person_vault_io() -> crate::person_io::SessionPersonIo<'static> {
+    crate::person_io::SessionPersonIo::new(vault_io())
+}
+
+/// The same decorator as a `'static` reference, for the commands whose seam
+/// demands one (`sync_status`, `sync_now`; the cycle's `io` argument is
+/// `&'static dyn VaultIo` because it can outlive the call).
+///
+/// One leaked instance per thread, not one per call: the wrapper holds no
+/// handles (its own docs say so, and that is why it is `Send + Sync`-free), so a
+/// single instance is the whole state, and `Box::leak` on a per-call basis would
+/// be an unbounded leak in a command a user can press all day.
+pub(crate) fn person_vault_io_ref() -> &'static crate::person_io::SessionPersonIo<'static> {
+    thread_local! {
+        static IO: &'static crate::person_io::SessionPersonIo<'static> =
+            Box::leak(Box::new(crate::person_io::SessionPersonIo::new(vault_io())));
+    }
+    IO.with(|io| *io)
+}
+
 /// Route one command.
 ///
 /// `args` is the raw JSON payload as the page sent it, so a command that takes
@@ -1008,6 +1036,90 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // The identity-phrase door on a person-born vault (myne-md/myne#911
+        // task 13). Both halves existed in core as `*_from_host` already; what
+        // was missing was this wiring, which is why a browser could CREATE a
+        // person-wrapped vault and then have no in-page way back in with the
+        // phrase after forgetting the password.
+        //
+        // `vault_is_person_wrapped` is the probe the Unlock screen makes to
+        // decide whether to offer that door at all. It answers `false` for a
+        // missing or unreadable file rather than erroring, so a refusal here
+        // would be indistinguishable from "not a person vault", which is why
+        // it is on `capability::BOOT_PATH`'s roster.
+        "plugin:vault-unlock|vault_is_person_wrapped" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                vault_id: Option<String>,
+            }
+            let args: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::vault_unlock::commands::vault_is_person_wrapped_from_host(
+                args.vault_id,
+                host_ctx(),
+                crate::session::state(),
+                vault_io(),
+            )
+            .await
+            {
+                Ok(flag) => Outcome::ok(&flag),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        // The phrase itself. Normalized HERE rather than trusted from the
+        // caller: `protocol::normalize_user_phrase` is the one normalization all
+        // three clients share, and a caller that skipped it would derive a
+        // different person with no error anywhere. The desktop wrapper does the
+        // same, immediately above its `*_from_host` call.
+        "plugin:vault-unlock|unlock_with_person_phrase" => {
+            use myne_core::plugins::vault_unlock::commands::unlock_with_person_phrase_from_host;
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                #[serde(default)]
+                vault_id: Option<String>,
+                phrase: String,
+            }
+            let args: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            // Wrapped before it is read, for the reason the desktop wrapper states:
+            // every early return past this line drops a zeroed buffer instead of
+            // the IPC copy (myne-md/myne#911 review).
+            let phrase = zeroize::Zeroizing::new(args.phrase);
+            let normalized = protocol::normalize_user_phrase(&phrase);
+            match unlock_with_person_phrase_from_host(
+                args.vault_id,
+                (*normalized).clone(),
+                crate::session::state(),
+                crate::session::hooks(),
+                host_ctx(),
+                vault_io(),
+                myne_core::vault_label::key::platform_keychain(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&()),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         // ── notes: the read path (task 13) ──────────────────────────────────
         //
         // Read-only, so no `atomic_write` and no `note_txn` WAL — the write path
@@ -1623,9 +1735,18 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // state — `Disabled` / `NotEnrolled` / `Pending` / `Idle` — never a
         // fabricated "Syncing".
         "plugin:sync|sync_status" => {
+            // The `'static` reference, because this seam's `io` parameter is
+            // `&'static dyn VaultIo` and a local binding is not.
+            let person_io = person_vault_io_ref();
+            // `person_vault_io()`, not `vault_io()`: the status reads the person
+            // session's own two files (`person-auth.json`, the sealed keypair),
+            // which live in the Worker's memory and exist nowhere in OPFS. With
+            // the vault io the `person` half of the read answered `NotFound`,
+            // `sync_status` derived "not enrolled" and the panel hid its only
+            // manual trigger (myne-md/myne#911 review).
             match myne_core::plugins::sync::status::read_status(
                 host_ctx(),
-                vault_io(),
+                person_io,
                 crate::session::state(),
                 None,
             )
@@ -1833,9 +1954,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // matter more, not less: a user clicking "Sync now" on an unenrolled
         // browser must not see the dot go green.
         "plugin:sync|sync_now" => {
+            let person_io = person_vault_io_ref();
+            // Same seam as `sync_status` above, and the same failure: a person
+            // session's token is only visible through the person io.
             let status = myne_core::plugins::sync::cycle::sync_now_from_host(
                 host_ctx(),
-                vault_io(),
+                person_io,
                 crate::session::state(),
                 crate::session::hooks(),
                 crate::session::live_sessions(),
@@ -2178,9 +2302,44 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     }
                 }
             };
+            // The target id: the FIRST container keeps the fixed id every
+            // pre-unlock path resolves against, and each later one mints its own
+            // (myne-md/myne#911 task 13). Two vaults under one origin is what this
+            // makes possible, and the fixed id for the first is what keeps
+            // `sole_vault_id` and every sole-vault fallback meaning what they
+            // meant before. Existing installs already live at
+            // `vaults/<fixed-id>/`, which the discovery below finds, so nothing
+            // had to migrate.
+            let base = match host_ctx().app_data_dir() {
+                Ok(base) => base,
+                Err(_) => {
+                    return Outcome::error(
+                        &myne_core::plugins::vault_creation::error::AppError::Protocol(
+                            protocol::ProtocolError::InvalidVaultMeta,
+                        ),
+                    )
+                }
+            };
+            let existing =
+                myne_core::vault_registry::discover_vaults_via_io(vault_io(), &base).await;
+            let target_id = if existing.is_empty() {
+                myne_core::paths::web_single_vault_id()
+            } else {
+                myne_core::vault_id::VaultId::mint()
+            };
             match begin_with_vault_id(
+                // The browser's creation is the person path when an identity is
+                // unlocked, and the pre-change birth when there is none
+                // (myne-md/myne#911 tasks 5 and 13): the same rule the native
+                // clients follow, resolved from this client's own session.
+                myne_core::plugins::vault_creation::commands::creation_person_from_host(
+                    host_ctx(),
+                    &person_vault_io(),
+                    crate::session::state(),
+                )
+                .await,
                 a.password,
-                myne_core::paths::web_single_vault_id(),
+                target_id,
                 crate::session::creation(),
                 host_ctx(),
             )
@@ -2483,14 +2642,149 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // number, no hash bytes and no path — the DENY list `src/lib/vault-list.ts`
         // documents — because it is a constant chosen for exactly that.
         "plugin:vault-unlock|vault_list" => {
-            let rows = myne_core::plugins::vault_unlock::commands::vault_list_single_from_host(
+            // Real discovery, not a fixed id (myne-md/myne#911 task 13): the
+            // browser walks `vaults/` through the io seam, so two vaults under one
+            // origin both appear and the boot probe routes to the picker. The
+            // single-container installs this replaces already live at
+            // `vaults/<fixed-id>/`, which is exactly what the walk finds, so
+            // nothing had to migrate.
+            let rows = myne_core::plugins::vault_unlock::commands::vault_list_via_io_from_host(
                 host_ctx(),
                 vault_io(),
                 crate::session::state(),
-                myne_core::paths::web_single_vault_id(),
             )
             .await;
             Outcome::ok(&rows)
+        }
+
+        // ── the person plane (myne-md/myne#911 task 13) ─────────────────────
+        //
+        // The identity is created, registered and held in the Worker's session,
+        // and every command here reads and writes through `person_vault_io()`
+        // rather than `vault_io()`: the two person files live in the Worker's
+        // MEMORY, never in OPFS (`crate::person_io`), because an origin's storage
+        // is readable by any script on that origin and a phrase-derived keypair
+        // at rest there is an offline cracking target no password change rotates
+        // (threat-model A15/TB11, A18). Everything else, including
+        // `sync-config.json` and `legal-consent.json` in the same directory, keeps
+        // persisting.
+        //
+        // The MEMBER half of this plugin stays refused (`memberSharing`, absent on
+        // web): invites, the roster, member names and the device-binding map all
+        // need a group key and a signed roster this client does not carry. Its
+        // command cores are `#[cfg(not(target_arch = "wasm32"))]` inside
+        // `person_account` for exactly that reason.
+        "plugin:sync|sync_person_status" => {
+            match myne_core::plugins::sync::person_account::person_status_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+            )
+            .await
+            {
+                Ok(view) => Outcome::ok(&view),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+        "plugin:sync|sync_person_setup" => {
+            let phrase = args
+                .get("phrase")
+                .and_then(|v| v.as_str())
+                .map(str::to_owned);
+            match myne_core::plugins::sync::person_account::person_setup_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+                phrase,
+            )
+            .await
+            {
+                Ok(view) => Outcome::ok(&view),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+        "plugin:sync|sync_person_account_number" => {
+            match myne_core::plugins::sync::person_account::person_account_number_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+            )
+            .await
+            {
+                Some(number) => Outcome::ok(&number),
+                None => Outcome::ok(&None::<String>),
+            }
+        }
+        "plugin:sync|sync_person_register" => {
+            let phrase = args
+                .get("phrase")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            match myne_core::plugins::sync::person_account::person_register_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+                phrase,
+            )
+            .await
+            {
+                Ok(view) => Outcome::ok(&view),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+        "plugin:sync|sync_person_join_device" => {
+            let person_id = args
+                .get("personIdHex")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            let endpoint = args
+                .get("endpointUrl")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            let phrase = args
+                .get("phrase")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_owned();
+            match myne_core::plugins::sync::person_account::person_join_device_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+                person_id,
+                endpoint,
+                phrase,
+            )
+            .await
+            {
+                Ok(view) => Outcome::ok(&view),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+        "plugin:sync|sync_person_claim_device" => {
+            match myne_core::plugins::sync::person_account::person_claim_device_from_host(
+                host_ctx(),
+                &person_vault_io(),
+                crate::session::state(),
+            )
+            .await
+            {
+                Ok(view) => Outcome::ok(&view),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+        "plugin:sync|sync_person_list_vaults" => {
+            match myne_core::plugins::sync::person_discovery::list_person_vaults(
+                host_ctx(),
+                &person_vault_io(),
+            )
+            .await
+            {
+                Ok(rows) => Outcome::ok(&rows),
+                Err(e) => Outcome::error(&e),
+            }
         }
 
         // ── sync: keep-both conflict staging ────────────────────────────────

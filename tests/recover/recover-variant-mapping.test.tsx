@@ -78,7 +78,7 @@ function mockA8d(error: VaultRecoveryError | null): void {
     switch (cmd) {
       case "plugin:vault-unlock|vault_list":
         return Promise.resolve([
-          { id: "00000000-0000-7000-8000-00000000000a", status: { kind: "Exists" }, label: null, last_unlock: null },
+          { id: "00000000-0000-7000-8000-00000000000a", status: { kind: "Exists" }, label: null, icon: null, last_unlock: null, published: false },
         ]);
       case "plugin:vault-recover|recover_with_phrase":
         return error ? Promise.reject(error) : Promise.resolve(undefined);

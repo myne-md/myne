@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
-// The two platform caveats owed by any screen that shows a once-only secret and
-// offers to copy it.
+// The three platform caveats owed by any screen that shows a once-only secret
+// and offers to copy it.
 //
 // Both are chosen off `has(...)` rather than written once, and that is a
 // `recovery-flow.md` §2.2 requirement as amended 2026-08-15: a client may not
@@ -31,9 +31,25 @@ const CAVEAT_STYLE: CSSProperties = {
 export interface SecretDisplayCaveatsProps {
   /** Testid stem: `<stem>-clipboard-notice` and `<stem>-extension-notice`. */
   testIdPrefix: string;
+  /**
+   * The secret's lifetime, for the one caveat that is about it rather than about
+   * the platform.
+   *
+   * `identity` (the default) is the account's phrase on the identity plane, which
+   * a client without `personCredentialPersisted` asks for again after every
+   * reload. `vault` is a vault's own recovery phrase, which is never requested
+   * again on any client, so the session caveat would assert a platform fact that
+   * is false for it. Defaulting to `identity` keeps the identity surfaces
+   * unchanged; a vault kit must pass `vault` explicitly (myne-md/myne#911
+   * review).
+   */
+  secret?: "identity" | "vault";
 }
 
-export function SecretDisplayCaveats({ testIdPrefix }: SecretDisplayCaveatsProps) {
+export function SecretDisplayCaveats({
+  testIdPrefix,
+  secret = "identity",
+}: SecretDisplayCaveatsProps) {
   const { t } = useTranslation();
   return (
     <>
@@ -45,6 +61,21 @@ export function SecretDisplayCaveats({ testIdPrefix }: SecretDisplayCaveatsProps
       {!has("screenCaptureProtection") && (
         <p data-testid={`${testIdPrefix}-extension-notice`} style={CAVEAT_STYLE}>
           {t("vaultCreation.phrase.extensionNotice")}
+        </p>
+      )}
+      {/*
+        The third caveat, and the one the person account added
+        (myne-md/myne#911 task 13). On a client that does not persist the person
+        credential, the phrase is asked for again after every reload: that is the
+        price of keeping no phrase-derived keypair in an origin's storage, and a
+        screen that shows the words without saying so would let a user conclude
+        the browser remembers them. Keyed on the capability rather than on the
+        platform, so a native client (which DOES keep the sealed keypair) renders
+        nothing here.
+      */}
+      {secret === "identity" && !has("personCredentialPersisted") && (
+        <p data-testid={`${testIdPrefix}-session-notice`} style={CAVEAT_STYLE}>
+          {t("vaultCreation.phrase.sessionOnlyNotice")}
         </p>
       )}
     </>

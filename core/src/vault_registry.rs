@@ -164,6 +164,60 @@ pub fn discover_vaults(base: &Path) -> Vec<DiscoveredVault> {
     found
 }
 
+/// The **io-seam twin** of [`discover_vaults`] (myne-md/myne#911 task 13).
+///
+/// The same walk and the same classification, expressed through [`VaultIo`]
+/// instead of `std::fs`, so a client whose storage is not a filesystem can
+/// discover its own containers. The web client is the reason it exists: its
+/// container is OPFS, `std::fs::read_dir` cannot run on `wasm32` at all, and
+/// before this the browser resolved a single FIXED vault id instead of looking
+/// for what was there.
+///
+/// **What differs from [`discover_vaults`], stated rather than left to be
+/// found:** well-formedness here is "carries a readable `vault.meta`", while the
+/// native walk additionally requires `vault_artifacts_present` (any note,
+/// attachment or singleton at all) before it looks for the meta. The native rule
+/// is the stricter one and it needs a directory walk of its own; the seam-level
+/// rule matches what the web's single-vault projection already answered
+/// (`vault_list_single_from_host`), so a browser's `Exists`/`Corrupted` split is
+/// unchanged by this landing.
+///
+/// A missing `vaults/` directory is an EMPTY result, never an error: discovery
+/// never fails on a fresh install.
+pub async fn discover_vaults_via_io(
+    io: &dyn crate::vault_io::VaultIo,
+    base: &Path,
+) -> Vec<DiscoveredVault> {
+    let vaults_dir = base.join(VAULTS_DIR_NAME);
+    let Ok(entries) = io.read_dir(&vaults_dir).await else {
+        return Vec::new();
+    };
+    let mut found = Vec::new();
+    for entry in entries {
+        if !entry.is_dir {
+            continue;
+        }
+        let Some(id) = VaultId::parse(&entry.name).ok() else {
+            // Not a `vaults/<id>/` directory (stray scratch dir, etc.).
+            continue;
+        };
+        let root = vaults_dir.join(&entry.name);
+        let well_formed = io
+            .exists(&root.join(VAULT_META_FILE_NAME))
+            .await
+            .unwrap_or(false);
+        found.push(DiscoveredVault {
+            id,
+            root,
+            well_formed,
+        });
+    }
+    // Deterministic ordering by opaque id, matching the sync walk so the two
+    // cannot disagree about the order of the same set.
+    found.sort_by_key(|a| a.id);
+    found
+}
+
 /// A discovered `vaults/<id>/` is well-formed when it carries a readable
 /// `vault.meta`. Reuses the [`vault_artifacts_present`] taxonomy predicate as
 /// the "is there a vault here at all" check, then narrows to the canonical
@@ -978,5 +1032,91 @@ mod tests {
             !tmp.path().join(VAULTS_DIR_NAME).exists(),
             "the sweep must not create vaults/"
         );
+    }
+}
+
+#[cfg(test)]
+mod io_discovery_tests {
+    //! `discover_vaults_via_io` (myne-md/myne#911 task 13): the walk a client
+    //! whose storage is not a filesystem uses to find its own containers.
+    //!
+    //! The real thing runs over OPFS in a browser, which no test here can
+    //! stand up. What IS testable is the rule, and it is the rule that matters:
+    //! which entries count, which are ignored, and how a container with no
+    //! `vault.meta` is classified.
+
+    use super::*;
+    use crate::test_support::block_on;
+    use crate::test_support::ScopedTempDir;
+    use crate::vault_io::StdVaultIo;
+
+    /// Two containers under one root: the state this task exists for. Before it,
+    /// the web client answered a single FIXED id and could not see a second.
+    #[test]
+    fn two_containers_are_both_discovered() {
+        block_on(async {
+            let dir = ScopedTempDir::new("registry-io-two").expect("tempdir");
+            let base = dir.path();
+            let first = {
+                let id = VaultId::mint();
+                let root = base.join(VAULTS_DIR_NAME).join(id.to_string());
+                std::fs::create_dir_all(&root).expect("dir");
+                std::fs::write(root.join("vault.meta"), b"meta").expect("meta");
+                id
+            };
+            let second = {
+                let id = VaultId::mint();
+                let root = base.join(VAULTS_DIR_NAME).join(id.to_string());
+                std::fs::create_dir_all(&root).expect("dir");
+                std::fs::write(root.join("vault.meta"), b"meta").expect("meta");
+                id
+            };
+
+            let found = discover_vaults_via_io(&StdVaultIo, base).await;
+            assert_eq!(found.len(), 2, "both containers must be discovered");
+            let ids: Vec<_> = found.iter().map(|d| d.id).collect();
+            assert!(ids.contains(&first) && ids.contains(&second));
+            assert!(
+                found.iter().all(|d| d.well_formed),
+                "a container with a vault.meta is well formed"
+            );
+        });
+    }
+
+    /// A container with no `vault.meta` is DISCOVERED and flagged, never
+    /// dropped: the picker has to be able to show it as `Corrupted` rather than
+    /// pretend the user's vault does not exist.
+    #[test]
+    fn a_container_without_meta_is_discovered_but_not_well_formed() {
+        block_on(async {
+            let dir = ScopedTempDir::new("registry-io-corrupt").expect("tempdir");
+            let base = dir.path();
+            let id = VaultId::mint();
+            std::fs::create_dir_all(base.join(VAULTS_DIR_NAME).join(id.to_string())).expect("dir");
+
+            let found = discover_vaults_via_io(&StdVaultIo, base).await;
+            assert_eq!(found.len(), 1);
+            assert!(!found[0].well_formed);
+        });
+    }
+
+    /// Entries that are not `vaults/<id>/` are ignored, and a fresh install is
+    /// an empty result rather than an error.
+    #[test]
+    fn stray_entries_and_a_missing_root_are_empty_not_errors() {
+        block_on(async {
+            let dir = ScopedTempDir::new("registry-io-stray").expect("tempdir");
+            let base = dir.path();
+            // No `vaults/` at all.
+            assert!(discover_vaults_via_io(&StdVaultIo, base).await.is_empty());
+
+            let vaults = base.join(VAULTS_DIR_NAME);
+            std::fs::create_dir_all(vaults.join("not-an-id")).expect("dir");
+            std::fs::write(vaults.join("loose-file"), b"x").expect("file");
+            assert!(
+                discover_vaults_via_io(&StdVaultIo, base).await.is_empty(),
+                "a stray directory and a loose file are not vaults"
+            );
+        });
     }
 }

@@ -39,6 +39,18 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   "screenCaptureProtection",
   // Legacy single-vault layout never existed in OPFS.
   "vaultMigration",
+  // The person identity is SESSION-only on this client (myne-md/myne#911 task
+  // 13): the two person files (the sealed keypair and the device token) live in
+  // the Worker's memory, so a reload asks for the 24 words again. An origin's
+  // storage is readable by any script on that origin, and a phrase-derived
+  // keypair at rest there is an offline cracking target that no password change
+  // rotates. What this absence changes is COPY, not a control: the phrase step
+  // says the words are asked for again on reload.
+  //
+  // `personVaultCredential` and `personIdentity` are NOT here any more: the web
+  // person plane dispatches, so the unlock screen's identity-phrase arm and the
+  // identity row are offers the commands answer.
+  "personCredentialPersisted",
   // Owner decision, 2026-07-27 (task 72). Repair scans a vault DIRECTORY for
   // orphan artefacts — a thing that exists because a desktop directory is
   // writable by other software. An OPFS container has exactly one writer, and
@@ -83,7 +95,7 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // The sandboxed editor for the user's own on-disk files (myne-md/myne#788).
   // A page has no OS file ingress, no native open dialog and no handler
   // registration, and the surface exists to be independent of vault state in a
-  // way a browser session (one vault per origin, sync required) is not. The
+  // way a browser session (vault-scoped, sync required) is not. The
   // whole `plain-file` plugin is `Class::Unsupported` in `capability.rs`; this
   // entry is the other half of that decision, so a menu or palette entry can
   // never be offered against commands that refuse.
@@ -170,13 +182,12 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // block is omitted rather than greyed. Absent by platform fact, not by
   // decision: there is nothing to port.
   "cliAccess",
-  // myne-md/myne#411. Two halves, and both are missing. The picker is what a
-  // cached name exists to label, and there is no locked picker here: an origin
-  // holds exactly one container, which is why `check-web-screens.mjs` records
-  // `VaultPicker.tsx` as `excluded`. And the `MYL1` store is sealed under an OS
-  // keychain `wrap_key`, which a page does not have. So the Privacy row is
-  // omitted rather than rendered against three commands that reject: its
-  // subject does not exist here.
+  // myne-md/myne#411. The picker is what a cached name exists to label, and it
+  // now SHIPS here (`check-web-screens.mjs` records `VaultPicker.tsx` as
+  // `ported` since myne-md/myne#911 task 13). What is still missing is the
+  // carrier: the `MYL1` store is sealed under an OS keychain `wrap_key`, which a
+  // page does not have. So the Privacy row is omitted rather than rendered
+  // against three commands that reject: the store it governs cannot exist here.
   //
   // The ENCRYPTION is not what is absent, and the distinction matters the same
   // way it does for `spellCheck` and `MYD1`: `MYL1` is unchanged, and on
@@ -190,16 +201,18 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // tunnel would be, which is Tor Browser (docs, task 12). The Developer
   // Options block is omitted here rather than greyed.
   "torRouting",
-  // myne-md/myne#684: the account/vault split. A browser holds exactly one
-  // vault per origin and has no OS keychain, so there is no grouping to render
-  // and nowhere to keep the wrap key whose seal is the account record. The
-  // picker grouping UI is omitted rather than rendered against commands that
-  // reject.
+  // myne-md/myne#684: the account/vault split. A browser can hold two containers
+  // under one origin since myne-md/myne#911 task 13, so the obstacle is not the
+  // count: the account record is sealed with a wrap key kept in an OS keychain,
+  // and a page has none. The picker renders the rows standalone instead of
+  // failing the list, and the grouping UI is omitted rather than rendered
+  // against commands that reject.
   "accountGrouping",
   // The B2B member surface: the person identity's sealed file lives outside
-  // browser storage, and the panel's recovery-phrase prompt is substituted out
-  // of the served bundle. The
-  // phrase is not an enrolment credential in served code.
+  // browser storage, and the panel's recovery-phrase prompt stays out of served
+  // code by capability rather than by build-time substitution (retired by
+  // `decisions.md` 2026-10-18, entry 0704). The phrase is not an enrolment
+  // credential here.
   "memberSharing",
   // myne#173. A pop-out is a second host-spawned OS window. A browser page has
   // one tab context and cannot open an OS window a viewer would read as another
@@ -219,14 +232,15 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // sentence keeps and because the browser is where a user cannot open a
   // devtools panel and read a failure back.
   "diagnosticLog",
-  // Live-collab, `SYNC-31`. Multi-user co-editing needs a PERSON identity: the
-  // B2B group substrate, the roster and the member removal rekey, all held in a
+  // Live-collab, `SYNC-31`. Multi-user co-editing needs the B2B member plane:
+  // the group substrate, the roster and the member removal rekey, held in a
   // device-local sealed file outside browser storage whose panel prompt is
-  // substituted out of the bundle. A browser origin cannot hold a person
-  // identity, so this is absent for the same reasons `memberSharing` is. Split
-  // from `liveCollabPeerPresence`, which stays PRESENT here, so the client is
-  // not second-class for its own devices while never implying multi-user works
-  // in a page. Omitted, not greyed.
+  // refused in the served bundle. A browser can hold a person identity for the
+  // session (myne-md/myne#911 task 13, which made `personIdentity` present
+  // here), but it cannot hold the member half, so this is absent for the same
+  // reasons `memberSharing` is. Split from `liveCollabPeerPresence`, which stays
+  // PRESENT here, so the client is not second-class for its own devices while
+  // never implying multi-user works in a page. Omitted, not greyed.
   //
   // No command surface of its own: the transport exposes wasm exports, not an
   // IPC command, and the person/membership commands it would depend on are

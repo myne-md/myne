@@ -3943,7 +3943,6 @@
         "ribbon": "vasen nauha kisko kiinnitä pin komento komennot mukauta järjestä irrota työkalupalkki pikanäppäimet",
         "folderNotes": "kansio muistiinpano indeksi folder_index laskeutumissivu kaksoisnapsautus kansiolinkki projektit pois poista käytöstä",
         "syncMembers": "jäsenet, jaa, kutsu, tiimi, yhteistyö, valtiointi",
-        "accountName": "tilin nimi ryhmä ryhmittely nimeä uudelleen nimike laite paikallinen",
         "accountVaults": "tili holvit ryhmitelty mitkä holvit kuuluvat ryhmä luettelo",
         "aiMeetingPrompt": "kokous tiivistelmä kehote ohje mukautettu litterointi toimenpiteet päätökset",
         "update": "päivitys päivitä tarkista päivitykset uusi versio julkaisu lataa",
@@ -4025,14 +4024,10 @@
       "atCap": "Luettelo on täynnä, joten uutta ei voi muistaa. Poista merkintä tehdäksesi tilaa."
     },
     "account": {
-      "nameLabel": "Tilin nimi",
-      "nameHelper": "Nimi tälle holvien ryhmälle tällä laitteella. Holvivalitsin käyttää sitä ryhmän otsikkona. Se pysyy tällä laitteella eikä sitä tallenneta koskaan holvin sisään, joten se ei synkronoidu, ja toinen laite voi ryhmitellä ja nimetä samat holvit eri tavalla.",
-      "namePlaceholder": "Lisää nimi…",
-      "nameSave": "Tallenna",
-      "nameSaving": "Tallennetaan…",
       "vaultsLabel": "Tämän tilin holvit",
       "vaultsHelper": "Holvit, jotka tämä laite ryhmittelee yllä olevan nimen alle. Ryhmittely on laitekohtainen järjestelyvalinta, joten se ei ole osa minkään holvin sisältöä eikä kulje sen mukana.",
-      "vaultsCount": "{{count}} holvia",
+      "vaultsCount_one": "{{count}} holvia",
+      "vaultsCount_other": "{{count}} holvia",
       "currentVault": "Tämä holvi",
       "unknownVault": "Toinen holvi tällä laitteella",
       "standaloneHelper": "Tätä holvia ei ole ryhmitelty tilin alle tällä laitteella, joten se on oma erillinen kokonaisuutensa. Ryhmittely on laitekohtaista: toinen laite voi näyttää sen jonkin ryhmän sisällä.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Nimet voidaan asettaa, kun tämä holvi on jaettu.",
       "nameErrorLocked": "Avaa holvi vaihtaaksesi nimesi.",
       "nameErrorGeneric": "Nimeäsi ei voitu tallentaa. Yritä uudelleen.",
-      "nameInvite": "Sinulla ei ole vielä näyttönimeä. Muut jäsenet näkevät sormenjälkesi.",
       "nameInviteCta": "Aseta nimi",
-      "nameInviteDismiss": "Ei nyt",
       "noInvitations": "Ei vielä lähetettyjä kutsuja.",
       "identityHeading": "Identiteettisi",
       "membersHeading": "Jäsenet",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Palautuslause — jos unohdat salasanasi",
       "save": "Tallenna palautuspaketti",
       "saveFailed": "Tiedostoa ei voitu tallentaa. Kopioi paketti sen sijaan tai kirjoita molemmat osat ylös.",
-      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joka sisältää molemmat salaisuudet, joten pidä se paikassa, josta vain sinä voit lukea sen.",
-      "whyEnglish": "Sanat ovat englanniksi kaikilla kielillä. Ne ovat osa BIP-39-standardia, joten mikä tahansa Myne-asiakasohjelma voi lukea toisen kirjoittaman lauseen. Älä käännä niitä: käännetyt sanat eivät ole sanalistassa, ja lause lakkaisi toimimasta."
+      "savedToFile": "Tallennettu. Se on pelkkä tekstitiedosto, joka sisältää molemmat salaisuudet, joten pidä se paikassa, josta vain sinä voit lukea sen."
     },
     "name": {
       "back": "Takaisin",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Tili",
     "moveToAccount": "Siirry tilille…",
     "moveToNewAccount": "Siirry uudelle tiliin",
-    "renameAccount": "Nimeä tili uudelleen",
     "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
     "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
-    "labelTooLong": "Nimi on liian pitkä. Pidä se alle 512 merkkiä.",
-    "renameCancel": "Peruuta",
-    "renamePlaceholder": "Tilin nimi",
-    "renameSave": "Nimeä",
     "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu.",
     "createShort": "Uusi holvi",
     "joinShort": "Lisää laite",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Keskeytyneestä poistosta jääneitä tiedostoja ({{n}}). Siivoa ne ennen holvin luomista.",
     "cleanUpFiles": "Siivoa jäljelle jääneet tiedostot",
     "connect": "Yhdistä tiliini",
-    "startIdentity": "Luo identiteetti",
-    "startLocal": "Luo sen sijaan paikallinen holvi",
     "tagline": "Salattuja markdown-muistiinpanoja. Ei sähköpostia rekisteröityessä.",
-    "identityTitle": "Luo identiteetti",
-    "identityBody": "Yksi identiteetti kaikille holvillesi, jotta ihmiset voivat kutsua sinut. Vaatii synkronointipalvelimen.",
-    "localTitle": "Luo paikallinen holvi",
-    "localBody": "Salattu holvi tällä laitteella. Lisää synkronointi tai identiteetti myöhemmin.",
     "restoreTitle": "Palauta varmuuskopiosta",
     "restoreBody": "Avaa aiemmin tallentamasi .myne-backup-tiedosto.",
     "joinTitle": "Lisää tämä laite tilille",
     "joinBody": "Käytä holvia, joka sinulla on jo toisella laitteella.",
-    "createAction": "Luo",
     "restoreAction": "Palauta",
     "joinAction": "Lisää laite",
     "version": "Versio {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "avattu {{count}} vuotta sitten",
     "corruptedBadge": "Vioittunut",
     "accountFallback": "Tili",
-    "renameAccount": "Nimeä tili uudelleen",
     "moveToNewAccount": "Siirry uudelle tiliin",
     "moveToAccount": "Siirry tilille…",
     "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
     "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
-    "labelTooLong": "Nimi on liian pitkä. Pidä se alle 512 merkkiä.",
-    "renameCancel": "Peruuta",
-    "renamePlaceholder": "Tilin nimi",
-    "renameSave": "Nimeä",
     "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identiteetti palautettu.",
     "title": "Luo identiteetti",
     "errorAlreadyHeld": "Tällä laitteella on jo identiteetti. Palauta se sen palautuslauseella tai unohda se ja luo uusi.",
-    "errorNotConfigured": "Identiteettiä ei voitu määrittää. Tarkista, että synkronointipalvelin on määritetty, ja yritä sitten uudelleen.",
     "forgetCancel": "Säilytä se",
     "forgetConfirm": "Unohda ja luo uusi",
     "forgetCta": "Unohda tämä identiteetti ja luo uusi",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Palauta se tällä laitteella sen 24-sanaisella palautuslauseella.",
     "recoverAction": "Palauta",
     "back": "Takaisin",
-    "changeServer": "Vaihda tai vahvista synkronointipalvelin",
-    "errorTlsFailure": "Palvelimen HTTPS-varmennetta ei voitu varmistaa. Tarkista palvelimen osoite ja sen varmenne.",
     "phraseTitle": "Tallenna identiteettilauseesi",
     "phraseContinue": "Jatka",
     "confirmTitle": "Vahvista lauseesi"
@@ -5509,15 +5481,6 @@
       "hint": "Uudelleen yrittäminen aloittaa latauksen alusta.",
       "retry": "Yritä uudelleen",
       "back": "Takaisin avaamiseen"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Valitse synkronointipalvelin",
-      "intro": "Myne tarvitsee palvelimen säilyttääkseen salatut muistiinpanosi ja tavoittaakseen sinut kutsuja varten. Muistiinpanosi pysyvät salattuina tällä laitteella ennen kuin ne lähtevät; palvelin tallentaa vain salatekstiä.",
-      "notConfigured": "Syötä palvelimen osoite ylle ja paina Yhdistä jatkaaksesi.",
-      "back": "Takaisin",
-      "continue": "Jatka"
     }
   },
   "identityFlow": {

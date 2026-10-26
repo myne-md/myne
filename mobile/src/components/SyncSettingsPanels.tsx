@@ -322,9 +322,17 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
           <Group>
             {plane === "owner" && (
               <Row first testId="sync.usage-storage">
-                <span style={rowLabel}>{t("sync.usage.storage")}</span>
+                <span style={rowLabel}>
+                  {usage.person === true
+                    ? t("sync.usage.storageAcrossVaults")
+                    : t("sync.usage.storage")}
+                </span>
                 <span style={usageValue}>
-                  {usage.quota_bytes === 0
+                  {/* A person total is a SUM over several vaults and its ceiling
+                      is reported, not enforced (myne-md/myne#911 task 11), so it
+                      renders as a bare figure: no "of <total>" comparison, which
+                      would name a ceiling no single vault is judged against. */}
+                  {usage.person === true || usage.quota_bytes === 0
                     ? formatBytes(usage.stored_bytes)
                     : t("sync.usage.ofTotal", {
                         used: formatBytes(usage.stored_bytes),
@@ -1180,6 +1188,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
           ))}
         </Group>
       )}
+
     </div>
   );
 }

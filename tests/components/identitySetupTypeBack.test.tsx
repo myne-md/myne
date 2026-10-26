@@ -19,7 +19,7 @@
 // the rendered fields rather than hardcoding them, which is also what makes the
 // test survive a change to the draw.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personSetup = vi.hoisted(() => vi.fn());
@@ -221,7 +221,12 @@ describe("IdentitySetupDialog two-step ceremony (myne-md/myne#869)", () => {
     expect(onClose).not.toHaveBeenCalled();
     clickBackdrop();
     expect(onClose).not.toHaveBeenCalled();
-    expect(screen.queryByTestId("identity-setup.root-close")).toBeNull();
+    // The × goes a frame later than the phrase: a parent renders before its
+    // children, so the frame cannot see the panel's own facts in the commit
+    // that mounts them. AWAITED rather than asserted synchronously, and the
+    // refusal does not depend on it: `IdentitySetupDialog.close` re-checks the
+    // live gate, so a click in that frame is a no-op rather than an escape.
+    await waitFor(() => expect(screen.queryByTestId("identity-setup.root-close")).toBeNull());
 
     // Revealing the words does not open the door either. Only the four
     // matching words do (myne-md/myne#855's demonstration, #869's gate).

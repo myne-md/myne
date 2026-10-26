@@ -22,3 +22,16 @@ serde_json = "1"
 # no new supply-chain surface, just a direct edge to a version already
 # resolved in `Cargo.lock`.
 dirs = "6"
+
+[target.'cfg(windows)'.dependencies]
+# The named-pipe transport for the desktop's CLI door. Pure-Rust bindings to the
+# five calls it needs, no system-lib build script — the same posture as
+# `src-tauri`'s own `windows-sys` promotion, and the reason no IPC crate is
+# pulled in: this is a trust-boundary path and the surface stays reviewable.
+windows-sys = { version = "0.60", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+] }

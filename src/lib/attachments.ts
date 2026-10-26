@@ -1,9 +1,9 @@
 // Tauri IPC wrappers for the `attachments` plugin (MYND-169 / MYND-170).
 //
 // Mirrors the Rust DTOs + error enums in:
-//   - src-tauri/src/plugins/attachments/commands.rs (ImportSource,
+//   - core/src/plugins/attachments/commands.rs (ImportSource,
 //     ImportedAttachment, CatalogEntry, attachment_rename)
-//   - src-tauri/src/plugins/attachments/error.rs    (AttachmentImportError,
+//   - core/src/plugins/attachments/error.rs    (AttachmentImportError,
 //     CatalogListError, AttachmentDeleteError, AttachmentRenameError)
 //
 // No mock layer (src/AGENTS.md "Tauri command bindings") — the real

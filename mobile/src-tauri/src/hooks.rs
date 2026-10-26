@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Mobile implementation of [`myne_core::hooks::VaultLifecycleHooks`].
 //!
-//! Mobile carries few of the desktop-only side-effect subsystems (search,
-//! spell, workspace, … are still absent), so most hooks are no-ops — the same
-//! shape as `myne_core::hooks::NoopHooks`.
+//! Mobile carries none of the desktop-only side-effect subsystems (spell,
+//! backup, importer, clipper pairing), so most hooks are no-ops — the same
+//! shape as `myne_core::hooks::NoopHooks`. The search, workspace and themes
+//! plugins that do exist here are driven by their own commands.
 //!
 //! The two exceptions wire the **snapshots** subsystem, which lives entirely in
 //! `myne-core` (`snapshot_store` + `snapshot_policy`, no desktop dependency):

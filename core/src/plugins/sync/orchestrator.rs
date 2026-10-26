@@ -929,11 +929,11 @@ fn read_dictionary_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
 /// `themes_sync_id` archetype.
 ///
 /// It cannot go through [`shared_sync_id`], and the reason is worth stating: this
-/// family is `NTV6`-only and has **no `SubkeyRole` counterpart** (there is no
-/// pre-B2B form to derive a root-tier id for), so `SubkeyRole::shared_group_role`
-/// has no arm to map and a `SubkeyRole` argument would not typecheck. `None` is
-/// therefore the whole pre-B2B answer: an `OwnerRoot` session has no such blob and
-/// the phase stands down, exactly as the command layer answers
+/// family exists only on a vault that HAS a group tier, and it has **no `SubkeyRole`
+/// counterpart** (there is no pre-B2B form to derive a root-tier id for), so
+/// `SubkeyRole::shared_group_role` has no arm to map and a `SubkeyRole` argument would
+/// not typecheck. `None` is therefore the whole pre-B2B answer: an `OwnerRoot` session
+/// has no such blob and the phase stands down, exactly as the command layer answers
 /// `NotASharedVault`.
 fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
     let group = shared.group_bytes()?;
@@ -942,8 +942,9 @@ fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
 
 /// The member-names blob's sync discriminator (`read_singleton_nonce` over MYO5).
 ///
-/// `MYO5` is this family's ONE generation: it is born `NTV6`-only, so there is no
-/// `MYO1` form and no later `MY?5` generation to accept beside it. That is why the
+/// `MYO5` is this family's ONE generation: it exists only on a vault with a group
+/// tier, so there is no `MYO1` form and no later `MY?5` generation to accept beside
+/// it. That is why the
 /// `later` list is empty here and not because one was forgotten, which is the shape
 /// `check-crypto-registries.mjs` rule 5 exists to catch: `MEMBER_NAMES_BLOB_MAGIC` is
 /// deliberately off the `_V<n>_<m>_MAGIC` pattern, so the family has no later magic
@@ -963,7 +964,8 @@ fn device_bindings_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
 
 /// The device-binding blob's sync discriminator (`read_singleton_nonce` over MYU5).
 ///
-/// `MYU5` is this family's ONE generation, born `NTV6`-only exactly as `MYO5` is: there
+/// `MYU5` is this family's ONE generation, existing on every vault with a group tier
+/// exactly as `MYO5` does: there
 /// is no `MYU1` form and no later `MY?5` generation to accept beside it. The `later`
 /// list is empty because there is nothing to name, not because one was forgotten, which
 /// is the shape `check-crypto-registries.mjs` rule 5 exists to catch;
@@ -3683,7 +3685,8 @@ impl MemberNamesPhase {
 /// `sync_themes_phase` twin. Three things differ, and each is dictated by the family
 /// rather than chosen here:
 ///
-/// 1. **It is `NTV6`-only.** The store is group-sealed and its AAD binds the group
+/// 1. **It needs the group tier, which both tail generations carry.** The store is
+///    group-sealed and its AAD binds the group
 ///    epoch, so a pre-B2B `OwnerRoot` session has neither, and the phase answers
 ///    [`MemberNamesPhase::idle`] without a byte of traffic. The command layer answers
 ///    `NotASharedVault` for the same vault.
@@ -3711,8 +3714,8 @@ async fn sync_member_names_phase(
     names_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
 ) -> Result<MemberNamesPhase, SyncCycleError> {
-    // NTV6-only: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK
-    // to derive and no blob to address.
+    // No group tier: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK
+    // to derive and no blob to address. `NTV6` and `NTV7` both carry it.
     let Some(group) = shared.group_bytes() else {
         return Ok(MemberNamesPhase::idle());
     };
@@ -3910,8 +3913,9 @@ impl DeviceBindingsPhase {
 
 /// Pull-side `vault.device-bindings` reconciliation, the `sync_member_names_phase` twin.
 ///
-/// Every structural decision is the same as its sibling's and for the same reasons: it is
-/// `NTV6`-only (the store is group-sealed and its AAD binds the epoch); the KEK and its
+/// Every structural decision is the same as its sibling's and for the same reasons: it needs
+/// the group tier, which both tail generations carry (the store is group-sealed and its AAD
+/// binds the epoch); the KEK and its
 /// two bindings come from the family's own resolver, which reads `vault.meta` once for the
 /// account hash AND the epoch; a pulled copy that does not decode is refused rather than
 /// merged as empty, because `merge(local, empty) == local` would discard a peer's claim
@@ -3938,8 +3942,8 @@ async fn sync_device_bindings_phase(
     bindings_id: &[u8; 16],
     remote_record: Option<&ChangedBlob>,
 ) -> Result<DeviceBindingsPhase, SyncCycleError> {
-    // NTV6-only: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK to
-    // derive and no blob to address.
+    // No group tier: a pre-B2B `OwnerRoot` session holds no group key, so there is no KEK to
+    // derive and no blob to address. `NTV6` and `NTV7` both carry it.
     let Some(group) = shared.group_bytes() else {
         return Ok(DeviceBindingsPhase::idle());
     };
@@ -4483,33 +4487,52 @@ pub(crate) async fn sync_meta_phase(
     let local_changed = dirty || (baseline.is_some() && baseline != Some(local_hash.as_str()));
     let server_changed = baseline.is_none() || baseline != Some(server_hash.as_str());
 
-    // NTV6 branch (B2B, myne-md/myne#711 task 13). An `NTV6` `vault.meta`
-    // carries a B2B tail OUTSIDE `VaultMeta` (the owner-wrapped group key, the
-    // group-key epoch and the signed roster), so it is NEVER re-serialized from
-    // the parsed `VaultMeta`: only a VERBATIM write of one side's bytes is safe
-    // (`serialize_vault_meta_v0_2` would drop the tail and downgrade the vault).
+    // B2B/person branch (myne-md/myne#711 task 13, extended to the third
+    // generation by the myne-md/myne#911 review). An `NTV6` or `NTV7`
+    // `vault.meta` carries the B2B tail OUTSIDE `VaultMeta` (the owner-wrapped
+    // group key, the group-key epoch and the signed roster), so it is NEVER
+    // re-serialized from the parsed `VaultMeta`: only a VERBATIM write of one
+    // side's bytes is safe (`serialize_vault_meta_v0_2` would drop the tail).
     //
-    // The epoch rule: a strictly-greater server epoch is adopted; a lower one is
-    // a rollback and is refused; equal epochs must agree, and at equal epoch the
-    // server may still carry a newer roster (an invite writes the roster at the
-    // SAME epoch), so a server-only change is adopted too. A concurrent change at
-    // the same epoch cannot be tie-broken and is refused. A MEMBER device (no
-    // `root_key`) adopts but never writes `vault.meta`.
-    let is_ntv6 = |b: &[u8]| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice());
-    let local_is_ntv6 = is_ntv6(&local_bytes);
-    let server_is_ntv6 = is_ntv6(&server_bytes);
-    if local_is_ntv6 || server_is_ntv6 {
+    // **The generation comparison is ordered, not a magic test, and that is the
+    // review's first finding.** `magic == NTV6` classified an `NTV7` frame as
+    // "older than B2B", so a server still holding `NTV6` was ADOPTED over it
+    // verbatim (the person wrap gone, the password the only credential left),
+    // and the mirror arm pushed local `NTV6` over a server `NTV7` (the only
+    // person wrap deleted server-side). Both were ordinary cycles, and the
+    // second silently reversed an upgrade the spec calls irreversible.
+    // `protocol::vault_meta_generation` orders `MYV1`/`NTV5` < `NTV6` < `NTV7`,
+    // so: local newer means push, server newer means adopt, equal merges by
+    // epoch, and a strictly older server is never allowed to overwrite what this
+    // device holds.
+    //
+    // The epoch rule below is unchanged: a strictly-greater server epoch is
+    // adopted; a lower one is a rollback and is refused; equal epochs must agree,
+    // and at equal epoch the server may still carry a newer roster (an invite
+    // writes the roster at the SAME epoch), so a server-only change is adopted
+    // too. A concurrent change at the same epoch cannot be tie-broken and is
+    // refused. A MEMBER device (no `root_key`) adopts but never writes
+    // `vault.meta`.
+    let local_generation = protocol::vault_meta_generation(&local_bytes);
+    let server_generation = protocol::vault_meta_generation(&server_bytes);
+    if local_generation != protocol::VaultMetaGeneration::Legacy
+        || server_generation != protocol::VaultMetaGeneration::Legacy
+    {
         let member = root_key.is_none();
-        // One-sided generation transition, LOCAL side (myne-md/myne#795): this
-        // device performed the owner-only `NTV5`->`NTV6` migration and the server
-        // still holds the pre-B2B copy. This is the ONLY path that carries a
-        // migrated `vault.meta` to the server — the migration itself does not push,
-        // and the both-sides-`NTV6` logic below cannot merge a one-sided frame — so
-        // without it the server keeps serving `NTV5` and a member's accept, which
-        // fetches the server copy and requires `NTV6`, dies at parse. A MEMBER never
-        // holds `root_key`, so it can never have migrated; never adopt the older
-        // server copy here.
-        if local_is_ntv6 && !server_is_ntv6 {
+        // One-sided generation transition, LOCAL side: this device performed an
+        // owner-only upgrade (`NTV5`->`NTV6`, or `NTV6`/`NTV5`->`NTV7`) and the
+        // server still holds the older copy. This is the ONLY path that carries a
+        // migrated `vault.meta` to the server: the migration itself does not push,
+        // and the equal-generation logic below cannot merge a one-sided frame. A
+        // MEMBER never holds `root_key`, so it can never have migrated.
+        //
+        // **`local > server` is also what keeps an older server frame from ever
+        // replacing a newer local one**, and that is why there is no separate
+        // "refuse a rollback" arm above this one: the two conditions are the same
+        // predicate, and the first draft of this fix had both, which made the
+        // push below unreachable. The person wrap survives because this arm
+        // pushes rather than adopts.
+        if local_generation > server_generation {
             if !member
                 && may_push
                 && super::enroll::put_vault_meta(transport, &put_token, &local_bytes).is_ok()
@@ -4518,35 +4541,36 @@ pub(crate) async fn sync_meta_phase(
                 let _ = clear_vault_meta_dirty(io, vault_root).await;
                 tracing::info!(
                     stage = "meta_phase",
-                    event = "ntv6_generation_pushed",
-                    "published a local NTV5->NTV6 generation transition to the server"
+                    event = "meta_generation_pushed",
+                    "published a local vault generation transition to the server"
                 );
                 return MetaPhaseOutcome::Pushed;
             }
             return MetaPhaseOutcome::Skipped;
         }
         // One-sided generation transition, SERVER side: another owner device
-        // migrated this vault. Adopt the server's `NTV6` bytes verbatim, verified
-        // under our root key when we hold one (mirrors the newer-epoch adopt below).
-        if !local_is_ntv6 && server_is_ntv6 {
-            // A MEMBER cannot verify an `NTV6` frame at all (no root key), so it
+        // upgraded this vault. Adopt the server's bytes verbatim, verified under
+        // our root key when we hold one. `parse_b2b_tail` accepts both tail
+        // generations, so a peer's `NTV7` frame is verifiable here too.
+        if server_generation > local_generation {
+            // A MEMBER cannot verify a tail frame at all (no root key), so it
             // must not adopt one on the server's word (myne-md/myne#797): the
             // member's own group package, verified against the PINNED owner half,
             // is the only route to a new generation. Hold and retry.
             if member {
                 tracing::warn!(
                     stage = "meta_phase",
-                    event = "ntv6_generation_held_for_member",
-                    "holding an unverified NTV6 generation transition on a member device"
+                    event = "meta_generation_held_for_member",
+                    "holding an unverified vault generation transition on a member device"
                 );
                 return MetaPhaseOutcome::Skipped;
             }
-            let Ok(server_ntv6) = protocol::parse_vault_meta_ntv6(&server_bytes) else {
+            let Some(server_tail) = protocol::parse_b2b_tail_any(&server_bytes).ok() else {
                 return MetaPhaseOutcome::Skipped;
             };
             if let Some(root_key) = root_key {
                 let group = match protocol::unlock_group_key_ntv6(
-                    &server_ntv6,
+                    &server_tail,
                     &protocol::OwnerKey::new(*root_key),
                 ) {
                     Ok(group) => group,
@@ -4554,14 +4578,42 @@ pub(crate) async fn sync_meta_phase(
                 };
                 if protocol::person_invite::open_group_roster(
                     &group,
-                    &server_ntv6.base.account_number_hash,
-                    server_ntv6.group_key_epoch,
-                    &server_ntv6.signed_roster_envelope,
+                    &server_tail.base.account_number_hash,
+                    server_tail.group_key_epoch,
+                    &server_tail.signed_roster_envelope,
                 )
                 .is_none()
                 {
                     return MetaPhaseOutcome::Skipped;
                 }
+            }
+            // **A `NTV7` frame is STAGED, never adopted verbatim (myne-md/myne#911
+            // review).** `sync-protocol.md` §10 already requires it: a device that
+            // sees a newer server generation MUST persist it as
+            // `vault.meta.incoming` and leave `vault.meta` byte-identical, then
+            // promote once the user's own credential has opened it. The reason is
+            // sharper on this generation than on `NTV6`: the person wrap is the
+            // vault's only second credential, and the checks above authenticate
+            // the CREDENTIAL side (the group wrap and the roster), not the person
+            // wrap. A hostile server can take the genuine frame, keep its password
+            // wrap, append a person envelope sealed to its own key, and the
+            // password still opens the adopted vault while the identity phrase is
+            // now dead, silently, on every device that adopts it. Staging costs a
+            // peer one unlock before it leaves the old generation, which is the
+            // trade §10 chose.
+            if server_generation == protocol::VaultMetaGeneration::Person {
+                crate::plugins::vault_migrate::adopt::stage_incoming_meta(
+                    io,
+                    vault_root,
+                    &server_bytes,
+                )
+                .await;
+                tracing::info!(
+                    stage = "meta_phase",
+                    event = "meta_generation_staged",
+                    "staged a newer person-wrapped vault generation for the next unlock to prove"
+                );
+                return MetaPhaseOutcome::Skipped;
             }
             if io
                 .write(
@@ -4577,16 +4629,19 @@ pub(crate) async fn sync_meta_phase(
                 let _ = clear_vault_meta_dirty(io, vault_root).await;
                 tracing::info!(
                     stage = "meta_phase",
-                    event = "ntv6_generation_adopted",
-                    "adopted a peer's NTV5->NTV6 generation transition"
+                    event = "meta_generation_adopted",
+                    "adopted a peer's vault generation transition"
                 );
                 return MetaPhaseOutcome::Adopted;
             }
             return MetaPhaseOutcome::Skipped;
         }
-        let (Ok(local_ntv6), Ok(server_ntv6)) = (
-            protocol::parse_vault_meta_ntv6(&local_bytes),
-            protocol::parse_vault_meta_ntv6(&server_bytes),
+        // Equal non-legacy generation. The tail is identical across `NTV6` and
+        // `NTV7`, so the merge reads it through one parser and the bytes it
+        // writes below are always the ADOPTED side's, never re-serialized.
+        let (Some(local_ntv6), Some(server_ntv6)) = (
+            protocol::parse_b2b_tail_any(&local_bytes).ok(),
+            protocol::parse_b2b_tail_any(&server_bytes).ok(),
         ) else {
             return MetaPhaseOutcome::Skipped;
         };
@@ -5158,7 +5213,10 @@ async fn sync_cycle_attempt(
         crate::plugins::sync::state::read_content_epoch(io, vault_root).await,
         io.read(&vault_root.join("vault.meta")).await,
     ) {
-        if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta) {
+        // Both tail generations. Reading only `NTV6` made this stand-down check a no-op on
+        // `NTV7`, so a person-born vault whose local content lagged the group-key epoch went
+        // on to re-seal under a retired `itemsKey` instead of waiting.
+        if let Ok(b2b) = protocol::parse_b2b_tail_any(&meta) {
             if content_epoch < b2b.group_key_epoch {
                 tracing::warn!(
                     stage = "sync_cycle",
@@ -7493,7 +7551,7 @@ async fn sync_cycle_attempt(
                 "marked the re-key's stranded singleton blobs for horizon-GC"
             );
         }
-        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
+        write_head_baseline(io, vault_root, &sealed, head_authority.authors_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
         state.record_observation(&sealed.head_id, &version_vector);
@@ -7505,7 +7563,7 @@ async fn sync_cycle_attempt(
             record: vh.record.clone(),
             head_id: vh.head_id,
         };
-        write_head_baseline(io, vault_root, &sealed, head_authority.expected_format())
+        write_head_baseline(io, vault_root, &sealed, head_authority.authors_format())
             .await
             .map_err(|_| SyncCycleError::Io)?;
     }
@@ -8601,7 +8659,7 @@ mod tests {
         // The member's own identity; deterministic seeds keep the test stable.
         let person = PersonKeyPair::generate_raw(&[0x11; 64], &[0x22; 32], &[0x33; 32]);
         let person_public = person.public_half();
-        let ctx = SignedHeadCtx::new(person, account_number_hash, vec![person_public]);
+        let ctx = SignedHeadCtx::new(Some(person), account_number_hash, vec![person_public]);
 
         // The server serves a signed head so the cycle adopts it rather than
         // authoring a genesis (which would need a push route this test omits).
@@ -12579,6 +12637,152 @@ mod tests {
 
     // ---- F1 Faz B: vault.meta reconcile (sync_meta_phase) --------------------
 
+    /// The review's first Critical (myne-md/myne#911).
+    ///
+    /// The generation gate used to be `magic == NTV6`, which classifies an
+    /// `NTV7` frame as "older than B2B". A server still holding the pre-upgrade
+    /// `NTV6` copy was then adopted VERBATIM over it: the person wrap is gone,
+    /// the phrase wrap was already zeroed, and the vault is left with the
+    /// password as its only credential, with no error anywhere.
+    ///
+    /// The fixture is a REAL person-wrapped frame, because that is the only kind
+    /// the old code would adopt: it verified the owner wrap and the roster under
+    /// the root key first, and dummy bytes fail that check and skip. So this
+    /// test drives the actual path: same tail in both frames, so the NTV6 copy
+    /// verifies, and the only thing that can stop the overwrite is the
+    /// generation comparison.
+    mod meta_generation {
+        use super::{blocking, IO};
+
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::transport::FakeTransport;
+        use crate::plugins::vault_creation::commands::{
+            build_and_serialize_person_vault_meta, build_person_session,
+        };
+        use crate::plugins::vault_creation::state::CreationPerson;
+
+        use super::super::*;
+        use protocol::KdfParams;
+
+        /// Fast KDF: this test never derives a password, and the identity seed's
+        /// parameters do not reach the frame. A real-cost derivation here would
+        /// add seconds to every `cargo test`.
+        const FAST: KdfParams = KdfParams {
+            m_kib: protocol::MIN_KDF_M_KIB,
+            t: 1,
+            p: 1,
+            argon2_version: 0x13,
+        };
+
+        const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
+
+        /// A real `NTV7` frame plus the root key its group wrap opens under, and
+        /// the `NTV6` frame the SAME tail serializes to. The pair is what a
+        /// server that has not upgraded yet serves beside an upgraded device.
+        fn frames() -> (Vec<u8>, Vec<u8>, zeroize::Zeroizing<[u8; 32]>) {
+            let person_id = protocol::kdf::person_id_hash(PHRASE);
+            let seed = protocol::kdf::derive_person_identity_seed(PHRASE, &person_id, &FAST)
+                .expect("identity seed");
+            let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+            let person = CreationPerson {
+                pair: protocol::PersonKeyPair::generate_raw(
+                    &seeds.kem,
+                    &seeds.ed25519,
+                    &seeds.mldsa,
+                ),
+                person_id,
+                number: protocol::account_number_from_person_id(&person_id),
+            };
+            let session = build_person_session(
+                crate::paths::web_single_vault_id(),
+                "person-born-test-pw",
+                FAST,
+                person,
+            )
+            .expect("person session");
+            let (ntv7, _group) =
+                build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
+            let parsed = protocol::parse_vault_meta_ntv7(&ntv7).expect("parse NTV7");
+            let ntv6 = protocol::serialize_vault_meta_ntv6(&parsed.as_ntv6_tail())
+                .expect("the same tail as an NTV6 frame");
+            (ntv7, ntv6, session.root_key.clone())
+        }
+
+        fn scratch(tag: &str) -> std::path::PathBuf {
+            let d = std::env::temp_dir().join(format!(
+                "myne-metagen-{tag}-{}-{:p}",
+                std::process::id(),
+                &tag
+            ));
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        #[test]
+        fn refuses_to_adopt_an_ntv6_server_frame_over_a_local_ntv7_frame() {
+            let (local, server, root_key) = frames();
+            let dir = scratch("older-server");
+            std::fs::write(dir.join("vault.meta"), &local).unwrap();
+            // The ordinary post-upgrade state: this device has nothing new to
+            // say (the upgrade pushed already) and the server still serves the
+            // pre-upgrade frame. That is the pairing the old code adopted.
+            let mut st = SyncState {
+                meta_baseline_hex: Some(sha256_hex(&local)),
+                ..SyncState::default()
+            };
+            let t = FakeTransport::new();
+            t.on(HttpMethod::Get, "/vault.meta", 200, server.clone());
+
+            let out = blocking(sync_meta_phase(
+                &IO,
+                &t,
+                "tok",
+                &dir,
+                &mut st,
+                true,
+                Some(&root_key),
+            ));
+
+            assert_ne!(
+                out,
+                MetaPhaseOutcome::Adopted,
+                "an older generation must never be adopted over a newer local frame"
+            );
+            assert_eq!(
+                std::fs::read(dir.join("vault.meta")).unwrap(),
+                local,
+                "the person wrap must survive a server that has not upgraded yet"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        #[test]
+        fn the_two_helpers_order_and_classify_every_generation() {
+            let (ntv7, ntv6, _root) = frames();
+            let legacy = protocol::serialize_vault_meta(
+                &protocol::parse_vault_meta_ntv7(&ntv7).expect("parse").base,
+            );
+
+            assert_eq!(
+                protocol::vault_meta_generation(&legacy),
+                protocol::VaultMetaGeneration::Legacy
+            );
+            assert_eq!(
+                protocol::vault_meta_generation(&ntv6),
+                protocol::VaultMetaGeneration::B2b
+            );
+            assert_eq!(
+                protocol::vault_meta_generation(&ntv7),
+                protocol::VaultMetaGeneration::Person
+            );
+            assert!(protocol::VaultMetaGeneration::Person > protocol::VaultMetaGeneration::B2b);
+            assert!(protocol::VaultMetaGeneration::B2b > protocol::VaultMetaGeneration::Legacy);
+            assert!(protocol::has_b2b_tail(&ntv6));
+            assert!(protocol::has_b2b_tail(&ntv7));
+            assert!(!protocol::has_b2b_tail(&legacy));
+        }
+    }
+
     // ---- myne-md/myne#640: vault.dictionary phase (sync_dictionary_phase) ----
 
     mod dictionary_phase {
@@ -15968,7 +16172,7 @@ mod tests {
             // genesis (a push route this test does not need).
             let person = person(0x51, 0x52, 0x53);
             let person_public = person.public_half();
-            let ctx = SignedHeadCtx::new(person, HASH, vec![person_public]);
+            let ctx = SignedHeadCtx::new(Some(person), HASH, vec![person_public]);
             let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
             let head = VaultHead {
                 head_format_version: VAULT_HEAD_FORMAT_V2,
@@ -16439,7 +16643,7 @@ mod tests {
             // genesis (a push route this test does not need).
             let signer = person(0x51, 0x52, 0x53);
             let signer_public = signer.public_half();
-            let ctx = SignedHeadCtx::new(signer, HASH, vec![signer_public]);
+            let ctx = SignedHeadCtx::new(Some(signer), HASH, vec![signer_public]);
             let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
             let head = VaultHead {
                 head_format_version: VAULT_HEAD_FORMAT_V2,

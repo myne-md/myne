@@ -102,9 +102,7 @@ describeE2E("plain-file editor", () => {
         // The Welcome screen is the vault-less boot stage; wait for it, then
         // assert the surface never appeared. A wait-for-element would pass on
         // the wrong thing here, so the assertion is the absence.
-        await app.session.waitForElement(
-          `${testIdSelector("welcome.create-cta")}, ${testIdSelector("welcome.identity-cta")}`,
-        );
+        await app.session.waitForElement(testIdSelector("welcome.create-cta"));
         const markers = await app.session.byTestIdAll("plain-file.marker");
         expect(markers).toHaveLength(0);
         expect(readFileSync(file, "utf8")).toBe("# Not for you\n");

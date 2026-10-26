@@ -33,9 +33,18 @@ export function personSetup(phrase?: string): Promise<PersonSetupView> {
   });
 }
 
+/**
+ * The account lifecycle (myne-md/myne#911). `null` means this device holds no
+ * identity at all. Mirrors the desktop shape so the two clients cannot disagree
+ * about what a status payload means.
+ */
+export type PersonAccountState = "reserved" | "pending" | "enrolled";
+
 /** Whether this device holds a person account, and whose it is. Device-local. */
 export interface PersonStatusView {
   enrolled: boolean;
+  /** The three-state lifecycle; `null` when there is no identity. */
+  state: PersonAccountState | null;
   identity_unlocked: boolean;
   person_id_hex: string | null;
   identity_code: string | null;
@@ -47,6 +56,98 @@ export interface PersonStatusView {
 
 export function personStatus(): Promise<PersonStatusView> {
   return invoke<PersonStatusView>("plugin:sync|sync_person_status");
+}
+
+/** What an unlocked identity reports to the UI: public halves only. */
+export interface PersonIdentityView {
+  fingerprint_hex: string;
+  person_id_hex: string;
+  identity_code: string;
+}
+
+/**
+ * Unlock this device's sealed person identity for the session (myne-md/myne#911).
+ *
+ * Desktop has had this door since the identity home shipped; the phone did not,
+ * so a phone whose identity was sealed could only be told `PersonLocked` with no
+ * surface that clears it. The phrase is the proof of possession and the only
+ * input, and it crosses IPC once.
+ */
+export function personUnlock(phrase: string): Promise<PersonIdentityView> {
+  return invoke<PersonIdentityView>("plugin:sync|sync_person_unlock", { phrase });
+}
+
+export function personRegister(phrase: string): Promise<PersonSetupView> {
+  return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
+}
+
+/**
+ * The person's account number, in canonical form, or `null` when this device
+ * holds no identity (myne-md/myne#911 review).
+ *
+ * Derived from the person id, so it needs no phrase and no network. Format it
+ * for display with `@myne/client-core`'s `formatPersonAccountNumber`, which is
+ * the one place the `MY-` grouping lives on the client side.
+ */
+export async function personAccountNumber(): Promise<string | null> {
+  return invoke<string | null>("plugin:sync|sync_person_account_number");
+}
+
+/** Mirrors the Rust `PersonJoinView` (myne-md/myne#911 task 9). */
+export interface PersonJoinView {
+  /** The person this device now belongs to, 32 lowercase hex. It equals the id
+   *  the QR carried: a phrase for anyone else is refused (`PersonMismatch`). */
+  person_id_hex: string;
+  /** False while the device waits for an existing device to approve it. */
+  approved: boolean;
+}
+
+/**
+ * Admit THIS device to a person's account from a scanned person QR and the
+ * phrase (myne-md/myne#911 task 9, wired on this client by task 12).
+ *
+ * The phrase crosses IPC once, exactly as the identity-unlock path does. The
+ * device lands PENDING rather than approved: an existing device has to approve
+ * it, which is what stops a stolen phrase from attaching a device by itself
+ * (story 16).
+ */
+export function personJoinDevice(
+  personIdHex: string,
+  endpointUrl: string,
+  phrase: string,
+): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_join_device", {
+    personIdHex,
+    endpointUrl,
+    phrase,
+  });
+}
+
+/**
+ * Finish a pending device's enrolment once an existing device has approved it.
+ *
+ * Re-runs the same handshake with the session's cached derived secret, so no
+ * phrase is entered a second time. `PersonSessionRequired` means the session (or
+ * the app) ended in between and only the phrase can restart it.
+ */
+export function personClaimDevice(): Promise<PersonJoinView> {
+  return invoke<PersonJoinView>("plugin:sync|sync_person_claim_device");
+}
+
+/** One vault the person account is bound to (mirrors the Rust `PersonVaultRow`). */
+export interface PersonVaultRow {
+  vault_id: string | null;
+  account_hash_hex: string;
+  role: string;
+}
+
+/**
+ * List the account's vaults and materialise each one's FRAME locally, so the
+ * picker can show a vault this device has never opened. Opening one still asks
+ * for that vault's password: the join installs no key material.
+ */
+export function personListVaults(): Promise<PersonVaultRow[]> {
+  return invoke<PersonVaultRow[]>("plugin:sync|sync_person_list_vaults");
 }
 
 /**

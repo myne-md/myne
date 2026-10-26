@@ -29,7 +29,6 @@ import {
   vaultMetaPath,
   type SeededVault,
 } from "./support/fixtures";
-import { seedProductionVault } from "./support/realistic-fixture";
 import { activeTestId, typeIntoActive } from "./support/keyboard";
 import { ioBanner } from "../src/lib/io-banner";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
@@ -45,16 +44,26 @@ const VAULT_NOT_FOUND_BANNER = "Vault file not found. Please restart the app.";
 
 describeE2E("VU-1/VU-9/VU-10 happy path + decrypting cluster (MYND-125 task 1)", () => {
   it("gates empty input, survives a recovery round-trip, decrypts at production KDF", async () => {
-    // Vault-count precondition: 1 — the VC-1-captured production-KDF
-    // fixture (a vault the app itself created); generator fallback
-    // keeps the suite standalone-runnable.
+    // Vault-count precondition: 1 — a PRODUCTION-KDF vault, seeded by the
+    // generator rather than by the VC-1 capture.
+    //
+    // **Not `seedProductionVault` any more, and the fixture says why.** Since
+    // myne-md/myne#911 task 6 the captured vault is PERSON-BORN: it has no vault
+    // phrase, and its unlock screen's recovery link opens the IDENTITY-phrase
+    // door (`Unlock.tsx` branches on `personWrapped`) instead of the recover
+    // step this scenario walks into. Clicking it therefore mounted no
+    // `recover.phrase-grid`, and the suite reported a 10 s timeout on a screen
+    // that was working exactly as designed. `RealisticFixture.phrase` is `null`
+    // for that vault and its own doc says a phrase-typing suite must seed with
+    // `seedVault(..., { kdf: "production" })`, which is a legacy vault at real
+    // KDF params and still the shape that has a phrase.
     let password!: string;
     let vaultId!: string;
     await scenario(
       "vu1-happy-decrypting",
       {
         seed: (appDataDir) => {
-          ({ password, vaultId } = seedProductionVault(appDataDir));
+          ({ password, vaultId } = seedVault(appDataDir, { kdf: "production" }));
         },
       },
       async (app) => {

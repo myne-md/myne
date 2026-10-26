@@ -3943,7 +3943,6 @@
         "ribbon": "bal szalag sín rögzítés pin parancs parancsok testreszabás átrendezés feloldás eszköztár gyorsbillentyűk",
         "folderNotes": "mappa jegyzet index folder_index kezdőlap dupla kattintás mappahivatkozás projektek ki kapcsolás kikapcsol",
         "syncMembers": "tagok, megosztás, meghívás, csapat, együttműködés, trezor",
-        "accountName": "fióknév fiók csoport csoportosítás átnevezés címke eszköz helyi account name group rename label device local",
         "accountVaults": "fiók széfek csoportosított mely széfek tartoznak ide csoportlista account vaults grouped group list",
         "aiMeetingPrompt": "megbeszélés, összefoglaló, utasítás, egyéni, átirat, teendők, döntések",
         "update": "frissítés, frissítés keresése, új verzió, kiadás, letöltés",
@@ -4025,14 +4024,10 @@
       "atCap": "A lista megtelt, ezért semmi újat nem lehet megjegyezni. Törölj egy bejegyzést, hogy helyet csinálj."
     },
     "account": {
-      "nameLabel": "Fióknév",
-      "nameHelper": "Ennek a széfcsoportnak a neve ezen az eszközön. A széfválasztó ezt használja a csoport fejléceként. Ezen az eszközön marad, és soha nem tárolódik egyetlen széfben sem, ezért nem szinkronizálódik, és egy másik eszköz másképp csoportosíthatja és nevezheti el ugyanezeket a széfeket.",
-      "namePlaceholder": "Adj meg egy nevet…",
-      "nameSave": "Mentés",
-      "nameSaving": "Mentés…",
       "vaultsLabel": "Széfek ebben a fiókban",
       "vaultsHelper": "Azok a széfek, amelyeket ez az eszköz a fenti név alá csoportosít. A csoportosítás eszközönkénti szervezési döntés, ezért nem része egyetlen széf tartalmának sem, és nem utazik vele.",
-      "vaultsCount": "{{count}} széf",
+      "vaultsCount_one": "{{count}} széf",
+      "vaultsCount_other": "{{count}} széf",
       "currentVault": "Ez a széf",
       "unknownVault": "Egy másik széf ezen az eszközön",
       "standaloneHelper": "Ez a széf ezen az eszközön nincs fiók alá csoportosítva, ezért önmagában áll. A csoportosítás eszközönkénti: egy másik eszköz egy fiókon belül mutathatja.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "A nevek akkor állíthatók be, ha ez a széf már meg van osztva.",
       "nameErrorLocked": "A név megváltoztatásához oldd fel a széfet.",
       "nameErrorGeneric": "Nem sikerült elmenteni a nevedet. Próbáld újra.",
-      "nameInvite": "Még nincs megjelenített neved. A többi tag az ujjlenyomatodat látja.",
       "nameInviteCta": "Név beállítása",
-      "nameInviteDismiss": "Most nem",
       "noInvitations": "Még nincs elküldött meghívó.",
       "identityHeading": "Az identitásod",
       "membersHeading": "Tagok",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Helyreállító mondat — ha elfelejted a jelszavadat",
       "save": "Helyreállítási csomag mentése",
       "saveFailed": "Nem sikerült elmenteni a fájlt. Másold inkább a csomagot, vagy írd le mindkét részt.",
-      "savedToFile": "Elmentve. Ez egy egyszerű szövegfájl, amely mindkét titkot tartalmazza, ezért tartsd olyan helyen, ahol csak te olvashatod.",
-      "whyEnglish": "A szavak minden nyelven angolul vannak. A BIP-39 szabvány részei, ezért bármely Myne-kliens be tudja olvasni bármely másik által írt mondatot. Ne fordítsd le őket: a lefordított szavak nincsenek benne a szólistában, és a mondat működésképtelenné válna."
+      "savedToFile": "Elmentve. Ez egy egyszerű szövegfájl, amely mindkét titkot tartalmazza, ezért tartsd olyan helyen, ahol csak te olvashatod."
     },
     "name": {
       "back": "Vissza",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Fiók",
     "moveToAccount": "Áthelyezés fiókba…",
     "moveToNewAccount": "Áthelyezés új fiókba",
-    "renameAccount": "Fiók átnevezése",
     "accountError": "A fiókcsoportosítást nem sikerült frissíteni. Semmi sem változott.",
     "accountHidden": "A fiókműveletek nem érhetők el, amíg a trezornevek rejtve vannak.",
-    "labelTooLong": "A név túl hosszú. Legyen 512 karakternél rövidebb.",
-    "renameCancel": "Mégse",
-    "renamePlaceholder": "Fióknév",
-    "renameSave": "Átnevezés",
     "accountUnreadable": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön. Semmi sem változott.",
     "createShort": "Új széf",
     "joinShort": "Eszköz hozzáadása",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Maradék fájlok egy megszakadt törlésből ({{n}}). Takarítsa el őket, mielőtt széfet hoz létre.",
     "cleanUpFiles": "Maradék fájlok eltakarítása",
     "connect": "Csatlakozás a fiókomhoz",
-    "startIdentity": "Identitás létrehozása",
-    "startLocal": "Inkább helyi széf létrehozása",
     "tagline": "Titkosított markdown jegyzetek. Regisztrációhoz nem kell e-mail.",
-    "identityTitle": "Identitás létrehozása",
-    "identityBody": "Egy identitás az összes széfedhez, hogy az emberek meghívhassanak. Szinkronszervert igényel.",
-    "localTitle": "Helyi széf létrehozása",
-    "localBody": "Egy titkosított széf ezen az eszközön. A szinkront vagy egy identitást később is hozzáadhatod.",
     "restoreTitle": "Visszaállítás biztonsági mentésből",
     "restoreBody": "Nyiss meg egy korábban mentett .myne-backup fájlt.",
     "joinTitle": "Az eszköz hozzáadása egy fiókhoz",
     "joinBody": "Használj egy széfet, amely már megvan egy másik eszközödön.",
-    "createAction": "Létrehozás",
     "restoreAction": "Visszaállítás",
     "joinAction": "Eszköz hozzáadása",
     "version": "{{version}} verzió · pre-alfa"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "{{count}} éve megnyitva",
     "corruptedBadge": "Sérült",
     "accountFallback": "Fiók",
-    "renameAccount": "Fiók átnevezése",
     "moveToNewAccount": "Áthelyezés új fiókba",
     "moveToAccount": "Áthelyezés fiókba…",
     "accountError": "A fiókcsoportosítást nem sikerült frissíteni. Semmi sem változott.",
     "accountHidden": "A fiókműveletek nem érhetők el, amíg a trezornevek rejtve vannak.",
-    "labelTooLong": "A név túl hosszú. Legyen 512 karakternél rövidebb.",
-    "renameCancel": "Mégse",
-    "renamePlaceholder": "Fióknév",
-    "renameSave": "Átnevezés",
     "accountUnreadable": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön. Semmi sem változott."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identitás visszaállítva.",
     "title": "Identitás létrehozása",
     "errorAlreadyHeld": "Ez az eszköz már tárol egy identitást. Állítsd helyre a helyreállító mondatával, vagy felejtsd el, és hozz létre egy újat.",
-    "errorNotConfigured": "Nem sikerült beállítani az identitást. Ellenőrizd, hogy be van állítva szinkronszerver, majd próbáld újra.",
     "forgetCancel": "Megtartom",
     "forgetConfirm": "Elfelejtem, és újat hozok létre",
     "forgetCta": "Az identitás elfelejtése és új létrehozása",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Állítsd helyre ezen az eszközön a 24 szavas helyreállító mondatával.",
     "recoverAction": "Helyreállítás",
     "back": "Vissza",
-    "changeServer": "Szinkronszerver módosítása vagy ellenőrzése",
-    "errorTlsFailure": "Nem sikerült ellenőrizni a szerver HTTPS-tanúsítványát. Ellenőrizd a szerver címét és a tanúsítványát.",
     "phraseTitle": "Mentsd el az identitásmondatodat",
     "phraseContinue": "Folytatás",
     "confirmTitle": "Mondat megerősítése"
@@ -5509,15 +5481,6 @@
       "hint": "Az újrapróbálkozás elölről kezdi a letöltést.",
       "retry": "Újrapróbálás",
       "back": "Vissza a feloldáshoz"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Válassz szinkronszervert",
-      "intro": "A Myne-nek kell egy szerver, amely tárolja a titkosított jegyzeteidet, és elér téged a meghívókhoz. A jegyzeteid titkosítva maradnak ezen az eszközön, mielőtt elhagyják; a szerver csak titkosított szöveget tárol.",
-      "notConfigured": "Adj meg fent egy szervercímet, és a folytatáshoz nyomd meg a Csatlakozás gombot.",
-      "back": "Vissza",
-      "continue": "Folytatás"
     }
   },
   "identityFlow": {

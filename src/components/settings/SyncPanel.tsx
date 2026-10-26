@@ -15,12 +15,14 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
+import { publishErrorKind, publishVault, readPublishState, type PublishState } from "../../lib/sync-publish";
 import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
+import { PersonRegisterDialog } from "../sync/PersonRegisterDialog";
 import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
 import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
@@ -44,6 +46,7 @@ import {
   UNKNOWN_CONFLICT_ORIGINAL,
 } from "../../notes/sidebarState";
 import { noteRead } from "../../notes/readNote";
+import { formatRelativeTime, useTick } from "../../notes/components/relativeTime";
 import { noteUpdate } from "../../notes/updateNote";
 import { deleteNoteRouted } from "../../notes/deleteNote";
 import {
@@ -53,7 +56,7 @@ import {
 } from "../../notes/conflictCopy";
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
-import { Tooltip } from "../primitives/Tooltip";
+import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
 import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -190,31 +193,79 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // Rendering the empty state first would flash the "Add an identity" CTA on a
   // device that holds one.
   const identityLoaded = person !== null || identityReady || identityOwnerCode != null;
+  // Registration (2026-10-23). The identity home offers this, and it is the only
+  // place that did: that screen renders at ZERO vaults, so a user sitting in a
+  // vault had no door to register from, and the publish row's own refusal
+  // (`PersonNotRegistered`) told them to go to a screen they could not open.
+  //
+  // `reserved` ONLY. A `pending` device has already registered and is waiting for
+  // another device's approval; re-registering mints a second device id (so the
+  // owner is asked to approve a row nothing holds any more) and the recovery path
+  // self-approves, which would silently skip the wait this panel is describing.
+  // The identity home gates on `reserved` for the same reason.
+  const [registerOpen, setRegisterOpen] = useState(false);
+  const needsRegistration = hasIdentity && person?.state === "reserved";
   // Copy the public identity code. Outcome-only feedback, never the value
   // (`lib/clipboard.ts`), the same arm `MemberRosterPanel` uses
   // (myne-md/myne#818).
   const copyIdentityCode = () => {
     if (!identityCode) return;
-    setIdentityCopyFeedback(null);
     void copyText(clipboardWriteText, identityCode, {
       onSuccess: {
         kind: "toast",
         run: () => {
-          setIdentityCopyFeedback("success");
-          toast({ message: t("personIdentityCode.copied"), variant: "info" });
+          setIdentityCopied(true);
+          if (identityCopyTimer.current !== null) window.clearTimeout(identityCopyTimer.current);
+          identityCopyTimer.current = window.setTimeout(() => {
+            setIdentityCopied(false);
+            identityCopyTimer.current = null;
+          }, 1600);
         },
       },
       onFailure: {
         kind: "toast",
-        run: () => {
-          setIdentityCopyFeedback("error");
-          toast({ message: t("personIdentityCode.copyFailed"), variant: "error" });
-        },
+        run: () => toast({ message: t("personIdentityCode.copyFailed"), variant: "error" }),
       },
     });
   };
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
+  // Publish state (myne-md/myne#911 task 8). Two facts, and they are different
+  // ones: `publishState` is the DURABLE answer read from disk on mount (so a
+  // published vault says so after a restart), and `publishRun` is this session's
+  // own click (busy / error / the answer the user just got).
+  const [publishState, setPublishState] = useState<PublishState | null>(null);
+  const [publishRun, setPublishRun] = useState<"idle" | "busy" | "done" | "error">("idle");
+  const [publishError, setPublishError] = useState<string | null>(null);
+  // Whether the vault is on a server, from either source: the record read on
+  // mount, or the click that just succeeded.
+  const published = publishRun === "done" || publishState?.published === true;
+  // When that happened, as the row says it. `published_at_ms` was read from disk
+  // and then dropped on the floor: the panel had the one fact that turns “Published”
+  // from a claim into a record. `useTick` is the shared 30-second interval every
+  // relative-time string in the app rides on, so “2 min ago” does not freeze at the
+  // moment the panel mounted. The empty string means the record predates the field.
+  useTick();
+  const publishedWhen =
+    publishState?.published_at_ms != null
+      ? formatRelativeTime(new Date(publishState.published_at_ms))
+      : "";
+  // The legacy "add this device" form is the VAULT ACCOUNT flow (account number +
+  // password), and a person-born vault has no such account: its credential is the
+  // identity, so publishing is what puts it on a server. Offering the form there
+  // would ask for a number that does not exist (myne-md/myne#911 task 8).
+  const showEnrollForm = showEnroll && publishState?.person_born !== true;
+  // The durable read, re-run when the identity becomes ready: that is exactly
+  // when a device-only person vault starts being publishable, and the row's gate
+  // keys off this answer.
+  const probePublishState = useCallback(() => {
+    void readPublishState()
+      .then((s) => setPublishState(s))
+      .catch(() => setPublishState(null));
+  }, []);
+  useEffect(() => {
+    probePublishState();
+  }, [probePublishState, identityReady]);
   const betaTerms = useBetaTermsGate();
   // The terms dialog, opened from the gate below. Local, and reported up so
   // the Settings shell stops competing for Esc while it is open. The cleanup
@@ -233,11 +284,18 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // A member's own-device QR dialog (myne-md/myne) — the same slot, a different
   // producer. Held separately from `qrOpen` so the two can never both be up.
   const [memberQrOpen, setMemberQrOpen] = useState(false);
-  // The identity-code copy outcome, for the icon-chip + inline line
-  // (myne-md/myne#818). Mirrors `MemberRosterPanel`'s arm.
-  const [identityCopyFeedback, setIdentityCopyFeedback] = useState<
-    "success" | "error" | null
-  >(null);
+  // The identity-code copy confirms itself (2026-10-24): the chip's glyph
+  // becomes a tick and pops, and the live region below says it out loud. The
+  // toast is kept for the FAILURE only, because a chip cannot report "that did
+  // not work" by looking happy.
+  const [identityCopied, setIdentityCopied] = useState(false);
+  const identityCopyTimer = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (identityCopyTimer.current !== null) window.clearTimeout(identityCopyTimer.current);
+    },
+    [],
+  );
   // Any child ModalShell this panel mounts must stand the Settings shell's
   // Escape/keys down while it is up (myne-md/myne#831 added the QR dialog;
   // IdentitySetupDialog was the same latent gap). ModalShell calls
@@ -485,13 +543,20 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           accent rule unconditionally, so an ungated section would show a title
           above nothing on a v0.2 vault and on web. */}
       <SettingsSection title={t("sync.panel.sections.account")}>
-      {/* Identity block (myne-md/myne#768). Shown whenever sharing is available:
-          with no identity on this device it offers to add one; with an identity
-          it shows THAT identity (its public code) and, while the private identity
-          is locked for the session (decisions/protocol/0612), the unlock action.
-          Before, the block vanished once an identity existed, so a locked
-          identity had no surface here at all (myne-md/myne#792 follow-up). */}
-      {hasCapability("memberSharing") && identityLoaded && (
+      {/* Identity block (myne-md/myne#768). Shown wherever the IDENTITY plane
+          exists: with no identity on this device it offers to add one; with an
+          identity it shows THAT identity (its public code) and, while the private
+          identity is locked for the session (decisions/protocol/0612), the unlock
+          action. Before, the block vanished once an identity existed, so a locked
+          identity had no surface here at all (myne-md/myne#792 follow-up).
+
+          **Gated on `personIdentity`, not `memberSharing`** (myne-md/myne#911
+          task 13). One flag used to cover both planes, so a client that shipped
+          the identity could not have it without also shipping the member surface.
+          Web is now exactly the case that flag could not express: the identity
+          plane dispatches there, and the roster, the invites, member names and
+          the device-binding map still do not. */}
+      {hasCapability("personIdentity") && identityLoaded && (
         // A `SettingRow` (myne-md/myne#885 visual pass): the actions sit in the
         // control slot on the right, side by side, and the phrase entry the
         // unlock needs is a dialog rather than 24 cells expanded under the row.
@@ -503,19 +568,36 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           helper={
             !hasIdentity
               ? t("sync.panel.identity.helper")
-              : identityUnlocked
-                ? t("sync.panel.identity.unlockedHelper")
-                : t("sync.panel.identity.lockedHelper")
+              : needsRegistration
+                ? // A `reserved` identity is NOT “locked and waiting”: it has
+                  // never been written to a server, so there is nothing it
+                  // could sign yet, and the old sentence sent the reader to the
+                  // unlock door first (2026-10-25 owner report: “I created it
+                  // with the identity, why register again”). One fact, said
+                  // once, and it names the act the button beside it performs.
+                  t("sync.panel.identity.unregisteredHelper")
+                : identityUnlocked
+                  ? t("sync.panel.identity.unlockedHelper")
+                  : t("sync.panel.identity.lockedHelper")
           }
           {...(hasIdentity
             ? {
-                helperTestId: identityUnlocked
-                  ? "sync.panel.identity-unlocked"
-                  : "sync.panel.identity-locked",
+                helperTestId: needsRegistration
+                  ? "sync.panel.identity-unregistered"
+                  : identityUnlocked
+                    ? "sync.panel.identity-unlocked"
+                    : "sync.panel.identity-locked",
               }
             : {})}
           control={
-            identityUnlocked ? null : (
+            // A `reserved` identity has no Unlock control, and that is the
+            // correction rather than a tidy-up: Register (`person_register`)
+            // installs the person session itself, so the two doors asked for the
+            // same 24 words while only one of them led anywhere. Publishing
+            // refuses a reserved identity with `PersonNotRegistered`, the invite
+            // list needs a token, and the sync cycle needs a token, so an unlock
+            // on its own changed nothing a user could see.
+            identityUnlocked || needsRegistration ? null : (
               <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
                 {!hasIdentity && (
                   <Button
@@ -538,7 +620,10 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           }
         >
           {/* A locked identity still shows its public code, with the copy chip
-              at the end of the box (myne-md/myne#818). */}
+              at the end of the box (myne-md/myne#818). A `reserved` one shows it
+              too: the code is public and stable, so writing it down now is what
+              makes an invitation addressable the moment the identity reaches a
+              server. */}
           {hasIdentity && !identityUnlocked && identityCode ? (
             <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
               <Input
@@ -551,17 +636,22 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
                 onFocus={(e) => e.target.select()}
               />
               <IconButton
-                icon={
-                  identityCopyFeedback === "success"
-                    ? "check"
-                    : identityCopyFeedback === "error"
-                      ? "circle-x"
-                      : "copy"
-                }
+                icon="copy"
                 label={t("personIdentityCode.copy")}
+                bordered
+                tooltip
+                confirmed={identityCopied}
                 onClick={copyIdentityCode}
                 testId="sync.panel.copy-identity"
               />
+              <p
+                role="status"
+                aria-live="polite"
+                data-testid="sync.panel.copy-status"
+                style={VISUALLY_HIDDEN}
+              >
+                {identityCopied ? t("personIdentityCode.copied") : ""}
+              </p>
             </div>
           ) : null}
           {/* What the code is, beside the code itself (example-org/operations#54).
@@ -576,6 +666,41 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
               {t("identityHome.shareCodeHint")}
             </p>
           ) : null}
+          {/* Registration, where the need appears (2026-10-23). A `reserved`
+              identity has sent nothing and a `pending` one has no token, so
+              neither can be invited, published under, or found. The identity
+              home is the only other place this act exists and it renders at zero
+              vaults; this block is the one a user with a vault is looking at.
+
+              The act itself is the shared DIALOG (2026-10-24), not a block that
+              expands in this row: it asks which server the identity is written
+              to before it asks for the phrase, and that is one component so the
+              two doors cannot answer it differently. */}
+          {needsRegistration ? (
+            <div>
+              <Button
+                variant="secondary"
+                data-testid="sync.panel.register-cta"
+                onClick={() => setRegisterOpen(true)}
+              >
+                {t("identityHome.registerCta")}
+              </Button>
+              <PersonRegisterDialog
+                open={registerOpen}
+                testIdPrefix="sync.panel.register"
+                onRegistered={() => {
+                  setRegisterOpen(false);
+                  // Re-probe rather than assume: the lifecycle is DERIVED from
+                  // disk, and this panel's block is the thing being re-rendered.
+                  // The cycle kick clears the status dot without waiting for the
+                  // retry ladder.
+                  probePerson();
+                  void syncNow();
+                }}
+                onClose={() => setRegisterOpen(false)}
+              />
+            </div>
+          ) : null}
         </SettingRow>
       )}
 
@@ -586,11 +711,109 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         <EndpointConfig />
       </div>
 
+      {/* Publish this vault (myne-md/myne#911 task 8; moved here 2026-10-25).
+          A vault created under an identity is device-only until the user says
+          otherwise, and publishing is that act: it binds the owner on the
+          server's first write and records the vault's namespace locally so sync
+          can address it.
+
+          **It lives in this section, not under “Enrolled devices”, and that is a
+          correction rather than a preference.** Publishing is an IDENTITY act: its
+          refusals are `PersonSessionRequired` and `PersonNotRegistered`, and what
+          it puts on the server is this vault under the person that owns it. Filed
+          under a devices heading it read as a device operation, and the owner's
+          2026-10-25 screenshot shows exactly that: “ENROLLED DEVICES” over
+          “Publish to your server”. The section now reads identity → server →
+          publishing → status, which is the order the facts depend on.
+
+          The gate is the READ, and the read is the capability. `publishState`
+          answers only where the command exists (desktop today; the browser and
+          mobile refuse it, myne-md/myne#911 tasks 12 and 13), so a client without
+          the read does not offer a button that would fail. `disabled` is the one
+          status that hides it too: publishing needs somewhere to publish TO, and
+          the Server row directly above this one is how that gets set. */}
+      {hasCapability("personIdentity") &&
+        publishState !== null &&
+        syncStatus?.state !== "disabled" && (
+        <SettingRow
+          anchorId="sync.publish"
+          testId="sync.panel.publish-row"
+          label={t("sync.panel.publish.label")}
+          // A published vault's row is a READOUT whose action is a repair, so the
+          // sentence states when the act happened and what it bought. It used to
+          // say only “Published.” and the date it had recorded (`published_at_ms`)
+          // reached no surface at all: a fact the panel had in hand and withheld
+          // from the one screen that exists to report it (2026-10-25).
+          helper={
+            published
+              ? publishedWhen === ""
+                ? t("sync.panel.publish.publishedHelperNoDate")
+                : t("sync.panel.publish.publishedHelper", { when: publishedWhen })
+              : t("sync.panel.publish.deviceOnlyHelper")
+          }
+          // A REFUSAL is an error, not a readout (2026-10-23). It used to
+          // replace the helper paragraph, so a click that failed changed a muted
+          // sentence into another muted sentence: no alert, no colour, no focus.
+          // Reported as "clicking does nothing", which is what it looked like.
+          // `SettingRow`'s `error` slot is the announcing one, and the button
+          // stays enabled so the retry is the same control.
+          error={
+            publishRun === "error"
+              ? t(`sync.panel.publish.error.${publishError ?? "Other"}`)
+              : null
+          }
+          helperTestId="sync.panel.publish-state"
+          control={
+            <Button
+              // A repeat of a completed act is not a primary action: it is the
+              // repair for a server that lost this vault's record (an account
+              // reset is the real case), and it is the only way back, so it stays
+              // reachable rather than being deleted. `ghost` is the row's own
+              // vocabulary for “quiet but findable” (`decisions/ui/0726`).
+              variant={published ? "ghost" : "primary"}
+              disabled={publishRun === "busy"}
+              onClick={() => {
+                setPublishRun("busy");
+                setPublishError(null);
+                void publishVault()
+                  .then(() => {
+                    setPublishRun("done");
+                    // The durable record now says published; re-read rather than
+                    // infer, so the panel and the vault row cannot disagree.
+                    probePublishState();
+                  })
+                  .catch((e: unknown) => {
+                    setPublishError(publishErrorKind(e));
+                    setPublishRun("error");
+                  });
+              }}
+              data-testid="sync.panel.publish"
+            >
+              {published
+                ? t("sync.panel.publish.republishCta")
+                : t("sync.panel.publish.cta")}
+            </Button>
+          }
+        />
+      )}
+
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>
         <SyncStatusIndicator
+          // A `reserved` identity's “not enrolled” is not a missing enrolment, it
+          // is a registration that never happened, and the panel says so in the
+          // row directly above. Two words for one state is how a reader concludes
+          // the app wants two separate acts from them (2026-10-25).
+          notRegistered={needsRegistration}
           onUnlockIdentity={
-            hasCapability("memberSharing") ? () => setIdentityUnlockOpen(true) : undefined
+            // Same plane as the identity block above, so the same gate: the
+            // unlock action opens the identity's own prompt, which needs no
+            // member surface (myne-md/myne#911 task 13). Withheld on a `reserved`
+            // identity for the reason the control slot states: there is nothing
+            // an unlock alone could enable.
+            hasCapability("personIdentity") && !needsRegistration
+              ? () => setIdentityUnlockOpen(true)
+              : undefined
           }
         />
         <BuildingIndexState building={buildingIndex} />
@@ -684,6 +907,12 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           one, the roster, the member each device is claimed by) against the
           people the vault is shared with. */}
       <SettingsSection title={t("sync.panel.sections.devices")}>
+      {/* The ACCOUNT model in one sentence, above the controls that act on it.
+          Without it the section reads as a list of vault participants: the reader
+          has to infer whether a device is added to this vault or to the person.
+          It is added to the person, and that is the one fact this surface owed
+          (2026-10-25, `decisions/protocol/0731`). */}
+      <p style={HELPER_STYLE}>{t("sync.panel.devices.helper")}</p>
       {/* The beta-terms gate (operations#15). One of three doors that turn sync
           on, and the gate stands in front of each — a consent screen at one
           door is not a consent screen.
@@ -697,7 +926,7 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           place until they are accepted. The form is not merely covered — it is
           not rendered — so dismissing the dialog cannot reveal a route past the
           text it was asking about. */}
-      {showEnroll && !betaTerms.pending && (
+      {showEnrollForm && !betaTerms.pending && (
         <div style={BLOCK_STYLE} data-setting-anchor="sync.add-device" data-setting-row="true">
           <span style={SECTION_TITLE_STYLE}>
             {t("sync.panel.addDevice.label")}
@@ -747,41 +976,53 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
-        {/* The device-join QR is an icon in this header rather than a
-            full-width block below (myne-md/myne#831). Only an already-enrolled
-            device can invite another by showing one. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
-          {enrolledHere ? (
-            <Tooltip label={t("sync.deviceJoinQr.title")}>
-              <IconButton
-                icon="plus"
-                label={t("sync.deviceJoinQr.title")}
+        {/* The device-join action is a LABELLED button, not a bare `+`
+            (2026-10-25 owner report: "it looks as if a vault is being added").
+            An icon-only plus beside a "Devices" sub-heading had to be hovered to
+            learn what it added, and the answer differs by identity plane: on an
+            owner it signs ANOTHER device in to the account, on a member it signs
+            their own second device in to THIS vault. One word beside the control
+            says which, and the pair never renders together (`enrolledHere` is
+            owner-only, the member arm is the other plane), so the two never
+            compete for one slot.
+
+            The redundant "Devices" sub-heading is gone with it: the section above
+            is already titled "Devices on your account", and "devices" twice in a
+            row is the vocabulary this change exists to fix. */}
+        {(enrolledHere || plane === "member") && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+            }}
+          >
+            {/* The owner arm needs an ENROLLED device to show a code for another
+                one; the member arm needs the member plane. The two never render
+                together, so one slot carries one action and one label. */}
+            {enrolledHere ? (
+              <Button
+                variant="secondary"
                 onClick={() => setQrOpen(true)}
-                testId="sync.device-join-qr.open"
-              />
-            </Tooltip>
-          ) : null}
-          {/* A member's own-device QR (myne-md/myne). Same slot as the owner's
-              above and never both: this one needs no pasted account number,
-              because it describes the shared vault this device is already in. */}
-          {plane === "member" ? (
-            <Tooltip label={t("sync.memberJoinQr.title")}>
-              <IconButton
-                icon="plus"
-                label={t("sync.memberJoinQr.title")}
+                data-testid="sync.device-join-qr.open"
+              >
+                {t("sync.deviceJoinQr.title")}
+              </Button>
+            ) : null}
+            {/* A member's own-device QR: no pasted account number, because it
+                describes the shared vault this device is already a member of. */}
+            {plane === "member" ? (
+              <Button
+                variant="secondary"
                 onClick={() => setMemberQrOpen(true)}
-                testId="sync.member-join-qr.open"
-              />
-            </Tooltip>
-          ) : null}
-        </div>
+                data-testid="sync.member-join-qr.open"
+              >
+                {t("sync.memberJoinQr.title")}
+              </Button>
+            ) : null}
+          </div>
+        )}
         <DeviceManagementPanel hook={devicesHook} plane={plane} />
       </div>
 
@@ -807,7 +1048,9 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       {hasCapability("memberSharing") && (
         <>
         <div data-setting-anchor="sync.members" data-setting-row="true">
-          <MemberRosterPanel onDialogOpenChange={setRosterDialogOpen} />
+          <MemberRosterPanel
+            onDialogOpenChange={setRosterDialogOpen}
+          />
         </div>
 
       {/* The vault's devices with the member each is CLAIMED by (myne-md/myne#852
@@ -818,11 +1061,14 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           roster, for the same reason: on a client with no person-identity
           carrier there is no member to attribute a device to, and the store
           itself is group-tier sealed. */}
-        <SettingsSection title={t("sync.deviceBindings.title")}>
+        {/* One heading, not two. The panel draws its own `SettingsSection`, and
+            wrapping it in a second one put "MEMBER DEVICES" above "CLAIMED
+            DEVICES": two titles for one block, which is the shape that made the
+            owner read three separate device lists on this topic (2026-10-25).
+            The anchor div stays, because the settings search scrolls to it. */}
         <div style={BLOCK_STYLE} data-setting-anchor="sync.device-bindings" data-setting-row="true">
           <DeviceAttributionPanel />
         </div>
-        </SettingsSection>
         </>
       )}
       </SettingsTopicPanel>
@@ -879,7 +1125,15 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         onCreated={handleIdentityCreated}
       />
 
-      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
+      {/* The owner's device-join code. A vault born under an identity has no
+          account number, so its code names the PERSON and the payload comes from
+          this device's own identity (myne-md/myne#911 task 9); a legacy vault
+          keeps the account-number form. */}
+      <DeviceJoinQrDialog
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        variant={publishState?.person_born ? "person" : "account"}
+      />
 
       <Toast
         message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}
