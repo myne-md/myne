@@ -1610,7 +1610,9 @@
     "tagSuggestion": {
       "label": "Suggested tags",
       "accept": "Add the tag {{tag}} to this note",
-      "dismiss": "Dismiss the suggested tag {{tag}}"
+      "dismiss": "Dismiss the suggested tag {{tag}}",
+      "groupExisting": "In your vault",
+      "groupNew": "New"
     },
     "taskField": {
       "addAffordance": "Add task field",
@@ -2785,6 +2787,10 @@
     },
     "workspace": {
       "defaultSlotName": "Default"
+    },
+    "autoTag": {
+      "applied": "Tags added: {{tags}}",
+      "undo": "Undo"
     }
   },
   "photoNote": {
@@ -3623,7 +3629,7 @@
       "pendingHint": "Coming soon"
     },
     "ai": {
-      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion.",
+      "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion, unless you turn on the row below.",
       "historyBudgetInline": "How much of the recent conversation each request carries, in characters.",
       "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
@@ -3775,7 +3781,9 @@
         "memory": "Memory",
         "excluded": "What AI can read",
         "history": "Chat history"
-      }
+      },
+      "autoApplyLabel": "Apply suggested tags automatically",
+      "autoApplyHelper": "Writes the tags into the note without asking, once per note each session, only after you edit it. On this device only. Undo sits under the note after it writes."
     },
     "memory": {
       "heading": "What the assistant remembers",
@@ -4348,7 +4356,7 @@
       "invalidAccount": "That doesn’t look like a valid account number.",
       "notConfigured": "Configure a sync server first, then make a QR.",
       "scanWithApp": "Scan with the iOS app",
-      "title": "Add a device with a QR"
+      "title": "Sign in another device"
     },
     "memberJoinQr": {
       "error": "Couldn’t make the code.",
@@ -4360,7 +4368,7 @@
       "stepIdentity": "On your other device, open Myne and choose “I already have an identity”.",
       "stepJoin": "This shared vault will be waiting in your invitations. Open it to join.",
       "stepPhrase": "Enter your 24-word recovery phrase there.",
-      "title": "Add your own device"
+      "title": "Sign in your second device"
     },
     "personJoinQr": {
       "title": "Add a device to your identity",
@@ -4380,7 +4388,7 @@
       "awaitingApproval_other": "{{count}} devices awaiting approval",
       "loading": "Loading…",
       "noDevices": "No other devices yet",
-      "notEnrolled": "This device isn’t connected yet. If you just added it, wait for approval from another device; otherwise add it with the “Add a device” form above.",
+      "notEnrolled": "This device isn’t signed in yet. If you just added it, wait for approval from a device that is already on your account; otherwise sign it in with “Sign in this device”.",
       "platform": {
         "android": "Android phone",
         "androidTablet": "Android tablet",
@@ -4529,7 +4537,7 @@
     "panel": {
       "addDevice": {
         "helper": "Sign in on a new device with your account number and password or recovery phrase. A device stays pending until an existing device approves it.",
-        "label": "Add a device"
+        "label": "Sign in this device"
       },
       "awaitingApproval": {
         "label": "Awaiting approval"
@@ -4539,7 +4547,8 @@
         "label": "Conflicts"
       },
       "devices": {
-        "label": "Devices"
+        "label": "Devices",
+        "helper": "One approval signs a device in to your account. It then sees every vault you own, and each vault still opens with its own password."
       },
       "recovered": {
         "close": "Close",
@@ -4585,7 +4594,7 @@
       "sections": {
         "account": "Account",
         "server": "Server",
-        "devices": "Enrolled devices"
+        "devices": "Devices on your account"
       },
       "publish": {
         "label": "Publish to your server",
@@ -4726,20 +4735,19 @@
       "identityHeading": "Your identity",
       "membersHeading": "Members",
       "personUnlock": "Unlock member identity",
-      "personReady": "Member identity unlocked.",
+      "personReady": "Your identity is unlocked for this session.",
       "ownerCodeHint": "Share this code with the person you invite so they can verify the vault is yours. It contains only public information.",
-      "personLock": "Lock member identity",
+      "personLock": "Lock identity",
       "personError": "That phrase did not open a member identity.",
       "inviteHint": "Paste the invited member’s identity code (from their identity home).",
-      "inviteCodeLabel": "Member identity code",
+      "inviteCodeLabel": "Your identity code",
       "untitledVault": "Untitled vault",
       "inviteFailed": "The invite could not be created.",
+      "inviteNotOnServer": "This vault is not on your sync server yet. Publish it, and register your identity, then invite again.",
       "removeFailed": "The member could not be removed.",
       "emptyTitle": "No members yet",
       "personUnlockOpen": "Unlock",
-      "generationOwnsAlone": "This vault was born under your identity, and this vault generation cannot be shared with another person yet. Nothing here is broken: it is the only member, and its devices and members arrive with sharing.",
       "identityLockedNotice": "Unlock your identity for this session to manage members and invitations.",
-      "emptyOwnedAlone": "You are the only member.",
       "unsharedNotice": "This vault is not shared yet. Sharing it is permanent and happens the first time you invite someone.",
       "shareConfirmTitle": "Share this vault?",
       "shareConfirmBody": "Inviting someone turns this vault into a shared one: it gains a group key, and people you invite open its content with it. This change is permanent and there is no way back to a single-user vault. Continue to choose who to invite.",
@@ -4750,11 +4758,11 @@
       "identityForgetConfirm": "Forget identity",
       "identityForgetCancel": "Keep it",
       "identityForgetWarning": "This removes the identity from this device only. The server account and any vault it owns or joined are untouched, and you can recover the identity with its 24-word phrase on another device. Invites and roster actions on this device will need it unlocked again.",
-      "identityForgetError": "Could not forget the identity. Try again."
+      "identityForgetError": "Could not forget the identity. Try again.",
+      "invitationDeclined": "Declined"
     },
     "deviceBindings": {
-      "title": "Devices and members",
-      "heading": "Claimed devices",
+      "heading": "Member devices",
       "hint": "Each device that has claimed itself in this vault, with the member whose own signature claims it. A claim is not proof of ownership: it says which member signed the statement, not that the device is theirs.",
       "loading": "Loading devices…",
       "emptyTitle": "No devices claimed yet",
@@ -4765,7 +4773,6 @@
       "claimHint": "This device has no verified claim of its own in this vault. Claiming it again registers it under your identity, and it is also the repair for a claim that did not check out.",
       "claim": "Claim this device",
       "claiming": "Claiming…",
-      "generationOwnsAlone": "A vault born under your identity has no member devices to attribute yet, and this vault generation cannot be shared with another person, so there is nobody a device could be claimed by.",
       "unshared": "This vault is not shared yet, so there is no member to attribute a device to. Sharing it is permanent and happens the first time you invite someone.",
       "errorLocked": "Unlock the vault to read its devices.",
       "errorUnshared": "This vault is not shared, so it carries no device bindings.",
@@ -5043,10 +5050,10 @@
     "restoreHint": "Restoring from a backup isn't available on mobile yet.",
     "restoreCta": "Restore from a backup",
     "ioErrorHint": "Try again, or reopen Myne.",
-    "identityPhraseLink": "Forgot your password? Use your identity phrase",
+    "identityPhraseLink": "Use your identity phrase",
     "identityPhrase": {
       "title": "Unlock with your identity phrase",
-      "body": "This vault was upgraded to one-phrase recovery, so the vault phrase you saved for it no longer opens it. Enter the 24 words you wrote down for your identity.",
+      "body": "This vault opens with its password or with your identity phrase. If you saved a separate vault phrase for it, that one was retired and no longer opens it. Opening it with the 24 words you wrote down for your identity also unlocks your identity for this session, so sync runs without a second prompt.",
       "label": "Identity phrase",
       "hint": "24 words, in order.",
       "submit": "Unlock with identity phrase",
@@ -5364,9 +5371,16 @@
     "error": "Could not load invitations. Check your connection and sync server.",
     "retry": "Try again",
     "noIdentity": "This device holds no identity yet, so no invitation can be addressed to it.",
-    "notEnrolled": "This identity is not registered yet, so invitations cannot arrive. Register it in Settings, then check again.",
+    "notEnrolled": "This identity is not registered yet, so invitations addressed to it cannot be listed. Registering it is the act that lets them arrive.",
     "notice_one": "{{count}} invitation waiting",
-    "notice_other": "{{count}} invitations waiting"
+    "notice_other": "{{count}} invitations waiting",
+    "decline": "Decline",
+    "declineTitle": "Decline this invitation?",
+    "declineBody": "The invitation is deleted on your server, so it can never be accepted, and the owner sees that you declined rather than that they are still waiting. Getting it back means the owner inviting you again.",
+    "declineCta": "Decline invitation",
+    "declineFailed": "The invitation could not be declined. Try again.",
+    "noticeUnregistered": "Register this identity to see invitations",
+    "noticePending": "Invitations cannot be listed until this device is approved"
   },
   "firstRun": {
     "heading": "Create your identity"
@@ -5452,6 +5466,14 @@
       "finishingLead": "This phone is added to your account. Its vaults are being fetched now; each one still asks for its own password.",
       "listFailed": "This phone was added, but your account’s vaults did not arrive. Check your connection and try again.",
       "listRetry": "Fetch the vaults again"
+    },
+    "unlock": {
+      "title": "Unlock your identity",
+      "lead": "Your identity is sealed on this device for this session. Its 24-word recovery phrase opens it; nothing is sent anywhere.",
+      "open": "Unlock identity",
+      "cta": "Unlock",
+      "working": "Unlocking…",
+      "failed": "That phrase did not open this identity. Check the 24 words and try again."
     }
   },
   "identitySetup": {
@@ -5490,6 +5512,7 @@
   },
   "identityHome": {
     "createVaultCta": "Create a vault",
+    "createVaultLocked": "Unlock your identity to create a vault. It signs the vault's first member list, which is what makes the vault yours, and this device has it sealed for this session.",
     "invitesError": "Could not load invites. Check your connection and sync server.",
     "invitesHeading": "Invitations",
     "invitesLoading": "Checking for invitations…",

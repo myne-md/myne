@@ -76,6 +76,12 @@ export interface TagSuggestionTriggerDeps {
   /** The vault's existing tag vocabulary, read at fire time (it changes as the
    *  user accepts tags). */
   existingTags: () => Promise<readonly string[]>;
+  /** Tags offered to the PROMPT as reusable vocabulary, scoped to a folder
+   *  (myne-md/myne#908 item 8). Optional: when absent the prompt gets the whole
+   *  vocabulary, which is the pre-feature behaviour. It is read at fire time,
+   *  like the vocabulary itself, because a folder's tags change as the user
+   *  accepts. */
+  folderTags?: (folder: string) => Promise<readonly string[]>;
   /** `prefs.ai_excluded_folders`, read at fire time (SYNC-14). */
   excludedFolders: () => readonly string[];
   /** Called with each settled answer. */
@@ -185,12 +191,15 @@ export function createTagSuggestionTrigger(
     let pass: TagSuggestionPass;
     try {
       const existingTags = await deps.existingTags();
+      const hintTags =
+        deps.folderTags === undefined ? undefined : await deps.folderTags(note.noteFolder);
       if (epoch !== mine) return;
       pass = await runTagSuggestionPass({
         noteId: note.noteId,
         noteBody: note.noteBody,
         noteFolder: note.noteFolder,
         existingTags,
+        ...(hintTags === undefined ? {} : { hintTags }),
         excludedFolders: deps.excludedFolders(),
         suggest,
       });

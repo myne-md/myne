@@ -98,11 +98,20 @@ async function createIdentityFromSettings(session: Session): Promise<string[]> {
   });
   await done.click();
 
-  // The upgrade needs the identity's KEYPAIR in the session, not merely the
-  // sealed file on disk: an `NTV5` source signs its first roster. This is the
-  // assertion that the ceremony installed it, so a regression here fails as
-  // `IdentityLocked` in the next step rather than as a mystery.
-  await session.waitForElement(testIdSelector("sync.panel.identity-unlocked"), {
+  // **The block reports `unregistered`, not `unlocked`, and this scenario has no
+  // server, so that is the state it can honestly name (2026-10-25).** The panel's
+  // helper is one ternary — `needsRegistration ? unregistered : identityUnlocked
+  // ? unlocked : locked` — and a `reserved` identity (on this device, on no
+  // server) takes the FIRST arm however unlocked its session is, because
+  // `person_register` is what installs the person session and it needs a named
+  // endpoint. Waiting for `identity-unlocked` here was waiting for a word the
+  // panel deliberately stops printing.
+  //
+  // What the upgrade itself needs is the identity's KEYPAIR in the session, and
+  // that is still asserted, by its consequence: an `NTV5` source signs its first
+  // roster, so a ceremony that failed to install the keypair fails the upgrade
+  // step below as `IdentityLocked` rather than as a mystery.
+  await session.waitForElement(testIdSelector("sync.panel.identity-unregistered"), {
     timeoutMs: 20_000,
   });
   return words;

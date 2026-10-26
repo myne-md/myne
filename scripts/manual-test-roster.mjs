@@ -3612,6 +3612,8 @@ export const ROSTER = Object.freeze([
       "mobile/src/formfactor/SizeClassContext.tsx",
       "mobile/src/app/flows/editor/SidebarPane.tsx",
       "mobile/src/app/flows/EditorFlow.tsx",
+      "mobile/src/app/flows/editor/sheets/ListDrawer.tsx",
+      "mobile/src/app/flows/editor/caretRestore.ts",
       "mobile/src/ipad",
       "mobile/src/formfactor/",
       "mobile/src/app/AppShell.tsx",
@@ -3619,6 +3621,8 @@ export const ROSTER = Object.freeze([
     clients: ["ios", "android"],
     automatedBy: [
       "mobile/tests/flow-logic/settings/format-bar.flow.ts",
+      "mobile/tests/flow-logic/duo/band.flow.ts",
+      "mobile/tests/size-class.test.ts",
     ],
     manual: [
       {
@@ -3634,6 +3638,13 @@ export const ROSTER = Object.freeze([
         clients: ["ios", "android"],
         estimateMin: 6,
         tier: "core",
+      },
+      {
+        see: "On an iPhone Duo, open a note, put the caret in the middle of a paragraph and scroll to the middle of a long note, then fold the device in half. Confirm the note keeps every character, the caret stays where it was, the view does not jump to the top, the keyboard does not fight the transition, and the layout becomes the phone single-pane form. Unfold it and confirm the note returns to ONE wider column rather than the two-pane tablet layout, the caret is still where you left it, and the list opens over the note as a drawer instead of replacing it. Swipe the drawer toward its own edge and confirm it closes with the note underneath unmoved. Then run Myne beside another app and confirm the half-width window uses the phone layout with nothing clipped.",
+        whyNotAutomated: "The fold is a physical hinge event on a handset no CI lane has, and what `window.screen` reports across a real fold is the one thing this feature could not measure in a container: the flow tier pins both possible readings instead. The keyboard behaviour across the transition belongs to the iOS input system, and the hinge gesture itself has no driver equivalent.",
+        clients: ["ios"],
+        estimateMin: 12,
+        tier: "standard",
       },
     ],
     exemptionReason: "",

@@ -78,10 +78,11 @@ pub fn bindings_key_for_group(
 /// Resolve the family's keyspace from the raw group key and `vault.meta`. The meta is
 /// read ONCE, so the account hash and the epoch cannot come from two different files.
 ///
-/// A `vault.meta` that is not `NTV6` is [`DeviceBindingError::NotASharedVault`]: this
-/// family does not exist in a pre-B2B vault, where there is no `group_key` a member
-/// could read a member-writable binding map with, and no members to bind a device to.
-/// A caller holding only the owner root answers that before it gets here.
+/// A `vault.meta` with no B2B tail is [`DeviceBindingError::NotASharedVault`]: this family
+/// does not exist in a pre-B2B vault, where there is no `group_key` a member could read a
+/// member-writable binding map with, and no members to bind a device to. A caller holding
+/// only the owner root answers that before it gets here. `NTV6` and `NTV7` both carry the
+/// tail this family is sealed under (see the `_and_meta_` arm below).
 pub async fn resolve_bindings_from_group_key(
     io: &dyn VaultIo,
     group_key: &[u8; AEAD_KEY_LEN],
@@ -101,6 +102,13 @@ pub async fn resolve_bindings_from_group_key(
 /// time: two reads of `vault.meta` can observe different bytes, which is the rule
 /// [`bindings_key_for_group`] already states for the key and the epoch. One read, one
 /// account hash, one epoch, one envelope.
+///
+/// **Both tail generations are read, through `parse_b2b_tail_any`.** `NTV7` carries the
+/// `NTV6` tail byte for byte (`PersonWrappedVaultMeta::as_ntv6_tail`), so a person-born
+/// vault has exactly the tier this map is sealed under; parsing only `NTV6` made the
+/// family answer `NotASharedVault` on one. The signed roster envelope returned here is
+/// the same bytes on both, which is what lets the attribution partition verify a row's
+/// signature without a second read.
 pub async fn resolve_bindings_and_meta_from_group_key(
     io: &dyn VaultIo,
     group_key: &[u8; AEAD_KEY_LEN],
@@ -111,7 +119,7 @@ pub async fn resolve_bindings_and_meta_from_group_key(
         .await
         .map_err(|io_error_kind| DeviceBindingError::Io { io_error_kind })?;
     let b2b =
-        protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| DeviceBindingError::NotASharedVault)?;
+        protocol::parse_b2b_tail_any(&bytes).map_err(|_| DeviceBindingError::NotASharedVault)?;
     let resolved =
         bindings_key_for_group(group_key, b2b.base.account_number_hash, b2b.group_key_epoch);
     Ok((resolved, b2b))
@@ -232,5 +240,38 @@ mod tests {
         let kek =
             protocol::derive_group_subkey_v0_2(&GroupKey::new(GROUP), GroupRole::DeviceBindingKey);
         assert_ne!(bindings_sync_id(&GROUP), kek[..16]);
+    }
+
+    /// **A person-born (`NTV7`) `vault.meta` resolves this family's keyspace, and
+    /// carries its signed roster envelope.**
+    ///
+    /// The parse used to be `parse_vault_meta_ntv6`, which made the whole binding map
+    /// answer `NotASharedVault` on the one generation that is born with the group tier.
+    /// Reverting the parse to the `NTV6` one fails here with that variant.
+    #[test]
+    fn a_person_born_meta_resolves_the_same_tail_and_envelope() {
+        let dir = std::path::Path::new("/vault");
+        let frame = crate::test_support::person_born_meta_frame(0x6b);
+        let io = crate::vault_io::test_io::MemoryVaultIo::with_file(
+            dir.join("vault.meta"),
+            frame.clone(),
+        );
+        let (resolved, meta) = crate::test_support::block_on(
+            resolve_bindings_and_meta_from_group_key(&io, &GROUP, dir),
+        )
+        .expect("an NTV7 frame carries the tail this family reads");
+
+        assert_eq!(resolved.account_number_hash, [0x6b; 16]);
+        assert_eq!(resolved.group_key_epoch, 1);
+        assert_eq!(meta.group_key_epoch, 1);
+        // The attribution partition verifies a row's signature against this envelope,
+        // so the resolver has to hand back the frame's own bytes rather than an empty
+        // placeholder: an empty roster would verify nothing and read as "no bindings".
+        assert_eq!(
+            meta.signed_roster_envelope,
+            vec![0xC3; 64],
+            "the envelope must come from the parsed frame"
+        );
+        assert_eq!(frame.len(), protocol::NTV7_FIXED_LEN + 64);
     }
 }

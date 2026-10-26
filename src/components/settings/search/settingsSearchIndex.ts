@@ -465,7 +465,10 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.panel.devices.label",
+    // The section's own title, not the shorter `devices.label` the mobile panel
+    // still uses: a search result that lands on a heading has to name the
+    // heading the reader arrives at (2026-10-25, the same pass that renamed it).
+    titleKey: "sync.panel.sections.devices",
     keywordsKey: "settings.search.keywords.syncDevices",
   },
   {
@@ -513,7 +516,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.deviceBindings.title",
+    titleKey: "sync.deviceBindings.heading",
     descriptionKey: "sync.deviceBindings.hint",
     keywordsKey: "settings.search.keywords.syncDeviceBindings",
     // Same gate as `sync.members` above, and for the same reason: the block is

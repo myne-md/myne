@@ -68,6 +68,10 @@ permissions = [
     "allow-sync-person-register",
     "allow-sync-person-account-number",
     "allow-sync-person-list-invites",
+    # The recipient's refusal of an invitation (myne-md/myne#911 follow-up). A
+    # write against the relay, not against the vault: it releases no key and
+    # touches no vault content, so it sits beside the list it acts on.
+    "allow-sync-person-decline-invite",
     "allow-sync-person-lock",
     "allow-sync-start-b2b-migration",
     "allow-sync-remove-member",
@@ -227,6 +231,11 @@ commands.allow = ["sync_person_create_invite"]
 identifier = "allow-sync-list-vault-invites"
 description = "Allow invoking sync:sync_list_vault_invites (B2B owner-side: list the invitations this owner has sent for the active vault, with the recipient person id and the claimed flag. Authorized by the owner's per-vault token; no payload)."
 commands.allow = ["sync_list_vault_invites"]
+
+[[permission]]
+identifier = "allow-sync-person-decline-invite"
+description = "Allow invoking sync:sync_person_decline_invite (B2B: refuse an invitation addressed to this identity). The server drops the sealed payload, so the invitation can never be claimed, and the sender's own list reports it declined. Sends the device-scoped person token and the invite id and nothing else; no vault content, no key material, no vault access."
+commands.allow = ["sync_person_decline_invite"]
 
 [[permission]]
 identifier = "allow-sync-person-accept-invite"

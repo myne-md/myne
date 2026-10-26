@@ -9,6 +9,7 @@
 // flow until that lands, and the crypto behind it is identical either way.
 import {
   useEffect,
+  useId,
   useRef,
   useState,
   type CSSProperties,
@@ -19,8 +20,8 @@ import { startB2bMigration } from "../../lib/invite";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { usePrefs } from "../../hooks/usePrefs";
-import { useFocusTrap } from "../../hooks/useFocusTrap";
 import { Button } from "../primitives/Button";
+import { ModalShell } from "../primitives/ModalShell";
 import { IconButton } from "../primitives/IconButton";
 import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
 import { EmptyState } from "../primitives/EmptyState";
@@ -141,27 +142,10 @@ const NAME_ERROR_STYLE: CSSProperties = {
 
 export function MemberRosterPanel({
   onDialogOpenChange,
-  personBorn = null,
 }: {
   /** Raises the shell's child-dialog flag so one Escape closes THIS dialog
    *  rather than the whole Settings modal (SettingsModal's own gate comment). */
   onDialogOpenChange?: (open: boolean) => void;
-  /**
-   * Whether the active vault was BORN under a person identity (`NTV7`,
-   * `decisions/storage/0723`), or `null` while that is unknown.
-   *
-   * It decides one control and one sentence, and the reason is a stated limit
-   * rather than a guess: the member plane that writes a shared vault (invite,
-   * removal, group rotation) is `NTV6`-only, and the `NTV7` upgrade refuses a vault
-   * with a live second member, so a person-born vault is **owner-only on every
-   * client today** (`protocol.md` §9.29, "On `NTV7` the family is unreachable
-   * today, and that is stated rather than implied").
-   *
-   * Before this prop existed the panel offered "Invite member" on a vault that
-   * cannot invite, disabled and silent, and the 2026-10-25 owner report is exactly
-   * that screenshot: "I did everything and I still cannot click invite".
-   */
-  personBorn?: boolean | null;
 } = {}) {
   const { t } = useTranslation();
   const { prefs } = usePrefs();
@@ -206,11 +190,23 @@ export function MemberRosterPanel({
   const [forgetAck, setForgetAck] = useState(false);
   const [forgetBusy, setForgetBusy] = useState(false);
   const [forgetError, setForgetError] = useState(false);
+  // Stable ids for the child dialogs' `aria-labelledby` (they are conditionally
+  // rendered, so the ids must not depend on which one is up).
+  const shareConfirmLabelId = useId();
+  const inviteLabelId = useId();
+  const removeLabelId = useId();
+  const nameLabelId = useId();
   // The generation answer, read once here because two blocks below need it: the
   // invite control and the "not shared yet" sentence. `null` (unknown) keeps the
   // pre-change behaviour, which is what a client that cannot read the publish
   // state should get.
-  const generationOwnsAlone = personBorn === true;
+  //
+  // **`NTV7` no longer appears here, and its absence is the change.** A vault born
+  // under a person identity used to be owner-only (`protocol.md` §9.29, and the
+  // `0729` decision that stated it on five surfaces): the invite control was
+  // withheld and a sentence said the generation could not be shared. The member
+  // plane reads that generation's tail now, so the panel offers the same controls on
+  // every vault and has no generation branch left to get wrong.
   // The unlock door for a LOCKED identity, mounted here rather than pointed at.
   // The Identity row that owns it lives in the Connection topic, so a reader on
   // the Devices topic had a disabled button, no sentence, and no way to fix it
@@ -350,12 +346,11 @@ export function MemberRosterPanel({
   // state already says "invite someone", so the button belongs with that
   // sentence rather than floating under the box.
   //
-  // **Absent, not disabled, on a generation that cannot share** (2026-10-25).
-  // `protocol.md` §9.29 states that a person-born vault is owner-only today, so
-  // this control was an offer the product cannot honour, and it said nothing while
-  // refusing: the report was "I did everything and I still cannot click invite".
-  // The sentence that replaces it is `generationNotice` below.
-  const inviteButton = generationOwnsAlone ? null : (
+  // It is offered on every generation now. It used to be absent on a person-born
+  // vault with a sentence where it would have been, because the member plane was
+  // `NTV6`-only; that limit is gone, so both the absent-not-disabled carve-out and
+  // the sentence that explained it are gone with it.
+  const inviteButton = (
     <Button
       type="button"
       variant="primary"
@@ -375,14 +370,6 @@ export function MemberRosterPanel({
       {t("sync.memberRoster.invite")}
     </Button>
   );
-  // Why the invite is not there, in the one place a reader looks for it. Two
-  // facts and no promise: what this vault is, and that the person who owns it
-  // can still reach it from another device by moving the vault, not by sharing.
-  const generationNotice = generationOwnsAlone ? (
-    <p data-testid="member-roster.generation-notice" style={HELPER_STYLE}>
-      {t("sync.memberRoster.generationOwnsAlone")}
-    </p>
-  ) : null;
 
   return (
     <div data-testid="member-roster" style={ROOT_STYLE}>
@@ -540,15 +527,7 @@ export function MemberRosterPanel({
           icon="user"
           size="sm"
           title={t("sync.memberRoster.emptyTitle")}
-          // The zero state asks the question, so it owes the answer for THIS
-          // vault. "Invite someone to share this vault" is a instruction on a
-          // generation that cannot invite, and the sentence above already carries
-          // the reason, so this arm states the fact once and stops.
-          body={t(
-            generationOwnsAlone
-              ? "sync.memberRoster.emptyOwnedAlone"
-              : "sync.memberRoster.empty",
-          )}
+          body={t("sync.memberRoster.empty")}
           {...(authority === "owner" && inviteButton !== null ? { action: inviteButton } : {})}
           testId="member-roster.empty"
         />
@@ -618,9 +597,11 @@ export function MemberRosterPanel({
                 {/* The rename affordance, on the caller's own row only, the
                     owner's included: `is_self` is the identity-based test the
                     backend enforces in the key, and `shared` is here because the
-                    family is `NTV6`-only, so on a birth-format vault the control
-                    would only ever answer `NotASharedVault`. Omitted rather than
-                    shown broken, per the platform-seam rule. */}
+                    family needs the GROUP tier, which a vault gains only by being
+                    shared. It used to say "the family is `NTV6`-only", which stopped
+                    being true when the resolver learned `parse_b2b_tail_any`
+                    (`decisions/protocol/0730`); the gate is unchanged because a
+                    vault with no group tier still has nowhere to hold a name. */}
                 {m.is_self && shared && nameEdit === null ? (
                   <Button
                     type="button"
@@ -675,11 +656,12 @@ export function MemberRosterPanel({
               </li>
             ))}
           </ul>
-          {generationOwnsAlone ? null : (
-            <p data-testid="member-roster.removal-limits" style={STATUS_STYLE}>
-              {t("sync.memberRoster.removalLimits")}
-            </p>
-          )}
+          {/* The removal disclosure is about an act this vault can now perform on
+              every generation: it used to be withheld on a person-born vault because
+              there was no member for it to describe. */}
+          <p data-testid="member-roster.removal-limits" style={STATUS_STYLE}>
+            {t("sync.memberRoster.removalLimits")}
+          </p>
         </>
       )}
 
@@ -688,20 +670,16 @@ export function MemberRosterPanel({
           sentence is about the PANEL's missing action, not about this vault having
           no members, and it is the whole story on a vault whose only member is the
           reader. */}
-      {generationNotice}
-
       {/* An unshared vault says so once, plainly, instead of leaving the reader
           to infer it from an error line. `shared` is the roster view's
           `group_key_epoch`, so this is a state and not a guess.
 
-          Withheld on a person-born vault, deliberately: that vault DOES carry the
-          group tier from birth (epoch 1, a one-row owner roster), so `shared` is
-          true there and this line never rendered anyway. Its job on `NTV5` is
-          unchanged, and the person-born case has its own sentence above
-          (`generationNotice`), because "not shared yet" and "cannot be shared"
-          are different facts and the old copy promised the second would end on the
-          first invite. */}
-      {authority === "owner" && personReady && !shared && !generationOwnsAlone ? (
+          A person-born vault never reaches here: it carries the group tier from
+          birth (epoch 1, a one-row owner roster), so `shared` is true there. The
+          old comment explained the absence of a second sentence for that
+          generation; there is no such sentence now, because there is no longer a
+          generation that cannot share. */}
+      {authority === "owner" && personReady && !shared ? (
         <p data-testid="member-roster.unshared" style={HELPER_STYLE}>
           {t("sync.memberRoster.unsharedNotice")}
         </p>
@@ -781,11 +759,14 @@ export function MemberRosterPanel({
                   <span
                     data-testid="member-roster.invitation-status"
                     data-claimed={inv.claimed ? "true" : "false"}
+                    data-declined={inv.declined ? "true" : "false"}
                     style={STATUS_STYLE}
                   >
-                    {inv.claimed
-                      ? t("sync.memberRoster.invitationClaimed")
-                      : t("sync.memberRoster.invitationPending")}
+                    {inv.declined
+                      ? t("sync.memberRoster.invitationDeclined")
+                      : inv.claimed
+                        ? t("sync.memberRoster.invitationClaimed")
+                        : t("sync.memberRoster.invitationPending")}
                   </span>
                 </li>
               ))}
@@ -801,14 +782,13 @@ export function MemberRosterPanel({
       ) : null}
 
       {shareConfirmOpen ? (
-        <div
-          data-testid="member-roster.share-confirm"
-          role="dialog"
-          aria-modal="true"
-          aria-label={t("sync.memberRoster.shareConfirmTitle")}
-          style={SECTION_STYLE}
+        <ModalShell
+          open
+          testId="member-roster.share-confirm"
+          labelId={shareConfirmLabelId}
+          title={t("sync.memberRoster.shareConfirmTitle")}
+          onClose={() => setShareConfirmOpen(false)}
         >
-          <p style={STATUS_STYLE}>{t("sync.memberRoster.shareConfirmTitle")}</p>
           <p data-testid="sync.memberRoster.shareConfirmBody" style={STATUS_STYLE}>
             {t("sync.memberRoster.shareConfirmBody")}
           </p>
@@ -842,11 +822,12 @@ export function MemberRosterPanel({
               {t("sync.memberRoster.shareConfirmCta")}
             </Button>
           </div>
-        </div>
+        </ModalShell>
       ) : null}
 
       {inviteOpen ? (
         <InviteMemberModal
+          labelId={inviteLabelId}
           busy={inviting}
           onCancel={() => setInviteOpen(false)}
           onSubmit={async (input) => {
@@ -863,11 +844,26 @@ export function MemberRosterPanel({
             // step), so this is a plain invite. Any failure is reported as-is:
             // the retired hidden retry turned a real error into a second
             // attempt the user could not see or reason about.
+            //
+            // `NotEnrolled` is the one refusal that gets its own sentence. It is
+            // what a vault with no server record answers, and it is REACHABLE on
+            // a vault born under an identity: such a vault invites with the
+            // person session, and a vault that was never published has no
+            // selector to address (`vault_selector_hex`), so the backend refuses
+            // before any round trip. "The invite could not be created" reads as a
+            // broken product when the act that is missing is publishing.
             try {
               await invite(args);
               setInviteOpen(false);
-            } catch {
-              setActionError(t("sync.memberRoster.inviteFailed"));
+            } catch (e) {
+              const kind = (e as { kind?: string } | null)?.kind;
+              setActionError(
+                t(
+                  kind === "NotEnrolled"
+                    ? "sync.memberRoster.inviteNotOnServer"
+                    : "sync.memberRoster.inviteFailed",
+                ),
+              );
             }
           }}
         />
@@ -875,6 +871,7 @@ export function MemberRosterPanel({
 
       {removeTarget ? (
         <RemoveConfirmDialog
+          labelId={removeLabelId}
           name={
             removeTarget.display_name ||
             removeTarget.fingerprint_hex.slice(0, 16)
@@ -894,6 +891,7 @@ export function MemberRosterPanel({
 
       {nameEdit !== null ? (
         <MemberNameDialog
+          labelId={nameLabelId}
           draft={nameEdit.draft}
           busy={nameBusy}
           errorKey={nameError}
@@ -922,12 +920,12 @@ export function MemberRosterPanel({
 /** The display-name dialog (2026-10-25 owner report: "Set a name" should open a
  *  dialog, not grow an editor inside the row).
  *
- *  It is the PANEL's dialog pattern rather than `ModalShell`, which the
- *  Settings-level dialogs use: this panel is already inside the Settings modal, so
- *  a second modal chrome would stack two backdrops. `RemoveConfirmDialog` and
- *  `InviteMemberModal` are the same shape — a `role="dialog"` with a focus trap and
- *  Escape — and the panel reports it through `childDialogOpen` so the shell stands
- *  its own Escape handler down while it is up.
+ *  It runs on the shared `ModalShell` like every other modal in the app, which
+ *  is the 2026-10-25 P4 pass: the panel's four child dialogs used to be hand
+ *  rolled `role="dialog"` divs (no backdrop, no card, no centred position) with
+ *  a comment claiming a second backdrop would stack. It does stack, and that is
+ *  the right shape: a dialog over the Settings modal dims it rather than
+ *  appearing as another block of the page.
  *
  *  A name is a signed, synced, other-device-visible record (its own row in
  *  `vault.member-names`, `MYO5`), which is why it earns a dialog rather than an
@@ -936,6 +934,7 @@ export function MemberRosterPanel({
  *  from saving an empty name, because the backend refuses the latter by design: a
  *  tombstone is what makes a cleared name win a merge. */
 function MemberNameDialog({
+  labelId,
   draft,
   busy,
   errorKey,
@@ -944,6 +943,7 @@ function MemberNameDialog({
   onClear,
   onCancel,
 }: {
+  labelId: string;
   draft: string;
   busy: boolean;
   errorKey: string | null;
@@ -953,17 +953,13 @@ function MemberNameDialog({
   onCancel: () => void;
 }) {
   const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(ref, { enabled: true });
-  useEscapeToClose(onCancel);
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("sync.memberRoster.nameLabel")}
-      data-testid="member-roster.name-dialog"
-      style={STATUS_STYLE}
+    <ModalShell
+      open
+      testId="member-roster.name-dialog"
+      labelId={labelId}
+      title={t("sync.memberRoster.nameLabel")}
+      onClose={onCancel}
     >
       <form
         onSubmit={(e) => {
@@ -1008,94 +1004,78 @@ function MemberNameDialog({
           </Button>
         </div>
       </form>
-    </div>
+    </ModalShell>
   );
 }
 
-/** Escape closes the topmost child dialog (the invite form, while removal
- *  is parked). */
-function useEscapeToClose(onClose: () => void) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-}
-
-/** The removal confirm. A modal dialog with a focus trap and Escape-to-close,
- *  matching `InviteMemberModal`, so focus is moved in and `aria-modal="true"`
- *  is truthful. */
+/** The removal confirm, on the shared `ModalShell` like its siblings (P4). */
 function RemoveConfirmDialog({
+  labelId,
   name,
   busy,
   onCancel,
   onConfirm,
 }: {
+  labelId: string;
   name: string;
   busy: boolean;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(ref, { enabled: true });
-  useEscapeToClose(onCancel);
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("sync.memberRoster.remove")}
-      data-testid="member-roster.remove-confirm"
-      style={STATUS_STYLE}
+    <ModalShell
+      open
+      testId="member-roster.remove-confirm"
+      labelId={labelId}
+      title={t("sync.memberRoster.remove")}
+      onClose={onCancel}
     >
       <p>{t("sync.memberRoster.removeConfirm", { name })}</p>
-      <Button
-        type="button"
-        data-testid="member-roster.remove-cancel"
-        onClick={onCancel}
-      >
-        {t("common.cancel")}
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        data-testid="member-roster.remove-submit"
-        disabled={busy}
-        onClick={() => void onConfirm()}
-      >
-        {t("sync.memberRoster.remove")}
-      </Button>
-    </div>
+      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <Button
+          type="button"
+          data-testid="member-roster.remove-cancel"
+          onClick={onCancel}
+        >
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          data-testid="member-roster.remove-submit"
+          disabled={busy}
+          onClick={() => void onConfirm()}
+        >
+          {t("sync.memberRoster.remove")}
+        </Button>
+      </div>
+    </ModalShell>
   );
 }
 
 /** The invite form. The invitee's identity code is pasted and the invite is
  *  sealed and relayed from it. The code carries public material only. */
 function InviteMemberModal({
+  labelId,
   busy,
   onCancel,
   onSubmit,
 }: {
+  labelId: string;
   busy: boolean;
   onCancel: () => void;
   onSubmit: (input: { recipientCode: string }) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [code, setCode] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
-  useFocusTrap(ref, { enabled: true });
-  useEscapeToClose(onCancel);
   return (
-    <div
-      ref={ref}
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("sync.memberRoster.invite")}
-      data-testid="member-roster.invite-modal"
-      style={STATUS_STYLE}
+    <ModalShell
+      open
+      testId="member-roster.invite-modal"
+      labelId={labelId}
+      title={t("sync.memberRoster.invite")}
+      onClose={onCancel}
     >
       <p>{t("sync.memberRoster.inviteHint")}</p>
       <textarea
@@ -1108,18 +1088,20 @@ function InviteMemberModal({
         rows={4}
         style={MULTILINE_STYLE}
       />
-      <Button type="button" data-testid="member-roster.invite-cancel" onClick={onCancel}>
-        {t("common.cancel")}
-      </Button>
-      <Button
-        type="button"
-        variant="primary"
-        data-testid="member-roster.invite-confirm"
-        disabled={busy || code.trim() === ""}
-        onClick={() => onSubmit({ recipientCode: code.trim() })}
-      >
-        {t("sync.memberRoster.invite")}
-      </Button>
-    </div>
+      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+        <Button type="button" data-testid="member-roster.invite-cancel" onClick={onCancel}>
+          {t("common.cancel")}
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          data-testid="member-roster.invite-confirm"
+          disabled={busy || code.trim() === ""}
+          onClick={() => onSubmit({ recipientCode: code.trim() })}
+        >
+          {t("sync.memberRoster.invite")}
+        </Button>
+      </div>
+    </ModalShell>
   );
 }

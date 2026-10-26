@@ -25,6 +25,11 @@ import { rankTagCandidates, type TagSuggestion } from "./tagRanker";
 /** Max notes-body characters fed to the tag prompt (a token proxy budget). */
 export const TAG_PROMPT_BODY_CHARS = 2000;
 
+/** Max tags offered to the model as reusable vocabulary (myne-md/myne#908 item
+ *  8). A hint list is context, not a taxonomy dump: a 0.5B model given a hundred
+ *  tags treats them as noise and picks the adjacent one. */
+export const TAG_HINT_MAX = 12;
+
 /** Max candidate tags surfaced from one pass (sprawl guard on the model). */
 export const MAX_TAG_SUGGESTIONS = 8;
 
@@ -87,9 +92,13 @@ export function buildTagPrompt(
   existingTags: readonly string[],
 ): string {
   const body = tagPromptBody(noteBody);
+  // Bounded at the prompt boundary, not only at the caller: the hint used to be
+  // every tag in the vault, which is both a token cost and the thing that made a
+  // note about one project eligible for another project's tag.
+  const hintList = existingTags.slice(0, TAG_HINT_MAX);
   const hint =
-    existingTags.length > 0
-      ? `Prefer reusing these existing tags when relevant: ${existingTags.join(", ")}.\n\n`
+    hintList.length > 0
+      ? `Prefer reusing these existing tags when relevant: ${hintList.join(", ")}.\n\n`
       : "";
   return (
     `Suggest up to ${MAX_TAG_SUGGESTIONS} topical tags for the note below, ` +
@@ -132,8 +141,17 @@ export interface TagSuggestionPassInput {
   noteBody: string;
   /** The note's canonical trailing-slash folder (`""` = vault root). */
   noteFolder: string;
-  /** The vault's existing tag vocabulary (folded index, RAM cache). */
+  /** The vault's existing tag vocabulary (folded index, RAM cache). This is
+   *  what the RANKER folds against, so "already in the vault" stays a true
+   *  statement for the chip's existing/new grouping even when the prompt hint is
+   *  narrower. */
   existingTags: readonly string[];
+  /** The tags the PROMPT may offer for reuse, pre-ranked by the caller
+   *  (myne-md/myne#908 item 8). Defaults to `existingTags`, which is the
+   *  pre-feature behaviour for any caller that does not scope it. The two are
+   *  deliberately separate: scoping the hint must not reclassify a vault tag as
+   *  new. */
+  hintTags?: readonly string[];
   /** `prefs.ai_excluded_folders` (SYNC-14). */
   excludedFolders: readonly string[];
   /** The dedicated tag model (stubbed in tests). */
@@ -154,7 +172,7 @@ export async function runTagSuggestionPass(
   if (isNoteAiExcluded(input.noteFolder, input.excludedFolders)) {
     return { suggestions: [], skipped: true, deferred: false };
   }
-  const prompt = buildTagPrompt(input.noteBody, input.existingTags);
+  const prompt = buildTagPrompt(input.noteBody, input.hintTags ?? input.existingTags);
   let raw: string;
   try {
     raw = await input.suggest({ noteId: input.noteId, prompt });

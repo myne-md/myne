@@ -419,7 +419,11 @@ async fn gather_awareness_ctx<R: Runtime>(app: &AppHandle<R>) -> Option<([u8; 16
     // task 4): an `NTV6` B2B vault carries it, so a frame sealed under a RETIRED epoch
     // fails to open (`open_awareness_frame` takes it as AAD). A single-user (or pre-B2B)
     // vault has none, and the epoch stays `None`.
-    let epoch = protocol::parse_vault_meta_ntv6(&meta)
+    // Both tail generations carry the epoch (`NTV7` is `NTV6` plus the person wrap), and a
+    // member of a person-born vault is on `NTV7`: reading only the `NTV6` frame left `epoch`
+    // as `None` there, so frames were sealed without the AAD component this function exists
+    // to bind.
+    let epoch = protocol::parse_b2b_tail_any(&meta)
         .ok()
         .map(|m| m.group_key_epoch);
     Some((account, epoch))

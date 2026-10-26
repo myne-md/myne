@@ -57,7 +57,6 @@ import {
 import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
-import { Tooltip } from "../primitives/Tooltip";
 import { Input } from "../primitives/Input";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -908,6 +907,12 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           one, the roster, the member each device is claimed by) against the
           people the vault is shared with. */}
       <SettingsSection title={t("sync.panel.sections.devices")}>
+      {/* The ACCOUNT model in one sentence, above the controls that act on it.
+          Without it the section reads as a list of vault participants: the reader
+          has to infer whether a device is added to this vault or to the person.
+          It is added to the person, and that is the one fact this surface owed
+          (2026-10-25, `decisions/protocol/0731`). */}
+      <p style={HELPER_STYLE}>{t("sync.panel.devices.helper")}</p>
       {/* The beta-terms gate (operations#15). One of three doors that turn sync
           on, and the gate stands in front of each — a consent screen at one
           door is not a consent screen.
@@ -971,41 +976,53 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
-        {/* The device-join QR is an icon in this header rather than a
-            full-width block below (myne-md/myne#831). Only an already-enrolled
-            device can invite another by showing one. */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <span style={SECTION_TITLE_STYLE}>{t("sync.panel.devices.label")}</span>
-          {enrolledHere ? (
-            <Tooltip label={t("sync.deviceJoinQr.title")}>
-              <IconButton
-                icon="plus"
-                label={t("sync.deviceJoinQr.title")}
+        {/* The device-join action is a LABELLED button, not a bare `+`
+            (2026-10-25 owner report: "it looks as if a vault is being added").
+            An icon-only plus beside a "Devices" sub-heading had to be hovered to
+            learn what it added, and the answer differs by identity plane: on an
+            owner it signs ANOTHER device in to the account, on a member it signs
+            their own second device in to THIS vault. One word beside the control
+            says which, and the pair never renders together (`enrolledHere` is
+            owner-only, the member arm is the other plane), so the two never
+            compete for one slot.
+
+            The redundant "Devices" sub-heading is gone with it: the section above
+            is already titled "Devices on your account", and "devices" twice in a
+            row is the vocabulary this change exists to fix. */}
+        {(enrolledHere || plane === "member") && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "var(--space-3)",
+            }}
+          >
+            {/* The owner arm needs an ENROLLED device to show a code for another
+                one; the member arm needs the member plane. The two never render
+                together, so one slot carries one action and one label. */}
+            {enrolledHere ? (
+              <Button
+                variant="secondary"
                 onClick={() => setQrOpen(true)}
-                testId="sync.device-join-qr.open"
-              />
-            </Tooltip>
-          ) : null}
-          {/* A member's own-device QR (myne-md/myne). Same slot as the owner's
-              above and never both: this one needs no pasted account number,
-              because it describes the shared vault this device is already in. */}
-          {plane === "member" ? (
-            <Tooltip label={t("sync.memberJoinQr.title")}>
-              <IconButton
-                icon="plus"
-                label={t("sync.memberJoinQr.title")}
+                data-testid="sync.device-join-qr.open"
+              >
+                {t("sync.deviceJoinQr.title")}
+              </Button>
+            ) : null}
+            {/* A member's own-device QR: no pasted account number, because it
+                describes the shared vault this device is already a member of. */}
+            {plane === "member" ? (
+              <Button
+                variant="secondary"
                 onClick={() => setMemberQrOpen(true)}
-                testId="sync.member-join-qr.open"
-              />
-            </Tooltip>
-          ) : null}
-        </div>
+                data-testid="sync.member-join-qr.open"
+              >
+                {t("sync.memberJoinQr.title")}
+              </Button>
+            ) : null}
+          </div>
+        )}
         <DeviceManagementPanel hook={devicesHook} plane={plane} />
       </div>
 
@@ -1033,10 +1050,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         <div data-setting-anchor="sync.members" data-setting-row="true">
           <MemberRosterPanel
             onDialogOpenChange={setRosterDialogOpen}
-            // The generation, from the ONE durable read this panel already holds.
-            // `null` while unread (or on a client without the command) keeps the
-            // pre-change behaviour rather than claiming a limit it cannot prove.
-            personBorn={publishState?.person_born ?? null}
           />
         </div>
 
@@ -1048,11 +1061,14 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           roster, for the same reason: on a client with no person-identity
           carrier there is no member to attribute a device to, and the store
           itself is group-tier sealed. */}
-        <SettingsSection title={t("sync.deviceBindings.title")}>
+        {/* One heading, not two. The panel draws its own `SettingsSection`, and
+            wrapping it in a second one put "MEMBER DEVICES" above "CLAIMED
+            DEVICES": two titles for one block, which is the shape that made the
+            owner read three separate device lists on this topic (2026-10-25).
+            The anchor div stays, because the settings search scrolls to it. */}
         <div style={BLOCK_STYLE} data-setting-anchor="sync.device-bindings" data-setting-row="true">
-          <DeviceAttributionPanel personBorn={publishState?.person_born ?? null} />
+          <DeviceAttributionPanel />
         </div>
-        </SettingsSection>
         </>
       )}
       </SettingsTopicPanel>

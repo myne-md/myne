@@ -39,8 +39,10 @@ export type VaultUpgradeError = {
     /** This session is a MEMBER of the vault; a member does not author the
      *  credential side of an owner-signed frame. */
     | "NotOwner"
-    /** The vault is shared with another person. The person-wrapped generation
-     *  is owner-only until the member plane can write its tail. */
+    /** The vault is shared with another person. This is a ROLLOUT rule, not a
+     *  capability one: a client that predates the person-wrapped generation
+     *  rejects the magic outright, and a shared vault's other devices belong to
+     *  other people. `protocol.md` §10.4.2 item 9. */
     | "SharedVault"
     /** No vault is open. */
     | "NotUnlocked"

@@ -157,6 +157,23 @@ export interface PersonStatusView {
   sealed_keypair_present: boolean;
 }
 
+/**
+ * Why the invitation list could not be produced.
+ *
+ * - `no-identity`: this device holds no person identity at all.
+ * - `not-enrolled`: it holds one, but the server does not know it yet, so there
+ *   is nothing for an owner to invite. Registering (identity home, Settings, or
+ *   the invitation dialog's own door) is the act.
+ * - `pending`: it is registered and waiting for this device's approval, so it has
+ *   an account and no token. Registration would not help and is not offered.
+ * - `error`: the relay call failed. The address is fine and a retry may work.
+ *
+ * It lives here rather than in the hook because three components read it
+ * (`VaultPicker`, `VaultSwitcher`, `InvitesDialog`) and none of them should have
+ * to import a hook module to name a state.
+ */
+export type InvitesUnavailable = "no-identity" | "not-enrolled" | "pending" | "error";
+
 /** Device-local probe; no network. Drives the identity-only home. */
 export async function personStatus(): Promise<PersonStatusView> {
   return invoke<PersonStatusView>("plugin:sync|sync_person_status");
@@ -173,6 +190,22 @@ export interface InviteSummary {
 /** List the invites addressed to this person account (sealed relay). */
 export async function personListInvites(): Promise<InviteSummary[]> {
   return invoke<InviteSummary[]>("plugin:sync|sync_person_list_invites");
+}
+
+/**
+ * Refuse an invitation addressed to this identity.
+ *
+ * The server DROPS the sealed payload, so the invitation can never be claimed and
+ * the sender's own list reports it declined instead of "not accepted yet". It is
+ * a real delete rather than a client-side hide, which is what makes "decline"
+ * mean something to the person who sent it (myne-md/myne#911 follow-up).
+ *
+ * Refused `DeviceNotFound` for an id this identity does not hold, and
+ * `BadRequest` once the invitation has already been accepted: ending that
+ * membership is the owner's removal, not a declined invitation.
+ */
+export async function personDeclineInvite(inviteIdHex: string): Promise<void> {
+  return invoke<void>("plugin:sync|sync_person_decline_invite", { inviteIdHex });
 }
 
 /** What a successful acceptance reports: public fields only. */

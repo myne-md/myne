@@ -200,3 +200,24 @@ describe("the strip never ends flush against the window edge", () => {
     expect(screen.getByTestId("editor.tab-strip").style.paddingInlineEnd).toBe("76px");
   });
 });
+
+describe("tab title reveal (myne-md/myne#908 item 6)", () => {
+  it("carries no native title tooltip on the tab", () => {
+    setup();
+    const tabs = screen.getAllByTestId("editor.tab");
+    for (const tab of tabs) expect(tab.getAttribute("title")).toBeNull();
+  });
+
+  it("marks the label box so the reveal has a measurable target", () => {
+    setup();
+    const label = screen.getAllByTestId("editor.tab-label")[0];
+    expect(label).toBeTruthy();
+    expect(label?.style.overflow).toBe("hidden");
+    // The ellipsis stays at REST and is dropped only while the reveal runs:
+    // removing it outright deleted every truncation mark in the strip.
+    expect(label?.style.textOverflow).toBe("ellipsis");
+    // And the text is `inline` at rest, because an inline-block child is an
+    // atomic box that swallows the parent's ellipsis.
+    expect(label?.firstElementChild?.style.display).toBe("inline");
+  });
+});

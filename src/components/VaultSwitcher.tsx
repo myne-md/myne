@@ -51,6 +51,7 @@ import {
 } from "../lib/vault-list";
 import { VAULT_PREFS_CHANGED_EVENT } from "../lib/prefs";
 import { formatRelativeTime, useTick } from "../notes/components/relativeTime";
+import type { InvitesUnavailable } from "../lib/personAccount";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
 
@@ -87,8 +88,15 @@ interface VaultSwitcherProps {
    * already-unlocked device has: the picker is a boot surface, and a user who
    * works inside their vault would otherwise have to lock it and quit to learn
    * that someone invited them.
+   *
+   * `invitesUnavailable` is the arm that keeps the row when the count cannot be
+   * KNOWN. An invitation is addressed to a registered person account, so an
+   * identity this device created but never registered lists nothing and would
+   * otherwise wait in silence, with the only explanation on a screen it is not
+   * looking at (`decisions/ui/0725`).
    */
   inviteCount?: number;
+  invitesUnavailable?: InvitesUnavailable | null;
   /** Open the invitations dialog. The caller tears the vault down first. */
   onInvites?: () => void;
   /**
@@ -329,6 +337,7 @@ export function VaultSwitcher({
   onCreateAnother,
   onJoinDevice,
   inviteCount = 0,
+  invitesUnavailable,
   onInvites,
   switching,
 }: VaultSwitcherProps) {
@@ -766,20 +775,34 @@ export function VaultSwitcher({
 
           <hr style={DIVIDER_STYLE} aria-hidden="true" />
 
-          {inviteCount > 0 && onInvites !== undefined && (
-            <Button
-              variant="ghost"
-              icon="id-card"
-              onClick={() => {
-                setOpen(false);
-                onInvites();
-              }}
-              style={FOOTER_STYLE}
-              data-testid="switcher.invites-notice"
-            >
-              <span>{t("invites.notice", { count: inviteCount })}</span>
-            </Button>
-          )}
+          {onInvites !== undefined &&
+            (inviteCount > 0 ||
+              invitesUnavailable === "not-enrolled" ||
+              invitesUnavailable === "pending") && (
+              <Button
+                variant="ghost"
+                icon="id-card"
+                onClick={() => {
+                  setOpen(false);
+                  onInvites();
+                }}
+                style={FOOTER_STYLE}
+                data-testid="switcher.invites-notice"
+                data-invites={
+                  inviteCount > 0 ? "count" : (invitesUnavailable ?? undefined)
+                }
+              >
+                <span>
+                  {inviteCount > 0
+                    ? t("invites.notice", { count: inviteCount })
+                    : t(
+                        invitesUnavailable === "pending"
+                          ? "invites.noticePending"
+                          : "invites.noticeUnregistered",
+                      )}
+                </span>
+              </Button>
+            )}
 
           <button
             type="button"

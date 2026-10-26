@@ -1588,7 +1588,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
 
         "plugin:vault-indices|vault_indices_tag_tree" => {
             use myne_core::plugins::vault_indices::commands::vault_indices_tag_tree_from_host;
+            // myne-md/myne#908 item 8: the folder scope is OPTIONAL, and the
+            // web client passes none (the auto-tag pass is desktop-only, so it
+            // has nothing to scope). `None` is the whole-vault answer, which is
+            // exactly what the tag browser here reads.
             match vault_indices_tag_tree_from_host(
+                None,
                 crate::session::state(),
                 crate::session::indices(),
             )

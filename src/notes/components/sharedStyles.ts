@@ -47,3 +47,26 @@ export const SIDEBAR_CARD_STYLE: CSSProperties = {
   cursor: "pointer",
   fontFamily: "inherit",
 };
+
+/**
+ * The unfocused pane's dim (myne-md/myne#908 item 3).
+ *
+ * A split workspace had no visual difference between the pane holding the caret
+ * and the others. The treatment is a BRIGHTNESS reduction on the pane itself,
+ * not an overlay: an overlay has to pick a colour, and every colour that works
+ * on one theme is wrong on another. A foreground wash LIGHTENS a dark pane
+ * (which reads as a highlight rather than a recession, measured on AMOLED first,
+ * then visible on dark too), and a black wash does nothing at all on AMOLED's
+ * true black. Lowering the pane's brightness is the one operation that means
+ * "this is not the active one" in every theme, including the pure-black one.
+ *
+ * `0.8` keeps the other pane readable, which is the point of having it open:
+ * this dims, it does not hide.
+ */
+export function paneDimStyle(
+  focused: boolean,
+  paneCount: number,
+): CSSProperties | null {
+  if (focused || paneCount < 2) return null;
+  return { filter: "brightness(0.8)" };
+}
