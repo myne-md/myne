@@ -14,6 +14,17 @@
   consistent with the no-telemetry / no-analytics posture. Myne opens NO other
   local-network sockets and declares no Bonjour service.
 
+  ITSAppUsesNonExemptEncryption: App Store Connect will not show a build to
+  TestFlight testers until export compliance is answered, and an unanswered build
+  sits as `MISSING_EXPORT_COMPLIANCE` with `processingState: VALID` — the upload
+  says nothing is wrong. Declaring it here answers the question at upload time so
+  no release depends on somebody noticing. `false` is the honest value: Myne uses
+  only OS-provided cryptography (Keychain, Apple CryptoKit-adjacent primitives
+  through RustCrypto) and ships no proprietary or non-exempt encryption, the same
+  claim the App Store listing makes. myne-md/myne#929's v0.11.0 run hit this:
+  the build was accepted and then invisible until the declaration was PATCHed in
+  through the App Store Connect API.
+
   NSFaceIDUsageDescription: required by the biometric quick-unlock provider
   (MYND-329; main repo docs/decisions.md 2026-07-12) — without it iOS denies
   the Face ID evaluation behind the gated Keychain read
@@ -41,6 +52,8 @@
 -->
 <plist version="1.0">
 <dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Myne connects to a Myne sync server on your local network only if you set one up. It never scans your network or sends any data anywhere else.</string>
 	<key>NSFaceIDUsageDescription</key>
