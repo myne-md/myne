@@ -1610,7 +1610,9 @@
     "tagSuggestion": {
       "label": "Suggested tags",
       "accept": "Add the tag {{tag}} to this note",
-      "dismiss": "Dismiss the suggested tag {{tag}}"
+      "dismiss": "Dismiss the suggested tag {{tag}}",
+      "groupExisting": "In your vault",
+      "groupNew": "New"
     },
     "taskField": {
       "addAffordance": "Add task field",
