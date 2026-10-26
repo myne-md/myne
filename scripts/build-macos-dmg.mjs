@@ -104,16 +104,19 @@ for (const bin of sidecars) {
     console.error(`sidecar not found in the app bundle: ${bin}`);
     process.exit(1);
   }
-  run("codesign", ["--force", "--sign", ID, path]);
+  run("codesign", ["--force", "--options", "runtime", "--sign", ID, path]);
 }
-run("codesign", [
-  "--force",
-  "--sign",
-  ID,
-  "--entitlements",
-  join(ROOT, "src-tauri/entitlements.plist"),
-  APP,
-]);
+// The app is signed WITHOUT `src-tauri/entitlements.plist`, which is now an
+// empty dict on purpose. That file used to carry `keychain-access-groups`, and on
+// macOS 26 that restricted entitlement made the app unlaunchable
+// (`Launchd job spawn failed`, NSPOSIXErrorDomain 163) even with an embedded
+// development profile, a matching certificate and the profile's own
+// application-identifier entitlement. It granted nothing: the Touch ID provider
+// sets no access group, so its items already live in the default group, which is
+// the identifier the entitlement named. Reintroducing it needs a Developer ID
+// provisioning profile with Keychain Sharing, not another entitlement edit.
+run("codesign", ["--force", "--options", "runtime", "--sign", ID, APP]);
+
 run("codesign", ["--verify", "--verbose=2", APP]);
 
 // 4. Rebuild the DMG from the fixed app using Tauri's own script (the chrome, the
