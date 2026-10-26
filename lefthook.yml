@@ -784,6 +784,22 @@ pre-commit:
       glob: "*.{rs,json}"
       run: node scripts/check-cli-sidecar.mjs
 
+    mcp-tool-surface:
+      # external-mcp-connection (myne-md/myne#923): the compiled MCP tool list
+      # must stay a constant expression over string literals AND name no
+      # capability outside the vault. `mcp/src/tools_test.rs` asserts the same
+      # thing from inside the build, and that is exactly why this exists: a check
+      # that only runs when somebody runs `cargo test` is a check that did not
+      # run. It reads `mcp/src/tool_list.rs`, the declaration itself, never a
+      # document about it.
+      #
+      # Globbed to the crate plus this script: the answer changes when the list
+      # changes, and nowhere else. A no-fetch/no-shell/no-clipboard surface is
+      # the one rule the whole feature rests on: a tool that reaches outside the
+      # vault makes Myne the exfiltration path rather than the data source.
+      glob: "{mcp/**,scripts/check-mcp-tool-surface.mjs}"
+      run: node scripts/check-mcp-tool-surface.mjs
+
     clipper-identifiers:
       # The clipper's three load-bearing identifiers (myne-md/myne#558). Every
       # pairing token binds to an extension ID, and the native-messaging host

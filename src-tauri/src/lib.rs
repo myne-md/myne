@@ -419,6 +419,11 @@ pub fn run() {
         .plugin(plugins::themes::init())
         .plugin(plugins::member_names::init())
         .plugin(plugins::device_binding::init())
+        // external-mcp-connection (myne-md/myne#923): the two read-only
+        // commands behind Settings > AI > External access. Registered
+        // unconditionally; the section that calls them renders only where the
+        // `externalMcp` capability exists, which is desktop only.
+        .plugin(plugins::mcp::init())
         .plugin(plugins::notes::init())
         .plugin(plugins::snapshots::init())
         .plugin(plugins::sync::init())
@@ -667,7 +672,9 @@ pub fn run() {
             // best-effort and non-fatal (the clipper wrapper's discipline),
             // and NOT gated on `cli_enabled`: the CLI's "access is disabled,
             // enable it in Settings" refusal is only readable if the command
-            // exists. Never clobbers a `myne` we did not write.
+            // exists. Never clobbers a command we did not write — and the same
+            // reconcile installs `myne-mcp` (external-mcp-connection task 1),
+            // each with its own ownership marker.
             cli_bridge::path_shim::reconcile();
             // Shared command-core lifecycle hooks (myne-core). The desktop
             // impl captures the AppHandle and delegates to the desktop-only

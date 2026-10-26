@@ -40,12 +40,14 @@
 //!   (task 10). A slowdown against a runaway script, NOT a protection —
 //!   read that module's own opening paragraph before writing any copy that
 //!   mentions it.
-//! - [`path_shim`] — how the bundled sidecar becomes a typeable command
+//! - [`path_shim`] — how a bundled sidecar becomes a typeable command
 //!   (task 11): a `~/.local/bin/myne` launcher reconciled on every startup,
-//!   which never clobbers a `myne` it did not write and is deliberately NOT
+//!   which never clobbers a command it did not write and is deliberately NOT
 //!   gated on `cli_enabled` (a refusal you can only read if the command
-//!   exists). The bundling half is `tauri.conf.json`'s `externalBin` plus
-//!   `scripts/build-cli-sidecar.mjs`.
+//!   exists). The same reconcile installs `~/.local/bin/myne-mcp`
+//!   (external-mcp-connection task 1), with its own ownership marker so the
+//!   two launchers cannot claim each other's file. The bundling half is
+//!   `tauri.conf.json`'s `externalBin` plus `scripts/build-{cli,mcp}-sidecar.mjs`.
 //! - [`activity`] — the session-memory "when did the door last serve a
 //!   command" marker behind the Settings last-access line (task 12). RAM
 //!   only; read that module's docs before considering persisting it.
@@ -112,6 +114,8 @@ pub mod framing;
 pub mod gate;
 #[cfg(test)]
 mod logging_discipline;
+#[cfg(all(test, unix))]
+mod mcp_door_test;
 pub mod path_shim;
 #[cfg(windows)]
 mod pipe;

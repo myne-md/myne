@@ -25,6 +25,7 @@
     "scripts/check-prefs-parity.mjs."
   ],
   "states": {
+    "revoke_mcp_connection": "called|never-bound",
     "set_active_workspace": "called|bound-no-caller",
     "set_auto_tag_enabled": "called|never-bound",
     "set_bar_items_order": "called|bound-no-caller",
@@ -40,6 +41,7 @@
     "set_folder_notes_enabled": "called|never-bound",
     "set_hidden_bar_items": "called|bound-no-caller",
     "set_keymap_binding": "called|bound-no-caller",
+    "set_mcp_connection_grant": "called|never-bound",
     "set_new_note_location": "called|bound-no-caller",
     "set_ribbon_items": "called|never-bound",
     "set_ribbon_visible": "called|never-bound",
@@ -53,6 +55,7 @@
     "set_view_approval": "called|never-bound"
   },
   "oneSided": {
+    "revoke_mcp_connection": "Desktop calls it; mobile has nothing to call it from. The caller is the external-access section's per-connection Revoke (`src/components/settings/McpSection.tsx`, via `src/lib/prefs.ts`), which renders only under the `externalMcp` capability: mobile's descriptor answers that one false, because `myne-mcp` is a desktop sidecar installed on a PATH and a phone has neither a shell nor a PATH. The gap is therefore structural rather than temporary, and the verdict stays one-sided on purpose. Note the state columns: desktop went `never-bound` -> `called` when the section shipped, and the row's remaining absence is mobile's.",
     "set_active_workspace": "Desktop-shaped by nature, expected to stay desktop-only: workspaces are a desktop bottom-bar surface, and no mobile screen reads or writes the active workspace. The binding exists on mobile only so the twin prefs modules keep identical export names (myne-md/myne#486). Recorded rather than deleted for that reason, and recorded here so a future parity audit does not re-open it as a gap.",
     "set_auto_tag_enabled": "Whole feature absent on mobile: automatic tag suggestion has no mobile surface and no mobile reader, so the phone neither honours nor can set it. The remedy is a feature rather than a row, and it stays desktop-only until that feature is decided. Not a defect this branch introduces or can close.",
     "set_bar_items_order": "Desktop-shaped by nature: the bottom-bar reorder surface is desktop-only, since resolveBarOrder and reorderByDrop have no mobile caller, so the order is default-only on this client. Twin-parity binding, already recorded as dead in scripts/ipc-binding-callers.json for the same reason.",
@@ -68,6 +71,7 @@
     "set_folder_notes_enabled": "Whole feature absent on mobile: folder notes have no mobile surface and no mobile reader, so the phone neither honours nor can set the off-switch. The remedy is a feature rather than a row. Not a defect this branch introduces or can close.",
     "set_hidden_bar_items": "Desktop-shaped by nature: bottom-bar customization, and there is no mobile bar to customize and no mobile reader. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
     "set_keymap_binding": "Desktop-shaped by nature, expected to stay desktop-only: mobile has no keymap surface at all, and nothing on this client reads or writes the pref, not even the prefs default object. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
+    "set_mcp_connection_grant": "Desktop calls it; mobile has nothing to call it from. The caller is the external-access approval dialog (`src/components/settings/McpGrantDialog.tsx`, via `src/lib/prefs.ts`) and the delta row's one-click extend on the section, both of which render only under the `externalMcp` capability. Mobile's descriptor answers that one false, because `myne-mcp` is a desktop sidecar installed on a PATH and a phone has neither a shell nor a PATH. There is deliberately no mobile twin to write: a phone holds no grant, so a phone-side setter would author an approval nothing could ever use.",
     "set_new_note_location": "Desktop-shaped by nature: the new-note location preference, and the mobile creation flow offers no location choice and nothing reads the default. Already recorded as dead on mobile in scripts/ipc-binding-callers.json.",
     "set_ribbon_items": "Desktop-shaped by nature: the rail is how a desktop's chrome is arranged, and mobile has no rail. §10.2 classifies it device-local for exactly that reason, so a synced value would mean nothing on a phone.",
     "set_ribbon_visible": "Desktop-shaped by nature, the visibility half of set_ribbon_items: mobile has no rail to show or hide. Device-local by §10.2 for the same reason.",

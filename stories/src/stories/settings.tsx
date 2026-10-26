@@ -51,6 +51,8 @@ import { LineNumbersSettings } from "@app/components/settings/LineNumbersSetting
 import { MemorySection } from "@app/components/settings/MemorySection";
 import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
 import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
+import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
+import { McpSection } from "@app/components/settings/McpSection";
 import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
 import { NewNoteLocationSettings } from "@app/components/settings/NewNoteLocationSettings";
@@ -230,6 +232,46 @@ const SYNC_FIXTURE: Fixture = {
     // "NaN KiB of NaN KiB" and "undefined of undefined" (myne-md/myne#843).
     "plugin:sync|sync_account_status": () => null,
     "plugin:sync|sync_list_devices": () => [],
+  },
+};
+
+/** Same vault, with two approved external MCP connections (myne-md/myne#923). */
+const MCP_FIXTURE: Fixture = {
+  description: "one unlocked vault with two approved external MCP connections",
+  handlers: {
+    ...PREFS_FIXTURE.handlers,
+    "plugin:mcp|mcp_external_access": () => ({
+      connections: [
+        {
+          name: "claude-desktop",
+          readFolders: ["Projects/", "Work/"],
+          missingFolders: [],
+          writeFolders: [],
+          approvedAt: 1_761_000_000,
+          lastUsedAt: 1_761_000_600,
+          noteCount: 412,
+          deltaFolders: ["Projects/New/"],
+        },
+        {
+          name: "lm-studio",
+          readFolders: ["Archive/"],
+          missingFolders: ["Old/"],
+          writeFolders: [],
+          approvedAt: 1_759_000_000,
+          lastUsedAt: null,
+          noteCount: 7,
+          deltaFolders: [],
+        },
+      ],
+      folders: ["", "Archive/", "Projects/", "Projects/Deep/", "Work/"],
+      noteCount: 512,
+    }),
+    "plugin:mcp|mcp_grant_preview": () => ({
+      noteCount: 512,
+      folderCount: 5,
+      excludedCount: 0,
+      folders: ["", "Archive/", "Projects/", "Projects/Deep/", "Projects/New/", "Work/"],
+    }),
   },
 };
 
@@ -565,6 +607,64 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           onSetEnabled={action("onSetEnabled")}
           onSetExcludedFolders={action("onSetExcludedFolders")}
           onSetRateLimitDisabled={action("onSetRateLimitDisabled")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/mcpsection/default",
+    group: "settings",
+    surface: "McpSection",
+    state: "default",
+    description:
+      "The external-access section under Settings → AI → Limits: the master switch for the myne-mcp door, two approved connections with what each may read and when it was last used, and per-connection Revoke plus the setup snippet a client's config pastes. A connection's name is a label rather than a credential, and the section states plainly what Myne does not control about what a connected tool does with what it reads.",
+    tags: [
+      "settings",
+      "ai",
+      "mcp",
+      "external-access",
+      "connections",
+      "revoke",
+      "developer-mode",
+      "device-local",
+    ],
+    fixture: MCP_FIXTURE,
+    render: () => (
+      <Frame>
+        <McpSection
+          enabled
+          onSetEnabled={action("onSetEnabled")}
+          onShowToast={action("onShowToast")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/mcpgrantdialog/default",
+    group: "settings",
+    surface: "McpGrantDialog",
+    state: "default",
+    description:
+      "The one-time approval screen for an external MCP connection: the counts the host resolved (notes, folders, exclusions) rather than a description of the rule, the folder exclusions chosen before approving, and the two bounds stated plainly. The set is frozen at approval, so a folder created later starts outside it; what the connected tool does with what it reads is outside Myne.",
+    tags: [
+      "settings",
+      "ai",
+      "mcp",
+      "external-access",
+      "consent",
+      "scope",
+      "exclusions",
+      "frozen-snapshot",
+    ],
+    fixture: MCP_FIXTURE,
+    render: () => (
+      <Frame>
+        <McpGrantDialog
+          open
+          connection={null}
+          folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
+          onApprove={async () => true}
+          onClose={action("onClose")}
         />
       </Frame>
     ),

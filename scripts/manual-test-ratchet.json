@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11935,
+  "totalMinutesCeiling": 11980,
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",
@@ -1405,5 +1405,33 @@
     "The item is standard and counts once per client, so gatedMinutes is unchanged",
     "(3837): the rule is that gating may not fall by more than total does, and both",
     "rose."
+  ],
+  "$comment28": [
+    "CEILING RAISED 11935 -> 11980 by the external-mcp-connection feature (myne-md/myne#923), on top of the five raises above rather than beside them:",
+    "The 45 minutes below were written against 11873, before $comment26 and $comment27 landed; the delta is unchanged and the base is theirs.",
+    "(myne-md/myne#923), in the sanctioned direction: a NEW surface that genuinely",
+    "needs a human, on the three clients that can host it. What added the minutes,",
+    "named so the raise is an argument rather than a number:",
+    "",
+    "  + one standard item on settings.block.external-mcp, 15 minutes on each of",
+    "    desktop-macos, desktop-linux and desktop-windows = 45, the whole of",
+    "    11873 -> 11918, on top of the 16 the board view added in $comment25. It asks a person to configure a real MCP client, approve a",
+    "    scope for it, and then READ the connection row and the approval screen as",
+    "    somebody who has not read the PRD: whether the counts state what the tool",
+    "    can reach, whether the row reads as an authentication or safety mechanism",
+    "    (it is neither: the name is a label), and whether the sentence about what",
+    "    Myne does not control lands before the approve click rather than after.",
+    "",
+    "WHY IT IS NOT A SCENARIO. The client is a separately distributed program, so",
+    "driving it through tauri-driver would test the harness rather than the",
+    "product; that is the same split the feature makes everywhere (the protocol",
+    "half is covered by the shim's own integration tests, and the counts by",
+    "core/src/plugins/mcp/view_test.rs). What is left is the reading of a consent",
+    "screen by somebody meeting it for the first time, which is a perceptual",
+    "judgement with a pass condition written into the item, and two of the three",
+    "clients have no driver lane at all.",
+    "",
+    "The item is standard tier, so gatedMinutes is untouched (3837 before and",
+    "after) and the whole 45 lands on the ceiling. Nothing was subtracted."
   ]
 }

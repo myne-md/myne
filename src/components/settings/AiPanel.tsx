@@ -68,6 +68,7 @@ import type {
   ProviderModel,
 } from "../../lib/ai-model-store";
 import { usePrefs } from "../../hooks/usePrefs";
+import { has } from "../../platform/capabilities";
 import {
   endpointRejectionOf,
   listProviderModels,
@@ -115,6 +116,7 @@ import { SettingRow } from "./SettingRow";
 import { SettingsTopicPanel } from "./SettingsTabs";
 import { SettingsSection } from "./SettingsSection";
 import { MemorySection } from "./MemorySection";
+import { McpSection } from "./McpSection";
 import {
   AiModelCatalogue,
   ACTION_CELL_STYLE as TABLE_ACTION_CELL_STYLE,
@@ -479,6 +481,10 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
     setAutoTagEnabled,
     setChatHistoryBudget,
     setMeetingAiPrompt,
+    // `cli_enabled` is the master switch for external access, and the section
+    // that renders it lives in this panel (Limits) while the CLI panel renders the
+    // other door. One field, two surfaces; the copy says so.
+    setCliEnabled,
   } = usePrefs(onShowToast);
   // Local draft for the meeting-AI prompt textarea: it writes on blur rather
   // than on every keystroke, and resyncs when the stored value changes (a sync
@@ -593,10 +599,14 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
   // **Only the provider consent is a dialog now** (myne-md/myne#885): the model
   // catalogue left its `ModalShell` for an inline table, so there is no second
   // dialog to gate the shell's Esc on.
+  // The external-access approval dialog is a second modal of ours, so the gate is
+  // the OR of the two. Its own effect reports into the same state, and both reset
+  // on unmount because the shell's flag outlives this panel.
+  const [mcpDialogOpen, setMcpDialogOpen] = useState(false);
   useEffect(() => {
-    onDialogOpenChange?.(pendingProvider !== null);
+    onDialogOpenChange?.(pendingProvider !== null || mcpDialogOpen);
     return () => onDialogOpenChange?.(false);
-  }, [pendingProvider, onDialogOpenChange]);
+  }, [pendingProvider, mcpDialogOpen, onDialogOpenChange]);
   // The provider's own catalogue, and the three states it can be in. `null` is
   // "not asked yet" and is NOT the same as `[]` ("asked, and the provider
   // published none") — collapsing them would tell the user a provider has no
@@ -1910,6 +1920,22 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
         )}
       />
       </SettingsSection>
+
+      {/* **External access** (external-mcp-connection, myne-md/myne#923): the
+          third answer to what this panel's Limits topic asks, and the only one
+          that is about a program other than Myne. Absent rather than disabled
+          where `externalMcp` is missing (`decisions.md` 2026-07-26): no client but
+          desktop can host the sidecar the section describes. */}
+      {has("externalMcp") && (
+        <McpSection
+          enabled={prefs.cli_enabled}
+          onSetEnabled={(next) => {
+            void setCliEnabled(next);
+          }}
+          onShowToast={onShowToast}
+          onDialogOpenChange={setMcpDialogOpen}
+        />
+      )}
       </SettingsTopicPanel>
 
       {/* **Advanced**: the knobs a user reaches for once the rest works: the

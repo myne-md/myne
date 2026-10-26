@@ -277,6 +277,12 @@ export const NO_FIELD = new Set(["prefs_read", "ai_provider_has_key", "device_pl
  */
 export const FIELD_OVERRIDES = {
   set_keymap_binding: "keymap",
+  // external-mcp-connection (myne-md/myne#923): two verbs over one map, like
+  // the saved-views pair above. The command names carry the verb because the
+  // host stamps the approval time and normalizes the name, so neither is a
+  // plain whole-value write.
+  set_mcp_connection_grant: "mcp_connections",
+  revoke_mcp_connection: "mcp_connections",
   upsert_saved_view: "saved_views",
   delete_saved_view: "saved_views",
   // view-manifests: the command acts on ONE view's approval, while the field is

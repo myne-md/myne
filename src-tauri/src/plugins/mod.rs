@@ -50,6 +50,11 @@ pub mod importer;
 // commands. Core in `myne-core::plugins::live`; this shim registers them.
 pub mod live;
 pub mod member_names;
+// external-mcp-connection (myne-md/myne#923): the Settings reads behind the
+// external-access section. Core in `myne-core::plugins::mcp::commands`; this
+// shim registers the two read-only commands. Desktop-only by construction (the
+// `myne-mcp` sidecar ships in this bundle), and `Unsupported` on web.
+pub mod mcp;
 pub mod memory;
 // local-ai epic (MYND-406): on-device inference plugin, gated behind the
 // default-off `local-inference` cargo feature (SYNC-5). Absent — zero symbols —

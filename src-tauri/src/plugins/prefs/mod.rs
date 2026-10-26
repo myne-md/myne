@@ -179,6 +179,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // view-manifests: read + strictly validate ONE `.myneview` file.
             // Needs its own `allow-` entry like every command above.
             import::read_view_manifest,
+            // external-mcp-connection task 3: the external MCP connection grant
+            // (device-local, §10.2) — approve/re-approve one named connection and
+            // revoke one. Each needs a matching allow- entry in
+            // permissions/prefs/default.toml and a name in build.rs's inlined
+            // command list.
+            commands::set_mcp_connection_grant,
+            commands::revoke_mcp_connection,
         ])
         .build()
 }

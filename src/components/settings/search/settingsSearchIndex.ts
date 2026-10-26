@@ -1294,6 +1294,33 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     descriptionKey: "settings.ai.excludedHelper",
     keywordsKey: "settings.search.keywords.aiExcluded",
   },
+  // External access (external-mcp-connection, myne-md/myne#923): the master switch
+  // for the `myne-mcp` door, in the same Limits topic because it answers the same
+  // question about a different program.
+  //
+  // **Its own capability, not `localAi`.** The AI panel is dropped from the rail
+  // where `localAi` is absent, so a client without on-device AI renders no panel
+  // and this entry inherits that absence for free; the `externalMcp` gate is what
+  // keeps it off a client that has AI but no sidecar (a page, a phone), where the
+  // section really is omitted.
+  //
+  // `WRITABILITY_CONTROL` rather than `WRITABILITY_DEVICE_LOCAL`, which is the
+  // other verdict this row could carry: `cli_enabled` IS stored device-local, but
+  // the reason it must not be agent-writable is the stronger one, and it is what
+  // the field's twin in the CLI panel already says. Two verdicts for one field
+  // would be worse than either.
+  {
+    id: "ai.external-access",
+    agentWritability: WRITABILITY_CONTROL,
+    capability: "externalMcp",
+    developerGated: true,
+    panelId: "ai",
+    topic: "limits",
+    testid: "settings.mcp-enable",
+    titleKey: "settings.ai.externalAccess.label",
+    descriptionKey: "settings.ai.externalAccess.helperOff",
+    keywordsKey: "settings.search.keywords.externalAccess",
+  },
   {
     id: "ai.memory",
     agentWritability: WRITABILITY_NONE,

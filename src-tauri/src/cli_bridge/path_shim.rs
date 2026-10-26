@@ -1,25 +1,30 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The `myne` PATH shim — how the bundled sidecar becomes a command the user
-//! can type (cli-thin-client task 11; MYND-490).
+//! The `myne` and `myne-mcp` PATH shims — how the bundled sidecars become
+//! commands the user can type (cli-thin-client task 11; MYND-490, extended by
+//! external-mcp-connection task 1; myne-md/myne#923).
 //!
-//! Tauri's `externalBin` puts the CLI binary *inside* the bundle, beside the
+//! Tauri's `externalBin` puts the sidecars *inside* the bundle, beside the
 //! desktop executable (`Myne.app/Contents/MacOS/myne`, or next to
-//! `myne-desktop` on Linux). That ships it; it does not make `myne list` work
-//! in a fresh shell. This module writes a tiny launcher into the user's own
-//! `~/.local/bin`, following `super::super::clipper::install`'s wrapper
-//! precedent exactly: a `#!/bin/sh` one-liner that `exec`s the real sidecar,
-//! rewritten on every startup so its target tracks the current binary
-//! (dev ↔ prod), best-effort and non-fatal.
+//! `myne-desktop` on Linux). That ships them; it does not make `myne list` or a
+//! client's `{"command": "myne-mcp"}` line work in a fresh shell. This module
+//! writes a tiny launcher per command into the user's own `~/.local/bin`,
+//! following `super::super::clipper::install`'s wrapper precedent exactly: a
+//! `#!/bin/sh` one-liner that `exec`s the real sidecar, rewritten on every
+//! startup so its target tracks the current binary (dev ↔ prod), best-effort
+//! and non-fatal.
 //!
 //! ## Three rules that shape everything here
 //!
-//! 1. **Never clobber somebody else's `myne`.** Before writing anything we
-//!    resolve `myne` on the live `$PATH`. A hit we did not write (no
-//!    [`SHIM_MARKER`]) is left strictly alone and reported as
+//! 1. **Never clobber somebody else's command.** Before writing anything we
+//!    resolve the command on the live `$PATH`. A hit we did not write (no
+//!    matching [`SHIM_MARKER`]) is left strictly alone and reported as
 //!    [`ShimOutcome::ForeignOnPath`] — the user's own binary wins, and the
-//!    desktop app is not in the business of shadowing it. A hit that IS the
-//!    sidecar itself (a distro package that already installed it to
-//!    `/usr/bin/myne` — see `packaging/arch/PKGBUILD`) needs no shim at all.
+//!    desktop app is not in the business of shadowing it. The marker is
+//!    **per command** ([`CLI_SHIM`], [`MCP_SHIM`]): a file written for one is
+//!    never mistaken for the other, so installing `myne-mcp` cannot claim
+//!    ownership of a `myne` the user replaced. A hit that IS the sidecar itself
+//!    (a distro package that already installed it to `/usr/bin/myne` — see
+//!    `packaging/arch/PKGBUILD`) needs no shim at all.
 //! 2. **The shim is NOT gated on `cli_enabled`.** The door being off is a
 //!    *refusal* the CLI reports (exit code 5, "enable it in Settings" — task
 //!    4), and a refusal you can only read if the command exists. Gating the
@@ -36,7 +41,7 @@
 //!
 //! ## Uninstall
 //!
-//! [`remove`] deletes the shim, and only if it is ours. Nothing calls it in
+//! [`remove`] deletes the CLI shim, and only if it is ours. Nothing calls it in
 //! production today (Tauri bundles have no uninstall hook that runs our code),
 //! so it is the tested opt-out seam a "remove from PATH" affordance would use.
 //!
@@ -48,14 +53,69 @@ use std::ffi::OsStr;
 use std::io;
 use std::path::{Path, PathBuf};
 
-/// Marker line inside every shim we write. It is what makes "is this file
-/// ours?" a fact rather than a guess, and therefore what makes rule 1 above
-/// enforceable: a `myne` on `$PATH` without this line is somebody else's.
-const SHIM_MARKER: &str = "# myne-cli-shim v1";
+/// One sidecar we put on `$PATH`.
+///
+/// The marker is part of the spec rather than one shared string because
+/// ownership has to be answerable per file: sharing a marker would let the
+/// `myne-mcp` reconcile treat a user's own `~/.local/bin/myne` as ours (or the
+/// reverse), which is exactly the destructive case rule 1 exists to prevent.
+struct ShimSpec {
+    /// The command name — the crate's `[[bin]]` name, the staged `externalBin`
+    /// basename, and what the user types. One name, three roles.
+    command: &'static str,
+    /// Marker line inside every shim we write for this command.
+    marker: &'static str,
+    /// Which command this spec reconciles, as a closed set rather than a
+    /// string. The logging-discipline guard only accepts a bounded expression
+    /// in a `tracing` field, and a closed enum's `label()` is the form it
+    /// already accepts (`outcome.label()`, `e.label()`).
+    stage: ShimStage,
+}
 
-/// The command name — the `[[bin]] name` of the `myne-cli` crate, the staged
-/// `externalBin` basename, and what the user types. One name, three roles.
-const COMMAND_NAME: &str = "myne";
+/// The two commands a shim is installed for. Closed on purpose: a third
+/// externalBin is a decision, and this is where it would have to be made.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ShimStage {
+    Cli,
+    Mcp,
+}
+
+impl ShimStage {
+    /// The literal a log line may carry. Never a path, never user text.
+    fn label(self) -> &'static str {
+        match self {
+            ShimStage::Cli => "cli_path_shim",
+            ShimStage::Mcp => "mcp_path_shim",
+        }
+    }
+}
+
+/// `myne` — the CLI thin client (`cli/`, MYND-490).
+const CLI_SHIM: ShimSpec = ShimSpec {
+    command: "myne",
+    marker: "# myne-cli-shim v1",
+    stage: ShimStage::Cli,
+};
+
+/// `myne-mcp` — the MCP front-end (`mcp/`, external-mcp-connection task 1).
+/// Installed for the same reason: a client config line names the command, not a
+/// path, and `{"command": "myne-mcp"}` must work without the user learning
+/// where the bundle put it.
+const MCP_SHIM: ShimSpec = ShimSpec {
+    command: "myne-mcp",
+    marker: "# myne-mcp-shim v1",
+    stage: ShimStage::Mcp,
+};
+
+/// The CLI command and marker, kept as their old names so the Settings-facing
+/// helpers below ([`command_on_path`], [`shim_dir_for_display`]) and the tests
+/// that pin rule 1 keep reading as the CLI's.
+const COMMAND_NAME: &str = CLI_SHIM.command;
+// Test-only since the reconcile became per-spec: a production build reaches
+// ownership through one `ShimSpec`, and the tests are what still name the CLI's
+// marker as its own value.
+#[cfg_attr(not(test), allow(dead_code))]
+const SHIM_MARKER: &str = CLI_SHIM.marker;
 
 /// The user-level bin dir the shim goes into, relative to `$HOME`. Deliberately
 /// not `/usr/local/bin`: that needs root, and a notes app must never ask for it.
@@ -68,13 +128,14 @@ pub enum ShimOutcome {
     Installed,
     /// A correct shim was already in place; nothing was written.
     Unchanged,
-    /// No sidecar beside the running binary — a dev build that never ran
-    /// `scripts/build-cli-sidecar.mjs`. Nothing to point a shim at.
+    /// No sidecar beside the running binary — a dev build that never ran the
+    /// matching `scripts/build-*-sidecar.mjs`. Nothing to point a shim at.
     SidecarAbsent,
     /// The sidecar itself already resolves on `$PATH` (a distro package put it
     /// in `/usr/bin`). A shim would be redundant.
     SidecarAlreadyOnPath,
-    /// Some other `myne` already resolves on `$PATH`. Left untouched (rule 1).
+    /// Some other file with this command's name already resolves on `$PATH`.
+    /// Left untouched (rule 1).
     ForeignOnPath,
     /// Windows: no shim mechanism yet (documented seam, mirroring
     /// `clipper::install`'s own Windows posture). Constructed only by the
@@ -106,12 +167,22 @@ impl ShimOutcome {
 /// The sidecar's path: beside the running executable, which is exactly where
 /// Tauri places an `externalBin` (and how Tauri's own sidecar resolution finds
 /// it), with the target-triple suffix stripped by the bundler.
+///
+/// Test-only now that [`reconcile`] resolves per spec
+/// ([`sidecar_path_beside_named`]); kept because the one-command shape is what
+/// the path assertions read as.
+#[cfg_attr(not(test), allow(dead_code))]
 pub fn sidecar_path_beside(exe: &Path) -> Option<PathBuf> {
+    sidecar_path_beside_named(exe, COMMAND_NAME)
+}
+
+/// [`sidecar_path_beside`] for any of the bundled commands.
+fn sidecar_path_beside_named(exe: &Path, command: &str) -> Option<PathBuf> {
     let parent = exe.parent()?;
     let name = if cfg!(windows) {
-        format!("{COMMAND_NAME}.exe")
+        format!("{command}.exe")
     } else {
-        COMMAND_NAME.to_string()
+        command.to_string()
     };
     Some(parent.join(name))
 }
@@ -126,8 +197,15 @@ pub fn shim_dir_under_home(home: &Path) -> PathBuf {
 }
 
 /// The shim's own path inside its directory.
+fn shim_path_for(spec: &ShimSpec, shim_dir: &Path) -> PathBuf {
+    shim_dir.join(spec.command)
+}
+
+/// The CLI shim's path — the one the Settings-facing helpers and the tests
+/// below mean when they say "the shim".
+#[cfg_attr(not(test), allow(dead_code))]
 fn shim_path(shim_dir: &Path) -> PathBuf {
-    shim_dir.join(COMMAND_NAME)
+    shim_path_for(&CLI_SHIM, shim_dir)
 }
 
 // POSIX single-quoting moved to `crate::sh_quote` (myne#381) — the clipper's
@@ -141,32 +219,41 @@ use crate::sh_quote::sh_single_quote;
 /// single-quoted so one with spaces (`…/Application Support/…`) survives and
 /// one with `"`/`` ` ``/`$` cannot expand; `"$@"` forwards verbatim so
 /// `myne show <id>` reaches the sidecar unchanged.
-fn shim_body(sidecar: &str) -> String {
+fn shim_body_for(spec: &ShimSpec, sidecar: &str) -> String {
     let quoted = sh_single_quote(sidecar);
+    let command = spec.command;
+    let marker = spec.marker;
     format!(
-        "#!/bin/sh\n{SHIM_MARKER} — written by the Myne desktop app so `{COMMAND_NAME}` is on\n\
-         # your PATH. Safe to delete; the app rewrites it on the next start.\nexec {quoted} \"$@\"\n"
+        "#!/bin/sh\n{marker} — written by the Myne desktop app so `{command}` is on\n\
+         # your PATH. Safe to delete; the app rewrites it on the next start.\n\
+         exec {quoted} \"$@\"\n"
     )
 }
 
-/// Is this file one of ours? The marker is the whole test — see rule 1.
-fn is_our_shim(bytes: &[u8]) -> bool {
+/// Is this file one of ours for `spec`? The marker is the whole test — see
+/// rule 1.
+fn is_our_shim_for(spec: &ShimSpec, bytes: &[u8]) -> bool {
     // A shim is a tiny ASCII script; a non-UTF-8 file is definitionally not ours.
     std::str::from_utf8(bytes)
-        .map(|text| text.contains(SHIM_MARKER))
+        .map(|text| text.contains(spec.marker))
         .unwrap_or(false)
 }
 
-/// First existing `myne` on a `$PATH`-shaped variable, in `$PATH` order.
-/// Empty entries are skipped (a `::` in `$PATH` means "cwd" to some shells;
-/// resolving a command out of the current directory is not a thing we want to
-/// reason about here).
-fn resolve_on_path(path_var: Option<&OsStr>) -> Option<PathBuf> {
+/// First existing command of this name on a `$PATH`-shaped variable, in `$PATH`
+/// order. Empty entries are skipped (a `::` in `$PATH` means "cwd" to some
+/// shells; resolving a command out of the current directory is not a thing we
+/// want to reason about here).
+fn resolve_on_path_for(command: &str, path_var: Option<&OsStr>) -> Option<PathBuf> {
     let path_var = path_var?;
     std::env::split_paths(path_var)
         .filter(|dir| !dir.as_os_str().is_empty())
-        .map(|dir| dir.join(COMMAND_NAME))
+        .map(|dir| dir.join(command))
         .find(|candidate| candidate.exists())
+}
+
+/// [`resolve_on_path_for`] for the CLI command.
+fn resolve_on_path(path_var: Option<&OsStr>) -> Option<PathBuf> {
+    resolve_on_path_for(COMMAND_NAME, path_var)
 }
 
 /// Is the shim dir itself on `$PATH`? Reported, never acted on (rule 3).
@@ -220,19 +307,23 @@ fn same_file(a: &Path, b: &Path) -> bool {
 /// The decision core: what to do given the world's current state. Pure over its
 /// inputs (no IO beyond the existence/identity probes its callers already did),
 /// so every branch of rule 1 is unit-testable without a bundle or a real PATH.
-fn decide(sidecar: &Path, path_var: Option<&OsStr>) -> Result<(), ShimOutcome> {
+fn decide_for(
+    spec: &ShimSpec,
+    sidecar: &Path,
+    path_var: Option<&OsStr>,
+) -> Result<(), ShimOutcome> {
     if !sidecar.exists() {
         return Err(ShimOutcome::SidecarAbsent);
     }
-    match resolve_on_path(path_var) {
+    match resolve_on_path_for(spec.command, path_var) {
         Some(found) if same_file(&found, sidecar) => Err(ShimOutcome::SidecarAlreadyOnPath),
-        // A `myne` that is ours — whether it is the file in our own shim dir
+        // A command that is ours — whether it is the file in our own shim dir
         // or a copy left in a directory the shim dir used to be — means
         // writing our own copy is still correct. Anything else (a user's own
         // script, or a file we cannot read) is theirs to keep: we never
         // clobber it, and we never delete files outside our own dir.
         Some(found) => match std::fs::read(&found) {
-            Ok(bytes) if is_our_shim(&bytes) => Ok(()),
+            Ok(bytes) if is_our_shim_for(spec, &bytes) => Ok(()),
             _ => Err(ShimOutcome::ForeignOnPath),
         },
         None => Ok(()),
@@ -242,7 +333,7 @@ fn decide(sidecar: &Path, path_var: Option<&OsStr>) -> Result<(), ShimOutcome> {
 /// Write the shim, creating its directory. Write-if-changed (a needless rewrite
 /// churns mtime on every app start), executable bit set on Unix.
 #[cfg(unix)]
-fn write_shim(shim_dir: &Path, sidecar: &Path) -> io::Result<ShimOutcome> {
+fn write_shim_for(spec: &ShimSpec, shim_dir: &Path, sidecar: &Path) -> io::Result<ShimOutcome> {
     use std::os::unix::fs::PermissionsExt;
 
     let Some(sidecar_str) = sidecar.to_str() else {
@@ -252,8 +343,8 @@ fn write_shim(shim_dir: &Path, sidecar: &Path) -> io::Result<ShimOutcome> {
             "sidecar path is not UTF-8",
         ));
     };
-    let body = shim_body(sidecar_str).into_bytes();
-    let path = shim_path(shim_dir);
+    let body = shim_body_for(spec, sidecar_str).into_bytes();
+    let path = shim_path_for(spec, shim_dir);
     match std::fs::read(&path) {
         Ok(cur) if cur == body => return Ok(ShimOutcome::Unchanged),
         // Rule 1 on the *write* path, and not a duplicate of `decide()`'s
@@ -263,11 +354,11 @@ fn write_shim(shim_dir: &Path, sidecar: &Path) -> io::Result<ShimOutcome> {
         // invisible to it and this write would silently replace it, on every
         // app start. `remove()` makes exactly this check before deleting;
         // acting is no less destructive than deleting.
-        Ok(cur) if !is_our_shim(&cur) => return Ok(ShimOutcome::ForeignOnPath),
+        Ok(cur) if !is_our_shim_for(spec, &cur) => return Ok(ShimOutcome::ForeignOnPath),
         Ok(_) => {}
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         // A file we cannot read is a file we cannot claim — the same verdict
-        // `decide()` reaches for an unreadable `myne` on `$PATH`.
+        // `decide()` reaches for an unreadable command on `$PATH`.
         Err(_) => return Ok(ShimOutcome::ForeignOnPath),
     }
     std::fs::create_dir_all(shim_dir)?;
@@ -276,27 +367,43 @@ fn write_shim(shim_dir: &Path, sidecar: &Path) -> io::Result<ShimOutcome> {
     Ok(ShimOutcome::Installed)
 }
 
-/// Reconcile the shim against one explicit world (dir + sidecar + `$PATH`).
-/// The seam the tests drive; [`reconcile`] is the thin production caller that
-/// resolves those three from the environment.
+/// Reconcile one command's shim against one explicit world (dir + sidecar +
+/// `$PATH`). The seam the tests drive; [`reconcile`] is the thin production
+/// caller that resolves those three from the environment.
 #[cfg(unix)]
-pub fn reconcile_in(shim_dir: &Path, sidecar: &Path, path_var: Option<&OsStr>) -> ShimOutcome {
-    if let Err(outcome) = decide(sidecar, path_var) {
+fn reconcile_spec_in(
+    spec: &ShimSpec,
+    shim_dir: &Path,
+    sidecar: &Path,
+    path_var: Option<&OsStr>,
+) -> ShimOutcome {
+    if let Err(outcome) = decide_for(spec, sidecar, path_var) {
         return outcome;
     }
-    match write_shim(shim_dir, sidecar) {
+    match write_shim_for(spec, shim_dir, sidecar) {
         Ok(outcome) => outcome,
         Err(e) => ShimOutcome::Failed(crate::io_failure_kind::from_io_error_kind(e.kind())),
     }
 }
 
-/// Remove the shim — but only if it is ours (rule 1 applies in both
+/// [`reconcile_spec_in`] for the CLI, the shape the Settings-facing code and
+/// the drift guard's precedent already use.
+///
+/// Test-only since [`reconcile`] became per-spec; the CLI's own call sites are
+/// the path assertions.
+#[cfg(unix)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn reconcile_in(shim_dir: &Path, sidecar: &Path, path_var: Option<&OsStr>) -> ShimOutcome {
+    reconcile_spec_in(&CLI_SHIM, shim_dir, sidecar, path_var)
+}
+
+/// Remove one command's shim — but only if it is ours (rule 1 applies in both
 /// directions). A missing file is success. The opt-out seam; see module docs.
 #[cfg_attr(not(test), allow(dead_code))]
-pub fn remove(shim_dir: &Path) -> ShimOutcome {
-    let path = shim_path(shim_dir);
+fn remove_spec(spec: &ShimSpec, shim_dir: &Path) -> ShimOutcome {
+    let path = shim_path_for(spec, shim_dir);
     match std::fs::read(&path) {
-        Ok(bytes) if is_our_shim(&bytes) => match std::fs::remove_file(&path) {
+        Ok(bytes) if is_our_shim_for(spec, &bytes) => match std::fs::remove_file(&path) {
             Ok(()) => ShimOutcome::Unchanged,
             Err(e) => ShimOutcome::Failed(crate::io_failure_kind::from_io_error_kind(e.kind())),
         },
@@ -306,46 +413,58 @@ pub fn remove(shim_dir: &Path) -> ShimOutcome {
     }
 }
 
-/// Startup entry point (`lib.rs` `.setup`): resolve the sidecar beside the
-/// running binary and reconcile `~/.local/bin/myne` to it. Best-effort and
+/// [`remove_spec`] for the CLI shim.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn remove(shim_dir: &Path) -> ShimOutcome {
+    remove_spec(&CLI_SHIM, shim_dir)
+}
+
+/// Startup entry point (`lib.rs` `.setup`): resolve each sidecar beside the
+/// running binary and reconcile its launcher in `~/.local/bin`. Best-effort and
 /// non-fatal, the same discipline as `clipper::install::reconcile_from_flag`
 /// and the relay bind next to it — the app starts regardless.
+///
+/// Both commands are attempted independently: a missing `myne-mcp` (a dev tree
+/// that never ran `scripts/build-mcp-sidecar.mjs`) must not cost the user a
+/// working `myne`, and the two shims live in the same directory.
 #[cfg(unix)]
 pub fn reconcile() {
     let Ok(exe) = std::env::current_exe() else {
-        tracing::debug!(stage = "cli_path_shim", outcome = "exe_unresolved");
+        tracing::debug!(stage = "path_shim", outcome = "exe_unresolved");
         return;
     };
     // Canonicalize so the shim's target survives a symlinked launch path.
     let exe = std::fs::canonicalize(&exe).unwrap_or(exe);
-    let Some(sidecar) = sidecar_path_beside(&exe) else {
-        tracing::debug!(stage = "cli_path_shim", outcome = "sidecar_unresolved");
-        return;
-    };
     let Some(home) = std::env::var_os("HOME") else {
-        tracing::debug!(stage = "cli_path_shim", outcome = "home_unresolved");
+        tracing::debug!(stage = "path_shim", outcome = "home_unresolved");
         return;
     };
     let shim_dir = shim_dir_under_home(Path::new(&home));
     let path_var = std::env::var_os("PATH");
-    let outcome = reconcile_in(&shim_dir, &sidecar, path_var.as_deref());
     // `on_path` is what task 12's Settings copy needs to know: on macOS
     // `~/.local/bin` is typically NOT on PATH, so an installed shim can still
     // be unreachable and the user needs that one line in their shell profile.
     let on_path = shim_dir_on_path(&shim_dir, path_var.as_deref());
-    match outcome {
-        ShimOutcome::Failed(kind) => {
-            tracing::error!(
-                stage = "cli_path_shim",
+
+    for spec in [&CLI_SHIM, &MCP_SHIM] {
+        let Some(sidecar) = sidecar_path_beside_named(&exe, spec.command) else {
+            tracing::debug!(stage = spec.stage.label(), outcome = "sidecar_unresolved");
+            continue;
+        };
+        match reconcile_spec_in(spec, &shim_dir, &sidecar, path_var.as_deref()) {
+            ShimOutcome::Failed(kind) => {
+                tracing::error!(
+                    stage = spec.stage.label(),
+                    outcome = "failed",
+                    io_failure_kind = ?kind
+                );
+            }
+            outcome => tracing::debug!(
+                stage = spec.stage.label(),
                 outcome = outcome.label(),
-                io_failure_kind = ?kind
-            );
+                shim_dir_on_path = on_path
+            ),
         }
-        _ => tracing::debug!(
-            stage = "cli_path_shim",
-            outcome = outcome.label(),
-            shim_dir_on_path = on_path
-        ),
     }
 }
 
@@ -355,10 +474,14 @@ pub fn reconcile() {
 /// Windows registration.
 #[cfg(windows)]
 pub fn reconcile() {
-    tracing::debug!(
-        stage = "cli_path_shim",
-        outcome = ShimOutcome::Unsupported.label()
-    );
+    // Both commands, not just the CLI: naming them here is also what keeps the
+    // two specs live in a Windows build, where no reconcile below can use them.
+    for spec in [&CLI_SHIM, &MCP_SHIM] {
+        tracing::debug!(
+            stage = spec.stage.label(),
+            outcome = ShimOutcome::Unsupported.label()
+        );
+    }
 }
 
 #[cfg(all(test, unix))]
@@ -679,5 +802,148 @@ mod tests {
         make_sidecar(dir.path());
         assert_eq!(resolve_on_path(Some(OsStr::new("::"))), None);
         assert_eq!(resolve_on_path(None), None);
+    }
+
+    /// A sidecar binary that exists on disk, named for `spec`.
+    fn make_sidecar_named(dir: &Path, spec: &ShimSpec) -> PathBuf {
+        let path = dir.join(spec.command);
+        std::fs::write(&path, b"#!/bin/sh\ntrue\n").unwrap();
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn each_sidecar_resolves_under_its_own_name_beside_the_executable() {
+        let exe = Path::new("/Applications/Myne.app/Contents/MacOS/Myne");
+        assert_eq!(
+            sidecar_path_beside_named(exe, CLI_SHIM.command),
+            Some(PathBuf::from("/Applications/Myne.app/Contents/MacOS/myne"))
+        );
+        assert_eq!(
+            sidecar_path_beside_named(exe, MCP_SHIM.command),
+            Some(PathBuf::from(
+                "/Applications/Myne.app/Contents/MacOS/myne-mcp"
+            ))
+        );
+    }
+
+    #[test]
+    fn the_mcp_shim_is_installed_beside_the_cli_shim_without_disturbing_it() {
+        // The two launchers share a directory, so the failure this prevents is
+        // concrete: installing `myne-mcp` must not rewrite, rename or delete
+        // the `myne` launcher that was already there.
+        let dir = ScopedTempDir::new("shim-mcp-install").unwrap();
+        let bundle = dir.path().join("bundle");
+        std::fs::create_dir_all(&bundle).unwrap();
+        let cli_sidecar = make_sidecar_named(&bundle, &CLI_SHIM);
+        let mcp_sidecar = make_sidecar_named(&bundle, &MCP_SHIM);
+        let empty = dir.path().join("empty-path-dir");
+        std::fs::create_dir_all(&empty).unwrap();
+        let var = path_var(&[&empty]);
+        let shim_dir = dir.path().join("home/.local/bin");
+
+        assert_eq!(
+            reconcile_in(&shim_dir, &cli_sidecar, Some(&var)),
+            ShimOutcome::Installed
+        );
+        let cli_before = std::fs::read(shim_path(&shim_dir)).unwrap();
+
+        assert_eq!(
+            reconcile_spec_in(&MCP_SHIM, &shim_dir, &mcp_sidecar, Some(&var)),
+            ShimOutcome::Installed
+        );
+
+        let mcp = shim_path_for(&MCP_SHIM, &shim_dir);
+        assert_eq!(mcp, shim_dir.join("myne-mcp"));
+        let mcp_body = std::fs::read_to_string(&mcp).unwrap();
+        assert!(mcp_body.starts_with("#!/bin/sh"));
+        assert!(
+            mcp_body.contains(MCP_SHIM.marker),
+            "the mcp shim must carry its own ownership marker"
+        );
+        assert!(
+            !mcp_body.contains(SHIM_MARKER),
+            "and must not carry the CLI's: ownership is per command"
+        );
+        assert!(mcp_body.contains(mcp_sidecar.to_str().unwrap()));
+        assert!(mcp_body.contains("\"$@\""));
+
+        assert_eq!(
+            std::fs::read(shim_path(&shim_dir)).unwrap(),
+            cli_before,
+            "installing the mcp shim must leave the CLI shim byte-identical"
+        );
+        assert!(
+            std::fs::read_to_string(shim_path(&shim_dir))
+                .unwrap()
+                .contains(cli_sidecar.to_str().unwrap()),
+            "and still pointing at the CLI sidecar"
+        );
+    }
+
+    #[test]
+    fn a_foreign_myne_mcp_is_left_strictly_alone() {
+        // Rule 1 for the second command. Both configurations count: the shim
+        // dir on `$PATH` (visible to `decide`) and off it (only the write path
+        // can see the file), because macOS is the second one by default.
+        let dir = ScopedTempDir::new("shim-mcp-foreign").unwrap();
+        let bundle = dir.path().join("bundle");
+        std::fs::create_dir_all(&bundle).unwrap();
+        let mcp_sidecar = make_sidecar_named(&bundle, &MCP_SHIM);
+        let shim_dir = dir.path().join("bin");
+        std::fs::create_dir_all(&shim_dir).unwrap();
+        let foreign = shim_path_for(&MCP_SHIM, &shim_dir);
+        let original = b"#!/bin/sh\nsomebody elses mcp server\n";
+        std::fs::write(&foreign, original).unwrap();
+        let elsewhere = dir.path().join("usr-bin");
+        std::fs::create_dir_all(&elsewhere).unwrap();
+
+        assert_eq!(
+            reconcile_spec_in(
+                &MCP_SHIM,
+                &shim_dir,
+                &mcp_sidecar,
+                Some(&path_var(&[&elsewhere]))
+            ),
+            ShimOutcome::ForeignOnPath
+        );
+        assert_eq!(std::fs::read(&foreign).unwrap(), original);
+
+        assert_eq!(
+            reconcile_spec_in(
+                &MCP_SHIM,
+                &shim_dir,
+                &mcp_sidecar,
+                Some(&path_var(&[&shim_dir]))
+            ),
+            ShimOutcome::ForeignOnPath
+        );
+        assert_eq!(std::fs::read(&foreign).unwrap(), original);
+    }
+
+    #[test]
+    fn the_mcp_shim_actually_execs_the_mcp_sidecar_with_the_users_args() {
+        // A client's config line names `myne-mcp` and passes no args, so the
+        // property under test is that the launcher is runnable and reaches the
+        // right binary — not the argument forwarding (the CLI test covers the
+        // shared body generator).
+        let dir = ScopedTempDir::new("shim-mcp-exec").unwrap();
+        let bundle = dir.path().join("Application Support");
+        std::fs::create_dir_all(&bundle).unwrap();
+        let mcp_sidecar = bundle.join(MCP_SHIM.command);
+        std::fs::write(&mcp_sidecar, b"#!/bin/sh\necho mcp-reached\nexit 0\n").unwrap();
+        std::fs::set_permissions(&mcp_sidecar, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let shim_dir = dir.path().join("bin");
+
+        assert_eq!(
+            reconcile_spec_in(&MCP_SHIM, &shim_dir, &mcp_sidecar, None),
+            ShimOutcome::Installed
+        );
+
+        let out = std::process::Command::new(shim_path_for(&MCP_SHIM, &shim_dir))
+            .output()
+            .expect("the mcp shim must be executable");
+        assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "mcp-reached");
+        assert!(out.status.success());
     }
 }
