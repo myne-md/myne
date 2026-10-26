@@ -25,7 +25,10 @@ import { load as parseYaml } from "js-yaml";
 import { locateFrontmatter } from "../../dialect/lezer/frontmatter";
 import { formatYamlStringScalar } from "../../dialect/surgery";
 import { foldSegment } from "../../dialect/folderPath";
-import { planSequenceItemInsert } from "../../dialect/frontmatterSequence";
+import {
+  planSequenceItemInsert,
+  planSequenceItemRemove,
+} from "../../dialect/frontmatterSequence";
 import { collectFrontmatterTags } from "../frontmatterTags";
 import { cleanTagToken } from "./tagRanker";
 
@@ -133,6 +136,31 @@ export function computeTagAcceptEdit(
   // `2026` / `true` / `null` would reach the tag index as a number, a bool or
   // nothing at all.
   return plan.edit(formatYamlStringScalar(cleaned));
+}
+
+/**
+ * Compute the edit that takes `tag` back out of the note's frontmatter `tags:`
+ * list — the inverse of {@link computeTagAcceptEdit}, and the only thing that
+ * makes an automatic write reversible (myne-md/myne#908).
+ *
+ * The symmetry is deliberate and is why this is one call rather than a stored
+ * copy of the previous document: the removal is recomputed against the CURRENT
+ * text, so it survives the user typing after the write. It removes one item whose
+ * folded value matches, collapses a `tags:` line left empty, and returns `null`
+ * for the frontmatter shapes the writer refuses (mapping / block scalar /
+ * multi-line flow) and for a tag the note does not carry.
+ *
+ * An inline `#tag` in the body is NOT removed: the accept path never writes one,
+ * so one found there is the author's own prose and removing it would delete text
+ * the user wrote. Pure.
+ */
+export function computeTagRemoveEdit(
+  doc: string,
+  tag: string,
+): TagAcceptEdit | null {
+  const cleaned = cleanTagToken(tag);
+  if (cleaned.length === 0) return null;
+  return planSequenceItemRemove(doc, "tags", foldSegment(cleaned));
 }
 
 /**

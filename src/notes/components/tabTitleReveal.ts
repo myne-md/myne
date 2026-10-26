@@ -39,3 +39,13 @@ export function prefersReducedMotion(
 ): boolean {
   return media?.matches === true;
 }
+
+/** Travel speed for the in-place reveal, in CSS px per millisecond. 18 px/s:
+ *  slow enough to read a word as it goes past, and slow enough that a 200px
+ *  overflow takes about eleven seconds rather than the two the first version
+ *  took. Constant, deliberately: the same speed on every tab is what makes the
+ *  motion read as a mechanism rather than an animation. */
+export const MARQUEE_PX_PER_MS = 0.018;
+
+/** How long the text rests at each end before turning round. */
+export const MARQUEE_HOLD_MS = 700;

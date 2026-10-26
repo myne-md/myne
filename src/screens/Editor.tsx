@@ -50,7 +50,7 @@ import {
 } from "../notes/selectionBridges";
 import { openCommandForKind } from "../notes/tabKinds";
 import { CommandPalette } from "../components/CommandPalette";
-import { LeftRibbon } from "../notes/components/LeftRibbon";
+import { LeftRibbon, RAIL_WIDTH } from "../notes/components/LeftRibbon";
 import { ribbonCommands } from "../notes/ribbonCommands";
 import { COMMAND_ACTIONS, type CommandContext } from "../commands";
 import { useKeybindDispatcher } from "../commands/useKeybindDispatcher";
@@ -1260,8 +1260,18 @@ function EditorChrome({
   // the sidebar toggle past them. In fullscreen the traffic lights are hidden -
   // drop that gap so the toggle sits flush-left (matching the non-mac layout).
   const isFullscreen = useIsFullscreen();
+  // Windowed macOS: clear the traffic lights. Fullscreen: there are none, so the
+  // toggle centres on the RIBBON COLUMN below it rather than sitting at an
+  // arbitrary 12px (myne-md/myne#908): the rail is `RAIL_WIDTH` wide and the
+  // toggle is `TITLE_BAR_TOGGLE_WIDTH`, so `(RAIL_WIDTH - width) / 2` is the one
+  // offset that lands their centres on the same vertical line. With the ribbon
+  // hidden there is no column to align to, and 12px is the honest edge gap.
   const leftToggleX =
-    HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen ? TRAFFIC_LIGHT_GAP + 16 : 12;
+    HAS_OVERLAY_WINDOW_CONTROLS && !isFullscreen
+      ? TRAFFIC_LIGHT_GAP + 16
+      : ribbonShown
+        ? (RAIL_WIDTH - TITLE_BAR_TOGGLE_WIDTH) / 2
+        : 12;
   const leftClearance = leftToggleX + LEFT_CONTROLS_WIDTH + 8;
   // Is anything FLOATED in the top-right corner? Two things can be, the
   // note-actions "…" menu and the right-sidebar toggle, and they share one
