@@ -35,13 +35,13 @@
 # lists, so `makepkg` refuses a substituted download instead of trusting the
 # transport. Update it in the same edit as `pkgver`, never separately.
 #
-# Bumped to 0.9.0 on 2026-10-03. The hash is the v0.9.0 amd64 `.deb`
-# (`Myne_0.9.0_amd64.deb`); the source URL resolves once Phase H publishes
-# `downloads.myne.md/releases/v0.9.0/`.
+# Bumped to 0.11.0 on 2026-10-26. The hash is the v0.11.0 amd64 `.deb`
+# (`Myne_0.11.0_amd64.deb`, 155 MiB, the build from the pinned tag); the source
+# URL resolves once Phase H publishes `downloads.myne.md/releases/v0.11.0/`.
 
 pkgname=myne-bin
 _appname=myne
-pkgver=0.9.0
+pkgver=0.11.0
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
 arch=('x86_64')
@@ -53,7 +53,7 @@ conflicts=("$_appname")
 options=('!strip')
 
 source=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
-sha256sums=('cf9dbf894a32987c199168f05aaaf43627dd813e57e067a5afee4349c68290fc')
+sha256sums=('c8e0b3a7631ef5cc7149f6673a6c167fadde828201e0fade2228ad61a7073c96')
 # makepkg would otherwise try to unpack the .deb into $srcdir as a source
 # archive. package() reads it directly instead, so the outer `ar` container and
 # the inner data tarball stay paired.
