@@ -70,6 +70,12 @@ pub async fn attachment_import<R: Runtime>(
         myne_core::plugins::attachments::commands::IngestPolicy {
             created_at_override: created_at,
             compression: myne_core::plugins::attachments::commands::IngestCompression::Apply,
+            // **The library, because mobile has no chat-attachment surface
+            // wired yet** (myne-md/myne#913 is a desktop panel change). The
+            // field is declared rather than defaulted so a mobile paste cannot
+            // silently join the library if that surface ever arrives: the
+            // compiler asks this call site the question then.
+            scope: myne_core::plugins::attachments::commands::scope_for_wire(None),
         },
         extractor,
     )

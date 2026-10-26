@@ -451,11 +451,19 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
 
         "plugin:attachments|attachment_import" => {
             use myne_core::plugins::attachments::commands::{
-                attachment_import_from_host, ImportSource,
+                attachment_import_from_host, scope_for_wire, ImportSource,
             };
             #[derive(serde::Deserialize)]
             struct Args {
                 source: ImportSource,
+                /// Where the file lands (myne-md/myne#913): `None` for the
+                /// library, `Some("chat")` for a file pasted into a
+                /// conversation. Declared here because the shared binding sends
+                /// it on every import and Tauri/serde drops an unknown argument
+                /// silently: without the field a web paste would import into
+                /// the library and nothing would complain.
+                #[serde(default)]
+                scope: Option<String>,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -472,6 +480,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::state(),
                 crate::session::hooks(),
                 a.source,
+                scope_for_wire(a.scope.as_deref()),
             )
             .await
             {
@@ -4625,6 +4634,10 @@ pub async fn dispatch_with_bytes(cmd: &str, args: serde_json::Value, bytes: Vec<
                     bytes,
                     filename: a.filename,
                 },
+                // This arm carries raw bytes and is built for the clip/share
+                // path, which imports into the library by definition: the JSON
+                // arm is the one a composer's paste goes through.
+                myne_core::plugins::attachments::commands::scope_for_wire(None),
             )
             .await
             {

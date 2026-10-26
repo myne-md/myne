@@ -404,9 +404,16 @@ fn is_yaml_timestamp(value: &str) -> bool {
 ///   letting it through would rewrite the note's bytes and bump its sync version
 ///   for no change.
 ///
-/// **Not the folder's existence.** In Myne a folder IS the `folder:` field of
-/// some note, so naming a new one creates it by construction, exactly as a
-/// proposed new note does. The variant is not refused here.
+/// **Not the folder's existence either, but only here.** In Myne a folder IS the
+/// `folder:` field of some note, so naming a new one creates it by construction.
+/// This function cannot tell an existing folder from an invented one and does
+/// not try: the APPLY path refuses a destination the vault does not have
+/// (`EditRejection::UnknownFolder`, myne-md/myne#913), because it is the layer
+/// holding the folder roster. The split is deliberate: a pure string transform
+/// stays pure, and the check that needs the vault lives where the vault is.
+/// (That clause reverses the earlier "naming a new one creates it" reading, on
+/// the report of a run that moved a note into a new top-level `Areas` beside the
+/// user's `02 - AREAS`.)
 ///
 /// ## The destination is compared canonically and written as given
 ///

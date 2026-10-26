@@ -218,6 +218,58 @@ describe("tab title reveal (myne-md/myne#908 item 6)", () => {
     expect(label?.style.textOverflow).toBe("ellipsis");
     // And the text is `inline` at rest, because an inline-block child is an
     // atomic box that swallows the parent's ellipsis.
-    expect(label?.firstElementChild?.style.display).toBe("inline");
+    expect((label?.firstElementChild as HTMLElement | null)?.style.display).toBe(
+      "inline",
+    );
+  });
+});
+
+describe("the strip's observer is torn down (myne-md/myne#913)", () => {
+  it("disconnects the ResizeObserver when the strip unmounts", () => {
+    // The row's `ref` was an inline arrow that called the overflow hook and
+    // DROPPED the cleanup it returns, so every render built a fresh observer for
+    // the live node and never disconnected the old one: an unbounded leak on a
+    // component rendered per pane and re-rendered on every save-status change.
+    // The observable consequence is on the OBSERVER, not on the listener: React
+    // wraps listeners, so an identity comparison there is inconclusive.
+    const disconnect = vi.spyOn(ResizeObserver.prototype, "disconnect");
+    const observe = vi.spyOn(ResizeObserver.prototype, "observe");
+
+    const { unmount } = render(
+      <TabStrip
+        paneId="pane-1"
+        tabs={["A", "B", "C"]}
+        activeTab="B"
+        titleOf={titleOf}
+        onActivate={vi.fn()}
+        onClose={vi.fn()}
+        onNewTab={vi.fn()}
+        onMoveTab={vi.fn()}
+      />,
+    );
+    expect(observe).toHaveBeenCalled();
+    disconnect.mockClear();
+
+    unmount();
+
+    expect(disconnect).toHaveBeenCalled();
+    disconnect.mockRestore();
+    observe.mockRestore();
+  });
+});
+
+describe("<TabStrip> tab widths", () => {
+  it("keeps every tab readable and lets the row scroll instead of shrinking", () => {
+    // myne-md/myne#913, second report: the strip shrank inactive tabs to an icon
+    // (56px) and the note titles became unreadable. Shrinking is what produced
+    // that, so the floor is a readable label and an overflowing row scrolls.
+    setup();
+    const [first, active] = screen.getAllByRole("tab");
+    // jsdom keeps the inline value verbatim, which is the point of asserting it.
+    expect(first!.style.minWidth).toBe("132px");
+    expect(first!.style.flexShrink).toBe("0");
+    // The active tab is sized by its own label, not by the floor.
+    expect(active!.style.minWidth).toBe("max-content");
+    expect(active!.style.flexShrink).toBe("0");
   });
 });

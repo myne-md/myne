@@ -38,6 +38,13 @@ pub async fn attachment_import<R: Runtime>(
     // migration import) so the unused-cleanup grace window measures from the
     // file's real age, not the moment of import.
     created_at: Option<u64>,
+    // Where the file lands (myne-md/myne#913): `None` for the attachment
+    // library, `Some("chat")` for a file pasted into a conversation, which is
+    // stored encrypted and kept out of the library listing. Declared even though
+    // the ordinary callers omit it, because the shared binding sends it on every
+    // import and Tauri drops an unknown argument silently: without this a paste
+    // into a chat would import into the library and nothing would complain.
+    scope: Option<String>,
 ) -> Result<ImportedAttachment, AttachmentImportError> {
     let dir = crate::paths::active_vault_root_io(&app, state.active_vault_id().await)
         .map_err(AttachmentImportError::from)?;
@@ -73,6 +80,7 @@ pub async fn attachment_import<R: Runtime>(
         myne_core::plugins::attachments::commands::IngestPolicy {
             created_at_override: created_at,
             compression: myne_core::plugins::attachments::commands::IngestCompression::Apply,
+            scope: myne_core::plugins::attachments::commands::scope_for_wire(scope.as_deref()),
         },
         extractor,
     )

@@ -156,6 +156,18 @@ export interface AgentTurnSummary {
 
 /** One transcript turn. Assistant turns carry the streaming / error / citation
  *  state; user turns are inert text. */
+/** One file a user turn carried (myne-md/myne#913). Enough to draw the chip and
+ *  open the file; the id is the attachment catalog's, so the bytes are reachable
+ *  through `attachment://` without storing a second copy. */
+export interface TurnAttachment {
+  /** Attachment id, lowercase hex. */
+  id: string;
+  /** The display name the user saw when they picked or pasted it. */
+  name: string;
+  /** MIME hint for the thumbnail's kind (image / pdf / audio / file). */
+  contentType: string;
+}
+
 export interface ChatTurn {
   /** Stable React key (monotonic, store-assigned). */
   id: string;  /** Which flow produced it. Required rather than optional, so every
@@ -197,6 +209,16 @@ export interface ChatTurn {
    *  "I asked this, over that", which is the pairing the approval gate is
    *  about. */
   scopeLabel?: string;
+  /**
+   * The files this message carried, on the USER turn (myne-md/myne#913).
+   *
+   * **A message's attachments belong to the message, not to the composer.** The
+   * chips used to live only above the input and were cleared on send, so a
+   * transcript read back later showed a question about a document with no sign of
+   * which document, and there was no way to open the one that was sent. Stored on
+   * the turn for the same reason `scopeLabel` is: the pairing is the record.
+   */
+  attachments?: readonly TurnAttachment[];
   /** An agent turn's frozen counts. Absent while the run has not settled. */
   agentSummary?: AgentTurnSummary;
   /**
@@ -234,6 +256,7 @@ export type ChatAction =
       agentId: string;
       task: string;
       scopeLabel: string;
+      attachments?: readonly TurnAttachment[];
     }
   | { type: "AGENT_SETTLE"; summary: AgentTurnSummary }
   | { type: "AGENT_OUTCOME"; runId: string; outcome: AgentRunOutcome }
@@ -378,6 +401,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         error: false,
         insertable: false,
         scopeLabel: action.scopeLabel,
+        // Omitted when empty, so an ordinary message's persisted turn is
+        // byte-identical to the one written before this field existed.
+        ...(action.attachments !== undefined && action.attachments.length > 0
+          ? { attachments: action.attachments }
+          : {}),
       };
       // Not `streaming`, and `state.streaming` is left alone. That flag drives
       // the ask composer's Stop control, and an agent run is stopped through
@@ -731,13 +759,18 @@ export function stopChatTurn(): void {
  *  locked-out ask stream cannot mutate the transcript, and an agent run is a
  *  different channel with its own cancellation. Bumping it here would silently
  *  kill an ask generation the user did not stop. */
-export function sendAgentTurn(task: string, scopeLabel: string): void {
+export function sendAgentTurn(
+  task: string,
+  scopeLabel: string,
+  attachments: readonly TurnAttachment[] = [],
+): void {
   dispatchChat({
     type: "AGENT_SEND",
     userId: nextTurnId(),
     agentId: nextTurnId(),
     task,
     scopeLabel,
+    ...(attachments.length > 0 ? { attachments } : {}),
   });
 }
 

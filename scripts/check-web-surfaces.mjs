@@ -248,6 +248,7 @@ const V = {
   "src/components/settings/search/foldAccents.ts": ["ported", "Pure Unicode folding."],
 
   // ── src/lib ─────────────────────────────────────────────────────────────
+  "src/lib/agent-events.ts": ["ported", "One string: the wire name of the agent's notes-changed event, mirroring the Rust constant. The web build never runs an agent (the plugin is Class::Unsupported in web/wasm/src/capability.rs), so nothing listens for it there, and a module that only holds a name has nothing to adapt."],
   "src/lib/autoApplyTags.ts": ["ported", "Device-local automatic-tagging permission (localStorage), same shape as aiOnboardingSeen. Runs as written on web, where it is inert: the tag pass this gates is local-inference only, so no web build reaches a write."],
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/aiOnboardingSeen.ts": ["ported", "Device-local first-run AI-onboarding seen flag (localStorage), same shape as accentColor/viewsEnabled; runs as written. On web the surface it gates is only reachable with `downloads: false`, but this module holds no host call."],
