@@ -223,6 +223,20 @@ struct PersonSession {
     identity: Option<PersonIdentitySession>,
     profile: Option<PersonProfileSession>,
     pending_transition: Option<Vec<u8>>,
+    /// The derived SCRAM secret of a device that has ENROLLED and is waiting to
+    /// be approved (myne-md/myne#911 task 9).
+    ///
+    /// Held so the pending device can finish its own handshake the moment the
+    /// owner approves, with no second phrase entry. The phrase itself is never
+    /// kept: this is the value `derive_person_server_auth_key` produced from it,
+    /// it authenticates to that one server account and nothing else, and it
+    /// cannot reconstruct the phrase or the keypair.
+    ///
+    /// Lifetime is the session's, and every path that clears the person session
+    /// clears it: a vault lock, an explicit identity lock, a forget, and process
+    /// exit. A device that is still pending after a restart asks for the phrase
+    /// again rather than keeping a credential on disk.
+    pending_claim_secret: Option<zeroize::Zeroizing<Vec<u8>>>,
     generation: u64,
     /// Set by an explicit `sync_person_lock` (not a vault lock or switch). While
     /// true, the vault-bound carrier must NOT auto-reinstall the identity at a
@@ -238,11 +252,11 @@ impl PersonSession {
         self.generation = self.generation.wrapping_add(1);
         self.profile = None;
         self.pending_transition = None;
+        self.pending_claim_secret = None;
         self.identity.take().map(|identity| identity.pair)
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct PersonSessionInstall {
     pub(crate) pair: protocol::PersonKeyPair,
     pub(crate) person_id: [u8; 16],
@@ -250,7 +264,6 @@ pub(crate) struct PersonSessionInstall {
     pub(crate) transition: Option<Vec<u8>>,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
 pub(crate) struct PersonIdentitySnapshot {
     pub(crate) person_id: [u8; 16],
     pub(crate) public: protocol::person_key::PersonPublicHalf,
@@ -272,6 +285,29 @@ impl VaultRuntimeState {
     /// this in their command's critical-section guard.
     pub fn auth_permits(&self) -> &Semaphore {
         &self.auth_permits
+    }
+
+    /// Remember the pending device's derived SCRAM secret (task 9).
+    pub async fn set_pending_claim_secret(&self, secret: zeroize::Zeroizing<[u8; 32]>) {
+        self.person_session.write().await.pending_claim_secret =
+            Some(zeroize::Zeroizing::new(secret.to_vec()));
+    }
+
+    /// Borrow the pending secret for one handshake. `None` means either "this
+    /// device never enrolled" or "the session was cleared", and both read the
+    /// same way to a caller: the phrase has to be entered again.
+    pub async fn pending_claim_secret(&self) -> Option<zeroize::Zeroizing<Vec<u8>>> {
+        self.person_session
+            .read()
+            .await
+            .pending_claim_secret
+            .clone()
+    }
+
+    /// Drop it once the claim lands, so a credential that has done its job does
+    /// not outlive it.
+    pub async fn clear_pending_claim_secret(&self) {
+        self.person_session.write().await.pending_claim_secret = None;
     }
 
     pub async fn set_person_identity(&self, pair: protocol::PersonKeyPair) {
@@ -309,7 +345,6 @@ impl VaultRuntimeState {
         self.person_session.read().await.explicit_lock
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) async fn person_session_generation(&self) -> u64 {
         self.person_session.read().await.generation
     }
@@ -318,7 +353,6 @@ impl VaultRuntimeState {
         self.person_session.write().await.clear()
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) async fn clear_person_session_if_generation(
         &self,
         expected_generation: u64,
@@ -335,7 +369,6 @@ impl VaultRuntimeState {
         self.clear_person_session().await
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) async fn install_person_session_if_generation(
         &self,
         expected_generation: u64,
@@ -401,7 +434,6 @@ impl VaultRuntimeState {
         self.person_session.read().await.identity.is_some()
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
     pub(crate) async fn person_identity_status(&self) -> Option<PersonIdentitySnapshot> {
         self.person_session
             .read()

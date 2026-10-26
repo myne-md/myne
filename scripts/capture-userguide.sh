@@ -73,14 +73,20 @@ E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HO
 # `e2e/AGENTS.md` documents as the fix for `rustc … (signal: 9, SIGKILL)` on
 # `myne_desktop_lib` was unreachable from the one runner that does a full
 # release build as its normal job — `e2e-local.sh` had it, this did not.
-E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS"
+E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS $E2E_CARGO_OPT_LEVEL $E2E_SIDECAR_FEATURES"
 # Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS
 # masks this via ownership remapping; native Linux / CI does not.)
 FIX_PERMS='chown -R e2e:e2e /work'
 
-BUILD_CMD='pnpm install --frozen-lockfile && pnpm tauri build --no-bundle'
+# `touch src-tauri/src/lib.rs`: the frontend is EMBEDDED at compile time, so a
+# diff confined to `src/` relinks nothing and `tauri build` reports success while
+# the binary keeps whatever `dist/` it was last compiled against (`e2e/AGENTS.md`,
+# the myne-md/myne#520 trap). Every other runner here does this; this one was the
+# only build-capable script that did not, so a frontend-only change produced
+# screenshots of the PREVIOUS frontend with no sign anywhere that it had.
+BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi

@@ -31,7 +31,7 @@
 // eager write-path prune runs backend-side on every snapshot create), and
 // retention is a timing/window concern — the wrong fit for E2E (the SYNC-15
 // auto-lock-timing precedent). The retention policy is pure and already
-// unit-covered in `src-tauri/src/snapshot_policy.rs` (`mod tests` —
+// unit-covered in `core/src/snapshot_policy.rs` (`mod tests` —
 // `snapshots_to_prune` window/count/byte-budget selection +
 // `should_snapshot` coalesce gate). This suite covers list/preview/restore
 // round-trip + reversibility + MY01 at-rest only.

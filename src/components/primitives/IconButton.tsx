@@ -44,6 +44,20 @@ interface IconButtonProps {
   bordered?: boolean;
   /** Toggled-on state. Emits `aria-pressed`, which is also what paints it. */
   active?: boolean;
+  /**
+   * Transient confirmation state: the glyph becomes a tick and pops once, in
+   * `--success` (2026-10-24). For a control whose whole job is "did that run?",
+   * the answer belongs on the control rather than in a toast at the corner of
+   * the screen. The CALLER owns the timer that clears it, and owes a live
+   * region saying the same thing: a tick is invisible to a screen reader.
+   *
+   * **Passing it at all opts the control into the mechanism** (true OR false):
+   * the stylesheet keys the two-way animation on that, so the tick arrives with
+   * a pop and the copy glyph returns with a softer one instead of snapping back
+   * when the timer clears. A caller that never confirms anything never sets it,
+   * and its glyphs stay still.
+   */
+  confirmed?: boolean;
   /** Emits `aria-expanded`, for a control that opens a panel or menu. */
   expanded?: boolean;
   /**
@@ -75,6 +89,7 @@ export function IconButton({
   disabled = false,
   testId,
   bordered = false,
+  confirmed = false,
   active,
   expanded,
   nativeTitle = true,
@@ -86,6 +101,8 @@ export function IconButton({
       type="button"
       className="myne-icon-btn"
       data-bordered={bordered ? "true" : undefined}
+      data-confirmed={confirmed ? "true" : undefined}
+      data-copy-feedback={confirmed === undefined ? undefined : "true"}
       aria-pressed={active}
       aria-expanded={expanded}
       onClick={onClick}
@@ -101,7 +118,7 @@ export function IconButton({
       // this file as exempt with that reason.
       title={tooltip || !nativeTitle ? undefined : label}
     >
-      <Icon name={icon} size={iconSize} />
+      <Icon name={confirmed ? "check" : icon} size={iconSize} />
     </button>
   );
   return tooltip ? <Tooltip label={label}>{button}</Tooltip> : button;

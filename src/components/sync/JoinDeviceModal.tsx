@@ -55,6 +55,11 @@ import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
 import { DestructiveBanner } from "../DestructiveBanner";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
+import {
+  personClaimDevice,
+  personJoinDevice,
+  personListVaults,
+} from "../../lib/personAccount";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 // Aliased: the component already has a `setDeviceName` React state setter.
 import { setDeviceName as persistDeviceName } from "../../lib/prefs";
@@ -215,9 +220,22 @@ interface JoinDeviceModalProps {
    * slot to that step — the same door a reload mid-recovery uses.
    */
   onRecovering: () => void;
+  /**
+   * A PERSON join succeeded and its vaults were listed (myne-md/myne#911 task 9).
+   * There is no single vault to route into: the device now belongs to an
+   * account, and the vaults it just materialised frames for are opened one at a
+   * time with their own passwords. The caller reprobes, which is the whole
+   * routing.
+   */
+  onAccountJoined: () => void;
 }
 
-export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDeviceModalProps) {
+export function JoinDeviceModal({
+  onCancel,
+  onJoined,
+  onRecovering,
+  onAccountJoined,
+}: JoinDeviceModalProps) {
   const betaTerms = useBetaTermsGate();
   const { t } = useTranslation();
   const baseId = useId();
@@ -249,7 +267,32 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
   // proves the account with the phrase instead of waiting for an approval
   // nobody is left to give. There is no certificate step: the server is
   // trusted through the platform's CA store (`docs/decisions/sync/0620`).
-  const [step, setStep] = useState<"form" | "pending" | "pending-phrase" | "verify">("form");
+  const [step, setStep] = useState<
+    "form" | "code" | "person-phrase" | "person-pending" | "pending" | "pending-phrase" | "verify"
+  >("form");
+  // The pasted join code (myne-md/myne#911 task 9). Desktop has no camera, so the
+  // QR a user's other device is showing arrives here as text: the same payload,
+  // decoded by the same command the phone's scanner calls.
+  const [code, setCode] = useState("");
+  /** Set once a person code has been accepted: what the phrase step needs. */
+  const [personJoin, setPersonJoin] = useState<{
+    personIdHex: string;
+    endpointUrl: string;
+  } | null>(null);
+  /** A claim attempt was refused because the session (or the app) restarted. */
+  const [claimNeedsPhrase, setClaimNeedsPhrase] = useState(false);
+  /**
+   * The account's vault listing failed after an admission that SUCCEEDED.
+   *
+   * The two are different facts and the old code merged them: `personListVaults`
+   * was caught, then `.finally` navigated onward, so the user landed on the
+   * identity home with zero vaults, no error and no way to ask again. Listing is
+   * the act that writes the account's vault frames, so a silent failure reads as
+   * "your account is empty" about a successful join. The mobile twin got a
+   * visible failure plus Retry in the same change; this is that shape
+   * (myne-md/myne#911 review).
+   */
+  const [personListFailed, setPersonListFailed] = useState(false);
   const [joinedVaultId, setJoinedVaultId] = useState<string | null>(null);
   const [aborting, setAborting] = useState(false);
   // MYND-548: the id this join minted, kept so the pending path can name the
@@ -348,6 +391,148 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
       })
       .finally(() => setBusy(false));
   };
+
+  // ── the person join (myne-md/myne#911 task 9) ────────────────────────────
+
+  /** The decoded join code, as `sync_decode_join_qr` renders it. */
+  type CodeView =
+    | { kind: "account"; endpoint_url: string; account_number: string; fresh: boolean }
+    | { kind: "member_vault"; endpoint_url: string; account_hash_hex: string; fresh: boolean }
+    | { kind: "person"; endpoint_url: string; person_id_hex: string; fresh: boolean };
+
+  const submitCode = () => {
+    const scanned = code.trim();
+    if (scanned.length === 0) return;
+    setError(null);
+    void invoke<CodeView>("plugin:sync|sync_decode_join_qr", { scanned })
+      .then((view) => {
+        if (!view.fresh) {
+          setCode("");
+          setError(t("sync.join.codeExpired"));
+          return;
+        }
+        if (view.kind === "person") {
+          // The identity-model join: the code names the PERSON, and the phrase
+          // is the credential. Nothing else on this screen is needed, which is
+          // why it replaces the form rather than filling it.
+          setPersonJoin({
+            personIdHex: view.person_id_hex,
+            endpointUrl: view.endpoint_url,
+          });
+          setUrl(view.endpoint_url);
+          setCode("");
+          setStep("person-phrase");
+          return;
+        }
+        if (view.kind === "member_vault") {
+          // A member's own second device for a shared vault is the invite
+          // wizard's, not this modal's: it needs the vault's group package from
+          // the identity home, which this screen does not host. Say so rather
+          // than sending the user to a form with no account number.
+          setCode("");
+          setError(t("sync.join.codeMemberUnsupported"));
+          return;
+        }
+        // A legacy account code prefills the existing form, so one door serves
+        // both: the user still types the vault password.
+        setUrl(view.endpoint_url);
+        setAccount(formatAccountNumberInput(view.account_number));
+        setCode("");
+        setStep("form");
+      })
+      .catch(() => {
+        setCode("");
+        setError(t("sync.join.codeInvalid"));
+      });
+  };
+
+  const finishPersonJoin = () => {
+    // Listing is the point of the join: the account's vaults become local
+    // frames the picker can show, and each opens later with its own password.
+    // A listing failure is NOT a join failure, so it must not claim one: it is
+    // surfaced with a retry instead of being swallowed on the way out.
+    //
+    // The step moves FIRST, and that is not cosmetic. `personJoinDevice` can
+    // answer `approved: true` on the first call, which runs this straight from
+    // `person-phrase`; a failure banner rendered only inside `person-pending`
+    // would then have no home, so the user would sit on an empty 24-cell form
+    // with the cells already cleared (myne-md/myne#911 review). On success the
+    // route leaves this screen, so the intermediate step is never seen.
+    setStep("person-pending");
+    setPersonListFailed(false);
+    void personListVaults()
+      .then(() => onAccountJoined())
+      .catch(() => setPersonListFailed(true));
+  };
+
+  const submitPersonPhrase = () => {
+    if (personJoin === null || !cells.every((c) => c.length > 0) || busy) return;
+    const phrase = buildPhraseCredential(cells);
+    clearCells();
+    setBusy(true);
+    setError(null);
+    setClaimNeedsPhrase(false);
+    void personJoinDevice(personJoin.personIdHex, personJoin.endpointUrl, phrase)
+      .then((view) => {
+        refreshTorState();
+        if (view.approved) {
+          finishPersonJoin();
+          return;
+        }
+        setStep("person-pending");
+      })
+      .catch((e: unknown) => {
+        const kind = (e as { kind?: string } | null)?.kind;
+        if (kind === "PersonMismatch") {
+          setError(t("sync.join.personMismatch"));
+          return;
+        }
+        if (kind === "TlsFailure") {
+          setError(t("sync.endpoint.tlsFailure"));
+          return;
+        }
+        setError(t("sync.join.errorPhrase"));
+      })
+      .finally(() => setBusy(false));
+  };
+
+  // While the device waits, ask the server whether the approval has landed.
+  // The poll re-runs the SAME handshake with the session's cached secret, which
+  // is why it can finish without the phrase; a session that ended in between
+  // answers `PersonSessionRequired` and the screen asks for it again rather than
+  // polling a credential it no longer has.
+  useEffect(() => {
+    if (step !== "person-pending") return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const tick = () => {
+      void personClaimDevice()
+        .then((view) => {
+          if (cancelled) return;
+          if (view.approved) {
+            finishPersonJoin();
+            return;
+          }
+          timer = setTimeout(tick, 2000);
+        })
+        .catch((e: unknown) => {
+          if (cancelled) return;
+          if ((e as { kind?: string } | null)?.kind === "PersonSessionRequired") {
+            setClaimNeedsPhrase(true);
+            return; // stop polling: only the phrase can restart the handshake
+          }
+          timer = setTimeout(tick, 2000);
+        });
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // `finishPersonJoin` is stable enough for this poll: it closes over the
+    // props the caller already holds and is re-created only with them.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
 
   // The adopted-head watch, and the SYNC-40 compare it feeds (myne#462).
   //
@@ -556,6 +741,146 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
     );
   }
 
+  // Paste a join code (myne-md/myne#911 task 9). Desktop has no camera, so this is
+  // how a QR from a phone reaches a laptop: the same payload, decoded by the same
+  // command.
+  if (step === "code") {
+    return (
+      <JoinScreen rootRef={backdropRef} testId="join.code">
+        <h2 style={TITLE}>{t("sync.join.codeTitle")}</h2>
+        <p style={HELP}>{t("sync.join.codeBody")}</p>
+        <div style={FIELD}>
+          <label style={LABEL} htmlFor={`${baseId}-code`}>
+            {t("sync.join.codeLabel")}
+          </label>
+          <Input
+            id={`${baseId}-code`}
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            data-testid="join.code-input"
+          />
+        </div>
+        {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
+        <div style={ROW}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setCode("");
+              setError(null);
+              setStep("form");
+            }}
+            data-testid="join.code-back"
+          >
+            {t("sync.join.back")}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submitCode}
+            disabled={code.trim().length === 0}
+            data-testid="join.code-submit"
+          >
+            {t("sync.join.codeContinue")}
+          </Button>
+        </div>
+      </JoinScreen>
+    );
+  }
+
+  // The person join's credential step (task 9). The phrase proves the identity;
+  // the code already named the person and the server.
+  if (step === "person-phrase") {
+    const filled = cells.every((c) => c.length > 0);
+    return (
+      <JoinScreen rootRef={backdropRef} testId="join.person-phrase">
+        <h2 style={TITLE}>{t("sync.join.personPhraseTitle")}</h2>
+        <p style={HELP}>{t("sync.join.personPhraseBody")}</p>
+        <PhraseEntryGrid
+          baseId={`${baseId}-person`}
+          cells={cells}
+          onCellChange={handleCellChange}
+          onCellPaste={handleCellPaste}
+          disabled={busy}
+          gridTestId="join.person-phrase-grid"
+          cellTestId={() => "join.person-phrase-cell"}
+        />
+        {error && <DestructiveBanner testId="join.error">{error}</DestructiveBanner>}
+        <div style={ROW}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              clearCells();
+              setError(null);
+              setStep("code");
+            }}
+            data-testid="join.person-phrase-back"
+          >
+            {t("sync.join.back")}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={submitPersonPhrase}
+            disabled={!filled || busy}
+            data-testid="join.person-phrase-submit"
+          >
+            {busy ? t("sync.join.submitting") : t("sync.join.personPhraseSubmit")}
+          </Button>
+        </div>
+      </JoinScreen>
+    );
+  }
+
+  // Waiting for an existing device to approve THIS one (task 9). The poll does
+  // the finishing, so the only controls are the ones a user needs when they
+  // stop waiting: re-enter the phrase (the session ended) or leave.
+  if (step === "person-pending") {
+    return (
+      <JoinScreen rootRef={backdropRef} testId="join.person-pending">
+        <h2 style={TITLE}>{t("sync.join.personPendingTitle")}</h2>
+        <p style={HELP}>{t("sync.join.personPendingBody")}</p>
+        {!claimNeedsPhrase && <p style={HELP}>{t("sync.join.personPendingHint")}</p>}
+        {claimNeedsPhrase && (
+          <p style={HELP} data-testid="join.person-pending-phrase-again">
+            {t("sync.join.personPendingPhraseAgain")}
+          </p>
+        )}
+        {/* The admission succeeded and the LISTING did not. Said here rather
+            than swallowed on the way out, with the one control that tries it
+            again (myne-md/myne#911 review). */}
+        {personListFailed && (
+          <DestructiveBanner testId="join.person-list-failed">
+            {t("sync.join.personListFailed")}
+          </DestructiveBanner>
+        )}
+        <div style={ROW}>
+          {personListFailed && (
+            <Button
+              variant="primary"
+              onClick={finishPersonJoin}
+              data-testid="join.person-list-retry"
+            >
+              {t("sync.join.personListRetry")}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              clearCells();
+              setStep("person-phrase");
+            }}
+            data-testid="join.person-pending-phrase"
+          >
+            {t("sync.join.personPendingPhraseCta")}
+          </Button>
+          <Button variant="secondary" onClick={onCancel} data-testid="join.cancel">
+            {t("sync.join.cancel")}
+          </Button>
+        </div>
+      </JoinScreen>
+    );
+  }
+
   // Mandatory head-fingerprint SAS eye-compare (SYNC-40).
   if (step === "verify") {
     return (
@@ -621,6 +946,23 @@ export function JoinDeviceModal({ onCancel, onJoined, onRecovering }: JoinDevice
           {t("sync.join.title")}
         </h2>
         <p style={HELP}>{t("sync.join.help")}</p>
+
+        {/* The second door, and the one that needs no account number: a code
+            from a device that already belongs to the identity (myne-md/myne#911
+            task 9). Kept above the form because a user holding a code has
+            nothing to type into an account-number field. */}
+        <div style={ROW}>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setError(null);
+              setStep("code");
+            }}
+            data-testid="join.code-open"
+          >
+            {t("sync.join.codeOpen")}
+          </Button>
+        </div>
 
         <div style={FIELDS_CARD}>
         <div style={FIELD}>

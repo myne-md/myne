@@ -1,9 +1,9 @@
 // TypeScript mirror of the Rust vault_list IPC contract (SYNC-4).
 //
 // Source-of-truth Rust definitions:
-//   - src-tauri/src/plugins/vault_unlock/commands.rs
+//   - core/src/plugins/vault_unlock/commands.rs
 //       (VaultSummary struct + VaultSummaryStatus enum + vault_list command)
-//   - src-tauri/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
+//   - core/src/plugins/vault_unlock/error.rs   (VaultStatusError enum)
 //
 // `vault_list` is the multi-vault generalization of `vault_status`: where
 // `vault_status` probes the single legacy vault.meta, `vault_list` enumerates
@@ -50,6 +50,11 @@ export type VaultSummaryStatus = { kind: "Exists" } | { kind: "Corrupted" };
  *   Twin of `label`.
  * - `last_unlock`: epoch-ms of the last successful unlock from the registry
  *   cache, or `null` for a vault never unlocked.
+ * - `published`: whether the vault is reachable on a sync server
+ *   (myne-md/myne#911 task 8). `false` is "device only", which is how a vault is
+ *   born. Derived from device-local state plus the `vault.meta` generation byte,
+ *   so it is answered while the vault is locked; the namespace it derives from is
+ *   deliberately NOT projected (DENY-list), only the boolean.
  *
  * Never carries `account_number_hash` bytes or a filesystem path (DENY-list).
  */
@@ -59,6 +64,7 @@ export type VaultSummary = {
   label: string | null;
   icon: string | null;
   last_unlock: number | null;
+  published: boolean;
 };
 
 /**

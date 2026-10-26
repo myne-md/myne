@@ -6,7 +6,7 @@
 //
 // Selecting a field's canonical default clears the stored value to `null` (via
 // `toWire`), keeping an explicitly-default vault byte-identical to an untouched
-// one. The presets + their CSS mapping are single-homed in `editor/typography.ts`.
+// one. The presets + their CSS mapping are single-homed in `editor/src/typography.ts`.
 
 import { Fragment, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -142,7 +142,7 @@ export function TypographySettings() {
       {ROWS.map((row) => {
         const label = t(row.labelKey);
         // Each option's `label` is an i18n KEY (single-homed in
-        // `editor/typography.ts`); resolve it here so a language switch
+        // `editor/src/typography.ts`); resolve it here so a language switch
         // re-labels the options. `value` (the wire value, and the `data-value`
         // each option carries) is untouched.
         const options = row.options.map((o) => ({ value: o.value, label: t(o.label) }));

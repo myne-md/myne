@@ -263,7 +263,7 @@ const KNOWN = [
       "`if &blob[0..MAGIC.len()] != MAGIC` is the correct behaviour for it: the version-aware " +
       "entry point is `decode_note_any` in `core/src/plugins/notes/decode.rs`, which reads the " +
       "first four bytes, decides the generation, and calls this codec only once it has " +
-      "established the blob IS `MY01`. Structurally identical to the `vault_meta.rs` entry above, " +
+      "established the blob IS `MY01`. Structurally identical to the `vault_meta.rs` entry, " +
       "and recorded for the same reason: a codec behind a dispatcher, not the myne-md/myne#638 " +
       "shape of a reader that silently answers `None`. " +
       "This file became visible to rule 5 only when `EXTRA_MAGIC_PAIRS` gained `selfToken`: the " +
@@ -280,7 +280,7 @@ const KNOWN = [
     // A `VAULT_META_V0_3_MAGIC` or a further NTV generation in a sibling module
     // changes this set and the file starts failing again, which is the property
     // a file-wide entry could not have.
-    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_V0_2_MAGIC",
+    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC,VAULT_META_V0_2_MAGIC",
     why:
       "`parse_vault_meta` is deliberately v0.1-only and its single-generation rejection at " +
       "`bytes[0..4] != VAULT_META_MAGIC` is the correct behaviour for it: the version-aware " +
@@ -300,11 +300,12 @@ const KNOWN = [
     rule: "magic-parity",
     file: "core/src/plugins/vault_migrate/mod.rs",
     contains: "VAULT_META_MAGIC",
-    missing: "VAULT_META_NTV6_MAGIC",
+    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC",
     why:
       "The v0.1 to v0.2 ON-DISK migration reads a `MYV1` `vault.meta` and writes `NTV5`; an " +
-      "`NTV6` vault never reaches it, because the B2B `NTV5` to `NTV6` migration lives in " +
-      "`core/src/plugins/vault_migrate/b2b.rs`, which names `VAULT_META_NTV6_MAGIC`. This " +
+      "`NTV6` (or person-born `NTV7`) vault never reaches it, because the B2B `NTV5` to `NTV6` " +
+      "migration, and the `NTV7` birth that supersedes it, live in " +
+      "`core/src/plugins/vault_migrate/b2b.rs` (which names `VAULT_META_NTV6_MAGIC`) and `core/src/plugins/vault_migrate/ntv7.rs` (which writes `NTV7`). This " +
       "function reads only the v0.1 base (`parse_vault_meta`) behind the generation dispatcher, " +
       "the legitimate single-generation-reader shape rule 5's header names. It became visible " +
       "to rule 5 only when the family table learned the `_NTV<n>_MAGIC` spelling, which is why " +

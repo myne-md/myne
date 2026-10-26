@@ -273,11 +273,6 @@ describe("AiChatTab", () => {
       expect(screen.getByTestId("ai.turn-streaming")).toBeTruthy();
     });
 
-
-
-
-
-
     it("hides the empty hint once the transcript has turns", () => {
       sendChatMessage("q");
       render(<AiChatTab />);

@@ -8,11 +8,24 @@
 //
 // SYNC-13: assertion shapes never print credentials; the scraped
 // phrase/password land only in the gitignored fixture artifact.
+//
+// **Every 0-vault entry is now the first run** (myne-md/myne#911 task 6): the
+// welcome screen's one create door opens the identity ceremony, and the vault
+// that follows is person-born, so it has NO vault phrase and NO recovery kit.
+// The scenarios below that need a vault KIT (copy feedback, the confirm matrix,
+// the picker and switcher entries) therefore seed an identity-less vault and
+// create a second one, which is the legacy path where the phrase still exists.
+// Where a claim moved with the ceremony, the scenario says where it went.
 
 import { expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
+import {
+  clickByTestId,
+  startFirstRunIdentity,
+  startFirstRunToVault,
+} from "./support/flows";
 import {
   dismissImporterOffer,
   pageSeatInvoke,
@@ -27,12 +40,6 @@ import { scanForPlaintext } from "./support/plaintext-scan";
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const VC1_PASSWORD = "Tk9#mQ4!wX7&zR2p-vc1";
-/** 11 chars — under the 12-char protocol floor AND zxcvbn-weak. */
-const WEAK_PASSWORD = "weakweak123";
-
-/** Crockford base32 (no I/L/O/U) — `account-number.md` §3 display form:
- *  `MY-` + five dash-separated 4-char groups (27 chars total). */
-const ACCOUNT_DISPLAY_RE = /^MY(-[0-9A-HJKMNP-TV-Z]{4}){5}$/;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -65,43 +72,19 @@ async function submitPasswordStep(session: Session, password: string): Promise<v
   await session.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
 }
 
-/** Traverse the first-run safety briefing (MYND-114): tick all three
- *  acknowledgements and continue to the password step. Pre-KDF — the
- *  briefing sits ahead of `begin`, so this spends no Argon2id. Only the
- *  welcome (first-run) entry shows it; picker/switcher creates skip it.
- *
- *  Lands on the NAME step, which is what follows the briefing since
- *  myne-md/myne#468, and walks it, so every caller reaches the password step
- *  exactly as it did before. */
-async function acknowledgeBriefing(session: Session): Promise<void> {
-  await session.byTestId("create.briefing", { timeoutMs: 15_000 });
-  const cont = await session.byTestId("create.briefing-continue");
-  expect(await cont.enabled()).toBe(false); // gated until all three ticked
-  const acks = await session.byTestIdAll("create.briefing-ack");
-  expect(acks.length).toBe(3);
-  for (const ack of acks) {
-    await ack.click();
-  }
-  await session.waitUntil(() => cont.enabled(), {
-    label: "briefing continue enabled (3/3 acknowledged)",
-    timeoutMs: 10_000,
-  });
-  await cont.click();
-  await nameVaultStep(session);
-}
-
 /** Scrape the 24 revealed phrase words in data-index order (single
  *  in-page pass — 1 round-trip instead of 48). The word is the LAST
  *  span of each cell (the first is the index numeral). */
-async function scrapePhrase(session: Session): Promise<string[]> {
+async function scrapePhrase(session: Session, stem = "create.phrase-word"): Promise<string[]> {
   const words = await session.execute<string[]>(
     "var words = [];" +
       "for (var i = 1; i <= 24; i++) {" +
       "  var el = document.querySelector(" +
-      "    '[data-testid=\"create.phrase-word\"][data-index=\"' + i + '\"] span:last-child');" +
+      "    '[data-testid=\"' + arguments[0] + '\"][data-index=\"' + i + '\"] span:last-child');" +
       "  words.push(el ? el.textContent || '' : '');" +
       "}" +
       "return words;",
+    [stem],
   );
   // Shape-only check (SYNC-13: never print the words themselves).
   expect(words.length).toBe(24);
@@ -124,101 +107,37 @@ async function fillConfirmChallenge(session: Session, words: string[]): Promise<
 }
 
 describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () => {
-  it("creates a vault end-to-end, lands in the editor, captures the realistic fixture", async () => {
-    // Vault-count precondition: 0. Full production KDF — creation params
-    // are pinned in the binary (SYNC-9: no weak-KDF shortcut exists for
-    // creation, by design).
+  it("creates an identity, then a vault with no vault phrase, and lands in the editor", async () => {
+    // Vault-count precondition: 0. Full production KDF: the identity seed
+    // plus creation's own Argon2id pair. SYNC-9: no weak-KDF shortcut exists
+    // for creation, by design.
     await scenario("vc1-happy-path", {}, async (app) => {
-      // Welcome → create → first-run safety briefing (MYND-114) → password.
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
-      await acknowledgeBriefing(app.session);
+      // Welcome → the ONE create door → the identity ceremony → briefing.
+      await startFirstRunToVault(app.session);
 
-      // Password step — zxcvbn gate first (story 1): a matching but
-      // weak/short password keeps Continue disabled.
-      const pwInput = await app.session.byTestId("create.password-input");
-      const confirmInput = await app.session.byTestId("create.confirm-input");
+      await (await app.session.byTestId("create.password-input")).sendKeys(VC1_PASSWORD);
+      await (await app.session.byTestId("create.confirm-input")).sendKeys(VC1_PASSWORD);
       const submit = await app.session.byTestId("create.submit");
-      await pwInput.sendKeys(WEAK_PASSWORD);
-      await confirmInput.sendKeys(WEAK_PASSWORD);
-      expect(await submit.enabled()).toBe(false);
-
-      // Strong password → gate opens (zxcvbn evaluates async — poll).
-      // replaceText, NOT clear(): W3C clear bypasses React's value
-      // tracker on the Input primitive — a silent no-op here would
-      // seal the vault under the CONCATENATED weak+strong string and
-      // poison the captured fixture (found the hard way: VU-1 red).
-      await pwInput.replaceText(VC1_PASSWORD);
-      await confirmInput.replaceText(VC1_PASSWORD);
       await app.session.waitUntil(() => submit.enabled(), {
         label: "password submit enabled (zxcvbn ≥3)",
         timeoutMs: 15_000,
       });
       await submit.click();
 
-      // BEGIN runs the production Argon2id pair — budget generously.
-      const grid = await app.session.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
-      expect(await grid.attribute("data-revealed")).toBe("false");
+      // The retirement, asserted as an ABSENCE. A person-born vault has no
+      // phrase, so the kit never mounts and `commit` runs straight after
+      // `begin`: waiting for Ready is what proves the flow went through
+      // `committing` rather than stalling on a screen that no longer exists.
+      const done = await app.session.byTestId("create.ready-done", { timeoutMs: 180_000 });
+      expect(await app.session.byTestIdAll("create.phrase-grid")).toHaveLength(0);
+      expect(await app.session.byTestIdAll("create.kit-sheet")).toHaveLength(0);
 
-      // The kit shows the account number BESIDE the phrase, in the same sheet,
-      // which is the merge this flow gained (myne-md/myne#468). 27-char §3
-      // display form. Asserted here rather than one step later because there is
-      // no later step to assert it on.
-      await app.session.byTestId("create.kit-sheet", { timeoutMs: 10_000 });
-      const accountEl = await app.session.byTestId("create.account-number", {
-        timeoutMs: 10_000,
-      });
-      const account = (await accountEl.text()).trim();
-      expect(account).toHaveLength(27);
-      expect(ACCOUNT_DISPLAY_RE.test(account)).toBe(true);
-      // The vault's own name heads its kit, which is half of why the name step
-      // exists. Its other half — the label reaching `vault.prefs` — is asserted
-      // after the unlock, further down.
-      //
-      // Polled through `textContent()`, NOT read once with `text()`. A one-shot
-      // `GET /text` on a node the render tree has only just received can answer
-      // `""` while the DOM is already correct (the trap `waitForBannerText`'s
-      // header documents, measured on a just-inserted banner), and `kit-meta` is
-      // exactly that case: it mounts with the kit sheet.
-      await app.session.waitUntil(
-        async () => {
-          const el = await app.session.byTestId("create.kit-meta");
-          const text = (await el.textContent()) ?? "";
-          return text.includes(VC_VAULT_NAME) ? true : null;
-        },
-        { label: "the kit names the vault", timeoutMs: 15_000 },
-      );
+      // Ready is forward-only: no Back affordance survives the commit.
+      for (const backId of ["create.confirm-back", "create.phrase-back", "create.secondary"]) {
+        expect(await app.session.byTestIdAll(backId)).toHaveLength(0);
+      }
 
-      // Reveal + scrape the 24 words (the fixture's ONLY capture point —
-      // the phrase is never re-displayed).
-      await (await app.session.byTestId("create.phrase-reveal")).click();
-      await app.session.waitUntil(
-        async () => (await grid.attribute("data-revealed")) === "true" || null,
-        { label: "phrase revealed", timeoutMs: 10_000 },
-      );
-      const words = await scrapePhrase(app.session);
-      await (await app.session.byTestId("create.phrase-continue")).click();
-
-      // 4-of-24 type-back confirm.
-      await app.session.byTestId("create.confirm-input", { timeoutMs: 10_000 });
-      await fillConfirmChallenge(app.session, words);
-      const confirmContinue = await app.session.byTestId("create.confirm-continue");
-      await app.session.waitUntil(() => confirmContinue.enabled(), {
-        label: "confirm continue enabled (4/4 match)",
-        timeoutMs: 10_000,
-      });
-      // This click COMMITS: the confirm step is the last one now
-      // (myne-md/myne#468 — the account number moved back into the recovery kit
-      // and its acknowledgement checkbox was deleted rather than moved, because
-      // `protocol.md` §7.1.3 says a bare checkbox is not evidence and the
-      // type-back this button is gated on already is).
-      await confirmContinue.click();
-
-      // Ready step. Do NOT click "Show vault folder" (MYND-219 pending —
-      // it still opens the legacy `vault/` path).
-      const done = await app.session.byTestId("create.ready-done", { timeoutMs: 60_000 });
-
-      // Disk contract BEFORE Done (commit already wrote the layout):
-      // hard-assert the canonical meta; soft-check optional siblings.
+      // Disk contract BEFORE Done (commit already wrote the layout).
       const vaultsDir = join(app.appDataDir, "vaults");
       const ids = readdirSync(vaultsDir, { withFileTypes: true })
         .filter((d) => d.isDirectory())
@@ -228,38 +147,33 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       expect(UUID_RE.test(vaultId)).toBe(true);
       const metaPath = join(vaultsDir, vaultId, "vault.meta");
       const metaBytes = readFileSync(metaPath);
-      expect(metaBytes).toHaveLength(345);
-      // `NTV5`, not `MYV1`: a vault created today is born v0.2
-      // (`decisions.md` 2026-08-13 — the birth-format entry; `protocol.md`
-      // §10.3.1). The layout is the same 345 bytes; only bytes 0..5 differ.
-      // This assertion IS the birth format's end-to-end proof — it runs against
-      // the production binary through the real creation UI, so nothing about it
-      // is mocked or seeded.
-      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV5");
+      // `NTV7`, not `NTV5`: a vault created under an identity is the
+      // person-wrapped generation (myne-md/myne#911 tasks 2 and 5). This
+      // assertion IS the birth format's end-to-end proof: it runs against the
+      // production binary through the real creation UI, so nothing about it is
+      // seeded or mocked.
+      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV7");
+      // The frame is `445 + roster_len + 1208`, so it is NOT the 345-byte base.
+      // A length check here would be a second opinion about a number task 2
+      // owns, so the assertion is the inequality the shape implies.
+      expect(metaBytes.length).toBeGreaterThan(345);
 
-      // Soft checks: format-verified when present, warned when absent
-      // (these artifacts are creation-version-dependent).
-      // The two singletons the creation path seeds eagerly carry the SAME
-      // generation as the meta above — `MYP5`/`MYC5`, not `MYP1`/`MYC1`. A
-      // mismatch here is the hybrid-vault shape §10.3.1 forbids, and it is
-      // invisible at runtime because every decoder detects its own magic.
-      const soft: Array<[string, (buf: Buffer) => boolean]> = [
-        ["vault.prefs", (b) => b.subarray(0, 4).toString("latin1") === "MYP5"],
-        ["vault.attachments", (b) => b.subarray(0, 4).toString("latin1") === "MYC5"],
-      ];
-      for (const [name, check] of soft) {
+      // The two eagerly seeded singletons keep their own generation (`MYP5` /
+      // `MYC5`): what changed for this generation is the TIER they are sealed
+      // under (group, following the roster), not their inner framing.
+      for (const [name, magic] of [
+        ["vault.prefs", "MYP5"],
+        ["vault.attachments", "MYC5"],
+      ] as const) {
         const p = join(vaultsDir, vaultId, name);
         if (existsSync(p)) {
-          expect(check(readFileSync(p))).toBe(true);
+          expect(readFileSync(p).subarray(0, 4).toString("latin1")).toBe(magic);
         } else {
           // eslint-disable-next-line no-console
           console.warn(`[vc1] soft disk-check: ${name} absent (accepted)`);
         }
       }
-      // Registry is a LAZY cache (SYNC-10: the disk-scan is the
-      // authority; the file rebuilds on the next vault_list). At this
-      // point it may predate the commit, so the soft check is FORMAT
-      // only — membership is asserted by the boot-routing suite.
+      // Registry is a LAZY cache (SYNC-10: the disk-scan is the authority).
       const registryPath = join(vaultsDir, "registry.json");
       if (existsSync(registryPath)) {
         const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
@@ -275,38 +189,32 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
 
       // Done → auto-unlock chain (production Argon2id again) → editor.
       await done.click();
-      await app.session.byTestId("editor.root", { timeoutMs: 120_000 });
+      await app.session.byTestId("editor.root", { timeoutMs: 180_000 });
 
-      // Capture the epic's realistic fixture (credentials + meta bytes)
-      // BEFORE teardown removes the data dir.
+      // The realistic fixture keeps serving the unlock suites, which need a
+      // REAL created-by-the-app vault and its password. It no longer carries a
+      // phrase, because this vault has none: a suite that needs to RECOVER a
+      // vault seeds a legacy one instead (`seedVault({kdf:"production"})`), and
+      // that is the path `recovery-drill`, `recovery-phrase-check` and
+      // `change-password` now take.
       saveRealisticFixture(
-        { vaultId, password: VC1_PASSWORD, phrase: words.join(" "), account },
+        { vaultId, password: VC1_PASSWORD, phrase: null, account: null },
         metaBytes,
       );
 
-      // Plaintext-never-on-disk: neither credential persisted anywhere
-      // under the session's filesystem surface (needle indices only).
-      const hits = scanForPlaintext(app.dataHome, [words.join(" "), VC1_PASSWORD]);
+      // Plaintext-never-on-disk: the password is the only credential this
+      // scenario holds (SYNC-13: no phrase is ever captured here).
+      const hits = scanForPlaintext(app.dataHome, [VC1_PASSWORD]);
       expect(hits).toEqual([]);
 
-      // #393 — a freshly-created vault is seeded with a small EXAMPLE VAULT:
-      // five ordinary notes under one "Getting started" folder, with the index
-      // note ("Start here") auto-opened in the editor via the pre-seeded
-      // workspace descriptor. A vault with no seed would show zero folders AND
-      // zero tabs, so the folder's presence plus a note tab opened on the index
-      // proves the whole chain: created → foldered → listed → restored open.
-      // (Lives on VC-1 — the epic's one production-KDF creation that lands in
-      // the editor — rather than a second multi-minute creation.)
+      // #393: a freshly-created vault is seeded with a small EXAMPLE VAULT.
+      // Unchanged by the generation: creation seeds it on the first unlock
+      // chain, and that chain still runs here.
       await dismissImporterOffer(app.session);
-      // The example folder is in the tree (its label is the frontmatter `folder:`).
       const exampleFolder = await app.session.byTestId("notes.folder-row", {
         timeoutMs: 15_000,
       });
       expect(await exampleFolder.textContent()).toContain("Getting started");
-      // A note tab is open — the index note, keyed `note:<id>` in `data-tab-id`
-      // (Saved Views #4 generalized tabs to `note | view` items). Its title is
-      // frontmatter-`title:` driven (no body-H1 fallback), so it reads
-      // "Start here", never the "Untitled" placeholder.
       const indexTab = await app.session.byTestId("editor.tab", { timeoutMs: 15_000 });
       expect(await indexTab.attribute("data-tab-id")).toMatch(/^note:/);
       expect(await indexTab.textContent()).toContain("Start here");
@@ -315,98 +223,96 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
 });
 
 describeE2E("VC-2 confirm gating + VC-3 blur cover (MYND-124 task 2)", () => {
-  it("wrong word gates Continue per-cell; NFKD/case-folded input matches; cover re-arms only via Reveal", async () => {
-    // Vault-count precondition: 0. ONE creation session past `begin`
-    // (single production-Argon2id spend) chains both scenarios.
+  it("the IDENTITY ceremony gates Done per-cell and covers the words on blur", async () => {
+    // Vault-count precondition: 0. ONE identity creation (one Argon2id seed
+    // derivation) chains both scenarios.
+    //
+    // **Re-sited, not retired** (myne-md/myne#911 task 6). These two claims used
+    // to be asserted on the vault's kit and confirm steps; a person-born vault
+    // has neither, because the phrase and its type-back moved to the identity
+    // ceremony. The CLAIM is unchanged (a wrong word is refused per cell with
+    // its own position; a walk-away hides the words and only Reveal brings them
+    // back), and so is the code under test: `PhraseTypeBack` and
+    // `useLocalPhraseReveal` are the same shared components, now mounted by the
+    // panel. Leaving them asserted nowhere would have been the quiet loss.
     await scenario("vc2-vc3-confirm-and-cover", {}, async (app) => {
-      // Reach the phrase step.
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
-      await acknowledgeBriefing(app.session);
-      await (await app.session.byTestId("create.password-input")).sendKeys(VC1_PASSWORD);
-      await (await app.session.byTestId("create.confirm-input")).sendKeys(VC1_PASSWORD);
-      const submit = await app.session.byTestId("create.submit");
-      await app.session.waitUntil(() => submit.enabled(), {
-        label: "password submit enabled",
-        timeoutMs: 15_000,
-      });
-      await submit.click();
-      await app.session.byTestId("create.phrase-grid", { timeoutMs: 120_000 });
-      await (await app.session.byTestId("create.phrase-reveal")).click();
-      const words = await scrapePhrase(app.session);
-      await (await app.session.byTestId("create.phrase-continue")).click();
+      const s = app.session;
+      await (await s.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      await s.byTestId("first-run.root", { timeoutMs: 15_000 });
+      await (await s.byTestId("first-run.identity.create-cta", { timeoutMs: 20_000 })).click();
+      await s.byTestId("first-run.identity.phrase", { timeoutMs: 120_000 });
+      await (await s.byTestId("first-run.identity.phrase-reveal")).click();
+      const words = await scrapePhrase(s, "first-run.identity.phrase-word");
+      await (await s.byTestId("first-run.identity.phrase-continue")).click();
 
-      // ── VC-2: per-cell mismatch gating on the confirm step ──
-      await app.session.byTestId("create.confirm-input", { timeoutMs: 10_000 });
-      const cells = await app.session.byTestIdAll("create.confirm-input");
+      // ── VC-2: per-cell mismatch gating on the type-back ──
+      await s.byTestId("first-run.identity.confirm-input", { timeoutMs: 10_000 });
+      const cells = await s.byTestIdAll("first-run.identity.confirm-input");
       expect(cells.length).toBe(4);
       const firstPos = Number(await cells[0].attribute("data-index"));
 
-      // Wrong word (not in any BIP-39 list) → the per-cell error with
-      // its position-addressed literal copy + Continue disabled.
+      // Wrong word (not in any BIP-39 list) → the per-cell error with its
+      // position-addressed copy, and Done stays refused.
       await cells[0].sendKeys("zzzzzz");
-      const cellError = await app.session.waitForElement(
-        testIdSelector("create.confirm-error", { "data-index": String(firstPos) }),
+      const cellError = await s.waitForElement(
+        testIdSelector("first-run.identity.confirm-error", {
+          "data-index": String(firstPos),
+        }),
       );
-      expect(await cellError.text()).toBe(`Doesn't match word ${firstPos}.`);
-      const confirmContinue = await app.session.byTestId("create.confirm-continue");
-      expect(await confirmContinue.enabled()).toBe(false);
+      expect(await cellError.text()).toBe(`That does not match word #${firstPos}.`);
+      const done = await s.byTestId("first-run.identity.close-cta");
+      expect(await done.enabled()).toBe(false);
 
-      // No autocomplete/typeahead surface on confirm cells (§2.3: the
-      // type-back must PROVE recall, not assist it).
+      // No autocomplete/typeahead surface: the type-back must PROVE recall.
       for (const cell of cells) {
         expect(await cell.attribute("autocomplete")).toBe("off");
         expect(await cell.attribute("spellcheck")).toBe("false");
         expect(await cell.attribute("list")).toBeNull();
       }
-      expect(await app.session.findElements("[role='listbox'], datalist")).toHaveLength(0);
+      expect(await s.findElements("[role='listbox'], datalist")).toHaveLength(0);
 
-      // Correct the cell with UPPERCASE input — `normalizeWord` (NFKD +
-      // case-fold) must accept it; error clears. (`replaceText`: W3C
-      // clear bypasses React's value tracker on the Input primitive.)
+      // Correct the cell with UPPERCASE input: `normalizeWord` (NFKD +
+      // case-fold) accepts it and the error clears.
       await cells[0].replaceText(words[firstPos - 1].toUpperCase());
-      await app.session.waitForGone(
-        testIdSelector("create.confirm-error", { "data-index": String(firstPos) }),
+      await s.waitForGone(
+        testIdSelector("first-run.identity.confirm-error", {
+          "data-index": String(firstPos),
+        }),
       );
 
-      // Fill the remaining three correctly → Continue arms.
       for (const cell of cells.slice(1)) {
         const pos = Number(await cell.attribute("data-index"));
         await cell.sendKeys(words[pos - 1]);
       }
-      await app.session.waitUntil(() => confirmContinue.enabled(), {
-        label: "confirm continue enabled (4/4 match)",
+      await s.waitUntil(() => done.enabled(), {
+        label: "identity Done enabled (4/4 match)",
         timeoutMs: 10_000,
       });
 
       // ── VC-3: blur cover on the phrase step (walk-away guard) ──
-      // CONFIRM_BACK remounts PhraseStep — re-fetch the grid handle
-      // (the pre-confirm one is a stale element reference).
-      await (await app.session.byTestId("create.confirm-back")).click();
-      const gridBack = await app.session.byTestId("create.phrase-grid", { timeoutMs: 10_000 });
+      // Back remounts the phrase step; re-fetch the grid handle, because the
+      // pre-confirm element is a stale reference.
+      await (await s.byTestId("first-run.identity.confirm-back")).click();
+      const gridBack = await s.byTestId("first-run.identity.phrase", { timeoutMs: 10_000 });
+      await s.waitUntil(
+        async () => (await gridBack.attribute("data-revealed")) === "true" || null,
+        { label: "phrase still revealed after Back", timeoutMs: 10_000 },
+      );
 
-      // Ensure revealed, then blur the window: the cover must drop.
-      if ((await gridBack.attribute("data-revealed")) !== "true") {
-        await (await app.session.byTestId("create.phrase-reveal")).click();
-        await app.session.waitUntil(
-          async () => (await gridBack.attribute("data-revealed")) === "true" || null,
-          { label: "phrase revealed pre-blur", timeoutMs: 10_000 },
-        );
-      }
-      // The production listener is `window.addEventListener("blur")` —
-      // fire the same event the OS does on Cmd-Tab (no hook; DOM-level).
-      await app.session.execute("window.dispatchEvent(new Event('blur'))");
-      await app.session.waitUntil(
+      // The production listener is `window.addEventListener("blur")`; fire the
+      // same event the OS does on Cmd-Tab.
+      await s.execute("window.dispatchEvent(new Event('blur'))");
+      await s.waitUntil(
         async () => (await gridBack.attribute("data-revealed")) === "false" || null,
         { label: "cover dropped on blur", timeoutMs: 10_000 },
       );
 
-      // Refocus does NOT restore — §2.2: re-reveal is explicit only.
-      await app.session.execute("window.dispatchEvent(new Event('focus'))");
+      // Refocus does NOT restore (protocol.md §2.2: re-reveal is explicit).
+      await s.execute("window.dispatchEvent(new Event('focus'))");
       expect(await gridBack.attribute("data-revealed")).toBe("false");
 
-      // Explicit Reveal restores.
-      await (await app.session.byTestId("create.phrase-reveal")).click();
-      await app.session.waitUntil(
+      await (await s.byTestId("first-run.identity.phrase-reveal")).click();
+      await s.waitUntil(
         async () => (await gridBack.attribute("data-revealed")) === "true" || null,
         { label: "re-revealed via button", timeoutMs: 10_000 },
       );
@@ -415,131 +321,45 @@ describeE2E("VC-2 confirm gating + VC-3 blur cover (MYND-124 task 2)", () => {
 });
 
 describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () => {
-  /** Drive Welcome → password → begin → revealed phrase; returns the
-   *  scraped words. One production-Argon2id spend per call. */
-  async function reachPhraseStep(session: Session): Promise<string[]> {
-    await submitPasswordStep(session, VC1_PASSWORD);
-    await (await session.byTestId("create.phrase-reveal")).click();
-    return scrapePhrase(session);
-  }
-
-  it("Confirm↔Kit preserves state; ReadyStep is forward-only", async () => {
-    // Vault-count precondition: 0. One begin chains arms 1+2+3.
-    await scenario("vc4-mid-flow-backs", {}, async (app) => {
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
-      await acknowledgeBriefing(app.session);
-      const words = await reachPhraseStep(app.session);
-      await (await app.session.byTestId("create.phrase-continue")).click();
-
-      // Type ONE correct word, note its position…
-      await app.session.byTestId("create.confirm-input", { timeoutMs: 10_000 });
-      const cells = await app.session.byTestIdAll("create.confirm-input");
-      const positionsBefore: number[] = [];
-      for (const cell of cells) {
-        positionsBefore.push(Number(await cell.attribute("data-index")));
-      }
-      await cells[0].sendKeys(words[positionsBefore[0] - 1]);
-
-      // …Back to Phrase, Forward again: positions stable across
-      // CONFIRM_BACK and the typed input preserved (arm 1).
-      await (await app.session.byTestId("create.confirm-back")).click();
-      await app.session.byTestId("create.phrase-grid", { timeoutMs: 10_000 });
-      await (await app.session.byTestId("create.phrase-continue")).click();
-      const cellsAfter = await app.session.waitUntil(
-        async () => {
-          const found = await app.session.byTestIdAll("create.confirm-input");
-          return found.length === 4 ? found : null;
-        },
-        { label: "confirm cells remounted", timeoutMs: 10_000 },
-      );
-      const positionsAfter: number[] = [];
-      for (const cell of cellsAfter) {
-        positionsAfter.push(Number(await cell.attribute("data-index")));
-      }
-      expect(positionsAfter).toEqual(positionsBefore);
-      expect(await cellsAfter[0].property<string>("value")).toBe(
-        words[positionsBefore[0] - 1],
-      );
-
-      // Fill the rest. Arm 2 used to be Account→Confirm returning
-      // already-passed; there is no account step to come back FROM since
-      // myne-md/myne#468, so what replaces it is the second half of arm 1: a
-      // round trip to the kit and back must leave the challenge already passed,
-      // with Continue enabled and nothing retyped.
-      for (const cell of cellsAfter.slice(1)) {
-        const pos = Number(await cell.attribute("data-index"));
-        await cell.sendKeys(words[pos - 1]);
-      }
-      const confirmContinue = await app.session.byTestId("create.confirm-continue");
-      await app.session.waitUntil(() => confirmContinue.enabled(), {
-        label: "confirm continue enabled",
-        timeoutMs: 10_000,
-      });
-      await (await app.session.byTestId("create.confirm-back")).click();
-      await app.session.byTestId("create.phrase-grid", { timeoutMs: 10_000 });
-      await (await app.session.byTestId("create.phrase-continue")).click();
-      const continueBack = await app.session.byTestId("create.confirm-continue", {
-        timeoutMs: 10_000,
-      });
-      await app.session.waitUntil(() => continueBack.enabled(), {
-        label: "confirm continue still enabled after a kit round trip",
-        timeoutMs: 10_000,
-      });
-
-      // Forward to Ready: no Back affordance anywhere (arm 3). One click, because
-      // this control is the commit as well as the Continue.
-      await continueBack.click();
-      await app.session.byTestId("create.ready-done", { timeoutMs: 60_000 });
-      for (const backId of [
-        "create.confirm-back",
-        "create.phrase-back",
-        "create.secondary",
-      ]) {
-        expect(await app.session.byTestIdAll(backId)).toHaveLength(0);
-      }
-    });
-  });
-
-  it("Back-from-Phrase is a clean restart; Back-from-password steps back to the name step", async () => {
-    // Vault-count precondition: 0. Two begins (the restart proof needs a
-    // fresh begin to succeed — arm 4b).
+  it("Back from the password step keeps the name; Back again lands on the identity home", async () => {
+    // Vault-count precondition: 0. Whole scenario walks only up to the password
+    // form, so it spends the identity's Argon2id and nothing more.
+    //
+    // **What left this scenario** (myne-md/myne#911 task 6): the Confirm↔Kit
+    // state matrix and "Back-from-Phrase is a clean restart". Both were
+    // assertions about the VAULT phrase step, which a person-born vault does not
+    // have. Their equivalents now live on the identity ceremony, in VC-2/VC-3
+    // above (the challenge's own round trip and reveal behaviour) and in
+    // `e2e/first-run-offline.e2e.ts` (the ceremony end to end). What remains
+    // here is the part that was never about the phrase.
     await scenario("vc4-clean-restart", {}, async (app) => {
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
-      await acknowledgeBriefing(app.session);
-      await reachPhraseStep(app.session);
+      const s = app.session;
+      await startFirstRunToVault(s);
 
-      // Arm 4: Back from Phrase cancels the backend session and lands
-      // on an EMPTY password form (password non-survival).
-      await (await app.session.byTestId("create.phrase-back")).click();
-      const pwInput = await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
-      expect(await pwInput.property<string>("value")).toBe("");
-      expect(await (await app.session.byTestId("create.confirm-input")).property<string>("value")).toBe("");
-      expect(await (await app.session.byTestId("create.submit")).enabled()).toBe(false);
-
-      // Arm 4b: a FRESH begin succeeds (no stale session blocks it).
-      await reachPhraseStep(app.session);
-      await (await app.session.byTestId("create.phrase-back")).click();
-      await app.session.byTestId("create.password-input", { timeoutMs: 10_000 });
-
-      // Arm 6: Back from the password step (entered from Welcome) → the NAME
-      // step, one back-step rather than an exit, which is what myne-md/myne#468
-      // made it ("One step BACK, to the vault-name step — not out of the flow"),
-      // with the typed name kept. Then Back again → Welcome (MYND-219 reprobe:
-      // 0 vaults on disk, so the entry surface is the welcome screen).
-      await (await app.session.byTestId("create.secondary")).click();
-      const backAtName = await app.session.byTestId("create.name-input", { timeoutMs: 15_000 });
+      // Arm 6, first hop: Back from the password step is ONE step, to the name
+      // step, with the typed name kept (myne-md/myne#468).
+      await (await s.byTestId("create.secondary")).click();
+      const backAtName = await s.byTestId("create.name-input", { timeoutMs: 15_000 });
       expect(
         await backAtName.property<string>("value"),
         "the back-step must keep the name the user already typed",
-      ).toBe(VC_VAULT_NAME);
-      await (await app.session.byTestId("create.name-back")).click();
-      await app.session.byTestId("welcome.root", { timeoutMs: 15_000 });
+      ).toBe("E2E Kasa");
+
+      // Arm 6, second hop: Back again leaves creation. Boot routing decides
+      // where, and it is NOT Welcome any more: an identity now exists on this
+      // device, so the zero-vault arm lands on the identity home (myne-md/myne#911
+      // task 4). That is also the honest answer to "the user abandoned the first
+      // run", the identity they just created is real and stays.
+      await (await s.byTestId("create.name-back")).click();
+      await s.byTestId("identity-home.root", { timeoutMs: 20_000 });
     });
   });
 
   it("create entered from the picker returns to the picker on Back (MYND-219 reprobe)", async () => {
     // Vault-count precondition: 2 (weak KDF; Back fires BEFORE begin —
-    // no Argon2id spend).
+    // no Argon2id spend). Unchanged by the first-run rework: a device with
+    // vaults has no identity, so "create another" is the LEGACY path, phrase
+    // and all.
     await scenario(
       "vc4-back-to-picker",
       {
@@ -551,23 +371,12 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
       async (app) => {
         await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
         await (await app.session.byTestId("picker.create-cta")).click();
-        // The NAME step first, on every entry (myne-md/myne#468): only the
-        // safety briefing is first-run-only, so "create another" lands on the
-        // name step and this walk reaches the password step.
         await nameVaultStep(app.session);
 
         // First-run-only scoping (MYND-114): the picker "create another"
-        // entry shows NO safety briefing (a returning user has acknowledged
-        // the recovery model once).
+        // entry shows NO safety briefing.
         expect(await app.session.byTestIdAll("create.briefing")).toHaveLength(0);
 
-        // Arm 5: Back from the password step → the NAME step, which is the
-        // back-step myne-md/myne#468 gave it ("One step BACK, to the vault-name
-        // step — not out of the flow"), and then Back again → the entry surface,
-        // which here is the picker (the pre-MYND-219 behavior stranded this path
-        // on Welcome). Asserted in two hops rather than one, because a single
-        // click that left creation entirely would satisfy the old form and
-        // report nothing about the name step's existence.
         await (await app.session.byTestId("create.secondary")).click();
         await app.session.byTestId("create.name-input", { timeoutMs: 15_000 });
         await (await app.session.byTestId("create.name-back")).click();
@@ -577,8 +386,29 @@ describeE2E("VC-4 back-navigation matrix (MYND-124 task 3, post-MYND-219)", () =
   });
 });
 
+/** Drive the PASSWORD step of a person-born creation → ReadyStep through the
+ *  real UI (one production begin). No kit and no type-back: this generation has
+ *  no vault phrase, so `begin` auto-commits and Ready is the first screen after
+ *  the password. Caller decides what to do at Ready. */
+async function createPersonVaultToReady(session: Session, password: string): Promise<void> {
+  await (await session.byTestId("create.password-input")).sendKeys(password);
+  await (await session.byTestId("create.confirm-input")).sendKeys(password);
+  const submit = await session.byTestId("create.submit");
+  await session.waitUntil(() => submit.enabled(), {
+    label: "password submit enabled",
+    timeoutMs: 15_000,
+  });
+  await submit.click();
+  await session.byTestId("create.ready-done", { timeoutMs: 180_000 });
+}
+
 /** Drive password → recovery kit → confirm (which commits) → ReadyStep through
- *  the real UI (one production begin). Caller decides what to do at Ready. */
+ *  the real UI (one production begin). Caller decides what to do at Ready.
+ *
+ *  The KIT path, still used by the picker and switcher entries: those devices
+ *  hold seeded vaults and no identity, so "create another" is the legacy birth
+ *  with its phrase. A personality-created vault must use
+ *  [`createPersonVaultToReady`] instead. */
 async function createToReadyStep(session: Session, password: string): Promise<void> {
   await submitPasswordStep(session, password);
   await (await session.byTestId("create.phrase-reveal")).click();
@@ -664,9 +494,8 @@ describeE2E("VC-6 auto-unlock-failure fallback (MYND-124 task 5)", () => {
   it("Done with a vanished vault.meta lands on unlock targeting the just-created vault", async () => {
     // Vault-count precondition: 0 → 1 (the created vault).
     await scenario("vc6-auto-unlock-fallback", {}, async (app) => {
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
-      await acknowledgeBriefing(app.session);
-      await createToReadyStep(app.session, VC1_PASSWORD);
+      await startFirstRunToVault(app.session);
+      await createPersonVaultToReady(app.session, VC1_PASSWORD);
 
       // At-rest fault injection BEFORE Done: delete the just-committed
       // vault.meta so the chained auto-unlock rejects naturally.
@@ -781,21 +610,31 @@ describeE2E("VC-9/VC-10 create-second-vault entries (MYND-124 task 6)", () => {
 });
 
 describeE2E("MYND-114 first-run safety briefing (pre-vault-create contract)", () => {
-  it("gates Continue on three acknowledgements, expands Why? inline, and Back returns to Welcome", async () => {
-    // Vault-count precondition: 0. Entirely pre-KDF — the briefing sits
-    // ahead of `begin`, so this scenario spends no Argon2id.
+  it("gates Continue on three acknowledgements, expands Why? inline, and Back leaves the flow", async () => {
+    // Vault-count precondition: 0. The briefing itself is pre-KDF, but the
+    // FIRST RUN now reaches it through the identity ceremony, which is not:
+    // one identity creation pays one Argon2id seed derivation.
     await scenario("mynd114-safety-briefing", {}, async (app) => {
-      // Welcome → create: the briefing gates the flow — no password yet.
-      await (await app.session.byTestId("welcome.create-cta", { timeoutMs: 20_000 })).click();
+      // Welcome → the one create door → identity ceremony → the briefing gates
+      // vault creation, no password yet (myne-md/myne#911 task 6).
+      await startFirstRunIdentity(app.session);
       await app.session.byTestId("create.briefing", { timeoutMs: 15_000 });
       expect(await app.session.byTestIdAll("create.password-input")).toHaveLength(0);
 
-      // Back → Welcome: the contract is declinable, not a trap.
+      // Back leaves the flow, and the surface it returns to is the identity
+      // home: the identity now exists on this device, so boot routing answers
+      // with the screen that owns it rather than Welcome (myne-md/myne#911
+      // task 4). The contract is declinable, not a trap, and the identity is
+      // not undone by declining.
       await (await app.session.byTestId("create.briefing-back")).click();
-      await app.session.byTestId("welcome.root", { timeoutMs: 15_000 });
+      await app.session.byTestId("identity-home.root", { timeoutMs: 20_000 });
 
-      // Re-enter: a fresh mount re-arms the gate (acknowledgements reset).
-      await (await app.session.byTestId("welcome.create-cta")).click();
+      // Re-enter from the identity home: a fresh mount re-arms the gate
+      // (acknowledgements reset). `clickByTestId`, not a bare element click:
+      // the identity home's action sits inside `CenteredCard`'s own scroller,
+      // and WebKit refused a plain `/click` with "element not interactable"
+      // for 10 s while the DOM dump showed the button present and unobscured.
+      await clickByTestId(app.session, "identity-home.create-vault-cta");
       await app.session.byTestId("create.briefing", { timeoutMs: 15_000 });
       const cont = await app.session.byTestId("create.briefing-continue");
       expect(await cont.enabled()).toBe(false);

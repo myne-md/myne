@@ -104,6 +104,11 @@ export interface MockConfig {
     person_id_hex: string | null;
     identity_code: string | null;
     sealed_keypair_present: boolean;
+    /** The three-state lifecycle (myne-md/myne#911 task 4). `null` = no identity;
+     *  the flow routes on THIS rather than on `enrolled`, because a `reserved`
+     *  identity is an identity (created offline, sealed, usable) and used to land
+     *  on the gate offering to create a second one. */
+    state?: "reserved" | "pending" | "enrolled" | null;
   };
   /** `sync_person_list_invites`: the pending-invite roster the identity home
    *  renders. One row is what puts an `Open` control on screen at all. */
@@ -128,6 +133,20 @@ export interface MockConfig {
   /** `sync_person_setup` refusal, e.g. `{ kind: "BadRequest" }` for the
    *  non-distinguishing wrong-phrase arm. */
   personSetupError?: { kind: string };
+  /** `sync_person_register` refusal (myne-md/myne#911 task 12). Absent = the
+   *  registration lands and the device becomes `enrolled`. */
+  personRegisterError?: { kind: string };
+  /** `sync_person_join_device` refusal (task 12): `PersonMismatch` for a phrase
+   *  that belongs to another person, `TlsFailure` for an endpoint that does not
+   *  verify. Absent = the join lands, pending unless `personJoinApproved`. */
+  personJoinError?: { kind: string };
+  /** Whether the person join comes back approved rather than pending. `false`
+   *  (the default) is the real first answer: an existing device has to approve
+   *  this one, which is what the pending screen exists for. */
+  personJoinApproved?: boolean;
+  /** `sync_person_list_vaults`: the account's vaults, materialised as local
+   *  frames. What the picker shows after a person join. */
+  personVaults?: Array<{ vault_id: string | null; account_hash_hex: string; role: string }>;
   /** `sync_person_accept_invite` refusal. Absent = the accept lands, and the mock
    *  then reports the accepted vault from `vault_list`, which is what makes the
    *  re-probe reach the editor. */
@@ -183,6 +202,15 @@ export interface MockConfig {
         kind: "member_vault";
         endpoint_url: string;
         account_hash_hex: string;
+        fresh: boolean;
+      }
+    | {
+        /** The PERSON join (myne-md/myne#911 task 9, wired on this client by task
+         *  12): the code names the person, and the identity phrase is the
+         *  credential. No account number, no vault password. */
+        kind: "person";
+        endpoint_url: string;
+        person_id_hex: string;
         fresh: boolean;
       };
   qrDecodeError?: { kind: string };
@@ -369,6 +397,25 @@ export interface MockConfig {
    *  `[]`. Lets a transcription test seed an audio attachment for the
    *  Transcribe row to appear on. */
   catalog?: Array<{ id: string; filename: string; content_type: string; size: number }>;
+  /** Canned `plugin:attachments|attachment_read_extracted_text` answers, keyed by
+   *  attachment id (myne-md/myne#926). A string is the MYE1 text the import
+   *  wrote; `null` is "no usable cache entry". An id that is absent reads as
+   *  `null`, which is also the honest default: a spec that has not said what the
+   *  page contained gets a page with nothing on it. */
+  readExtractedText?: Record<string, string | null>;
+  /** Make `attachment_import` report a DEDUP HIT: the vault already held this
+   *  exact image, so the returned id is somebody else's attachment and the flow
+   *  must not delete it. This is the arm a cancel has to respect (myne-md/myne#926
+   *  review), and the default `false` is what made the first version of the
+   *  cancel test blind to it. */
+  importDeduplicated?: boolean;
+  /** Make `note_create` REJECT, so "the sheet stays open with your text" can be
+   *  driven. A create that fails must not look like one that landed. */
+  createNoteFails?: boolean;
+  /** Make `attachment_delete` REJECT, so the failed-discard arm can be driven:
+   *  a cancel that cannot remove the bytes must say so rather than close as if
+   *  it had. */
+  deleteFails?: boolean;
   /** Seed + capture for `plugin:chats|*` (myne-md/myne#675). `rows` seeds the
    *  roster `chats_list` returns (each `{ id, created_at, title, updated_at,
    *  version }`); `payloads` maps conversation id → turn-list payload JSON
@@ -677,6 +724,14 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
      *  real sequence: `sync_person_accept_invite` materializes and unlocks the
      *  slot host-side, and the shell then re-probes and finds it. */
     let acceptedVaultId: string | null = null;
+    /** The lifecycle state this session's identity has reached, or `null` while
+     *  there is none (myne-md/myne#911 task 12). Set by `sync_person_setup`
+     *  (create → `reserved`) and by `sync_person_register` (→ `enrolled`), and
+     *  read by `sync_person_status`, because that is the real sequence: the state
+     *  is DERIVED from disk on every read (task 4), and a mock that reported a
+     *  constant would make the identity home's create-vault and register blocks
+     *  unreachable no matter what the flow did. */
+    let personState: "reserved" | "pending" | "enrolled" | null = null;
     // Vaults deleted during this session, by id. The delete escape routes by
     // re-probing rather than by navigating, so the roster is the only thing
     // that can carry the outcome — see the vault-delete handler.
@@ -1526,10 +1581,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           filename: source.filename ?? "file",
           size: len,
           created_at: 0,
-          deduplicated: false,
+          deduplicated: config.importDeduplicated === true,
         };
       },
       "plugin:attachments|catalog_list": () => config.catalog ?? [],
+      // The MYE1 read-back photo-to-note's draft sheet makes (myne-md/myne#926).
+      // Canned rather than derived from the import because the extractor is a
+      // Rust model this tier has no access to; the question a spec asks here is
+      // what the SHEET does with an answer, not whether PP-OCRv5 read the page
+      // (no scenario in this repository can answer that about a real photo).
+      "plugin:attachments|attachment_read_extracted_text": (args) => {
+        const text = config.readExtractedText?.[String(args.id ?? "")];
+        if (text === undefined || text === null) return null;
+        return { text, source_format: "image", truncated: false };
+      },
+      // Deletions are recorded so a cancel can be asserted to clean up exactly
+      // the import this flow created, which is a data-safety property rather
+      // than a UI detail.
+      "plugin:attachments|attachment_delete": (args) => {
+        if (config.deleteFails === true) throw { kind: "Io" };
+        const w = window as unknown as { __attachmentDeletes?: string[] };
+        (w.__attachmentDeletes ??= []).push(String(args.id ?? ""));
+        return null;
+      },
       // ── AI conversations (myne-md/myne#675) ──
       // STATEFUL roster + payloads: seeded from `config.chats`, mutated by
       // the UI's writes, so list/open/new/rename/delete flows assert against
@@ -1729,6 +1803,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // command returns, the first one keeping the constant the single-create
       // specs already assert on.
       "plugin:notes|note_create": (args) => {
+        if (config.createNoteFails === true) throw { kind: "Io" };
         const w = window as unknown as { __noteCreates?: string[] };
         const text = String(args.plaintext ?? "");
         (w.__noteCreates ??= []).push(text);
@@ -1974,12 +2049,19 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_status": () => config.syncStatus ?? { state: "not_enrolled" },
       "plugin:sync|sync_get_endpoint": () =>
         config.endpoint ?? { endpoint_url: null, cert_pin_hex: null, pin_source: null },
-      "plugin:sync|sync_set_endpoint": (args) =>
-        config.setEndpoint ?? {
+      "plugin:sync|sync_set_endpoint": (args) => {
+        // Recorded for the same reason `sync_person_register`'s argument is: the
+        // register step writes the address BEFORE any secret crosses IPC
+        // (2026-10-24), and "did it send the address, and before the phrase" is a
+        // question only this tier can answer.
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs ??= [];
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs!.push(args);
+        return config.setEndpoint ?? {
           fingerprint: null,
           pin_source: String(args.endpointUrl ?? "").startsWith("https://")
             ? "platform_trust_store" : null,
-        },
+        };
+      },
       // MYND-548 device naming. The setter mirrors the real one's contract: a
       // blank name is refused (no write), so an empty submit cannot blank a row.
       "plugin:prefs|set_device_name": (args) => {
@@ -2011,13 +2093,18 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // than modelling "the accept returned" is what makes the spec's assertion
       // ("the editor mounted") a statement about the product.
       "plugin:sync|sync_person_status": () =>
-        config.personStatus ?? {
+        ({
           enrolled: false,
           identity_unlocked: false,
           person_id_hex: null,
           identity_code: null,
           sealed_keypair_present: false,
-        },
+          ...(config.personStatus ?? {}),
+          // The session's own lifecycle, layered OVER the configured fixture: a
+          // spec that configures a status is describing where the device STARTS,
+          // and the two commands below describe what it became.
+          state: personState ?? config.personStatus?.state ?? null,
+        }),
       "plugin:sync|sync_person_list_invites": () => config.personInvites ?? [],
       "plugin:sync|sync_person_setup": (args) => {
         // The identity-only setup, and the ONE command behind both of the gate's
@@ -2029,8 +2116,48 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (window as unknown as { __personSetupArgs?: unknown }).__personSetupArgs = args;
         if (config.personSetupError) throw config.personSetupError;
         if (!config.personSetupResult) throw { kind: "NotConfigured" };
+        // Creating an identity with no endpoint configured leaves it `reserved`
+        // (myne-md/myne#911 task 4), which is the state the identity home's
+        // register block exists for. Recording it here is what lets a spec drive
+        // the offline first run end to end.
+        personState = "reserved";
         return config.personSetupResult;
       },
+      "plugin:sync|sync_person_register": (args) => {
+        // The explicit registration (myne-md/myne#911 task 12). The phrase is the
+        // proof of possession, so the argument is recorded the way the accept's is:
+        // "which credential did the phone send" is a question only this tier can
+        // answer.
+        (window as unknown as { __personRegisterArgs?: unknown }).__personRegisterArgs = args;
+        if (config.personRegisterError) throw config.personRegisterError;
+        personState = "enrolled";
+        return {
+          phrase: null,
+          fingerprint_hex: "ab".repeat(32),
+          person_id_hex: "cd".repeat(16),
+          identity_code: config.personSetupResult?.identity_code ?? "MYNE-PERSON-1:" + "cd".repeat(16),
+          approved: true,
+        };
+      },
+      "plugin:sync|sync_person_join_device": (args) => {
+        (window as unknown as { __personJoinArgs?: unknown }).__personJoinArgs = args;
+        if (config.personJoinError) throw config.personJoinError;
+        const approved = config.personJoinApproved ?? false;
+        personState = approved ? "enrolled" : "pending";
+        return {
+          person_id_hex: String((args as { personIdHex?: string })?.personIdHex ?? "cd".repeat(16)),
+          approved,
+        };
+      },
+      "plugin:sync|sync_person_claim_device": () => {
+        const approved = config.personJoinApproved ?? false;
+        if (approved) personState = "enrolled";
+        return {
+          person_id_hex: "cd".repeat(16),
+          approved,
+        };
+      },
+      "plugin:sync|sync_person_list_vaults": () => config.personVaults ?? [],
       "plugin:sync|sync_person_accept_invite": (args) => {
         // The four arguments, in order, are the accept's contract (task 14): the
         // invite id, the owner's out-of-band identity code, the recovery phrase,

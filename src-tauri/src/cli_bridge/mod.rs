@@ -113,6 +113,8 @@ pub mod gate;
 #[cfg(test)]
 mod logging_discipline;
 pub mod path_shim;
+#[cfg(windows)]
+mod pipe;
 pub mod plugin;
 pub mod rate_limit;
 pub mod scope;

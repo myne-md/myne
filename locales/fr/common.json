@@ -4069,7 +4069,6 @@
         "ribbon": "ruban gauche rail épingler épingles commande commandes personnaliser réordonner détacher barre d'outils raccourcis",
         "folderNotes": "dossier note index folder_index page d'accueil double clic lien dossier projets off interrupteur désactiver",
         "syncMembers": "membres, partage, inviter, équipe, collaboration, coffre",
-        "accountName": "nom du compte groupe regroupement renommer étiquette appareil local",
         "accountVaults": "compte coffres regroupés quels coffres appartiennent groupe liste",
         "aiMeetingPrompt": "réunion résumé invite instruction personnalisé transcription points d'action décisions",
         "update": "mise à jour mise à niveau rechercher des mises à jour nouvelle version publication télécharger",
@@ -4151,14 +4150,10 @@
       "atCap": "La liste est pleine, rien de nouveau ne peut donc être mémorisé. Supprimez une entrée pour faire de la place."
     },
     "account": {
-      "nameLabel": "Nom du compte",
-      "nameHelper": "Un nom pour ce groupe de coffres sur cet appareil. Le sélecteur de coffres l'utilise comme titre du groupe. Il reste sur cet appareil et n'est jamais stocké à l'intérieur d'un coffre, il n'est donc pas synchronisé, et un autre appareil peut regrouper et nommer les mêmes coffres différemment.",
-      "namePlaceholder": "Ajouter un nom…",
-      "nameSave": "Enregistrer",
-      "nameSaving": "Enregistrement…",
       "vaultsLabel": "Coffres de ce compte",
       "vaultsHelper": "Les coffres que cet appareil regroupe sous le nom ci-dessus. Le regroupement est un choix d'organisation propre à chaque appareil, il ne fait donc partie du contenu d'aucun coffre et ne voyage pas avec lui.",
-      "vaultsCount": "{{count}} coffres",
+      "vaultsCount_one": "{{count}} coffres",
+      "vaultsCount_other": "{{count}} coffres",
       "currentVault": "Ce coffre",
       "unknownVault": "Un autre coffre sur cet appareil",
       "standaloneHelper": "Ce coffre n'est regroupé sous aucun compte sur cet appareil, il est donc autonome. Le regroupement est propre à chaque appareil : un autre appareil peut l'afficher dans un compte.",
@@ -4170,7 +4165,8 @@
       "sections": {
         "extensions": "Extensions de navigateur",
         "grouping": "Ce compte"
-      }
+      },
+      "vaultsCount_many": "{{count}} coffres"
     },
     "plainFile": {
       "errorSaveSetting": "Impossible d'enregistrer le réglage des fichiers bruts.",
@@ -4604,9 +4600,7 @@
       "nameErrorUnshared": "Les noms peuvent être définis une fois ce coffre partagé.",
       "nameErrorLocked": "Déverrouillez le coffre pour modifier votre nom.",
       "nameErrorGeneric": "Impossible d'enregistrer votre nom. Réessayez.",
-      "nameInvite": "Vous n'avez pas encore de nom d'affichage. Les autres membres voient votre empreinte.",
       "nameInviteCta": "Définir un nom",
-      "nameInviteDismiss": "Pas maintenant",
       "noInvitations": "Aucune invitation envoyée pour l'instant.",
       "identityHeading": "Votre identité",
       "membersHeading": "Membres",
@@ -5109,8 +5103,7 @@
       "phraseFor": "Phrase de récupération — si vous oubliez votre mot de passe",
       "save": "Enregistrer le kit de récupération",
       "saveFailed": "Impossible d'enregistrer le fichier. Copiez plutôt le kit, ou notez les deux parties.",
-      "savedToFile": "Enregistré. C'est un fichier texte brut contenant les deux secrets, conservez-le donc dans un endroit que vous seul pouvez lire.",
-      "whyEnglish": "Les mots sont en anglais dans toutes les langues. Ils font partie de la norme BIP-39, ainsi tout client Myne peut lire une phrase écrite par n'importe quel autre. Ne les traduisez pas : les mots traduits ne figurent pas dans la liste de mots, et la phrase cesserait de fonctionner."
+      "savedToFile": "Enregistré. C'est un fichier texte brut contenant les deux secrets, conservez-le donc dans un endroit que vous seul pouvez lire."
     },
     "name": {
       "back": "Retour",
@@ -5136,13 +5129,8 @@
     "accountFallback": "Compte",
     "moveToAccount": "Déplacer vers le compte…",
     "moveToNewAccount": "Déplacer vers un nouveau compte",
-    "renameAccount": "Renommer le compte",
     "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
     "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
-    "labelTooLong": "Ce nom est trop long. Gardez-le sous 512 caractères.",
-    "renameCancel": "Annuler",
-    "renamePlaceholder": "Nom du compte",
-    "renameSave": "Renommer",
     "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé.",
     "createShort": "Nouveau coffre",
     "joinShort": "Ajouter un appareil",
@@ -5247,18 +5235,11 @@
     "residueBanner": "Fichiers résiduels d'une suppression interrompue ({{n}}). Nettoyez-les avant de créer un coffre-fort.",
     "cleanUpFiles": "Nettoyer les fichiers résiduels",
     "connect": "Me connecter à mon compte",
-    "startIdentity": "Créer une identité",
-    "startLocal": "Créer plutôt un coffre local",
     "tagline": "Des notes markdown chiffrées. Aucun e-mail à l'inscription.",
-    "identityTitle": "Créer une identité",
-    "identityBody": "Une identité pour tous vos coffres, pour que les gens puissent vous inviter. Nécessite un serveur de synchronisation.",
-    "localTitle": "Créer un coffre local",
-    "localBody": "Un coffre chiffré sur cet appareil. Ajoutez la synchronisation ou une identité plus tard.",
     "restoreTitle": "Restaurer depuis une sauvegarde",
     "restoreBody": "Ouvrez un fichier .myne-backup que vous avez enregistré précédemment.",
     "joinTitle": "Ajouter cet appareil à un compte",
     "joinBody": "Utilisez un coffre que vous avez déjà sur un autre appareil.",
-    "createAction": "Créer",
     "restoreAction": "Restaurer",
     "joinAction": "Ajouter un appareil",
     "version": "Version {{version}} · pré-alpha"
@@ -5347,15 +5328,10 @@
     "openedYearsAgo_other": "ouvert il y a {{count}} ans",
     "corruptedBadge": "Corrompu",
     "accountFallback": "Compte",
-    "renameAccount": "Renommer le compte",
     "moveToNewAccount": "Déplacer vers un nouveau compte",
     "moveToAccount": "Déplacer vers le compte…",
     "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
     "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
-    "labelTooLong": "Ce nom est trop long. Gardez-le sous 512 caractères.",
-    "renameCancel": "Annuler",
-    "renamePlaceholder": "Nom du compte",
-    "renameSave": "Renommer",
     "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé."
   },
   "join": {
@@ -5492,7 +5468,6 @@
     "recovered": "Identité récupérée.",
     "title": "Créer une identité",
     "errorAlreadyHeld": "Cet appareil détient déjà une identité. Récupérez-la avec sa phrase de récupération, ou oubliez-la et créez-en une nouvelle.",
-    "errorNotConfigured": "Impossible de configurer l'identité. Vérifiez qu'un serveur de synchronisation est configuré, puis réessayez.",
     "forgetCancel": "La conserver",
     "forgetConfirm": "Oublier et en créer une nouvelle",
     "forgetCta": "Oublier cette identité et en créer une nouvelle",
@@ -5507,8 +5482,6 @@
     "recoverHint": "Récupérez-la sur cet appareil avec sa phrase de récupération de 24 mots.",
     "recoverAction": "Récupérer",
     "back": "Retour",
-    "changeServer": "Modifier ou vérifier le serveur de synchronisation",
-    "errorTlsFailure": "Impossible de vérifier le certificat HTTPS du serveur. Vérifiez l'adresse du serveur et son certificat.",
     "phraseTitle": "Enregistrez votre phrase d'identité",
     "phraseContinue": "Continuer",
     "confirmTitle": "Confirmez votre phrase"
@@ -5657,15 +5630,6 @@
       "hint": "Réessayer relance le téléchargement depuis le début.",
       "retry": "Réessayer",
       "back": "Retour au déverrouillage"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Choisir un serveur de synchronisation",
-      "intro": "Myne a besoin d'un serveur pour héberger vos notes chiffrées et pour vous joindre pour les invitations. Vos notes restent chiffrées sur cet appareil avant de le quitter ; le serveur ne stocke que du texte chiffré.",
-      "notConfigured": "Saisissez une adresse de serveur ci-dessus et appuyez sur Se connecter pour continuer.",
-      "back": "Retour",
-      "continue": "Continuer"
     }
   },
   "identityFlow": {

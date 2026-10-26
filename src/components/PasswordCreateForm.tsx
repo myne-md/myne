@@ -131,18 +131,25 @@ export function PasswordCreateForm({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { ready: zxcvbnReady, result } = usePasswordStrength(password);
+  const { ready: zxcvbnReady, result, unavailable } = usePasswordStrength(password);
 
   // Unicode scalar values, not `.length` — same unit as the backend
   // floor (see `passwordLength`).
   const passwordLen = passwordLength(password);
   const tooShort = passwordLen > 0 && passwordLen < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== password;
+  // The strength check can fail to load (a stale page asking for a build's chunk
+  // hashes, a blocked request, an offline start). 2026-10-24, the owner's call:
+  // the step then falls back to the length floor rather than leaving the user on
+  // a screen whose caption says "Checking strength…" forever and whose submit
+  // never enables. The caption says so, because a gate that quietly stopped
+  // asking for a score is a weaker gate and the user is owed the difference.
+  const strengthUnavailable = unavailable && !zxcvbnReady;
   const submitReady =
     passwordLen >= MIN_PASSWORD_LEN &&
     password === confirm &&
-    result !== null &&
-    result.score >= MIN_ZXCVBN_SCORE;
+    (strengthUnavailable ||
+      (result !== null && result.score >= MIN_ZXCVBN_SCORE));
 
   let passwordCaption: string | undefined;
   let passwordTone: "muted" | "danger" | "pending" = "muted";
@@ -154,6 +161,9 @@ export function PasswordCreateForm({
   } else if (tooShort) {
     passwordCaption = t("password.createForm.tooShort", { n: MIN_PASSWORD_LEN });
     passwordTone = "danger";
+  } else if (strengthUnavailable) {
+    passwordCaption = t("password.createForm.strengthUnavailable");
+    passwordTone = "muted";
   } else if (!zxcvbnReady || !result) {
     passwordCaption = t("password.createForm.checkingStrength");
     passwordTone = "pending";

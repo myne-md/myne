@@ -1,7 +1,7 @@
 // TODO(Phase-1-end): Replace this hand-written file with a `ts-rs`
 // auto-generated artifact + a CI drift check. The Rust types live in:
-//   - src-tauri/src/io_failure_kind.rs                  (IoFailureKind)
-//   - src-tauri/src/plugins/notes/error.rs              (NoteCreateError)
+//   - core/src/io_failure_kind.rs                  (IoFailureKind)
+//   - core/src/plugins/notes/error.rs              (NoteCreateError)
 //
 // Plan: derive `ts_rs::TS` on those enums, run `cargo test` to emit
 // the file at this path, and have CI fail if `git diff --exit-code`

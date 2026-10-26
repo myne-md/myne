@@ -3,7 +3,7 @@
 //! with known credentials (e2e-harness task 5; epic policy SYNC-2/9).
 //!
 //! Composes the SAME protocol public API the production creation path
-//! does (`src-tauri/src/plugins/vault_creation/commands.rs::
+//! does (`core/src/plugins/vault_creation/commands.rs::
 //! {build_session, build_and_serialize_vault_meta}`), so a generated
 //! fixture unlocks through the untouched production unlock path. Weak
 //! KDF params are legal at read time because unlock derives from the
@@ -37,7 +37,7 @@ use protocol::{
 use zeroize::Zeroizing;
 
 /// Weak Argon2id parameters for fast fixtures — mirrors
-/// `src-tauri/src/test_support.rs::FAST_TEST_KDF`. Lives only in fixture
+/// `core/src/test_support.rs::FAST_TEST_KDF`. Lives only in fixture
 /// bytes, never in production code (SYNC-9).
 ///
 /// `m_kib` is pinned to `protocol::MIN_KDF_M_KIB` (8 MiB), the floor

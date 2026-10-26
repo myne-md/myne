@@ -1,4 +1,15 @@
-# Woodpecker CI for Myne: the E2E lanes. MANUAL ONLY, run before a release.
+# Woodpecker CI for Myne: the E2E lanes. Never on a push or a pull request: by
+# hand before a release, and on a nightly cron.
+#
+# TWO TRIGGERS, ONE LANE. A human triggers it before a release, carrying
+# `RUN_E2E = true` (the desktop gate) or `RUN_E2E_AI = true` (the inference suites
+# alone), because that is the only moment an hour of runner time is owed. A
+# Woodpecker cron on `develop` runs it every night, because `Myne/myne` has had
+# no push-triggered CI since 2026-07-18 (`myne-ops/runbooks/ci-webhook-gap.md`):
+# without that entry nothing measured `develop` between releases, and a red
+# `develop` was discovered by the release that needed it. The cron passes both
+# variables, so one nightly pipeline runs both suites IN SEQUENCE (`e2e-ai`
+# depends on `e2e`) rather than racing them for the same cores.
 #
 # myne-md/myne#579. Decision: `docs/decisions/ops/0529`, "Both E2E lanes leave
 # the per-push pipeline for a manual, pre-release workflow", which supersedes
@@ -78,8 +89,24 @@
 # docs-only trigger could skip the suite it was triggered for.
 
 when:
+  # A human, before a release. Two intents, one variable apart, so a manual
+  # trigger starts exactly one suite: `RUN_E2E` is the desktop gate,
+  # `RUN_E2E_AI` the inference lane on its own. The second half of that
+  # disjunction is what makes the AI lane reachable by hand at all — without it
+  # `RUN_E2E = true` was the only way into this file, and a run that only wanted
+  # the AI suites had to drag the whole desktop gate along with it.
   - event: manual
-    evaluate: 'RUN_E2E == "true"'
+    evaluate: 'RUN_E2E == "true" || RUN_E2E_AI == "true"'
+  # The nightly, on `develop` only, and with NO `evaluate` on this entry on
+  # purpose: the cron carries `RUN_E2E = true` and `RUN_E2E_AI = true` as its own
+  # variables, and an admission rule that read them back would turn a
+  # differently-spelled cron into a pipeline that silently ran nothing. What
+  # runs is decided by `e2e` and `e2e-ai` below, where a miss is a skipped step
+  # in a visible pipeline rather than a pipeline that never existed. The branch
+  # filter is there because this lane's numbers were measured on `develop`; a
+  # cron repointed at a release branch would measure a different tree.
+  - event: cron
+    branch: develop
 
 steps:
   # ─── myne-server binary for the desktop sync scenarios ───────
@@ -268,11 +295,14 @@ steps:
     # from `main.yml`; `scripts/check-ci-image.mjs` reads every workflow file and
     # holds them all to the one digest recorded in `ci/image.json`.
     #
-    # The suite steps below deliberately do NOT use it: `scripts/ci-e2e-lane.sh`
-    # installs a RUNTIME-only set (`webkit2gtk-driver`, `xvfb`, `xauth`, no -dev
-    # header chains) because it consumes the binary this step just built. Baking
-    # those into the shared image would make every push pull an X server and a
-    # webkit driver that no push step uses.
+    # The suite steps below use a DIFFERENT image, `myne-ci-e2e`: they consume the
+    # binary this step just built and need a RUNTIME-only set
+    # (`webkit2gtk-driver`, `xvfb`, `xauth`, `xdotool`, `python3`), while this
+    # step needs the -dev header chains that compile against GTK. Folding the
+    # runtime set in here would make every push pull an X server and a WebKit
+    # driver that no push step uses. Child of this image by digest, recorded in
+    # `ci/e2e/image.json`, and it exists so the lane stops apt-installing and
+    # `cargo install`ing tauri-driver from source on every run.
     image: ghcr.io/myne-md/myne-ci@sha256:99fbe08624fd824de91a9615202439fceb4d696e2bb911e175f4624096131b67
     when: *always
     depends_on:
@@ -321,9 +351,23 @@ steps:
   # which is blocking and whose `stable_max_failures` ceiling is 0, so a real
   # regression still reddens this pipeline, through the step that can tell a
   # regression from a flake by counting.
+  # The image is `ci/e2e/image.json`'s digest: the CI base image plus this lane's
+  # runtime set and `tauri-driver 2.0.6` compiled from source ONCE, in place of
+  # the `apt-get install`, the Node tarball fetch and the `cargo install` this
+  # step used to pay on every run. The same digest is on `e2e-quarantine` and
+  # `e2e-ai`. `scripts/ci-e2e-lane.sh` still installs whatever is missing, so a
+  # runner left on an older image keeps working (slower) rather than failing.
   e2e:
-    image: rust:1.96.0-slim
-    when: *always
+    image: ghcr.io/myne-md/myne-ci-e2e@sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04
+    # The variable is not redundant with the workflow-level gate any more, and
+    # dropping it would be a silent regression: that gate now also admits the
+    # AI-only trigger, and an AI-only run must not drag the full desktop gate
+    # along with it. `status` is written out rather than inherited from `&always`
+    # for the reason that anchor exists at all — a step that loses the key
+    # silently inherits the pipeline-wide implicit `status: success` (myne#458).
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E == "true"'
     depends_on:
       - name: e2e-compile
         optional: true
@@ -332,6 +376,13 @@ steps:
     failure: ignore
     environment:
       CI: "true"
+      # No `MYNE_E2E_TIMEOUT_SCALE` here, deliberately. It exists and is honoured
+      # (`e2e/support/webdriver.ts`), but doubling it was MEASURED to make things
+      # worse, not better: pipeline 946 ran with 2 and reported 19 reds against
+      # the 4-5 a normal run gives, because a wedged scenario then holds its
+      # worker for twice as long and every later file in that shard falls with
+      # it. The budget was never the axis; the concurrent app count was, and
+      # `scripts/ci-e2e-lane.sh` now runs the gate on one shard.
     commands:
       - bash scripts/ci-e2e-lane.sh stable
 
@@ -343,13 +394,20 @@ steps:
   # `e2e-compile` built.
   #
   # Its own step rather than a second invocation inside `e2e`, and the cost is
-  # real: a second container, and a second `cargo install tauri-driver` from
-  # source. What it buys is the separate status line, which is the ENTIRE point
+  # real: a second container, and its own copy of the suite's setup. (The
+  # from-source `cargo install tauri-driver` that used to dominate that setup is
+  # baked into `ci/e2e/image.json`'s image now.) What it buys is the separate
+  # status line, which is the ENTIRE point
   # of the quarantine lane: folded into a `failure: ignore` step, a quarantined
   # scenario's result would be a line in someone else's log.
   e2e-quarantine:
-    image: rust:1.96.0-slim
-    when: *always
+    image: ghcr.io/myne-md/myne-ci-e2e@sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04
+    # Gated on the same variable as `e2e`, and not on `&always`: this is the other
+    # half of the desktop suite, so an AI-only run must not start it. Both halves
+    # of the suite belong to one intent.
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E == "true"'
     depends_on:
       - name: e2e
         optional: true
@@ -361,7 +419,73 @@ steps:
     commands:
       - bash scripts/ci-e2e-lane.sh quarantine
 
-  # ─── E2E floor (the one part of this lane that BLOCKS) ───────
+  # ─── The AI lane (non-blocking, scheduled) ───────────────────
+  # The sixteen `MYNE_E2E_AI` spec files moved OUT of the gate, not out of the
+  # suite: inference scenarios are the slowest tests here (a model download, a
+  # chat stream, a transcription) and a release gate that spends a fifth of its
+  # wall clock proving the runner still answers is a gate people stop running.
+  # `scripts/ci-e2e-lane.sh ai` derives the file list from the specs themselves,
+  # so a new AI spec joins this lane the moment it lands.
+  #
+  # Gated on its OWN variable rather than on `RUN_E2E`, so a manual release run
+  # starts one suite and not two: two WebKit apps on one host is exactly the
+  # contention that made the gate untrustworthy (see `e2e` below). The scheduled
+  # entry point passes both.
+  e2e-ai:
+    image: ghcr.io/myne-md/myne-ci-e2e@sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04
+    # One entry, and the gate is the VARIABLE rather than the event, because the
+    # variable is the intent: a release run sets it by hand, the nightly cron
+    # passes it, and both must reach this step. `status` is written out so a
+    # genuine failure elsewhere in the pipeline does not skip the lane by
+    # inheriting the pipeline-wide implicit `status: success` (myne#458).
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E_AI == "true"'
+    depends_on:
+      # SEQUENTIAL, not merely ordered. Two WebKit apps on one host is the
+      # contention that made the desktop gate untrustworthy (see `e2e`), and a
+      # nightly that sets both variables would otherwise put the two suites in
+      # the agent's two workflow slots at once. `optional: true` because on an
+      # AI-only manual run `e2e` is skipped by its own `when`, and a skip must
+      # not swallow this lane: the same shape `myne-server-build` has above.
+      - name: e2e
+        optional: true
+      - name: e2e-compile
+        optional: true
+      - name: myne-server-build
+        optional: true
+    failure: ignore
+    environment:
+      CI: "true"
+    commands:
+      - bash scripts/ci-e2e-lane.sh ai
+
+  # ─── The AI lane's floor (blocking, like the stable one) ─────
+  # `e2e-ai` is `failure: ignore` for the same reason `e2e` is, and the
+  # relaxation has the identical hole: a lane that executes NOTHING exits 0 and
+  # reads green. So the count is gated while the results are not, and the
+  # recorded number is a CI measurement rather than an arithmetic guess —
+  # pipeline 949's AI lane executed 41 scenarios across 17 files, 41 passed, 0
+  # failed, 0 skipped, in 5.6 minutes.
+  #
+  # BLOCKING, deliberately, even though this lane gates no release. The
+  # distinction is the same one `e2e-floor` keeps: a red AI scenario is a known
+  # cost that must not stop a release, but a lane that silently ran nothing is a
+  # measurement that is not a measurement — and the nightly exists precisely to
+  # measure, so a nightly reporting "nothing ran" as green is worse than one that
+  # is red.
+  e2e-floor-ai:
+    image: node:25
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E_AI == "true"'
+    depends_on:
+      - name: e2e-ai
+        optional: true
+    commands:
+      - node scripts/check-e2e-floor.mjs --lane ai
+
+  # ─── E2E floor (the stable lane's blocking half) ─────────────
   # `e2e` above is `failure: ignore`, and that relaxation has a hole in it
   # nobody chose: it does not distinguish "some scenarios failed" from "no
   # scenarios ran". A suite that executes ZERO tests exits 0, and every
@@ -381,9 +505,16 @@ steps:
   # `.config/vitest/e2e.config.ts` writes the two lanes to separate report files and
   # this runs `--lane stable`. Waiting for the quarantine lane would put the
   # only blocking verdict in this workflow behind a whole second container.
+  #
+  # Gated on `RUN_E2E`, like the step it reads. Not cosmetic: this guard FAILS BY
+  # NAME when the report is absent, which is the property that makes it worth
+  # having, so leaving it ungated would turn every AI-only run into a red
+  # pipeline for a reason that has nothing to do with the AI lane.
   e2e-floor:
     image: node:25
-    when: *always
+    when:
+      - status: [success, failure]
+        evaluate: 'RUN_E2E == "true"'
     depends_on:
       - name: e2e
         optional: true
@@ -428,6 +559,13 @@ steps:
         optional: true
       - name: e2e-floor
         optional: true
+      - name: e2e-ai
+        optional: true
+      # Added with the AI lane's floor. This list is the notifier's whole
+      # coverage: a blocking step that is not named here goes red without paging
+      # anybody, which is the failure mode this file's comments keep returning to.
+      - name: e2e-floor-ai
+        optional: true
     environment:
       PUSHOVER_TOKEN:
         from_secret: pushover_token
@@ -444,9 +582,12 @@ steps:
           --data-urlencode "message=$CI_COMMIT_AUTHOR · $CI_COMMIT_MESSAGE" \
           --data-urlencode "url=$CI_PIPELINE_URL" \
           https://api.pushover.net/1/messages.json
-    # No `event:` here: the workflow-level `when` above already admits only the
-    # manual event, and repeating it would silently stop this notifier firing if
-    # that gate ever gained one.
+    # No `event:` here: the workflow-level `when` above is where admission is
+    # decided, and repeating an event list would silently stop this notifier
+    # firing if that gate ever gained one — which it has. It admits the nightly
+    # cron as well as the manual trigger now, and a red nightly owes the same
+    # push: it exists precisely so a red `develop` is not discovered by the
+    # release that needed it.
     when:
       - status: failure
     failure: ignore

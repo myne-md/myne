@@ -16,6 +16,7 @@
 
 import { test, expect, type Page } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { createIdentityToHome, startVaultFromIdentityHome, IDENTITY_SETUP_RESULT } from "../helpers";
 
 const PHRASE_WORD = "ribbon";
 
@@ -33,13 +34,18 @@ async function ackBriefing(page: Page): Promise<void> {
 
 test.describe("mobile create-vault onboarding", () => {
   test("Welcome → … → commit → auto-unlock → editor", async ({ page }) => {
-    await installMockIpc(page, { freshDevice: true });
+    await installMockIpc(page, {
+      freshDevice: true,
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await page.goto("/");
 
-    // Welcome (fresh install, no vaults). First run is identity-first
-    // (myne-md/myne#768), so the vault door is the "Create a local vault
-    // instead" ghost button, beside the "Create an identity" primary.
-    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+    // Welcome (fresh install, no vaults). The phone's first run is ONE door
+    // (myne-md/myne#911 task 12): the identity is created first, and the vault
+    // follows from the identity home. This spec is about the vault half, so the
+    // identity ceremony is the helper's job.
+    await createIdentityToHome(page);
+    await startVaultFromIdentityHome(page);
 
     // The safety briefing (first-run only, and unnumbered for that reason).
     await ackBriefing(page);
@@ -127,9 +133,13 @@ test.describe("mobile create-vault onboarding", () => {
     // identical to a user and one of them costs a prefs write on every unnamed
     // vault. An assertion on an ABSENCE, so the walk to the editor is the control
     // that proves the flow ran at all.
-    await installMockIpc(page, { freshDevice: true });
+    await installMockIpc(page, {
+      freshDevice: true,
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await page.goto("/");
-    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+    await createIdentityToHome(page);
+    await startVaultFromIdentityHome(page);
     await ackBriefing(page);
 
     // Straight past the name step without typing, which is the point.
@@ -170,9 +180,13 @@ test.describe("mobile create-vault onboarding", () => {
     // current task's microtasks have drained. So the read lands after the commit
     // and before the frame, which is what makes these states deterministic
     // instead of a race against the 240ms deferral.
-    await installMockIpc(page, { freshDevice: true });
+    await installMockIpc(page, {
+      freshDevice: true,
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await page.goto("/");
-    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+    await createIdentityToHome(page);
+    await startVaultFromIdentityHome(page);
 
     const why = page.getByTestId("create-vault.briefing-why").first();
     const body = page.getByTestId("create-vault.briefing-why-text");
@@ -264,9 +278,13 @@ test.describe("mobile create-vault onboarding", () => {
     // the TRANSITION, but the unmount deferral is a timer, so without the skip
     // a reduced-motion user would still hold a collapsed body for 240ms.
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await installMockIpc(page, { freshDevice: true });
+    await installMockIpc(page, {
+      freshDevice: true,
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await page.goto("/");
-    await page.getByRole("button", { name: "Create a local vault instead" }).click();
+    await createIdentityToHome(page);
+    await startVaultFromIdentityHome(page);
 
     const body = page.getByTestId("create-vault.briefing-why-text");
     await expect(body).toHaveCount(0);

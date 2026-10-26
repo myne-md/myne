@@ -177,8 +177,8 @@ describeE2E("a deployment without the isolation headers", () => {
       // version listed the three post-gate surfaces and timed out reporting
       // `bootstrap.beta-terms` — a legitimate boot surface, and one `openApp`
       // exists to walk (review, scroll, accept) precisely because everyone who
-      // hand-rolls this wait forgets it. The lane already lost 12 of 20 tests
-      // to that once; its comment says so.
+      // hand-rolls this wait forgets it. The lane already lost most of its
+      // scenarios to that once; its comment says so.
       await openApp(session, server.origin);
       const refused = await session.execute<number>(
         "return document.querySelectorAll('[data-testid=\"web.unsupported-environment\"]').length;",

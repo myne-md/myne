@@ -69,8 +69,9 @@ import {
 
 // === Image reference seam contract (task 9 — SYNC-10 / SYNC-14) ============
 //
-// The desktop ingest seam this serializer emits FOR (consumed by sub-feature 3,
-// currently Rust-blocked). The contract, in one place:
+// The desktop ingest seam this serializer emits FOR (consumed by
+// `src/clip/ingestClipImages.ts`, which rewrites each ref in place). The
+// contract, in one place:
 //
 //   Each embedded image in the walked body emits a canonical markdown image
 //   reference `![<alt>](clip-image:<N>)`, where <N> is the image's 0-based

@@ -198,9 +198,9 @@ const RECOMMENDED_MODEL: Record<ModelRole, { name: string; url: string }> = {
  * project URL, so it lives here as a constant rather than in the catalog.
  *
  * The link is the SAME OS handoff the recommended-model links use — the user's
- * own browser opens it. That is what keeps "Myne never downloads models" true
- * without an exception: nothing here fetches, and the row offers no "pull a
- * model" affordance for the same reason.
+ * own browser opens it. Nothing here fetches: the row offers no "pull a model"
+ * affordance, and the one download path Myne does own (its own origin, on an
+ * explicit click) is a separate control.
  */
 const LOCAL_RUNTIME = { name: "Ollama", url: "https://ollama.com" };
 

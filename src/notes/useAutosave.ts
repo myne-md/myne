@@ -179,8 +179,16 @@ export function useAutosave(
   guardEnabled = true,
   /** The live-session context for a save of `noteId` (`LiveSaveContext`): the
    *  editor's mirror as the merge base, and the hook that moves it. Omitted, a
-   *  save through a session replaces the session's text, as before. */
-  liveSaveFor?: (noteId: string) => LiveSaveContext,
+   *  save through a session replaces the session's text, as before.
+   *
+   *  **`undefined` for a note with NO live session is the contract, not an
+   *  oversight.** A caller that answers for every note hands the save a base the
+   *  durable file never held, and a legacy `MY01` note — which can never have a
+   *  session, because `live_session_open` decodes an `NC05` blob and refuses
+   *  anything else — then comes back `BaseMismatch`, mints a keep-both duplicate
+   *  and loses the keystrokes. Measured 2026-10-24; `PaneView`'s `liveSaveFor`
+   *  carries the trace. */
+  liveSaveFor?: (noteId: string) => LiveSaveContext | undefined,
 ): UseAutosaveReturn {
   const [status, setStatus] = useState<SaveStatus>({ status: "clean" });
 

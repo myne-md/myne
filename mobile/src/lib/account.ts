@@ -1,10 +1,11 @@
 // The device-local account record (the account/vault split, myne-md/myne#684):
 // the types the backend answers with, the narrowing that reads its error tag,
-// and the four command wrappers.
+// and the three command wrappers.
 //
-// The record itself is `myne_core::account`. Nothing here reads or writes a
-// label in the clear: the only values that cross are the account label (the
-// user's own text) and vault ids.
+// The record itself is `myne_core::account`. Nothing here carries user-authored
+// text: an account has no name (`docs/decisions/ui/0728`), so the only values
+// that cross are hex account ids and vault ids, and the heading a surface draws
+// for a group is derived from that group's own vault names.
 
 import { invoke } from "../platform/core";
 
@@ -12,8 +13,6 @@ import { invoke } from "../platform/core";
 export interface AccountView {
   /** The account id, hex-encoded (32 hex chars). */
   id: string;
-  /** The account label (empty means unlabelled). */
-  label: string;
   /** The member vault ids, canonical 36-char strings. */
   vaults: string[];
 }
@@ -24,7 +23,6 @@ export type AccountCommandErrorKind =
   | "KeychainUnavailable"
   | "VaultNotFound"
   | "Backend"
-  | "LabelTooLong"
   | "Hidden"
   | "RecordUnreadable"
   | "Locked";
@@ -36,7 +34,6 @@ export function accountCommandErrorKind(e: unknown): AccountCommandErrorKind | n
     kind === "KeychainUnavailable" ||
     kind === "VaultNotFound" ||
     kind === "Backend" ||
-    kind === "LabelTooLong" ||
     kind === "Hidden" ||
     kind === "RecordUnreadable" ||
     kind === "Locked"
@@ -50,11 +47,6 @@ export async function listAccounts(): Promise<AccountView[]> {
   return invoke<AccountView[]>("plugin:account|account_list");
 }
 
-/** Rename the account owning `vaultId`. */
-export async function renameAccount(vaultId: string, label: string): Promise<AccountView> {
-  return invoke<AccountView>("plugin:account|account_rename", { vaultId, label });
-}
-
 /** Move `vaultId` into the account owning `targetVaultId`. */
 export async function moveVault(vaultId: string, targetVaultId: string): Promise<AccountView[]> {
   return invoke<AccountView[]>("plugin:account|account_move", { vaultId, targetVaultId });
@@ -63,25 +55,6 @@ export async function moveVault(vaultId: string, targetVaultId: string): Promise
 /** Split `vaultId` into a fresh account. */
 export async function splitVault(vaultId: string): Promise<AccountView[]> {
   return invoke<AccountView[]>("plugin:account|account_split", { vaultId });
-}
-
-/**
- * Truncate a label draft to a UTF-8 byte cap without splitting a character.
- * The backend enforces `ACCOUNT_LABEL_MAX_LEN` in bytes while inputs count in
- * characters, so a multibyte draft can pass `maxLength` and still trip
- * `LabelTooLong`: truncating on input keeps the two in agreement.
- */
-export function truncateLabelToBytes(draft: string, maxBytes: number): string {
-  const encoder = new TextEncoder();
-  let bytes = 0;
-  let end = 0;
-  for (const ch of draft) {
-    const len = encoder.encode(ch).length;
-    if (bytes + len > maxBytes) break;
-    bytes += len;
-    end += ch.length;
-  }
-  return draft.slice(0, end);
 }
 
 /**
@@ -99,6 +72,28 @@ export function accountIdForVault(
     if (account.vaults.includes(vaultId)) return account.id;
   }
   return null;
+}
+
+/**
+ * The heading a surface draws for an account: the names of the vaults it holds,
+ * joined. An account has no name of its own (`docs/decisions/ui/0728`), and this
+ * is the replacement: a group is identified by what is inside it, so a picker
+ * cannot show two groups under one invented label.
+ *
+ * `nameOf` resolves ONE vault id to its display name, and returning `null` for
+ * an id it cannot name (a vault the list failed to enumerate) drops that name
+ * rather than rendering a placeholder inside the heading. `fallback` is what is
+ * left when nothing could be named at all.
+ */
+export function accountHeading(
+  account: AccountView,
+  nameOf: (vaultId: string) => string | null,
+  fallback: string,
+): string {
+  const names = account.vaults
+    .map((id) => nameOf(id))
+    .filter((name): name is string => name !== null && name !== "");
+  return names.length === 0 ? fallback : names.join(" · ");
 }
 
 /** One grouped row of vaults: the owning account, or `null` for standalone
