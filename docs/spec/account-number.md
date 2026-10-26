@@ -6,11 +6,12 @@
 
 ## 1. Purpose
 
-The account number is Myne's primary user identifier — a Mullvad-style self-generated value that replaces email at signup. It serves three roles:
+The account number is Myne's primary user identifier, a Mullvad-style value that replaces email at signup (generated on a legacy vault, derived from the phrase on a person account, §3.1). It serves four roles:
 
-- **Vault binding** — the SHA-256 hash of the canonical form is mixed into both Argon2id salts (`protocol.md` §3.1) so vault keys cannot be precomputed across accounts.
-- **Sync entitlement token** (Phase 2+) — when the sync server exists, the account number is the bearer token for hosted-sync access. The server stores only a hash; the raw number is never persisted server-side after registration.
+- **Vault binding**: on `MYV1`/`NTV5`/`NTV6` vaults the SHA-256 hash of the canonical form is mixed into both Argon2id salts (`protocol.md` §3.1) so vault keys cannot be precomputed across accounts. An `NTV7` vault binds its salts to its own random [vault id](../glossary.md#vault-id) instead (`protocol.md` §3.1, §9.3.5), so the account number never enters that vault's cryptography.
+- **Registration handle** (Phase 2+): the number is what a device registers, binds to, or names when it addresses a vault's namespace; the server stores only a hash and never the raw value. It is **not a credential**: knowing a number authenticates nothing; on a legacy vault it is also the selector for the pre-authenticated metadata fetch, because access is authenticated by the SCRAM session on that account (`server-protocol.md` §3.1). A person number is *derived* from the phrase (§3.1), so it cannot be a shared secret by construction, and the earlier wording here ("bearer token for hosted-sync access") was the wrong frame even before that derivation existed.
 - **User-facing identifier** — what the user writes down, hands to a self-host operator, or types when restoring on a new device.
+- **Person identifier** (the person plane): one number per *person* rather than per vault, derived from the identity phrase instead of sampled (§3.1). It is the account identifier and the support handle, and it is **not a billing identity**: Myne operates no paid tier and the server keeps `plan_id` reserved and unexposed (`vision.md`, `decisions/sync/0696`, `server-protocol.md` §7.1). It is **derived, never stored, and never part of a recovery kit**: a user who loses the printed number has lost nothing, because the phrase reproduces it.
 
 The account number is **not** a key. It does not encrypt anything. Possession of an account number alone grants no read access to a vault — the master password and/or recovery phrase are required to derive `root_key`.
 
@@ -29,7 +30,7 @@ Layout:
 ```
 
 - **Alphabet**: Crockford base32 — `0 1 2 3 4 5 6 7 8 9 A B C D E F G H J K M N P Q R S T V W X Y Z`. Excludes the visually ambiguous `I L O U` and uppercases by default. Source: https://www.crockford.com/base32.html.
-- **Entropy**: 19 characters × 5 bits = **95 bits** of secret entropy.
+- **Payload**: 19 characters × 5 bits = **95 bits**. For a generated number these are 95 bits of CSPRNG output; for a person number they are the leading 95 bits of the person id (§3.1), which is derived from the phrase and is not a secret.
 - **Check character**: 1 Damm-32 digit, computed across the 19 entropy chars.
 - **Prefix `MY-`**: human-readable prefix indicating "this is a Myne account number". Display-only; not part of the canonical form, not part of the entropy or check, not part of the SHA-256 input.
 - **Separators**: dashes between 4-character groups in the display form. Display-only.
@@ -50,6 +51,42 @@ The 95-bit entropy is encoded as the first 19 base32 characters by:
 - Pad the 95-bit value to 95 bits exactly (no leading zero stripping).
 - Group into 19 5-bit chunks, big-endian.
 - Map each chunk through the Crockford alphabet table.
+
+### 3.1 Derivation from the person id (the person account)
+
+A **person** number takes step 1 of §3 from the identity rather than from the OS
+CSPRNG. Steps 2 to 5 are unchanged, character for character:
+
+```
+1. person_id     := SHA-256("myne.person-id|" || phrase_normalized)[:16]   # protocol.md §3.1
+2. payload_bits  := be_uint128(person_id) >> 33        # the LEADING 95 bits
+3. entropy_chars := crockford_base32_encode(payload_bits)                  # 19 chars
+```
+
+`be_uint128` reads the 16 bytes as one big-endian unsigned integer, so byte 0
+holds the most significant bits and bit 127 is the first bit of the payload.
+The shift discards the **low** 33 bits; it does not mask them off. A bit at
+index 33 (the least significant bit inside the window) reaches the final
+5-bit chunk, and bits 0 to 32 reach nothing at all.
+
+**Why the leading bits, and why it is frozen.** The person id is a SHA-256
+truncation, so every 95-bit window of it is uniformly random and the choice
+carries no security weight. It is frozen because it is load-bearing through
+*identity*: two implementations that read different bits would print different
+numbers for the same phrase, and the number is what a support handoff or a
+self-host operator reads between two people. The `person-account-number`
+vectors pin phrase, person id, canonical form, display form and
+`account_number_hash`, including two hand-computable cases (the all-zero id and
+an id whose only set bit is bit 127) that a swapped window or a little-endian
+read cannot pass.
+
+Nothing else about the scheme moves. The prefix, the alphabet, the 95-bit
+width, the Damm-32 check character, the display grouping and the
+`account_number_hash` rule of §6 are the same values for a generated and a
+derived number, so one parser validates both and the table frozen in §4.2
+applies to both. A person number is **not** mixed into any vault's Argon2id
+salt: it names the person, and a vault created under the person plane is bound
+to its own vault id rather than to any account-number hash.
 
 ## 4. Damm-32 check character
 

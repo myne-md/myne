@@ -5,9 +5,14 @@
 #
 # The plugin core is shared from `myne-core`; mobile registers the CRUD subset
 # that works without a native microphone or the desktop text extractor — NO
-# `voice_record_*`. All commands are Slot::Unlocked-gated and consume the
-# `VaultRuntimeState` singleton (registered by `vault-unlock::init`); the
-# reference graph (`AttachmentRefsState`) is managed in `lib.rs` setup.
+# `voice_record_*`, and no PDF/DOCX/text extraction. It DOES register the
+# MYE1 read-back (myne-md/myne#926): the mobile import OCRs an image into the
+# cache (MYND-441), so the cache can be non-empty on a phone and the surface that
+# shows it is the photo-to-note sheet.
+#
+# Every command here is `Slot::Unlocked`-gated and consumes the `VaultRuntimeState`
+# singleton registered by `vault-unlock::init`; the reference graph
+# (`AttachmentRefsState`) is owned in `lib.rs` setup.
 #
 # Main-window-only invariant: import + delete + rename + clean write vault
 # state, export decrypts, and the catalog / unused / reconcile reads decrypt
@@ -19,7 +24,7 @@
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the mobile attachments plugin — import + catalog list + delete + rename + export + unused-list + clean-unused + reconcile (apply / remove / referencing)."
+description = "Default permission set for the mobile attachments plugin: import + catalog list + delete + rename + export + unused-list + clean-unused + reconcile (apply / remove / referencing) + the MYE1 extracted-text read-back."
 permissions = [
   "allow-attachment-import",
   "allow-catalog-list",
@@ -31,11 +36,12 @@ permissions = [
   "allow-attachment-refs-apply",
   "allow-attachment-refs-remove",
   "allow-attachment-refs-referencing",
+  "allow-attachment-read-extracted-text",
 ]
 
 [[permission]]
 identifier = "allow-attachment-import"
-description = "Allow invoking attachments:attachment_import (Slot::Unlocked-gated import of inline bytes or a path; sniffs + validates the type against the PNG/JPEG/GIF/WebP/SVG/PDF allowlist, enforces the 64 MiB cap, computes the content-addressed attachment-id, dedups on id-existence, else encrypts the MYA1 blob + upserts the MYC1 catalog; returns the id + metadata. Extraction-free on mobile — no MYE1 text cache is written)."
+description = "Allow invoking attachments:attachment_import (Slot::Unlocked-gated import of inline bytes or a path; sniffs + validates the type against the PNG/JPEG/GIF/WebP/SVG/PDF allowlist, enforces the 64 MiB cap, computes the content-addressed attachment-id, dedups on id-existence, else encrypts the MYA1 blob + upserts the MYC1 catalog; returns the id + metadata. On mobile an IMAGE is OCR'd eagerly into the MYE1 cache unless the device-local `attachment_ocr_enabled` pref is off (MYND-441); PDF/DOCX/text extraction stays desktop-only)."
 commands.allow = ["attachment_import"]
 
 [[permission]]
@@ -82,3 +88,8 @@ commands.allow = ["attachment_refs_remove"]
 identifier = "allow-attachment-refs-referencing"
 description = "Allow invoking attachments:attachment_refs_referencing (Slot::Unlocked-gated query of the note-ids referencing one attachment-id — the library's 'used in N notes' count + the delete-warning's note list; SYNC-6 amended exposes ids, not just a count)."
 commands.allow = ["attachment_refs_referencing"]
+
+[[permission]]
+identifier = "allow-attachment-read-extracted-text"
+description = "Allow invoking attachments:attachment_read_extracted_text (Slot::Unlocked-gated read-back of one attachment's cached MYE1 extracted text, which on mobile is the image OCR the import wrote (protocol.md § 9.15); decrypts the device-local cache blob in Rust and crosses IPC as plaintext of note-body class, rendered as inert editable text in the photo-to-note draft sheet, returning null when no usable cache entry exists. No engine and no pref gate: reading needs neither. myne-md/myne#926)."
+commands.allow = ["attachment_read_extracted_text"]

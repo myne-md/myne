@@ -18,7 +18,14 @@ import { orderByLastUnlock, stableVaultNumber } from "../../src/lib/vault-list";
 import type { VaultSummary } from "../../src/types/vault-summary";
 
 function vault(id: string, last_unlock: number | null): VaultSummary {
-  return { id, status: { kind: "Exists" }, label: null, icon: null, last_unlock };
+  return {
+    id,
+    status: { kind: "Exists" },
+    label: null,
+    icon: null,
+    last_unlock,
+    published: false,
+  };
 }
 
 // Three real UUIDv7-shaped ids whose ASCII order is a, b, c and whose unlock

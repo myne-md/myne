@@ -148,9 +148,24 @@ to produce a number to compare against a row.**
 1. Check out the commit whose bundle you intend to serve. The record is keyed on
    a commit, not a tag: nothing has been tagged as a release yet.
 2. Build the bundle. To **serve** it, natively:
-   `pnpm install --frozen-lockfile && pnpm web:build`. To produce a number you
-   can **compare against a row**, build the reference environment instead, which
-   any host can enter through emulation:
+   `pnpm install --frozen-lockfile && ./scripts/build-wasm.sh && pnpm web:build`.
+   The wasm step is not optional and `pnpm web:build` does not do it: it bundles
+   whatever `web/wasm/pkg` already holds, so a fresh checkout without that step
+   serves a bundle whose Rust half does not correspond to the source you just
+   checked out. `scripts/build-wasm.sh` is the real command (there is no
+   `pnpm web:wasm` script), and nothing on this path catches the omission for
+   you. `node scripts/check-web-wasm-freshness.mjs` is the only check in the tree,
+   `pnpm web:build` never runs it, and it hashes the source trees it watches
+   against a digest recorded beside the artefact rather than hashing the artefact
+   itself. So a `pkg` left from an earlier checkout passes it whenever the
+   difference between the two commits lies outside those watched files (the
+   toolchain pin in `rust-toolchain.toml`, the container recipe), and a rebuild
+   under a different toolchain does too. The `bundle_hash` you read in step 3 is
+   then the hash of a mixture, it cannot match the row for the commit you checked
+   out, and the mismatch reads exactly like the build-environment difference
+   below, which is the wrong conclusion to draw from it.
+   To produce a number you can **compare against a row**, build the reference
+   environment instead, which any host can enter through emulation:
    `docker buildx build --platform linux/amd64 -f web/container/Dockerfile .`
 3. Read the hash the build itself wrote. `pnpm web:build` ends in
    `scripts/emit-web-version.mjs`, which emits `web/dist/version.json` carrying
@@ -207,7 +222,21 @@ These are yours to get right; nothing in the client can compensate:
   origin-scoped: any script on that origin can reach the vault storage. Give the
   client its own origin. That is the same reasoning that put the (now closed)
   hosted client on a dedicated hostname rather than a path on the marketing site
-  (`decisions.md` 2026-07-26).
+  (`decisions.md` 2026-07-26). **The origin now also holds more than one vault
+  container** (myne-md/myne#911 task 13): a browser that creates or joins several
+  vaults keeps them side by side under `vaults/<id>/`, and each one opens with its
+  own password. Co-hosting therefore puts *every* vault in that profile behind
+  whatever else shares the origin, not one.
+- **The identity phrase is typed into a page.** Since the same task, a browser can
+  create, register and unlock a person identity, so the 24 words are entered here
+  rather than only in a native client, and they are the account's phrase: no
+  password change rotates them, and they open every vault the person owns.
+  `docs/threat-model.md` A18 owns the cost, and two properties bound it rather
+  than remove it. The phrase is asked for only on a deliberate identity action,
+  and the browser keeps **no person credential at rest**: the sealed keypair and
+  the device token live in the Worker's memory, so there is no phrase-encrypted
+  file in origin storage to crack offline. The price is stated on the screen that
+  shows the words: a reload asks for them again.
 - **Not weakening the header set.** It is baked in; overriding it at a proxy is
   possible and is your decision to justify.
 - **Not logging client IPs at the bundle origin.** The sync server's no-IP

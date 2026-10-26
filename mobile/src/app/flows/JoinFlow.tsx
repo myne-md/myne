@@ -268,7 +268,13 @@ async function persistDeviceNameWithRetry(
   return false;
 }
 
-export function JoinFlow({ onComplete, onRecovering, onCancel, onMemberJoin }: JoinFlowProps) {
+export function JoinFlow({
+  onComplete,
+  onRecovering,
+  onCancel,
+  onMemberJoin,
+  onPersonJoin,
+}: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
@@ -441,6 +447,18 @@ export function JoinFlow({ onComplete, onRecovering, onCancel, onMemberJoin }: J
       // the identity phrase, not this vault's password. So it never reaches the
       // confirm step — it hands the target back to the shell, which opens the
       // identity flow's join wizard for that vault.
+      if (view.kind === "person") {
+        // An identity-model device join (myne-md/myne#911 task 9, wired on this
+        // client by task 12). The code names the PERSON and the credential is the
+        // identity phrase, so there is no account number for the confirm step to
+        // show: the shell opens the identity flow's person-join wizard instead,
+        // exactly as the member arm below hands its target back.
+        onPersonJoin({
+          endpointUrl: view.endpoint_url,
+          personIdHex: view.person_id_hex,
+        });
+        return;
+      }
       if (view.kind === "member_vault") {
         onMemberJoin({ endpointUrl: view.endpoint_url, accountHashHex: view.account_hash_hex });
         return;

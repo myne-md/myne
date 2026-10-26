@@ -118,7 +118,7 @@ const FACTS: CSSProperties = {
 };
 
 /** Translate a seed/apply failure into a sentence that names its cause. */
-export function seedErrorKey(kind: string | undefined): string {
+function seedErrorKey(kind: string | undefined): string {
   switch (kind) {
     case "AiDisabled":
       return "settings.memory.seed.errors.aiDisabled";

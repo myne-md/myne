@@ -1,11 +1,23 @@
 [package]
 name = "myne-desktop"
-version = "0.10.0"
+version = "0.10.1"
 description = "Myne — end-to-end-encrypted markdown notes desktop client"
 edition = "2021"
 license = "AGPL-3.0"
 repository = "https://github.com/myne-md/myne"
 publish = false
+# Two bins ship from this package: the app and the browser clipper's host. Tauri
+# needs to be told which one is the application (`tauri build` says "failed to
+# find main binary" without it, and it lists no candidates).
+default-run = "myne-desktop"
+
+# The browser clipper's native-messaging host, as its own executable: a browser
+# launches a manifest's `path` with no arguments and host mode needs one, and a
+# `.cmd` wrapper would re-expand `%` in an install path (myne#381 on Unix).
+# Staged as an `externalBin` so it lands beside the app binary.
+[[bin]]
+name = "myne-clipper-host"
+path = "src/bin/clipper_host.rs"
 
 [lib]
 # `_lib` suffix is required so the lib name is unique and does not conflict
@@ -321,17 +333,27 @@ tauri-plugin-single-instance = "2"
 windows-sys = { version = "0.60", features = [
     "Win32_Storage_FileSystem",
     "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_System_Registry",
+    "Win32_System_IO",
+    "Win32_System_Memory",
+    "Win32_System_Pipes",
+    "Win32_System_Time",
     "Win32_UI_Input_KeyboardAndMouse",
     "Win32_System_SystemInformation",
 ] }
 # PDF export native print-to-PDF arm, Windows (MYND-255):
 # `ICoreWebView2_7::PrintToPdf` via tauri's `with_webview` handle.
-# Transitive→direct promotions — `webview2-com 0.38.2` and
-# `windows 0.61.3` are already locked via tauri/wry on Windows; zero
-# dependency-tree expansion. Best-effort arm (no Windows lane);
-# ratified fallback is window.print() if unviable.
-webview2-com = "0.38"
-windows = "0.61"
+# Transitive→direct promotions — these must name the versions tauri/wry already
+# lock on Windows, or the tree carries TWO `windows-core` majors and the
+# `Interface` trait in scope is not the one implemented for the WebView2
+# interfaces: `core.cast()` failed with E0599 for exactly that reason under
+# `cargo xwin check --target x86_64-pc-windows-msvc`. Zero dependency-tree
+# expansion while the promotion matches the lock. Best-effort arm (no Windows
+# lane); ratified fallback is window.print() if unviable.
+webview2-com = "0.39"
+windows = "0.62"
 
 # Linux machine-level idle reader (MYND-121): the X11 ScreenSaver extension
 # (`XScreenSaverQueryInfo` equivalent) via the **pure-Rust** `x11rb` (talks

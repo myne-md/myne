@@ -66,7 +66,12 @@ fn main() {
     .expect("build vault-creation session");
 
     let account_number = session.account.display.clone();
-    let phrase = session.phrase.words().join(" ");
+    let phrase = session
+        .phrase
+        .as_ref()
+        .expect("build_session always mints a phrase")
+        .words()
+        .join(" ");
     let meta = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
 
     // Endpoint -> host/port. The certificate is verified the way the shipped

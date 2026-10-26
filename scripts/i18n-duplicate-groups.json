@@ -220,6 +220,14 @@
     "reason": "Same generic failure on snapshots and the sync panel; generic fallback, intentionally shared."
   },
   {
+    "value": "The strength check could not load, so only the minimum length is checked.",
+    "keys": [
+      "password.createForm.strengthUnavailable",
+      "settings.changePassword.strengthUnavailable"
+    ],
+    "reason": "Same fallback sentence on the password create form and change-password, for the same reason `tooShort` above is shared: one policy, stated once. Two keys rather than one because each form composes its own caption from its own namespace, and rewording one side would let the two forms tell the user different things about why a gate came open."
+  },
+  {
     "value": "Use at least {{n}} characters.",
     "keys": [
       "password.createForm.tooShort",
@@ -354,14 +362,6 @@
     "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
   },
   {
-    "value": "Couldn't reach that server. Check the address and try again.",
-    "keys": [
-      "identityFlow.serverUnreachable",
-      "sync.settings.connectError"
-    ],
-    "reason": "Same sync-server connect failure on the mobile identity flow's server step and the desktop Settings sync panel; one 'the server did not answer' fact on two surfaces, intentionally identical (myne-md/myne#768)."
-  },
-  {
     "value": "Double-check this number. It doesn't look right.",
     "keys": [
       "join.accountHint",
@@ -433,14 +433,6 @@
       "vaultPicker.accountHidden"
     ],
     "reason": "Same hidden-names notice on the picker twins; identical screens, identical string."
-  },
-  {
-    "value": "That name is too long. Keep it under 512 characters.",
-    "keys": [
-      "picker.labelTooLong",
-      "vaultPicker.labelTooLong"
-    ],
-    "reason": "Same label-length error on the picker twins; identical screens, identical string."
   },
   {
     "value": "The account grouping could not be read on this device. Nothing was changed.",

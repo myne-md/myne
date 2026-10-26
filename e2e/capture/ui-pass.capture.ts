@@ -107,7 +107,7 @@ runner(
       await frame(
         s,
         "00b-first-run-create",
-        "The first step behind 'create a vault'.",
+        "The first step behind 'create your identity and vault': one door, then the identity ceremony.",
         async () => {
           await (await s.byTestId("welcome.create-cta")).click();
           await sleep(900);

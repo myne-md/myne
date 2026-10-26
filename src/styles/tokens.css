@@ -839,7 +839,12 @@ a:focus-visible,
   gap: var(--space-3);
   background: var(--bg-2);
   border: 1px solid var(--line-1);
-  border-inline-start: 3px solid var(--toast-accent);
+  /* No accent rail on the inline start (2026-10-24). The 3px `--toast-accent`
+     stripe was decoration on the one edge the card already borders, and the
+     accent is the canon's signal for focus, primary actions, links and the
+     active selection, never for chrome (docs/design/README.md). The variant's
+     colour is still carried, by the ICON, which is the part that means
+     something. */
   border-radius: var(--radius-2);
   padding: var(--space-3) var(--space-4);
   box-shadow: var(--shadow-2);

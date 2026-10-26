@@ -26,8 +26,15 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="external" path="Documents" />
+        <!-- The person device token (myne-md/myne#911 review). `domain="file"` is
+             the app's internal files dir, which is where tauri's app_config_dir
+             resolves on Android. The token is plaintext and authorizes every vault
+             the account is bound to, so a backup carried one credential for the
+             whole set. -->
+        <exclude domain="file" path="person-auth.json" />
     </cloud-backup>
     <device-transfer>
         <exclude domain="external" path="Documents" />
+        <exclude domain="file" path="person-auth.json" />
     </device-transfer>
 </data-extraction-rules>

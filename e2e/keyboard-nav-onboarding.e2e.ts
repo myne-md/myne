@@ -97,7 +97,7 @@ describeE2E("KN-2 recovery phrase grid has a deterministic Tab order (MYND-93)",
 });
 
 describeE2E("KN-3 create flow is enterable by keyboard (MYND-93)", () => {
-  it("the Welcome create CTA is Tab-reachable and Enter opens the briefing", async () => {
+  it("the Welcome create CTA is Tab-reachable and Enter opens the first run", async () => {
     // Vault-count precondition: 0 (cold boot → Welcome).
     await scenario("kn3-create-entry", {}, async (app) => {
       await app.session.byTestId("welcome.root", { timeoutMs: 20_000 });
@@ -108,8 +108,10 @@ describeE2E("KN-3 create flow is enterable by keyboard (MYND-93)", () => {
       expect(await activeTestId(app.session)).toBe("welcome.create-cta");
       await pressKey(app.session, KEY.ENTER);
 
-      // First-run create starts at the safety briefing (MYND-114).
-      await app.session.byTestId("create.briefing", { timeoutMs: 15_000 });
+      // The one create door opens the FIRST RUN (myne-md/myne#911 task 6):
+      // the identity ceremony, and the safety briefing follows it. The claim
+      // here is keyboard reachability, which is why it stops at the stage.
+      await app.session.byTestId("first-run.root", { timeoutMs: 15_000 });
     });
   });
 });

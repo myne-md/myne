@@ -9,6 +9,9 @@ import i18n from "../i18n";
 export interface DeviceJoinQr {
   /** A self-contained SVG string rendering the join payload as a QR. */
   svg: string;
+  /** The encoded payload the QR renders. Public by construction, and the form a
+   *  device without a camera needs (paste it into the join screen). */
+  payload: string;
   /** Seconds the payload stays fresh — regenerate before this lapses. */
   ttl_secs: number;
 }
@@ -20,7 +23,8 @@ export type DeviceJoinQrErrorKind =
   | "EndpointRead"
   | "Render"
   | "NotAMemberVault"
-  | "VaultAccountUnknown";
+  | "VaultAccountUnknown"
+  | "NoIdentity";
 
 /**
  * Build a device-join QR from the user-pasted account number.
@@ -52,6 +56,23 @@ export async function generateDeviceJoinQr(
  */
 export async function generateMemberJoinQr(): Promise<DeviceJoinQr> {
   return invoke<DeviceJoinQr>("plugin:sync|sync_member_join_qr");
+}
+
+/**
+ * Build the QR that admits another device to this PERSON's account
+ * (myne-md/myne#911 task 9).
+ *
+ * Takes no argument for the same reason the member QR does not: the person id
+ * comes from the identity this device holds and the endpoint from its own config,
+ * so the call cannot describe an account the caller is not in. Refuses
+ * (`NoIdentity`) on a device that holds no identity, rather than minting a code
+ * with an empty id.
+ *
+ * This is the owner's code on the identity model: a vault born under an identity
+ * has no account number, which is what `generateDeviceJoinQr` needs.
+ */
+export async function generatePersonJoinQr(): Promise<DeviceJoinQr> {
+  return invoke<DeviceJoinQr>("plugin:sync|sync_person_join_qr");
 }
 
 /** Map a `sync_device_join_qr` failure to its user-facing message (the repo's
@@ -95,5 +116,22 @@ export function memberJoinQrErrorMessage(e: unknown): string {
       return i18n.t("sync.memberJoinQr.noAccount");
     default:
       return i18n.t("sync.memberJoinQr.error");
+  }
+}
+
+/** Map a `sync_person_join_qr` failure to its user-facing message (myne-md/myne#911
+ *  task 9), the same shape the member mapper takes. */
+export function personJoinQrErrorMessage(e: unknown): string {
+  const kind =
+    e && typeof e === "object" && "kind" in e
+      ? (e as { kind?: DeviceJoinQrErrorKind }).kind
+      : undefined;
+  switch (kind) {
+    case "NotConfigured":
+      return i18n.t("sync.personJoinQr.notConfigured");
+    case "NoIdentity":
+      return i18n.t("sync.personJoinQr.noIdentity");
+    default:
+      return i18n.t("sync.personJoinQr.error");
   }
 }

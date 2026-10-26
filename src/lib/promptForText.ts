@@ -1,5 +1,5 @@
 // A minimal text-input prompt modal — the generic twin of the attachment
-// rename prompt (`editor/attachments/renamePrompt.ts`), used where a command
+// rename prompt (`editor/src/attachments/renamePrompt.ts`), used where a command
 // needs a single line of text and there is no inline-editing surface to host it.
 //
 // Why not `window.prompt`: the Tauri WebView no-ops `window.prompt` (it returns

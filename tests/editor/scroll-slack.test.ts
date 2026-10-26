@@ -35,13 +35,12 @@ function tree(): { outer: HTMLElement; inner: HTMLElement; editor: HTMLElement; 
 }
 
 describe("slackFor", () => {
-  it("reserves 60% of the viewport below the cap", () => {
-    expect(slackFor(600)).toBe(360);
-  });
-
-  it("clamps at the cap so a tall viewport can't reserve the world", () => {
-    expect(slackFor(1600)).toBe(480);
-    expect(slackFor(100_000)).toBe(480);
+  it("reserves a fixed two-line allowance, not a share of the viewport", () => {
+    // The share was the bug: a note ending three lines into the pane still
+    // scrolled through half a screen of nothing below its tail.
+    expect(slackFor(600)).toBe(48);
+    expect(slackFor(1600)).toBe(48);
+    expect(slackFor(100_000)).toBe(48);
   });
 
   it("reserves nothing for a viewport that hasn't been measured", () => {
@@ -90,7 +89,7 @@ describe("slackForOverflow (myne-md/myne#908 item 10)", () => {
   });
 
   it("reserves slack once the content is taller than the host", () => {
-    expect(slackForOverflow(700, 900)).toBe(420);
+    expect(slackForOverflow(700, 900)).toBe(48);
   });
 
   it("ignores a measurement that has not happened yet", () => {
@@ -100,7 +99,7 @@ describe("slackForOverflow (myne-md/myne#908 item 10)", () => {
 
   it("is not fooled by a one-pixel rounding wobble at the boundary", () => {
     expect(slackForOverflow(700, 701)).toBe(0);
-    expect(slackForOverflow(700, 702)).toBe(420);
+    expect(slackForOverflow(700, 702)).toBe(48);
   });
 });
 
@@ -114,7 +113,7 @@ describe("naturalContentHeight (the anti-feedback arithmetic)", () => {
   });
 
   it("still reports overflow for a note that genuinely outgrows the host", () => {
-    expect(slackForOverflow(700, naturalContentHeight(1260, 360))).toBe(420);
+    expect(slackForOverflow(700, naturalContentHeight(1260, 360))).toBe(48);
   });
 
   it("never goes negative on a stale applied value", () => {

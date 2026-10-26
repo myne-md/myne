@@ -1167,6 +1167,41 @@ describe("ChatComposer, the blocked zero state", () => {
 // file with no extractable text is a sentence rather than a message that goes
 // out without it.
 describe("ChatComposer: attached documents", () => {
+  it("keeps a pasted document when a library file is picked afterwards", async () => {
+    // **The picker cannot return a chat-scoped file** (review round five): it
+    // lists the library, so a file already attached from a paste is not among
+    // its rows. The composer used to REPLACE its list with the picker's answer,
+    // so picking a library PDF silently dropped the pasted screenshot's chip and
+    // left that file with nothing naming it, which the sweep would later erase.
+    mount();
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [new File(["png"], "pasted.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(1),
+    );
+
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+    const option = await screen.findByTestId("ai.attachment-option");
+    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(2),
+    );
+    const names = screen
+      .getAllByTestId("ai.composer-attachment")
+      .map((chip) => chip.textContent ?? "")
+      .join(" ");
+    // The mock's import returns  whatever the File was called; what
+    // matters is that the pasted chip survived alongside the picked one.
+    expect(names).toContain("image.png");
+    expect(names).toContain("lecture.pdf");
+  });
+
   it("sends the chosen document's text with the run", async () => {
     mount();
     type("summarise the lecture");
@@ -1291,6 +1326,44 @@ describe("ChatComposer: pasted files", () => {
     expect((await screen.findByTestId("ai.composer-attachment-error")).textContent).toContain(
       "agent.attachments.cap:4",
     );
+  });
+
+  it("never erases a file the batch did not create (a dedup hit)", async () => {
+    // **The library file a user curated, pasted by mistake** (review round four,
+    // data loss): a dedup hit returns an attachment that already existed, so
+    // deleting it on a later file's failure removes the user's library file, its
+    // blob and its catalog row, with no confirmation. `deduplicated` is the
+    // host's answer and the only safe source for "did this batch create it".
+    mount();
+    attachmentImport
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: "lib11",
+        content_type: "image/png",
+        filename: "already-here.png",
+        size: 3,
+        created_at: 2,
+        deduplicated: true,
+        original_size: 3,
+        container_changed: false,
+      })
+      .mockRejectedValueOnce(new Error("no keys"));
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [
+          new File(["one"], "already-here.png", { type: "image/png" }),
+          new File(["two"], "second.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-attachment-error") as HTMLElement).textContent,
+      ).toContain("agent.attachments.pasteFailed"),
+    );
+    expect(attachmentDelete).not.toHaveBeenCalled();
   });
 
   it("erases the files a failed batch had already stored", async () => {

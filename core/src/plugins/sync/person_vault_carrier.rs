@@ -191,11 +191,26 @@ pub async fn delete_all_person_vault_carriers(
     }
 }
 
-/// Whether this vault's `vault.meta` is an `NTV6` frame.
-async fn is_ntv6(io: &dyn VaultIo, vault_root: &std::path::Path) -> bool {
+/// Whether this vault carries the B2B tail AND is not person-wrapped, i.e.
+/// whether the person-keypair carrier applies to it.
+///
+/// **`NTV6` only, and `NTV7` is excluded on purpose (myne-md/myne#911 review).**
+/// The carrier exists so a later PASSWORD unlock can install the person session
+/// without the phrase, by sealing the person keypair under this vault's
+/// `root_key`. On `NTV6` that is a convenience: the vault's own credential opens
+/// the vault and nothing else. On `NTV7` the same file becomes a cross-vault key
+/// escalation, because `NTV7` also seals every owned vault's `root_key` to that
+/// person key: one vault's password, or a PIN or a biometric that yields its
+/// `root_key`, would unwrap the carrier, recover the person keypair, and from it
+/// open the person wrap of every other vault the identity owns, offline, from
+/// the disk alone. The phrase is the credential that opens the person wrap, so a
+/// person-born vault asks for the phrase instead. `has_b2b_tail` would answer
+/// true for `NTV7` (it has the tail) and that is exactly the mistake this
+/// predicate must not make twice.
+async fn carrier_applies(io: &dyn VaultIo, vault_root: &std::path::Path) -> bool {
     io.read(&vault_root.join("vault.meta"))
         .await
-        .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
+        .map(|b| protocol::vault_meta_generation(&b) == protocol::VaultMetaGeneration::B2b)
         .unwrap_or(false)
 }
 
@@ -220,7 +235,7 @@ pub async fn refresh_carrier_best_effort(
         return;
     };
     let root = crate::paths::vault_root_for_id_from_base(&base, active);
-    if !is_ntv6(io, &root).await {
+    if !carrier_applies(io, &root).await {
         return;
     }
     let _ = write_person_vault_carrier(
@@ -267,7 +282,7 @@ pub async fn install_from_carrier_best_effort(
         return;
     };
     let root = crate::paths::vault_root_for_id_from_base(&base, active);
-    if !is_ntv6(io, &root).await {
+    if !carrier_applies(io, &root).await {
         return;
     }
     let vault_id = *active.as_uuid().as_bytes();

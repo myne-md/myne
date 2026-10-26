@@ -302,6 +302,7 @@ pub fn ensure_export_dir<R: tauri::Runtime>(
 /// export command is the half that fails closed.
 #[cfg(target_os = "ios")]
 pub fn init<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::Manager;
     for dir in ExportDir::ALL {
         if let Err(e) = ensure(app, *dir) {
             tracing::warn!(
@@ -309,6 +310,26 @@ pub fn init<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
                 dir = dir.name(),
                 reason = ?e,
                 "directory not excluded from platform backup"
+            );
+        }
+    }
+    // The app-config directory, for a credential rather than for plaintext
+    // (myne-md/myne#911 review). `<app_config_dir>/person-auth.json` holds the
+    // person device token in plaintext, and that token authorizes every vault the
+    // account is bound to: reads, the metadata write, and the attachment plane.
+    // The config directory is ordinary app-container storage, so iCloud Backup
+    // carried it off the device by default, which turns one restored backup into a
+    // credential for the whole vault set. Excluding the DIRECTORY rather than the
+    // file is deliberate on two counts: Apple QA1719 makes a directory-level
+    // exclusion cover files created inside it afterwards, which is what a
+    // forget-then-create cycle needs, and the other two files there
+    // (`sync-config.json`, `legal-consent.json`) survive re-entry anyway.
+    if let Ok(dir) = app.path().app_config_dir() {
+        let path = dir.to_string_lossy().to_string();
+        if !exclude_from_backup_at(&path) {
+            tracing::warn!(
+                event = "config_dir_not_excluded",
+                "the app-config directory was not excluded from platform backup"
             );
         }
     }

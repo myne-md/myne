@@ -1,0 +1,5 @@
+{
+  "image": "ghcr.io/myne-md/myne-ci-e2e",
+  "tag": "2026-10-25",
+  "digest": "sha256:219f5994419f54810504c5aeb78a2fd49382e947727b481d8b4e874eff764d04"
+}

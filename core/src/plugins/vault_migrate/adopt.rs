@@ -92,6 +92,58 @@ pub(crate) async fn discard_incoming_meta(io: &dyn VaultIo, vault_root: &Path) {
 /// local singleton is one push away from overwriting the migrating device's real
 /// data.
 pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, bytes: &[u8]) {
+    // **Only a promotion that REPLACES the root may drop anything** (myne-md/myne#911
+    // review). Everything below exists because the v0.1 to v0.2 hop re-keys the
+    // vault: an artefact sealed under the old root is unreadable bytes that their
+    // readers answer as EMPTY, one push away from overwriting the re-sealing
+    // device's data. The `NTV6` to `NTV7` promotion this feature stages changes the
+    // CREDENTIAL side only; `root_key`, `items_key`, the group key and every KEK
+    // are byte-identical, so dropping them destroys state that was still perfectly
+    // readable, including two things that cannot be recovered: `vault.head-state`
+    // (the sync-protocol §7 record "not reconstructible from the server, by
+    // design", so the rollback defence silently falls back to a TOFU re-bootstrap)
+    // and `vault.dictionary` ("NOT recoverable ... a word list emptied").
+    let replaces_root = io
+        .read(&vault_root.join("vault.meta"))
+        .await
+        .ok()
+        .map(|current| {
+            protocol::vault_meta_generation(&current) == protocol::VaultMetaGeneration::Legacy
+        })
+        .unwrap_or(false);
+
+    if replaces_root {
+        drop_artefacts_under_replaced_root(io, vault_root).await;
+    }
+
+    if io
+        .write(&vault_root.join("vault.meta"), bytes, WriteOpts::default())
+        .await
+        .is_err()
+    {
+        // The meta did not land. Leave the staging file: the next unlock
+        // re-attempts the whole promotion.
+        return;
+    }
+
+    // The meta phase's baseline must name what is now on disk. Left stale it
+    // reads "this device changed its meta", and the next cycle argues with the
+    // server about a generation it just adopted.
+    if let Ok(mut state) = crate::plugins::sync::state::read_sync_state(io, vault_root).await {
+        state.meta_baseline_hex = Some(crate::plugins::sync::orchestrator::sha256_hex(bytes));
+        // On a root-replacing promotion the old generation's singleton baselines
+        // are keyed by sync-ids derived from the OLD `root_key`, which this device
+        // no longer has and cannot re-derive, so they cannot be removed by name
+        // here. They are inert: nothing will ever look those keys up again.
+        let _ = crate::plugins::sync::state::write_sync_state(io, vault_root, &state).await;
+    }
+
+    discard_incoming_meta(io, vault_root).await;
+}
+
+/// Every artefact that only a REPLACED root makes unreadable. Split out so the
+/// promotion path can skip it, and kept together so the reason stays in one place.
+async fn drop_artefacts_under_replaced_root(io: &dyn VaultIo, vault_root: &Path) {
     // The synced singletons are dropped IN ADDITION to the shared roster. The
     // migrating device re-seals these (it holds both keys for one moment); a
     // peer never does, so for it they are unreadable bytes that come back from
@@ -139,29 +191,4 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
     // two roots are never in memory at once, so nothing can re-seal it. Recorded
     // in `decisions.md` rather than discovered by a user whose word list emptied.
     let _ = io.remove_file(&vault_root.join("vault.dictionary")).await;
-
-    if io
-        .write(&vault_root.join("vault.meta"), bytes, WriteOpts::default())
-        .await
-        .is_err()
-    {
-        // The meta did not land. Leave the staging file: the drops above are
-        // rebuildable, and the next unlock re-attempts the whole promotion.
-        return;
-    }
-
-    // The meta phase's baseline must name what is now on disk. Left stale it
-    // reads "this device changed its meta", and the next cycle argues with the
-    // server about a generation it just adopted.
-    if let Ok(mut state) = crate::plugins::sync::state::read_sync_state(io, vault_root).await {
-        state.meta_baseline_hex = Some(crate::plugins::sync::orchestrator::sha256_hex(bytes));
-        // The old generation's singleton baselines are keyed by sync-ids derived
-        // from the OLD `root_key`, which this device no longer has and cannot
-        // re-derive — so they cannot be removed by name here. They are inert:
-        // nothing will ever look those keys up again, because every id this
-        // device derives from now on comes from the new root.
-        let _ = crate::plugins::sync::state::write_sync_state(io, vault_root, &state).await;
-    }
-
-    discard_incoming_meta(io, vault_root).await;
 }

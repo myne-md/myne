@@ -8,7 +8,9 @@ import {
 } from "react";
 import { AccountBootstrap } from "./screens/AccountBootstrap";
 import { Welcome } from "./screens/Welcome";
+import { FirstRun } from "./screens/FirstRun";
 import { IdentityHome } from "./screens/IdentityHome";
+import { formatPersonAccountNumber } from "@myne/client-core/person-account";
 import { RestoreBackup } from "./screens/RestoreBackup";
 
 import { Unlock } from "./screens/Unlock";
@@ -42,10 +44,13 @@ import { Toaster } from "./components/toast/Toaster";
 import { UpdateNotice } from "./components/update/UpdateNotice";
 import { UpdatingScreen } from "./screens/UpdatingScreen";
 import { JoinDeviceModal } from "./components/sync/JoinDeviceModal";
+import { InvitesDialog } from "./components/sync/InvitesDialog";
+import { unclaimedInvites } from "./hooks/usePendingInvites";
+import { usePendingInvites } from "./hooks/usePendingInvites";
 import { resetPersonIdentityState, setPersonIdentityState } from "./components/sync/personIdentityState";
 import { has } from "./platform/capabilities";
 import { listVaults } from "./lib/vault-list";
-import { personStatus } from "./lib/personAccount";
+import { personAccountNumber, personStatus } from "./lib/personAccount";
 import { probeSlotKind } from "./lib/vault-slot-kind";
 import { lockVault } from "./lib/vault-unlock";
 import { useIdleAutoLock } from "./hooks/useIdleAutoLock";
@@ -161,15 +166,40 @@ function App() {
   // substituted away in the web build, where the join door is `AccountBootstrap`
   // and an origin holds exactly one container.
   const [joinOpen, setJoinOpen] = useState(false);
+  // The invitations dialog (myne-md/myne#911 follow-up): the ONE surface on
+  // which an invitation can be accepted by a device that already holds a vault.
+  // It is a modal over whatever is showing, like the join, because its two
+  // entries (the picker's notice row and the switcher's) land differently.
+  const [invitesOpen, setInvitesOpen] = useState(false);
   // Identity-only home (myne-md/myne#711): at zero vaults, if this device
   // already holds a person account, show the identity home instead of Welcome.
   // Probe-only state; a failed probe leaves `false` (the pre-B2B Welcome path).
   const [personEnrolled, setPersonEnrolled] = useState(false);
+  const [personAccountState, setPersonAccountState] = useState<
+    "reserved" | "pending" | "enrolled" | null
+  >(null);
   // `person_id_hex` is read off the same probe and deliberately NOT kept: the
   // identity home used to print it above the invite code, which is an unlabeled
   // 32-byte blob a user can neither read nor act on (myne-md/myne#869). The
   // public material that IS actionable is `identity_code`.
   const [identityCode, setIdentityCode] = useState<string | null>(null);
+  // The person account number, DISPLAY form, for the identity home
+  // (myne-md/myne#911 review). Read from the backend's derived value and
+  // formatted through the shared presentation module, so the grouping matches
+  // every client.
+  const [personAccountNumberValue, setPersonAccountNumberValue] = useState<string | null>(null);
+
+  // Unaccepted invitations, read once per process and shared by the picker's
+  // notice row, the switcher's, and the dialog itself. Gated on the lifecycle
+  // rather than firing blind: an invitation cannot exist for an identity the
+  // server has never seen, and the hook says so without a request.
+  //
+  // This is the one client-side call that talks to the sync server BEFORE any
+  // vault is unlocked. It is the same call the identity home already makes when
+  // it is the landing screen, and it carries only the device token: no vault
+  // key, no note, nothing that needs `root_key`.
+  const pendingInvites = usePendingInvites(personAccountState === "enrolled");
+  const inviteCount = unclaimedInvites(pendingInvites.invites).length;
 
   // Boot-time multi-vault probe pair (MYND-204 SYNC-4): `vault_list`
   // (disk enumeration) + `vault_slot_kind(None)` (the active runtime
@@ -220,7 +250,7 @@ function App() {
       // asks for no password, and the only exit from pending needs `root_key`.
       // The verdict is taken after unlock instead, where the screen it routes to
       // can actually make progress: `awaitingApprovalVerdict` below.
-      const [vaultList, activeSlotKind, person] = await Promise.all([
+      const [vaultList, activeSlotKind, person, accountNumberCanonical] = await Promise.all([
         listVaults(),
         probeSlotKind(),
         // A vault-less identity probe. It only changes what the ZERO-VAULT
@@ -229,15 +259,33 @@ function App() {
         // rather than blocking boot.
         personStatus().catch(() => ({
           enrolled: false,
+          state: null,
           identity_unlocked: false,
           person_id_hex: null,
           identity_code: null,
           sealed_keypair_present: false,
         })),
+        // `null` for a device with no identity, which is every device that has
+        // not created one; the identity home is the only surface that reads it.
+        personAccountNumber().catch(() => null),
       ]);
       const slotMap: SlotMap = { [ACTIVE_SLOT_KEY]: activeSlotKind };
-      setPersonEnrolled(person.enrolled);
+      // Any identity state lands the zero-vault arm on the identity home, not
+      // only `enrolled` (myne-md/myne#911): a `reserved` identity has no token by
+      // definition, and offering it the Welcome screen would offer a Create that
+      // cannot open the frame the device already holds.
+      //
+      // The booleans stay as a fallback so a status payload that predates the
+      // `state` field routes correctly instead of reading `undefined` as an
+      // identity: `state != null` is false for both `null` and absent.
+      setPersonEnrolled(
+        person.state != null || person.enrolled || person.sealed_keypair_present,
+      );
+      setPersonAccountState(person.state ?? (person.enrolled ? "enrolled" : null));
       setIdentityCode(person.identity_code);
+      setPersonAccountNumberValue(
+        accountNumberCanonical ? formatPersonAccountNumber(accountNumberCanonical) : null,
+      );
       setPersonIdentityState({
         ready: person.identity_unlocked,
         ownerCode: person.identity_code,
@@ -666,6 +714,25 @@ function App() {
     })();
   };
 
+  // The switcher's invitations door (myne-md/myne#911 follow-up). Same teardown
+  // and for the same reason `onJoinDeviceFromEditor` states: accepting an
+  // invitation materializes and UNLOCKS a member vault, and SYNC-1 zeroizes the
+  // open one on the way, so a dialog left over a mounted editor would sit on
+  // plaintext whose keys are already gone.
+  //
+  // Unlike the join, the dialog is not tied to one stage: cancelling it leaves
+  // the user on the unlock screen they were just routed to, which is coherent
+  // (retype the password), and accepting re-probes, which is the one place that
+  // knows whether the new member vault makes this a picker or a single-vault
+  // device.
+  const onInvitesFromEditor = () => {
+    void (async () => {
+      await leaveActiveVault({ onSavingChange: setSwitching });
+      dispatch({ type: "editor.lock" });
+      setInvitesOpen(true);
+    })();
+  };
+
   // Where a completed join lands, per the stage that opened the modal. One
   // action per source (the convention `*.create-vault` and `*.restore-backup`
   // already follow), each producing a vault-addressed `editor` stage — the
@@ -692,6 +759,35 @@ function App() {
     }
   };
 
+  /**
+   * The identity home, rendered from BOTH zero-vault stages.
+   *
+   * `welcome` is the desktop/mobile empty state ("make something"), and
+   * `account-entry` is the web one ("tell me which account to pull"). An
+   * identity makes the second question moot: a vault born under the person plane
+   * has no account number to type, so a browser holding one must land on the
+   * home rather than on a sign-in form whose only input it does not have
+   * (myne-md/myne#911 task 13). One definition, so the two stages cannot drift.
+   */
+  const identityHome = () => (
+    <IdentityHome
+      identityCode={identityCode}
+      accountNumber={personAccountNumberValue}
+      accountState={personAccountState}
+      // A device that holds an identity creating a vault is a FULLY KNOWN
+      // destination, so this is the sanctioned out-of-band stage set rather than
+      // a transition: the stage table's `create-vault.start` arm means "make an
+      // identity", which on the web client's `account-entry` stage sent the user
+      // back into the ceremony they had just finished (myne-md/myne#911 review).
+      // Ownership is already established here, which is the precondition the
+      // ceremony exists to reach.
+      onCreateVault={() => setStage({ name: "create-vault", briefing: true })}
+      onAccepted={() => void reprobe()}
+      onForgotten={reprobe}
+      onRegistered={() => void reprobe()}
+    />
+  );
+
   const screen = (() => {
     switch (stage.name) {
       case "account-entry":
@@ -708,12 +804,21 @@ function App() {
         // and routes to unlock — or, if this device is still awaiting approval,
         // to `pending-approval` below. Either way this screen never has to know
         // what comes next, and boot routing stays the one place that decides.
+        // A device that holds an identity lands on the home, exactly as it does
+        // from `welcome`: there is no account number to type, because a vault
+        // born under the person plane has none.
+        if (personEnrolled) return identityHome();
         return (
           <AccountBootstrap
             onBootstrapped={() => void reprobe()}
             // `decisions.md` 2026-08-15. Passed only where the capability is
             // present, so a client that cannot create an account never renders
             // the door — omitted, not greyed (`decisions.md` 2026-07-26).
+            //
+            // Since myne-md/myne#911 task 13 it opens the FIRST RUN rather than
+            // vault creation directly: the identity is created first and the
+            // vault follows it, so the browser's create path is the same one the
+            // native clients run (the transition is retargeted in `LEGAL`).
             onCreateAccount={
               has("vaultCreation")
                 ? () => dispatch({ type: "create-vault.start" })
@@ -743,27 +848,42 @@ function App() {
         // person account lands here instead of Welcome, so a vault-less member
         // sees their identity and pending invites. Creating a vault is still
         // reachable from the home.
-        if (personEnrolled) {
-          return (
-            <IdentityHome
-              identityCode={identityCode}
-              onCreateVault={() => dispatch({ type: "create-vault.start" })}
-              onAccepted={() => void reprobe()}
-              onForgotten={reprobe}
-            />
-          );
-        }
+        if (personEnrolled) return identityHome();
         return (
           <Welcome
-            onCreateVault={() => dispatch({ type: "create-vault.start" })}
+            // The ONE create door (myne-md/myne#911 task 6). It opens the first
+            // run, which creates the identity first and the vault after it; the
+            // welcome screen no longer decides between the two.
+            onStart={() => dispatch({ type: "welcome.start" })}
             onRestoreBackup={() => dispatch({ type: "welcome.restore-backup" })}
+            // The invited door: the same ceremony, landing on the identity home
+            // so the invitation is listed and can be accepted without creating a
+            // vault of one's own (myne-md/myne#911 follow-up).
+            onInvited={() => dispatch({ type: "welcome.invited-start" })}
             // The modal itself is mounted below, over every stage (myne#221) —
             // this screen only opens it. Nothing is unlocked here, so unlike the
             // switcher entry there is nothing to tear down first.
             onJoinDevice={() => setJoinOpen(true)}
-            // After identity-only setup, re-probe so the zero-vault arm lands
-            // on the identity home instead of Welcome.
-            onIdentityCreated={reprobe}
+          />
+        );
+      case "first-run":
+        // The identity, its one phrase and its type-back, then vault creation
+        // (myne-md/myne#911 task 6). Both exits are deliberately different
+        // kinds: finishing is a stage action, leaving is a reprobe, because the
+        // identity the user just created exists on disk and only boot routing
+        // knows what a device holding one should see next.
+        return (
+          <FirstRun
+            // Which door opened the ceremony decides its landing, and only that:
+            // the create door continues into vault creation, the invited door
+            // re-probes into the identity home (where invitations are listed).
+            // `after` is fixed at dispatch time, so this is a constant per mount.
+            onIdentityCreated={
+              stage.after === "identity-home"
+                ? () => void reprobe()
+                : () => dispatch({ type: "create-vault.start" })
+            }
+            onAbandon={() => void reprobe()}
           />
         );
       case "create-vault":
@@ -778,8 +898,6 @@ function App() {
               // Back-from-create is reprobe-based (MYND-219 / SYNC-16):
               // boot routing decides the return surface — welcome at 0
               // vaults, the lone vault's unlock at 1, the picker at ≥2.
-              // (The former `create-vault.back` → welcome arm stranded
-              // picker/editor entrants on Welcome.)
               onBack={reprobe}
               onAutoUnlockSuccess={onCreateAutoUnlockSuccess}
               onAutoUnlockFailed={onCreateAutoUnlockFailed}
@@ -871,6 +989,13 @@ function App() {
               onJoinDevice={
                 has("localOnlyVault") ? onJoinDeviceFromEditor : undefined
               }
+              // The invitation notice needs no capability of its own: the hook
+              // is gated on `personIdentity` internally and renders no row where
+              // that is absent. Passed only with its opener, so a count can never
+              // render without a door.
+              inviteCount={inviteCount}
+              invitesUnavailable={pendingInvites.unavailable}
+              onInvites={onInvitesFromEditor}
               onRestoreBackup={() =>
                 dispatch({ type: "editor.restore-backup" })
               }
@@ -917,6 +1042,9 @@ function App() {
             // existed. Picking a row never unlocked anything, so the modal opens
             // straight over the picker.
             onJoinDevice={() => setJoinOpen(true)}
+            inviteCount={inviteCount}
+            invitesUnavailable={pendingInvites.unavailable}
+            onInvites={() => setInvitesOpen(true)}
           />
         );
       case "updating":
@@ -1071,6 +1199,38 @@ function App() {
           // door a reload mid-recovery uses, so no new stage action is needed.
           onRecovering={() => {
             setJoinOpen(false);
+            void reprobe();
+          }}
+          // A person join (myne-md/myne#911 task 9) lands no single vault: it
+          // admits this device to an account and lists every vault in it. Boot
+          // routing then sends an identity-plus-vaults device to the picker, so
+          // the reprobe is again the whole routing.
+          onAccountJoined={() => {
+            setJoinOpen(false);
+            void reprobe();
+          }}
+        />
+      )}
+      {/* The invitations dialog (myne-md/myne#911 follow-up): the ONE surface on
+          which a device that already holds a vault can accept an invitation.
+          Mounted over whatever stage is showing, like the join above, because
+          its two entries (the picker's row and the switcher's) land differently:
+          the picker needs no teardown, the switcher has already run one. */}
+      {invitesOpen && (
+        <InvitesDialog
+          open
+          invites={pendingInvites.invites}
+          loading={pendingInvites.loading}
+          unavailable={pendingInvites.unavailable}
+          onClose={() => setInvitesOpen(false)}
+          onRetry={pendingInvites.reload}
+          onAccepted={() => {
+            setInvitesOpen(false);
+            // The member vault is on disk and unlocked by the accept. Boot
+            // routing is the one place that knows what that makes this device
+            // (picker, or the lone vault's unlock), and the reload is what drops
+            // the row that was just accepted.
+            pendingInvites.reload();
             void reprobe();
           }}
         />

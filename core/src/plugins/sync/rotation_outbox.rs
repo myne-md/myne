@@ -357,7 +357,11 @@ pub async fn drain_rotation_outbox_from_host(
     //   local == replacement -> the record's own commit: deliver everything.
     //   local >  replacement -> superseded: deliver its packages and its
     //                           obligations, but never push its meta.
-    let parsed_epoch = protocol::parse_vault_meta_ntv6(&meta_bytes)
+    // Generation-agnostic: on `NTV7` (every vault born under an identity, and every vault an
+    // owner shares now) the `NTV6`-only reader answered `None`, which skipped the
+    // never-committed discard check AND left `meta_is_replacement` false, so a rotation's
+    // meta was never pushed and the remaining members stayed on the retired epoch.
+    let parsed_epoch = protocol::parse_b2b_tail_any(&meta_bytes)
         .map(|b2b| b2b.group_key_epoch)
         .ok();
     // Discard ONLY on positive evidence that the rotation never committed: the

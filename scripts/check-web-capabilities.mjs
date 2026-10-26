@@ -123,6 +123,26 @@ const CAPABILITY_BACKING = {
   // v0.1 layout to migrate, so the dispatcher refuses `vault-migrate` and the
   // `MigrateVaultForm` is gated behind this (absent-on-web) capability.
   vaultMigration: ["vault-migrate"],
+  // Deliberately empty, and for the reason `phraseEnrolment` states one screen
+  // down: there is no refused command behind it. Empty, and it stays empty now
+  // that the web person plane SHIPS (myne-md/myne#911 task 13): both
+  // `vault_is_person_wrapped` and `unlock_with_person_phrase` are dispatched, so
+  // the unlock screen's identity-phrase arm is an offer the command answers.
+  // (The paragraph this replaced argued the opposite from the plugin's `Pending`
+  // default and was kept beside its own correction for a round; the review found
+  // the pair contradicting each other.)
+  personVaultCredential: [],
+  // Empty for the same shape of reason: the identity plane's commands are
+  // dispatched, so nothing is refused BECAUSE of this capability. What it names
+  // is the PLANE, which the SyncPanel's identity row gates on now that the two
+  // are split (task 13); the member surface's commands stay covered by
+  // `memberSharing` below.
+  personIdentity: [],
+  // Empty, and it is the entry task 13 added rather than a refusal: a browser
+  // keeps NO person credential at rest (the sealed keypair and the device token
+  // live in the Worker's memory), which is a COPY fact and not a command
+  // refusal. The phrase step says the words are asked for again on reload.
+  personCredentialPersisted: [],
   backup: ["backup"],
   // A seam refusal (`dialog.save`), not an IPC command.
   nativeSaveAs: [],
@@ -227,9 +247,13 @@ const CAPABILITY_BACKING = {
   // ships and dispatches its session commands), so a future cursor port on web
   // must move this entry rather than inherit a blanket absence.
   liveCollabAwarenessCursors: ["plugin:live|live_session_set_presence"],
-  // myne-md/myne#698: the B2B member-sharing surface (person keypairs, the
-  // roster, the invite and the removal rekey). Named per command, NOT as the
-  // whole `sync` plugin, which ships on web and dispatches most of its surface.
+  // myne-md/myne#698: the B2B member-sharing surface (the roster, the invite and
+  // the removal rekey). Named per command, NOT as the whole `sync` plugin, which
+  // ships on web and dispatches most of its surface. **myne-md/myne#911 task 13
+  // moved the IDENTITY plane out of this list and into the dispatcher**: create,
+  // register, status, the person device join and the vault listing ship on web
+  // now, because the identity is the user's own keypair and token while
+  // everything still named here needs a group key and a signed roster.
   // They are refused because the person identity's carrier is a device-local
   // sealed file outside the browser's storage and the panel asks for the
   // recovery phrase to unlock it, which `docs/vision.md` keeps out of served
@@ -239,11 +263,19 @@ const CAPABILITY_BACKING = {
   memberSharing: [
     "plugin:sync|sync_person_unlock",
     "plugin:sync|sync_person_lock",
-    "plugin:sync|sync_person_setup",
-    "plugin:sync|sync_person_status",
+    // myne-md/myne#911 splits setup into a network-free create and an explicit
+    // register. Both take the phrase across a prompt or return it once, which is
+    // the half served code may not hold; a browser still reaches its own
+    // identity story through the web first-run step instead.
+    "plugin:sync|sync_publish_vault",
+    "plugin:sync|sync_published_state",
     "plugin:sync|sync_person_list_invites",
     "plugin:sync|sync_list_vault_invites",
     "plugin:sync|sync_person_accept_invite",
+    // The refusal of an invitation (`decisions/protocol/0732`). Same credential as
+    // the claim above (the device-scoped person token), so it is refused for the
+    // same reason and appears beside it rather than under a class of its own.
+    "plugin:sync|sync_person_decline_invite",
     // The SECOND device's join (myne-md/myne#852 task 7). Same refusal, same
     // reason, one command over from the accept above: it is the accept path with
     // the out-of-band code replaced by the owner identity PINNED in the person's

@@ -34,8 +34,8 @@ const UNLOCK_TIMEOUT_MS = 60_000;
  *  and a fresh browser profile has no consent — so on the web client it is the
  *  FIRST screen, every time. This helper used to wait only for the three
  *  admitted surfaces, none of which exists behind the gate, and every scenario
- *  in the lane died in `openApp` with a boot timeout: 12 of 20 tests, all with
- *  the same message, which reads like the bundle failing to start rather than
+ *  in the lane died in `openApp` with a boot timeout, all with the same message,
+ *  which reads like the bundle failing to start rather than
  *  like one screen that was added in front of it.
  *
  *  The desktop lane was given a consent seed (`multi-device.ts`'s
@@ -409,4 +409,85 @@ export async function typeIntoEditor(session: Session, text: string): Promise<vo
       timeoutMs: 15_000,
     },
   );
+}
+
+/**
+ * Scrape the 24 revealed phrase words in `data-index` order, in ONE in-page
+ * pass rather than 48 round trips. Each cell's LAST span carries the word; the
+ * first is the index numeral.
+ *
+ * Shape-only assertions on purpose (SYNC-13): a phrase that never reaches a log
+ * cannot be quoted out of a CI report.
+ */
+export async function scrapePhrase(session: Session, stem: string): Promise<string[]> {
+  const words = await session.execute<string[]>(
+    "var words = [];" +
+      "for (var i = 1; i <= 24; i++) {" +
+      "  var el = document.querySelector(" +
+      "    '[data-testid=\"' + arguments[0] + '\"][data-index=\"' + i + '\"] span:last-child');" +
+      "  words.push(el ? el.textContent || '' : '');" +
+      "}" +
+      "return words;",
+    [stem],
+  );
+  if (words.length !== 24 || words.some((w) => w.length === 0)) {
+    throw new Error(`scrapePhrase: expected 24 non-empty words at ${stem}, got ${words.length}`);
+  }
+  return words;
+}
+
+/**
+ * Complete the first-run identity ceremony, which since myne-md/myne#768 stands
+ * in front of vault creation on every client.
+ *
+ * The ceremony is network-free by construction (`IdentitySetupPanel`: the
+ * keypair derives from the phrase and the frame is sealed locally), so it
+ * completes against an unreachable sync origin. That is what makes it safe for
+ * the web lane, whose account-creation scenarios point registration at
+ * `https://sync.unreachable.test` on purpose: reaching the vault flow through
+ * the ceremony does not borrow a server that could not be reached.
+ *
+ * Leaves the app at whatever the caller's next stage is; on first run that is
+ * the safety briefing, then the vault name.
+ */
+export async function createFirstRunIdentity(
+  session: Session,
+  prefix = "first-run.identity",
+): Promise<void> {
+  await (await session.byTestId(`${prefix}.create-cta`, { timeoutMs: 30_000 })).click();
+  await session.byTestId(`${prefix}.phrase`, { timeoutMs: 120_000 });
+  // Every control here is scrolled into view before it is clicked. The headless
+  // web viewport is 413 px tall and the ceremony's scroll container is an inner
+  // element rather than the document, which chromedriver's own auto-scroll does
+  // not reach: the control reports `element not interactable` with
+  // `elementFromPoint` returning null at its centre. The briefing step in this
+  // same file already carries that measurement; the 24-word grid is taller
+  // still.
+  const reveal = await session.byTestId(`${prefix}.phrase-reveal`);
+  await reveal.scrollIntoView();
+  await reveal.click();
+  const words = await scrapePhrase(session, `${prefix}.phrase-word`);
+  const cont = await session.byTestId(`${prefix}.phrase-continue`);
+  await cont.scrollIntoView();
+  await cont.click();
+
+  const cells = await session.byTestIdAll(`${prefix}.confirm-input`);
+  if (cells.length !== 4) {
+    throw new Error(`createFirstRunIdentity: expected 4 confirm cells, got ${cells.length}`);
+  }
+  for (const cell of cells) {
+    const pos = Number(await cell.attribute("data-index"));
+    if (!(pos >= 1 && pos <= 24)) {
+      throw new Error(`createFirstRunIdentity: confirm cell declares data-index ${pos}`);
+    }
+    await cell.scrollIntoView();
+    await cell.sendKeys(words[pos - 1]);
+  }
+  const done = await session.byTestId(`${prefix}.close-cta`);
+  await session.waitUntil(() => done.enabled(), {
+    label: "identity Done enabled (4/4 words match)",
+    timeoutMs: 20_000,
+  });
+  await done.scrollIntoView();
+  await done.click();
 }

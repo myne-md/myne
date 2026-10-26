@@ -69,11 +69,12 @@ struct DeviceKeyResponse {
     key: Vec<u8>,
 }
 
-/// Managed handle to the Kotlin plugin. Registered on Android so the (future)
-/// Android Keystore device-key path can fetch it via
+/// Managed handle to the Kotlin plugin. Registered on Android so the Android
+/// Keystore device-key path can fetch it via
 /// `app.try_state::<ShareIntent<R>>()` — the `screen_guard::ScreenGuard`
-/// precedent. See `KEYSTORE_TODO.md` for why the seam is not yet wired into
-/// `myne-core`'s `device_key::get_or_create`.
+/// precedent. The seam IS wired: the mobile host's
+/// `ShareImportDeviceKeyProvider` calls `get_or_create_device_key` through
+/// `myne-core`'s `device_key` trait.
 #[cfg(target_os = "android")]
 pub struct ShareIntent<R: Runtime>(tauri::plugin::PluginHandle<R>);
 

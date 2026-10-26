@@ -24,7 +24,7 @@ import {
   VAULT_META_OFFSETS as O,
   type SeededVault,
 } from "./support/fixtures";
-import { seedProductionVault } from "./support/realistic-fixture";
+
 import { ioBanner } from "../src/lib/io-banner";
 import { RECOVERY_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -153,8 +153,12 @@ describeE2E("VR-3 cancel rules + delete-link distinction (MYND-126 task 2)", () 
     await scenario(
       "vr3-no-cancel-zones",
       {
+        // A LEGACY production-KDF vault, deliberately not the realistic
+        // fixture: that one is person-born and has no phrase (myne-md/myne#911
+        // task 6), and this scenario's subject is the phrase recovery path a
+        // legacy vault still has.
         seed: (dir) => {
-          ({ phrase } = seedProductionVault(dir));
+          ({ phrase } = seedVault(dir, { kdf: "production" }));
         },
       },
       async (app) => {
@@ -210,8 +214,12 @@ describeE2E("VR-4 slot-priority resume + VR-5 reload race (MYND-126 task 3)", ()
     await scenario(
       "vr5-reload-race",
       {
+        // A LEGACY production-KDF vault, deliberately not the realistic
+        // fixture: that one is person-born and has no phrase (myne-md/myne#911
+        // task 6), and this scenario's subject is the phrase recovery path a
+        // legacy vault still has.
         seed: (dir) => {
-          ({ phrase } = seedProductionVault(dir));
+          ({ phrase } = seedVault(dir, { kdf: "production" }));
         },
       },
       async (app) => {

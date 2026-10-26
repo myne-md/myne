@@ -168,7 +168,6 @@ function readStoredChoice(): ThemeChoice {
 // ── Shared presentational bits (mirror the ST grouped-list geometry) ─────────
 
 const rowLabel: CSSProperties = { fontSize: 16, color: "var(--fg-1)" };
-/** A helper line under a group or a field. See {@link PanelHint}. */
 /** The vertical stack a category panel's body sits in.
  *
  *  Hoisted from four inline copies (myne-md/myne#456): the AI panel would have

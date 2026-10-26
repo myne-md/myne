@@ -62,6 +62,11 @@ fn main() {
                 // fails at the ACL, and a shared `src/` tree can call it from
                 // either client.
                 "account_number_check",
+                // myne-md/myne#911: the identity phrase as a vault credential. The
+                // sealed `NTV7` person wrap is opened by the person phrase, and the
+                // probe decides whether an unlock screen offers that door at all.
+                "unlock_with_person_phrase",
+                "vault_is_person_wrapped",
             ]),
         )
         .plugin(
@@ -111,6 +116,10 @@ fn main() {
                 "vault_migrate_confirm",
                 "vault_migrate_settle_status",
                 "vault_migrate_progress",
+                // myne-md/myne#911: the explicit `NTV6` to `NTV7` upgrade. It moves
+                // the birth generation, which is why it lives on this plugin's
+                // surface rather than as a silent re-serialize inside a reader.
+                "vault_upgrade_to_ntv7",
             ]),
         )
         .plugin(
@@ -608,14 +617,13 @@ fn main() {
         .plugin(
             "account",
             // myne-md/myne#684: the device-local account record (the
-            // account/vault split). `account_list` (read) + `account_rename` +
-            // `account_move` + `account_split` (writes). Same InlinedPlugin
+            // account/vault split). `account_list` (read) + `account_move` +
+            // `account_split` (writes). Same InlinedPlugin
             // discipline as the plugins above; without a matching
             // `commands.allow` entry in `permissions/account/default.toml` the
             // ACL resolver never authorizes the `plugin:account|<cmd>` invoke.
             tauri_build::InlinedPlugin::new().commands(&[
                 "account_list",
-                "account_rename",
                 "account_move",
                 "account_split",
             ]),
@@ -722,6 +730,9 @@ fn main() {
                 "sync_person_lock",
                 "sync_person_create_invite",
                 "sync_list_vault_invites",
+                // The recipient's refusal (myne-md/myne#911 follow-up):
+                // a real server-side delete of the invitation.
+                "sync_person_decline_invite",
                 "sync_person_accept_invite",
                 // member-devices task 7: a member's SECOND device joins the
                 // vault from the phrase alone. Takes no owner code from the
@@ -740,6 +751,22 @@ fn main() {
                 "sync_person_clear_member_unlock",
                 "sync_list_roster",
                 "sync_remove_member",
+                // myne-md/myne#911 (person account): the person plane's own
+                // commands. They were registered in `generate_handler!` and granted
+                // in `permissions/sync/default.toml` while missing from this
+                // mirror, which is the half the comment above calls load-bearing,
+                // so the four steps of adding a command were three of four.
+                "sync_person_status",
+                "sync_person_setup",
+                "sync_person_register",
+                "sync_person_account_number",
+                "sync_person_join_device",
+                "sync_person_claim_device",
+                "sync_person_list_vaults",
+                "sync_person_join_qr",
+                "sync_decode_join_qr",
+                "sync_publish_vault",
+                "sync_published_state",
             ]),
         )
         .plugin(

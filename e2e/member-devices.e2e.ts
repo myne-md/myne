@@ -100,11 +100,12 @@ import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
   activeNoteId,
+  clickByTestId,
   clickNoteRow,
   closeSettings,
   createNote,
   dismissImporterOfferIfPresent,
-  openSettings,
+  openSyncDevices,
   pageSeatInvoke,
   runPaletteAction,
   typeIntoEditor,
@@ -352,8 +353,12 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
 
       // ---- the join ----
       await second.session.byTestId("identity-home.claimed-invites", { timeoutMs: SYNC_BUDGET_MS });
-      await (await second.session.byTestId("identity-home.claimed-row")).click();
-      await (await second.session.byTestId("identity-home.join-open")).click();
+      // `clickByTestId`, not a raw click: the identity home's invitation list sits
+      // inside a scroll container, and the row expands in place, so the door that
+      // opens the join can be below the fold when it appears (the same class
+      // `vault-format-upgrade` hit on the Settings body).
+      await clickByTestId(second.session, "identity-home.claimed-row", { timeoutMs: 20_000 });
+      await clickByTestId(second.session, "identity-home.join-open", { timeoutMs: 20_000 });
       await second.session.byTestId("identity-home.join-form");
 
       // The same phrase, a fresh device-local password. Neither is the owner's.
@@ -432,7 +437,7 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // a roster that names THIS device, and the member's own add-a-device door. The
       // roster is the member's own PERSON account's, which is the account plane a
       // member vault resolves to.
-      await openSettings(second.session, "sync");
+      await openSyncDevices(second.session);
       await second.session.byTestId("sync.device-management", { timeoutMs: 30_000 });
       expect(
         await second.session.byTestIdAll("sync.device-error"),
@@ -599,7 +604,16 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // member is a device whose history resolver has the same three stores to read.
       await runPaletteAction(second.session, "snapshots.open", "snap");
       await second.session.byTestId("snapshots.panel");
-      const rows = await second.session.byTestIdAll("snapshots.row");
+      // The panel fetches its list on mount, so a bare read is a bet on the IPC:
+      // wait for the rows to EXIST and assert the count, rather than sampling once
+      // and reporting "the history is empty" on a list that had not arrived.
+      const rows = await second.session.waitUntil(
+        async () => {
+          const found = await second.session.byTestIdAll("snapshots.row");
+          return found.length >= 2 ? found : null;
+        },
+        { label: "the version history lists both devices' revisions", timeoutMs: 20_000 },
+      );
       // Two machines edited this note, so a single row could not cover both. This is the
       // belt under "every row is labelled", which a list of one would satisfy.
       expect(
@@ -678,7 +692,7 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // The panel writes the 16-character prefix, so that is the form to compare in.
       const secondDevicePrefix = (secondDeviceId as string).slice(0, 16);
 
-      await openSettings(owner.session, "sync");
+      await openSyncDevices(owner.session);
       await owner.session.byTestId("device-bindings", { timeoutMs: 30_000 });
 
       // The owner's half of the member-QR pair, read BEFORE the list settles: the
@@ -695,10 +709,19 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // cycle against a store the join materialised in the background, so one read is a
       // bet on the two having met. Nudge and re-read, the shape `openNoteOn` uses.
       const nudgeOwner = makeNudger(owner.session);
+      const nudgeSecond = makeNudger(second.session);
       const ownerRows = await owner.session.waitUntil(
         async () => {
           const rows = await readDeviceRows(owner.session);
           if (rows.some((row) => row.id === secondDevicePrefix)) return rows;
+          // **Nudge the WRITER as well as the reader.** The row is claimed as the
+          // tail of the join (`materialize_member_vault` →
+          // `claim_own_binding_best_effort`), which runs AFTER that join's own sync
+          // cycle has finished — so at this instant the row is on the second
+          // device's disk and has never been in a cycle. The owner pulling forever
+          // cannot produce it; the writer needs one push. Measured 2026-10-24:
+          // nudging only the owner timed out at 120 s in three consecutive attempts.
+          await nudgeSecond();
           await nudgeOwner();
           return null;
         },
@@ -736,5 +759,12 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
         "no row on the owner's device list claims ownership",
       ).not.toMatch(/belong|owned/i);
     });
-  });
+    // A FIVE-STEP, THREE-DEVICE scenario, and 180 s is the config default rather
+    // than a decision anybody made about it. The step count is what it is: two
+    // identities, an owner enrolment, a group-tier invite, a phrase-only join, a
+    // presence round trip and a revoke — with three app boots and two Argon2id
+    // derivations inside it. The sibling multi-device suites (`sync-replication`,
+    // `member-onboarding`) declare the same budget for the same reason; without it
+    // the timeout lands mid-flow and reports "Test timed out", which names nothing.
+  }, 600_000);
 });

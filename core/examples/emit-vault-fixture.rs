@@ -40,14 +40,25 @@ use std::path::Path;
 /// Fixed so a re-run produces a fixture the same scenarios can unlock. Not a
 /// secret in any sense that matters: it opens one throwaway vault whose bytes
 /// are regenerated on every emit.
-// secret-scan:allow — fixture-generator constant, not a credential
+// secret-scan:allow, fixture-generator constant, not a credential
 const PASSWORD: &str = "fixture-vault-password-7x3k9q";
 
 /// Body of the quarantined note. A distinctive token so a scenario can assert
 /// the READ step decrypted it rather than merely listed a filename.
 const QUARANTINED_BODY: &str = "quarantined fixture note: quokkazephyr";
 
+/// The 24 words a `--person` fixture's identity is derived from, normalized
+/// (single spaces, lowercase). The browser lane types these into the identity
+/// phrase door, so this string IS the credential the scenario uses; the unlock
+/// path derives the same keypair from the same words.
+// secret-scan:allow, fixture-generator constant, not a credential
+const PERSON_PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
+
 fn main() {
+    if std::env::args().any(|a| a == "--person") {
+        emit_person_fixture();
+        return;
+    }
     let tmp = ScopedTempDir::new("vault-fixture").expect("scratch dir");
     let vault_dir = tmp.path().join("vault");
 
@@ -233,6 +244,89 @@ fn main() {
         );
     }
     println!("  ]");
+    println!("}}");
+}
+
+/// Emit a PERSON-WRAPPED (`NTV7`) vault (myne-md/myne#911 task 13).
+///
+/// Drives the same creation path the app does, with an identity derived from
+/// [`PERSON_PHRASE`], so the browser lane can prove that a page offers the
+/// identity-phrase door and that it opens the vault. Two parameters are pinned
+/// rather than chosen here:
+///
+/// - the identity seed derives under `DEFAULT_V0_1_KDF_PARAMS`, because the
+///   UNLOCK path derives it under exactly that set (`derive_keys_from_person_phrase`).
+///   A fixture minted under the fast test parameters would produce a different
+///   keypair from the same words and the person wrap would never open, which is
+///   a fixture bug that reads as a product bug.
+/// - the vault's own KDF is the default too, so the password path costs what a
+///   real vault costs.
+///
+/// `--release` is therefore not optional: two 256 MiB Argon2id derivations.
+fn emit_person_fixture() {
+    use myne_core::plugins::vault_creation::state::CreationPerson;
+
+    let tmp = ScopedTempDir::new("vault-fixture-person").expect("scratch dir");
+    let vault_dir = tmp.path().join("vault");
+
+    let person_id = protocol::kdf::person_id_hash(PERSON_PHRASE);
+    let seed = protocol::kdf::derive_person_identity_seed(
+        PERSON_PHRASE,
+        &person_id,
+        &protocol::DEFAULT_V0_1_KDF_PARAMS,
+    )
+    .expect("identity seed");
+    let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+    let pair = protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+    let person = CreationPerson {
+        pair,
+        person_id,
+        number: protocol::account_number_from_person_id(&person_id),
+    };
+
+    let session = myne_core::plugins::vault_creation::commands::build_person_session(
+        myne_core::paths::web_single_vault_id(),
+        PASSWORD,
+        protocol::DEFAULT_V0_1_KDF_PARAMS,
+        person,
+    )
+    .expect("build person-born creation session");
+    let (meta, _group_key) =
+        myne_core::plugins::vault_creation::commands::build_and_serialize_person_vault_meta(
+            &session,
+        )
+        .expect("serialize person-wrapped vault.meta");
+
+    block_on(async {
+        let io = ContainerVaultIo;
+        io.create_dir_all(&vault_dir).await.expect("mkdir");
+        io.write(&vault_dir.join("vault.meta"), &meta, WriteOpts::default())
+            .await
+            .expect("write vault.meta");
+    });
+
+    let files = collect_slots(&vault_dir);
+    println!("{{");
+    println!("  \"//\": \"person-wrapped NTV7 fixture, emit-vault-fixture --person\",");
+    println!("  \"password\": \"{}\",", PASSWORD);
+    println!("  \"phrase\": \"{}\",", PERSON_PHRASE);
+    println!("  \"accountNumber\": \"\",");
+    println!("  \"files\": [");
+    for (i, (name, bytes)) in files.iter().enumerate() {
+        println!(
+            "    {{ \"name\": \"{}\", \"bytes\": [{}] }}{}",
+            name,
+            bytes
+                .iter()
+                .map(|b| b.to_string())
+                .collect::<Vec<_>>()
+                .join(","),
+            if i + 1 == files.len() { "" } else { "," }
+        );
+    }
+    println!("  ],");
+    println!("  \"pendingFiles\": [],");
+    println!("  \"configFiles\": []");
     println!("}}");
 }
 

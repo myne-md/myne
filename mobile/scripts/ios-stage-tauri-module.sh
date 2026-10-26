@@ -25,15 +25,23 @@ set -u
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 GEN_EXTERNALS="$REPO_ROOT/mobile/src-tauri/gen/apple/Externals/arm64"
 
+# The products dir is per-CONFIGURATION, and a `--debug` simulator build lands in
+# `Debug-iphonesimulator` while a release/archive build lands in
+# `Release-iphonesimulator`. This script named the release dir and nothing else,
+# so `tauri ios build --debug --target aarch64-sim` staged nothing, the Swift
+# compile could not resolve `import Tauri`, and the app build died before the app
+# existed (myne-md/myne#918 task 6 found it; the device path always archived in
+# release, which is why it never showed up there). Glob the configuration rather
+# than pinning it.
 case "${PLATFORM_NAME:-iphoneos}" in
-  *simulator*) TRIPLE="aarch64-apple-ios-sim"; PRODUCTS="Release-iphonesimulator" ;;
-  *) TRIPLE="aarch64-apple-ios"; PRODUCTS="Release-iphoneos" ;;
+  *simulator*) TRIPLE="aarch64-apple-ios-sim"; PRODUCTS="*-iphonesimulator" ;;
+  *) TRIPLE="aarch64-apple-ios"; PRODUCTS="*-iphoneos" ;;
 esac
 
 # swift-rs always builds the Tauri package in the release profile (the archive
 # `ios-link.sh` force-loads is `.../Tauri/release/libTauri.a` regardless of the
 # app configuration), so the module path is profile-independent.
-SRC=$(ls -td "$REPO_ROOT"/target/"$TRIPLE"/release/build/tauri-*/out/swift-rs/Tauri/out/Products/"$PRODUCTS" 2>/dev/null | head -1)
+SRC=$(ls -td "$REPO_ROOT"/target/"$TRIPLE"/*/build/tauri-*/out/swift-rs/Tauri/out/Products/$PRODUCTS 2>/dev/null | head -1)
 if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
   echo "ios-stage-tauri-module: no Tauri Products dir for $TRIPLE ($PRODUCTS); nothing staged" >&2
   exit 0

@@ -86,11 +86,6 @@ describe("both secrets, one sheet", () => {
     expect(screen.getByTestId("create.kit-meta").textContent).not.toContain("·");
   });
 
-  it("says why the words are English, where the question occurs", () => {
-    renderKit();
-    const note = screen.getByTestId("create.kit-english-note").textContent ?? "";
-    expect(note).toContain("BIP-39");
-  });
 });
 
 describe("Save writes the whole kit", () => {

@@ -47,12 +47,13 @@
 //!
 //! **iOS is implemented** (task 2): `UNUserNotificationCenter`, one
 //! `UNCalendarNotificationTrigger` per reminder, no repeating trigger, no push
-//! service, no background refresh. **Android is still the skeleton** (task 3):
-//! its methods answer [`Error::Unimplemented`] rather than a fake success, which
-//! would be worse — the reconciliation pass would believe a registration exists.
-//! Off iOS/Android (the macOS dev host) every command answers
-//! [`Error::Unsupported`], so the crate still compiles and `cargo check`s
-//! everywhere.
+//! service, no background refresh. **Android is implemented** (task 3):
+//! `AlarmManager` through `ReminderAlarms`, `setExactAndAllowWhileIdle` when the
+//! platform permits exact alarms and `setAndAllowWhileIdle` otherwise, restored
+//! on boot by `BootReceiver`, and a refusal is surfaced as the platform's own
+//! reason rather than a fake success. Off iOS/Android (the macOS dev host) every
+//! command answers [`Error::Unsupported`], so the crate still compiles and
+//! `cargo check`s everywhere.
 
 use serde::{Deserialize, Serialize};
 use tauri::{
@@ -301,11 +302,12 @@ impl<R: Runtime> Reminders<R> {
 
 /// Map a native bridge failure's text onto [`Error`].
 ///
-/// The native halves reject with the sentinel below until tasks 2 and 3 land;
-/// it is re-typed here so the WebView sees "not implemented yet" rather than a
-/// string that reads like a device fault. Takes the already-stringified message
-/// rather than the bridge's error type, so this crate does not name a
-/// `tauri::plugin::mobile` type that only exists on mobile targets.
+/// No native half emits the sentinel below today; both platforms implement their
+/// methods. The mapping stays so a future stub answers "not implemented yet"
+/// rather than a string that reads like a device fault. It takes the
+/// already-stringified message rather than the bridge's error type, so this crate
+/// does not name a `tauri::plugin::mobile` type that only exists on mobile
+/// targets.
 #[cfg(any(target_os = "ios", target_os = "android"))]
 fn classify_bridge_error(text: String) -> Error {
     if text.contains(UNIMPLEMENTED_SENTINEL) {

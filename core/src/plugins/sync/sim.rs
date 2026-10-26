@@ -2678,9 +2678,20 @@ async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
     .expect("write config");
 
     let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
-    let view = person_setup_from_host(&host, &io, &state, Some(phrase.to_string()))
+    person_setup_from_host(&host, &io, &state, Some(phrase.to_string()))
         .await
-        .expect("the person identity sets up against the real server");
+        .expect("the person identity sets up locally");
+    // Registration is its own act since the review: setup no longer reaches the
+    // network, so the harness asks for it explicitly, which is what a client does
+    // from the identity home.
+    let view = crate::plugins::sync::person_account::person_register_from_host(
+        &host,
+        &io,
+        &state,
+        phrase.to_string(),
+    )
+    .await
+    .expect("the person identity registers against the real server");
     assert!(view.approved, "the person plane admits this device");
     PersonDevice {
         _tmp: tmp,

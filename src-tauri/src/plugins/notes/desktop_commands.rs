@@ -3702,7 +3702,6 @@ mod tests {
             .await
             .unwrap();
 
-            // Confirm file exists pre-delete.
             let path = notes_dir.join(format!(
                 "{}.myn",
                 NoteId::parse(&note_id_str).unwrap().as_uuid()

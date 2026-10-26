@@ -78,6 +78,21 @@ they are violations:
     non-loopback uses; the difference is that metrics carries aggregate counters and this carries a
     per-account roster.
   Never add a reverse-proxy route for the panel, and never point it at a public origin.
+- **Log full request URIs without stripping the query string.** A person session names the vault it is
+  syncing with `?account=<account_number_hash>` on `/sync/*`, `PUT /vault.meta` and the three attachment
+  routes (`server-protocol.md` §3.1a, §3.2), so the value reaches the request line, and a proxy, CDN or
+  ingress that keeps `$request` / `{uri}` records a durable per-request trail of which vault each sync
+  touched, keyed by a hash that is itself the selector for that vault's pre-authenticated metadata fetch.
+  Log the path pattern instead, or scrub the parameter. This is the one deliberate exception to the
+  "account never appears in a request line" rule the threat model states, and it is recorded there
+  (`threat-model.md` §7); it is accepted rather than removed because the selector has to travel somewhere
+  and a header is equally visible to the same log. **Myne's own reference Caddy configuration
+  does not meet this duty today** (tracked as `myne-md/myne-ops#77`, which must merge before
+  the selector ships): its global error-log filter deletes the client address fields and keeps
+  `uri`, and its per-site access-log filter removes the same address fields and nothing else, so a
+  self-hoster who copies either one records the selector on every error and every request while believing
+  the no-IP work is done. The duty stays as written; what is wrong is the reference configuration, and it
+  has to change before copying it is safe.
 - **Attempt to weaken the zero-knowledge protocol** in any way — you can't read content regardless, but you
   must not, e.g., add a plaintext side-channel or a metadata-correlation log.
 

@@ -31,10 +31,18 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("vault-unlock")
         .invoke_handler(tauri::generate_handler![
             commands::unlock,
+            // The `NTV7` generation's second credential (myne-md/myne#911 task 10).
+            // Registered here too so the shared `src/` unlock surface can offer it
+            // once this client has the person plane (task 12); a vault of any other
+            // generation refuses it.
+            commands::unlock_with_person_phrase,
             commands::lock,
             commands::vault_status,
             commands::vault_list,
             commands::vault_is_unlocked,
+            // The person-wrapped generation's one-bit discriminator (myne-md/myne#911
+            // task 10), registered alongside the credential it describes.
+            commands::vault_is_person_wrapped,
             commands::vault_slot_kind,
             // myne-md/myne#476: the AUTHORITATIVE active-vault id, from the
             // runtime slot map. Registered here so this client can stop
