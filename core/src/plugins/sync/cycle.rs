@@ -374,23 +374,36 @@ async fn signed_head_ctx(
         b2b.group_key_epoch,
         &b2b.signed_roster_envelope,
     )?;
-    let person = state.clone_person_identity().await?;
-    let owner_public = if is_owner {
-        person.public_half()
-    } else {
-        let code = super::state::read_sync_state(io, vault_dir)
-            .await
-            .ok()?
-            .owner_identity_code?;
-        super::invite::decode_person_identity_code(&code)
-            .ok()?
-            .public
+    // The held identity is NOT required to build this context any more. It is required to
+    // author a `0x02` head, and `SignedHeadCtx::sign` refuses that arm without it, but a
+    // cold start has to be able to VERIFY heads and the roster it is verified through,
+    // and a device key authors `0x03` without the phrase at all (`0731` stage 1). Requiring
+    // the phrase here is what kept the phrase in the sync path after the device key had
+    // already removed it from signing.
+    let person = state.clone_person_identity().await;
+    let sync_state = super::state::read_sync_state(io, vault_dir).await.ok()?;
+    let owner_public = match (&person, is_owner) {
+        (Some(held), true) => held.public_half(),
+        // An OWNER's cold start: this device cached its own code the last time the phrase
+        // was entered (public material only, refreshed on every unlock).
+        (None, true) => {
+            let code = sync_state.own_identity_code.as_deref()?;
+            super::invite::decode_person_identity_code(code)
+                .ok()?
+                .public
+        }
+        // A member holds the owner's half only as the code pinned out of band at accept.
+        (_, false) => {
+            let code = sync_state.owner_identity_code.as_deref()?;
+            super::invite::decode_person_identity_code(code)
+                .ok()?
+                .public
+        }
     };
     // The roster may have been signed by the owner's PERSON key or by one of the
     // owner's DEVICES (`decisions/protocol/0731` stage 2). Candidates come from the
     // pinned attestation (a member), this device's own key (the owner) and the
     // verified rows of the binding store.
-    let sync_state = super::state::read_sync_state(io, vault_dir).await.ok()?;
     let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
         &group_key,
         b2b.base.account_number_hash,
@@ -429,7 +442,7 @@ async fn signed_head_ctx(
         })
         .collect();
     let ctx = super::head_authority::SignedHeadCtx::new(
-        person.clone(),
+        person,
         b2b.base.account_number_hash,
         roster_publics.clone(),
     );
@@ -877,17 +890,24 @@ pub async fn run_active_cycle_from_host(
                 return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
             }
         };
-        if needs_signed_head && signed_ctx.is_none() {
-            // A missing person identity is the one cause of `signed_ctx == None`
-            // the user can fix in place (unlock the identity), so it gets its own
-            // class and the UI its own sentence. Any OTHER
-            // reason the head context could not be built (roster, group key)
-            // stays a generic failure — that fix is not something to ask of them.
+        let can_author = signed_ctx
+            .as_ref()
+            .is_some_and(super::head_authority::SignedHeadCtx::can_author);
+        if needs_signed_head && !can_author {
+            // Unlocking the person identity is one cause the user can fix in place, so it
+            // gets its own class and the UI its own sentence. It is no longer the only
+            // way to author a head (`0731` stage 1: a device key authors `0x03` with no
+            // phrase), so the class is chosen by asking what this device is actually
+            // missing rather than by whether an identity happens to be held. Any OTHER
+            // reason (roster, group key, an unverified binding row) stays a generic
+            // failure, because that fix is not something to ask of them.
             let has_person = state.clone_person_identity().await.is_some();
-            let class = if has_person {
-                super::loop_control::FailureClass::Other
-            } else {
+            let has_device_key =
+                super::device_identity::load_for_fallback("cycle_can_author").is_some();
+            let class = if !has_person && !has_device_key {
                 super::loop_control::FailureClass::IdentityLocked
+            } else {
+                super::loop_control::FailureClass::Other
             };
             tracing::warn!(
                 stage = "sync_cycle",
