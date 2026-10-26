@@ -77,6 +77,10 @@ const ENROLLED = {
   person_id_hex: "person",
   identity_code: "MYNE-PERSON-1:aa:bb:cc:dd",
   sealed_keypair_present: true,
+  // The lifecycle state routes the flow past the gate (myne-md/myne#911 task 12):
+  // `state` is what the identity flow reads, not `enrolled`, because a `reserved`
+  // identity is an identity too.
+  state: "enrolled",
 };
 
 /** The "Connect to my account" door on Welcome (the owner's join flow). */

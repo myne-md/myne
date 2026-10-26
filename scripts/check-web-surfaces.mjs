@@ -43,6 +43,10 @@ const V = {
     "ported",
     "Build identity and links; no host call. Carries the Developer mode toggle, which since #181 renders here too — it used to be withheld on a `localAi`-less capability set, which on web left the mode's other members (the Vim row) unreachable.",
   ],
+  "src/components/settings/DiagnosticsPanel.tsx": [
+    "adapted",
+    "Ships, and it is the one settings panel whose WEB arm is the point rather than a compromise. The report block and its Copy button render on every client on purpose: a browser user cannot open a devtools panel and read a failure back to anyone, so the copy is the half that matters most there. The logging half (the switch, the crash record, the folder reveal and the saved bundle) is capability-gated on `diagnosticLog`, which the web descriptor does not carry because a served bundle installs no `tracing` subscriber, so those rows are absent rather than disabled. Split out of AboutPanel on 2026-10-25; the verdict is unchanged in kind, because it is the same code with the same gate.",
+  ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
     "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",
@@ -143,6 +147,10 @@ const V = {
     "excluded",
     "The whole-vault v0.1→v0.2 migration form (#420) is desktop-only and its recovery-phrase credential is substituted out of the web bundle; a browser client joins an already-current account and never migrates.",
     "migrate.phrase-input",
+  ],
+  "src/components/settings/VaultFormatUpgrade.tsx": [
+    "typed-unsupported",
+    "The explicit upgrade of an existing vault to one-phrase recovery (myne-md/myne#911 task 10). Desktop-only: the person envelope is sealed to a person identity, and a browser origin holds none. `vault_is_person_wrapped` answers the typed refusal on web, the component renders nothing when that probe fails, and `vaultMigration` (absent on web) is what keeps the whole row off the panel.",
   ],
   "src/components/settings/SettleMigrationBlock.tsx": ["typed-unsupported", "The post-migration settle surface (§10.4.1 point 5, #430) — abort / confirm over the `legacy/` snapshot. Desktop-only for the same reason as the form above: a browser client never migrates, so it never has a `legacy/` snapshot to settle. Its status probe answers the typed refusal, and the block renders nothing when the probe fails, so on web it is simply absent."],
   "src/components/settings/NewNoteLocationSettings.tsx": ["ported", "Prefs-backed."],
@@ -252,6 +260,13 @@ const V = {
     "Module-scope state over the `local-inference` download/cancel commands and their progress event (myne-md/myne#814). Same verdict and reason as `ai-model-download.ts`, which it wraps: the plugin is `Class::Unsupported` on web, so an invoke answers the typed refusal rather than dispatching. No AI surface renders on web (`localAi` is absent), so nothing reaches it; `typed-unsupported` rather than `excluded` because its backend answers a typed refusal rather than the code being absent.",
   ],
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
+  "src/lib/sync-publish.ts": [
+    "typed-unsupported",
+    "SHIPS but is unreachable on web: the only binding it wraps (plugin:sync|sync_publish_vault) is " +
+      "Class::Unsupported there (myne-md/myne#911 task 13 owes the person plane), so the dispatcher " +
+      "answers its typed refusal and the SyncPanel row that calls it is gated on `memberSharing`. " +
+      "Typed rather than excluded because nothing substitutes the module out of the bundle.",
+  ],
   "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
@@ -492,6 +507,7 @@ const V = {
   ],
   "src/lib/vault-delete.ts": ["adapted", "Task 72 owns what deletion MEANS on a sync-required client; the binding itself is portable."],
   "src/lib/vault-migrate.ts": ["typed-unsupported", "The whole-vault v0.1→v0.2 migration (#420) is a desktop flow (Class::Unsupported in web/wasm/src/capability.rs, like vault-creation): a browser client joins an already-current account over sync and never migrates. The binding is present but its command answers the typed refusal on web."],
+  "src/lib/vault-format-upgrade.ts": ["typed-unsupported", "The NTV6→NTV7 upgrade and its two probes (myne-md/myne#911 task 10). Desktop-only for the same reason `vault-migrate.ts` is: the person envelope is sealed to a person identity, which a browser origin does not hold. The upgrade command is `Class::Unsupported` through the `vault-migrate` plugin and the two `vault-unlock` probes are `Pending`, so all three answer a typed refusal rather than running."],
   "src/lib/vault-export-errors.ts": ["ported", "Error copy shared with the note-level export that does ship."],
   "src/lib/vault-label.ts": [
     "adapted",
@@ -499,7 +515,7 @@ const V = {
   ],
   "src/lib/account.ts": [
     "adapted",
-    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
+    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the three `plugin:account|...` wrappers, plus the pure grouping and heading helpers every picker shares. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/vaultDisplayName.ts": [
@@ -516,7 +532,7 @@ const V = {
   "src/lib/vault-status.ts": ["ported", "Boot probe."],
   "src/lib/vault-switch.ts": ["adapted", "Reachable only with ≥2 vaults, which one origin cannot have."],
   "src/lib/vault-unlock.ts": ["ported", "The unlock IPC — the one path web needs most."],
-  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` one line up documents."],
+  "src/lib/meeting-notes.ts": ["adapted", "Meeting sessions are desktop-only in EFFECT rather than by omission: the capture path is a Rust CoreAudio tap plus cpal, and the web dispatcher refuses the three `plugin:attachments|meeting_session_*` commands, so `/meeting` starts and immediately fails on web. The seam member IS installed (an earlier version of this verdict claimed the host omits it, which `src/editor-host.ts` contradicts), which is the same interim shape `voice-record.ts` documents."],
   "src/lib/voice-record.ts": ["adapted", "Voice capture is desktop-only; the editor host omits the recorder."],
   "src/lib/workspace-persist.ts": ["ported", "`MYW1` IPC; ported into core and dispatched in task 65."],
   "src/lib/writing-assistant.ts": ["adapted", "Unreachable where `localAi` is absent."],
@@ -580,6 +596,10 @@ const V = {
     "Pure DOM: the React binding for the shared overlay `inert` owner (myne#728). No host call, and the browser client renders the same overlays from the same `src/` tree.",
   ],
   "src/hooks/useIdleAutoLock.ts": ["adapted", "Same signal difference as useActivityHeartbeat."],
+  "src/hooks/usePendingInvites.ts": [
+    "ported",
+    "Runs, and does nothing where `personIdentity` is absent: the effect returns before any invoke. That is the correct web answer rather than a gap, because an invitation is addressed to a person identity and the browser has no person-identity carrier, so neither the picker nor the switcher notice can appear there.",
+  ],
   "src/hooks/useIsFullscreen.ts": [
     "adapted",
     "Answers the Fullscreen API on web — the seam's `isFullscreen` is `document.fullscreenElement !== null`, which is the question the caller is asking.",

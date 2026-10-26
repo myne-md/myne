@@ -79,6 +79,11 @@ vi.mock("../../src/components/settings/StoragePanel", () => ({
 vi.mock("../../src/components/settings/AboutPanel", () => ({
   AboutPanel: () => <div data-testid="panel.about">about</div>,
 }));
+// The panel split out of About on 2026-10-25. Mocked for the same reason as the
+// rest: the shell routes by id, and each panel's own behaviour is its own spec.
+vi.mock("../../src/components/settings/DiagnosticsPanel", () => ({
+  DiagnosticsPanel: () => <div data-testid="panel.diagnostics">diagnostics</div>,
+}));
 vi.mock("../../src/components/settings/AiPanel", () => ({
   AiPanel: (props: { onDialogOpenChange?: (open: boolean) => void }) => {
     aiDialogOpen = props.onDialogOpenChange;
@@ -171,11 +176,12 @@ describe("SettingsModal — tab routing", () => {
     // ArrowUp from account would wrap; reset to account first by clicking.
     fireEvent.click(screen.getByTestId("settings.tab-account"));
     fireEvent.keyDown(window, { key: "ArrowUp" });
-    // Wraps to the last VISIBLE panel — About, since the whole Developer group
-    // is filtered out of the roster while the mode is off.
-    expect(screen.getByTestId("panel.about")).toBeTruthy();
+    // Wraps to the last VISIBLE panel — Diagnostics, which joined the core group
+    // after About on 2026-10-25, since the whole Developer group is filtered out
+    // of the roster while the mode is off.
+    expect(screen.getByTestId("panel.diagnostics")).toBeTruthy();
     expect(
-      screen.getByTestId("settings.tab-about").getAttribute("aria-selected"),
+      screen.getByTestId("settings.tab-diagnostics").getAttribute("aria-selected"),
     ).toBe("true");
   });
 });

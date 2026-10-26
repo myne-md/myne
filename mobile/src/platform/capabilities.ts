@@ -70,6 +70,16 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   // The v0.1 to v0.2 on-disk migration. Mobile registers no `vault_migrate`
   // plugin, so a pre-v0.2 vault has no upgrade path on this client.
   vaultMigration: false,
+  // The owner's identity phrase as a vault credential (myne-md/myne#911 task 12).
+  // This client has the person plane: it creates an identity, registers it and
+  // opens a person-wrapped vault with the phrase.
+  personVaultCredential: true,
+  // The identity plane itself: task 12 gave this client creation, registration
+  // and the person-scoped QR join.
+  personIdentity: true,
+  // …and it keeps that identity at rest, in its app-config directory, so a
+  // reload finds it where it left it (unlike the browser, task 13).
+  personCredentialPersisted: true,
   // Vault backup (MYB1). The mobile backend carries no backup command at all:
   // `RestoreBackupFlow` is a WIRED PLACEHOLDER whose own header says
   // "Backup/restore is a Phase-2 capability that the mobile backend does not yet

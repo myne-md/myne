@@ -90,7 +90,7 @@ export interface RawClipImage {
  * The RAW (un-validated) desktop-ingest envelope — the hostile input shape the
  * host relays into ingest. Mirrors the Rust `HandoffEnvelope`'s ingest subset
  * (root-only, SYNC-15) with camelCase field names matching the rest of the
- * desktop clip layer (`dialect/clip/captureKind.ts`'s `ClipInput`).
+ * desktop clip layer (`src/dialect/clip/captureKind.ts`'s `ClipInput`).
  *
  * NOTE the types are deliberately PERMISSIVE where the boundary does the work:
  * `captureKind` is a bare `string` (validated against the closed set) and
@@ -169,7 +169,7 @@ export type ClipEnvelopeRejection =
 /**
  * The structured result of the boundary gate — a discriminated union matching
  * the codebase's result-type idiom (`{ kind: "ok" } | { kind: "err" }`, e.g.
- * `dialect/clip/captureKind.ts`'s `ClipSerializeResult`). The caller switches
+ * `src/dialect/clip/captureKind.ts`'s `ClipSerializeResult`). The caller switches
  * on `kind`; there is NO `envelope` field on the `err` arm, so a rejected clip
  * can never be mistaken for a (partially-)validated one.
  */

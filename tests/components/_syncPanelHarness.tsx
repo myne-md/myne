@@ -29,6 +29,9 @@ export interface SyncPanelRoute {
    *  Defaults to "no identity on this device". */
   readonly person?: {
     readonly enrolled?: boolean;
+    /** The three-state lifecycle (myne-md/myne#911). `reserved` and `pending`
+     *  are the two states that cannot list invites and need registration. */
+    readonly state?: "reserved" | "pending" | "enrolled" | null;
     readonly identity_unlocked?: boolean;
     readonly person_id_hex?: string | null;
     readonly identity_code?: string | null;
@@ -50,6 +53,21 @@ export interface SyncPanelRoute {
   /** What `sync_account_status` reports. `null` (the default) hides the whole
    *  usage block, which is what a server without the route answers. */
   readonly usage?: AccountStatus | null;
+  /**
+   * What `sync_published_state` reports (myne-md/myne#911 task 8): the DURABLE
+   * publish state of the active vault. `null` (the default) answers as an
+   * unreadable command does, which HIDES the publish row: the row's gate is the
+   * read, because a client that cannot answer it cannot publish either (the
+   * browser, and mobile until its person plane lands).
+   */
+  readonly publishState?:
+    | {
+        readonly published: boolean;
+        readonly namespace_hex?: string | null;
+        readonly published_at_ms?: number | null;
+        readonly person_born?: boolean;
+      }
+    | null;
 }
 
 /**
@@ -68,6 +86,7 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     migration = { offerable: false, pending: false },
     memberVault = false,
     usage = null,
+    publishState = null,
   } = route;
   return async (cmd: string): Promise<unknown> => {
     if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
@@ -79,6 +98,7 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     if (cmd === "plugin:sync|sync_person_status") {
       return {
         enrolled: false,
+        state: null,
         identity_unlocked: false,
         person_id_hex: null,
         identity_code: null,
@@ -113,6 +133,15 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
     if (cmd === "plugin:sync|sync_get_endpoint") return { endpoint_url: null };
     if (cmd === "plugin:sync|sync_account_status") return usage;
+    if (cmd === "plugin:sync|sync_published_state") {
+      if (publishState === null) throw { kind: "NotAvailable" };
+      return {
+        namespace_hex: null,
+        published_at_ms: null,
+        person_born: true,
+        ...publishState,
+      };
+    }
     if (cmd === "plugin:sync|sync_pending_conflicts") return [];
     if (cmd === "plugin:sync|sync_list_quarantine") return [];
     if (cmd === "plugin:notes|note_list") return [];

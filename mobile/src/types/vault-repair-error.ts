@@ -1,5 +1,5 @@
 // Hand-mirrored from the Rust enum. Keep in sync in the same change:
-//   - src-tauri/src/io_failure_kind.rs                   (IoFailureKind)
+//   - core/src/io_failure_kind.rs                   (IoFailureKind)
 //   - src-tauri/src/plugins/vault_repair/error.rs        (VaultRepairError)
 
 import type { IoFailureKind } from "./vault-unlock-error";

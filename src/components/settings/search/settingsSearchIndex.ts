@@ -206,18 +206,10 @@ export const WRITABILITY_WRITABLE: AgentWritability = { verdict: "writable" };
 export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   // ── Account ────────────────────────────────────────────────────────────────
   // The account-level panel. Its namespace is the account grouping: which
-  // vaults this device treats as one account, and what that group is called.
-  // Everything that acts on a vault's own container lives under `vault.*`
-  // below.
-  {
-    id: "account.name",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "account",
-    testid: "settings.account-name-input",
-    titleKey: "settings.account.nameLabel",
-    descriptionKey: "settings.account.nameHelper",
-    keywordsKey: "settings.search.keywords.accountName",
-  },
+  // vaults this device treats as one account. An account has no name
+  // (`design-notes/ui/0728`), so there is no entry for one: the group heading
+  // is derived from the group's own vault names. Everything that acts on a
+  // vault's own container lives under `vault.*` below.
   {
     id: "account.vaults",
     agentWritability: WRITABILITY_NONE,
@@ -226,6 +218,20 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.account.vaultsLabel",
     descriptionKey: "settings.account.vaultsHelper",
     keywordsKey: "settings.search.keywords.accountVaults",
+  },
+  {
+    // The person account number (2026-10-23), and the panel's first block since
+    // `design-notes/ui/0728` replaced the account name with it. It is derived
+    // from the identity phrase, so this entry is a READ: the copy button is the
+    // only control, and the value itself is never in the index (it is generated,
+    // not authored).
+    id: "account.number",
+    agentWritability: WRITABILITY_NONE,
+    panelId: "account",
+    testid: "settings.account-number-copy",
+    titleKey: "settings.account.numberLabel",
+    descriptionKey: "identityHome.accountNumberHint",
+    keywordsKey: "settings.search.keywords.accountNumber",
   },
   {
     // Moved here from the Storage section: the control it names
@@ -275,6 +281,22 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     titleKey: "settings.vault.changePasswordHeading",
     descriptionKey: "settings.vault.changePasswordHelper",
     keywordsKey: "settings.search.keywords.changePassword",
+  },
+  {
+    // The one-phrase upgrade (myne-md/myne#911). Gated on `vaultMigration`, the
+    // capability the row's control renders behind (`VaultPanel`): the upgrade
+    // needs a desktop vault directory and the person plane beside it. It was
+    // gated on `personVaultCredential`, which the browser HAS, so a web search
+    // would have scrolled to a section that client never draws.
+    id: "vault.format",
+    agentWritability: WRITABILITY_NONE,
+    capability: "vaultMigration",
+    panelId: "vault",
+    topic: "vault",
+    testid: "settings.vault.format-cta",
+    titleKey: "settings.vault.format.heading",
+    descriptionKey: "settings.vault.format.intro",
+    keywordsKey: "settings.search.keywords.vaultFormat",
   },
   {
     id: "vault.danger-zone",
@@ -443,8 +465,37 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.panel.devices.label",
+    // The section's own title, not the shorter `devices.label` the mobile panel
+    // still uses: a search result that lands on a heading has to name the
+    // heading the reader arrives at (2026-10-25, the same pass that renamed it).
+    titleKey: "sync.panel.sections.devices",
     keywordsKey: "settings.search.keywords.syncDevices",
+  },
+  {
+    // Publishing (myne-md/myne#911): the explicit act that makes a device-local
+    // vault reachable from the person's other devices.
+    //
+    // Gated on `localOnlyVault`, which is the fact the commands answer for: a
+    // vault can be device-only WHERE a vault may live with no server behind it.
+    // The web client has no such state (`decisions.md` 2026-07-26 makes sync
+    // required there) and both `sync_published_state` and `sync_publish_vault`
+    // are `Class::Unsupported` in its dispatcher, so `publishState` stays null
+    // and the row never renders. `personIdentity` was the gate before, and the
+    // browser has it since task 13: search offered a row that client cannot
+    // draw.
+    id: "sync.publish",
+    agentWritability: WRITABILITY_NONE,
+    capability: "localOnlyVault",
+    panelId: "sync",
+    // `connection`, not `devices` (2026-10-25): the row moved into the account
+    // section, under the identity and the server, because publishing is an identity
+    // act and a devices heading over it read as a device operation. Search lands on
+    // the topic the row actually renders in; this registry is what says so.
+    topic: "connection",
+    testid: "sync.panel.publish",
+    titleKey: "sync.panel.publish.label",
+    descriptionKey: "sync.panel.publish.deviceOnlyHelper",
+    keywordsKey: "settings.search.keywords.publishVault",
   },
   {
     id: "sync.members",
@@ -465,7 +516,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",
     topic: "devices",
-    titleKey: "sync.deviceBindings.title",
+    titleKey: "sync.deviceBindings.heading",
     descriptionKey: "sync.deviceBindings.hint",
     keywordsKey: "settings.search.keywords.syncDeviceBindings",
     // Same gate as `sync.members` above, and for the same reason: the block is
@@ -1045,7 +1096,11 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
       reason:
         "consent control: it decides whether a plaintext log is written to disk, not how the app behaves, so it is not an agent-settable setting",
     },
-    panelId: "about",
+    // `panelId` follows the ROW, not the key prefix: the row moved to its own
+    // Diagnostics panel on 2026-10-25 and its i18n keys kept the `settings.about.`
+    // prefix, because a key name is a catalog id that no user reads and renaming it
+    // would move thirty-three catalogs for a naming preference.
+    panelId: "diagnostics",
     titleKey: "settings.about.diagnosticLogLabel",
     descriptionKey: "settings.about.diagnosticLogHelper",
     keywordsKey: "settings.search.keywords.diagnosticLog",

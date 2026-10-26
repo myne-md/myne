@@ -240,6 +240,21 @@ describe("DeviceAttributionPanel: failures are typed, not flattened", () => {
     expect(screen.queryByTestId("device-bindings.error")).toBeNull();
     expect(screen.queryByTestId("device-bindings.claim")).toBeNull();
   });
+
+  // 2026-10-25, second report. The panel used to split the refusal in two: an `NTV5`
+  // vault has no group tier, and a person-born `NTV7` vault was said to carry one it
+  // could not use. That second claim is gone with the member plane's generation
+  // support (`protocol.md` §9.30, `decisions/protocol/0730`), so the panel reports one
+  // state again and says nothing about a generation.
+  it("reports the unshared state, and claims nothing about the generation", async () => {
+    listRejects("NotASharedVault");
+    render(<DeviceAttributionPanel />);
+
+    await waitFor(() => expect(screen.queryByTestId("device-bindings.unshared")).toBeTruthy());
+    // The removed arm: a per-generation testid and the sentence that a person-born
+    // vault cannot carry the family.
+    expect(screen.queryByTestId("device-bindings.generation")).toBeNull();
+  });
 });
 
 describe("DeviceAttributionPanel: the claim affordance", () => {

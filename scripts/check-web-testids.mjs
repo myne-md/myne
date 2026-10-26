@@ -4,7 +4,7 @@
 // # Why this needs a script when the desktop convention does not have one
 //
 // `src/AGENTS.md` states the rule flatly — "a screen without testids is
-// invisible to E2E" — and 489 `data-testid` attributes in `src/` are held to it
+// invisible to E2E" — and every `data-testid` attribute in `src/` is held to it
 // by **review alone**. That works while every screen has an owner who reviews
 // it. The web client's screens do not: tasks 61/59/74/105/106 CONSUME testids
 // (`byTestId` is the only sanctioned selector in `e2e/AGENTS.md`), while the
@@ -113,16 +113,53 @@ const RENDERS_NOTHING = new Set([
 const NAME = /^[a-z][a-z0-9-]*(\.[a-z0-9-]+)+$/;
 
 /**
+ * Shared screens that render BEFORE any vault is unlocked, and so are roots of
+ * the leak budget in their own right.
+ *
+ * **Listed rather than derived, and checked both ways.** Whether a screen
+ * mounts pre-unlock lives in `src/App.tsx`'s stage switch, which this script
+ * cannot read; `check-web-screens.mjs`'s `ported` verdict says the screen SHIPS
+ * on web and nothing about WHEN it mounts (`Editor.tsx` is `adapted` and is the
+ * most post-unlock file in the tree). The note that licensed `PRE_UNLOCK_FLOOR`
+ * 39 claimed the shared picker was already in the walk on the strength of that
+ * verdict, and it was not: `webModules()` is `walk(web/src)` plus the
+ * `web-only` verdicts, and `VaultPicker.tsx` / `IdentityHome.tsx` are both
+ * `ported` (myne-md/myne#911 review).
+ *
+ * These are roots for the PER-FILE rules only: `preUnlockScope` deliberately
+ * does NOT follow their imports. `VaultPicker` imports `lib/vault-unlock.ts`,
+ * which is the door into the whole unlocked app (the editor, the note stores,
+ * the dialect), so following it turns a 41-file pre-unlock budget into a
+ * 162-file app-wide one whose messages then say "the account number is
+ * pre-unlock INPUT" about post-unlock code. The primitive walk still starts
+ * from the web-only roots, which is what it was built for.
+ */
+export const SHARED_PRE_UNLOCK_SCREENS = Object.freeze([
+  join("src", "screens", "VaultPicker.tsx"),
+  join("src", "screens", "IdentityHome.tsx"),
+]);
+
+/**
  * Fewest files the pre-unlock walk may cover before the walk itself is suspect.
  *
- * Recorded from a real run (40 when R0.2 widened the roots to every derived
- * web-only screen, 15 before that), not invented, and it may rise as the tree
- * grows.
+ * Recorded from a real run (41 when the shared pre-unlock screens joined the
+ * walk, 40 when R0.2 widened the roots to every derived web-only screen, 15
+ * before that), not invented, and it may rise as the tree grows.
  * Lowering it is the edit that is never routine: it means the account-number
  * screens compose less than they did, which is either a real simplification
  * worth saying out loud or a walk that has stopped finding things.
+ *
+ * **40 -> 39 -> 41, myne-md/myne#911, and 39 lasted one review.** The browser's
+ * own `VaultPicker` substitute was deleted (one origin can hold several
+ * containers now) and the note that licensed 39 said the shared
+ * `src/screens/VaultPicker.tsx` had taken its place in the walk. It had not:
+ * that file is verdicted `ported` and the walk was `web/src` plus the
+ * `web-only` verdicts, so the number moved while the scope did not.
+ * `SHARED_PRE_UNLOCK_SCREENS` above carries the picker and `IdentityHome` as
+ * roots now, which is 39 + 2 = 41, and the picker's `picker.vault-row` testid
+ * is asserted by `e2e-web/multi-vault.e2e.ts`.
  */
-const PRE_UNLOCK_FLOOR = 40;
+const PRE_UNLOCK_FLOOR = 41;
 
 export function webModules(dir = WEB_DIR) {
   const out = [];
@@ -457,6 +494,18 @@ export function preUnlockScope(roots) {
  */
 const ALLOWED_DYNAMIC = new Map([
   ["data-wall", "WebNoAccount's `no-account` / `no-sync` variant, a closed union."],
+  // The invitations row on the pre-unlock picker (`src/screens/VaultPicker.tsx`).
+  // A closed union the CODE controls (`"count" | "not-enrolled" | "pending"`), and
+  // each member says which of three FIXED sentences the row renders, so a test can
+  // tell "2 invitations waiting" from "register this identity to see invitations"
+  // without asserting copy. No user input reaches it and it carries no account
+  // value; the row exists on this screen at all because an unregistered identity
+  // cannot list invitations, and a count-only row would have rendered nothing
+  // (`design-notes/protocol/0732`, `decisions/ui/0725`).
+  [
+    "data-invites",
+    "Which arm of the invitations row is up: `count` / `not-enrolled` / `pending`.",
+  ],
   [
     "data-fade-top",
     "Scroll geometry on `CenteredCard`: is there content above the viewport. " +
@@ -500,6 +549,14 @@ const ALLOWED_DYNAMIC = new Map([
       "text beside it. The account number is not on this screen and cannot reach " +
       "this attribute.",
   ],
+  [
+    "data-vault-id",
+    "`VaultPicker`'s row discriminator: the vault's own opaque id, which the " +
+      "scenario selects by (`e2e-web/multi-vault.e2e.ts`). It is a `VaultId`, " +
+      "not anything the user typed, and the pre-unlock screen shows no account " +
+      "number, the picker's only pre-unlock leak is vault count and last-unlock " +
+      "times, both of which it renders as text by design (SYNC-7 / SYNC-3).",
+  ],
 ]);
 
 function main() {
@@ -529,6 +586,20 @@ function main() {
         `that has been removed leaves the exemption describing a file nobody ` +
         `can open. Delete the entry with the file.`,
     );
+  }
+
+  // The shared pre-unlock roots, compared BOTH ways for the same reason the
+  // exemption list is: an entry naming a deleted screen reads as a scope that
+  // covers something, and the rules below would then check one file fewer while
+  // the floor absorbed it.
+  for (const f of SHARED_PRE_UNLOCK_SCREENS) {
+    if (!existsSync(f)) {
+      problems.push(
+        `${f} is recorded in SHARED_PRE_UNLOCK_SCREENS but does not exist. The ` +
+          `pre-unlock leak budget is only as wide as this list; delete the entry ` +
+          `with the screen, and re-record PRE_UNLOCK_FLOOR.`,
+      );
+    }
   }
 
   for (const f of files) {
@@ -574,7 +645,20 @@ function main() {
     ...SHARED_WEB_ONLY,
     ...files.filter((f) => f.startsWith(join("web", "src", "screens"))),
   ];
-  const preUnlock = preUnlockScope(roots);
+  // The shared pre-unlock SCREENS are appended rather than walked, and the
+  // difference is load-bearing: `preUnlockScope` follows relative imports, and
+  // `VaultPicker` imports `lib/vault-unlock.ts`, the module that reaches the
+  // entire unlocked app. Walking them would make the budget claim to be about
+  // pre-unlock code while it scanned the editor and the note stores; see
+  // `SHARED_PRE_UNLOCK_SCREENS`. A missing entry is reported by the stale check
+  // above, so it is filtered here rather than left for `readFileSync` to throw
+  // on before those problems are printed.
+  const preUnlock = [
+    ...new Set([
+      ...preUnlockScope(roots),
+      ...SHARED_PRE_UNLOCK_SCREENS.filter((f) => existsSync(f)),
+    ]),
+  ].sort();
   // A COVERAGE CLAIM, not a walk that reports ok on whatever it happened to
   // find. `check-platform-seam.mjs` derives one for the same reason: a scope
   // that silently shrinks to nothing passes every check inside it. Two paths

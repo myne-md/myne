@@ -80,8 +80,9 @@ vi.mock("../../src/components/DeleteVaultConfirmForm", () => ({
     onContinueAfterPartial: () => void;
     inFlight?: boolean;
     partialFailContext: { kind: string; remainingCount?: number } | null;
+    variant?: "owner" | "member";
   }) => (
-    <div data-testid="dvcf">
+    <div data-testid="dvcf" data-variant={props.variant ?? "owner"}>
       <span data-testid="dvcf.inflight">{String(props.inFlight)}</span>
       {props.partialFailContext != null && (
         <div data-testid="dvcf.partial">{props.partialFailContext.kind}</div>
@@ -377,6 +378,29 @@ describe("VaultPanel — delete vault", () => {
     await waitFor(() => expect(deleteVault).toHaveBeenCalled());
     expect(screen.queryByTestId("dvcf.partial")).toBeNull();
     expect(props.onDeleteVaultSuccess).not.toHaveBeenCalled();
+  });
+
+  it("a member vault is offered removal and passes the member variant", async () => {
+    memberVaultStatus.mockResolvedValueOnce(true);
+    renderPanel({}, "danger");
+
+    // The probe settles the section into the member arm.
+    const cta = await screen.findByText("Remove from this device");
+    // The owner's irreversible sentence is absent, not corrected after it.
+    expect(
+      screen.queryByText(
+        "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
+      ),
+    ).toBeNull();
+
+    fireEvent.click(cta);
+    expect(screen.getByTestId("dvcf").getAttribute("data-variant")).toBe("member");
+  });
+
+  it("an owner vault keeps the owner copy and the owner variant", () => {
+    renderPanel({}, "danger");
+    fireEvent.click(screen.getByText("Delete vault…"));
+    expect(screen.getByTestId("dvcf").getAttribute("data-variant")).toBe("owner");
   });
 });
 

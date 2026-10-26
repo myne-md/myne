@@ -71,7 +71,7 @@ describe("join modal — pending head-fingerprint poll", () => {
       return Promise.resolve(undefined);
     });
 
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     await reachPending();
 
     await act(async () => {
@@ -103,7 +103,7 @@ describe("join modal — pending head-fingerprint poll", () => {
       return Promise.resolve(undefined);
     });
 
-    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} />);
+    render(<JoinDeviceModal onCancel={vi.fn()} onJoined={vi.fn()} onRecovering={vi.fn()} onAccountJoined={vi.fn()} />);
     await reachPending();
 
     // Five ~1 s ticks of the fingerprint poll…

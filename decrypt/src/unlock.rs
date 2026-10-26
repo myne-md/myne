@@ -115,11 +115,14 @@ fn items_key_from_root(
     version: MetaVersion,
     bytes: &[u8],
 ) -> Result<(Zeroizing<[u8; 32]>, Option<Zeroizing<[u8; 32]>>), UnlockError> {
-    // An `NTV6` vault seals `itemsKey` under the GROUP tier; the root-tier
-    // derive fails there, so unwrap the group key first and return it too.
-    if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        let b2b =
-            protocol::parse_vault_meta_ntv6(bytes).map_err(|_| UnlockError::InvalidVaultMeta)?;
+    // A B2B vault (`NTV6` or the person-wrapped `NTV7`) seals `itemsKey` under
+    // the GROUP tier; the root-tier derive fails there, so unwrap the group key
+    // first and return it too. Reading only `NTV6` here made this tool unable to
+    // open a vault born on the current generation, which is the one case it
+    // exists for: the app is gone and the user has only their words
+    // (myne-md/myne#911 review).
+    if protocol::has_b2b_tail(bytes) {
+        let b2b = protocol::parse_b2b_tail_any(bytes).map_err(|_| UnlockError::InvalidVaultMeta)?;
         let group = protocol::unlock_group_key_ntv6(&b2b, &protocol::OwnerKey::new(*root_key))
             .map_err(|_| UnlockError::InvalidVaultMeta)?;
         let group_key = protocol::GroupKey::new(*group);
@@ -152,6 +155,46 @@ fn open_32(
     let mut out = Zeroizing::new([0u8; 32]);
     out.copy_from_slice(&plaintext);
     Ok(out)
+}
+
+/// Unlock a person-wrapped (`NTV7`) vault directory with the owner's identity
+/// phrase.
+///
+/// This is the second credential the generation ships, and the one a user holds
+/// when the app is gone: the tool has to open it or the birth format loses its
+/// documented recovery route. The derivation is exactly the app's
+/// (`person_id_hash` → identity seed → the three key seeds → the person keypair),
+/// under the DEFAULT KDF parameters the unlock path uses, so the same words
+/// produce the same key here as there.
+pub fn unlock_with_identity(
+    vault_dir: &std::path::Path,
+    phrase_normalized: &str,
+) -> Result<UnlockedVault, UnlockError> {
+    let (meta, version, bytes) = read_meta(vault_dir)?;
+    let ntv7 =
+        protocol::parse_vault_meta_ntv7(&bytes).map_err(|_| UnlockError::InvalidVaultMeta)?;
+    eprintln!("Deriving the identity key (Argon2id, ~1-3 s)... ");
+    let person_id = protocol::kdf::person_id_hash(phrase_normalized);
+    let seed = protocol::kdf::derive_person_identity_seed(
+        phrase_normalized,
+        &person_id,
+        &protocol::DEFAULT_V0_1_KDF_PARAMS,
+    )
+    .map_err(|_| UnlockError::InvalidCredentialOrVault)?;
+    let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+    let owner = protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+    let root_key =
+        protocol::open_person_wrapped_root_key(&owner, &ntv7.person_wrap, &ntv7.base.items_key_id)
+            .map_err(|_| UnlockError::InvalidCredentialOrVault)?;
+    let (items_key, group_key) = items_key_from_root(&root_key, &meta, version, &bytes)?;
+    eprintln!("done");
+    Ok(UnlockedVault {
+        root_key,
+        group_key,
+        items_key,
+        items_key_id: meta.items_key_id,
+        version,
+    })
 }
 
 /// Unlock a vault directory with the master password.

@@ -44,9 +44,13 @@ const MUST_BE_ABSENT: readonly [string, string][] = [
   // lesson: an absence assertion on a name nothing renders passes forever and
   // proves nothing. The list below is checked against real testids.)
   //
-  // What stays is the phrase path this client still refuses, and it is asserted
-  // on the enrolment screen where it would actually appear.
-  ["sync.enroll.phrase-cell", "the phrase as a DEVICE-ENROLMENT credential — the one phrase path this client still refuses (decisions.md 2026-08-15)"],
+  // What stays is the phrase path this client still refuses to OFFER. The grid
+  // itself SHIPS here since `decisions.md` 2026-10-18 (entry 0704, which retired
+  // the build-time substitution and the deleted `check-web-no-phrase.mjs`), so
+  // the rule this entry asserts is the rendered arm, not the module: the
+  // `phraseEnrolment` capability flag hides it, and an element that renders
+  // anyway is the regression.
+  ["sync.enroll.phrase-cell", "the phrase as a DEVICE-ENROLMENT credential — refused as an offer, while the module ships (decisions.md 2026-10-18, entry 0704)"],
   ["member-roster", "the B2B member surface: `memberSharing` is absent (web has no keychain-style carrier and the panel's phrase prompt is substituted out of the bundle, not merely gated)"],
   ["create.ready-backup-now", "the encrypted-backup export; `backup` and `nativeSaveAs` are both absent here"],
   ["create.ready-show-folder", "revealing a vault directory in an OS file manager; OPFS has no path to reveal"],
@@ -70,36 +74,6 @@ describeE2E("capability gating renders as absence", () => {
         }
       } finally {
         await browser.teardown();
-      }
-    } finally {
-      await server.close();
-    }
-  });
-
-  it("serves the phrase vocabulary the creation flow needs, and no enrolment grid", async () => {
-    // **This assertion was inverted on 2026-08-15 and the inversion is the
-    // point.** It used to require that NO BIP-39 vocabulary reached the served
-    // bundle. Creation and recovery ship now and both need the wordlist, so the
-    // old form would fail on a correct build.
-    //
-    // What is worth asserting through the SERVER rather than off disk is
-    // unchanged in kind: `check-web-no-phrase.mjs` reads `web/dist`, and this
-    // catches a build that is fine on disk behind a server that rewrites or
-    // falls back to a different asset.
-    const server = await startBundleServer({ root: BUNDLE_DIR, syncOrigin: SYNC_ORIGIN });
-    try {
-      const index = await (await fetch(`${server.origin}/index.html`)).text();
-      const assets = [...index.matchAll(/(?:src|href)="([^"]+\.js)"/g)].map((m) => m[1]);
-      expect(assets.length, "the bundle must serve at least one script").toBeGreaterThan(0);
-      for (const asset of assets) {
-        const url = new URL(asset, server.origin).toString();
-        const body = await (await fetch(url)).text();
-        // The enrolment grid's testid is the marker that must never appear.
-        // Not the wordlist: creation and recovery both need it, so a wordlist
-        // assertion would be asserting against the feature.
-        expect(body, `${asset} carries the enrolment phrase grid`).not.toContain(
-          "sync.enroll.phrase-cell",
-        );
       }
     } finally {
       await server.close();

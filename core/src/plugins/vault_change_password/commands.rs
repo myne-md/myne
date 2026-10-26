@@ -440,8 +440,13 @@ pub(crate) async fn change_password_with_path(
             // the root-tier verify below would always AEAD-fail; unwrap the group
             // key with the (already verified) root key and open the items wrap
             // through the group tier instead.
-            if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+            if protocol::has_b2b_tail(&bytes) {
+                // Both B2B generations seal `itemsKey` under the group tier. The
+                // `NTV7` generation was classified as "not NTV6" here, so the
+                // root-tier derive below AEAD-failed and every password change on
+                // a person-born vault reported the vault as corrupted
+                // (myne-md/myne#911 review).
+                let b2b = protocol::parse_b2b_tail_any(&bytes)
                     .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
                 let group = protocol::unlock_group_key_ntv6(
                     &b2b,
@@ -525,28 +530,46 @@ pub(crate) async fn change_password_with_path(
             //     primitive. Recovery-side + items_key wrap byte-
             //     preserved per `recovery-flow.md` §4.4 — the helper
             //     enforces the invariant internally.
-            let rewrite = if bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-                // An `NTV6` rewrite must carry the B2B tail (owner-wrapped group
-                // key, epoch, sealed roster); the versioned v0.2 rewrite would
+            let rewrite = match protocol::vault_meta_generation(&bytes) {
+                // The newest generation needs its own rewrite: the `NTV6` one
+                // re-serializes through the `NTV6` writer and would drop the
+                // person wrap, and the versioned v0.2 one would re-serialize as
+                // `NTV5` and drop the whole tail.
+                protocol::VaultMetaGeneration::Person => {
+                    let ntv7 = protocol::parse_vault_meta_ntv7(&bytes)
+                        .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv7(
+                        &ntv7,
+                        &root_key_for_seal,
+                        &new_password,
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
+                // A B2B rewrite must carry the tail (owner-wrapped group key,
+                // epoch, sealed roster); the versioned v0.2 rewrite would
                 // re-serialize as `NTV5` and drop it.
-                let b2b = protocol::parse_vault_meta_ntv6(&bytes)
-                    .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
-                protocol::rewrite_vault_meta_password_side_ntv6(
-                    &b2b,
-                    &root_key_for_seal,
-                    &new_password,
-                    &fresh_salt,
-                    &fresh_nonce,
-                )
-            } else {
-                protocol::rewrite_vault_meta_password_side_versioned(
-                    version,
-                    &existing,
-                    &root_key_for_seal,
-                    &new_password,
-                    &fresh_salt,
-                    &fresh_nonce,
-                )
+                protocol::VaultMetaGeneration::B2b => {
+                    let b2b = protocol::parse_vault_meta_ntv6(&bytes)
+                        .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv6(
+                        &b2b,
+                        &root_key_for_seal,
+                        &new_password,
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
+                protocol::VaultMetaGeneration::Legacy => {
+                    protocol::rewrite_vault_meta_password_side_versioned(
+                        version,
+                        &existing,
+                        &root_key_for_seal,
+                        &new_password,
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
             };
             let new_bytes = rewrite
             .map_err(|e| {
@@ -769,7 +792,12 @@ mod tests {
         let scratch = scratch_vault();
         let session = build_session(crate::vault_id::VaultId::mint(), password, FAST_TEST_KDF)
             .expect("build_session");
-        let phrase_string: String = (*session.phrase.join_normalized()).to_string();
+        let phrase_string: String = (*session
+            .phrase
+            .as_ref()
+            .expect("build_session always mints a phrase")
+            .join_normalized())
+        .to_string();
         let meta_bytes = build_and_serialize_vault_meta(&session).expect("serialize vault.meta");
         scratch.write_meta(&meta_bytes);
 

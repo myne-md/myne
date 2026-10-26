@@ -57,12 +57,14 @@ describe("manifestRepos", () => {
     expect(manifestRepos("# nothing but a comment\n\n")).toEqual([]);
   });
 
-  it("reads the real manifest and finds the two private entries", () => {
+  it("reads the real manifest and finds every private entry the tree declares", () => {
     // The tree's own file, so the grammar and its use cannot drift apart: this is
-    // the assertion that fails if the marker is ever respelled.
+    // the assertion that fails if the marker is ever respelled. It is an exact
+    // list on purpose — adding a private companion is a change to what setup.sh
+    // will refuse to clone, so it should require a deliberate edit here too.
     const listed = manifestRepos(readFileSync("workspace/manifest.txt", "utf8"));
     const privates = listed.filter((e) => e.private).map((e) => e.name);
-    expect(privates).toEqual(["operations", "agent-tooling"]);
+    expect(privates).toEqual(["operations", "agent-tooling", "myne-pi-plugin"]);
     expect(listed.length).toBeGreaterThan(5);
     for (const entry of listed) expect(entry.name).not.toContain(" ");
   });

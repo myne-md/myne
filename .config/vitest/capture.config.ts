@@ -20,10 +20,13 @@ export default defineConfig({
     maxConcurrency: 1,
     // One app boot builds a vault through the UI and snaps every frame —
     // budget generously (Argon2id unlock + lazy KaTeX/mermaid mounts). The
-    // expanded ~60-frame pass at @2x (--retina) needs headroom beyond the
-    // original 600s: best-effort frames each wait out their timeout, and 2x
-    // rendering is slower, so the full pass can run ~10-14 min.
-    testTimeout: 900_000,
+    // expanded ~60-frame pass needs headroom beyond the original 600s: best-
+    // effort frames each wait out their timeout, and this is a CAPTURE, so a
+    // slow host is the normal case rather than an error. Measured at 1x on a
+    // loaded machine (another session compiling in the same checkout): 583 s
+    // for 65 frames. At @2x the same walk is slower again. A timeout is a
+    // ceiling and costs nothing when the pass is fast, so it is 30 min.
+    testTimeout: 1_800_000,
     hookTimeout: 120_000,
     reporters: ["verbose"],
   },

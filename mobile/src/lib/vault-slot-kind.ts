@@ -2,7 +2,7 @@
 // probe in the live `VaultRuntimeState`).
 //
 // The Rust command lives at `plugin:vault-unlock|vault_slot_kind` (see
-// `src-tauri/src/plugins/vault_unlock/commands.rs`); permission entry
+// `core/src/plugins/vault_unlock/commands.rs`); permission entry
 // `allow-vault-slot-kind` is bundled under the existing
 // `vault-unlock:default` capability.
 //

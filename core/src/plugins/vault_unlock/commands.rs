@@ -48,11 +48,26 @@ pub(crate) struct DerivedKeys {
     pub(crate) items_key: Zeroizing<[u8; AEAD_KEY_LEN]>,
     pub(crate) items_key_id: [u8; 16],
     pub(crate) vault_meta_bytes_hash: [u8; 32],
+    /// The person keypair an identity-phrase unlock just DERIVED, so the caller
+    /// can install the person session from it. `None` on every password arm.
+    ///
+    /// Carried out rather than dropped inside the derivation, because the phrase is
+    /// the only credential that can produce it and the derivation has already been
+    /// paid for: an `NTV7` vault unlocked with the phrase was open while the person
+    /// session stayed empty, so the cycle refused to author a head
+    /// (`IdentityLocked`) and the user had to type the same twenty-four words a
+    /// second time in Settings (myne-md/myne#911 review).
+    pub(crate) person_pair: Option<(protocol::PersonKeyPair, [u8; 16])>,
 }
 
 enum VaultMetaPreview {
     Legacy(protocol::VaultMeta),
     Ntv6(protocol::B2bVaultMeta),
+    /// `NTV7`: the person-wrapped generation (myne-md/myne#911 task 5). Its base
+    /// is the same layout as every other generation, so the password arm derives
+    /// exactly as `Ntv6` does; what it adds is a `root_key` sealed to the owner's
+    /// person key, which is the arm an identity phrase opens.
+    Ntv7(Box<protocol::PersonWrappedVaultMeta>),
 }
 
 /// Resolve `<app_data_dir>/vault/vault.meta` for the running app.
@@ -157,6 +172,60 @@ pub async fn unlock_from_host(
     io: &dyn VaultIo,
     keychain: &dyn crate::vault_label::key::LabelKeychain,
 ) -> Result<(), VaultUnlockError> {
+    unlock_from_host_credential(
+        UnlockCredential::Password(Zeroizing::new(password)),
+        vault_id,
+        state,
+        hooks,
+        host,
+        io,
+        keychain,
+    )
+    .await
+}
+
+/// Open a person-born (`NTV7`) vault with the owner's identity phrase
+/// (myne-md/myne#911 task 5).
+///
+/// The phrase arrives already §7.4-normalized, exactly as the person plane's own
+/// entry points take it, so the one normalization lives where it already lives.
+/// It is the second credential the generation ships: the vault password still
+/// opens the vault, and so does the phrase, because both wrap the same
+/// `root_key`.
+///
+/// Every post-open step (the lock-then-unlock ordering, the switch teardown, the
+/// hydration) is shared with the password path rather than repeated, which is
+/// what keeps "an unlock" one meaning across two credentials.
+pub async fn unlock_with_person_phrase_from_host(
+    vault_id: Option<String>,
+    phrase_normalized: String,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+) -> Result<(), VaultUnlockError> {
+    unlock_from_host_credential(
+        UnlockCredential::PersonPhrase(Zeroizing::new(phrase_normalized)),
+        vault_id,
+        state,
+        hooks,
+        host,
+        io,
+        keychain,
+    )
+    .await
+}
+
+async fn unlock_from_host_credential(
+    credential: UnlockCredential,
+    vault_id: Option<String>,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+) -> Result<(), VaultUnlockError> {
     // SYNC-6 targeting: `Some(id)` → unlock exactly `vaults/<id>/` (the picker
     // of sub-feature 3 passes the chosen id); `None`/malformed → the sole-vault
     // fallback. The parsed id keys BOTH the path resolution and the slot map so
@@ -177,7 +246,7 @@ pub async fn unlock_from_host(
         crate::paths::vault_id_from_root(vault_path.parent().unwrap_or(&vault_path))
     });
 
-    unlock_with_path(password, target, &vault_path, state, io, host).await?;
+    unlock_with_credential(credential, target, &vault_path, state, io, host).await?;
 
     // A SWITCH occurred when a DIFFERENT vault was unlocked beforehand.
     // `set_unlocked_locking_others` (inside `unlock_with_path`) already dropped
@@ -683,6 +752,47 @@ pub async fn unlock<R: Runtime>(
     .await
 }
 
+/// IPC wrapper for the identity-phrase arm of the same unlock (myne-md/myne#911
+/// task 10).
+///
+/// The published surface of this command is the upgraded (`NTV7`) vault's second
+/// credential: the saved vault phrase is retired by the upgrade, and the identity
+/// phrase is what replaces it for recovery on this device. A vault of any other
+/// generation refuses it with the same non-distinguishing
+/// `InvalidCredentialOrVault` a wrong password gets, because a credential that
+/// does not apply to this vault must not be distinguishable from one that does.
+///
+/// The phrase is normalized here rather than by the caller: there is exactly one
+/// normalization (`protocol::normalize_user_phrase`) and three clients, so a
+/// caller that skipped it would derive a different person with no error anywhere.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn unlock_with_person_phrase<R: Runtime>(
+    vault_id: Option<String>,
+    phrase: String,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    app: AppHandle<R>,
+) -> Result<(), VaultUnlockError> {
+    // The IPC copy is the account's only credential, so it is wrapped before it is
+    // read: `src-tauri/AGENTS.md`'s Zeroizing pattern says the wrap is the first
+    // non-doc statement precisely so every early return drops a zeroed buffer, and
+    // this path used to normalize the raw `String` and hand the core a CLONE,
+    // leaving a second live copy for the whole call (myne-md/myne#911 review).
+    let phrase = zeroize::Zeroizing::new(phrase);
+    let normalized = protocol::normalize_user_phrase(&phrase);
+    unlock_with_person_phrase_from_host(
+        vault_id,
+        (*normalized).clone(),
+        state.inner(),
+        hooks.inner(),
+        &TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        crate::vault_label::key::platform_keychain(),
+    )
+    .await
+}
+
 /// MYND-160 pipeline steps 4-6: derive `prefs_key` from the just-
 /// unlocked `root_key`, read `vault.prefs` (falling back to defaults
 /// on absence / AEAD-fail / parse-fail per spec § 9.5.5), then apply
@@ -918,12 +1028,22 @@ pub(crate) async fn recover_pending_rekey_on_unlock(
             };
             let version =
                 protocol::meta_version_of(&new_meta).unwrap_or(protocol::MetaVersion::V0_1);
-            if new_meta.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+            // `NTV7` keeps `NTV6`'s tail byte for byte, so the group-tier arm
+            // below serves both: its `itemsKey` is group-sealed exactly the same
+            // way, and reading it through the root tier would install a key that
+            // opens nothing.
+            let is_ntv7 = new_meta.get(..4)
+                == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice());
+            if new_meta.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) || is_ntv7 {
                 // A group rotation wrote this journal: the committed meta is
                 // `NTV6`, whose `itemsKey` is group-sealed. Derive the group key
                 // first and install BOTH tiers, or the session keeps the retired
                 // keys and cannot read any note or shared singleton.
-                let Ok(b2b) = protocol::parse_vault_meta_ntv6(&new_meta) else {
+                let Ok(b2b) = (if is_ntv7 {
+                    protocol::parse_vault_meta_ntv7(&new_meta).map(|m| m.as_ntv6_tail())
+                } else {
+                    protocol::parse_vault_meta_ntv6(&new_meta)
+                }) else {
                     return;
                 };
                 let Ok(group) =
@@ -979,10 +1099,44 @@ pub async fn unlock_with_path(
     io: &dyn VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), VaultUnlockError> {
-    // Wrap immediately so any early-return path (VaultAlreadyUnlocked,
-    // UnlockInProgress, IO failure, parse failure) drops the wrapper
-    // and zeroes the bytes. Plain `String` would drop without zeroize.
-    let password = Zeroizing::new(password);
+    unlock_with_credential(
+        UnlockCredential::Password(Zeroizing::new(password)),
+        vault_id,
+        vault_path,
+        state,
+        io,
+        host,
+    )
+    .await
+}
+
+/// The one credential a vault unlock can present (myne-md/myne#911 task 5).
+///
+/// Two arms rather than two functions, because everything after the derivation
+/// is identical and ONE of them owns the teardown invariants: the slot swap, the
+/// lock-then-unlock ordering, `mark_full_unlock_done`, the success event. A
+/// second copy of that tail is how the two credentials would come to disagree
+/// about what an unlock means.
+enum UnlockCredential {
+    /// The vault password: Argon2id under the §3.1 password salt domain.
+    Password(Zeroizing<String>),
+    /// The person's identity phrase, which opens an `NTV7` vault's person wrap.
+    /// Already §7.4-normalized, and never logged.
+    PersonPhrase(Zeroizing<String>),
+}
+
+/// [`unlock_with_path`] with an explicit credential. See [`UnlockCredential`].
+async fn unlock_with_credential(
+    credential: UnlockCredential,
+    vault_id: Option<crate::vault_id::VaultId>,
+    vault_path: &Path,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), VaultUnlockError> {
+    // Both arms already hold `Zeroizing`, so every early-return path
+    // (VaultAlreadyUnlocked, UnlockInProgress, IO failure, parse failure) drops
+    // the wrapper and zeroes the bytes.
 
     // Host clock, not `Instant::now()`: the latter PANICS on
     // `wasm32-unknown-unknown` (std falls to its `unsupported` time backend).
@@ -1113,6 +1267,15 @@ pub async fn unlock_with_path(
             protocol::parse_vault_meta_ntv6(candidate)
                 .map(VaultMetaPreview::Ntv6)
                 .map(|meta| (meta, candidate.to_vec()))
+        } else if candidate.get(..4)
+            == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+        {
+            // Its own arm rather than the any-parser: the any-parser reads only
+            // the 345-byte base, and a preview that cannot see the tail would
+            // lose the generation the derivation below has to branch on.
+            protocol::parse_vault_meta_ntv7(candidate)
+                .map(|meta| VaultMetaPreview::Ntv7(Box::new(meta)))
+                .map(|meta| (meta, candidate.to_vec()))
         } else {
             protocol::parse_vault_meta_any(candidate)
                 .map(VaultMetaPreview::Legacy)
@@ -1170,45 +1333,74 @@ pub async fn unlock_with_path(
     let mut adopted: Option<Vec<u8>> = None;
     let mut derived: Option<DerivedKeys> = None;
 
-    if let Some(candidate) =
-        crate::plugins::vault_migrate::adopt::read_incoming_meta(io, &vault_root).await
-    {
-        // Its own preview parse: a staged meta belongs to a DIFFERENT
-        // generation, so the local meta's KDF params say nothing about what this
-        // one will ask the host to allocate.
-        match protocol::parse_vault_meta_any(&candidate) {
-            Ok(preview) => {
-                match derive_keys_from_meta_candidate(
-                    host,
-                    &preview,
-                    candidate.clone(),
-                    password.clone(),
-                )
-                .await
-                {
-                    Ok(keys) => {
-                        derived = Some(keys);
-                        adopted = Some(candidate);
-                    }
-                    Err(_) => {
-                        // Not an unlock failure: nothing has failed from the
-                        // user's side, and the local meta is about to answer.
-                        tracing::info!(
-                            stage = "staged_meta",
-                            event = "not_opened",
-                            "a staged newer-generation vault.meta did not open under this \
-                             credential; discarding it and using the local one"
-                        );
-                        crate::plugins::vault_migrate::adopt::discard_incoming_meta(
-                            io,
-                            &vault_root,
+    // A staged meta is a PASSWORD story: it is a newer generation a server pushed
+    // for the same vault, opened by the same credential. The identity phrase
+    // opens a wrap inside THIS vault's own frame, so there is nothing a staged
+    // one could answer and reading it would only spend an Argon2id.
+    if matches!(credential, UnlockCredential::Password(_)) {
+        if let Some(candidate) =
+            crate::plugins::vault_migrate::adopt::read_incoming_meta(io, &vault_root).await
+        {
+            // Its own preview parse: a staged meta belongs to a DIFFERENT
+            // generation, so the local meta's KDF params say nothing about what this
+            // one will ask the host to allocate.
+            match protocol::parse_vault_meta_any(&candidate) {
+                Ok(preview) => {
+                    // A staged meta belongs to a different generation than the local
+                    // one, so the derivation is dispatched on its OWN magic rather
+                    // than on the local preview's type. A staged `NTV7` opened with
+                    // the legacy arm would parse as a bare base and fail on the
+                    // group-sealed `items_key`.
+                    let staged_is_ntv7 = candidate.get(..4)
+                        == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice());
+                    let staged_result = if staged_is_ntv7 {
+                        match protocol::parse_vault_meta_ntv7(&candidate) {
+                            Ok(meta) => {
+                                derive_keys_from_ntv7_candidate(
+                                    host,
+                                    &meta,
+                                    candidate.clone(),
+                                    staged_password(&credential),
+                                )
+                                .await
+                            }
+                            Err(_) => Err(VaultUnlockError::InvalidVaultMeta),
+                        }
+                    } else {
+                        derive_keys_from_meta_candidate(
+                            host,
+                            &preview,
+                            candidate.clone(),
+                            staged_password(&credential),
                         )
-                        .await;
+                        .await
+                    };
+                    match staged_result {
+                        Ok(keys) => {
+                            derived = Some(keys);
+                            adopted = Some(candidate);
+                        }
+                        Err(_) => {
+                            // Not an unlock failure: nothing has failed from the
+                            // user's side, and the local meta is about to answer.
+                            tracing::info!(
+                                stage = "staged_meta",
+                                event = "not_opened",
+                                "a staged newer-generation vault.meta did not open under this \
+                             credential; discarding it and using the local one"
+                            );
+                            crate::plugins::vault_migrate::adopt::discard_incoming_meta(
+                                io,
+                                &vault_root,
+                            )
+                            .await;
+                        }
                     }
                 }
-            }
-            Err(_) => {
-                crate::plugins::vault_migrate::adopt::discard_incoming_meta(io, &vault_root).await;
+                Err(_) => {
+                    crate::plugins::vault_migrate::adopt::discard_incoming_meta(io, &vault_root)
+                        .await;
+                }
             }
         }
     }
@@ -1221,14 +1413,27 @@ pub async fn unlock_with_path(
         items_key,
         items_key_id,
         vault_meta_bytes_hash,
+        person_pair,
     } = match derived {
         Some(keys) => keys,
-        None => match &meta_preview {
-            VaultMetaPreview::Legacy(meta) => {
-                derive_keys_from_meta_candidate(host, meta, bytes, password).await?
+        None => match (&credential, &meta_preview) {
+            (UnlockCredential::Password(pw), VaultMetaPreview::Legacy(meta)) => {
+                derive_keys_from_meta_candidate(host, meta, bytes, pw.clone()).await?
             }
-            VaultMetaPreview::Ntv6(meta) => {
-                derive_keys_from_ntv6_candidate(host, meta, bytes, password).await?
+            (UnlockCredential::Password(pw), VaultMetaPreview::Ntv6(meta)) => {
+                derive_keys_from_ntv6_candidate(host, meta, bytes, pw.clone()).await?
+            }
+            (UnlockCredential::Password(pw), VaultMetaPreview::Ntv7(meta)) => {
+                derive_keys_from_ntv7_candidate(host, meta, bytes, pw.clone()).await?
+            }
+            (UnlockCredential::PersonPhrase(phrase), VaultMetaPreview::Ntv7(meta)) => {
+                derive_keys_from_person_phrase(host, meta, bytes, phrase.clone()).await?
+            }
+            // An identity phrase presented to a generation with no person wrap.
+            // Non-distinguishing on purpose (§6.4): the caller learns "this did
+            // not open", not which half was wrong.
+            (UnlockCredential::PersonPhrase(_), _) => {
+                return Err(VaultUnlockError::InvalidCredentialOrVault)
             }
         },
     };
@@ -1238,6 +1443,29 @@ pub async fn unlock_with_path(
     if let Some(promoted) = adopted {
         crate::plugins::vault_migrate::adopt::promote_incoming_meta(io, &vault_root, &promoted)
             .await;
+    }
+
+    // An identity-phrase unlock has ALREADY derived the person keypair, so install
+    // the session from it (myne-md/myne#911 review). Dropping it left the vault open
+    // while the cycle refused to author a head (`IdentityLocked`), so the user had
+    // to type the same twenty-four words again in Settings before sync would run.
+    // The carrier that used to cover this is deliberately excluded from `NTV7`.
+    // Never overwrites a session that is already installed for a different person.
+    if let Some((pair, person_id)) = person_pair {
+        if state.clone_person_identity().await.is_none() {
+            let generation = state.person_session_generation().await;
+            let _ = state
+                .install_person_session_if_generation(
+                    generation,
+                    crate::plugins::vault_unlock::state::PersonSessionInstall {
+                        pair,
+                        person_id,
+                        profile: None,
+                        transition: None,
+                    },
+                )
+                .await;
+        }
     }
 
     let now_ms = host.monotonic_millis();
@@ -1935,8 +2163,9 @@ pub(crate) async fn vault_status_with_path(
             });
         }
     };
-    // A present vault is v0.1 (`MYV1`), a migrated v0.2 (`NTV5`), or a B2B-migrated
-    // v0.2 (`NTV6`). All three are well-formed, unlockable vaults — the boot probe
+    // A present vault is v0.1 (`MYV1`), a migrated v0.2 (`NTV5`), a B2B-migrated
+    // v0.2 (`NTV6`), or a person-born `NTV7`. All of them are well-formed,
+    // unlockable vaults, the boot probe
     // must report `Exists` for the later two, not `Corrupted`, or a just-migrated
     // vault strands the user at the corrupted-recovery surface (§10.4.1;
     // automerge-sync-migration #420). Try the v0.1 parser first (the common case),
@@ -1947,6 +2176,7 @@ pub(crate) async fn vault_status_with_path(
         Err(e) => {
             if protocol::parse_vault_meta_v0_2(&bytes).is_ok()
                 || protocol::parse_vault_meta_ntv6(&bytes).is_ok()
+                || protocol::parse_vault_meta_ntv7(&bytes).is_ok()
             {
                 return Ok(VaultStatus::Exists);
             }
@@ -2008,6 +2238,78 @@ pub(crate) async fn vault_is_unlocked_with_state(
     // TRANSITIONAL (sub-feature 2): true iff SOME vault is unlocked (the
     // active vault). Task 4 routes by an explicit vault_id.
     Ok(state.active_vault_id().await.is_some())
+}
+
+/// Whether the active vault carries the `NTV7` person wrap, i.e. whether the
+/// owner's identity phrase is a credential for it (myne-md/myne#911 task 10).
+///
+/// **One bit, no generation vocabulary.** The unlock screen needs exactly one
+/// fact to decide what its recovery escape hatch says: after the explicit
+/// `NTV7` upgrade the saved vault phrase is retired, so offering "unlock with
+/// your vault recovery phrase" would point at a credential the upgrade deleted.
+/// A full generation enum here would leak a format taxonomy into the UI for a
+/// boolean question, and the two surfaces that already need generations (the
+/// upgrade form, the publish row) read them from their own commands.
+///
+/// Not a secret: the magic is the first four bytes of `vault.meta` and any
+/// reader of the directory already has it. Read-only, no permit, no Argon2id,
+/// no slot peek, safe to call before an unlock attempt.
+pub async fn vault_is_person_wrapped_from_host(
+    vault_id: Option<String>,
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+) -> Result<bool, VaultStatusError> {
+    // Resolve the target the way an unlock does: the active vault, else the
+    // host's SOLE vault id, and only then the transitional disk scan.
+    //
+    // The `sole_vault_id()` step is what makes this probe work at all on the
+    // browser, and its absence was measured (myne-md/myne#911 task 13): with no
+    // vault open the id is `None`, the fallback is
+    // `current_vault_root_from_base`, and that scans with `std::fs::read_dir`,
+    // which cannot run on wasm32. It therefore found nothing, fell through to
+    // the pre-multi-vault `vault/` layout, failed the read and answered `false`
+    // for a perfectly good `NTV7` container, hiding the only door back into a
+    // person-born vault in a browser, silently, because `false` is also the
+    // honest answer for "not a person vault".
+    // The EXPLICIT id wins, because the unlock screen renders for a vault the
+    // picker chose while nothing is active. Then the active vault, then the
+    // host's sole id, and only then the transitional disk scan. Without the
+    // explicit arm this answered for the wrong vault on any multi-vault install
+    // and hid the identity-phrase door on the vault that needed it
+    // (myne-md/myne#911 review).
+    let vault_id = crate::vault_id::VaultId::parse_optional(vault_id.as_deref())
+        .or(state.active_vault_id().await)
+        .or_else(|| host.sole_vault_id());
+    let path = vault_meta_path(host, vault_id).map_err(|_| VaultStatusError::IoError {
+        io_error_kind: IoFailureKind::Other,
+    })?;
+    // A missing or unreadable file is `false`, not an error: the question is
+    // "does this vault accept the identity phrase", and a vault that is not
+    // there does not. The boot probe already decides missing-vs-corrupted.
+    let bytes = match io.read(&path).await {
+        Ok(bytes) => bytes,
+        Err(_) => return Ok(false),
+    };
+    Ok(bytes.get(..4) == Some(protocol::VAULT_META_NTV7_MAGIC.as_slice()))
+}
+
+/// IPC wrapper. Delegates; the command name and payload the frontend sends are
+/// unchanged because this IS the registered command.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_is_person_wrapped<R: Runtime>(
+    vault_id: Option<String>,
+    state: State<'_, VaultRuntimeState>,
+    app: AppHandle<R>,
+) -> Result<bool, VaultStatusError> {
+    vault_is_person_wrapped_from_host(
+        vault_id,
+        &TauriHost::new(app),
+        state.inner(),
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 // ---- Multi-vault enumeration: `vault_list` (SYNC-4) -------------------
@@ -2082,6 +2384,18 @@ pub struct VaultSummary {
     pub icon: Option<String>,
     /// Last successful unlock (epoch ms) from the registry cache, if any.
     pub last_unlock: Option<u64>,
+    /// Whether this vault is reachable on a sync server (myne-md/myne#911 task 8).
+    ///
+    /// `false` is "device only": the vault exists here and nowhere else, which is
+    /// the ordinary state of a new vault and the one a user has to be able to see
+    /// without opening Sync. Derived from [`crate::plugins::sync::publish::published_state`],
+    /// which is device-local state plus `vault.meta`'s generation byte, so this
+    /// reads no key material and works while the vault is locked.
+    ///
+    /// A boolean, deliberately: the namespace it derives from is the vault's
+    /// `account_number_hash` (or its random `NTV7` binding), and both are on the
+    /// DENY-list for this projection.
+    pub published: bool,
 }
 
 /// Enumerate every discovered vault under `<app_data_dir>/vaults/` and
@@ -2249,6 +2563,25 @@ pub(crate) async fn vault_list_from_base(
     // do not pay a second `vaults/` scan + re-stat per call.
     let discovered = crate::vault_registry::discover_vaults(base);
     let registry = crate::vault_registry::load_or_rebuild_registry_with(base, &discovered);
+    project_summaries(discovered, Some(&registry), state, io, keychain).await
+}
+
+/// Project a discovered set into the picker's rows. The single body both the
+/// native walk and the io-seam walk share, so a browser's rows and a desktop's
+/// rows cannot drift (myne-md/myne#911 task 13).
+///
+/// `registry` is the `last_unlock` source and is `None` where there is none to
+/// consult: the web client keeps no `registry.json` (it is written with
+/// `std::fs`), so its rows carry `last_unlock: None` and the picker falls back
+/// to its own ordering, which is what a client with no unlock history would do
+/// anyway.
+pub(crate) async fn project_summaries(
+    discovered: Vec<crate::vault_registry::DiscoveredVault>,
+    registry: Option<&crate::vault_registry::VaultRegistry>,
+    state: &VaultRuntimeState,
+    io: &dyn VaultIo,
+    keychain: &dyn crate::vault_label::key::LabelKeychain,
+) -> Vec<VaultSummary> {
     let mut summaries = Vec::with_capacity(discovered.len());
     for discovered in discovered {
         let status = if discovered.well_formed {
@@ -2256,12 +2589,18 @@ pub(crate) async fn vault_list_from_base(
         } else {
             VaultSummaryStatus::Corrupted
         };
-        let last_unlock = registry.last_unlock_ms(&discovered.id);
+        let last_unlock = registry.and_then(|r| r.last_unlock_ms(&discovered.id));
         let label =
             resolve_summary_label(state, io, &discovered.root, discovered.id, keychain).await;
         // vault-icons: project the per-session decrypted icon glyph the same way
         // as the label — `Some` only for a this-session-cached vault (SYNC-3/4).
         let icon = state.cached_icon(discovered.id).await;
+        // Device-only vs published, which is a question about state and a magic
+        // byte rather than about keys: the picker asks it for vaults it cannot
+        // unlock, so it may not need one.
+        let published = crate::plugins::sync::publish::published_state(io, &discovered.root)
+            .await
+            .published;
         summaries.push(VaultSummary {
             // `Display` → canonical hyphenated string; the `root` PathBuf
             // (DENY-listed) is dropped on the move into this map.
@@ -2270,6 +2609,7 @@ pub(crate) async fn vault_list_from_base(
             label,
             icon,
             last_unlock,
+            published,
         });
     }
     summaries
@@ -2296,6 +2636,39 @@ pub(crate) async fn vault_list_from_base(
 /// way: a readable `vault.meta` is `Exists`, a container without one is
 /// `Corrupted` (surfaced, never dropped — `initialStageFromProbe` routes it to
 /// the re-bootstrap path), and nothing at all is an empty list.
+/// **Every container this client holds**, discovered through the io seam
+/// (myne-md/myne#911 task 13).
+///
+/// The web client's `vault_list`. It exists because [`vault_list_from_base`]
+/// discovers with `std::fs`, which cannot run on `wasm32`, and because the
+/// browser used to answer a single FIXED vault id instead of looking for what is
+/// there. Two vaults under one origin is what this makes possible.
+///
+/// No keychain: a browser has none, so `platform_keychain()` resolves to the
+/// unavailable arm and every label falls back to the session cache, exactly as
+/// the single-vault projection already behaved.
+pub async fn vault_list_via_io_from_host(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> Vec<VaultSummary> {
+    let Ok(base) = host.app_data_dir() else {
+        return Vec::new();
+    };
+    let discovered = crate::vault_registry::discover_vaults_via_io(io, &base).await;
+    project_summaries(
+        discovered,
+        None,
+        state,
+        io,
+        crate::vault_label::key::platform_keychain(),
+    )
+    .await
+}
+
+/// One fixed container, for the clients that hold exactly one (the web client
+/// before task 13, and every caller that resolves the sole vault). Kept because
+/// the single-vault path is still what a legacy install's container IS.
 pub async fn vault_list_single_from_host(
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
@@ -2320,6 +2693,7 @@ pub async fn vault_list_single_from_host(
             label: state.cached_label(id).await,
             icon: state.cached_icon(id).await,
             last_unlock: None,
+            published: false,
         }];
     }
     vec![VaultSummary {
@@ -2331,6 +2705,10 @@ pub async fn vault_list_single_from_host(
         label: state.cached_label(id).await,
         icon: state.cached_icon(id).await,
         last_unlock: None,
+        // No sync plane on a single-vault (browser) client: publishing is a
+        // desktop action until the web container carries a namespace record
+        // (myne-md/myne#911 task 13), so the honest answer here is "device only".
+        published: false,
     }]
 }
 
@@ -2470,6 +2848,7 @@ pub(crate) async fn derive_keys_from_meta_candidate(
                 items_key,
                 items_key_id,
                 vault_meta_bytes_hash,
+                person_pair: None,
             })
         })
         .await;
@@ -2519,6 +2898,142 @@ async fn derive_keys_from_ntv6_candidate(
             items_key,
             items_key_id: meta.base.items_key_id,
             vault_meta_bytes_hash: crate::vault_meta_hash::vault_meta_sha256(&bytes),
+            person_pair: None,
+        })
+    })
+    .await
+    .map_err(|_| VaultUnlockError::JoinFailure)?
+}
+
+/// The password inside a credential, for the staged-meta arm. The arm is only
+/// reached when the credential IS a password (see its guard), so the fallback is
+/// a value no derivation can succeed with rather than a credential leak.
+fn staged_password(credential: &UnlockCredential) -> Zeroizing<String> {
+    match credential {
+        UnlockCredential::Password(pw) => pw.clone(),
+        UnlockCredential::PersonPhrase(_) => Zeroizing::new(String::new()),
+    }
+}
+
+/// Derive the session keys for an `NTV7` vault from the owner's IDENTITY PHRASE,
+/// by opening the person wrap (myne-md/myne#911 task 5).
+///
+/// This is the half of the generation that retires the vault phrase: the same
+/// `root_key` the password wrap carries is sealed to the owner's person key, and
+/// the phrase re-derives that key on any device
+/// (`decisions/protocol/0604`). Everything after `root_key` is the group tier
+/// `NTV7` shares with `NTV6`, reached through the owner subkey.
+///
+/// The phrase is used exactly as the person plane uses it: §7.4 normalization,
+/// then the deterministic identity seed. Nothing here reads or writes the sealed
+/// person credential, so an identity whose cache is missing (a second device, a
+/// forgotten-and-recreated file) still opens the vault.
+async fn derive_keys_from_person_phrase(
+    host: &dyn HostCtx,
+    meta_preview: &protocol::PersonWrappedVaultMeta,
+    bytes: Vec<u8>,
+    phrase_normalized: Zeroizing<String>,
+) -> Result<DerivedKeys, VaultUnlockError> {
+    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
+        // The identity seed derives under the DEFAULT parameter set, not the
+        // vault's, so the ceiling is asked about that one.
+        let required_kib = protocol::DEFAULT_V0_1_KDF_PARAMS.m_kib;
+        if required_kib > ceiling_kib {
+            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: required_kib / 1024,
+                available_mib: ceiling_kib / 1024,
+            });
+        }
+    }
+
+    let meta = meta_preview.clone();
+    crate::task::run_blocking(move || {
+        let person_id = protocol::kdf::person_id_hash(&phrase_normalized);
+        let seed = protocol::kdf::derive_person_identity_seed(
+            &phrase_normalized,
+            &person_id,
+            &protocol::DEFAULT_V0_1_KDF_PARAMS,
+        )
+        .map_err(|_| VaultUnlockError::InvalidCredentialOrVault)?;
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        let owner = protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+
+        let root_key = protocol::open_person_wrapped_root_key(
+            &owner,
+            &meta.person_wrap,
+            &meta.base.items_key_id,
+        )
+        .map_err(|_| VaultUnlockError::InvalidCredentialOrVault)?;
+        let owner_key = protocol::OwnerKey::new(*root_key);
+        let tail = meta.as_ntv6_tail();
+        let group_bytes = protocol::unlock_group_key_ntv6(&tail, &owner_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+        let group_key = protocol::GroupKey::new(*group_bytes);
+        let items_key = protocol::unlock_items_key_ntv6(&tail, &group_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+
+        Ok(DerivedKeys {
+            root_key,
+            group_key: Some(group_bytes),
+            items_key,
+            items_key_id: meta.base.items_key_id,
+            vault_meta_bytes_hash: crate::vault_meta_hash::vault_meta_sha256(&bytes),
+            person_pair: Some((owner, person_id)),
+        })
+    })
+    .await
+    .map_err(|_| VaultUnlockError::JoinFailure)?
+}
+
+/// Derive the session keys for an `NTV7` vault from its PASSWORD.
+///
+/// The body is `NTV6`'s with one addition that is not visible here: `NTV7`'s
+/// frame carries the same group tier, so the owner subkey still unwraps the
+/// group key, the group subkey still unwraps `items_key`, and the password wrap
+/// is byte-identical in layout and AAD. That is what makes "the password unlocks
+/// it exactly as today" true rather than aspirational.
+///
+/// The person wrap is NOT opened here. It is the *other* credential for the same
+/// `root_key`, and a caller that opens it has a different first step but the same
+/// tail; see `open_root_key_with_person_identity`.
+async fn derive_keys_from_ntv7_candidate(
+    host: &dyn HostCtx,
+    meta_preview: &protocol::PersonWrappedVaultMeta,
+    bytes: Vec<u8>,
+    password: Zeroizing<String>,
+) -> Result<DerivedKeys, VaultUnlockError> {
+    if let Some(ceiling_kib) = host.max_kdf_memory_kib() {
+        let required_kib = meta_preview.base.kdf_params.m_kib;
+        if required_kib > ceiling_kib {
+            return Err(VaultUnlockError::KdfMemoryExceedsHostCapability {
+                required_mib: required_kib / 1024,
+                available_mib: ceiling_kib / 1024,
+            });
+        }
+    }
+
+    let meta = meta_preview.clone();
+    crate::task::run_blocking(move || {
+        let root_key = derive_root_key_v0_2(&password, &meta.base)?;
+        let owner_key = protocol::OwnerKey::new(*root_key);
+        // The tail is `NTV6`'s byte for byte, so the two helpers that unwrap it
+        // are reused rather than re-derived. Building the `NTV6` view costs one
+        // clone of a few hundred bytes and buys the exact code path the
+        // migration and every `NTV6` unlock already exercise.
+        let tail = meta.as_ntv6_tail();
+        let group_bytes = protocol::unlock_group_key_ntv6(&tail, &owner_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+        let group_key = protocol::GroupKey::new(*group_bytes);
+        let items_key = protocol::unlock_items_key_ntv6(&tail, &group_key)
+            .map_err(|_| VaultUnlockError::InvalidVaultMeta)?;
+
+        Ok(DerivedKeys {
+            root_key,
+            group_key: Some(group_bytes),
+            items_key,
+            items_key_id: meta.base.items_key_id,
+            vault_meta_bytes_hash: crate::vault_meta_hash::vault_meta_sha256(&bytes),
+            person_pair: None,
         })
     })
     .await
@@ -2781,6 +3296,169 @@ mod tests {
             assert!(
                 !logs_contain(MARKER),
                 "SECRET LEAK: password appeared in tracing output (DENY-list violation)"
+            );
+        });
+    }
+
+    // ---- task 5: the person-born (`NTV7`) generation ----
+
+    const PERSON_PHRASE: &str = "abandon ability able about above absent absorb abstract \
+         absurd abuse access accident account accuse achieve acid acoustic acquire across act \
+         action actor actress actual";
+
+    /// Build a person-born vault on disk: the `NTV7` frame plus the session's
+    /// own keys, so both credential arms can be checked against one root key.
+    fn seed_person_vault(
+        password: &str,
+    ) -> (
+        Vec<u8>,
+        [u8; AEAD_KEY_LEN],
+        protocol::PersonKeyPair,
+        [u8; 16],
+    ) {
+        let person_id = protocol::kdf::person_id_hash(PERSON_PHRASE);
+        let seed = protocol::kdf::derive_person_identity_seed(
+            PERSON_PHRASE,
+            &person_id,
+            &protocol::DEFAULT_V0_1_KDF_PARAMS,
+        )
+        .expect("identity seed");
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        let pair = protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+        let session = crate::plugins::vault_creation::commands::build_person_session(
+            crate::vault_id::VaultId::mint(),
+            password,
+            FAST_TEST_KDF,
+            crate::plugins::vault_creation::state::CreationPerson {
+                pair: pair.clone(),
+                person_id,
+                number: protocol::account_number_from_person_id(&person_id),
+            },
+        )
+        .expect("person session");
+        let root_key = *session.root_key;
+        let (bytes, _group) =
+            crate::plugins::vault_creation::commands::build_and_serialize_person_vault_meta(
+                &session,
+            )
+            .expect("serialize NTV7");
+        (bytes, root_key, pair, person_id)
+    }
+
+    #[test]
+    fn the_password_opens_a_person_born_vault_exactly_as_today() {
+        rt().block_on(async {
+            let (meta_bytes, root_key, _pair, _person_id) = seed_person_vault("person-born-pw");
+            let scratch = scratch_vault();
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "person-born-pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("the password unlocks an NTV7 vault");
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
+            let derived = derive_keys_from_ntv7_candidate(
+                &crate::host::NoopHost,
+                &parsed,
+                meta_bytes.clone(),
+                Zeroizing::new("person-born-pw".to_string()),
+            )
+            .await
+            .expect("password arm");
+            assert_eq!(*derived.root_key, root_key);
+            assert!(
+                derived.group_key.is_some(),
+                "an NTV7 session always carries the group tier"
+            );
+        });
+    }
+
+    #[test]
+    fn the_identity_phrase_opens_a_person_born_vault() {
+        rt().block_on(async {
+            let (meta_bytes, root_key, _pair, _person_id) = seed_person_vault("person-born-pw");
+            let scratch = scratch_vault();
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_with_credential(
+                UnlockCredential::PersonPhrase(Zeroizing::new(PERSON_PHRASE.to_string())),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("the identity phrase unlocks its own vault");
+            assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
+
+            let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
+            let derived = derive_keys_from_person_phrase(
+                &crate::host::NoopHost,
+                &parsed,
+                meta_bytes.clone(),
+                Zeroizing::new(PERSON_PHRASE.to_string()),
+            )
+            .await
+            .expect("phrase arm");
+            assert_eq!(*derived.root_key, root_key);
+        });
+    }
+
+    #[test]
+    fn a_wrong_phrase_and_a_legacy_vault_both_refuse_without_saying_which() {
+        rt().block_on(async {
+            // (a) A different phrase against an NTV7 vault.
+            let (meta_bytes, _root, _pair, _id) = seed_person_vault("person-born-pw");
+            let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
+            let wrong = derive_keys_from_person_phrase(
+                &crate::host::NoopHost,
+                &parsed,
+                meta_bytes.clone(),
+                Zeroizing::new(
+                    "legal winner thank year wave sausage worth useful legal winner thank yellow"
+                        .to_string(),
+                ),
+            )
+            .await;
+            assert!(
+                matches!(wrong, Err(VaultUnlockError::InvalidCredentialOrVault)),
+                "a wrong phrase must be non-distinguishing"
+            );
+
+            // (b) The same phrase against a legacy (`NTV5`) vault, which has no
+            // person wrap to open.
+            let legacy = scratch_vault();
+            let (legacy_bytes, _) = seed_vault_meta("legacy-pw");
+            legacy.write_meta(&legacy_bytes);
+            let state = VaultRuntimeState::default();
+            let refused = unlock_with_credential(
+                UnlockCredential::PersonPhrase(Zeroizing::new(PERSON_PHRASE.to_string())),
+                None,
+                legacy.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(
+                matches!(refused, Err(VaultUnlockError::InvalidCredentialOrVault)),
+                "an identity phrase must not open a generation with no person wrap, got {refused:?}"
+            );
+            assert_eq!(
+                state.slot_kind(test_vault_id()).await,
+                SlotKind::Empty,
+                "a refused credential leaves no half-open slot"
             );
         });
     }
@@ -5236,6 +5914,50 @@ mod tests {
             assert_eq!(
                 uncached_s.label, None,
                 "a never-this-session-unlocked vault projects None (neutral fallback)"
+            );
+        });
+    }
+
+    /// myne-md/myne#911 task 8: the row's device-only/published marker is
+    /// projected per vault, from the durable record rather than from any session
+    /// state. One vault has published (a namespace recorded), the other has not,
+    /// and the assertion is in BOTH directions so a constant `false` fails.
+    #[test]
+    fn vault_list_projects_the_publish_state_per_vault() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vlist-published").unwrap();
+            let published = seed_disk_vault(tmp.path(), true);
+            let device_only = seed_disk_vault(tmp.path(), true);
+            let st = crate::plugins::sync::state::SyncState {
+                namespace_hex: Some("cd".repeat(16)),
+                ..crate::plugins::sync::state::SyncState::default()
+            };
+            crate::plugins::sync::state::write_sync_state(
+                &StdVaultIo,
+                &tmp.path().join(VAULTS_DIR).join(&published),
+                &st,
+            )
+            .await
+            .expect("record the namespace");
+
+            let state = VaultRuntimeState::default();
+            let summaries =
+                vault_list_from_base(tmp.path(), &state, &StdVaultIo, &FakeKeychain::empty()).await;
+            let published_s = summaries
+                .iter()
+                .find(|s| s.id == published)
+                .expect("published");
+            let device_only_s = summaries
+                .iter()
+                .find(|s| s.id == device_only)
+                .expect("device only");
+            assert!(
+                published_s.published,
+                "a recorded namespace means published"
+            );
+            assert!(
+                !device_only_s.published,
+                "a vault with no record and no token is device only"
             );
         });
     }

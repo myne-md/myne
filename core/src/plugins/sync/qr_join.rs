@@ -16,11 +16,14 @@
 //!
 //! ## Format
 //!
-//! v2 (current):
+//! v3 (current):
 //!
 //! ```text
 //! MYQR<version>|<kind>|<endpoint_url>|<target>|<cert_pin_hex|->|<generated_at>
 //! ```
+//!
+//! v2 (still decoded, a desktop that predates the person account emits it):
+//! the same layout with kinds `a` and `m` only.
 //!
 //! v1 (legacy, still decoded — an older desktop emits it):
 //!
@@ -31,11 +34,13 @@
 //! - `MYQR` — magic prefix; a scanned string without it is "not a Myne join QR".
 //! - `<version>` — one ASCII digit; a scanner rejects any other version with a
 //!   distinct [`QrJoinDecodeError::UnsupportedVersion`] instead of mis-parsing.
-//! - `<kind>` — `a` (the vault ACCOUNT, owner device-join) or `m` (a shared
-//!   vault, member device-join). See [`QrJoinTarget`].
+//! - `<kind>`, `a` (the vault ACCOUNT, legacy owner device-join), `m` (a shared
+//!   vault, member device-join), or `p` (the PERSON, an owner's device-join on
+//!   the identity model). See [`QrJoinTarget`].
 //! - `<target>` — for `a`, the canonical 20-char Crockford `<account#>`,
 //!   re-validated via Damm-32 on both encode and decode; for `m`, the vault's
-//!   16-byte `account_number_hash` as 32 lowercase hex.
+//!   16-byte `account_number_hash` as 32 lowercase hex; for `p`, the person id
+//!   (16 bytes) as 32 lowercase hex.
 //! - cert-pin slot — the 64-hex leaf-cert SHA-256, or `-` when no pin is carried
 //!   (hosted / loopback producer).
 //! - `<generated_at>` — unix seconds; drives the ephemeral freshness check
@@ -65,7 +70,14 @@ pub const QR_JOIN_MAGIC: &str = "MYQR";
 /// QR, because an older desktop still emits one and the phone scanning it is the
 /// newer build. The reverse fails loudly and safely — a v1 scanner handed a v2
 /// code reports `UnsupportedVersion`, which the UI renders as "update the app".
-pub const QR_JOIN_VERSION: u8 = 2;
+pub const QR_JOIN_VERSION: u8 = 3;
+
+/// v2, the first kind-tagged layout. Still decoded, and its kind set is NARROWER
+/// than v3's on purpose: a `p` target under version 2 is what a buggy producer
+/// would emit, and version 3 is how a producer says "I know about the person
+/// kind". An older reader handed a v3 code answers `UnsupportedVersion`, which
+/// the UI renders as "update the app", the honest message.
+const QR_JOIN_VERSION_TARGET_KINDS: u8 = 2;
 
 /// The legacy payload version, still decoded (see [`QR_JOIN_VERSION`]).
 const QR_JOIN_VERSION_LEGACY: u8 = 1;
@@ -82,11 +94,23 @@ pub enum QrJoinTarget {
     /// proves the **24-word recovery phrase** instead, self-approves, and fetches
     /// the vault's keys from the group package the owner already pushed.
     MemberVault { account_hash_hex: String },
+    /// The PERSON, by their 16-byte person id as 32 lowercase hex
+    /// (myne-md/myne#911 task 9). The identity-model owner's device-join: the
+    /// scanner proves the 24-word phrase, registers as a device of that person's
+    /// account, waits for one approval, and then sees every vault the person
+    /// owns.
+    ///
+    /// Not the vault account number, which a vault born under an identity does
+    /// not have. Not the person identity code either: that carries the public
+    /// halves and is long enough to make a QR hard to scan, while the id is all
+    /// the joining device needs to check it reached the account it scanned.
+    Person { person_id_hex: String },
 }
 
 /// One-character wire tag for each target kind. Legible on purpose: a raw QR
 /// string is the artefact a support conversation has to read out loud.
 const KIND_ACCOUNT_WIRE: &str = "a";
+const KIND_PERSON_WIRE: &str = "p";
 const KIND_MEMBER_WIRE: &str = "m";
 
 /// Ephemeral freshness window for a scanned payload (MYND-466 grill Q8).
@@ -138,6 +162,9 @@ pub enum QrJoinEncodeError {
     /// The vault account hash is not 32 lowercase hex characters.
     #[error("vault account hash is not 32 lowercase hex characters")]
     InvalidAccountHash,
+    /// The person id is not 32 lowercase hex characters.
+    #[error("person id is not 32 lowercase hex characters")]
+    InvalidPersonId,
     /// A field contains the reserved `|` delimiter (a malformed endpoint URL).
     #[error("field contains the reserved delimiter")]
     DelimiterInField,
@@ -186,6 +213,12 @@ fn is_valid_account_hash(hex: &str) -> bool {
         && hex
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+}
+
+/// Lowercase hex, exactly 16 bytes' worth. Same rule as [`is_valid_account_hash`]
+/// and for the same reason: one spelling on the wire between two devices.
+fn is_valid_person_id(hex: &str) -> bool {
+    is_valid_account_hash(hex)
 }
 
 /// Canonicalize an account number string via the protocol crate's parser (accepts
@@ -243,6 +276,31 @@ impl QrJoinPayload {
         )
     }
 
+    /// Build a PERSON payload: an owner's device-join on the identity model
+    /// (myne-md/myne#911 task 9).
+    ///
+    /// Carries no cert pin (there is no pin to carry; see [`Self::new`]) and no
+    /// account number, because the vault it serves has none. Nothing in it is a
+    /// secret: the person id is the hash the identity code already publishes.
+    pub fn person(
+        endpoint_url: impl Into<String>,
+        person_id_hex: &str,
+        generated_at: u64,
+    ) -> Result<Self, QrJoinEncodeError> {
+        let id = person_id_hex.trim();
+        if !is_valid_person_id(id) {
+            return Err(QrJoinEncodeError::InvalidPersonId);
+        }
+        Self::with_target(
+            endpoint_url.into(),
+            QrJoinTarget::Person {
+                person_id_hex: id.to_string(),
+            },
+            None,
+            generated_at,
+        )
+    }
+
     fn with_target(
         endpoint_url: String,
         target: QrJoinTarget,
@@ -268,6 +326,7 @@ impl QrJoinPayload {
         match &self.target {
             QrJoinTarget::Account { account_number } => account_number,
             QrJoinTarget::MemberVault { account_hash_hex } => account_hash_hex,
+            QrJoinTarget::Person { person_id_hex } => person_id_hex,
         }
     }
 
@@ -284,6 +343,12 @@ impl QrJoinPayload {
                     return Err(QrJoinEncodeError::InvalidAccountHash);
                 }
                 (KIND_MEMBER_WIRE, account_hash_hex.clone())
+            }
+            QrJoinTarget::Person { person_id_hex } => {
+                if !is_valid_person_id(person_id_hex) {
+                    return Err(QrJoinEncodeError::InvalidPersonId);
+                }
+                (KIND_PERSON_WIRE, person_id_hex.clone())
             }
         };
         if self.endpoint_url.contains('|') {
@@ -331,10 +396,11 @@ impl QrJoinPayload {
             });
         }
 
-        if version != QR_JOIN_VERSION {
+        if version != QR_JOIN_VERSION && version != QR_JOIN_VERSION_TARGET_KINDS {
             return Err(QrJoinDecodeError::UnsupportedVersion(version));
         }
-        // v2: `kind|endpoint|slot|pin|generated_at`.
+        // v2 and v3 share the layout: `kind|endpoint|slot|pin|generated_at`.
+        // They differ only in which kinds each may carry (see the constants).
         if parts.len() != 5 {
             return Err(QrJoinDecodeError::Malformed);
         }
@@ -351,6 +417,17 @@ impl QrJoinPayload {
                 }
                 QrJoinTarget::MemberVault {
                     account_hash_hex: parts[2].to_string(),
+                }
+            }
+            KIND_PERSON_WIRE => {
+                // A person target is only legal under v3. Under v2 it is a
+                // producer bug, and guessing would enrol a device against an
+                // account the scanner never named.
+                if version != QR_JOIN_VERSION || !is_valid_person_id(parts[2]) {
+                    return Err(QrJoinDecodeError::Malformed);
+                }
+                QrJoinTarget::Person {
+                    person_id_hex: parts[2].to_string(),
                 }
             }
             // A kind this build does not know is a NEWER payload wearing a version
@@ -456,7 +533,7 @@ mod tests {
             .encode()
             .unwrap();
         // Swap the version digit 2 -> 9 (right after the MYQR magic).
-        let bumped = good.replacen("MYQR2|", "MYQR9|", 1);
+        let bumped = good.replacen(&format!("MYQR{QR_JOIN_VERSION}|"), "MYQR9|", 1);
         assert_eq!(
             QrJoinPayload::decode(&bumped),
             Err(QrJoinDecodeError::UnsupportedVersion(9))
@@ -496,6 +573,10 @@ mod tests {
             QrJoinPayload::decode("MYQR2|a|b|c|d|e|f"),
             Err(QrJoinDecodeError::Malformed)
         );
+        assert_eq!(
+            QrJoinPayload::decode("MYQR3|p|b"),
+            Err(QrJoinDecodeError::Malformed)
+        );
     }
 
     /// A kind byte this build does not know is a broken/newer producer wearing a
@@ -507,6 +588,66 @@ mod tests {
         let acct = fresh_account();
         let s = format!("MYQR2|z|https://s.example|{}|-|1", acct);
         assert_eq!(QrJoinPayload::decode(&s), Err(QrJoinDecodeError::Malformed));
+    }
+
+    // ── the person target (myne-md/myne#911 task 9) ─────────────────────────
+
+    fn decoded_target(s: &str) -> QrJoinTarget {
+        QrJoinPayload::decode(s).expect("decode").target
+    }
+
+    /// The owner's device-join on the identity model: the payload names the
+    /// PERSON, and nothing in it is a secret.
+    #[test]
+    fn person_round_trips() {
+        let id = "cd".repeat(16);
+        let payload =
+            QrJoinPayload::person("https://sync.example.org", &id, 1_700_000_000).expect("payload");
+        let encoded = payload.encode().expect("encode");
+        assert_eq!(
+            decoded_target(&encoded),
+            QrJoinTarget::Person {
+                person_id_hex: id.clone()
+            }
+        );
+        assert_eq!(QrJoinPayload::decode(&encoded).unwrap(), payload);
+    }
+
+    #[test]
+    fn person_refuses_an_id_that_is_not_32_lowercase_hex() {
+        let short = "cd".repeat(15);
+        let upper = "CD".repeat(16);
+        let junk = "zz".repeat(16);
+        for bad in ["", short.as_str(), upper.as_str(), junk.as_str()] {
+            assert_eq!(
+                QrJoinPayload::person("https://s.example", bad, 1),
+                Err(QrJoinEncodeError::InvalidPersonId),
+                "person id {bad:?} must be refused"
+            );
+        }
+    }
+
+    /// A `p` target is legal ONLY under v3, and that is the whole reason the
+    /// version moved: a v2 reader (an older phone) handed a person code must say
+    /// "update the app" rather than mis-parse it, and a v2 PRODUCER claiming a
+    /// person target is a bug rather than a code from the future.
+    #[test]
+    fn a_person_target_under_version_two_is_malformed() {
+        let s = format!("MYQR2|p|https://s.example|{}|-|1", "cd".repeat(16));
+        assert_eq!(QrJoinPayload::decode(&s), Err(QrJoinDecodeError::Malformed));
+    }
+
+    /// v2's own kinds keep decoding under themselves, which is the compatibility
+    /// half of the version bump (an older desktop still emits `MYQR2`).
+    #[test]
+    fn a_version_two_member_payload_still_decodes() {
+        let s = format!("MYQR2|m|https://s.example|{}|-|1", "ab".repeat(16));
+        assert_eq!(
+            decoded_target(&s),
+            QrJoinTarget::MemberVault {
+                account_hash_hex: "ab".repeat(16)
+            }
+        );
     }
 
     // ── the member-vault target (myne-md/myne) ───────────────────────────────
@@ -530,11 +671,10 @@ mod tests {
         );
         let decoded = QrJoinPayload::decode(&payload.encode().expect("encode")).expect("decode");
         assert_eq!(decoded, payload);
-        // The wire form is the v2 shape, with the member kind tag.
-        assert!(payload
-            .encode()
-            .unwrap()
-            .starts_with("MYQR2|m|https://sync.example.org|"));
+        // The wire form is the kind-tagged shape, with the member kind tag.
+        assert!(payload.encode().unwrap().starts_with(&format!(
+            "MYQR{QR_JOIN_VERSION}|m|https://sync.example.org|"
+        )));
     }
 
     /// The distance from the owner layout is the whole reason the kind exists: an
@@ -544,7 +684,10 @@ mod tests {
     fn the_two_target_kinds_are_not_interchangeable() {
         let acct = fresh_account();
         let account = QrJoinPayload::new("https://s.example", &acct, None, 1).unwrap();
-        assert!(account.encode().unwrap().starts_with("MYQR2|a|"));
+        assert!(account
+            .encode()
+            .unwrap()
+            .starts_with(&format!("MYQR{QR_JOIN_VERSION}|a|")));
 
         // A hash in the account slot fails Damm-32…
         let hash = "ab".repeat(16);

@@ -165,6 +165,27 @@ export async function seedVault(session: Session, v: VaultFixture): Promise<void
 }
 
 /**
+ * Seed the same vault into a NAMED container root (myne-md/myne#911 task 13).
+ *
+ * The lane's other seeders all write to [`VAULT_ROOT`], the one fixed container
+ * a browser used to have. This one takes the root so a scenario can put a second
+ * container beside it, which is the state the multi-vault work exists for and
+ * the only way to produce it without driving two full creations.
+ *
+ * The bytes are the same fixture, so the two containers differ in exactly one
+ * way: their directory name. That is deliberate: what is under test is whether
+ * the client DISCOVERS both, not whether two different vaults can hold different
+ * content.
+ */
+export async function seedVaultAt(
+  session: Session,
+  root: string,
+  v: VaultFixture,
+): Promise<void> {
+  await seedFiles(session, root, v.files, "unlockable-vault-at");
+}
+
+/**
  * Seed a vault whose device enrolled but is **awaiting approval** (MYND-635).
  *
  * The state is a triple the client reads from disk: a device identity

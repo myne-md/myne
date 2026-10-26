@@ -23,13 +23,16 @@ const HELP: &str = "\
 myne-decrypt: export a Myne vault to plain markdown without the app installed
 
 USAGE:
-    myne-decrypt [--recovery] [--history] [--yes] <vault-or-backup> <out-dir>
+    myne-decrypt [--recovery | --identity] [--history] [--yes] <vault-or-backup> <out-dir>
 
 ARGUMENTS:
     <vault-or-backup>   A vault directory, or a .myne-backup container file
     <out-dir>           Where the plain markdown tree is written
 
 OPTIONS:
+    --identity          Unlock with the 24-word IDENTITY phrase instead of the
+                        master password (a vault created from an identity has
+                        that phrase as its second credential, not a vault one)
     --recovery          Unlock with the 24-word recovery phrase instead of
                         the master password
     --history           Also export note snapshots (version history)
@@ -67,7 +70,7 @@ fn main() -> ExitCode {
     // Credential entry: TTY prompt with echo off, or stdin pipe. The BIP-39
     // checksum is validated here (recovery mode) BEFORE the Argon2id KDF, so
     // a typo is caught in milliseconds rather than after a 1-3 s derivation.
-    let credential = match password::read_credential(parsed.recovery) {
+    let credential = match password::read_credential(parsed.recovery, parsed.identity) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("myne-decrypt: {e}");
@@ -114,11 +117,18 @@ fn main() -> ExitCode {
         password::Credential::RecoveryPhrase(phrase) => {
             unlock::unlock_with_phrase(&vault_dir, phrase)
         }
+        password::Credential::IdentityPhrase(phrase) => {
+            unlock::unlock_with_identity(&vault_dir, phrase)
+        }
     };
     let vault = match unlocked {
         Ok(v) => v,
         Err(unlock::UnlockError::InvalidCredentialOrVault) => {
             eprintln!("myne-decrypt: wrong password/phrase, or the vault is damaged");
+            eprintln!(
+                "  A vault created from an identity opens with the master password or --identity, \
+                 not with a vault recovery phrase."
+            );
             return ExitCode::FAILURE;
         }
         Err(unlock::UnlockError::InvalidVaultMeta) => {

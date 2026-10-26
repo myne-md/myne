@@ -8,10 +8,9 @@
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the account plugin: read the account grouping, rename an account, move a vault between accounts, and split a vault into a fresh account."
+description = "Default permission set for the account plugin: read the account grouping, move a vault between accounts, and split a vault into a fresh account."
 permissions = [
   "allow-account-list",
-  "allow-account-rename",
   "allow-account-move",
   "allow-account-split",
 ]
@@ -20,11 +19,6 @@ permissions = [
 identifier = "allow-account-list"
 description = "Allow invoking account:account_list (read the device-local account grouping from app_config_dir/account.json; absent means no grouping, a damaged file rebuilds from the disk-scan). A list of accounts out; no vault content, no keychain write."
 commands.allow = ["account_list"]
-
-[[permission]]
-identifier = "allow-account-rename"
-description = "Allow invoking account:account_rename (rename the account owning a vault). Takes a vault id and a label; writes the sealed record. No vault content."
-commands.allow = ["account_rename"]
 
 [[permission]]
 identifier = "allow-account-move"

@@ -41,13 +41,16 @@ const STAGE_DIR = join(repoRoot, "src-tauri", "binaries");
 /**
  * Parse the shared CLI surface: `[--profile debug|release] [--target <triple>]
  * [--no-build]`. `scriptName` only shapes the error messages.
+ *
+ * `args.features` is deliberately NOT parsed from the command line: it is set by
+ * the one caller whose package declares features (see `build-clipper-host.mjs`).
  */
 export function parseArgs(argv, scriptName) {
   const fail = (message) => {
     console.error(`${scriptName}: ${message}`);
     process.exit(1);
   };
-  const args = { profile: "release", target: null, build: true };
+  const args = { profile: "release", target: null, build: true, features: [] };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--profile") {
@@ -116,9 +119,39 @@ export function stageSidecar({ scriptName, package: pkg, binName, args }) {
   const exeSuffix = triple.includes("windows") ? ".exe" : "";
 
   if (args.build) {
+    // ── The bootstrap, and why a placeholder is written BEFORE cargo runs ──
+    //
+    // `src-tauri/build.rs` refuses to compile the myne-desktop package while an
+    // `externalBin` entry is missing from disk. `myne` and `myne-tor` are crates
+    // of their own, so nothing about them is needed to compile that package. The
+    // browser clipper's host is a bin INSIDE it, which makes staging it a
+    // chicken-and-egg: the build that produces the file trips the check on the
+    // file it is about to produce.
+    //
+    // The placeholder is zero bytes and is overwritten two steps below by the
+    // real binary. It cannot be bundled by accident: a failed cargo run exits
+    // through `onToolFailure: "fatal"` before anything stages it.
+    const destination = join(
+      repoRoot,
+      "src-tauri",
+      "binaries",
+      `${binName}-${triple}${exeSuffix}`,
+    );
+    if (!existsSync(destination)) {
+      mkdirSync(dirname(destination), { recursive: true });
+      writeFileSync(destination, "");
+    }
     const cargoArgs = ["build", "-p", pkg, "--bin", binName];
     if (args.profile === "release") cargoArgs.push("--release");
     if (args.target) cargoArgs.push("--target", args.target);
+    // `features` is OPT-IN and only the caller that knows its package declares
+    // them sets it (`build-clipper-host.mjs`). `myne` and `myne-tor` are their
+    // own crates with no such features, so a shared env var read here refused
+    // those builds outright: `the package 'myne-cli' does not contain these
+    // features`. The list belongs to the package, not to the stager.
+    if (args.features !== undefined && args.features.length > 0) {
+      cargoArgs.push("--features", args.features.join(","));
+    }
     // FATAL (myne#528). A cargo build is slow enough that silence reads as a
     // hang, so the diagnostics are what make the wait legible, not noise.
     runTool(["cargo", ...cargoArgs], { cwd: repoRoot, onToolFailure: "fatal" });

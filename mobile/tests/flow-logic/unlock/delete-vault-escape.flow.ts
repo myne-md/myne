@@ -16,9 +16,10 @@ test.describe("mobile delete-vault escape", () => {
     await page.getByTestId("unlock-delete-confirm").click();
 
     // Lands back on Welcome (fresh-start), and the real delete IPC ran once.
-    // Welcome's vault door is "Create a local vault instead" since the
-    // identity-first first run (myne-md/myne#768).
-    await expect(page.getByRole("button", { name: "Create a local vault instead" })).toBeVisible();
+    // Welcome's ONE create door is the identity chain since myne-md/myne#911 task
+    // 12: the "Create a local vault instead" fork is gone, so the assertion is the
+    // primary CTA rather than a vault-specific ghost button.
+    await expect(page.getByTestId("welcome.create-cta")).toBeVisible();
     expect(await page.evaluate(() => (window as unknown as { __vaultDeletes?: number }).__vaultDeletes ?? 0)).toBe(1);
   });
 
@@ -34,8 +35,7 @@ test.describe("mobile delete-vault escape", () => {
 
     await expect(page.getByTestId("unlock-delete-error")).toBeVisible();
     await page.getByTestId("unlock-delete-continue").click();
-    // Welcome's vault door is "Create a local vault instead" since the
-    // identity-first first run (myne-md/myne#768).
-    await expect(page.getByRole("button", { name: "Create a local vault instead" })).toBeVisible();
+    // Same landing surface as the case above, same one door.
+    await expect(page.getByTestId("welcome.create-cta")).toBeVisible();
   });
 });

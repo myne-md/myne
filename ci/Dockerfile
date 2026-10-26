@@ -25,12 +25,13 @@
 # hand, and the workflows pin the result BY DIGEST rather than by tag so a
 # republished tag cannot silently change what a gate ran on.
 #
-# WHY `ci-e2e-lane.sh` IS NOT ON THIS IMAGE. It installs a deliberately
-# different, RUNTIME-only set (`webkit2gtk-driver`, `xvfb`, `xauth`, no -dev
-# header chains) because it consumes a prebuilt binary. Folding those into this
-# image would make every push pull xvfb and a webkit driver no push step uses,
-# and that lane is manual and pre-release, so its install cost is paid a handful
-# of times per release rather than on every push.
+# WHY `ci-e2e-lane.sh` IS NOT ON THIS IMAGE. It needs a deliberately different,
+# RUNTIME-only set (`webkit2gtk-driver`, `xvfb`, `xauth`, `xdotool`, no -dev
+# header chains) because it consumes a prebuilt binary. Folding those in here
+# would make every push step pull xvfb and a WebKit driver no push step uses, so
+# they live in `ci/e2e/Dockerfile`, which is FROM this image BY DIGEST and adds
+# only that set plus `tauri-driver`. The two are published independently and the
+# digest of this file is what the child inherits.
 #
 # EVERY VERSION BELOW IS PINNED SOMEWHERE ELSE IN THE REPO, and
 # `scripts/check-ci-image.mjs` is what holds the two in step. Bump a version

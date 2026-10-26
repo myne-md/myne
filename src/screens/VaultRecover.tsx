@@ -35,15 +35,18 @@
 // cancel, and `onCompleteSuccess` (App transitions to `editor`) on
 // A8f success. No defensive cleanup, no `beforeunload` listener.
 
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import i18n from "../i18n";
 import { DeleteVaultConfirmForm } from "../components/DeleteVaultConfirmForm";
 import { FailClosedError } from "../components/FailClosedError";
+import { PersonPhraseUnlock } from "../components/PersonPhraseUnlock";
 import { failClosedExit, FAIL_CLOSED_EXIT_LABEL_KEY } from "../platform/app-exit";
+import * as capabilities from "../platform/capabilities";
 import { ioBanner } from "../lib/io-banner";
 import type { RecoverSubStep } from "../lib/stage";
 import { listVaults, soleVaultId } from "../lib/vault-list";
 import { recoverWithPhrase } from "../lib/vault-recover";
+import { vaultIsPersonWrapped } from "../lib/vault-format-upgrade";
 import {
   deleteVault,
   mapDeleteVaultError,
@@ -209,6 +212,38 @@ export function VaultRecover({
     };
   }, []);
 
+  // The picker lists EVERY vault on disk, and one of them may be person-wrapped
+  // (`NTV7`): the explicit upgrade retired that vault's own phrase, so the
+  // identity phrase is its second credential, and sending the user to the
+  // recovery grid would end in "that phrase is wrong" for words that are right
+  // (myne-md/myne#911 review). The probe is the same `vault_is_person_wrapped`
+  // read `Unlock.tsx` branches on, behind the same capability gate: a client
+  // without the person plane must not offer an arm whose command refuses.
+  //
+  // The choice is local state rather than a reducer action because the reducer's
+  // `select` sub-step is exactly where the picker lives: staying in it means
+  // Cancel on the identity grid returns to the picker rather than leaving
+  // recovery altogether.
+  const [personVaultId, setPersonVaultId] = useState<string | null>(null);
+  const chooseVault = (vaultId: string) => {
+    const toPhraseEntry = () => {
+      if (mountedRef.current) dispatch({ type: "vault-selected", vaultId });
+    };
+    if (!capabilities.has("personVaultCredential")) {
+      toPhraseEntry();
+      return;
+    }
+    void vaultIsPersonWrapped(vaultId)
+      .then((wrapped) => {
+        if (wrapped && mountedRef.current) setPersonVaultId(vaultId);
+        else toPhraseEntry();
+      })
+      // A probe that cannot answer falls back to the ordinary phrase-entry path:
+      // the failure this closes is a WRONG offer, and guessing a different one
+      // would be a different wrong answer.
+      .catch(toPhraseEntry);
+  };
+
   // MYND-206 multi-vault recovery gate. On a COLD-START mount (the orchestrator
   // entered via `unlock.start-recovery` → `initialSubStep === "phrase-entry"`),
   // probe how many vaults exist on disk. ≥2 → require a selection first
@@ -290,11 +325,25 @@ export function VaultRecover({
       // advances to phrase-entry against that vault. Cancel routes the whole
       // recovery flow back to unlock (same `recover.cancel` route as
       // phrase-entry's Cancel; slot is Empty — no `vault_lock` needed).
+      //
+      // A person-wrapped vault takes the identity-phrase sub-view instead
+      // (`chooseVault` probes for it): its saved phrase was retired by the
+      // upgrade, so the grid below it cannot open it. The sub-view UNLOCKS the
+      // vault rather than staging a recovery, which is why its success routes
+      // straight to `onCompleteSuccess` with no password-reset step: there is
+      // nothing to re-key, the credential that opened it is the owner's.
+      if (personVaultId !== null) {
+        return (
+          <PersonPhraseUnlock
+            vaultId={personVaultId}
+            onUnlocked={() => onCompleteSuccess(personVaultId)}
+            onCancel={() => setPersonVaultId(null)}
+          />
+        );
+      }
       return (
         <RecoverySelectStep
-          onVaultSelected={(vaultId) =>
-            dispatch({ type: "vault-selected", vaultId })
-          }
+          onVaultSelected={chooseVault}
           // No vault chosen yet on the select step — the post-cancel
           // unlock falls to the boot-shaped sole/None path.
           onCancel={() => onCancel(undefined)}
