@@ -366,6 +366,45 @@ export interface DevicesHook {
   resetLocal: () => Promise<void>;
 }
 
+/** What the joining device shows (`decisions/protocol/0735`), as the backend
+ *  serializes it. Snake_case for the same reason every other view here is: a
+ *  returned struct serializes verbatim. */
+export interface AdmissionCodeView {
+  code: string;
+  sas: string;
+  device_id_hex: string;
+  has_device_key: boolean;
+}
+
+export interface AdmitOutcomeView {
+  device_id_hex: string;
+  sas: string;
+  bound: boolean;
+}
+
+/** Mint this device's own server-auth secret and the code that offers it. */
+export function deviceAdmissionCode(personIdHex: string): Promise<AdmissionCodeView> {
+  return invoke<AdmissionCodeView>("plugin:sync|sync_device_admission_code", { personIdHex });
+}
+
+/** The admission this device already started, so an interrupted join resumes
+ *  instead of minting a second device id. */
+export function pendingDeviceAdmission(): Promise<AdmissionCodeView | null> {
+  return invoke<AdmissionCodeView | null>("plugin:sync|sync_pending_device_admission", {});
+}
+
+/** Admit the device a code describes; `sas` is what the user read on the other
+ *  screen, and the write is bound to it. */
+export function admitDevice(code: string, sas: string): Promise<AdmitOutcomeView> {
+  return invoke<AdmitOutcomeView>("plugin:sync|sync_admit_device", { code, sas });
+}
+
+/** Sign this device in with the credential an admitting device installed.
+ *  Resolves `false` while the install has not landed. */
+export function claimDeviceAdmission(): Promise<boolean> {
+  return invoke<boolean>("plugin:sync|sync_claim_device_admission", {});
+}
+
 export function useDevices(): DevicesHook {
   const [devices, setDevices] = useState<DeviceEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
