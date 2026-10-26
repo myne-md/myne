@@ -3,40 +3,30 @@
 <plist version="1.0">
 <dict>
   <!--
-    Keychain access for the MYND-329 quick-unlock Touch ID provider
-    (core/src/plugins/quick_unlock/apple.rs — moved out of the desktop crate and
-    generalized macOS -> macOS + iOS per decisions.md 2026-07-12). Without this
-    entitlement on a SIGNED binary, storing/reading a biometric-gated
-    (kSecAccessControlBiometryCurrentSet) Keychain item fails with
-    errSecMissingEntitlement (-34018).
+    EMPTY ON PURPOSE, and the reasoning is load-bearing (2026-10-26).
 
-    That OSStatus is mapped to ProviderError::HardwareUnavailable (MYND-628), so
-    an unsigned build reports "biometric unavailable" and falls back to the
-    password instead of surfacing an opaque backend error.
+    This file carried `keychain-access-groups = D8UWYY2KY7.md.myne.desktop` for
+    the MYND-329 quick-unlock Touch ID provider. That value is the app's DEFAULT
+    access group under a `D8UWYY2KY7.md.myne.desktop` signature, and the provider
+    never asks for a group (`core/src/plugins/quick_unlock/apple.rs` sets only
+    `kSecAccessControlBiometryCurrentSet` and `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`,
+    with no `kSecAttrAccessGroup`), so the entitlement granted nothing the app did
+    not already have.
 
-    The access group is the app's own identifier (self-access). With a real
-    Apple Development / Developer ID certificate, prefix it with the team:
-    `<string>$(AppIdentifierPrefix)md.myne.desktop</string>`. With ad-hoc
-    signing (`codesign -s -`) the literal identifier below is used.
+    What it did cost was the launch. On macOS 26 a restricted entitlement is only
+    honored with a provisioning profile that authorizes it, and with the profile
+    embedded and matching the certificate the spawn was still refused
+    (`Launchd job spawn failed`, NSPOSIXErrorDomain 163). Signed without the
+    entitlement, the same bundle launches, and `security-framework`'s macOS
+    SecItem path uses the classic keychain with the default group.
 
-    LOAD-BEARING on macOS 26+: a restricted entitlement is only honored when a
-    provisioning profile that authorizes it is embedded. Without the profile,
-    AMFI refuses to spawn the app ("Launchd job spawn failed", POSIX 163) even
-    though a `codesign` verify pass and notarization checks pass; with the
-    entitlement stripped instead, the Keychain returns errSecMissingEntitlement
-    (-34018) at runtime. `bundle.macOS.files` embeds
-    `Myne_Mac_Development.provisionprofile` at Contents/embedded.provisionprofile
-    so both halves hold. The profile is device-bound (only registered Macs launch
-    the bundle) and expires; regenerate it with the macOS signing section of
-    `myne-ops/runbooks/local-multiplatform-build.md` when it goes stale.
+    The earlier note here said the entitlement was required or biometric writes
+    return errSecMissingEntitlement (-34018); that is true of the DATA PROTECTION
+    keychain, which this code does not opt into on macOS.
 
-    NOTE: `tauri dev` runs an UNSIGNED binary, so biometric still fails there.
-    These entitlements apply to `tauri build` (configured via
-    bundle.macOS.entitlements) or when the dev binary is signed manually.
+    If biometric quick-unlock ever fails with -34018 on a real device, the answer
+    is a Developer ID provisioning profile with Keychain Sharing plus this key
+    back, not a wider entitlement: `myne-ops/runbooks/local-multiplatform-build.md`.
   -->
-  <key>keychain-access-groups</key>
-  <array>
-    <string>D8UWYY2KY7.md.myne.desktop</string>
-  </array>
 </dict>
 </plist>
