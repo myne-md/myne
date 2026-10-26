@@ -1312,7 +1312,12 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
   {
     id: "ai.external-access",
     agentWritability: WRITABILITY_CONTROL,
-    capability: "externalMcp",
+    // `localAi`, not `externalMcp`: the row lives in the AI panel, so a client
+    // without the AI capability has no panel to show it in. The section it points
+    // at needs `externalMcp` as well, and that is the component's gate rather than
+    // the search row's — a row keyed to a narrower capability would be offered on a
+    // build where the panel itself is absent.
+    capability: "localAi",
     developerGated: true,
     panelId: "ai",
     topic: "limits",
