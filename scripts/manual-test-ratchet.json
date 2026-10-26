@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11869,
+  "totalMinutesCeiling": 11889,
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",
@@ -1308,7 +1308,18 @@
     "Tor, which is why its text changed and its minutes did not."
   ],
   "$comment25": [
-    "CEILING RAISED 11857 -> 11869 by myne-md/myne#918 (iPhone Duo support), in the",
+    "CEILING RAISED 11857 -> 11889 by two changes that landed together, in the",
+    "sanctioned direction: each added a surface nothing in this tree can drive, and",
+    "each wrote its raise against the same 11857 baseline, so the merged ceiling is",
+    "the SUM of the two deltas rather than either number.",
+    "",
+    "  + 12 minutes from myne-md/myne#918 (iPhone Duo support).",
+    "  + 20 minutes from myne-md/myne#926 (Photo to note).",
+    "",
+    "Each argument is kept verbatim below rather than folded into this summary: a",
+    "raise whose reason is paraphrased is a number nobody can re-check.",
+    "",
+    "--- myne-md/myne#918 ---",
     "sanctioned direction: a device whose defining gesture no lane in this tree can",
     "perform. What added the minutes, named so the raise is an argument rather than a",
     "number:",
@@ -1333,6 +1344,28 @@
     "survives the remount by construction, and the undo history loss is a documented",
     "limitation rather than a data-loss path. So gatedMinutes is untouched (3837) and",
     "the whole 12 lands on the ceiling: gating may not fall by more than total does,",
-    "and the total rose while gating did not."
+    "and the total rose while gating did not.",
+    "",
+    "--- myne-md/myne#926 ---",
+    "a surface that did not exist before this change now needs eyes on a handset with",
+    "a camera in it. What added the minutes, named so the raise is an argument rather",
+    "than a number:",
+    "",
+    "  + photographing a physical page through Photo to note, 10 minutes on each of",
+    "    ios and android (20 total), standard. The OS camera app, the photo and camera",
+    "    permission prompts and the picker's own Take Photo / Photo Library action",
+    "    sheet are operating-system UI that no WebView driver can click, and the",
+    "    flow-logic tier mocks both the picker and the Tauri IPC, so no lane in this",
+    "    repository ever hands the app a photograph a camera captured. What CAN be",
+    "    asserted is asserted there: the entry, the draft sheet's four read states,",
+    "    the edit surviving the read, the commit shape and the image-only path",
+    "    (mobile/tests/flow-logic/photo-to-note.flow.ts).",
+    "",
+    "Standard rather than core, deliberately: a picker that refuses the camera costs",
+    "a feature, not data or a boundary. The data half is asserted in the tiers that",
+    "can see it, because nothing is written before the commit and a cancel deletes",
+    "only this flow's own import. Both phone clients are named rather than one:",
+    "WKWebView and Android's WebView reach the picker through different platform",
+    "code, and this flow's whole entry point is that dialog."
   ]
 }

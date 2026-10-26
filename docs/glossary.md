@@ -2029,6 +2029,14 @@ A peer's live caret and its name label, drawn in the open note as one CodeMirror
 
 Used in: `decisions/ui/0659`; `agent-tooling/features/collab-presence-ui/`
 
+### **photo to note** &nbsp; 📦 *Product*
+
+The mobile capture flow (myne-md/myne#926) that turns a photograph of a page, a whiteboard or a slide into note text. One entry in the editor's pinned format bar opens the OS file picker, whose own action sheet offers **Take Photo** beside **Photo Library**, so the camera is the OS camera app and Myne opens no stream of its own (the picker's camera usage string already existed for the attach path, MYND-474). The picked file is imported through the ordinary [attachment](#attachment) path, which runs [image OCR](#image-ocr) on the device into the device-local [`MYE1`](#mye1) cache; the flow then opens a **draft sheet** showing the photograph and that cached text in an editable field, and writes nothing until the user commits. Distinct from the plain attach button, which still inserts a bare embed with no reading.
+
+Not to be confused with [image OCR](#image-ocr): OCR is the extractor, and this is the one surface where its output is offered for review. The photograph is always kept, because an [`MYE1`](#mye1) entry is generation-bound and a better extractor can only re-read an original that is still in the vault. The reviewed text lands under the image embed as ordinary note markdown. Discarding a draft deletes the import only when the flow created it: `attachment_import` is content-addressed and dedups, so a photograph the vault already held is left alone. (`decisions/ui/0731`)
+
+Used in: `decisions/ui/0731`; `mobile/src/app/flows/PhotoNoteSheet.tsx`
+
 ### **policy refusal** &nbsp; 📦 *Product*
 
 A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.

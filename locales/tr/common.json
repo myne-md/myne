@@ -1732,6 +1732,7 @@
     "formatBar": {
       "redo": "Yinele",
       "attachFile": "Yeni dosya ekle",
+      "photoToNote": "Fotoğraftan nota",
       "insertFromLibrary": "Kitaplıktan ekle",
       "recordVoiceNote": "Sesli not kaydet",
       "showLivePreview": "Canlı önizlemeyi göster",
@@ -3112,7 +3113,8 @@
       "errorSaveSetting": "Bu ayar kaydedilemedi.",
       "processing_one": "1 ek okunuyor…",
       "processing_other": "{{count}} ek okunuyor…",
-      "mobileDeviceLocal": "Bu ayar cihaz başına: bu telefonun neleri dizinleyeceğine karar verir, böylece diğer cihazlarınız kendi seçimini korur."
+      "mobileDeviceLocal": "Bu ayar cihaz başına: bu telefonun neleri dizinleyeceğine karar verir, böylece diğer cihazlarınız kendi seçimini korur.",
+      "draftUse": "Buradan okunan metin, nota ekleyebileceğiniz bir taslak olarak da sunulur. Not, diğerleri gibi şifreli senkronlanır."
     },
     "autoBackup": {
       "backupFolder": "Yedekleme klasörü",
@@ -5446,6 +5448,33 @@
     "retry": "Yeniden dene",
     "skip": "Atla",
     "done": "Tamam"
+  },
+  "photoNote": {
+    "cancel": "İptal",
+    "commitNew": "Not oluştur",
+    "commitNote": "Bu nota ekle",
+    "defaultTitle": "Fotoğraf notu {{date}}",
+    "destinationLabel": "Fotoğraf ve metni nereye eklensin",
+    "imageOnly": "Fotoğrafı metinsiz ekle",
+    "locked": "Bu fotoğraf açıkken kasa kilitlendi. Fotoğraf eklerinizde duruyor; kilidi açıp yeniden deneyin.",
+    "machineText": "Bu metni bir makine okudu, saklamadan önce kontrol edin.",
+    "newNote": "Yeni not",
+    "noText": "Bu sayfadan metin okunamadı. Fotoğrafı yine de ekleyebilirsiniz.",
+    "ocrOff": "Bu cihazda görsellerden metin okuma kapalı, bu yüzden bu fotoğrafın metni yok. Açmak, çekeceğiniz sonraki fotoğraf için geçerli olur.",
+    "ocrOffAction": "Ayarı aç",
+    "readFailed": "Metin bu sefer okunamadı. Fotoğrafı yine de ekleyebilirsiniz.",
+    "reading": "Metin okunuyor…",
+    "textLabel": "Fotoğraftaki metin",
+    "textPlaceholder": "Uygulamanın okuduğu metin burada görünecek. Kendiniz de yazabilirsiniz.",
+    "thisNote": "Bu not",
+    "saveFailed": "Not oluşturulamadı. Metniniz burada duruyor.",
+    "importing": "Fotoğraf kaydediliyor…",
+    "addReading": "Okunan metni ekle",
+    "truncated": "Okuma bir uzunluk sınırında durdu, sayfanın sonu eksik olabilir.",
+    "discardFailed": "Fotoğraf kaldırılamadı. Eklerinizde duruyor.",
+    "readingArrived": "Siz yazarken okuma geldi. Aşağıda sizi bekliyor.",
+    "untitledFile": "Fotoğraf",
+    "openFailed": "Not oluşturuldu ama açılamadı."
   },
   "plainFile": {
     "closePending": {

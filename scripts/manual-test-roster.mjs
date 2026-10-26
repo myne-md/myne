@@ -362,6 +362,27 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "editor.photo-to-note",
+    title: "Photo to note (mobile)",
+    paths: [
+      "mobile/src/app/flows/PhotoNoteSheet.tsx",
+      "mobile/src/lib/photoNoteBody.ts",
+      "mobile/src-tauri/src/plugins/attachments/read_extracted.rs",
+    ],
+    clients: ["ios", "android"],
+    automatedBy: ["mobile/tests/flow-logic/photo-to-note.flow.ts"],
+    manual: [
+      {
+        see: "On a real iPhone and a real Android phone with a page of paper in front of you: tap Photo to note in the editor bar, choose Take Photo in the OS sheet that appears, allow the camera prompt if it is the first time, and photograph the page. Confirm the draft sheet opens over the note with the photograph visible and then its text in the editable field; correct one character; commit into this note and confirm the image embed lands with the corrected text directly below it, and that one undo removes both. Repeat choosing Photo Library, then once with the device OCR switch off (Settings > Data) and confirm the sheet says reading is off instead of claiming the page had no text. Then repeat with a blank sheet of paper and confirm the no-text state still offers the image alone.",
+        whyNotAutomated: "The camera and the photo library are reached through the OS file-picker action sheet and its camera and photo permission prompts, which are operating-system UI a WebView driver cannot click; the flow-logic tier mocks both the picker and the Tauri IPC, so no lane in this repository ever hands the app a real photograph captured by a camera app. Whether the sheet opens on the picture, whether OCR completes on a real page within a tolerable time, and whether the OS offers Take Photo alongside Photo Library for this input are properties of the device and its picker.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "ai.on-device-transcription",
     title: "On-device audio transcription (mobile)",
     paths: [

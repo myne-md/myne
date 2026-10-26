@@ -106,7 +106,7 @@
   "mobile/src/app/flows/editor/chrome/AppHeader.tsx": 3,
   "mobile/src/app/flows/editor/chrome/EditorTopBar.tsx": 4,
   "mobile/src/app/flows/editor/chrome/FavoritesStrip.tsx": 1,
-  "mobile/src/app/flows/editor/chrome/FormatBar.tsx": 17,
+  "mobile/src/app/flows/editor/chrome/FormatBar.tsx": 18,
   "mobile/src/app/flows/editor/chrome/NoteRow.tsx": 1,
   "mobile/src/app/flows/editor/chrome/ReadingBar.tsx": 1,
   "mobile/src/app/flows/editor/chrome/TabBar.tsx": 5,
