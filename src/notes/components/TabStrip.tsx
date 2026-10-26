@@ -51,7 +51,8 @@ import { getCurrentWindow } from "../../platform/window";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
 import { ornamentRole } from "@myne/ornaments";
 import { MIN_TARGET } from "../../components/primitives/targetSize";
-import { marqueeShift, prefersReducedMotion } from "./tabTitleReveal";
+import { useTitleReveal } from "./useTitleReveal";
+import { prefersReducedMotion } from "./tabTitleReveal";
 
 /** Strip height (px) — also the editor body's top inset, so the drop overlay
  *  starts below the strip and leaves the tabs interactive during a drag. */
@@ -648,58 +649,17 @@ function Tab({
   const { t } = useTranslation();
   const [hovering, setHovering] = useState(false);
   const [keyboardFocus, setKeyboardFocus] = useState(false);
-  const labelBoxRef = useRef<HTMLSpanElement | null>(null);
-  const labelTextRef = useRef<HTMLElement | null>(null);
+  // True while the focus about to arrive came from the pointer. A click focuses
+  // the tab too, and the reveal is meant for a reader who is LOOKING at a title,
+  // not for the tab they just selected.
+  const pointerFocusRef = useRef(false);
   const { text, italic } = tabLabel(title);
-
-  // In-place reveal of a truncated title (myne-md/myne#908 item 6). The rule:
-  // only a label that actually overflows moves, hover and keyboard focus are the
-  // same affordance, and reduced motion swaps the marquee for an instant jump to
-  // the end of the text. No tooltip anywhere.
-  useEffect(() => {
-    const box = labelBoxRef.current;
-    const body = labelTextRef.current;
-    if (box === null || body === null) return;
-    const revealed = hovering || keyboardFocus;
-    const shift = revealed ? marqueeShift(box.clientWidth, body.scrollWidth) : 0;
-    const reduced = prefersReducedMotion();
-
-    if (shift === 0) {
-      body.style.transform = "";
-      return;
-    }
-    if (reduced) {
-      body.style.transform = `translateX(-${shift}px)`;
-      return;
-    }
-    if (typeof body.animate !== "function") return;
-    const anim = body.animate(
-      [
-        { transform: "translateX(0)" },
-        { transform: `translateX(-${shift}px)` },
-        { transform: "translateX(0)" },
-      ],
-      {
-        duration: Math.max(1400, shift * 24),
-        delay: 260,
-        iterations: Infinity,
-        easing: "ease-in-out",
-      },
-    );
-    return () => {
-      anim.cancel();
-      body.style.transform = "";
-    };
-  }, [hovering, keyboardFocus, text]);
-
-  useEffect(() => {
-    // Leaving reduced motion (or turning it on) mid-hover must not strand a
-    // transform: the effect above re-runs on the reveal flags, so clear the
-    // inline transform when nothing is revealed.
-    if (hovering || keyboardFocus) return;
-    const body = labelTextRef.current;
-    if (body !== null) body.style.transform = "";
-  }, [hovering, keyboardFocus]);
+  // In-place reveal (myne-md/myne#908 item 6), shared with the sidebar rows.
+  // HOVER ONLY, plus a keyboard focus that the pointer did not cause: clicking a
+  // tab focuses it, and an active tab that keeps scrolling its own title is
+  // exactly the "tiring" case this avoids.
+  const revealed = hovering || keyboardFocus;
+  const { boxRef: labelBoxRef, textRef: labelTextRef } = useTitleReveal(revealed, text);
   // A pinned tab is close-protected — its × is hidden (unpin to close).
   const showClose = !pinned && (hovering || active);
 
@@ -715,18 +675,39 @@ function Tab({
     // enough for the platform to take it, then is removed. `setDragImage` is
     // absent in jsdom, which is why this is guarded rather than assumed.
     if (typeof e.dataTransfer.setDragImage !== "function") return;
-    const source = e.currentTarget;
-    const clone = source.cloneNode(true) as HTMLElement;
-    const rect = source.getBoundingClientRect();
-    clone.style.position = "fixed";
-    clone.style.top = "-10000px";
-    clone.style.left = "-10000px";
-    clone.style.width = `${rect.width}px`;
-    clone.style.opacity = "0.7";
-    clone.style.pointerEvents = "none";
-    document.body.appendChild(clone);
-    e.dataTransfer.setDragImage(clone, rect.width / 2, rect.height / 2);
-    setTimeout(() => clone.remove(), 0);
+    // A built ghost, NOT a clone of the tab. The clone carried the tab's flex
+    // rules into a fixed-position box, where `flex: 1 1 auto` had no row to
+    // shrink against and it grew to a strip-wide rectangle (measured in the
+    // app: a translucent band across the pane instead of a small tab). Its own
+    // explicit width and height is the only shape that stays predictable.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const ghost = document.createElement("div");
+    ghost.textContent = text;
+    ghost.style.cssText = [
+      "position:fixed",
+      "top:-10000px",
+      "left:-10000px",
+      `width:${rect.width}px`,
+      `height:${rect.height}px`,
+      "display:flex",
+      "align-items:center",
+      "box-sizing:border-box",
+      "padding:0 10px",
+      "overflow:hidden",
+      "white-space:nowrap",
+      "text-overflow:ellipsis",
+      "background:var(--bg-2)",
+      "border:1px solid var(--line-1)",
+      "border-radius:var(--radius-1, 4px)",
+      "font-family:var(--font-sans)",
+      "font-size:var(--text-xs)",
+      "color:var(--fg-2)",
+      "opacity:0.85",
+      "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(ghost);
+    e.dataTransfer.setDragImage(ghost, rect.width / 2, rect.height / 2);
+    setTimeout(() => ghost.remove(), 0);
   };
 
   // Drag-tab-out (myne#173): a tab dropped OUTSIDE the window (no valid drop
@@ -894,7 +875,12 @@ function Tab({
       style={style}
       onClick={() => onActivate(id)}
       onAuxClick={handleAux}
-      onKeyDown={handleTabKeyDown}
+      onKeyDown={(e) => {
+        // Keyboard focus from here on is a reader navigating, not a click that
+        // happens to focus the tab.
+        pointerFocusRef.current = false;
+        handleTabKeyDown(e);
+      }}
       onContextMenu={
         onContextMenu
           ? (e) => {
@@ -906,8 +892,14 @@ function Tab({
       }
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
-      onFocus={() => setKeyboardFocus(true)}
-      onBlur={() => setKeyboardFocus(false)}
+      onMouseDown={() => {
+        pointerFocusRef.current = true;
+      }}
+      onFocus={() => setKeyboardFocus(!pointerFocusRef.current)}
+      onBlur={() => {
+        pointerFocusRef.current = false;
+        setKeyboardFocus(false);
+      }}
     >
       <span
         aria-hidden="true"
@@ -944,10 +936,11 @@ function Tab({
           minWidth: 0,
           maxWidth: TITLE_MAX,
           overflow: "hidden",
-          // No `textOverflow: ellipsis` any more (myne-md/myne#908 item 6): the
-          // label reveals itself in place on hover/focus, so an ellipsis would
-          // sit under the moving text and re-truncate it. The box still clips;
-          // the marquee is what shows the rest.
+          // The ellipsis stays for the resting state and is dropped only while
+          // the reveal runs: it is painted by this box, so leaving it on would
+          // re-truncate the text as it moves. Removing it outright deleted every
+          // truncation mark in the strip (myne-md/myne#908, third pass).
+          textOverflow: revealed ? "clip" : "ellipsis",
           whiteSpace: "nowrap",
           fontStyle: italic ? "italic" : "normal",
           color: italic ? "var(--fg-3)" : undefined,
@@ -956,7 +949,12 @@ function Tab({
         {/* Isolate the user-authored tab title's direction (RTL/bidi). */}
         <bdi
           ref={labelTextRef}
-          style={{ display: "inline-block", willChange: "transform" }}
+          // `inline` at rest for the same reason as the sidebar rows: an
+          // inline-block is an atomic box and swallows the parent's ellipsis.
+          style={{
+            display: revealed ? "inline-block" : "inline",
+            willChange: revealed ? "transform" : undefined,
+          }}
         >
           {text}
         </bdi>
