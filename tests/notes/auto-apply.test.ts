@@ -15,6 +15,7 @@ import {
   subscribeAutoApplyTags,
   writeAutoApplyTags,
 } from "../../src/lib/autoApplyTags";
+import { ensureUsableStorage } from "../lib/_storage";
 
 const base = {
   enabled: true,
@@ -51,6 +52,7 @@ describe("shouldAutoApply", () => {
 
 describe("the device-local flag", () => {
   beforeEach(() => {
+    ensureUsableStorage();
     localStorage.clear();
     __resetAutoApplyTagsForTest();
   });
