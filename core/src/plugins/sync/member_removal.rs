@@ -756,7 +756,7 @@ pub async fn rotate_group_from_host(
     owner: &protocol::person_key::PersonKeyPair,
     removed_fingerprint_hex: &str,
 ) -> Result<GroupRotationOutput, MemberRemovalError> {
-    use protocol::person_invite::{rotate_group_roster, verify_group_roster};
+    use protocol::person_invite::{rotate_group_roster_signed_by, verify_group_roster};
 
     let _permit = match state.auth_permits().try_acquire() {
         Ok(p) => p,
@@ -792,11 +792,29 @@ pub async fn rotate_group_from_host(
         .read(&meta_path)
         .await
         .map_err(|_| MemberRemovalError::Io)?;
-    if meta_bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
+    // Both tail generations rotate the same way: the roster, the group key and the
+    // epoch are `NTV6` objects, and `NTV7` only adds the person wrap around them. The
+    // gate therefore admits both, and the wrap is carried to the writer below so the
+    // frame is re-emitted in the generation it arrived in (dropping it would retire
+    // the owner's only phrase-independent credential).
+    if !matches!(
+        protocol::vault_meta_generation(&meta_bytes),
+        protocol::VaultMetaGeneration::B2b | protocol::VaultMetaGeneration::Person
+    ) {
         return Err(MemberRemovalError::InvalidVaultMeta);
     }
-    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+    let b2b_meta = protocol::parse_b2b_tail_any(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
+    let person_wrap =
+        if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
+            Some(
+                protocol::parse_vault_meta_ntv7(&meta_bytes)
+                    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?
+                    .person_wrap,
+            )
+        } else {
+            None
+        };
     let account_number_hash = b2b_meta.base.account_number_hash;
     // Captured rather than read off `b2b_meta` later: `base` is moved out of it at
     // step (6), while the `vault.member-names` re-seal in between needs the RETIRED
@@ -812,8 +830,27 @@ pub async fn rotate_group_from_host(
         &b2b_meta.signed_roster_envelope,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    // The owner signs rosters with its device key once it holds one
+    // (`decisions/protocol/0731` stage 2), so the rotation reads back either class.
+    let owner_public = owner.public_half();
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        &old_group_key,
+        account_number_hash,
+        b2b_meta.group_key_epoch,
+    );
+    let own_device = crate::plugins::sync::device_identity::load_for_fallback("member_removal")
+        .map(|key| key.public_half());
+    let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
+        io,
+        &vault_root,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        None,
+        &owner_public,
+    )
+    .await;
     let mut current_roster = verify_group_roster(
-        &owner.public_half(),
+        crate::plugins::sync::roster_trust::trust(&owner_public, &owner_devices),
         &current_envelope,
         &account_number_hash,
     )
@@ -892,8 +929,31 @@ pub async fn rotate_group_from_host(
 
     // (5) New signed roster, remaining-member packages, retirement records.
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
-    let rotated = rotate_group_roster(
+    // Signed by the owner's DEVICE key when it holds one, with the attestation each
+    // package must carry so a member can verify the rotated roster (`0731` stage 2).
+    // Absent on a platform with no device-key rung, which keeps the person-key path.
+    let owner_public_for_rotation = owner.public_half();
+    // One call, one pair: the rotation signer and the attestation the packages carry are
+    // produced together or not at all (`own_device_signing_pair` owns the "same device"
+    // check that used to be rebuilt here by hand, and the both-or-neither rule with it).
+    let (rotation_device, rotation_attestation) =
+        match super::roster_trust::own_device_signing_pair(
+            io,
+            &vault_root,
+            &old_group_key,
+            account_number_hash,
+            b2b_meta.group_key_epoch,
+            &owner_public_for_rotation,
+        )
+        .await
+        {
+            Some((device_key, attestation)) => (Some(device_key), Some(attestation)),
+            None => (None, None),
+        };
+    let rotated = rotate_group_roster_signed_by(
         owner,
+        rotation_device.as_ref(),
+        rotation_attestation.as_ref(),
         &current_roster,
         removed_fingerprint_hex,
         &new_group_key,
@@ -1103,13 +1163,25 @@ pub async fn rotate_group_from_host(
         &rotated.signed_roster,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
-    let new_meta_bytes = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
-        base,
-        group_key_nonce,
-        enc_group_key,
-        group_key_epoch: rotated.new_epoch,
-        signed_roster_envelope,
-    })
+    let new_meta_bytes = match person_wrap {
+        Some(person_wrap) => {
+            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+                base,
+                group_key_nonce,
+                enc_group_key,
+                group_key_epoch: rotated.new_epoch,
+                signed_roster_envelope,
+                person_wrap,
+            })
+        }
+        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base,
+            group_key_nonce,
+            enc_group_key,
+            group_key_epoch: rotated.new_epoch,
+            signed_roster_envelope,
+        }),
+    }
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
 
     // (6b) Persist the delivery obligations BEFORE the first mutation. This is
@@ -1277,7 +1349,7 @@ pub async fn member_person_id_from_host(
         .read(&vault_root.join("vault.meta"))
         .await
         .map_err(|_| MemberRemovalError::Io)?;
-    let b2b_meta = protocol::parse_vault_meta_ntv6(&meta_bytes)
+    let b2b_meta = protocol::parse_b2b_tail_any(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
     let account_number_hash = b2b_meta.base.account_number_hash;
     let envelope = protocol::person_invite::open_group_roster(
@@ -1287,8 +1359,24 @@ pub async fn member_person_id_from_host(
         &b2b_meta.signed_roster_envelope,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
+    // Either class, for the same reason the rotation accepts both: the roster of a vault
+    // whose owner signs with a device key is a `v2`-class roster.
+    let owner_public = owner.public_half();
+    let mut owner_devices: Vec<protocol::device_key::DevicePublicHalf> = Vec::new();
+    if let Ok(sync_state) = crate::plugins::sync::state::read_sync_state(io, &vault_root).await {
+        if let Some(attestation) = sync_state.owner_device.as_ref() {
+            if attestation.verifies_against(&owner_public) {
+                if let Some(half) = attestation.device_public_half() {
+                    owner_devices.push(half);
+                }
+            }
+        }
+    }
+    if let Some(key) = crate::plugins::sync::device_identity::load_for_fallback("rotation_verify") {
+        owner_devices.push(key.public_half());
+    }
     let roster = protocol::person_invite::verify_group_roster(
-        &owner.public_half(),
+        crate::plugins::sync::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,
         &account_number_hash,
     )
@@ -1383,11 +1471,15 @@ pub async fn recover_pending_rekey(
                 {
                     failed = true;
                 } else {
-                    // The committed batch is a rotation when its meta is NTV6;
-                    // record that the local content is now at that epoch, so a
-                    // member's adoption (and the owner's own next cycle) can tell
-                    // "keys installed, blobs still retired" from "both landed".
-                    if let Ok(b2b) = protocol::parse_vault_meta_ntv6(&new_meta) {
+                    // The committed batch is a rotation when its meta carries the
+                    // B2B tail, in EITHER generation (`NTV7` is the birth format and
+                    // keeps the `NTV6` tail byte for byte); record that the local
+                    // content is now at that epoch, so a member's adoption (and the
+                    // owner's own next cycle) can tell "keys installed, blobs still
+                    // retired" from "both landed". Asking for the `NTV6` frame only
+                    // skipped this write on every person-born vault, which is now
+                    // every shared vault.
+                    if let Ok(b2b) = protocol::parse_b2b_tail_any(&new_meta) {
                         let _ = crate::plugins::sync::state::write_content_epoch(
                             io,
                             vault_root,
@@ -2426,7 +2518,7 @@ mod tests {
             )
             .expect("open sealed roster");
             let roster = protocol::person_invite::verify_group_roster(
-                &owner.public_half(),
+                protocol::person_invite::RosterTrust::person_only(&owner.public_half()),
                 &envelope,
                 &ROT_ACCT,
             )

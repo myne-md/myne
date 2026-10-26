@@ -167,6 +167,27 @@ pub async fn claim_own_binding_with_dir(
     let resolved = resolve_bindings(io, state, vault_dir).await?;
     let (person, _person_id) = session_person_id(state).await?;
     let device_id = session_device_id(io, vault_dir).await?;
+    // The device key, minted here because this is the ONE moment the person key is in
+    // hand: the row's signature is the person's, so creating the key anywhere else would
+    // need the phrase again. `load_or_create` is `Unsupported` on a platform with no
+    // storage rung (`0733`'s rung 4), and `None` then keeps today's `v1` row.
+    let device_public = match crate::plugins::sync::device_identity::load_or_create() {
+        Ok(pair) => Some(pair.public_half()),
+        // Rung 4: this platform has no place to keep one, so the row is written exactly
+        // as it was before the device-key change. Expected, not a fault.
+        Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => None,
+        Err(err) => {
+            // A keychain that refused is not a reason to refuse the BINDING (the row is
+            // valid without the halves and the next unlock retries), but it IS a fault
+            // rather than a platform fact, so it is logged as one and named.
+            tracing::warn!(
+                stage = "device_binding_claim",
+                error = ?err,
+                "device key could not be created; the binding is written without its halves"
+            );
+            None
+        }
+    };
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
     let (map, outcome) = claim_self_in_dir(
         io,
@@ -174,6 +195,7 @@ pub async fn claim_own_binding_with_dir(
         &resolved.borrow(),
         &person,
         &device_id,
+        device_public.as_ref(),
         &mut rng,
     )
     .await?;

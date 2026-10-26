@@ -114,6 +114,16 @@ function StageSwitch() {
     endpointUrl: string;
     accountHashHex: string;
   } | null>(null);
+  /**
+   * A scanned PERSON QR awaiting the identity flow's person-join step
+   * (myne-md/myne#911 task 12). Held here for the same reason
+   * `identityFromQr` is: the join overlay closes when it hands off, so the target
+   * has to outlive the flow that read it. `null` = no person QR in flight.
+   */
+  const [personJoinFrom, setPersonJoinFrom] = useState<{
+    endpointUrl: string;
+    personIdHex: string;
+  } | null>(null);
 
   /**
    * Land a stage — the single writer of `stage` and its ref mirror.
@@ -270,6 +280,14 @@ function StageSwitch() {
             setJoinFrom(null);
             setIdentityFromQr(target);
           }}
+          // A scanned person code: same shape, one step over. The credential is
+          // the identity phrase and the device lands pending until an existing
+          // device approves it, so the wizard for it lives in the identity flow
+          // (myne-md/myne#911 task 12).
+          onPersonJoin={(target) => {
+            setJoinFrom(null);
+            setPersonJoinFrom(target);
+          }}
         />
       </PhoneColumn>
     );
@@ -300,6 +318,30 @@ function StageSwitch() {
     );
   }
 
+  // A scanned PERSON QR: the identity flow's person-join wizard, which takes the
+  // phrase and waits for an existing device to approve this one
+  // (myne-md/myne#911 task 12). Rendered ABOVE the switch for the same reason the
+  // two overlays above are: the door is reachable from the picker and the editor
+  // too, so scoping it to `case "welcome"` would make it unreachable on a device
+  // that already holds vaults.
+  if (personJoinFrom !== null) {
+    return (
+      <PhoneColumn>
+        <IdentityFlow
+          fromPersonQr={personJoinFrom}
+          onCancel={() => setPersonJoinFrom(null)}
+          // The join listed the account's vaults and wrote their frames locally,
+          // so the probe is what decides where the user lands: the picker when
+          // several arrived, that vault's unlock when one did.
+          onAccepted={() => {
+            setPersonJoinFrom(null);
+            reprobe();
+          }}
+        />
+      </PhoneColumn>
+    );
+  }
+
   // Every stage except the editor renders inside <PhoneColumn> — on tablets the
   // single-column flows stay a centered phone-width column (no-op on phones);
   // the editor is the adaptive multi-pane surface and fills the window.
@@ -310,6 +352,16 @@ function StageSwitch() {
           <PhoneColumn>
             <IdentityFlow
               onCancel={() => setIdentityOpen(false)}
+              // The identity home's create-vault action, and the exit of the
+              // first run (myne-md/myne#911 task 12): the identity exists by the
+              // time this is reachable, so the next step of the same chain is the
+              // vault. Passed ONLY here, because this is the one entry that knows
+              // the device has zero vaults; the Settings entry below leaves it
+              // undefined so a device with vaults does not get a second door.
+              onCreateVault={() => {
+                setIdentityOpen(false);
+                dispatch({ type: "create-vault.start" });
+              }}
               // An invite was accepted, this device named itself, and the
               // member vault is on disk and unlocked: close the overlay and
               // re-probe, which is how the stage machine decides what the user
@@ -327,7 +379,6 @@ function StageSwitch() {
       return (
         <PhoneColumn>
           <WelcomeFlow
-            onCreate={() => dispatch({ type: "create-vault.start" })}
             onJoin={() => setJoinFrom("welcome")}
             onIdentity={() => setIdentityOpen(true)}
           />

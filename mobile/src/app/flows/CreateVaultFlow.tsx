@@ -704,9 +704,19 @@ export function CreateVaultFlow({
         if (HAS_TAURI) {
           const res = await beginVaultCreation(pwdRef.current);
           if (cancelled) return;
-          phraseRef.current = res.phrase;
+          // `null` means the vault was born under a person identity, whose
+          // generation retires the vault phrase (myne-md/myne#911 task 5). This
+          // client's person plane is live (task 12), so the arm is REACHED
+          // whenever the user holds an identity, not held open for a later task:
+          // a person-born vault skips the kit and the type-back entirely and
+          // commits straight from here.
+          phraseRef.current = res.phrase ?? [];
           sessionRef.current = res.session_token;
           setAccount(res.account_number);
+          if (res.phrase === null) {
+            void commit();
+            return;
+          }
         } else {
           phraseRef.current = [...PLACEHOLDER_PHRASE];
           sessionRef.current = PLACEHOLDER_SESSION;
@@ -772,12 +782,15 @@ export function CreateVaultFlow({
       committedRef.current = true;
       setStep("ready");
     } catch {
-      // Back to the challenge, which is where the commit was requested from now
-      // that the account number no longer has a step of its own. The typed words
-      // are still in state, so the banner appears above a challenge the user has
-      // already passed and can retry with one tap.
+      // A person-born vault has NO phrase (`phraseRef.current` is empty), so the
+      // type-back step is a trap there: the challenge draws four positions, every
+      // word is compared against a word that does not exist, `allCorrect` can
+      // never become true and `backToPhrase` opens a kit around an empty grid.
+      // The desktop reducer returns to the password step for exactly this case,
+      // and the two clients must not disagree about a recovery path
+      // (myne-md/myne#911 review).
       setCommitError(t("createVault.commitError"));
-      setStep("typeback");
+      setStep(phraseRef.current.length === 0 ? "password" : "typeback");
     }
   };
 
@@ -1124,21 +1137,6 @@ export function CreateVaultFlow({
             <AccountNumber value={account} />
           </div>
 
-          {/* Why the words are not in the reader's language, said once, where the
-              question occurs. Without it an untranslated grid in a translated UI
-              reads as a missing translation, and a user "helpfully" translating
-              the words back has destroyed their only backup. */}
-          <p
-            style={{
-              marginBlock: "var(--space-3) 0",
-              fontSize: "var(--text-sm)",
-              lineHeight: 1.55,
-              color: "var(--fg-3)",
-            }}
-            data-testid="create-vault.kit-english-note"
-          >
-            {t("vaultCreation.kit.whyEnglish")}
-          </p>
           {showSecondHalf && (
             <>
               {/* Tier 1 (myne-md/myne#455). Rendered only where the OS can hold

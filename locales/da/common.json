@@ -3943,7 +3943,6 @@
         "ribbon": "venstre bånd skinne fastgør pin kommando kommandoer tilpas omorganisér frigør værktøjslinje genveje",
         "folderNotes": "mappe note indeks folder_index landingsside dobbeltklik mappelink projekter fra slå fra deaktiver",
         "syncMembers": "medlemmer, del, inviter, team, samarbejde, bog",
-        "accountName": "kontonavn konto gruppe gruppering omdøb mærkat enhed lokal",
         "accountVaults": "konto bokse grupperet hvilke bokse tilhører gruppe liste",
         "aiMeetingPrompt": "møde resumé prompt instruktion brugerdefineret transskription handlingspunkter beslutninger",
         "update": "opdatering opgrader tjek for opdateringer ny version udgivelse download",
@@ -4025,14 +4024,10 @@
       "atCap": "Listen er fuld, så intet nyt kan huskes. Slet en post for at gøre plads."
     },
     "account": {
-      "nameLabel": "Kontonavn",
-      "nameHelper": "Et navn til denne gruppe af bokse på denne enhed. Boks vælgeren bruger det som gruppens overskrift. Det bliver på denne enhed og gemmes aldrig inde i en boks, så det synkroniseres ikke, og en anden enhed kan gruppere og navngive de samme bokse anderledes.",
-      "namePlaceholder": "Tilføj et navn…",
-      "nameSave": "Gem",
-      "nameSaving": "Gemmer…",
       "vaultsLabel": "Bokse i denne konto",
       "vaultsHelper": "De bokse, som denne enhed grupperer under navnet ovenfor. Gruppering er et organisationsvalg pr. enhed, så det er ikke en del af nogen boks' indhold og følger ikke med den.",
-      "vaultsCount": "{{count}} bokse",
+      "vaultsCount_one": "{{count}} bokse",
+      "vaultsCount_other": "{{count}} bokse",
       "currentVault": "Denne boks",
       "unknownVault": "En anden boks på denne enhed",
       "standaloneHelper": "Denne boks er ikke grupperet under en konto på denne enhed, så den står alene. Gruppering er pr. enhed: en anden enhed kan vise den inde i en.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Navne kan angives, når denne boks er delt.",
       "nameErrorLocked": "Lås boksen op for at ændre dit navn.",
       "nameErrorGeneric": "Kunne ikke gemme dit navn. Prøv igen.",
-      "nameInvite": "Du har endnu ikke noget visningsnavn. De øvrige medlemmer ser dit fingeraftryk.",
       "nameInviteCta": "Angiv et navn",
-      "nameInviteDismiss": "Ikke nu",
       "noInvitations": "Ingen invitationer sendt endnu.",
       "identityHeading": "Din identitet",
       "membersHeading": "Medlemmer",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Gendannelsessætning — hvis du glemmer din adgangskode",
       "save": "Gem gendannelsessæt",
       "saveFailed": "Kunne ikke gemme filen. Kopiér sættet i stedet, eller skriv begge dele ned.",
-      "savedToFile": "Gemt. Det er en almindelig tekstfil med begge hemmeligheder, så opbevar den et sted, hvor kun du kan læse den.",
-      "whyEnglish": "Ordene er engelske på alle sprog. De er en del af BIP-39-standarden, så enhver Myne-klient kan læse en sætning skrevet af enhver anden. Oversæt dem ikke: oversatte ord findes ikke på ordlisten, og sætningen ville holde op med at virke."
+      "savedToFile": "Gemt. Det er en almindelig tekstfil med begge hemmeligheder, så opbevar den et sted, hvor kun du kan læse den."
     },
     "name": {
       "back": "Tilbage",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Konto",
     "moveToAccount": "Flyt til konto…",
     "moveToNewAccount": "Flyt til ny konto",
-    "renameAccount": "Omdøb konto",
     "accountError": "Konto-grupperingen kunne ikke opdateres. Intet blev ændret.",
     "accountHidden": "Konto-handlinger er ikke tilgængelige, mens bognavne er skjulte.",
-    "labelTooLong": "Det navn er for langt. Hold det under 512 tegn.",
-    "renameCancel": "Annuller",
-    "renamePlaceholder": "Kontonavn",
-    "renameSave": "Omdøb",
     "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret.",
     "createShort": "Ny boks",
     "joinShort": "Tilføj enhed",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Resterende filer fra en afbrudt sletning ({{n}}). Ryd dem op, før du opretter en boks.",
     "cleanUpFiles": "Ryd resterende filer op",
     "connect": "Forbind til min konto",
-    "startIdentity": "Opret en identitet",
-    "startLocal": "Opret en lokal boks i stedet",
     "tagline": "Krypterede markdown-noter. Ingen e-mail ved oprettelse.",
-    "identityTitle": "Opret en identitet",
-    "identityBody": "Én identitet til alle dine bokse, så folk kan invitere dig. Kræver en synkroniseringsserver.",
-    "localTitle": "Opret en lokal boks",
-    "localBody": "En krypteret boks på denne enhed. Tilføj synkronisering eller en identitet senere.",
     "restoreTitle": "Gendan fra sikkerhedskopi",
     "restoreBody": "Åbn en .myne-backup-fil, du gemte tidligere.",
     "joinTitle": "Føj denne enhed til en konto",
     "joinBody": "Brug en boks, du allerede har på en anden enhed.",
-    "createAction": "Opret",
     "restoreAction": "Gendan",
     "joinAction": "Tilføj enhed",
     "version": "Version {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "åbnet for {{count}} år siden",
     "corruptedBadge": "Beskadiget",
     "accountFallback": "Konto",
-    "renameAccount": "Omdøb konto",
     "moveToNewAccount": "Flyt til ny konto",
     "moveToAccount": "Flyt til konto…",
     "accountError": "Konto-grupperingen kunne ikke opdateres. Intet blev ændret.",
     "accountHidden": "Konto-handlinger er ikke tilgængelige, mens bognavne er skjulte.",
-    "labelTooLong": "Det navn er for langt. Hold det under 512 tegn.",
-    "renameCancel": "Annuller",
-    "renamePlaceholder": "Kontonavn",
-    "renameSave": "Omdøb",
     "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identitet gendannet.",
     "title": "Opret en identitet",
     "errorAlreadyHeld": "Denne enhed har allerede en identitet. Gendan den med dens gendannelsessætning, eller glem den, og opret en ny.",
-    "errorNotConfigured": "Kunne ikke opsætte identiteten. Tjek, at der er konfigureret en synkroniseringsserver, og prøv igen.",
     "forgetCancel": "Behold den",
     "forgetConfirm": "Glem, og opret ny",
     "forgetCta": "Glem denne identitet, og opret en ny",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Gendan den på denne enhed med dens 24-ords gendannelsessætning.",
     "recoverAction": "Gendan",
     "back": "Tilbage",
-    "changeServer": "Ændr eller verificer synkroniseringsserver",
-    "errorTlsFailure": "Kunne ikke verificere serverens HTTPS-certifikat. Tjek serveradressen og dens certifikat.",
     "phraseTitle": "Gem din identitetssætning",
     "phraseContinue": "Fortsæt",
     "confirmTitle": "Bekræft din sætning"
@@ -5509,15 +5481,6 @@
       "hint": "Et nyt forsøg starter downloadet forfra.",
       "retry": "Prøv igen",
       "back": "Tilbage til oplåsning"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Vælg en synkroniseringsserver",
-      "intro": "Myne har brug for en server til at opbevare dine krypterede noter og til at nå dig med invitationer. Dine noter forbliver krypteret på denne enhed, før de forlader den; serveren gemmer kun ciphertext.",
-      "notConfigured": "Indtast en serveradresse ovenfor, og tryk på Opret forbindelse for at fortsætte.",
-      "back": "Tilbage",
-      "continue": "Fortsæt"
     }
   },
   "identityFlow": {

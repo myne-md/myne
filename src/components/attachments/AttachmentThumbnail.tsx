@@ -6,7 +6,7 @@
 //     reusable `renderPdfFirstPage()` (SYNC-5), degrading to a generic PDF icon
 //     when pdf.js is unavailable / fails / rejects. The render runs fully
 //     in-memory off the decrypted `attachment://` bytes; PDF scripting stays
-//     disabled (see `editor/attachments/pdf-render.ts`).
+//     disabled (see `editor/src/attachments/pdf-render.ts`).
 //   - audio/* as a styled, inline-playable tile (a centered play/pause button
 //     over a hidden `<audio>` fed from `attachment://`, MYND-259).
 //   - anything else / a failed image load → a generic file icon.

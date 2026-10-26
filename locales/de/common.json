@@ -3943,7 +3943,6 @@
         "ribbon": "linke leiste schiene anheften pins befehl befehle anpassen umsortieren lösen werkzeugleiste kürzel",
         "folderNotes": "ordner notiz index folder_index startseite doppelklick ordner link projekte aus schalter deaktivieren",
         "syncMembers": "mitglieder, teilen, einladen, team, zusammenarbeit, tresor",
-        "accountName": "kontoname gruppe gruppierung umbenennen bezeichnung gerät lokal",
         "accountVaults": "konto tresore gruppiert welche tresore gehören gruppenliste",
         "aiMeetingPrompt": "besprechung zusammenfassung prompt anweisung benutzerdefiniert transkript aufgabenpunkte entscheidungen",
         "update": "aktualisierung aktualisieren nach aktualisierungen suchen neue version release herunterladen",
@@ -4025,14 +4024,10 @@
       "atCap": "Die Liste ist voll, es kann also nichts Neues gemerkt werden. Löschen Sie einen Eintrag, um Platz zu schaffen."
     },
     "account": {
-      "nameLabel": "Kontoname",
-      "nameHelper": "Ein Name für diese Gruppe von Tresoren auf diesem Gerät. Der Tresor-Auswahlbildschirm verwendet ihn als Überschrift der Gruppe. Er bleibt auf diesem Gerät und wird nie in einem Tresor gespeichert, synchronisiert sich also nicht, und ein anderes Gerät kann dieselben Tresore anders gruppieren und benennen.",
-      "namePlaceholder": "Namen hinzufügen…",
-      "nameSave": "Speichern",
-      "nameSaving": "Wird gespeichert…",
       "vaultsLabel": "Tresore in diesem Konto",
       "vaultsHelper": "Die Tresore, die dieses Gerät unter dem Namen oben gruppiert. Gruppierung ist eine organisatorische Wahl pro Gerät, sie ist also nicht Teil des Inhalts eines Tresors und reist nicht mit ihm.",
-      "vaultsCount": "{{count}} Tresore",
+      "vaultsCount_one": "{{count}} Tresore",
+      "vaultsCount_other": "{{count}} Tresore",
       "currentVault": "Dieser Tresor",
       "unknownVault": "Ein anderer Tresor auf diesem Gerät",
       "standaloneHelper": "Dieser Tresor ist auf diesem Gerät nicht unter einem Konto gruppiert, er steht also für sich. Gruppierung gilt pro Gerät: Ein anderes Gerät kann ihn in einem anzeigen.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Namen lassen sich festlegen, sobald dieser Tresor geteilt ist.",
       "nameErrorLocked": "Entsperren Sie den Tresor, um Ihren Namen zu ändern.",
       "nameErrorGeneric": "Ihr Name konnte nicht gespeichert werden. Versuchen Sie es erneut.",
-      "nameInvite": "Sie haben noch keinen Anzeigenamen. Die anderen Mitglieder sehen Ihren Fingerabdruck.",
       "nameInviteCta": "Namen festlegen",
-      "nameInviteDismiss": "Nicht jetzt",
       "noInvitations": "Noch keine Einladungen gesendet.",
       "identityHeading": "Ihre Identität",
       "membersHeading": "Mitglieder",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Wiederherstellungsphrase — falls Sie Ihr Passwort vergessen",
       "save": "Wiederherstellungs-Kit speichern",
       "saveFailed": "Die Datei konnte nicht gespeichert werden. Kopieren Sie stattdessen das Kit oder schreiben Sie beide Teile auf.",
-      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, die beide Geheimnisse enthält, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können.",
-      "whyEnglish": "Die Wörter sind in jeder Sprache englisch. Sie sind Teil des BIP-39-Standards, daher kann jeder Myne-Client eine Phrase lesen, die ein anderer geschrieben hat. Übersetzen Sie sie nicht: Übersetzte Wörter stehen nicht in der Wortliste, und die Phrase würde aufhören zu funktionieren."
+      "savedToFile": "Gespeichert. Es ist eine reine Textdatei, die beide Geheimnisse enthält, bewahren Sie sie also an einem Ort auf, den nur Sie lesen können."
     },
     "name": {
       "back": "Zurück",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Konto",
     "moveToAccount": "Zu Konto verschieben…",
     "moveToNewAccount": "Zu neuem Konto verschieben",
-    "renameAccount": "Konto umbenennen",
     "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
     "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
-    "labelTooLong": "Dieser Name ist zu lang. Halten Sie ihn unter 512 Zeichen.",
-    "renameCancel": "Abbrechen",
-    "renamePlaceholder": "Kontoname",
-    "renameSave": "Umbenennen",
     "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert.",
     "createShort": "Neuer Tresor",
     "joinShort": "Gerät hinzufügen",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Übrig gebliebene Dateien von einem unterbrochenen Löschvorgang ({{n}}). Bereinige sie, bevor du einen Tresor erstellst.",
     "cleanUpFiles": "Übrig gebliebene Dateien bereinigen",
     "connect": "Mit meinem Konto verbinden",
-    "startIdentity": "Eine Identität erstellen",
-    "startLocal": "Stattdessen einen lokalen Tresor erstellen",
     "tagline": "Verschlüsselte Markdown-Notizen. Keine E-Mail bei der Anmeldung.",
-    "identityTitle": "Eine Identität erstellen",
-    "identityBody": "Eine Identität für alle Ihre Tresore, damit Menschen Sie einladen können. Braucht einen Sync-Server.",
-    "localTitle": "Einen lokalen Tresor erstellen",
-    "localBody": "Ein verschlüsselter Tresor auf diesem Gerät. Sync oder eine Identität später hinzufügen.",
     "restoreTitle": "Aus Sicherung wiederherstellen",
     "restoreBody": "Öffnen Sie eine .myne-backup-Datei, die Sie früher gespeichert haben.",
     "joinTitle": "Dieses Gerät einem Konto hinzufügen",
     "joinBody": "Verwenden Sie einen Tresor, den Sie bereits auf einem anderen Gerät haben.",
-    "createAction": "Erstellen",
     "restoreAction": "Wiederherstellen",
     "joinAction": "Gerät hinzufügen",
     "version": "Version {{version}} · Pre-Alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "vor {{count}} Jahren geöffnet",
     "corruptedBadge": "Beschädigt",
     "accountFallback": "Konto",
-    "renameAccount": "Konto umbenennen",
     "moveToNewAccount": "Zu neuem Konto verschieben",
     "moveToAccount": "Zu Konto verschieben…",
     "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
     "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
-    "labelTooLong": "Dieser Name ist zu lang. Halten Sie ihn unter 512 Zeichen.",
-    "renameCancel": "Abbrechen",
-    "renamePlaceholder": "Kontoname",
-    "renameSave": "Umbenennen",
     "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identität wiederhergestellt.",
     "title": "Eine Identität erstellen",
     "errorAlreadyHeld": "Dieses Gerät hält bereits eine Identität. Stellen Sie sie mit ihrer Wiederherstellungsphrase wieder her, oder vergessen Sie sie und erstellen Sie eine neue.",
-    "errorNotConfigured": "Die Identität konnte nicht eingerichtet werden. Prüfen Sie, ob ein Sync-Server konfiguriert ist, und versuchen Sie es dann erneut.",
     "forgetCancel": "Behalten",
     "forgetConfirm": "Vergessen und neu erstellen",
     "forgetCta": "Diese Identität vergessen und eine neue erstellen",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Stellen Sie sie auf diesem Gerät mit ihrer 24-Wort-Wiederherstellungsphrase wieder her.",
     "recoverAction": "Wiederherstellen",
     "back": "Zurück",
-    "changeServer": "Sync-Server ändern oder prüfen",
-    "errorTlsFailure": "Das HTTPS-Zertifikat des Servers konnte nicht verifiziert werden. Prüfen Sie die Serveradresse und ihr Zertifikat.",
     "phraseTitle": "Identitätsphrase speichern",
     "phraseContinue": "Weiter",
     "confirmTitle": "Bestätigen Sie Ihre Phrase"
@@ -5509,15 +5481,6 @@
       "hint": "Ein erneuter Versuch startet den Download von vorne.",
       "retry": "Erneut versuchen",
       "back": "Zurück zur Entsperrung"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Einen Sync-Server wählen",
-      "intro": "Myne braucht einen Server, um Ihre verschlüsselten Notizen zu halten und Sie für Einladungen zu erreichen. Ihre Notizen bleiben auf diesem Gerät verschlüsselt, bevor sie es verlassen; der Server speichert nur Geheimtext.",
-      "notConfigured": "Geben Sie oben eine Serveradresse ein und drücken Sie Verbinden, um fortzufahren.",
-      "back": "Zurück",
-      "continue": "Weiter"
     }
   },
   "identityFlow": {

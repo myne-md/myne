@@ -27,12 +27,30 @@
 import { useTranslation } from "react-i18next";
 import { BlockingProgressStep } from "../../components/BlockingProgressStep";
 
-export function ProvisioningStep() {
+export interface ProvisioningStepProps {
+  /**
+   * Whether a vault phrase FOLLOWS this screen.
+   *
+   * True for a vault that carries its own phrase, and that is the case the
+   * ordering above exists for. False for a vault born under a person identity:
+   * sync is still required, so provisioning still runs, but the next screen is
+   * the settled vault and not 24 words (myne-md/myne#911 task 13). Saying "your
+   * recovery phrase comes next" there promises the one thing the flow does not
+   * deliver.
+   */
+  expectsPhrase: boolean;
+}
+
+export function ProvisioningStep({ expectsPhrase }: ProvisioningStepProps) {
   const { t } = useTranslation();
   return (
     <BlockingProgressStep
       heading={t("vaultCreation.provisioning.heading")}
-      caption={t("vaultCreation.provisioning.caption")}
+      caption={
+        expectsPhrase
+          ? t("vaultCreation.provisioning.caption")
+          : t("vaultCreation.provisioning.captionNoPhrase")
+      }
       footerHint={t("vaultCreation.provisioning.footerHint")}
       testId="create.provisioning"
     />

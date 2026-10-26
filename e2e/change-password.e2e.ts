@@ -25,6 +25,7 @@ import {
   enterRecoveryPhrase,
   openSettings,
   unlockToEditor,
+  waitForBannerText,
 } from "./support/flows";
 import { UNLOCK_NON_DISTINGUISHING_BANNER } from "../src/lib/load-bearing-copy";
 import { testIdSelector, type Session } from "./support/webdriver";
@@ -102,8 +103,16 @@ describeE2E("cp1 rotation happy path — no relock (MYND-224)", () => {
         const input = await s.byTestId("unlock.password-input");
         await input.sendKeys(fixture.password);
         await (await s.byTestId("unlock.submit")).click();
-        const banner = await s.byTestId("unlock.error-banner", { timeoutMs: 15_000 });
-        expect(await banner.text()).toBe(UNLOCK_NON_DISTINGUISHING_BANNER);
+        // `waitForBannerText`, not a one-shot `text()`. WebKitWebDriver's
+        // `GET /text` answers `""` for a banner that has JUST been inserted
+        // while the DOM already carries the copy, so the one-shot read failed
+        // as `expected '' to be 'Wrong password or vault file is corrupt…'` on
+        // a banner rendering exactly the right words (the same trap
+        // `e2e/AGENTS.md` records, and the reason the toast in this file reads
+        // `textContent()`). The full-literal equality is kept: the helper
+        // re-reads on every poll, so a banner that never carries the copy still
+        // fails.
+        await waitForBannerText(s, "unlock.error-banner", UNLOCK_NON_DISTINGUISHING_BANNER);
         await input.replaceText(NEW_PASSWORD);
         await (await s.byTestId("unlock.submit")).click();
         await s.byTestId("editor.root", { timeoutMs: 30_000 });

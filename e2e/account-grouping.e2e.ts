@@ -19,7 +19,7 @@
 //     picker draws every vault as a standalone row with no account header.
 //
 // The consequence for coverage is stated rather than papered over: **the
-// "grouped picker shows the account label" half of #684 is NOT proven here, and
+// "grouped picker shows a group heading" half of #684 is NOT proven here, and
 // cannot be**, on this platform. What is proven here is the half that is real on
 // a keychain-less device, and it is the half with teeth:
 //
@@ -31,10 +31,10 @@
 //
 // The grouped path is covered off this lane by the Rust suites, which drive a
 // working keychain through the `LabelKeychain` trait
-// (`core/src/account/{store,commands}.rs`): upgrade-merges-N-vaults, rename /
+// (`core/src/account/{store,commands}.rs`): upgrade-merges-N-vaults,
 // split / move round-trips, hide-vault-names suppression and mutation refusal,
-// overlong-label rejection, read-only list (no write-back, undecryptable bytes
-// preserved), and eager seal at creation. The grouping helper both pickers
+// read-only list (no write-back, undecryptable bytes preserved), and eager seal
+// at creation. The grouping and heading helpers every picker
 // share is pinned by `tests/lib/accountGrouping.test.ts`, which fails if the
 // helper ever answers `null` unconditionally. (myne-md/myne#802 removed the
 // mobile twin's copy of that test: `mobile/src/lib/account.ts` is byte-

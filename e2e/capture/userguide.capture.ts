@@ -107,9 +107,19 @@ async function frame(
     await build();
     await capture(session, name, slug, alt);
   } catch (e) {
-    frames.push({ name, slug, alt, ok: false, note: String(e).slice(0, 200) });
+    // A locked vault makes every REMAINING frame fail on its own wait, and each
+    // one costs its full timeout before it does. The failure then reads as a
+    // moved surface ("waitUntil(waitForElement([data-testid=…])) timed out"),
+    // which is what sent the last investigation hunting selectors. Probe once
+    // and say so: the session is over, not the frame.
+    const locked = await session
+      .findElements(testIdSelector("unlock.password-input"))
+      .then((rows) => rows.length > 0)
+      .catch(() => false);
+    const note = `${locked ? "vault auto-locked; " : ""}${String(e).slice(0, 200)}`;
+    frames.push({ name, slug, alt, ok: false, note });
     // eslint-disable-next-line no-console
-    console.warn(`[capture] FAIL ${name} — ${String(e).slice(0, 160)}`);
+    console.warn(`[capture] FAIL ${name} — ${note.slice(0, 160)}`);
   }
 }
 
@@ -276,7 +286,31 @@ async function noteIdByTitle(session: Session, title: string): Promise<string> {
  *  every note once the sample vault has grown. */
 async function openNoteByTitle(session: Session, title: string): Promise<string> {
   const noteId = capturedNoteIds.get(title) ?? (await noteIdByTitle(session, title));
-  await searchAndOpenNote(session, title, noteId);
+  // One retry, and it is not a substitute for a diagnosis: it is the diagnosis.
+  // `palettePick` types the title through W3C element-send-keys, and under CPU
+  // load on this host WebKit intermittently drops the SHIFT of the FIRST
+  // character, so the input ends up holding the same NUMBER of characters in
+  // the wrong case ("reading list" for "Reading list"). The helper's own nudge
+  // retypes it the same way, the row never matches, and the frame dies on a
+  // 45 s palette wait that reports "held 12 of 12 typed characters" — lengths
+  // only, by design (SYNC-13), which is why the case never showed up in the
+  // message and the failure read as a search bug.
+  //
+  // The QUERY is therefore lowercased: `searchNotes` lowercases both sides
+  // (`src/notes/searchNotes.ts`), so the match is unaffected, while the typed
+  // string needs no SHIFT at all and the whole failure class disappears at its
+  // source rather than being retried around. The retry stays for every other
+  // way the palette can lose a query. Safe, unlike a frame-level retry: opening
+  // a note creates nothing, so a second attempt cannot duplicate a sample note.
+  // Escape first, because a failed attempt leaves the palette OPEN and the next
+  // `sendKeys` would append to the half-typed query.
+  const query = title.toLowerCase();
+  try {
+    await searchAndOpenNote(session, query, noteId);
+  } catch {
+    await pressKey(session, ESCAPE).catch(() => {});
+    await searchAndOpenNote(session, query, noteId);
+  }
   await sleep(500); // let the editor swap to the selected note
   return noteId;
 }
@@ -315,6 +349,25 @@ async function keyTypeIntoEditor(session: Session, text: string): Promise<void> 
   await content.sendKeys(text);
 }
 
+/** Type a slash query on a fresh line and wait for the menu to open, retrying
+ *  once. `keyTypeIntoEditor` proves the keystroke pipeline works by typing `x`,
+ *  which says nothing about the SLASH reaching the menu handler: the two frames
+ *  that use it sit at opposite ends of the pass, and `voice-notes` arrives from
+ *  the attachments library, where the editor has just been remounted. Measured
+ *  there: `x` landed, `/record` did not open the menu, and the frame was lost
+ *  after its 8 s wait. Escape + one more attempt costs a couple of seconds and
+ *  a second `x` in a throwaway note. */
+async function typeSlashCommand(session: Session, query: string): Promise<void> {
+  await keyTypeIntoEditor(session, query);
+  try {
+    await session.waitForElement(".cm-slash-menu", { timeoutMs: 4_000 });
+  } catch {
+    await pressKey(session, ESCAPE).catch(() => {});
+    await keyTypeIntoEditor(session, query);
+    await session.waitForElement(".cm-slash-menu", { timeoutMs: 8_000 });
+  }
+}
+
 const supported = harnessSupported();
 const runner = supported.ok ? it : it.skip;
 
@@ -332,8 +385,53 @@ runner(
     });
     const s = app.session;
     try {
+      // ---- Frame: the unlock screen (MUST run before the vault is opened) ----
+      // The only frame that has to come first: this surface is unreachable for
+      // the rest of the pass once the vault is unlocked, and re-locking to get
+      // it back would throw away the vault the pass just built. It is also the
+      // one frame whose whole subject is the state the harness normally spends
+      // its first seconds leaving.
+      await frame(
+        s,
+        "unlock-screen",
+        "getting-started/unlocking-your-vault",
+        "The unlock screen: the vault's name, the master-password field, and the recovery-phrase and delete-vault links below it.",
+        async () => {
+          await s.byTestId("unlock.password-input", { timeoutMs: 15_000 });
+          // The gate resolves when the node is in the DOM, which is mid-way
+          // through the screen's entrance fade: the first capture of this frame
+          // had the heading at half opacity and no password field visible at all.
+          await settle(s, 1_000);
+        },
+      );
+
       await unlockToEditor(s, password);
       await dismissImporterOffer(s);
+
+      // ---- Keep the session alive for the length of the pass ----
+      // The desktop auto-lock default is 300 s (`myne_core::DEFAULT_AUTO_LOCK_SECS`),
+      // and this pass legitimately runs far longer, so the vault locked about
+      // five minutes in and every frame after that waited out its own timeout on
+      // the unlock screen: 18 frames lost, the 900 s test timeout hit, no
+      // manifest written. The reason it is not a flake is the idle SOURCE:
+      // `src-tauri/src/auto_lock.rs::machine_idle` reads X11 ScreenSaver on
+      // Linux, and WebDriver input never reaches the X server (tauri-driver
+      // drives WebKit, not X), so that clock grows from the moment the session
+      // starts while the frontend's own heartbeat stays fresh. `effective_idle_from`
+      // prefers the machine value over the window one, so the heartbeat cannot
+      // save it. Raising the pref to the envelope's ceiling (3600 s, `AUTO_LOCK_CEILING_SECS`)
+      // is the real user-facing command, not a test hook; the console stays
+      // untouched. Deliberately NOT `safe()`: if this fails the pass is doomed
+      // and a clear abort now costs 5 s instead of ten minutes of lying waits.
+      await pageSeatInvoke(s, "plugin:prefs|set_auto_lock_timeout", { seconds: 3600 }, 15_000);
+      const prefsAfter = await pageSeatInvoke(s, "plugin:prefs|prefs_read", {}, 15_000);
+      const autoLockSecs = (prefsAfter.ok as { auto_lock_seconds?: number | null } | null)
+        ?.auto_lock_seconds;
+      if (autoLockSecs !== 3600) {
+        throw new Error(
+          `auto-lock did not take (auto_lock_seconds=${String(autoLockSecs)}); the pass would lock mid-walk`,
+        );
+      }
 
       // ---- Build a realistic, non-sensitive vault through the UI ----
       // All content is English (the guide is English) and mundane (no
@@ -619,8 +717,7 @@ runner(
         async () => {
           await openNoteByTitle(s, "Weekly review");
           await settle(s, 400);
-          await keyTypeIntoEditor(s, "/");
-          await s.waitForElement(".cm-slash-menu", { timeoutMs: 8000 });
+          await typeSlashCommand(s, "/");
           await settle(s, 400);
         },
       );
@@ -756,6 +853,17 @@ runner(
           body:
             "\nLocal-first software keeps data on your device.[^1] More on the [project site][home].\n\n" +
             "[^1]: Your notes never require a server.\n\n[home]: https://myne.md\n",
+        },
+        {
+          name: "markdown-inline-extras",
+          slug: "markdown/html-and-inline-extras",
+          alt: "A note showing a highlight, subscript and superscript, a coloured mark, an abbreviation and a keyboard key, all rendered inline.",
+          title: "Inline extras sample",
+          body:
+            "\nBeyond the core syntax: ==a yellow highlight==, H~2~O, x^2^, and press <kbd>Ctrl</kbd>+<kbd>K</kbd>.\n\n" +
+            "The same highlight in another color: <mark class=\"hl-green\">green</mark>, " +
+            "and <abbr title=\"HyperText Markup Language\">HTML</abbr> explains itself on hover.\n\n" +
+            "An emoji name renders too: :tada:\n",
         },
       ];
       for (const m of mdSamples) {
@@ -981,23 +1089,30 @@ runner(
       );
       await safe("close colour popover", () => pressKey(s, ESCAPE));
 
-      // ---- Frame: templates (the Manage templates modal) ----
-      // templates.manage → TemplatesManager (ModalShell, aria-labelledby). The
-      // capture vault has no templates, so the first-run empty state shows.
+      // ---- Frame: templates (the Manage templates tab) ----
+      // `templates.manage` opens the template library as a TAB BODY, not a
+      // modal (myne-md/myne#779, `decisions/ui/0633`): the title and the close
+      // affordance come from the tab strip, so the `aria-labelledby` modal
+      // attribute this frame used to wait for no longer exists anywhere in the
+      // tree. Gate on the body's own testid. The capture vault has no templates,
+      // so the first-run empty state shows.
       await frame(
         s,
         "templates",
         "notes-and-organization/templates",
-        "The Manage templates modal, where note templates are created, renamed, and removed.",
+        "The template library, where note templates are created, renamed, and removed.",
         async () => {
           await runPaletteAction(s, "templates.manage", "template");
-          await s.waitForElement('[aria-labelledby="templates-modal-title"]', { timeoutMs: 8000 });
+          await s.byTestId("templates.pane", { timeoutMs: 8000 });
           await settle(s, 500);
         },
       );
-      await safe("close templates modal", async () => {
-        await pressKey(s, ESCAPE);
-        await s.waitForGone('[aria-labelledby="templates-modal-title"]');
+      // The library is a tab now, so Escape does nothing: close it through the
+      // palette action and land back on a note, or the tab strip carries a
+      // stray "Templates" tab through every later frame.
+      await safe("close templates tab", async () => {
+        await runPaletteAction(s, "tab.close", "close tab");
+        await openNoteByTitle(s, "Roadmap");
       });
 
       // ---- Frame: trash (a soft-deleted note in the Trash panel) ----
@@ -1120,13 +1235,20 @@ runner(
       // ---- Frame: pinned and stacked tabs (a pinned tab + multiple tabs) ----
       // Use the rows' context-menu Open in new tab action, then the tab's own
       // context menu to pin it.
+      //
+      // The pin targets the FIRST TAB IN THE STRIP rather than the "Roadmap"
+      // tab by id. `createNote` reuses the focused pane's active tab, so by the
+      // time the two "Tab …" notes exist the Roadmap tab has already been
+      // replaced and a lookup by its id can only time out. That is what this
+      // frame shipped with: the article is about pinned tabs and the screenshot
+      // had none, while every gate in the frame passed.
       await frame(
         s,
         "pinned-and-stacked-tabs",
         "notes-and-organization/pinned-and-stacked-tabs",
         "The editor tab strip with several note tabs open and one tab pinned.",
         async () => {
-          const roadmapId = await openNoteByTitle(s, "Roadmap");
+          await openNoteByTitle(s, "Roadmap");
           await safe("open extra tabs from row menus", async () => {
             await createNote(s, "Tab reading");
             const readingId = capturedNoteIds.get("Tab reading");
@@ -1137,18 +1259,26 @@ runner(
             await rowMenuPick(s, weeklyId, "open-in-new-tab");
           });
           await s.byTestId("editor.tab-strip", { timeoutMs: 8000 });
-          // Best-effort: pin the first tab via its context menu.
-          await safe("pin a tab", async () => {
-            await rightClickBySelector(
-              s,
-              testIdSelector("editor.tab", { "data-tab-id": `note:${roadmapId}` }),
-            );
-            await (
-              await s.waitForElement(
-                testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
-              )
-            ).click();
-          });
+          // NOT best-effort any more: a strip with no pin is the wrong picture
+          // for this article, so the frame fails loudly instead of shipping it.
+          await s.waitUntil(
+            async () => ((await s.byTestIdAll("editor.tab")).length >= 2 ? true : null),
+            { label: "two note tabs in the strip", timeoutMs: 10_000 },
+          );
+          const stripTabs = await s.byTestIdAll("editor.tab");
+          const firstTabId = await stripTabs[0].attribute("data-tab-id");
+          if (!firstTabId) throw new Error("first tab carries no data-tab-id");
+          await rightClickBySelector(
+            s,
+            testIdSelector("editor.tab", { "data-tab-id": firstTabId }),
+          );
+          await (
+            await s.waitForElement(
+              testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
+              { timeoutMs: 6000 },
+            )
+          ).click();
+          await pressKey(s, ESCAPE); // the tab context menu, so the strip is clean
           await settle(s, 500);
         },
       );
@@ -1194,6 +1324,20 @@ runner(
           await settle(s, 600);
         },
       );
+      // Back to ONE pane. Without this the split survives into every later frame
+      // and the guide ends up showing it as the layout: the voice-notes frame
+      // shipped with the attachments library open beside the editor and the note
+      // squeezed into a third of the window, and every settings screenshot had a
+      // two-pane tab strip across the top. Closing the focused pane is the user's
+      // own route (`tab`/pane close), and the guard above proved there are two.
+      await safe("close the split pane", async () => {
+        await runPaletteAction(s, "pane.close", "close pane");
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("editor.pane")).length <= 1 ? true : null),
+          { label: "back to a single editor pane", timeoutMs: 10_000 },
+        );
+        await openNoteByTitle(s, "Welcome to Myne");
+      });
 
       // =====================================================================
       // FIND-AND-CONNECT FRAMES
@@ -1358,6 +1502,10 @@ runner(
       });
 
       // ---- Frame: privacy (auto-lock + screen-capture) ----
+      // The panel is split into TOPICS since myne-md/myne#885 and only the
+      // active topic's body mounts, so the auto-lock row lives under `locking`
+      // rather than directly under `settings.tab-privacy`. Clicking the rail tab
+      // alone lands on that panel's default topic and finds nothing.
       await frame(
         s,
         "settings-privacy",
@@ -1365,22 +1513,25 @@ runner(
         "The Privacy settings panel showing the auto-lock duration and screen-capture protection toggle.",
         async () => {
           await (await s.byTestId("settings.tab-privacy")).click();
+          await selectSettingsTopic(s, "privacy", "locking");
           await s.byTestId("settings.auto-lock-select", { timeoutMs: 6000 });
           await settle(s, 400);
         },
       );
 
       // ---- Frame: quick unlock (the Privacy panel's Quick unlock block) ----
-      // quick-unlock.e2e.ts: settings.quick-unlock lives on the Privacy tab.
+      // QuickUnlockSettings sits in the same Privacy `locking` topic as the
+      // auto-lock row above (myne-md/myne#885), so the topic is re-selected
+      // rather than assumed: a rail-tab click alone re-renders that panel's
+      // default topic and the block is gone.
       await frame(
         s,
         "quick-unlock",
         "settings-and-privacy/quick-unlock",
         "The Quick unlock section of the Privacy settings, where a device PIN can be set up.",
         async () => {
-          await safe("ensure privacy tab", async () => {
-            await (await s.byTestId("settings.tab-privacy")).click();
-          });
+          await (await s.byTestId("settings.tab-privacy")).click();
+          await selectSettingsTopic(s, "privacy", "locking");
           const block = await s.byTestId("settings.quick-unlock", { timeoutMs: 6000 });
           // Scroll the block into view so it is centred in the frame.
           await safe("scroll quick-unlock into view", async () => {
@@ -1396,8 +1547,8 @@ runner(
       );
 
       // ---- Frame: editor display (the Editor settings panel) ----
-      // reading-source-modes.e2e.ts / TypographySettings.tsx:
-      // settings.tab-editor → settings.editor-text-size.
+      // TypographySettings lives in the Editor panel's `text` topic
+      // (myne-md/myne#885), which is not the one a rail-tab click lands on.
       await frame(
         s,
         "editor-display",
@@ -1405,6 +1556,7 @@ runner(
         "The Editor settings panel with the text-size and display options.",
         async () => {
           await (await s.byTestId("settings.tab-editor")).click();
+          await selectSettingsTopic(s, "editor", "text");
           await s.byTestId("settings.editor-text-size", { timeoutMs: 6000 });
           await settle(s, 400);
         },
@@ -1439,6 +1591,31 @@ runner(
             );
           });
           void block;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: dates and times (the Editor panel's format rows) ----
+      // DateTimeSettings lives in the Editor panel's `editing` topic, the same
+      // one `vim-mode` just left selected, but the topic is re-selected rather
+      // than assumed: a rail-tab click re-renders the panel's default topic.
+      await frame(
+        s,
+        "dates-and-times",
+        "settings-and-privacy/dates-and-times",
+        "The Editor settings panel showing the date format, time format and time zone rows.",
+        async () => {
+          await (await s.byTestId("settings.tab-editor")).click();
+          await selectSettingsTopic(s, "editor", "editing");
+          const row = await s.byTestId("settings.date-format", { timeoutMs: 6000 });
+          await safe("scroll date-format into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("settings.date-format")],
+            );
+          });
+          void row;
           await settle(s, 400);
         },
       );
@@ -1523,6 +1700,11 @@ runner(
       );
 
       // ---- Frame: add a device (the enroll form, best-effort empty state) ----
+      // The form lives in the Sync panel's `devices` topic (myne-md/myne#885),
+      // and the beta-terms consent stands in its place until accepted
+      // (myne-ops#15): the gate REPLACES the form rather than covering it, so
+      // the form is simply not rendered on a vault that has never answered. A
+      // real user reads and accepts; the frame does the same.
       await frame(
         s,
         "add-a-device",
@@ -1531,7 +1713,14 @@ runner(
         async () => {
           await (await s.byTestId("settings.tab-sync")).click();
           await s.byTestId("settings.sync-panel", { timeoutMs: 6000 });
-          const enroll = await s.byTestId("sync.enroll", { timeoutMs: 6000 });
+          await selectSettingsTopic(s, "sync", "devices");
+          await safe("accept the sync beta terms", async () => {
+            const gate = await s.findElements(testIdSelector("sync.beta-terms.open"));
+            if (gate.length === 0) return;
+            await gate[0].click();
+            await (await s.byTestId("sync.beta-terms.accept", { timeoutMs: 6000 })).click();
+          });
+          const enroll = await s.byTestId("sync.enroll", { timeoutMs: 8000 });
           await safe("scroll enroll into view", async () => {
             await s.execute(
               "var el=document.querySelector(arguments[0]); if (el) el.scrollIntoView({ block: 'center' });",
@@ -1576,15 +1765,10 @@ runner(
       );
 
       // ---- Frame: AI settings (the AI panel, off by default) ----
-      // `ai` now sits in the Developer group (developer-mode feature, MYND-593
-      // — supersedes the earlier always-visible Labs framing this comment used
-      // to describe) and the tab only renders once Developer mode is on. This
-      // capture currently relies on `settings.tab-ai` being reachable
-      // unconditionally, which is no longer true — it needs an
-      // enable-Developer-mode step from the About panel before this frame,
-      // once that toggle lands (developer-mode feature task 6). Flagging
-      // rather than silently leaving a capture step that will fail once this
-      // TODO is addressed.
+      // `ai` sits in the Developer group (developer-mode feature, MYND-593), so
+      // the rail tab only renders once Developer mode is on. The `vim-mode`
+      // frame above has already turned it on, which is why this frame can reach
+      // it; nothing here re-toggles the mode.
       await frame(
         s,
         "ai-settings",
@@ -1593,6 +1777,108 @@ runner(
         async () => {
           await (await s.byTestId("settings.tab-ai")).click();
           await s.byTestId("settings.ai-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: Tor routing (the Network panel) ----
+      // Developer group, like the AI panel above, hence after `vim-mode`. The
+      // panel has its own root testid, so the gate is the panel itself.
+      await frame(
+        s,
+        "network-tor",
+        "settings-and-privacy/route-sync-through-tor",
+        "The Network settings panel with the Tor routing toggle, which sends sync traffic through Tor when it is on.",
+        async () => {
+          await (await s.byTestId("settings.tab-network")).click();
+          await s.byTestId("settings.network-panel", { timeoutMs: 6000 });
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: terminal access (the CLI panel) ----
+      await frame(
+        s,
+        "cli-access",
+        "command-line/the-myne-cli",
+        "The CLI settings panel, where terminal access to the unlocked vault is switched on and its scope is limited.",
+        async () => {
+          await (await s.byTestId("settings.tab-cli")).click();
+          const access = await s.byTestId("settings.cli-access", { timeoutMs: 6000 });
+          await safe("scroll cli-access into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("settings.cli-access")],
+            );
+          });
+          void access;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: app updates (the About panel's update block) ----
+      // Three frames share the About panel and each scrolls its own subject
+      // into view, because the panel's body overflows the modal: the update
+      // channel + check, the Developer-mode switch, and the diagnostic log.
+      await frame(
+        s,
+        "updates",
+        "settings-and-privacy/updates",
+        "The About settings panel scrolled to the update channel, the manual check button and the automatic update check.",
+        async () => {
+          await (await s.byTestId("settings.tab-about")).click();
+          const channel = await s.byTestId("about.update-channel", { timeoutMs: 6000 });
+          await safe("scroll updates into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("about.update-channel")],
+            );
+          });
+          void channel;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: Developer mode (the About panel's switch) ----
+      await frame(
+        s,
+        "developer-mode",
+        "settings-and-privacy/developer-mode",
+        "The About settings panel scrolled to the Developer mode switch, which reveals the AI, Network and CLI panels.",
+        async () => {
+          await (await s.byTestId("settings.tab-about")).click();
+          const row = await s.byTestId("about.developer-mode", { timeoutMs: 6000 });
+          await safe("scroll developer-mode into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("about.developer-mode")],
+            );
+          });
+          void row;
+          await settle(s, 400);
+        },
+      );
+
+      // ---- Frame: diagnostic logging (the About panel's diagnostics block) ----
+      await frame(
+        s,
+        "diagnostic-logging",
+        "settings-and-privacy/diagnostic-logging",
+        "The About settings panel scrolled to the diagnostic log switch and the copyable diagnostics report.",
+        async () => {
+          await (await s.byTestId("settings.tab-about")).click();
+          const logRow = await s.byTestId("about.diagnostic-log-row", { timeoutMs: 6000 });
+          await safe("scroll diagnostics into view", async () => {
+            await s.execute(
+              "var el = document.querySelector(arguments[0]);" +
+                "if (el) el.scrollIntoView({ block: 'center' });",
+              [testIdSelector("about.diagnostic-log-row")],
+            );
+          });
+          void logRow;
           await settle(s, 400);
         },
       );
@@ -1618,15 +1904,17 @@ runner(
         },
       );
 
-      // ---- Frame: account (the grouping: name, vaults, extensions) ----
+      // ---- Frame: account (the account number, grouping, extensions) ----
       // The Account panel is the account grouping (`decisions/ui/0679`): the
-      // account name, the vaults it groups on this device, and the extension
-      // pairing block the connected-extensions frame below covers in detail.
+      // person account number that now opens it (`decisions/ui/0728`, where the
+      // account name used to be), the vaults it groups on this device, and the
+      // extension pairing block the connected-extensions frame below covers in
+      // detail.
       await frame(
         s,
         "account-panel",
         "settings-and-privacy/account",
-        "The Account settings panel showing the account name, the vaults grouped under it, and the browser-extension pairing controls.",
+        "The Account settings panel showing the account number, the vaults grouped under it, and the browser-extension pairing controls.",
         async () => {
           await (await s.byTestId("settings.tab-account")).click();
           await s.byTestId("settings.account-panel", { timeoutMs: 6000 });
@@ -1756,10 +2044,9 @@ runner(
         async () => {
           await openNoteByTitle(s, "Weekly review");
           await settle(s, 400);
-          await keyTypeIntoEditor(s, "/record");
-          // Wait for the slash menu to open + filter to the Voice note command
-          // BEFORE committing, else Enter fires on an unrendered/unfiltered menu.
-          await s.waitForElement(".cm-slash-menu", { timeoutMs: 8000 });
+          // Wait for the menu to open + filter to the Voice note command BEFORE
+          // committing, else Enter fires on an unrendered/unfiltered menu.
+          await typeSlashCommand(s, "/record");
           await settle(s, 300);
           // Commit the slash menu's top match (Enter) to fire the command.
           await (await s.waitForElement(CM_CONTENT)).sendKeys(ENTER);
@@ -1818,7 +2105,15 @@ runner(
         },
       );
 
-      // ---- Manifest ----
+      // ---- Manifest ---- (written in `finally` below, not here)
+    } finally {
+      // Written here, not at the end of the body, because the body can ABORT
+      // mid-walk: the pass runs long enough that a single hung wait trips the
+      // 900 s test timeout, and when that happened the manifest was never
+      // written at all. 32 PNGs then sat in the output directory with no record
+      // of which frames they were, which frames were lost, or why. The manifest
+      // is the only artefact that answers those questions, so it is the one
+      // thing a failed run must still produce.
       writeFileSync(
         join(OUT_DIR, "manifest.json"),
         JSON.stringify(
@@ -1837,13 +2132,15 @@ runner(
       const ok = frames.filter((f) => f.ok).length;
       // eslint-disable-next-line no-console
       console.log(`[capture] done — ${ok}/${frames.length} frames captured -> ${OUT_DIR}`);
-    } finally {
       await app.teardown();
     }
   },
   // Per-test timeout (this arg overrides .config/vitest/capture.config.ts's testTimeout
-  // for THIS test). The expanded ~60-frame pass at @2x runs ~10-14 min — the
-  // original 600s aborted it mid-pass (manifest never written). Keep in sync
-  // with the config's testTimeout.
-  900_000,
+  // for THIS test). Keep in sync with the config's testTimeout: 30 min. The
+  // pass is a best-effort walk that is SUPPOSED to survive slow frames, so the
+  // timeout is not a quality budget — it is the point past which the run is
+  // considered hung. 900 s was that point at 1x and stopped being it under load
+  // (measured 583 s for a clean 65-frame pass on a busy host), which is how a
+  // healthy run got reported as a failure and lost its manifest.
+  1_800_000,
 );

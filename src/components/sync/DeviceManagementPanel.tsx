@@ -754,6 +754,7 @@ export function DeviceManagementPanel({
           </div>
         )}
       </div>
+
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
   ipcOk,
   openSettings,
   pageSeatInvoke,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./flows";
 
@@ -218,6 +219,11 @@ export async function setupTwoSyncedDevices(
       await dismissImporterOffer(a.session);
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
+      // The enrol form is on the panel's DEVICES topic since the topic split
+      // (myne-md/myne#885). Waiting for it on the panel's first topic is the
+      // stale-selector failure that took this helper's every caller down with it:
+      // the panel opens on Connection, so the form never appeared.
+      await selectSettingsTopic(a.session, "sync", "devices");
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
       if (opts.deviceNames) {
         // `replaceText`, not clear()+sendKeys: the field is PRE-FILLED with the
@@ -260,6 +266,7 @@ export async function setupTwoSyncedDevices(
       // A: approve B while it is pending.
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
+      await selectSettingsTopic(a.session, "sync", "devices");
       // Anything that must observe the PENDING row runs here — approving closes
       // that window for good. The row wait is scoped to that case: `approve-device`
       // is a CHILD of `pending-row`, so waiting for both on the default path would

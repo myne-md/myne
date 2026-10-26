@@ -12,12 +12,27 @@
 // length gate's UNIT (Unicode scalar values, not UTF-16 code units) is pinned
 // separately by `tests/components/passwordLengthGate.test.tsx`.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+
+/** The hook's three states, switched per test. `ready` and `unavailable` cannot
+ *  both be true in the real hook (there is no evaluator to be ready with), so the
+ *  mock keeps them derived from one value rather than letting a fixture describe
+ *  a state the product cannot reach. */
+const strength = vi.hoisted(() => ({
+  mode: "ready" as "ready" | "loading" | "unavailable",
+}));
 
 vi.mock("../../src/components/PasswordInput", async (importOriginal) => {
   const real = await importOriginal<typeof import("../../src/components/PasswordInput")>();
-  return { ...real, usePasswordStrength: () => ({ ready: true, result: { score: 4 } }) };
+  return {
+    ...real,
+    usePasswordStrength: () => ({
+      ready: strength.mode === "ready",
+      result: strength.mode === "ready" ? { score: 4 } : null,
+      unavailable: strength.mode === "unavailable",
+    }),
+  };
 });
 
 vi.mock("react-i18next", () => ({
@@ -27,6 +42,9 @@ vi.mock("react-i18next", () => ({
 const { PasswordCreateForm } = await import("../../src/components/PasswordCreateForm");
 const { MIN_PASSWORD_LEN } = await import("../../src/components/PasswordInput");
 
+beforeEach(() => {
+  strength.mode = "ready";
+});
 afterEach(cleanup);
 
 const submit = () => screen.getByTestId("t.submit") as HTMLButtonElement;
@@ -88,5 +106,41 @@ describe("PasswordCreateForm ready gate", () => {
     // Dropping the caller's flag leaves the internal gate in charge.
     rerender(<PasswordCreateForm submitLabel="Accept" onSubmit={onSubmit} testIdPrefix="t" />);
     expect(submit().disabled).toBe(false);
+  });
+
+  // A strength chunk that cannot be loaded used to be indistinguishable from one
+  // still loading: the caption said "Checking strength…" for the whole session and
+  // the submit never enabled, with nothing said about why (measured 2026-10-24 off
+  // a 504 on the lazy `@zxcvbn-ts/*` chunks). 2026-10-24, the owner's call: the
+  // step falls back to the length floor and the screen says so.
+  it("falls back to the length floor when the strength check cannot load", () => {
+    strength.mode = "unavailable";
+    const onSubmit = renderForm();
+    const longButWeak = "aaaaaaaaaaaaaaaa";
+
+    fill("t.password-input", longButWeak);
+    fill("t.confirm-input", longButWeak);
+    expect(screen.getByText("password.createForm.strengthUnavailable")).toBeTruthy();
+    expect(submit().disabled).toBe(false);
+
+    // The floor is untouched by the fallback: one character below it, still refused.
+    const short = longButWeak.slice(0, MIN_PASSWORD_LEN - 1);
+    fill("t.password-input", short);
+    fill("t.confirm-input", short);
+    expect(submit().disabled).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  // The other half of the same distinction: still loading is not the same state as
+  // failed, and must not render the fallback's sentence or its open gate.
+  it("stays closed and says it is checking while the check is still loading", () => {
+    strength.mode = "loading";
+    renderForm();
+    const long = "aaaaaaaaaaaaaaaa";
+    fill("t.password-input", long);
+    fill("t.confirm-input", long);
+    expect(screen.getByText("password.createForm.checkingStrength")).toBeTruthy();
+    expect(screen.queryByText("password.createForm.strengthUnavailable")).toBeNull();
+    expect(submit().disabled).toBe(true);
   });
 });

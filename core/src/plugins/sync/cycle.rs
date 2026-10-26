@@ -352,10 +352,21 @@ async fn signed_head_ctx(
     is_owner: bool,
 ) -> Option<super::head_authority::SignedHeadCtx> {
     let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
-    if bytes.get(..4) != Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        return None;
-    }
-    let b2b = protocol::parse_vault_meta_ntv6(&bytes).ok()?;
+    // The head format follows the GENERATION (decisions 0603), and there are now
+    // two generations that carry the B2B tail. `NTV7` needs no new mechanism: it
+    // IS `NTV6` plus a person wrap, so the tail accessor is the whole difference.
+    // Reading only `NTV6` here would have authored an HMAC (`0x01`) head for every
+    // vault born under an identity, i.e. a downgrade the `NTV6` guard below
+    // already refuses and no compiler can see (myne-md/myne#911 task 8).
+    let b2b = match bytes.get(..4) {
+        Some(magic) if magic == protocol::VAULT_META_NTV6_MAGIC.as_slice() => {
+            protocol::parse_vault_meta_ntv6(&bytes).ok()?
+        }
+        Some(magic) if magic == protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            protocol::parse_vault_meta_ntv7(&bytes).ok()?.as_ntv6_tail()
+        }
+        _ => return None,
+    };
     let group_key = shared.group_bytes()?;
     let envelope = protocol::person_invite::open_group_roster(
         &group_key,
@@ -363,25 +374,61 @@ async fn signed_head_ctx(
         b2b.group_key_epoch,
         &b2b.signed_roster_envelope,
     )?;
-    let person = state.clone_person_identity().await?;
-    let owner_public = if is_owner {
-        person.public_half()
-    } else {
-        let code = super::state::read_sync_state(io, vault_dir)
-            .await
-            .ok()?
-            .owner_identity_code?;
-        super::invite::decode_person_identity_code(&code)
-            .ok()?
-            .public
+    // The held identity is NOT required to build this context any more. It is required to
+    // author a `0x02` head, and `SignedHeadCtx::sign` refuses that arm without it, but a
+    // cold start has to be able to VERIFY heads and the roster it is verified through,
+    // and a device key authors `0x03` without the phrase at all (`0731` stage 1). Requiring
+    // the phrase here is what kept the phrase in the sync path after the device key had
+    // already removed it from signing.
+    let person = state.clone_person_identity().await;
+    let sync_state = super::state::read_sync_state(io, vault_dir).await.ok()?;
+    let owner_public = match (&person, is_owner) {
+        (Some(held), true) => held.public_half(),
+        // An OWNER's cold start: this device cached its own code the last time the phrase
+        // was entered (public material only, refreshed on every unlock).
+        (None, true) => {
+            let code = sync_state.own_identity_code.as_deref()?;
+            super::invite::decode_person_identity_code(code)
+                .ok()?
+                .public
+        }
+        // A member holds the owner's half only as the code pinned out of band at accept.
+        (_, false) => {
+            let code = sync_state.owner_identity_code.as_deref()?;
+            super::invite::decode_person_identity_code(code)
+                .ok()?
+                .public
+        }
     };
-    let roster = protocol::person_invite::verify_group_roster(
+    // The roster may have been signed by the owner's PERSON key or by one of the
+    // owner's DEVICES (`decisions/protocol/0731` stage 2). Candidates come from the
+    // pinned attestation (a member), this device's own key (the owner) and the
+    // verified rows of the binding store.
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        &group_key,
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+    );
+    let own_device = is_owner
+        .then(|| super::device_identity::load_for_fallback("sync_cycle"))
+        .flatten()
+        .map(|key| key.public_half());
+    let owner_devices = super::roster_trust::device_halves_for_owner(
+        io,
+        vault_dir,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        sync_state.owner_device.as_ref(),
         &owner_public,
+    )
+    .await;
+    let roster = protocol::person_invite::verify_group_roster(
+        super::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,
         &b2b.base.account_number_hash,
     )
     .ok()?;
-    let roster_publics = roster
+    let roster_publics: Vec<protocol::person_key::PersonPublicHalf> = roster
         .members
         .iter()
         .filter(|m| m.state == protocol::person_invite::GroupMemberState::Live)
@@ -394,11 +441,169 @@ async fn signed_head_ctx(
             .ok()
         })
         .collect();
-    Some(super::head_authority::SignedHeadCtx::new(
+    let ctx = super::head_authority::SignedHeadCtx::new(
         person,
         b2b.base.account_number_hash,
-        roster_publics,
+        roster_publics.clone(),
+    );
+
+    // The device half (`decisions/protocol/0731` + `0733`): this device authors `0x03`
+    // only when BOTH halves of the binding are in place: a device key at rest, and a
+    // VERIFIED binding row for this device that publishes the same public half. Either
+    // half missing means the phrase path (`0x02`), which every peer already accepts, so
+    // a half-finished rollout never authors a head its peers cannot resolve.
+    let Some(device_id_hex) = super::state::read_sync_state(io, vault_dir)
+        .await
+        .ok()
+        .and_then(|st| st.device_id_hex)
+    else {
+        return Some(ctx);
+    };
+    let Some(device_id) = super::devices::hex16(&device_id_hex) else {
+        return Some(ctx);
+    };
+    // Three states, told apart on purpose. `Ok(None)` is first run; `Unsupported` is
+    // rung 4 of the ladder (no storage on this platform), which is the ordinary state
+    // on everything but Apple. Anything else is a FAULT: a keychain that refused or an
+    // item that would not decode is not "this device has no key", and reading it as
+    // that would leave the phrase path in place for ever with one trace line as the
+    // only clue. It is still not fatal here: sync must run, and a `0x02` head is a
+    // head every peer accepts.
+    let device_key = match super::device_identity::load() {
+        Ok(Some(key)) => key,
+        Ok(None) => return Some(ctx),
+        Err(super::device_identity::DeviceKeyStoreError::Unsupported) => return Some(ctx),
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_device_key",
+                error = ?err,
+                "device key could not be read; authoring a person-signed head"
+            );
+            return Some(ctx);
+        }
+    };
+    let signers =
+        verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
+    let own_bound = signers
+        .iter()
+        .any(|s| s.device_id == device_id && s.public == device_key.public_half());
+    if !own_bound {
+        // A device key with no verified binding row is not a signer: peers would answer
+        // `AuthorUnknown` for its heads, and a head nobody can verify is worse than an
+        // `0x02` one everybody can.
+        return Some(ctx);
+    }
+    Some(ctx.with_device(
+        super::head_authority::DeviceSigner {
+            device_id,
+            key: device_key,
+        },
+        signers,
     ))
+}
+
+/// The device public halves a `0x03` head may be verified against: the LIVE,
+/// VERIFIED rows of `vault.device-bindings`, resolved through the signed roster.
+///
+/// "Verified" is the load-bearing word rather than tidiness. The map is group-sealed,
+/// so any member can write it; an unverified row would let a member holding the group
+/// key point a binding at a key they control and then sign heads as that person's
+/// device. The partition checks each row against the public half of the person the row
+/// NAMES, taken from the signed roster.
+async fn verified_device_head_signers(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_dir: &std::path::Path,
+    b2b: &protocol::B2bVaultMeta,
+    roster_publics: &[protocol::person_key::PersonPublicHalf],
+    group_key: &[u8; 32],
+) -> Vec<protocol::vault_head::DeviceHeadSigner> {
+    let bindings_key = super::super::device_binding::bindings_key_for_group(
+        group_key,
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+    );
+    let map = match super::super::device_binding::read_device_bindings_in_dir(
+        io,
+        vault_dir,
+        &bindings_key.borrow(),
+    )
+    .await
+    {
+        Ok(map) => map,
+        // An empty signer set and an unreadable store are different states with the
+        // same effect here, so the difference is at least recorded: a corrupt store
+        // silently reading as "no device is bound" is how a binding problem hides for
+        // a release.
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_device_signers",
+                error = ?err,
+                "device-binding store unreadable; no device signer is resolvable"
+            );
+            return Vec::new();
+        }
+    };
+    let (verified, _unverified) = protocol::partition_verified_bindings(
+        &map,
+        |fingerprint_hex| {
+            roster_publics
+                .iter()
+                .find(|p| protocol::hex::encode_lower(p.fingerprint()) == fingerprint_hex)
+                .cloned()
+        },
+        None,
+    );
+    verified
+        .iter()
+        .filter(|(_, entry)| !entry.tombstone)
+        .filter_map(|(device_hex, entry)| {
+            Some(protocol::vault_head::DeviceHeadSigner {
+                device_id: super::devices::hex16(device_hex)?,
+                public: protocol::device_public_half_from_entry(entry)?,
+            })
+        })
+        .collect()
+}
+
+/// The person session's device token, as raw bytes (myne-md/myne#911 task 8).
+///
+/// Read per cycle rather than cached: the token is rotated by re-enrolment and by
+/// a person-key rotation, and a cached copy would outlive the credential it
+/// names. `None` on an absent file (no identity on this device), an all-zero or
+/// unparseable one, or an empty token (an identity that never registered).
+async fn person_token_bytes(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Option<Vec<u8>> {
+    let path = super::person_auth::person_auth_path_for_read(host).ok()?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .ok()??;
+    if auth.token_hex.is_empty() {
+        return None;
+    }
+    // One lowercase-hex contract (audit T6.10(c)); a hand-rolled copy here was
+    // the third one in the crate.
+    let out = protocol::hex::decode_lower_vec(&auth.token_hex)?;
+    (!out.is_empty()).then_some(out)
+}
+
+/// The person session's 16-byte device id (myne-md/myne#911 task 8).
+///
+/// A person-born vault has no enrolment record, so this is the only device actor
+/// its heads can be authored under. Read per cycle for the same reason the token
+/// is: re-enrolment rotates it, and a cached copy would outlive the credential it
+/// names. `None` on an absent file or an unparseable id, which parks the cycle
+/// rather than authoring a head under a made-up actor.
+async fn person_device_id(
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Option<[u8; 16]> {
+    let path = super::person_auth::person_auth_path_for_read(host).ok()?;
+    let auth = super::person_auth::read_person_auth(io, &path)
+        .await
+        .ok()??;
+    hex16(&auth.device_id_hex)
 }
 
 pub async fn run_active_cycle_from_host(
@@ -483,13 +688,69 @@ pub async fn run_active_cycle_from_host(
             return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
         }
     };
-    let (Some(acct_hex), Some(dev_hex)) = (st.account_hash_hex.clone(), st.device_id_hex.clone())
-    else {
-        return CycleOutcome::NotReady; // not enrolled
+    // A PUBLISHED person-born vault (myne-md/myne#911 task 8). Its namespace is
+    // `vault.meta`'s random binding and its credential is the person session, so
+    // the request names the vault (`?account=`) and the recorded
+    // `account_hash_hex` is the PERSON's id, deliberately not the namespace.
+    // Absent on every pre-existing vault: there the credential names the
+    // namespace and nothing below changes.
+    //
+    // Only a person-born vault ever records one (`publish_vault` says why), so
+    // its presence here can stand in for the generation: a legacy vault that has
+    // been enrolled must NOT take the branch below.
+    //
+    // The record is a CACHE and the frame is the authority (myne-md/myne#911
+    // review): `sync-state.json` is evictable device-local state, so losing it
+    // used to leave a vault that opens, lists and then parks at `NotReady`
+    // forever with nothing saying why. §9.3 offset 6 carries the same value in
+    // `vault.meta`, so an absent record is read from there.
+    let published_namespace = match st.namespace_hex.as_deref().and_then(hex16) {
+        Some(namespace) => Some(namespace),
+        None => {
+            // **Only a person-wrapped frame answers here.** A legacy vault's
+            // offset-6 bytes are its account hash, which its own credential already
+            // names; reading those as a namespace would switch an enrolled legacy
+            // vault onto a credential it does not have.
+            let root =
+                crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+                    .ok();
+            match root {
+                Some(root) => {
+                    crate::plugins::sync::person_discovery::person_frame_namespace(io, &root).await
+                }
+                None => None,
+            }
+        }
     };
-    let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
-        return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+    // The cycle's identity: the namespace it addresses and the device actor it
+    // authors heads under.
+    let (account_hash, device_id) = match published_namespace {
+        Some(namespace) => {
+            // A person-born vault has no enrolment record at all. Creation writes
+            // neither an account hash nor a device id, because there is no vault
+            // account to enrol on; the namespace stands in for the account, and
+            // the person session is the only place a device id exists. Without a
+            // session the cycle parks exactly as a still-pending device does,
+            // because nothing it could do would fix that.
+            let Some(device_id) = person_device_id(io, host).await else {
+                return CycleOutcome::NotReady;
+            };
+            (namespace, device_id)
+        }
+        None => {
+            let (Some(acct_hex), Some(dev_hex)) =
+                (st.account_hash_hex.clone(), st.device_id_hex.clone())
+            else {
+                return CycleOutcome::NotReady; // not enrolled
+            };
+            let (Some(account_hash), Some(device_id)) = (hex16(&acct_hex), hex16(&dev_hex)) else {
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            };
+            (account_hash, device_id)
+        }
     };
+    let published_ns_hex: Option<String> =
+        published_namespace.map(|ns| protocol::hex::encode_lower(&ns));
     // Attachment sync (MYND-468) verifies downloaded MYA1 blobs end-to-end, so
     // the cycle needs the itemsKey material. The OWNER root key is optional: a
     // MEMBER holds no `root_key` (that is the point of sharing) and the shared
@@ -516,8 +777,9 @@ pub async fn run_active_cycle_from_host(
     // cache (see [`cycle_account_number_hash`]). Checked BEFORE the token block:
     // a device whose enrolment names another account must not go on to claim a
     // token under that account's SCRAM username either.
+    let expected_identity = published_namespace.unwrap_or(account_hash);
     let (meta_version, account_number_hash) =
-        match cycle_account_number_hash(io, &dir, &account_hash).await {
+        match cycle_account_number_hash(io, &dir, &expected_identity).await {
             Ok(hash) => hash,
             Err(AccountHashRefusal::MetaUnavailable) => {
                 tracing::error!(
@@ -542,25 +804,34 @@ pub async fn run_active_cycle_from_host(
     // claim one now if an existing device approved it (re-handshake under the
     // unlocked root key). A member's per-vault token was stored at invite accept,
     // so a missing one means the membership is not materialised here.
-    let token = match super::token_store::default_store().read(io, &dir).await {
-        Ok(Some(t)) => t,
-        _ => match &root_key {
-            Some(root_key) => {
-                match try_claim_token(
-                    io,
-                    url.clone(),
-                    dir.clone(),
-                    root_key.clone(),
-                    account_hash,
-                    device_id,
-                )
-                .await
-                {
-                    Some(t) => t,
-                    None => return CycleOutcome::NotReady, // still pending approval
+    let token = match published_namespace {
+        // No vault account exists to claim a token against, so the person token
+        // is the only credential; without a session the cycle parks exactly as a
+        // pending device does, because nothing it can do would fix that.
+        Some(_) => match person_token_bytes(io, host).await {
+            Some(t) => t,
+            None => return CycleOutcome::NotReady,
+        },
+        None => match super::token_store::default_store().read(io, &dir).await {
+            Ok(Some(t)) => t,
+            _ => match &root_key {
+                Some(root_key) => {
+                    match try_claim_token(
+                        io,
+                        url.clone(),
+                        dir.clone(),
+                        root_key.clone(),
+                        account_hash,
+                        device_id,
+                    )
+                    .await
+                    {
+                        Some(t) => t,
+                        None => return CycleOutcome::NotReady, // still pending approval
+                    }
                 }
-            }
-            None => return CycleOutcome::NotReady, // member with no stored token
+                None => return CycleOutcome::NotReady, // member with no stored token
+            },
         },
     };
 
@@ -591,22 +862,52 @@ pub async fn run_active_cycle_from_host(
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
     // user runs the person unlock. Refuse loudly instead of downgrading.
     {
-        let is_ntv6 = io
-            .read(&dir.join("vault.meta"))
-            .await
-            .map(|b| b.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()))
-            .unwrap_or(false);
-        if is_ntv6 && signed_ctx.is_none() {
-            // A missing person identity is the one cause of `signed_ctx == None`
-            // the user can fix in place (unlock the identity), so it gets its own
-            // class and the UI its own sentence. Any OTHER
-            // reason the head context could not be built (roster, group key)
-            // stays a generic failure — that fix is not something to ask of them.
+        // BOTH B2B generations, not just the first one: a head that a roster
+        // vouches for is what an `NTV7` vault needs exactly as much as an `NTV6`
+        // one, and checking one magic would let the newer generation author the
+        // downgraded head this guard exists to refuse (myne-md/myne#911 task 8).
+        let needs_signed_head = match io.read(&dir.join("vault.meta")).await {
+            Ok(b) => {
+                let magic = b.get(..4);
+                magic == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
+                    || magic == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
+            }
+            // An ABSENT meta is not a B2B vault, and that is the only read failure
+            // that means so. Collapsing every error into `false` was a default-on-
+            // error feeding a write: a transient IO failure made an `NTV7` vault look
+            // single-user, and the cycle then authored a `0x01` HMAC head the server
+            // refuses, wedging sync in exactly the shape this guard exists to prevent.
+            // An unreadable meta is a failure to classify, so the cycle stops and says
+            // so rather than guessing a generation.
+            Err(crate::io_failure_kind::IoFailureKind::NotFound) => false,
+            Err(err) => {
+                tracing::warn!(
+                    stage = "sync_cycle",
+                    event = "vault_meta_unreadable",
+                    reason = ?err,
+                    "cannot classify the vault generation, so the cycle will not author a head"
+                );
+                return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
+            }
+        };
+        let can_author = signed_ctx
+            .as_ref()
+            .is_some_and(super::head_authority::SignedHeadCtx::can_author);
+        if needs_signed_head && !can_author {
+            // Unlocking the person identity is one cause the user can fix in place, so it
+            // gets its own class and the UI its own sentence. It is no longer the only
+            // way to author a head (`0731` stage 1: a device key authors `0x03` with no
+            // phrase), so the class is chosen by asking what this device is actually
+            // missing rather than by whether an identity happens to be held. Any OTHER
+            // reason (roster, group key, an unverified binding row) stays a generic
+            // failure, because that fix is not something to ask of them.
             let has_person = state.clone_person_identity().await.is_some();
-            let class = if has_person {
-                super::loop_control::FailureClass::Other
-            } else {
+            let has_device_key =
+                super::device_identity::load_for_fallback("cycle_can_author").is_some();
+            let class = if !has_person && !has_device_key {
                 super::loop_control::FailureClass::IdentityLocked
+            } else {
+                super::loop_control::FailureClass::Other
             };
             tracing::warn!(
                 stage = "sync_cycle",
@@ -624,6 +925,16 @@ pub async fn run_active_cycle_from_host(
         let transport = super::http_transport::build_transport(&url).map_err(|e| {
             super::orchestrator::SyncCycleError::Pull(super::engine::PullError::Transport(e))
         })?;
+        // A published person vault names itself on every sync request; the
+        // wrapper rewrites only `/sync/*` and `/vault.meta`, so the SCRAM and
+        // attachment paths are untouched (see `NamespacedTransport`).
+        let scoped_transport = published_ns_hex
+            .as_deref()
+            .map(|ns| super::transport::NamespacedTransport::new(transport.as_ref(), ns));
+        let transport_ref: &dyn super::transport::SyncTransport = match &scoped_transport {
+            Some(t) => t,
+            None => transport.as_ref(),
+        };
         // The full `SyncCycleError` crosses the spawn_blocking boundary intact —
         // the integrity verdict (SYNC-10) and the scheduler's retry class are
         // both derived from it on the other side.
@@ -647,7 +958,7 @@ pub async fn run_active_cycle_from_host(
         // roles above (the SCRAM username in the claim, the enrolment identity).
         super::orchestrator::run_sync_cycle(
             io,
-            transport.as_ref(),
+            transport_ref,
             root_key.as_deref(),
             &shared,
             account_number_hash,

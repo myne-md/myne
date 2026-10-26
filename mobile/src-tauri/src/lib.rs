@@ -3,9 +3,9 @@
 // consumes the shared `myne-core` crate (the single source of truth for the
 // vault / notes / prefs plugin cores, extracted from the desktop crate) and the
 // audited `protocol/` crate directly (no port). The still-desktop-only
-// subsystems (clipper, auto-lock, backup, importer, themes, workspace, spell)
-// are not carried over — the core command cores trigger those
-// side-effects through the `myne_core::hooks::VaultLifecycleHooks` seam, into
+// subsystems (clipper pairing, backup, importer, auto-lock, spell) are not
+// carried over; themes and workspace are registered below. The core command
+// cores trigger those side-effects through the `VaultLifecycleHooks` seam, into
 // which mobile installs `hooks::MobileHooks` (no-op for every desktop-only
 // side-effect; screen-capture protection is LIVE through that seam — see
 // `screen_guard`, MYND-469). The

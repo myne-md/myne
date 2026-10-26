@@ -4,7 +4,7 @@
 // the exact defect the guard now claims to catch, watch it name that defect,
 // then restore." Running the guard on the real tree proves only that the real
 // tree is currently clean, which is what the two documents this guard replaces
-// already claimed while 215 keys were missing from all 31 catalogs.
+// already claimed while keys were missing from every catalog.
 //
 // `analyse(io)` takes its whole world as an argument, so every case below is a
 // synthetic file set rather than a mutation of `locales/`: no `git restore`,

@@ -51,6 +51,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useRevealAfterIdleLock } from "../hooks/useRevealAfterIdleLock";
+import type { InvitesUnavailable } from "../lib/personAccount";
 import type { TFunction } from "i18next";
 import { Icon } from "../components/primitives/Icon";
 import { fillingScrollRegionStyle, useScrollEdges } from "../hooks/useScrollEdges";
@@ -64,16 +65,15 @@ import {
   listVaults,
   orderByLastUnlock,
 } from "../lib/vault-list";
-import { vaultDisplayName } from "../lib/vaultDisplayName";
+import { vaultDisplayName, vaultDisplayNameById } from "../lib/vaultDisplayName";
 import {
   listAccounts,
-  renameAccount,
   moveVault,
   splitVault,
+  accountHeading,
   accountIdForVault,
   accountCommandErrorKind,
   groupVaultsByAccount,
-  truncateLabelToBytes,
 } from "../lib/account";
 import type { AccountView, AccountCommandErrorKind } from "../lib/account";
 import { isVaultUnlocked } from "../lib/vault-unlock";
@@ -97,6 +97,25 @@ interface VaultPickerProps {
    * moment this screen could appear at all.
    */
   onJoinDevice: () => void;
+  /**
+   * How many invitations addressed to this identity are still unaccepted
+   * (myne-md/myne#911 follow-up). Zero renders nothing: an invitation that does
+   * not exist is not a notification.
+   *
+   * It is a count rather than the list because the list lives in the dialog,
+   * which owns the two wizards and their error states.
+   *
+   * `invitesUnavailable` is the other half, and it is what keeps the row on
+   * screen when the count CANNOT be known: an invitation is addressed to a
+   * registered person account, so an identity this device created but never
+   * registered cannot list what was sent to it. Without this arm the invitee
+   * waits forever with no surface saying why, which is the report this pair of
+   * props exists to answer (myne-md/myne#911 follow-up).
+   */
+  inviteCount: number;
+  invitesUnavailable?: InvitesUnavailable | null;
+  /** Open the invitations dialog. */
+  onInvites: () => void;
 }
 
 // `loading` until the `vault_list()` IPC resolves; `loaded` carries the
@@ -126,13 +145,23 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
 
 
 /**
- * The account label for a group header, or `null` when the vaults in that group
- * are standalone (no account). An account with an empty label shows the neutral
- * "Account" fallback, exactly as a vault with no name shows "Vault N".
+ * The heading for a group: the names of the vaults inside it, in the order the
+ * list holds them (`docs/decisions/ui/0728` removed the user-set account name;
+ * a group is identified by its own contents instead). The neutral "Account"
+ * fallback survives for the one case that has nothing to name: every member
+ * vault failed to enumerate.
  */
-function accountLabel(account: AccountView | null, t: TFunction): string {
+function accountLabel(
+  account: AccountView | null,
+  vaults: readonly VaultSummary[],
+  t: TFunction,
+): string {
   if (account === null) return "";
-  return account.label === "" ? t("vaultPicker.accountFallback") : account.label;
+  return accountHeading(
+    account,
+    (id) => vaultDisplayNameById(id, vaults, t),
+    t("vaultPicker.accountFallback"),
+  );
 }
 
 /**
@@ -150,7 +179,6 @@ function accountErrorCopy(
   t: TFunction,
 ): string {
   if (kind === "Hidden") return t("vaultPicker.accountHidden");
-  if (kind === "LabelTooLong") return t("vaultPicker.labelTooLong");
   if (kind === "RecordUnreadable") return t("vaultPicker.accountUnreadable");
   return t("vaultPicker.accountError");
 }
@@ -285,6 +313,17 @@ const ROW_META_STYLE: CSSProperties = {
   color: "var(--ink-3)",
 };
 
+// The row's caption line: the last-unlock time and, when the vault has never
+// been published, the device-only marker. One line rather than two, because a
+// row is 60px and a second caption would push the label out of its own rhythm.
+const ROW_META_LINE_STYLE: CSSProperties = {
+  ...ROW_META_STYLE,
+  display: "flex",
+  alignItems: "baseline",
+  gap: "var(--space-2)",
+  minWidth: 0,
+};
+
 // The account group header: a small, secondary-ink label above a group of
 // vault rows. Standalone vaults (no account) render no header, so the header
 // only ever names a real grouping.
@@ -299,50 +338,6 @@ const ACCOUNTS_ERROR_STYLE: CSSProperties = {
   background: "var(--danger-soft)",
   borderRadius: "var(--radius-2)",
   padding: "var(--space-2) var(--space-3)",
-};
-
-// Inline rename form: one row, input growing, two buttons. Tokens only.
-const RENAME_FORM_STYLE: CSSProperties = {
-  flexShrink: 0,
-  margin: 0,
-  display: "flex",
-  gap: "var(--space-2)",
-  alignItems: "center",
-};
-
-const RENAME_INPUT_STYLE: CSSProperties = {
-  flexGrow: 1,
-  minWidth: 0,
-  fontSize: "var(--text-base)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--ink-1)",
-  background: "var(--paper)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-};
-
-const RENAME_SAVE_STYLE: CSSProperties = {
-  flexShrink: 0,
-  fontSize: "var(--text-sm)",
-  fontWeight: "var(--weight-medium)" as CSSProperties["fontWeight"],
-  color: "var(--paper)",
-  background: "var(--accent)",
-  border: "none",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-  cursor: "pointer",
-};
-
-const RENAME_CANCEL_STYLE: CSSProperties = {
-  flexShrink: 0,
-  fontSize: "var(--text-sm)",
-  color: "var(--ink-2)",
-  background: "transparent",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-  padding: "var(--space-2) var(--space-3)",
-  cursor: "pointer",
 };
 
 const CHEVRON_STYLE: CSSProperties = {
@@ -491,11 +486,70 @@ function CreateAnother({
   );
 }
 
+/**
+ * The invitation notice, above the vault list (myne-md/myne#911 follow-up).
+ *
+ * Deliberately a row rather than a toast or a badge on a button that does not
+ * exist yet: the picker is where a returning user lands, and an invitation is
+ * not a transient event to be missed while the window was closed.
+ *
+ * Renders NOTHING at zero, which is what keeps an uninvited user's picker
+ * exactly as it was before this feature.
+ */
+/**
+ * The invitations row of the picker: a count when the list is readable, and the
+ * reason plus the door when it is not.
+ *
+ * Both arms open the same dialog, and both are buttons: the second is not a
+ * notification, it is the one surface that says "an invitation to this identity
+ * cannot be listed until you register it". A `reserved` or `pending` identity is
+ * a normal first-run state, not a fault, so the row states the wait rather than
+ * an error.
+ */
+function InvitesNotice({
+  count,
+  unavailable,
+  onOpen,
+}: {
+  count: number;
+  unavailable?: InvitesUnavailable | null;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const unreadable =
+    unavailable === "not-enrolled" || unavailable === "pending" ? unavailable : null;
+  if (count <= 0 && unreadable === null) return null;
+  return (
+    <Button
+      variant="secondary"
+      onClick={onOpen}
+      data-testid="picker.invites-notice"
+      data-invites={count > 0 ? "count" : unreadable}
+      style={NOTICE_STYLE}
+    >
+      {count > 0
+        ? t("invites.notice", { count })
+        : t(
+            unreadable === "pending"
+              ? "invites.noticePending"
+              : "invites.noticeUnregistered",
+          )}
+    </Button>
+  );
+}
+
+const NOTICE_STYLE: CSSProperties = {
+  width: "100%",
+  justifyContent: "flex-start",
+  marginBottom: "var(--space-2)",
+};
+
 /** A single vault row. Hover/focus lifts fill + stroke (no transform). */
 function VaultRow({
   vault,
   label,
   meta,
+  publishNote,
   onSelect,
   onContextMenu,
   rowRef,
@@ -503,6 +557,10 @@ function VaultRow({
   vault: VaultSummary;
   label: string;
   meta: string;
+  /** "Device only" for a vault that exists nowhere but here; empty once
+   *  published, because the normal state does not need a badge
+   *  (myne-md/myne#911 task 8). */
+  publishNote: string;
   onSelect: (vaultId: VaultId) => void;
   onContextMenu: (vault: VaultSummary, pos: { x: number; y: number }) => void;
   rowRef: (vaultId: VaultId, el: HTMLButtonElement | null) => void;
@@ -544,7 +602,14 @@ function VaultRow({
       <span style={ROW_LEFT_STYLE}>
         <span style={LABEL_COL_STYLE}>
           <span style={rowLabelStyle(real)}>{label}</span>
-          {meta !== "" && <span style={ROW_META_STYLE}>{meta}</span>}
+          {(meta !== "" || publishNote !== "") && (
+            <span style={ROW_META_LINE_STYLE}>
+              {meta !== "" && <span>{meta}</span>}
+              {publishNote !== "" && (
+                <span data-testid="picker.vault-row-publish">{publishNote}</span>
+              )}
+            </span>
+          )}
         </span>
       </span>
       <Icon name="chevron-right" size={16} style={CHEVRON_STYLE} />
@@ -564,15 +629,14 @@ function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
-  onRestoreBackup, onJoinDevice }: VaultPickerProps) {
+  onRestoreBackup, onJoinDevice, inviteCount, invitesUnavailable,
+  onInvites }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
   // The last account-grouping failure, shown as a banner. `null` is no error.
   // Grouping failures never strand the picker: the list renders standalone.
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  // Inline rename form state. `null` is no form; the menu closes when it opens.
-  const [renaming, setRenaming] = useState<{ vault: VaultSummary; draft: string } | null>(null);
-  // Whether some vault is unlocked. Account mutations (rename/move/split) are
+  // Whether some vault is unlocked. Account mutations (move/split) are
   // refused while locked (backend `Locked`), so the menu offers them only
   // when unlocked; the locked picker stays a read surface.
   const [unlocked, setUnlocked] = useState(false);
@@ -583,7 +647,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
   const { ref: listRef, fadeProps: listFade } = useScrollEdges<HTMLDivElement>();
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
-  // The open row context menu (rename / move / split), or null when closed.
+  // The open row context menu (move / split), or null when closed.
   const [menu, setMenu] = useState<{
     vault: VaultSummary;
     x: number;
@@ -692,7 +756,13 @@ export function VaultPicker({ onSelect, onCreateAnother,
             onJoinDevice={onJoinDevice}
           />
         }
-      />
+      >
+        <InvitesNotice
+          count={inviteCount}
+          unavailable={invitesUnavailable}
+          onOpen={onInvites}
+        />
+      </PickerCard>
     );
   }
 
@@ -718,9 +788,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
   };
 
   // Account actions are offered only for member vaults. A standalone vault
-  // (no account, keychain-less device, or hidden names) has no account to
-  // rename or move from, and every command would answer VaultNotFound, so
-  // offering them is offering a guaranteed failure.
+  // (no account, keychain-less device, or hidden names) has no account to move
+  // from, and every command would answer VaultNotFound, so offering them is
+  // offering a guaranteed failure.
   const menuAccountId =
     menu !== null && state.kind === "loaded"
       ? accountIdForVault(state.accounts, menu.vault.id)
@@ -735,19 +805,12 @@ export function VaultPicker({ onSelect, onCreateAnother,
           (a) => a.id !== menuAccountId && a.vaults.length > 0,
         )
       : [];
+  // The loaded list, for the display names a move destination's heading is
+  // built from. Empty while loading, which is also when the menu offers nothing.
+  const loadedVaults = state.kind === "loaded" ? state.vaults : [];
   const menuItems: ContextMenuItem[] =
     menu !== null && menuAccount !== null && unlocked
       ? [
-          {
-            id: "picker.account-rename",
-            label: t("vaultPicker.renameAccount"),
-            onSelect: () => {
-              const vault = menu.vault;
-              setMenu(null);
-              setRenaming({ vault, draft: menuAccount.label });
-              setAccountsError(null);
-            },
-          },
           {
             id: "picker.account-move-new",
             label: t("vaultPicker.moveToNewAccount"),
@@ -758,8 +821,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
             },
           },
           // The destination is chosen from the other accounts, never typed:
-          // the backend needs the TARGET VAULT id, and a typed label can
-          // never be one. Each child anchors on its account's first member.
+          // the backend needs the TARGET VAULT id, and a name can never be one.
+          // Each child names its account by that account's own vaults and
+          // anchors on the first member.
           ...(moveDestinations.length > 0
             ? [
                 {
@@ -767,7 +831,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
                   label: t("vaultPicker.moveToAccount"),
                   children: moveDestinations.map((a, i) => ({
                     id: `picker.account-move-to-${i}`,
-                    label: accountLabel(a, t),
+                    label: accountLabel(a, loadedVaults, t),
                     onSelect: () => {
                       const vault = menu.vault;
                       setMenu(null);
@@ -780,15 +844,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
             : []),
         ]
       : [];
-
-  const commitRename = (e?: { preventDefault: () => void }) => {
-    e?.preventDefault();
-    const target = renaming;
-    if (target === null || target.draft.trim() === "") return;
-    const label = target.draft.trim();
-    setRenaming(null);
-    runAccountAction(() => renameAccount(target.vault.id, label));
-  };
 
   return (
     <PickerCard
@@ -810,6 +865,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
           {accountsError}
         </p>
       )}
+      <InvitesNotice
+          count={inviteCount}
+          unavailable={invitesUnavailable}
+          onOpen={onInvites}
+        />
       {/* The fade is applied here rather than baked into LIST_STYLE because it
           is conditional on scroll position; see `useScrollEdges.ts` for why a
           fixed mask on both edges is wrong at rest. */}
@@ -822,6 +882,9 @@ export function VaultPicker({ onSelect, onCreateAnother,
                 vault={vault}
                 label={vaultDisplayName(vault, state.vaults, t)}
                 meta={lastUnlockText(vault.last_unlock, t)}
+                publishNote={
+                  vault.published ? "" : t("vaultPicker.deviceOnly")
+                }
                 onSelect={onSelect}
                 onContextMenu={(v, pos) => setMenu({ vault: v, x: pos.x, y: pos.y })}
                 rowRef={(id, el) => {
@@ -833,51 +896,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
           </Fragment>
         ))}
       </div>
-      {renaming !== null && (
-        <form onSubmit={commitRename} style={RENAME_FORM_STYLE}>
-          <input
-            // eslint-disable-next-line jsx-a11y/no-autofocus
-            autoFocus
-            value={renaming.draft}
-            maxLength={512}
-            placeholder={t("vaultPicker.renamePlaceholder")}
-            aria-label={t("vaultPicker.renameAccount")}
-            data-testid="picker.rename-input"
-            style={RENAME_INPUT_STYLE}
-            onChange={(e) =>
-              setRenaming({
-                vault: renaming.vault,
-                // 512 UTF-8 bytes, the backend `ACCOUNT_LABEL_MAX_LEN`: a
-                // multibyte draft can pass `maxLength` and still trip
-                // `LabelTooLong`, so truncate here instead of failing there.
-                draft: truncateLabelToBytes(e.target.value, 512),
-              })
-            }
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setRenaming(null);
-              }
-            }}
-          />
-          <button
-            type="submit"
-            disabled={renaming.draft.trim() === ""}
-            data-testid="picker.rename-save"
-            style={RENAME_SAVE_STYLE}
-          >
-            {t("vaultPicker.renameSave")}
-          </button>
-          <button
-            type="button"
-            data-testid="picker.rename-cancel"
-            style={RENAME_CANCEL_STYLE}
-            onClick={() => setRenaming(null)}
-          >
-            {t("vaultPicker.renameCancel")}
-          </button>
-        </form>
-      )}
       {menu !== null && menuItems.length > 0 && (
         <ContextMenu
           x={menu.x}

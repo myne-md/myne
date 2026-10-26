@@ -1,7 +1,7 @@
 // Tauri IPC wrapper for `vault_list` (read-mostly multi-vault enumeration).
 //
 // The Rust command lives at `plugin:vault-unlock|vault_list` (see
-// `src-tauri/src/plugins/vault_unlock/commands.rs`); permission entry in
+// `core/src/plugins/vault_unlock/commands.rs`); permission entry in
 // `src-tauri/permissions/vault-unlock/default.toml` (`allow-vault-list`)
 // allows it via the existing `vault-unlock:default` capability.
 //

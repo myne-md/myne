@@ -43,19 +43,25 @@ when:
   # ("Run pipeline" / manual trigger). Without a matching `manual` event the
   # UI submits an empty pipeline (no step matches) and the run is rejected.
   #
-  # `RUN_E2E != "true"` makes the manual trigger carry ONE intent at a time.
-  # `.woodpecker/e2e.yml` claims the manual event with `RUN_E2E == "true"`, so
-  # without this negation an E2E trigger would ALSO run this whole pipeline,
-  # which would put two workflows CONCURRENTLY on the shared host, with the agent's
-  # `WOODPECKER_MAX_WORKFLOWS=2`, and that is the
-  # shared host, which is the documented root cause of the E2E suite's mount
-  # timeouts. A lane whose whole purpose is a clean pre-release signal must not
-  # be racing a full pipeline for the same cores.
+  # `RUN_E2E != "true" && RUN_E2E_AI != "true"` makes the manual trigger carry
+  # ONE intent at a time. `.woodpecker/e2e.yml` claims the manual event with
+  # `RUN_E2E == "true" || RUN_E2E_AI == "true"`, so without these negations an
+  # E2E trigger would ALSO run this whole pipeline, which would put two
+  # workflows CONCURRENTLY on the shared host with the agent's
+  # `WOODPECKER_MAX_WORKFLOWS=2`, and that shared host is the documented root
+  # cause of the E2E suite's mount timeouts. A lane whose whole purpose is a
+  # clean pre-release signal must not be racing a full pipeline for the same
+  # cores.
   #
-  # An unset RUN_E2E evaluates to the empty string, so an ordinary manual
+  # `RUN_E2E_AI` is negated for the same reason as `RUN_E2E`, and it is not
+  # spare symmetry: it is the variable that starts the inference lane WITHOUT
+  # the desktop gate, so leaving it out here would let that run pick up this
+  # pipeline as well.
+  #
+  # An unset variable evaluates to the empty string, so an ordinary manual
   # re-run, the case this entry was added for, is unaffected: `"" != "true"`.
   - event: manual
-    evaluate: 'RUN_E2E != "true"'
+    evaluate: 'RUN_E2E != "true" && RUN_E2E_AI != "true"'
 
 variables:
   # The prebuilt CI base image (myne-md/myne#585). It bakes the eleven Tauri
@@ -1724,7 +1730,21 @@ steps:
   # it empty and this step skips cleanly instead of failing; the same holds for
   # a fork PR, which gets no secrets at all.
   vector-verification:
-    image: rust:1.96.0-slim
+    # `*ci_image`, not a stock `rust:slim`. This step's NATIVE lane compiles
+    # `myne-core` on Linux, and `myne-core` depends on `tauri`, so the build walks
+    # `tauri-runtime-wry` -> `tao` -> `glib`/`dbus`/webkit and needs the full Tauri
+    # sysdep header chain. The image bakes exactly that set for the five steps that
+    # used to install it one by one (`ci/Dockerfile` is the list and the history),
+    # and this step was the sixth doing its own subset: it carried no `pkg-config`
+    # at all, so `libdbus-sys` aborted the build at `build.rs:25`, and adding only
+    # that plus `libdbus-1-dev` merely moved the failure one crate over to
+    # `glib-sys`, which wants `glib-2.0.pc` and then the rest of gtk3. Enumerating
+    # the eleven packages here a third time is the drift the image exists to end.
+    #
+    # Chromium is NOT baked: no push step uses it, and baking it would make every
+    # push pull a browser. It stays a per-step install, as a pair with its driver,
+    # because a chromedriver/browser major mismatch refuses the session outright.
+    image: *ci_image
     when: *code-paths
     depends_on: [cargo-test]
     environment:
@@ -1746,8 +1766,9 @@ steps:
       # chromium and its driver are what make the browser lane possible, and the
       # driver's major version must match the browser's, which is why they are
       # installed as a PAIR from the same distro archive rather than pinned
-      # separately (chromedriver 151 refuses a Chrome 150 session outright).
-      - apt-get update && apt-get install -y --no-install-recommends git ca-certificates curl chromium chromium-driver
+      # separately (chromedriver 151 refuses a Chrome 150 session outright). The
+      # rest of what this step needs is already in the image, see above.
+      - apt-get update && apt-get install -y --no-install-recommends chromium chromium-driver
       - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
       # Native lane: the desktop and mobile execution target.
       - cargo test -p protocol --test vectors

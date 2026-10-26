@@ -68,6 +68,7 @@ pub mod chats_catalog_blob;
 pub mod color_group;
 pub mod crdt_note_blob;
 pub mod device_binding_blob;
+pub mod device_key;
 pub mod dictionary_blob;
 pub mod error;
 pub mod graph_layout_blob;
@@ -100,6 +101,9 @@ pub mod vault_indices_blob;
 /// the `pub use` block below and is reached as `protocol::vault_label_blob::…`.
 pub mod vault_label_blob;
 pub mod vault_meta;
+/// `NTV7` person-wrapped `vault.meta` (myne-md/myne#911): the `NTV6` tail with
+/// the phrase wrap retired and `root_key` sealed to the owner's person key.
+pub mod vault_meta_ntv7;
 pub mod vault_meta_v0_2;
 pub mod workspace_blob;
 
@@ -109,8 +113,8 @@ pub mod workspace_blob;
 pub(crate) mod test_vector_fmt;
 
 pub use account_number::{
-    damm32_table, generate_account_number, parse_account_number, AccountNumber,
-    ACCOUNT_NUMBER_HASH_LEN,
+    account_number_from_person_id, damm32_table, generate_account_number, parse_account_number,
+    AccountNumber, ACCOUNT_NUMBER_HASH_LEN,
 };
 pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
@@ -212,14 +216,18 @@ pub use crdt_note_blob::{
     NC05_MAGIC, NC05_MAX_PLAINTEXT_LEN, NC05_PROTOCOL_VERSION,
 };
 pub use device_binding_blob::{
-    decode_device_binding_blob, decode_device_bindings_or_empty, device_binding_signed_bytes,
-    encode_device_binding_blob, encode_device_binding_blob_raw, encode_device_bindings_map,
-    live_device_bindings, merge_device_bindings, parse_device_bindings_map,
-    partition_verified_bindings, sign_device_binding, verify_device_binding,
+    binding_message_for_entry, decode_device_binding_blob, decode_device_bindings_or_empty,
+    device_binding_signed_bytes, device_binding_signed_bytes_v2, device_public_half_from_entry,
+    encode_device_binding_blob, encode_device_binding_blob_raw,
+    encode_device_binding_blob_raw_with_format, encode_device_bindings_map, live_device_bindings,
+    merge_device_bindings, parse_device_bindings_map, partition_verified_bindings,
+    sign_device_binding, sign_device_binding_v2, verify_device_binding,
     verify_device_binding_removal, DeviceBindingBlobError, DeviceBindingEntry, DeviceBindingsMap,
-    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_HEADER_LEN,
-    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX, DEVICE_BINDING_SIGNATURE_HEX_LEN,
-    DEVICE_BINDING_SIGNATURE_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
+    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_CURRENT,
+    DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_FORMAT_V2, DEVICE_BINDING_BLOB_HEADER_LEN,
+    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_BLOB_SUPPORTED_FORMATS, DEVICE_BINDING_PREFIX,
+    DEVICE_BINDING_PREFIX_V2, DEVICE_BINDING_SIGNATURE_HEX_LEN, DEVICE_BINDING_SIGNATURE_LEN,
+    MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
 };
 pub use dictionary_blob::{
     decode_dictionary_blob, decode_dictionary_blob_versioned,
@@ -351,16 +359,23 @@ pub use vault_meta::{
     VAULT_META_SALT_RANDOM_LEN, VAULT_META_V0_2_WITH_MEMBERSHIP_LEN,
     VAULT_META_WRAPPED_ITEMS_KEY_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN,
 };
+pub use vault_meta_ntv7::{
+    open_person_wrapped_root_key, parse_b2b_tail_any, parse_vault_meta_ntv7,
+    rewrite_vault_meta_password_side_ntv7, seal_root_key_to_person_raw, serialize_vault_meta_ntv7,
+    PersonWrap, PersonWrappedVaultMeta, NTV7_FIXED_LEN, PERSON_WRAP_LEN,
+    PERSON_WRAP_WRAPPED_ROOT_KEY_LEN, VAULT_META_NTV7_MAGIC, VAULT_META_NTV7_PROTOCOL_VERSION,
+};
 pub use vault_meta_v0_2::{
-    derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, meta_version_of,
-    parse_vault_meta_any, parse_vault_meta_ntv6, parse_vault_meta_v0_2,
+    derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, has_b2b_tail,
+    meta_version_of, parse_vault_meta_any, parse_vault_meta_ntv6, parse_vault_meta_v0_2,
     rewrite_vault_meta_password_side_ntv6, rewrite_vault_meta_password_side_v0_2,
     rewrite_vault_meta_password_side_versioned, seal_membership_raw, seal_membership_roster_raw,
     seal_person_binding_raw, serialize_vault_meta_ntv6, serialize_vault_meta_v0_2,
     serialize_vault_meta_versioned, unlock_group_key_ntv6, unlock_items_key_ntv6,
     unlock_root_key_v0_2_password, unlock_root_key_v0_2_recovery, unseal_membership,
-    unseal_membership_roster, unseal_person_binding, B2bVaultMeta, VAULT_META_NTV6_MAGIC,
-    VAULT_META_NTV6_PROTOCOL_VERSION, VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
+    unseal_membership_roster, unseal_person_binding, vault_meta_generation, B2bVaultMeta,
+    VaultMetaGeneration, VAULT_META_NTV6_MAGIC, VAULT_META_NTV6_PROTOCOL_VERSION,
+    VAULT_META_V0_2_MAGIC, VAULT_META_V0_2_PROTOCOL_VERSION,
 };
 pub use workspace_blob::{
     decode_workspace_blob, encode_workspace_blob, encode_workspace_blob_raw, WorkspaceBlobError,

@@ -492,6 +492,7 @@ export type SettingsTab =
   | "network"
   | "cli"
   | "transcription"
+  | "diagnostics"
   | "about";
 
 export async function openSettings(
@@ -548,6 +549,191 @@ export async function openSettings(
   if (tab && tab !== "account") {
     await (await session.byTestId(`settings.tab-${tab}`)).click();
   }
+}
+
+/**
+ * Deliver `event` to THIS webview with `payload`, through the production event
+ * plugin.
+ *
+ * **`plugin:event|emit_to`, not `plugin:event|emit`, and the difference is the
+ * whole delivery.** A broadcast `emit` invoked from the page seat does NOT reach
+ * a listener registered in the same webview: measured 2026-10-24 by registering
+ * one through the plugin's own `plugin:event|listen` and counting deliveries —
+ * 0 for `emit`, 1 for `emit_to` naming this window (`{kind: "WebviewWindow",
+ * label}`). `collab-presence` had been broadcasting and waiting for a decoration
+ * that could never arrive, and reported the renderer as broken.
+ *
+ * This is a production IPC call, not a test hook: it is the same path a
+ * Rust-side `emit_to` takes to reach one window, which is why the frame's shape
+ * stays the real one.
+ */
+export async function emitEventToSelf(
+  session: Session,
+  event: string,
+  payload: unknown,
+): Promise<void> {
+  const label = await session.execute<string>(
+    "return window.__TAURI_INTERNALS__.metadata.currentWebview.label;",
+  );
+  await pageSeatInvoke(
+    session,
+    "plugin:event|emit_to",
+    { target: { kind: "WebviewWindow", label }, event, payload },
+    10_000,
+  );
+}
+
+/** Click the `n`-th element carrying `testId`, re-finding it inside the poll.
+ *
+ *  A positional click needs its OWN helper: `clickByTestId` addresses a testid,
+ *  and a row index is not a selector. Reading `byTestIdAll(id)[n]` once and then
+ *  `.click()` is the shape `e2e/AGENTS.md` rules out — the handle is stale the
+ *  moment the list re-renders, and the click then burns its whole budget polling
+ *  a node that no longer exists (`waitUntil(element interactable + clicked)
+ *  timed out … [stale element reference]`, which reads as a slow app).
+ *  Measured on `agent-setting-intent` ag8, whose rows re-render as each applied
+ *  setting lands. */
+export async function clickNthByTestId(
+  session: Session,
+  testId: string,
+  index: number,
+  opts?: { timeoutMs?: number },
+): Promise<void> {
+  let lastReason = "never polled";
+  await session.waitUntil(
+    async () => {
+      const all = await session.byTestIdAll(testId);
+      if (all.length <= index) {
+        lastReason = `only ${all.length} match(es) for ${testId}`;
+        return null;
+      }
+      const el = all[index]!;
+      // Bring it into view inside its OWN scroll container first, the same
+      // reason `clickBySelector` does: WebDriver's pre-click scroll does not
+      // reliably reach a nested `overflow` body in WebKit. Index-based, because
+      // the selector here is a position rather than a testid.
+      try {
+        await session.execute(
+          "var els = document.querySelectorAll('[data-testid=\"' + arguments[0] + '\"]');" +
+            "var el = els[arguments[1]]; if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
+          [testId, String(index)],
+        );
+      } catch {
+        /* re-find next poll */
+      }
+      try {
+        await el.clickOnce();
+        return true;
+      } catch (e) {
+        if (
+          e instanceof WebDriverError &&
+          (e.code === "stale element reference" ||
+            e.code === "element not interactable" ||
+            e.code === "element click intercepted")
+        ) {
+          lastReason = `click reported "${e.code}"`;
+          return null;
+        }
+        throw e;
+      }
+    },
+    {
+      label: () => `${testId}[${index}] clicked (last poll: ${lastReason})`,
+      timeoutMs: opts?.timeoutMs ?? 20_000,
+    },
+  );
+}
+
+/** Settings → Sync, on the DEVICES topic.
+ *
+ * **The topic is a real step, and clicking the rail is not it.** Settings
+ * remembers the active topic across a reopen (`settings-tabs`: "selects a topic,
+ * keeps it across a reopen"), the Sync panel's default topic is `connection`,
+ * and the enrolment form and the device roster both live under `devices`
+ * (myne-md/myne#885). Every helper that opened the rail and then reached for
+ * `sync.enroll.*` or `sync.device-management` therefore waited 10 to 30 s for a
+ * row on a topic nobody had selected: measured 2026-10-24, six scenarios red in
+ * isolation for this one missing line, and every one of them reported the
+ * ELEMENT rather than the topic.
+ *
+ * One helper rather than the three lines at each call site, because the topic
+ * moves as panels are split and the failure it produces reads like a missing
+ * feature.
+ */
+export async function openSyncDevices(session: Session): Promise<void> {
+  await openSettings(session, "sync");
+  await selectSettingsTopic(session, "sync", "devices");
+}
+
+/** Settings → Sync, on the CONNECTION topic (the identity block, the endpoint,
+ *  the usage figures). Same reason as {@link openSyncDevices}: a remembered
+ *  topic is a starting point the caller has to state rather than assume. */
+export async function openSyncConnection(session: Session): Promise<void> {
+  await openSettings(session, "sync");
+  await selectSettingsTopic(session, "sync", "connection");
+}
+
+/** REGISTER the person identity — the act that writes its public halves to a
+ *  named server and mints this device's token (`PersonRegisterDialog`,
+ *  2026-10-24).
+ *
+ *  **Registration stopped being a side effect of the first run.** It used to
+ *  happen while the identity was created whenever a server answered; it is now
+ *  an explicit two-step act, because it writes to a NAMED server and which
+ *  server that is belongs before any secret is typed. Three scenarios still
+ *  assumed the old behaviour and failed on the NEXT step with a sentence the
+ *  product renders honestly: "Register your identity first, in the Identity
+ *  block above. This device holds the identity but has never registered it with
+ *  a server, so there is no account to publish under." Measured 2026-10-24 on
+ *  `publish-vault` and `person-device-enrolment`, in isolation.
+ *
+ *  Step one is the server (prefilled from the saved endpoint when there is
+ *  one), step two the phrase. Both are needed: the phrase is the proof that the
+ *  identity is the caller's, and it is asked AFTER the server so a
+ *  `NotConfigured` answer cannot wipe words already typed.
+ *
+ *  Leaves Settings OPEN on the CONNECTION topic, which is where both callers
+ *  continue from. */
+export async function registerPersonIdentity(
+  session: Session,
+  words: readonly string[],
+): Promise<void> {
+  await openSyncConnection(session);
+  await registerPersonIdentityIn(session, "sync.panel.register", words);
+}
+
+/** {@link registerPersonIdentity} at any door that mounts `PersonRegisterDialog`.
+ *
+ *  Two doors render the same dialog with their own testid prefix: the Settings
+ *  Sync panel (`sync.panel.register`) and the identity home
+ *  (`identity-home.register`, the only one reachable at zero vaults). The steps
+ *  are the dialog's, so they are written once against the prefix. */
+export async function registerPersonIdentityIn(
+  session: Session,
+  prefix: string,
+  words: readonly string[],
+): Promise<void> {
+  await clickByTestId(session, `${prefix}-cta`, { timeoutMs: 20_000 });
+  await session.byTestId(`${prefix}-form`, { timeoutMs: 15_000 });
+  // Step one. The field is pre-filled with the endpoint this device already
+  // saved (`syncConfigSeed`) — typed only when it is empty, because typing over
+  // a stored address would rewrite a config the scenario seeded on purpose.
+  const server = await session.byTestId(`${prefix}-server`);
+  if (((await server.property<string>("value")) ?? "").trim() === "") {
+    await server.sendKeys("http://127.0.0.1:1");
+  }
+  await clickByTestId(session, `${prefix}-continue`, { timeoutMs: 15_000 });
+  await session.byTestId(`${prefix}-phrase-grid`, { timeoutMs: 15_000 });
+  for (const [index, word] of words.entries()) {
+    const testId =
+      index === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${index + 1}`;
+    await (await session.byTestId(testId)).replaceText(word);
+  }
+  await clickByTestId(session, `${prefix}-submit`, { timeoutMs: 30_000 });
+  // The dialog closes on success and the panel re-probes; the CTA disappearing is
+  // the durable answer (`needsRegistration` is derived from disk, not from this
+  // session's optimism).
+  await session.waitForGone(testIdSelector(`${prefix}-form`));
 }
 
 /** Pick `value` from a token-styled {@link Select} named `selectTestId`: open the
@@ -1165,6 +1351,32 @@ export async function clickBySelector(
           // control cannot leak its own contents into a CI log.
           lastReason =
             `found, but the click reported "${e.code}"; ` + (await hitTest(session, selector));
+          // **A control that is OFF-SCREEN is a layout fact, not a coverage
+          // one, and no amount of waiting moves it.** The join card is taller
+          // than this seat's viewport (1100x695): its submit sits at y=895, no
+          // ancestor actually scrolls, and the driver refuses the click for the
+          // whole budget. Measured 2026-10-24 on `sync-join-recovery` JR-2,
+          // where the harness's own hit-test named the coordinates and settled
+          // it.
+          //
+          // So this arm dispatches a JS click instead of polling again, which is
+          // the fallback `pickSelect` already takes for a portal'd menu item and
+          // the browser lane takes everywhere. It is deliberately NARROW: only
+          // when the failure names the viewport, never for `element click
+          // intercepted`, because a covered control is a real defect a user would
+          // hit and a JS click would hide it. The element's own onClick still
+          // receives a real event, so what runs is the user's handler.
+          if (lastReason.includes("outside the viewport")) {
+            try {
+              await session.execute(
+                "var el = document.querySelector(arguments[0]);" + "if (el) el.click();",
+                [selector],
+              );
+              return true;
+            } catch {
+              // Fall through and report the reason above.
+            }
+          }
           return null; // replaced or not hit-testable yet — re-find next poll
         }
         throw e;
@@ -1228,6 +1440,9 @@ export async function unlockAndEnroll(
   await dismissImporterOffer(session);
   await openSettings(session);
   await (await session.byTestId("settings.tab-sync")).click();
+  // The enrol form moved to the panel's DEVICES topic (myne-md/myne#885); the
+  // panel opens on Connection, so this is a real step rather than a no-op.
+  await selectSettingsTopic(session, "sync", "devices");
   await (await session.byTestId("sync.enroll.account-input")).sendKeys(account);
   await (await session.byTestId("sync.enroll.password-input")).sendKeys(password);
   await (await session.byTestId("sync.enroll.submit")).click();
@@ -2284,6 +2499,37 @@ export async function waitForSaved(session: Session): Promise<void> {
  * still fails, and the element is re-found each poll so a replaced node cannot
  * leave a stale handle behind.
  */
+/** Wait for an assistive-technology status line to carry `expected`.
+ *
+ *  **Copy feedback moved OFF the toast and onto the control that was pressed**
+ *  (2026-10-24): the button's glyph becomes a tick and a visually hidden
+ *  `role="status" aria-live="polite"` line beside the field carries the
+ *  sentence a screen reader hears. A scenario that waited for
+ *  `editor.toast-message` therefore waited for something the product no longer
+ *  renders, and reported it as "the copy failed" — the loudest possible wrong
+ *  answer, since the copy had worked.
+ *
+ *  `textContent()` rather than `text()`: the line is VISUALLY HIDDEN (a 1px
+ *  clip box), and WebKitWebDriver's `GET /text` answers `""` for a node it
+ *  considers not displayed, which is the same trap `waitForBannerText` below
+ *  documents for a just-inserted banner. Re-found on every poll, so a line that
+ *  never carries the sentence still fails. */
+export async function waitForStatusText(
+  session: Session,
+  testId: string,
+  expected: string,
+  label: string,
+): Promise<void> {
+  await session.waitUntil(
+    async () => {
+      const [el] = await session.findElements(testIdSelector(testId));
+      if (el === undefined) return null;
+      return (await el.textContent()).trim() === expected ? true : null;
+    },
+    { label, timeoutMs: 10_000 },
+  );
+}
+
 export async function waitForBannerText(
   session: Session,
   testId: string,
@@ -2650,4 +2896,114 @@ export async function openExportSubmenuItem(
     { label: `export submenu open, ${format} present` },
   );
   return session.waitForElement(leaf);
+}
+
+/**
+ * Walk the desktop FIRST RUN from the welcome screen: the one create door, the
+ * identity's phrase ceremony (reveal, continue, 4-of-24 type-back), and Done,
+ * which hands off to vault creation (myne-md/myne#911 task 6).
+ *
+ * It returns nothing, because everything a caller needs to assert about the
+ * identity is the fact that it exists: the phrase is never returned, never
+ * logged, and never written to an artefact (SYNC-13). The words are scraped in
+ * one in-page pass, used to fill the challenge, and dropped.
+ *
+ * What it does NOT do is save the phrase to a file: the save action goes through
+ * the OS dialog, which this harness cannot answer, and the type-back is the gate
+ * the flow actually enforces. A scenario that needs the phrase on disk for a
+ * later recovery step must scrape it itself and treat it as a credential.
+ *
+ * Every scenario that used to click `welcome.create-cta` and land in vault
+ * creation now calls this first, because the welcome screen no longer creates a
+ * vault directly: identity first, then the vault.
+ */
+export async function startFirstRunIdentity(
+  session: Session,
+  /**
+   * Which welcome door opens the ceremony. The create door by default; the
+   * invited door (`welcome.invited-cta`) runs the SAME ceremony and only its
+   * landing differs, so one helper serves both rather than a copy that could
+   * drift on the phrase or the type-back.
+   */
+  doorTestId = "welcome.create-cta",
+): Promise<string[]> {
+  await (await session.byTestId(doorTestId, { timeoutMs: 20_000 })).click();
+  await session.byTestId("first-run.root", { timeoutMs: 15_000 });
+  await (await session.byTestId("first-run.identity.create-cta", { timeoutMs: 20_000 })).click();
+
+  // Step 1: the phrase. Continue is gated on the words having been revealed,
+  // and revealing is what makes them readable to the scrape below.
+  await session.byTestId("first-run.identity.phrase", { timeoutMs: 120_000 });
+  await (await session.byTestId("first-run.identity.phrase-reveal")).click();
+  const words = await session.execute<string[]>(
+    "var words = [];" +
+      "for (var i = 1; i <= 24; i++) {" +
+      "  var el = document.querySelector(" +
+      "    '[data-testid=\"first-run.identity.phrase-word\"][data-index=\"' + i + '\"] span:last-child');" +
+      "  words.push(el ? el.textContent || '' : '');" +
+      "}" +
+      "return words;",
+  );
+  expect(words.length).toBe(24);
+  expect(words.every((w) => w.length > 0)).toBe(true);
+
+  const cont = await session.byTestId("first-run.identity.phrase-continue");
+  await session.waitUntil(() => cont.enabled(), {
+    label: "identity phrase continue enabled after reveal",
+    timeoutMs: 10_000,
+  });
+  await cont.click();
+
+  // Step 2: the type-back. Each input declares its 1-based position.
+  const cells = await session.byTestIdAll("first-run.identity.confirm-input");
+  expect(cells.length).toBe(4);
+  for (const cell of cells) {
+    const pos = Number(await cell.attribute("data-index"));
+    expect(pos).toBeGreaterThanOrEqual(1);
+    expect(pos).toBeLessThanOrEqual(24);
+    await cell.sendKeys(words[pos - 1]);
+  }
+  const done = await session.byTestId("first-run.identity.close-cta");
+  await session.waitUntil(() => done.enabled(), {
+    label: "identity done enabled after type-back",
+    timeoutMs: 10_000,
+  });
+  await done.click();
+
+  // Returned so a scenario that needs the identity LATER can use it: unlocking
+  // the identity for a session is a real, frequent step (the person keypair is
+  // session-scoped, decision 0612, so a vault unlock does not carry it), and the
+  // phrase is the only credential that performs it.
+  return words;
+}
+
+/**
+ * [`startFirstRunIdentity`] plus the vault steps that follow it on the FIRST RUN:
+ * the safety briefing (three acknowledgements), and the vault-name step, so the
+ * caller lands on the password form (myne-md/myne#911 task 6).
+ *
+ * The briefing is still shown here, and it is not an oversight: its three
+ * statements are about the PASSWORD and the phrase, and the phrase it names is
+ * the identity's, which the user has just proved they saved. What it no longer
+ * has is a vault kit after it.
+ */
+export async function startFirstRunToVault(session: Session): Promise<void> {
+  await startFirstRunIdentity(session);
+
+  await session.byTestId("create.briefing", { timeoutMs: 15_000 });
+  const cont = await session.byTestId("create.briefing-continue");
+  const acks = await session.byTestIdAll("create.briefing-ack");
+  expect(acks.length).toBe(3);
+  for (const ack of acks) {
+    await ack.click();
+  }
+  await session.waitUntil(() => cont.enabled(), {
+    label: "briefing continue enabled (3/3 acknowledged)",
+    timeoutMs: 10_000,
+  });
+  await cont.click();
+
+  await (await session.byTestId("create.name-input", { timeoutMs: 15_000 })).sendKeys("E2E Kasa");
+  await (await session.byTestId("create.name-continue")).click();
+  await session.byTestId("create.password-input", { timeoutMs: 10_000 });
 }

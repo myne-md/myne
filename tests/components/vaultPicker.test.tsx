@@ -36,6 +36,7 @@ function summary(over: Partial<VaultSummary> & { id: string }): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
     ...over,
   };
 }
@@ -72,13 +73,20 @@ beforeEach(() => {
 
 afterEach(cleanup);
 
-function renderPicker(list: { ok: VaultSummary[] } | { err: unknown }) {
+function renderPicker(
+  list: { ok: VaultSummary[] } | { err: unknown },
+  overrides: Partial<Parameters<typeof VaultPicker>[0]> = {},
+) {
   listVaults.mockResolvedValue(list);
   const props = {
     onSelect: vi.fn(),
     onCreateAnother: vi.fn(),
     onRestoreBackup: vi.fn(),
     onJoinDevice: vi.fn(),
+    // No invitation notices in these cases: the row renders only above zero.
+    inviteCount: 0,
+    onInvites: vi.fn(),
+    ...overrides,
   };
   const utils = render(<VaultPicker {...props} />);
   return { ...utils, props };
@@ -98,6 +106,37 @@ describe("VaultPicker — the action block", () => {
     expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
     // The join door is not a vault selection — the picker must not also route.
     expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  // The invitation notice (myne-md/myne#911 follow-up): a device with a vault
+  // had no surface on which an invitation could be accepted, because the list
+  // lives on the identity home and that screen renders only at ZERO vaults.
+  it("surfaces a waiting invitation, and only when there is one", async () => {
+    renderPicker({ ok: TWO });
+    await screen.findByTestId("picker.create-cta");
+    // Absence first: an uninvited picker must look exactly as it did before.
+    expect(screen.queryByTestId("picker.invites-notice")).toBeNull();
+    cleanup();
+
+    const { props } = renderPicker({ ok: TWO }, { inviteCount: 2 });
+    fireEvent.click(await screen.findByTestId("picker.invites-notice"));
+    expect(props.onInvites).toHaveBeenCalledTimes(1);
+    // A notice is not a selection: opening it must not open a vault.
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  // The unpublishable-count case: an identity this device created but never
+  // registered cannot list its invitations, so a zero count there means "cannot
+  // be known". The row stays, says which state it is in, and opens the same door.
+  it("keeps the invitation row for an identity that cannot list yet", async () => {
+    const { props } = renderPicker(
+      { ok: TWO },
+      { inviteCount: 0, invitesUnavailable: "not-enrolled" },
+    );
+    const row = await screen.findByTestId("picker.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("not-enrolled");
+    fireEvent.click(row);
+    expect(props.onInvites).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the join affordance on the defensive empty/failed surface", async () => {
@@ -162,5 +201,36 @@ describe("VaultPicker: the fallback number", () => {
     await screen.findAllByTestId("picker.vault-row");
     expect(rowText("v1")).toContain("Work");
     expect(rowText("v1")).not.toContain("Vault");
+  });
+});
+
+// The device-only marker (myne-md/myne#911 task 8).
+//
+// "Where does this vault actually live" is the one fact this screen can answer
+// that the vault itself cannot: a vault that exists only on this machine has no
+// copy anywhere else, and before this the fact lived only inside the Sync panel
+// of a vault the user had already unlocked. Both directions are asserted, because
+// a marker that never clears would read as "nothing is ever published" and one
+// that never appears would read as "everything is".
+describe("VaultPicker: the publish state", () => {
+  it("marks a vault that exists only on this device", async () => {
+    renderPicker({
+      ok: [
+        summary({ id: "v1", label: "Work" }),
+        summary({ id: "v2", label: "Home", published: true }),
+      ],
+    });
+    await screen.findAllByTestId("picker.vault-row");
+    const markers = () =>
+      screen
+        .getAllByTestId("picker.vault-row")
+        .map((row) => [
+          row.getAttribute("data-vault-id"),
+          row.querySelector('[data-testid="picker.vault-row-publish"]')?.textContent ?? "",
+        ]);
+    expect(markers()).toEqual([
+      ["v1", "Device only"],
+      ["v2", ""],
+    ]);
   });
 });

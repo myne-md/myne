@@ -43,6 +43,7 @@ const MANY: VaultSummary[] = Array.from({ length: 24 }, (_, i) => ({
   label: `Vault ${i}`,
   icon: null,
   last_unlock: 1000 + i,
+  published: false,
   status: { kind: "Exists" } as const,
 }));
 
@@ -54,6 +55,8 @@ async function renderPicker() {
       onCreateAnother={() => {}}
       onRestoreBackup={() => {}}
       onJoinDevice={() => {}}
+      inviteCount={0}
+      onInvites={() => {}}
     />,
   );
   await waitFor(() => expect(screen.getAllByTestId("picker.vault-row").length).toBe(24));

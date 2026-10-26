@@ -870,6 +870,53 @@ pub fn aad_person_wrap(
     aad
 }
 
+/// The AAD for the `NTV7` person wrap of a vault's `root_key`
+/// (`vault_meta_ntv7.rs`, myne-md/myne#911).
+///
+/// Sibling of [`aad_person_wrap`], and a **different message class** on purpose:
+/// that one wraps an `itemsKey` to a member under the vault's account hash, this
+/// one wraps the owner's own `root_key` into the vault metadata itself. Sharing
+/// a role string would let a wrap from one class be presented as the other.
+///
+/// Bound values: the recipient fingerprint and the vault's `items_key_id`.
+/// - **Not the vault id**: a device that joins a vault mints its own, so binding
+///   it would make the metadata un-writable at creation time on the owner's
+///   device and un-readable on a device that re-minted.
+/// - **Not `account_number_hash`**: this generation keeps the account number out
+///   of vault cryptography entirely, so nothing here may lean on it.
+///
+/// `items_key_id` is what carries the vault binding instead: a `root_key` sealed
+/// for one vault cannot be dropped into another that happens to belong to the
+/// same person. Total length: `10 + 1 + 2 + 20 + 32 + 16 = 81` bytes.
+pub fn aad_person_wrap_root_key(
+    recipient_fingerprint: &[u8; PERSON_FINGERPRINT_LEN],
+    items_key_id: &[u8; 16],
+) -> alloc::vec::Vec<u8> {
+    const ROLE_STR_PERSON_WRAP_ROOT_KEY: &[u8] = b"person-wrap-root-key";
+    let mut aad = alloc::vec::Vec::with_capacity(
+        AAD_PREFIX_V0_2.len()
+            + 1
+            + 2
+            + ROLE_STR_PERSON_WRAP_ROOT_KEY.len()
+            + recipient_fingerprint.len()
+            + items_key_id.len(),
+    );
+    aad.extend_from_slice(AAD_PREFIX_V0_2);
+    aad.push(PROTOCOL_VERSION_V0_2);
+    crate::aead::push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_WRAP_ROOT_KEY);
+    aad.extend_from_slice(recipient_fingerprint);
+    aad.extend_from_slice(items_key_id);
+    // The length is part of the contract a port has to reproduce, and §5.2
+    // stated it as 80 for a round (the role is 20 bytes, not 19) while both the
+    // spec and this comment agreed with each other and disagreed with the code.
+    // The assert makes the emitted bytes the authority.
+    debug_assert_eq!(
+        aad.len(),
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_PERSON_WRAP_ROOT_KEY.len() + 32 + 16
+    );
+    aad
+}
+
 /// Compute the canonical fingerprint over the three public halves.
 pub fn compute_fingerprint(
     kem_ek: &[u8; PERSON_EK_LEN],

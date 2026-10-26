@@ -4069,7 +4069,6 @@
         "ribbon": "cinta izquierda raíl anclar pin comando comandos personalizar reordenar soltar barra de herramientas atajos",
         "folderNotes": "carpeta nota índice folder_index página de inicio doble clic enlace carpeta proyectos apagar interruptor desactivar",
         "syncMembers": "miembros, compartir, invitar, equipo, colaboración, bóveda",
-        "accountName": "nombre de cuenta grupo agrupación renombrar etiqueta dispositivo local",
         "accountVaults": "cuenta bóvedas agrupadas qué bóvedas pertenecen grupo lista",
         "aiMeetingPrompt": "reunión resumen instrucción personalizada transcripción tareas decisiones",
         "update": "actualización actualizar buscar actualizaciones versión nueva publicación descarga",
@@ -4151,14 +4150,10 @@
       "atCap": "La lista está llena, así que no se puede recordar nada nuevo. Elimina una entrada para hacer sitio."
     },
     "account": {
-      "nameLabel": "Nombre de la cuenta",
-      "nameHelper": "Un nombre para este grupo de bóvedas en este dispositivo. El selector de bóvedas lo usa como encabezado del grupo. Se queda en este dispositivo y nunca se guarda dentro de una bóveda, así que no se sincroniza y otro dispositivo puede agrupar y nombrar las mismas bóvedas de otra forma.",
-      "namePlaceholder": "Añadir un nombre…",
-      "nameSave": "Guardar",
-      "nameSaving": "Guardando…",
       "vaultsLabel": "Bóvedas de esta cuenta",
       "vaultsHelper": "Las bóvedas que este dispositivo agrupa bajo el nombre de arriba. La agrupación es una decisión organizativa de cada dispositivo, así que no forma parte del contenido de ninguna bóveda ni viaja con él.",
-      "vaultsCount": "{{count}} bóvedas",
+      "vaultsCount_one": "{{count}} bóvedas",
+      "vaultsCount_other": "{{count}} bóvedas",
       "currentVault": "Esta bóveda",
       "unknownVault": "Otra bóveda de este dispositivo",
       "standaloneHelper": "Esta bóveda no está agrupada bajo una cuenta en este dispositivo, así que va por su cuenta. La agrupación es por dispositivo: otro dispositivo puede mostrarla dentro de una.",
@@ -4170,7 +4165,8 @@
       "sections": {
         "extensions": "Extensiones del navegador",
         "grouping": "Esta cuenta"
-      }
+      },
+      "vaultsCount_many": "{{count}} bóvedas"
     },
     "plainFile": {
       "errorSaveSetting": "No se pudo guardar el ajuste de archivos sin formato.",
@@ -4604,9 +4600,7 @@
       "nameErrorUnshared": "Los nombres se pueden definir cuando esta bóveda se comparta.",
       "nameErrorLocked": "Desbloquea la bóveda para cambiar tu nombre.",
       "nameErrorGeneric": "No se pudo guardar tu nombre. Inténtalo de nuevo.",
-      "nameInvite": "Todavía no tienes un nombre para mostrar. Los demás miembros ven tu huella.",
       "nameInviteCta": "Definir un nombre",
-      "nameInviteDismiss": "Ahora no",
       "noInvitations": "Todavía no se ha enviado ninguna invitación.",
       "identityHeading": "Tu identidad",
       "membersHeading": "Miembros",
@@ -5109,8 +5103,7 @@
       "phraseFor": "Frase de recuperación — por si olvidas tu contraseña",
       "save": "Guardar kit de recuperación",
       "saveFailed": "No se pudo guardar el archivo. Copia el kit en su lugar, o anota las dos partes.",
-      "savedToFile": "Guardado. Es un archivo de texto sin formato que contiene ambos secretos, así que guárdalo en un lugar donde solo tú puedas leerlo.",
-      "whyEnglish": "Las palabras están en inglés en todos los idiomas. Forman parte del estándar BIP-39, así que cualquier cliente de Myne puede leer una frase escrita por cualquier otro. No las traduzcas: las palabras traducidas no están en la lista de palabras y la frase dejaría de funcionar."
+      "savedToFile": "Guardado. Es un archivo de texto sin formato que contiene ambos secretos, así que guárdalo en un lugar donde solo tú puedas leerlo."
     },
     "name": {
       "back": "Atrás",
@@ -5136,13 +5129,8 @@
     "accountFallback": "Cuenta",
     "moveToAccount": "Mover a la cuenta…",
     "moveToNewAccount": "Mover a una cuenta nueva",
-    "renameAccount": "Renombrar la cuenta",
     "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
     "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
-    "labelTooLong": "Ese nombre es demasiado largo. Mantenlo por debajo de 512 caracteres.",
-    "renameCancel": "Cancelar",
-    "renamePlaceholder": "Nombre de la cuenta",
-    "renameSave": "Renombrar",
     "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
     "createShort": "Bóveda nueva",
     "joinShort": "Añadir dispositivo",
@@ -5247,18 +5235,11 @@
     "residueBanner": "Archivos sobrantes de una eliminación interrumpida ({{n}}). Límpialos antes de crear una bóveda.",
     "cleanUpFiles": "Limpiar archivos sobrantes",
     "connect": "Conectar a mi cuenta",
-    "startIdentity": "Crear una identidad",
-    "startLocal": "Crear una bóveda local en su lugar",
     "tagline": "Notas markdown cifradas. Sin correo electrónico al registrarte.",
-    "identityTitle": "Crear una identidad",
-    "identityBody": "Una identidad para todas tus bóvedas, para que puedan invitarte. Necesita un servidor de sincronización.",
-    "localTitle": "Crear una bóveda local",
-    "localBody": "Una bóveda cifrada en este dispositivo. Añade sincronización o una identidad más adelante.",
     "restoreTitle": "Restaurar desde una copia de seguridad",
     "restoreBody": "Abre un archivo .myne-backup que guardaras antes.",
     "joinTitle": "Añadir este dispositivo a una cuenta",
     "joinBody": "Usa una bóveda que ya tengas en otro dispositivo.",
-    "createAction": "Crear",
     "restoreAction": "Restaurar",
     "joinAction": "Añadir dispositivo",
     "version": "Versión {{version}} · pre-alpha"
@@ -5347,15 +5328,10 @@
     "openedYearsAgo_other": "abierta hace {{count}} años",
     "corruptedBadge": "Dañada",
     "accountFallback": "Cuenta",
-    "renameAccount": "Renombrar la cuenta",
     "moveToNewAccount": "Mover a una cuenta nueva",
     "moveToAccount": "Mover a la cuenta…",
     "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
     "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
-    "labelTooLong": "Ese nombre es demasiado largo. Mantenlo por debajo de 512 caracteres.",
-    "renameCancel": "Cancelar",
-    "renamePlaceholder": "Nombre de la cuenta",
-    "renameSave": "Renombrar",
     "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada."
   },
   "join": {
@@ -5492,7 +5468,6 @@
     "recovered": "Identidad recuperada.",
     "title": "Crear una identidad",
     "errorAlreadyHeld": "Este dispositivo ya contiene una identidad. Recupérala con su frase de recuperación, u olvídala y crea una nueva.",
-    "errorNotConfigured": "No se pudo configurar la identidad. Comprueba que haya un servidor de sincronización configurado e inténtalo de nuevo.",
     "forgetCancel": "Conservarla",
     "forgetConfirm": "Olvidar y crear una nueva",
     "forgetCta": "Olvidar esta identidad y crear una nueva",
@@ -5507,8 +5482,6 @@
     "recoverHint": "Recupérala en este dispositivo con su frase de recuperación de 24 palabras.",
     "recoverAction": "Recuperar",
     "back": "Atrás",
-    "changeServer": "Cambiar o verificar el servidor de sincronización",
-    "errorTlsFailure": "No se pudo verificar el certificado HTTPS del servidor. Comprueba la dirección del servidor y su certificado.",
     "phraseTitle": "Guarda tu frase de identidad",
     "phraseContinue": "Continuar",
     "confirmTitle": "Confirma tu frase"
@@ -5657,15 +5630,6 @@
       "hint": "Intentarlo de nuevo reinicia la descarga desde el principio.",
       "retry": "Inténtalo de nuevo",
       "back": "Volver al desbloqueo"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Elige un servidor de sincronización",
-      "intro": "Myne necesita un servidor para alojar tus notas cifradas y para poder avisarte de las invitaciones. Tus notas permanecen cifradas en este dispositivo antes de salir de él; el servidor solo almacena texto cifrado.",
-      "notConfigured": "Introduce una dirección de servidor arriba y pulsa Conectar para continuar.",
-      "back": "Atrás",
-      "continue": "Continuar"
     }
   },
   "identityFlow": {
