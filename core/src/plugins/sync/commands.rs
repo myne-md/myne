@@ -628,6 +628,22 @@ pub async fn sync_person_unlock<R: Runtime>(
                 &view.identity_code,
             )
             .await;
+            // Claim this device in the ACTIVE vault, now that the person key is in hand.
+            //
+            // The unlock pipeline claims too, but it needs the person session to be held
+            // at the moment the VAULT unlocks, and on a person-born (`NTV7`) vault the
+            // carrier that would install one is deliberately excluded. So the ordinary
+            // order, unlock the vault and then unlock the identity, left the device
+            // UNCLAIMED, and an unclaimed device cannot author a `0x03` head, so every
+            // later sync still needed the phrase. That is the loop this closes: unlock the
+            // identity once and the claim happens, and from then on the device signs for
+            // itself.
+            crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                &crate::vault_io::StdVaultIo,
+                state.inner(),
+                &root,
+            )
+            .await;
         }
     }
     if super::person_account::refresh_person_auth_public_material(
