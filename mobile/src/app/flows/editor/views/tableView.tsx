@@ -10,7 +10,7 @@
 import { useMemo, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { ScreenScroll } from "../../../../components";
-import { useSizeClass } from "../../../../formfactor/SizeClassContext";
+import { isRegularSizeClass, useSizeClass } from "../../../../formfactor/SizeClassContext";
 import type { SavedView } from "../../../../lib/prefs";
 import type { ViewResult, ViewRow } from "@myne/editor/host/notes/queryEngine";
 import {
@@ -95,9 +95,10 @@ export function MobileTableView({
   const { sizeClass } = useSizeClass();
   const columns = useMemo(() => displayColumns(def), [def]);
   // Compact phones get tighter tracks so more of the table is visible before the
-  // horizontal scroll kicks in; roomier on tablets. Geometry is otherwise shared
-  // with desktop (same `tableGridTemplate`).
-  const compact = sizeClass === "compact";
+  // horizontal scroll kicks in; roomier on tablets. The folded band is 626pt
+  // wide, so it takes the phone tracks: a tablet's roomier ones would push the
+  // table into horizontal scroll on a screen that has no room to scroll into.
+  const compact = !isRegularSizeClass(sizeClass);
   const { template, minWidth } = useMemo(
     () =>
       tableGridTemplate(

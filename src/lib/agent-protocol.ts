@@ -247,6 +247,7 @@ export type EditRejection =
    *  `Work` moved to `work/` is the same folder, and applying it would rewrite
    *  the note's bytes and advance its sync version for no change. */
   | "moveToSameFolder"
+  | "unknownFolder"
   /** A move's destination is an AI-excluded folder. The second half of the
    *  clamp: `excludedNow` refuses leaving an excluded folder and this refuses
    *  entering one, so neither direction is reachable. */

@@ -71,6 +71,10 @@ export type ImportSource =
   | { kind: "bytes"; bytes: number[]; filename: string | null }
   | { kind: "path"; path: string };
 
+/** Where an imported file belongs (myne-md/myne#913), mirror of the Rust
+ *  `AttachmentScope`. `"library"` is the absent value on the wire. */
+export type AttachmentScope = "library" | "chat";
+
 /** Error surface of {@link attachmentImport} — mirror of `AttachmentImportError`. */
 export type AttachmentImportError =
   | { kind: "Locked" }
@@ -147,6 +151,11 @@ export type AttachmentUnusedListError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** The vault is a shared (`NTV6`) one, so every conversation lives in a
+   *  person-scoped store this session cannot fully read: no attachment can be
+   *  proven unused, and the list is refused rather than returned empty
+   *  (myne-md/myne#913). */
+  | { kind: "ConversationsNotProvable" }
   /** This device has not finished syncing, so the unused set would be computed
    *  over a fraction of the corpus (phase3-web-client task 89). */
   | { kind: "CorpusIncomplete" }
@@ -159,6 +168,10 @@ export type AttachmentCleanUnusedError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** A conversation could not be read while re-verifying references, so the
+   *  sweep refused and erased nothing. Fail-closed for EVERY row, because a
+   *  library attachment can be referenced only by a conversation turn. */
+  | { kind: "ConversationScanFailed" }
   /** See {@link AttachmentUnusedListError}. Re-checked at the destructive step,
    *  because the list is advisory and storage can shrink between the two. */
   | { kind: "CorpusIncomplete" }
@@ -216,9 +229,21 @@ export async function catalogList(): Promise<CatalogEntry[]> {
  */
 export async function attachmentImport(
   source: ImportSource,
+  /**
+   * Where the file lands (myne-md/myne#913). `"library"`, the default and what
+   * every existing caller means, is the vault's attachment library; `"chat"` is
+   * a file pasted into one conversation, stored and encrypted exactly the same
+   * way but absent from the library listing.
+   *
+   * A file that is ALREADY in the library dedups to that entry and stays there:
+   * it was the user's before the paste, and re-filing it would hide a file they
+   * curated.
+   */
+  scope: AttachmentScope = "library",
 ): Promise<ImportedAttachment> {
   return await invoke<ImportedAttachment>("plugin:attachments|attachment_import", {
     source,
+    scope: scope === "chat" ? "chat" : null,
   });
 }
 

@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personListInvites = vi.hoisted(() => vi.fn());
 const personRegister = vi.hoisted(() => vi.fn());
-const readSyncEndpoint = vi.hoisted(() => vi.fn());
+const readSyncConfig = vi.hoisted(() => vi.fn());
 const writeSyncEndpoint = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
@@ -35,7 +35,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personAcceptInvite,
   personRegister,
-  readSyncEndpoint,
+  readSyncConfig,
   writeSyncEndpoint,
 }));
 
@@ -59,6 +59,10 @@ vi.mock("../../src/hooks/useBetaTermsGate", () => ({
 }));
 
 import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 import { MIN_PASSWORD_LEN } from "../../src/components/PasswordInput";
 
@@ -70,9 +74,12 @@ function continueAccept(): void {
 }
 
 beforeEach(() => {
+  resetPersonIdentityState();
   personListInvites.mockReset().mockResolvedValue([]);
   personRegister.mockReset().mockResolvedValue({});
-  readSyncEndpoint.mockReset().mockResolvedValue("https://sync.example");
+  readSyncConfig
+    .mockReset()
+    .mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: null });
   writeSyncEndpoint.mockReset().mockResolvedValue(undefined);
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
@@ -82,6 +89,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetPersonIdentityState();
   vi.useRealTimers();
 });
 
@@ -89,6 +97,11 @@ describe("IdentityHome accept path", () => {
   const OWNER_CODE = `MYNE-PERSON-1:${"11".repeat(16)}:${"22".repeat(32)}:${"33".repeat(32)}:${"44".repeat(48)}`;
 
   it("offers a vault creation from the identity landing in one action", async () => {
+    // The identity is UNLOCKED for this session, which is what the CTA needs: a
+    // vault born under an identity signs its first member list with that key, so
+    // the button is withheld (not disabled) while it is sealed. The next case
+    // pins the locked arm.
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:owner" });
     render(
       <IdentityHome
         identityCode="code"
@@ -102,6 +115,30 @@ describe("IdentityHome accept path", () => {
     );
     await waitFor(() => expect(personListInvites).toHaveBeenCalled());
     expect(screen.getByTestId("identity-home.create-vault-cta")).toBeTruthy();
+  });
+
+  it("offers the unlock door instead of a CTA it cannot honour while the identity is locked", async () => {
+    // 2026-10-25 owner report: the CTA was offered while the identity was locked,
+    // the creation flow answered `PersonLocked`, and that sentence pointed at a
+    // door this screen did not have. On a device with zero vaults this screen is
+    // the only surface reachable, so the dead end was total.
+    setPersonIdentityState({ ready: false, ownerCode: "MYNE-PERSON-1:owner" });
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    expect(await screen.findByTestId("identity-home.create-vault-locked")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.create-vault-cta")).toBeNull();
+    // The door is mounted here, not pointed at: the same modal Settings uses.
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
   });
 
   it("lists a pending invite and opens the accept form with the member phrase", async () => {
@@ -248,6 +285,72 @@ describe("IdentityHome accept path", () => {
 
     await waitFor(() => expect(personLock).toHaveBeenCalledWith(true));
     await waitFor(() => expect(onForgotten).toHaveBeenCalled());
+  });
+
+  // The confirmation is a DIALOG rather than a box expanding in the card
+  // (2026-10-24). What that buys the user has to be asserted, or the shell could
+  // be swapped back for a div and every test above would still pass: the surface
+  // says it is a modal, and Escape answers it without the erase running.
+  it("opens the forget confirmation as a dialog that Escape dismisses", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    // Nothing is expanded before the press: the card states the action, and the
+    // warning lives in the dialog.
+    expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+
+    const dialog = await screen.findByTestId("identity-home.forget-confirm");
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(screen.getByTestId("identity-home.forget-warning")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull(),
+    );
+    expect(personLock).not.toHaveBeenCalled();
+  });
+
+  // The acknowledgement is the dialog's own state, not the screen's, so closing
+  // the dialog throws it away instead of leaving a ticked box behind for whoever
+  // opens it next (which is what the inline box did by hand).
+  it("does not carry the acknowledgement across a close", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-ack"));
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+
+    fireEvent.click(screen.getByTestId("identity-home.forget-cancel"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-cta"));
+
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 });
 
@@ -639,7 +742,15 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
     await screen.findByTestId("identity-home.invites-unavailable");
     expect(personListInvites).not.toHaveBeenCalled();
     expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
-      "identityHome.invitesNotEnrolled",
+      "identityHome.invitesUnregistered",
+    );
+    // The explanation and the action that ends the state are ONE block
+    // (2026-10-24): the paragraph says no invitation can reach this identity, and
+    // the register control sits under it rather than in a second block below the
+    // list. Injection: moving the control back out reddens this.
+    expect(screen.getByTestId("identity-home.register-cta")).toBeTruthy();
+    expect(screen.getByTestId("identity-home.account-state").textContent).toContain(
+      "identityHome.invitesUnregistered",
     );
     expect(screen.queryByTestId("identity-home.error")).toBeNull();
   });
@@ -651,6 +762,8 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
     expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
       "identityHome.invitesPending",
     );
+    // A wait has no action: the register control belongs to `reserved` alone.
+    expect(screen.queryByTestId("identity-home.register-cta")).toBeNull();
   });
 
   it("reads a NotEnrolled refusal as the same state, not as a connection error", async () => {
@@ -671,13 +784,18 @@ describe("IdentityHome invitation state follows the account lifecycle", () => {
   });
 });
 
-// 2026-10-23: the register form is the shared 24-cell grid, and the server
-// address is asked for HERE when the device has none, because this screen is
-// reachable at zero vaults, where Settings does not exist.
+// 2026-10-24: the register act is a DIALOG (it used to expand a 24-cell grid
+// inside the card, which is what pushed the card past the window), in TWO STEPS
+// (the server is a decision, the phrase is a secret, and one view made the user
+// read both before understanding either), and the server step comes first, because
+// which server the identity is written to is a decision with a place rather than a
+// value inherited in silence. This screen is reachable at zero vaults, where
+// Settings does not exist, so the address has to be answerable here.
 describe("IdentityHome registration", () => {
+  const P = "identity-home.register";
   const PHRASE = Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => `word${i + 1}`);
 
-  const renderReserved = () =>
+  const renderReserved = (onRegistered: () => void = () => {}) =>
     render(
       <IdentityHome
         identityCode="code"
@@ -686,73 +804,109 @@ describe("IdentityHome registration", () => {
         onAccepted={() => {}}
         onForgotten={() => {}}
         accountState="reserved"
-        onRegistered={() => {}}
+        onRegistered={onRegistered}
       />,
     );
 
   const fillCells = (prefix: string) => {
     for (let i = 0; i < PHRASE_CELL_COUNT; i += 1) {
-      const id =
-        i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
+      const id = i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
       fireEvent.change(screen.getByTestId(id), { target: { value: PHRASE[i] } });
     }
   };
 
+  /** Step one's Continue, the only way to the phrase. */
+  const toPhraseStep = async (prefix: string = P) => {
+    fireEvent.click(await screen.findByTestId(`${prefix}-continue`));
+    await screen.findByTestId(`${prefix}-phrase-grid`);
+  };
+
+  it("opens as a dialog on the server step, with the card left as it was", async () => {
+    renderReserved();
+    // Nothing of the form is in the card before the press.
+    expect(screen.queryByTestId(`${P}-server`)).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    // Mounted through a portal on `document.body`, and the form is inside it.
+    const dialog = await screen.findByTestId(`${P}-dialog`);
+    expect(dialog.parentElement).toBe(document.body);
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    // The phrase is not in the same view as the address.
+    expect(screen.queryByTestId(`${P}-phrase-grid`)).toBeNull();
+  });
+
   it("asks for the phrase in 24 cells, and keeps Register disabled until they are full", async () => {
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await screen.findByTestId("identity-home.register-phrase-grid");
-    const submit = screen.getByTestId(
-      "identity-home.register-submit",
-    ) as HTMLButtonElement;
+    await toPhraseStep();
+    const submit = screen.getByTestId(`${P}-submit`) as HTMLButtonElement;
     expect(submit.disabled).toBe(true);
 
-    fireEvent.change(screen.getByTestId("identity-home.register-phrase"), {
+    fireEvent.change(screen.getByTestId(`${P}-phrase`), {
       target: { value: PHRASE[0] },
     });
     expect(submit.disabled).toBe(true);
 
-    fillCells("identity-home.register");
+    fillCells(P);
     expect(submit.disabled).toBe(false);
   });
 
-  it("asks for the sync server when the device has none, and sets it before registering", async () => {
-    readSyncEndpoint.mockResolvedValue(null);
+  it("shows the server the identity will be registered on, prefilled", async () => {
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    const server = await screen.findByTestId("identity-home.register-server");
-    fillCells("identity-home.register");
-    fireEvent.change(server, { target: { value: "https://sync.example" } });
-    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+    const server = (await screen.findByTestId(`${P}-server`)) as HTMLInputElement;
+    await waitFor(() => expect(server.value).toBe("https://sync.example"));
+    // Unchanged, so it is not re-written (each write re-verifies TLS).
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
+    expect(writeSyncEndpoint).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example"));
+  it("takes an address when the device has none, and sets it before any phrase", async () => {
+    readSyncConfig.mockResolvedValue({ endpoint_url: null, invite_code: null });
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    const server = await screen.findByTestId(`${P}-server`);
+    // No address, no way forward: the order the 2026-10-24 report asked for.
+    expect((screen.getByTestId(`${P}-continue`) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(server, { target: { value: "https://sync.example" } });
+    await toPhraseStep();
+    expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example", null);
+    expect(personRegister).not.toHaveBeenCalled();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
     await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
   });
 
-  it("keeps the field out of the way when an endpoint is already configured", async () => {
-    readSyncEndpoint.mockResolvedValue("https://sync.example");
-    renderReserved();
-    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
-    expect(screen.queryByTestId("identity-home.register-server")).toBeNull();
-  });
-
-  it("reveals the server field when registration is refused for a missing endpoint", async () => {
-    readSyncEndpoint.mockRejectedValue(new Error("probe failed"));
+  it("goes back to the server step on NotConfigured, with the words kept", async () => {
+    // The defect the report named: the address was hidden, the register call
+    // refused `NotConfigured`, and the 24 words were wiped before the address
+    // field appeared. Injection: restoring `resetCells()` on this arm reddens it.
     personRegister.mockRejectedValue({ kind: "NotConfigured" });
     renderReserved();
     fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
-    await waitFor(() => expect(readSyncEndpoint).toHaveBeenCalled());
-    fillCells("identity-home.register");
-    fireEvent.click(screen.getByTestId("identity-home.register-submit"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
 
-    expect((await screen.findByTestId("identity-home.register-error")).textContent).toBe(
-      "identityHome.registerNeedsServer",
+    expect((await screen.findByTestId(`${P}-error`)).textContent).toBe(
+      "identityHome.registerServerError",
     );
-    expect(await screen.findByTestId("identity-home.register-server")).toBeTruthy();
-    // The phrase does not survive the failure.
-    expect(
-      (screen.getByTestId("identity-home.register-phrase") as HTMLInputElement).value,
-    ).toBe("");
+    // Back where the fix is, and the words survived the round trip.
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    await toPhraseStep();
+    expect((screen.getByTestId(`${P}-phrase`) as HTMLInputElement).value).toBe(PHRASE[0]);
+  });
+
+  it("closes the dialog and reprobes once the registration lands", async () => {
+    const onRegistered = vi.fn();
+    renderReserved(onRegistered);
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(onRegistered).toHaveBeenCalled());
+    expect(screen.queryByTestId(`${P}-dialog`)).toBeNull();
   });
 });

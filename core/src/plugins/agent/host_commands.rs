@@ -48,7 +48,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex};
 use tauri::ipc::Channel;
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Emitter, Runtime};
 use zeroize::Zeroize;
 
 use crate::plugins::agent::apply::{
@@ -166,6 +166,16 @@ struct Session {
     /// the seed halfway through would leave the model answering the second half
     /// of a conversation it can no longer see the first half of.
     history: Vec<Message>,
+    /// The documents the user attached to this run (myne-md/myne#913), already
+    /// budgeted and wrapped as untrusted messages.
+    ///
+    /// Held for the reason `language` is held: a run resumed after a scope
+    /// approval re-enters the loop, and a document that vanished on the second
+    /// leg would leave the model answering about a file it can no longer see.
+    /// NOT part of `history`, because `step` drops the seed when the egress
+    /// controls change and a withdrawn conversation is not a withdrawn
+    /// attachment: the user chose the file for this run.
+    documents: Vec<Message>,
     /// The egress controls the seed was built under, or `None` when the run
     /// was seeded with nothing.
     ///
@@ -437,6 +447,7 @@ impl AgentSessionState {
         live_ids: &BTreeSet<String>,
         language: Option<String>,
         history: Vec<Message>,
+        documents: Vec<Message>,
         seed_controls: Option<super::history::SeedControls>,
         offered_settings: Vec<String>,
     ) {
@@ -450,6 +461,7 @@ impl AgentSessionState {
                     task,
                     language,
                     history,
+                    documents,
                     seed_controls,
                     offered_settings,
                     ..Default::default()
@@ -578,6 +590,18 @@ fn wipe_session(session: &mut Session) {
         }
     }
     session.transcript.clear();
+    // The attached documents (myne-md/myne#913) hold the same class of bytes as
+    // a transcript: a document's text is somebody else's prose, and a run that
+    // read a PDF leaves it in RAM. Same loop, same arms, for the same reason the
+    // comment above gives about keying a teardown to today's answer.
+    for message in &mut session.documents {
+        for span in &mut message.content {
+            if let Content::Trusted(t) = span {
+                t.zeroize();
+            }
+        }
+    }
+    session.documents.clear();
     // **The whole proposal, destructured rather than enumerated.** This was
     // three hand-written lists until myne-md/myne#850, which is why it missed
     // `settings`: the `note.folder` arm below records that the same shape was
@@ -814,6 +838,7 @@ pub async fn step<R: Runtime>(
         task,
         language,
         mut history,
+        documents,
         mut read_ids,
         mut transcript,
         mut proposal,
@@ -833,6 +858,11 @@ pub async fn step<R: Runtime>(
             s.task.clone(),
             s.language.clone(),
             s.history.clone(),
+            // Cloned rather than taken: a document is read on every leg of the
+            // run, and a take would have to be written back on both exits from
+            // this function. The clone is the run's own text under `Zeroizing`,
+            // so it is wiped when the leg ends either way.
+            s.documents.clone(),
             std::mem::take(&mut s.read_ids),
             std::mem::take(&mut s.transcript),
             std::mem::take(&mut s.proposal),
@@ -908,6 +938,7 @@ pub async fn step<R: Runtime>(
         memory,
         language: language.as_deref(),
         history: &history,
+        documents: &documents,
         on_progress: &report,
     };
 
@@ -1299,6 +1330,26 @@ impl<R: Runtime> PrefWriter for PrefWriteAdapter<'_, R> {
 /// this line is the other half: a report can be diagnosed from the log without a
 /// rebuild. `kind()` is the bounded, content-free tag, the variant id only,
 /// never the note id or any text (`src-tauri/AGENTS.md`'s DENY list).
+/// Fired once per successful apply OR undo, so the WebView can refresh what it
+/// renders from the vault rather than from the run (myne-md/myne#913).
+///
+/// The sidebar had no way to learn that an agent run created, deleted or moved a
+/// note: the only "notes changed" event in the tree is the CLI bridge's, and the
+/// agent never emitted anything. So an agent-created note existed on disk and was
+/// absent from the left panel until something else forced a reload, which read as
+/// "the creation failed".
+///
+/// One event per RUN, not per note: the listener reloads the note list, so ten
+/// emits would be ten identical reloads. The name is the agent's own rather than
+/// the CLI's, because a shared name would tell a future reader that the CLI wrote
+/// the note.
+///
+/// **Above the `#[allow]`, not between it and the function.** It was inserted
+/// there first, which moved `too_many_arguments` off the eleven-parameter
+/// `apply_from_host` and onto the const, so `clippy --all-targets -D warnings`
+/// failed on a branch whose tests were green.
+pub const AGENT_NOTES_CHANGED_EVENT: &str = "myne://agent-notes-changed";
+
 #[allow(clippy::too_many_arguments)]
 pub async fn apply_from_host<R: Runtime>(
     app: AppHandle<R>,
@@ -1313,6 +1364,7 @@ pub async fn apply_from_host<R: Runtime>(
     vault: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
 ) -> Result<ApplyOutcome, AgentError> {
+    let notify = app.clone();
     let outcome = apply_from_host_inner(
         app,
         run_id,
@@ -1337,6 +1389,12 @@ pub async fn apply_from_host<R: Runtime>(
             event = "agent_apply_refused",
             error_kind = error.kind()
         );
+    }
+    if outcome.is_ok() {
+        // Emitted from HERE rather than inside the inner function: this is the
+        // single point where the whole apply has settled, so the WebView hears one
+        // event per run whatever the run did, and hears nothing when it failed.
+        let _ = notify.emit(AGENT_NOTES_CHANGED_EVENT, ());
     }
     outcome
 }
@@ -1388,8 +1446,72 @@ async fn apply_from_host_inner<R: Runtime>(
         state: vault,
         hooks: hooks.clone(),
     };
+    // **The folders this vault actually has** (myne-md/myne#913). Read here, at
+    // the write, for the same reason the exclusions are: the set can move while
+    // a proposal sits on the review screen (a folder emptied, a note added to
+    // one), and the answer that decides is the newest.
+    //
+    // **Read through the ORIGIN-reporting seam, and a read we cannot trust
+    // refuses the batch's creates** (review round seven). The first version used
+    // `prefs_read_from_host(..).ok()`, so a degraded or failed read became
+    // "the default is unset" and the approved note was written at the vault ROOT
+    // with nothing said: a silent mis-file, and the same class as the bug this
+    // rule was added for. The settings half of this same apply already answers it
+    // this way thirty lines up ("here the difference is a WRITE").
+    let prefs_read = crate::plugins::prefs::commands::prefs_read_from_host_reporting_origin(
+        &TauriHost::new(app.clone()),
+        vault,
+        &StdVaultIo,
+    )
+    .await;
+    let prefs_trustworthy = matches!(
+        &prefs_read,
+        Ok((_, crate::plugins::prefs::commands::PrefsOrigin::Stored))
+            | Ok((_, crate::plugins::prefs::commands::PrefsOrigin::Absent))
+    );
+    if !prefs_trustworthy && !approved_new_notes.is_empty() {
+        // Nothing has been written yet. A create whose destination is unknown is
+        // not placed anywhere: the user retries, and the card says the apply
+        // failed rather than the note appearing in the wrong folder.
+        tracing::warn!(
+            target: "myne_core::agent",
+            event = "agent_apply_refused",
+            error_kind = "prefs_unreadable"
+        );
+        return Err(AgentError::WriteFailed);
+    }
+    let prefs = prefs_read.ok().map(|(view, _)| view);
+    let deliberate = prefs
+        .as_ref()
+        .map(|p| p.deliberate_folders.clone())
+        .unwrap_or_default();
+    // The user's configured new-note location, as a proposed note with no folder
+    // should treat it (myne-md/myne#913). Only reached when the read is
+    // trustworthy or there is no create to place.
+    let default_new_note_folder = prefs.as_ref().and_then(|p| {
+        if p.new_note_location.as_deref() == Some("specific") {
+            p.new_note_location_folder.clone()
+        } else {
+            None
+        }
+    });
+    let records = indices.snapshot();
+    let known = super::scope::known_folders(
+        records.values().map(|record| record.folder.as_deref()),
+        &deliberate,
+    );
     let mut outcome = apply_approved(
-        runs, &run_id, &approved, &new_notes, &excluded, approval, &reader, &restore, &writer,
+        runs,
+        &run_id,
+        &approved,
+        &new_notes,
+        &excluded,
+        &known,
+        default_new_note_folder.as_deref(),
+        approval,
+        &reader,
+        &restore,
+        &writer,
     )
     .await?;
     // Edits the host never recorded the model proposing are REPORTED rather than
@@ -1694,6 +1816,14 @@ pub async fn undo_from_host<R: Runtime>(
             settings: failed_settings,
         });
     }
+    // **An undo changes notes too, so it emits the same event the apply does**
+    // (myne-md/myne#913). Without it the sidebar kept the applied title or folder
+    // after a successful undo: the review screen's undo refreshed because it calls
+    // `onNotesWritten(restored)`, and this path (the panel's own) refreshed only
+    // the open note's content. Emitted on a PARTIAL undo as well, because the
+    // notes that did revert are on disk, and once per undo rather than per note
+    // for the reason the apply states.
+    let _ = app.emit(AGENT_NOTES_CHANGED_EVENT, ());
     Ok(AgentUndoResult {
         reverted,
         failed: failed_ids,
@@ -1748,6 +1878,7 @@ mod tests {
             &live,
             Some("tr".to_string()),
             seed,
+            Vec::new(),
             Some(controls.clone()),
             vec!["editor.weekly-notes-folder".to_string()],
         );

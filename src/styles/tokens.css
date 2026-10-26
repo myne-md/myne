@@ -355,6 +355,39 @@ textarea,
 .myne-scroll-fade[data-fade-top="true"] { --myne-fade-top: var(--myne-fade); }
 .myne-scroll-fade[data-fade-bottom="true"] { --myne-fade-bottom: var(--myne-fade); }
 
+/* The same fade on the INLINE axis, for a row that scrolls sideways: the tab
+   strip (myne-md/myne#913). Its own class rather than an axis prop on the rule
+   above, because a mask gradient names its direction and the vertical one has
+   four adopters reading it by name.
+
+   **`currentColor`, not a black stop.** In a mask the colour's ALPHA is the
+   opacity, so any opaque colour works, and `currentColor` means this rule
+   introduces no colour literal of its own: the guard counts them, and a mask is
+   exactly the place a literal looks harmless and is not (it is painted over the
+   content, so a themed stop would tint the tabs it is fading). */
+.myne-tabstrip-fade {
+  --myne-tabstrip-fade: var(--space-5);
+  --myne-tabstrip-fade-left: 0px;
+  --myne-tabstrip-fade-right: 0px;
+}
+
+.myne-tabstrip-fade[data-fade-left="true"],
+.myne-tabstrip-fade[data-fade-right="true"] {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0, currentColor var(--myne-tabstrip-fade-left),
+    currentColor calc(100% - var(--myne-tabstrip-fade-right)), transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0, currentColor var(--myne-tabstrip-fade-left),
+    currentColor calc(100% - var(--myne-tabstrip-fade-right)), transparent 100%
+  );
+}
+
+.myne-tabstrip-fade[data-fade-left="true"] { --myne-tabstrip-fade-left: var(--myne-tabstrip-fade); }
+.myne-tabstrip-fade[data-fade-right="true"] { --myne-tabstrip-fade-right: var(--myne-tabstrip-fade); }
+
 /* -- Sidebar tree disclosure ------------------------------------------------
    Enter/exit motion for folder-tree rows revealed/hidden by expand/collapse
    lives in `NoteList`'s `DisclosureWrapper` as an inline `grid-template-rows`
@@ -806,7 +839,12 @@ a:focus-visible,
   gap: var(--space-3);
   background: var(--bg-2);
   border: 1px solid var(--line-1);
-  border-inline-start: 3px solid var(--toast-accent);
+  /* No accent rail on the inline start (2026-10-24). The 3px `--toast-accent`
+     stripe was decoration on the one edge the card already borders, and the
+     accent is the canon's signal for focus, primary actions, links and the
+     active selection, never for chrome (docs/design/README.md). The variant's
+     colour is still carried, by the ICON, which is the part that means
+     something. */
   border-radius: var(--radius-2);
   padding: var(--space-3) var(--space-4);
   box-shadow: var(--shadow-2);

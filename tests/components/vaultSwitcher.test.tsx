@@ -56,6 +56,61 @@ function renderSwitcher(
   return { ...utils, props };
 }
 
+describe("VaultSwitcher: the invitations row", () => {
+  // The failure these pin: an invitation is addressed to a REGISTERED person
+  // account, so a device whose identity is `reserved` or `pending` lists nothing.
+  // A purely count-driven row therefore showed nothing at all, and the invitee
+  // waited in silence. The owner's invitation existed and no surface said why it
+  // could not appear. The row is still one row and one door; it just says which
+  // state it is in.
+
+  async function openMenu(over: Partial<Parameters<typeof VaultSwitcher>[0]>) {
+    renderSwitcher([summary({ id: "v1", label: "Solo", last_unlock: 2000 })], {
+      onInvites: vi.fn(),
+      ...over,
+    });
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await waitFor(() => expect(screen.getByTestId("switcher.invites-notice")).toBeTruthy());
+  }
+
+  it("shows a count when the identity can list its invitations", async () => {
+    await openMenu({ inviteCount: 2 });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("count");
+    expect(row.textContent).toBe("2 invitations waiting");
+  });
+
+  it("keeps the row for an unregistered identity, and opens the same door", async () => {
+    const onInvites = vi.fn();
+    await openMenu({ inviteCount: 0, invitesUnavailable: "not-enrolled", onInvites });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("not-enrolled");
+    expect(row.textContent).toBe("Register this identity to see invitations");
+    fireEvent.click(row);
+    expect(onInvites).toHaveBeenCalledTimes(1);
+  });
+
+  it("says a pending device is waiting for approval rather than offering a remedy", async () => {
+    await openMenu({ inviteCount: 0, invitesUnavailable: "pending" });
+    const row = screen.getByTestId("switcher.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("pending");
+    expect(row.textContent).toBe("Invitations cannot be listed until this device is approved");
+  });
+
+  it("renders no row when there is no identity at all", async () => {
+    renderSwitcher([summary({ id: "v1", label: "Solo", last_unlock: 2000 })], {
+      inviteCount: 0,
+      invitesUnavailable: "no-identity",
+      onInvites: vi.fn(),
+    });
+    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
+    fireEvent.click(screen.getByTestId("switcher.chip"));
+    await waitFor(() => expect(screen.getByTestId("switcher.create-cta")).toBeTruthy());
+    expect(screen.queryByTestId("switcher.invites-notice")).toBeNull();
+  });
+});
+
 describe("VaultSwitcher — render gates", () => {
   it("renders nothing once the probe returns zero vaults", async () => {
     renderSwitcher([]);

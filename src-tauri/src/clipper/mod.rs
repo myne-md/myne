@@ -82,6 +82,8 @@ pub mod ingest;
 pub mod install;
 pub mod manifest;
 pub mod rate_limit;
+#[cfg(windows)]
+pub mod registry;
 pub mod relay;
 pub mod relay_app;
 pub mod token;

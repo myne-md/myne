@@ -621,7 +621,12 @@ export function AttachmentsLibrary(_props: AttachmentsLibraryProps) {
       setCleanNotice(
         kind === "CorpusIncomplete"
           ? t("attachments.library.corpusIncompleteNotice")
-          : t("attachments.library.checkUnusedFailedNotice"),
+          : // A shared vault's refusal is not a failure and not a sync wait: the
+            // reason is permanent for this vault, and "couldn't check" would leave
+            // the user re-clicking forever (myne-md/myne#913).
+            kind === "ConversationsNotProvable"
+            ? t("attachments.library.sharedVaultNotice")
+            : t("attachments.library.checkUnusedFailedNotice"),
       );
     } finally {
       setCheckingUnused(false);

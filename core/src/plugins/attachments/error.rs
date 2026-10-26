@@ -589,6 +589,16 @@ pub enum AttachmentUnusedListError {
     #[error("a note could not be scanned for attachment references")]
     NoteScanFailed,
 
+    /// This vault is a shared (`NTV6`) one, so the conversation references are
+    /// person-scoped and this session can prove only its own
+    /// (myne-md/myne#913, review round eight). **No row can be shown to be
+    /// unused**: a LIBRARY attachment picked with `+` is referenced only by a
+    /// turn too, and a member's turns live in their private container. The list
+    /// is refused rather than returned empty, because an empty list reads as
+    /// "nothing to clean" and hides the reason.
+    #[error("a shared vault keeps conversations per person, so unused files cannot be proven")]
+    ConversationsNotProvable,
+
     /// This device cannot prove it holds the whole vault (phase3-web-client
     /// task 89).
     ///
@@ -696,6 +706,16 @@ pub enum AttachmentCleanUnusedError {
     /// authoritative re-verify scan. **Fail-closed**: nothing is erased.
     #[error("a note could not be scanned for attachment references")]
     NoteScanFailed,
+
+    /// A CONVERSATION could not be decrypted / decoded during the reference
+    /// re-verify. **Fail-closed for the whole sweep, not only for chat-scoped
+    /// rows** (myne-md/myne#913, review round five): a library attachment can be
+    /// referenced only by a conversation turn (a file picked with `+` and never
+    /// embedded in a note), so narrowing the refusal to `scope: "chat"` would
+    /// still crypto-erase a library file whose only reference could not be read.
+    /// Nothing is erased.
+    #[error("a conversation could not be scanned for attachment references")]
+    ConversationScanFailed,
 
     /// This device cannot prove it holds the whole vault (phase3-web-client
     /// task 89).

@@ -1526,3 +1526,16 @@ export function useSelectedNote(): UseSelectedNoteReturn {
   }
   return ctx;
 }
+
+/**
+ * The sidebar state, or `null` outside the provider.
+ *
+ * For a surface that only needs a BEST-EFFORT read and can legitimately render
+ * without the editor tree: the reviewed-seed row's staleness hint reads note
+ * timestamps when the cache exists and says nothing when it does not (a Settings
+ * panel test, a story, or a future surface outside the sidebar). The strict hook
+ * stays the default everywhere the state is required.
+ */
+export function useSelectedNoteOptional(): UseSelectedNoteReturn | null {
+  return useContext(SidebarStateContext);
+}

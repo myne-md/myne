@@ -66,7 +66,7 @@
 import { describe, expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
-import { closeSettings, openSettings } from "./support/flows";
+import { closeSettings, openSyncDevices } from "./support/flows";
 import { testIdSelector } from "./support/webdriver";
 // The fleet steps and the phrase vectors live in `support/member-fleet.ts`, shared
 // with `member-devices.e2e.ts` rather than copied: the parts that matter are the
@@ -106,7 +106,14 @@ const describeCanary = ready ? describe : describe.skip;
  *  rows carrying a given name is therefore still the discriminator. */
 async function renderedNames(session: Session): Promise<string[]> {
   const cells = await session.byTestIdAll("member-roster.name");
-  return Promise.all(cells.map(async (cell) => (await cell.text()).trim()));
+  // **`textContent()`, not `text()`.** WebKitWebDriver's `GET /text` answers `""`
+  // for a node that has just been re-rendered, while the DOM already carries the
+  // copy — the trap `e2e/AGENTS.md` records for the unlock banner, and it lands
+  // here because this helper re-reads a roster that polls. Measured 2026-10-24:
+  // the backend reported the member's own row as `verified` with
+  // `display_name: "Rowan Ash"` in the same run this helper rendered `[""]`, and
+  // the scenario reported it as "the member's own row shows no name".
+  return Promise.all(cells.map(async (cell) => (await cell.textContent()).trim()));
 }
 
 /**
@@ -136,7 +143,7 @@ async function pollRoster(
     }
     await syncNow(writer);
     await syncNow(session);
-    await openSettings(session, "sync");
+    await openSyncDevices(session);
     await session.byTestId("member-roster");
     // `member-roster` mounts before `useRoster` resolves, so the root alone is not
     // the roster having loaded.
@@ -185,7 +192,9 @@ async function waitForNoName(
  *  keypair rather than a session flag, so waiting on it is also the assertion that
  *  this device can sign a name at all. */
 async function openOwnRoster(device: AppSession): Promise<void> {
-  await openSettings(device.session, "sync");
+  // The roster is a DEVICES-topic surface (myne-md/myne#885) and Settings restores
+  // the last topic, so the topic has to be named rather than assumed.
+  await openSyncDevices(device.session);
   await device.session.byTestId("member-roster", { timeoutMs: 10_000 });
   await device.session.byTestId("member-roster.person-ready", { timeoutMs: 60_000 });
 }

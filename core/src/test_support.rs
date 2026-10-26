@@ -57,6 +57,61 @@ impl Drop for ScratchVault {
     }
 }
 
+/// A serialized **`NTV7` (person-born) `vault.meta`**, for the readers that ask
+/// "which generations does this accept".
+///
+/// `seed_byte` fills the vault's 16-byte binding (offset 6), so two calls are two
+/// vaults. The recovery-phrase wrap is zeroed because `NTV7` requires its absence
+/// structurally: the writer refuses to emit a live phrase wrap and the parser refuses
+/// to accept one, and a fixture that carried one would test a frame no client can
+/// produce.
+///
+/// The seals inside are NOT openable (the person wrap is all zeros, the roster
+/// envelope is filler). That is deliberate: the callers of this fixture are key
+/// RESOLVERS and generation classifiers, which parse the frame and never open it. A
+/// test that needs to open one builds a real vault through the creation path instead.
+pub fn person_born_meta_frame(seed_byte: u8) -> Vec<u8> {
+    use protocol::vault_meta::{VAULT_META_SALT_RANDOM_LEN, VAULT_META_WRAPPED_ROOT_KEY_LEN};
+
+    // The base comes from the PRODUCTION creator rather than from the `_raw` encoder:
+    // `_raw` takes caller-supplied nonces and `check-crypto-registries.mjs` rule 4
+    // keeps that out of every file outside `protocol/src` (§6.7 keystream reuse), so
+    // sourcing them here would be a guard violation rather than a convenience. This
+    // path draws its own and writes an `NTV5` frame, which is exactly the base an
+    // `NTV7` frame carries.
+    let session = crate::plugins::vault_creation::commands::build_session(
+        crate::vault_id::VaultId::mint(),
+        "person-born-fixture-password",
+        FAST_TEST_KDF,
+    )
+    .expect("build a creation session");
+    let base_bytes =
+        crate::plugins::vault_creation::commands::build_and_serialize_vault_meta(&session)
+            .expect("serialize the NTV5 base");
+    let mut base = protocol::parse_vault_meta_any(&base_bytes).expect("parse the NTV5 base");
+    base.account_number_hash = [seed_byte; 16];
+    base.random_salt_recovery = [0u8; VAULT_META_SALT_RANDOM_LEN];
+    base.nonce_recovery_wrap = [0u8; 24];
+    base.enc_root_key_recovery = [0u8; VAULT_META_WRAPPED_ROOT_KEY_LEN];
+
+    protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+        base,
+        group_key_nonce: [0xA1; 24],
+        enc_group_key: [0xB2; 64],
+        group_key_epoch: 1,
+        // One plausible-length envelope: the parser bounds the length, it does not
+        // open it.
+        signed_roster_envelope: vec![0xC3; 64],
+        person_wrap: protocol::PersonWrap {
+            ml_kem_ct: [0u8; protocol::person_key::PERSON_CT_LEN],
+            ed_ephemeral_pk: [0u8; protocol::person_key::PERSON_ED25519_PK_LEN],
+            nonce: [0u8; 24],
+            wrapped_root_key: [0u8; protocol::PERSON_WRAP_WRAPPED_ROOT_KEY_LEN],
+        },
+    })
+    .expect("serialize the NTV7 frame")
+}
+
 /// Generic self-cleaning scratch directory for tests that don't need
 /// `ScratchVault`'s vault-meta convenience. Creates a unique-named dir
 /// under `std::env::temp_dir()` and removes it on drop. Avoids pulling

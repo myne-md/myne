@@ -113,13 +113,63 @@ pub const CATALOG_BLOB_HEADER_LEN: usize = 34;
 /// parallel to `prefs.rs`).
 pub const MAX_CATALOG_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
+/// Where an attachment belongs (myne-md/myne#913).
+///
+/// **One field, two places a file can live.** The vault has one attachment
+/// store and one catalog; this says which SURFACE a row belongs to, not where
+/// its bytes are. A library attachment is the ordinary case: it is listed, it
+/// can be embedded in any note, and the cleanup dialog can offer it. A chat
+/// attachment was pasted into one conversation and is reachable only from
+/// there: still encrypted, still in `vault.attachments`, still synced and
+/// backed up, and deliberately absent from the library listing so a file the
+/// user dropped into a question does not turn up beside the ones they curated.
+///
+/// **`Library` is the default and is never written.** The field is emitted only
+/// for `Chat`, so every existing catalog, and every ordinary import, encodes
+/// byte-identically to the pre-#913 shape. An older reader drops the unknown key
+/// (§9.10.2's additive-field rule) and lists the file in its library, which is
+/// the safe direction: the file is still theirs, still encrypted, and still
+/// deletable, and a reader that cannot see the marker is a reader that never
+/// created one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum AttachmentScope {
+    /// The vault's attachment library: listed, and embeddable from any note.
+    #[default]
+    Library,
+    /// Owned by one chat conversation. Stored and synced like any other
+    /// attachment; not listed in the library.
+    ///
+    /// `Ord` is load-bearing rather than incidental: the catalog merge breaks an
+    /// equal-`version` tie with a total order over retained fields, and a field
+    /// left out of that order turns arrival order into the tie-breaker. `Chat`
+    /// sorts ABOVE `Library` so two peers that disagree converge on the
+    /// conversation's claim rather than losing a file's placement to whichever
+    /// argument came first.
+    Chat,
+}
+
+impl AttachmentScope {
+    /// The canonical JSON token. `Library` has none on purpose: it is the
+    /// absent value.
+    pub const fn wire_token(self) -> Option<&'static str> {
+        match self {
+            Self::Library => None,
+            Self::Chat => Some("chat"),
+        }
+    }
+}
+
 /// One attachment's authoritative metadata (spec § 9.10.2). Fields are
 /// emitted in fixed canonical (lexicographic) order: `content_type` <
-/// `created_at` < `deleted_at` (when present) < `filename` < `size` <
-/// `updated_at` (when present) < `version` (when non-zero). The two
-/// `Option` fields plus `version` are the additive Phase-2-sync fields
-/// (MYND-468 + myne-md/myne#405); all absent/zero = pre-sync shape,
-/// byte-identical to the original four-field encode.
+/// `created_at` < `deleted_at` (when present) < `filename` < `scope` (when
+/// `chat`) < `size` < `updated_at` (when present) < `version` (when non-zero).
+/// This comment listed `scope` LAST while the encoder emitted it between
+/// `filename` and `size`, which is the slot §9.10.2 pins and the one a port
+/// reads; the comment was a second, wrong answer to the only question the
+/// ordering exists to settle. The `Option` fields plus `version` are the
+/// additive Phase-2-sync fields (MYND-468 + myne-md/myne#405); all
+/// absent/zero = pre-sync shape, byte-identical to the original four-field
+/// encode.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AttachmentMeta {
     /// Import-time MIME of the file (a hint; the `attachment://` handler
@@ -151,6 +201,10 @@ pub struct AttachmentMeta {
     /// field emitted only when non-zero, so a pre-#405 entry stays
     /// byte-identical. Declared last to keep canonical key order.
     pub version: u64,
+    /// Where this attachment belongs (myne-md/myne#913). Declared last for the
+    /// same reason `version` is, and emitted only for `Chat`, so a library entry
+    /// stays byte-identical to the pre-#913 encode.
+    pub scope: AttachmentScope,
 }
 
 impl AttachmentMeta {
@@ -166,7 +220,15 @@ impl AttachmentMeta {
             size,
             updated_at: None,
             version: 0,
+            scope: AttachmentScope::Library,
         }
+    }
+
+    /// The same entry, placed in a chat conversation instead of the library
+    /// (myne-md/myne#913).
+    pub fn in_chat(mut self) -> Self {
+        self.scope = AttachmentScope::Chat;
+        self
     }
 
     /// Whether this entry is an attachment catalog tombstone
@@ -192,6 +254,10 @@ impl AttachmentMeta {
             size: 0,
             updated_at: None,
             version: self.version + 1,
+            // Scrubbed with the rest: a tombstone describes nothing, and a
+            // surviving `chat` marker would say a conversation still owns a file
+            // that has been erased.
+            scope: AttachmentScope::Library,
         }
     }
 }
@@ -341,6 +407,12 @@ fn canonical_json_encode(catalog: &AttachmentsCatalog) -> Vec<u8> {
         }
         out.extend_from_slice(b",\"filename\":");
         push_json_string(&mut out, &meta.filename.nfc().collect::<String>());
+        // Between `filename` and `size`, which is where the canonical order puts
+        // "scope"; emitted only for `chat`, so the library shape is unchanged.
+        if let Some(token) = meta.scope.wire_token() {
+            out.extend_from_slice(b",\"scope\":");
+            push_json_string(&mut out, token);
+        }
         out.extend_from_slice(b",\"size\":");
         push_json_uint(&mut out, meta.size);
         if let Some(updated_at) = meta.updated_at {
@@ -511,6 +583,7 @@ impl Parser<'_> {
         let mut size: Option<u64> = None;
         let mut updated_at: Option<u64> = None;
         let mut version: u64 = 0;
+        let mut scope = AttachmentScope::Library;
 
         if self.peek() == Some(b'}') {
             self.pos += 1;
@@ -528,6 +601,31 @@ impl Parser<'_> {
                 "size" => size = Some(self.parse_uint()?),
                 "updated_at" => updated_at = Some(self.parse_uint()?),
                 "version" => version = self.parse_uint()?,
+                // An unknown scope value is TOLERATED as `Library` rather than
+                // failing the file: an additive field a later version invents
+                // must not cost this reader the whole catalog. The cost is that
+                // a future scope would list its rows in the library here, which
+                // is the same trade §9.10.2's additive-field rule makes
+                // everywhere else and the safe direction for a file the user
+                // still owns.
+                "scope" => {
+                    // **Tolerance covers the VALUE, not only the strings this
+                    // version knows** (myne-md/myne#913, review round three): a
+                    // later version may spell the field as a number or an
+                    // object, and §9.10.2 says a value this implementation does
+                    // not know reads as the library rather than failing the
+                    // catalog. Only a string can name a scope here, so anything
+                    // else is skipped and the row stays in the library.
+                    if self.peek() == Some(b'"') {
+                        scope = if self.parse_string()? == "chat" {
+                            AttachmentScope::Chat
+                        } else {
+                            AttachmentScope::Library
+                        };
+                    } else {
+                        self.skip_value()?;
+                    }
+                }
                 // Unknown (future additive) field — skip its value.
                 _ => self.skip_value()?,
             }
@@ -551,6 +649,7 @@ impl Parser<'_> {
             size: size?,
             updated_at,
             version,
+            scope,
         })
     }
 
@@ -1904,6 +2003,213 @@ mod tests {
             .expect("write attachments-catalog vectors dump");
     }
 
+    // ---- KAT vector APPEND generator: attachment scope -----------------
+
+    /// Emits a JSON **array fragment** of 2 `scope` cases for
+    /// `myne-test-vectors/vectors/attachments-catalog/v0.1/cases.json` at
+    /// `/tmp/myne_attachments_catalog_scope_vectors.json` (myne-md/myne#913),
+    /// spliced by hand into the existing `cases` array like the parse-fail
+    /// fragment beside it. The whole-file emitter above is NOT re-run: it is
+    /// byte-stable for `vector_id` immutability, and it predates the tombstone
+    /// cases too.
+    ///
+    /// Run with:
+    /// `cargo test -p protocol --lib emit_catalog_scope_vectors -- --ignored`
+    ///
+    /// The two directions the field has, and neither is covered before #913: a
+    /// `chat` row ENCODES `"scope":"chat"` in its canonical slot (between
+    /// `filename` and `size`), and a value from a later version DECODES as
+    /// `library` rather than failing the catalog (§9.10.2).
+    #[test]
+    #[ignore]
+    fn emit_catalog_scope_vectors() {
+        extern crate std;
+
+        let root_key: [u8; 32] = [0x42; 32];
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash: [u8; CATALOG_BLOB_ACCOUNT_HASH_LEN] =
+            [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        // 0x77 / 0x88 / 0x99 / 0xAA are taken in this family's nonce registry.
+        let nonce_chat: [u8; AEAD_NONCE_LEN] = [0xBB; AEAD_NONCE_LEN];
+        let nonce_future: [u8; AEAD_NONCE_LEN] = [0xCC; AEAD_NONCE_LEN];
+
+        // (1) A chat-scoped entry: the slot, and the whole MYC1 output.
+        let mut chat = AttachmentsCatalog::empty();
+        chat.entries.insert(
+            "cc33".to_string(),
+            AttachmentMeta::live(
+                "image/png".to_string(),
+                1_700_000_000,
+                "pasted.png".to_string(),
+                12345,
+            )
+            .in_chat(),
+        );
+        let pt_chat = canonical_json_encode(&chat);
+        let text = core::str::from_utf8(&pt_chat).expect("canonical JSON is UTF-8");
+        // The SLOT is the contract, so it is asserted here rather than left to
+        // the pinned bytes alone: a canonical order that moved it would still
+        // round-trip through this implementation, and only a port reading the
+        // vector would ever see the difference.
+        assert!(
+            text.contains(r#""filename":"pasted.png","scope":"chat","size":12345"#),
+            "scope must sit between filename and size: {text}"
+        );
+        let blob_chat =
+            encode_attachments_catalog_raw(&catalog_key, &account_hash, &chat, &nonce_chat)
+                .expect("encode chat scope");
+
+        // (2) A scope from a later version decodes as `library`, never as a
+        // failed catalog. The typed encoder cannot emit one, so the envelope is
+        // assembled by hand (assembly mirrors `encode_attachments_catalog_raw`).
+        let pt_future: &[u8] = br#"{"dd44":{"content_type":"text/plain","created_at":1700000000,"filename":"note.txt","scope":"note","size":42}}"#;
+        let aad = aad_attachments_catalog(&account_hash);
+        let sealed =
+            aead_seal_ctx(&catalog_key, &nonce_future, pt_future, &aad).expect("seal future");
+        let mut blob_future = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed.len());
+        blob_future.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob_future.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob_future.push(CATALOG_BLOB_RESERVED);
+        blob_future.extend_from_slice(&nonce_future);
+        blob_future.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob_future.extend_from_slice(&sealed);
+
+        let decoded = decode_attachments_catalog(&catalog_key, &account_hash, &blob_future)
+            .expect("an unknown scope must not fail the catalog");
+        assert_eq!(
+            decoded.entries["dd44"].scope,
+            AttachmentScope::Library,
+            "an unknown scope value decodes as library"
+        );
+        let pt_future_expected = canonical_json_encode(&decoded);
+        assert!(
+            !core::str::from_utf8(&pt_future_expected)
+                .expect("utf8")
+                .contains("scope"),
+            "the canonical re-encode of a library row carries no scope key"
+        );
+
+        let mut d = String::new();
+        d.push_str("    {\n");
+        d.push_str("      \"vector_id\": \"attachments-catalog/v0.1/encrypt-chat-scope\",\n");
+        d.push_str("      \"description\": \"A chat-scoped entry pins the canonical slot of the optional `scope` field: \\\"scope\\\":\\\"chat\\\" between `filename` and `size` (myne-md/myne#913, §9.10.2). The file's bytes, KEK and envelope are a library attachment's; the field only says which surface lists the row. `library` is never emitted, so a library row is byte-identical to the pre-#913 shape (`encrypt-populated`).\",\n");
+        d.push_str("      \"case_kind\": \"encrypt\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&pt_chat)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_catalog_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce_chat)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_catalog_key_hex\": \"{}\",\n",
+            hex_lower(catalog_key.as_slice())
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_catalog_blob_hex\": \"{}\"\n",
+            hex_lower(&blob_chat)
+        ));
+        d.push_str("    },\n");
+
+        d.push_str("    {\n");
+        d.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-unknown-scope-tolerated\",\n",
+        );
+        d.push_str("      \"description\": \"Forward-compat (§9.10.2): a sealed plaintext carrying a scope value this version does not know (`note`) MUST decode as `library` rather than fail the catalog, and a canonical re-encode drops the key. expected_plaintext_canonical_utf8_hex is that re-encode, NOT the sealed bytes; informational_sealed_plaintext_utf8_hex carries the sealed plaintext verbatim.\",\n");
+        d.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_future)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_sealed_plaintext_utf8_hex\": \"{}\",\n",
+            hex_lower(pt_future)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt_future_expected)
+        ));
+        d.push_str("    },\n");
+
+        // (3) A non-string value decodes as the library too. §9.10.2's tolerance
+        // is about a value this version does not know, and a later version could
+        // spell the field as a number; `parse_string()?` would have failed the
+        // whole catalog over it.
+        let nonce_non_string: [u8; AEAD_NONCE_LEN] = [0xCE; AEAD_NONCE_LEN];
+        let pt_non_string: &[u8] = br#"{"ee55":{"content_type":"text/plain","created_at":1700000000,"filename":"note.txt","scope":2,"size":42}}"#;
+        let sealed_non_string = aead_seal_ctx(&catalog_key, &nonce_non_string, pt_non_string, &aad)
+            .expect("seal non-string scope");
+        let mut blob_non_string =
+            Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed_non_string.len());
+        blob_non_string.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob_non_string.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob_non_string.push(CATALOG_BLOB_RESERVED);
+        blob_non_string.extend_from_slice(&nonce_non_string);
+        blob_non_string.extend_from_slice(&(sealed_non_string.len() as u32).to_be_bytes());
+        blob_non_string.extend_from_slice(&sealed_non_string);
+        let decoded_non_string =
+            decode_attachments_catalog(&catalog_key, &account_hash, &blob_non_string)
+                .expect("a non-string scope must not fail the catalog");
+        assert_eq!(
+            decoded_non_string.entries["ee55"].scope,
+            AttachmentScope::Library
+        );
+        let pt_non_string_expected = canonical_json_encode(&decoded_non_string);
+
+        d.push_str("    {\n");
+        d.push_str(
+            "      \"vector_id\": \"attachments-catalog/v0.1/decrypt-non-string-scope-tolerated\",\n",
+        );
+        d.push_str(
+            "      \"description\": \"Forward-compat (§9.10.2): the tolerance is stated for a scope VALUE this version does not know, not only for a string it does not know. A sealed non-string value MUST decode as `library` rather than fail the catalog (the first implementation used `parse_string()?`, which would have collapsed the WHOLE catalog to {}). expected_plaintext_canonical_utf8_hex is the re-encode without the key; informational_sealed_plaintext_utf8_hex carries the sealed bytes.\",\n",
+        );
+        d.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+        d.push_str(&alloc::format!(
+            "      \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob_non_string)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_key)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"informational_sealed_plaintext_utf8_hex\": \"{}\",\n",
+            hex_lower(pt_non_string)
+        ));
+        d.push_str(&alloc::format!(
+            "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+            hex_lower(&pt_non_string_expected)
+        ));
+        d.push_str("    }\n");
+
+        std::fs::write(
+            "/tmp/myne_attachments_catalog_scope_vectors.json",
+            d.as_bytes(),
+        )
+        .expect("write scope fragment");
+    }
+
     // ---- KAT vector APPEND generator: structural parse rejects --------
 
     /// Emits a JSON **array fragment** of 7 additional `parse_fail` cases
@@ -2221,5 +2527,106 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write attachments-catalog tombstone vectors dump");
+    }
+    // ---- scope: chat vs library (myne-md/myne#913) ------------------------
+
+    /// A library entry is byte-identical to the pre-#913 four-field encode.
+    ///
+    /// This is the property the additive-field rule exists for, and it is worth
+    /// a test rather than a comment: the field is written only for `chat`, so a
+    /// vault that never pastes a file into a conversation keeps emitting exactly
+    /// the bytes it emitted before, and a reader from either side reads them.
+    #[test]
+    fn a_library_entry_emits_no_scope_key() {
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert(
+            "aa11".to_string(),
+            AttachmentMeta::live("text/plain".to_string(), 100, "a.txt".to_string(), 7),
+        );
+        let plaintext = canonical_json_encode(&catalog);
+        let text = String::from_utf8(plaintext).expect("utf8");
+        assert_eq!(
+            text,
+            r#"{"aa11":{"content_type":"text/plain","created_at":100,"filename":"a.txt","size":7}}"#
+        );
+        assert!(!text.contains("scope"));
+    }
+
+    /// A chat attachment carries the marker, at its canonical position.
+    #[test]
+    fn a_chat_entry_carries_its_scope_between_filename_and_size() {
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert(
+            "bb22".to_string(),
+            AttachmentMeta::live("text/plain".to_string(), 100, "a.txt".to_string(), 7).in_chat(),
+        );
+        let text = String::from_utf8(canonical_json_encode(&catalog)).expect("utf8");
+        assert_eq!(
+            text,
+            r#"{"bb22":{"content_type":"text/plain","created_at":100,"filename":"a.txt","scope":"chat","size":7}}"#
+        );
+    }
+
+    /// The parser reads the marker back, and tolerates one it does not know.
+    #[test]
+    fn the_parser_reads_a_known_scope_and_tolerates_an_unknown_one() {
+        let parsed = canonical_json_decode(
+            br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","scope":"chat","size":2}}"#,
+        )
+        .expect("parses");
+        assert_eq!(parsed.entries["aa"].scope, AttachmentScope::Chat);
+
+        // A scope from a later version is Library here, not a failed file: an
+        // additive field must never cost the reader the whole catalog.
+        let future = canonical_json_decode(
+            br#"{"aa":{"content_type":"t","created_at":1,"filename":"f","scope":"note","size":2}}"#,
+        )
+        .expect("parses");
+        assert_eq!(future.entries["aa"].scope, AttachmentScope::Library);
+    }
+
+    /// Scrubbing a live entry into a tombstone drops the marker with the rest of
+    /// the descriptive metadata.
+    /// **A non-string scope decodes as the library instead of killing the
+    /// catalog** (myne-md/myne#913, review round three). §9.10.2's tolerance is
+    /// stated for a value this version does not know, and only a string can name
+    /// a scope; the first implementation used `parse_string()?`, so a future
+    /// `"scope":2` would have failed the parse and `read_or_empty` would have
+    /// collapsed the WHOLE catalog to `{}`: every attachment gone from every
+    /// listing over one word a later version invented.
+    #[test]
+    fn a_non_string_scope_decodes_as_the_library() {
+        let root_key = fixed_root_key();
+        let catalog_key = derive_subkey(&root_key, SubkeyRole::AttachmentsCatalogKey);
+        let account_hash = [0x33; CATALOG_BLOB_ACCOUNT_HASH_LEN];
+        let nonce = [0xCD; AEAD_NONCE_LEN];
+        // Not a canonical value for the field on purpose: the point is a shape
+        // this version has no rule for.
+        let plaintext: &[u8] =
+            br#"{"aa11":{"content_type":"t","created_at":1,"filename":"f","scope":2,"size":2}}"#;
+        let aad = aad_attachments_catalog(&account_hash);
+        let sealed = aead_seal_ctx(&catalog_key, &nonce, plaintext, &aad).expect("seal");
+        let mut blob = Vec::with_capacity(CATALOG_BLOB_HEADER_LEN + sealed.len());
+        blob.extend_from_slice(&CATALOG_BLOB_MAGIC);
+        blob.push(CATALOG_BLOB_PROTOCOL_VERSION);
+        blob.push(CATALOG_BLOB_RESERVED);
+        blob.extend_from_slice(&nonce);
+        blob.extend_from_slice(&(sealed.len() as u32).to_be_bytes());
+        blob.extend_from_slice(&sealed);
+
+        let decoded = decode_attachments_catalog(&catalog_key, &account_hash, &blob)
+            .expect("a non-string scope must not fail the catalog");
+        assert_eq!(decoded.entries["aa11"].scope, AttachmentScope::Library);
+    }
+
+    #[test]
+    fn a_tombstone_carries_no_scope() {
+        let live = AttachmentMeta::live("t".to_string(), 1, "f".to_string(), 2).in_chat();
+        let tomb = live.into_tombstone(9);
+        assert_eq!(tomb.scope, AttachmentScope::Library);
+        let mut catalog = AttachmentsCatalog::default();
+        catalog.entries.insert("aa".to_string(), tomb);
+        let text = String::from_utf8(canonical_json_encode(&catalog)).expect("utf8");
+        assert!(!text.contains("scope"));
     }
 }

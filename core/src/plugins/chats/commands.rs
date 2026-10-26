@@ -701,6 +701,80 @@ pub async fn chats_list_with_dir(
     Ok(rows)
 }
 
+/// The attachment ids any LIVE conversation's payload mentions
+/// (myne-md/myne#913).
+///
+/// **A hex scan, not a parse, and that is deliberate.** The conversation
+/// payload is opaque to this crate: the client owns its shape, and teaching Rust
+/// to read `turn.attachments` would make one client's JSON a wire contract for
+/// the backend. What this needs is not the shape but the IDS, and an id has a
+/// shape the crate already validates everywhere (`HybridId`-class 64 lowercase
+/// hex). So the payload is decrypted and scanned for 64-hex runs, and only the
+/// runs that name a catalog candidate come back.
+///
+/// A false positive is harmless by construction: the ONLY consequence of
+/// matching is that a file is not offered for cleanup. A false negative would be
+/// the dangerous direction, which is why an unreadable conversation answers
+/// `Err` and the caller then keeps every chat-scoped row (see the sweep), rather
+/// than treating "could not read" as "nothing referenced".
+pub async fn referenced_attachment_ids_with_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+) -> Result<std::collections::BTreeSet<String>, ChatsReadError> {
+    // **A member's conversations live person-privately** (design A), and the
+    // redirect is the same one every other chats entry point makes. Reading the
+    // SHARED family on a member vault would not fail here: it would answer "no
+    // conversations", which the attachment sweep reads as "nothing references
+    // these rows" and acts on irreversibly (myne-md/myne#913, review round seven).
+    if crate::plugins::sync::person_ai_store::person_ai_is_private(state).await {
+        let fs = crate::plugins::sync::person_ai_store::open_for_active(io, vault_dir, state)
+            .await
+            .map_err(|_| ChatsReadError::CatalogUnreadable)?;
+        return referenced_attachment_ids_in_dir(&fs, vault_dir, state).await;
+    }
+    referenced_attachment_ids_in_dir(io, vault_dir, state).await
+}
+
+/// The scan itself, over one Io implementation. Split from the entry point so
+/// the member redirect cannot recurse into itself.
+async fn referenced_attachment_ids_in_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+) -> Result<std::collections::BTreeSet<String>, ChatsReadError> {
+    use std::collections::BTreeSet;
+    // **No candidate filter, and that is what lets the caller run this BEFORE it
+    // takes the attachment slot guard** (myne-md/myne#913, review round seven).
+    // A filter would have to come from the catalog, which is read under that
+    // guard, and re-entering the slots `RwLock`'s read side under a held guard is
+    // the reentrancy hazard this crate documents elsewhere. The result is a
+    // superset (every 64-hex run in a conversation), which is harmless: the only
+    // use is "do not erase this id".
+    let (_, seal) = seal_from_slot_for_read(io, vault_dir, state).await?;
+    let map = read_catalog_in_dir(io, vault_dir, &seal).await?;
+    let mut found = BTreeSet::new();
+    for (id, entry) in map {
+        if !entry.is_live() {
+            continue;
+        }
+        let plaintext = read_conversation_in_dir(io, vault_dir, &id, &seal).await?;
+        let text = String::from_utf8_lossy(&plaintext);
+        for run in hex_runs(&text) {
+            found.insert(run.to_string());
+        }
+    }
+    Ok(found)
+}
+
+/// Every maximal run of lowercase hex EXACTLY 64 characters long, yielded as the
+/// run's own slice. An attachment id is exactly 64, so a longer run is not one:
+/// truncating it would invent an id that no line ever carried.
+fn hex_runs(text: &str) -> impl Iterator<Item = &str> {
+    text.split(|c: char| !c.is_ascii_hexdigit() || c.is_ascii_uppercase())
+        .filter(|run| run.len() == 64)
+}
+
 // ---------------------------------------------------------------------------
 // chats_rename
 // ---------------------------------------------------------------------------

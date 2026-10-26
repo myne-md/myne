@@ -40,6 +40,7 @@ import {
   type AgentRunOutcome,
   type AgentTurnSummary,
   type ChatTurn,
+  type TurnAttachment,
 } from "./chatStore";
 
 /** The persisted form of one turn: the rendering state minus the transient. */
@@ -54,6 +55,9 @@ export interface PersistedTurn {
   answeredBy?: unknown;
   scopeLabel?: string;
   agentSummary?: unknown;
+  /** Files the message carried (myne-md/myne#913). Additive and optional: a
+   *  turn written before this field re-hydrates without it. */
+  attachments?: unknown;
 }
 
 /** Title-derivation budget (§ 9.24.2): first 48 Unicode scalar values. */
@@ -101,10 +105,40 @@ export function serializeTranscript(turns: readonly ChatTurn[]): string {
     if (t.insertable) out.insertable = true;
     if (t.answeredBy !== undefined) out.answeredBy = t.answeredBy;
     if (t.scopeLabel !== undefined) out.scopeLabel = t.scopeLabel;
+    if (t.attachments !== undefined && t.attachments.length > 0) {
+      out.attachments = t.attachments;
+    }
     if (t.agentSummary !== undefined) out.agentSummary = t.agentSummary;
     return out;
   });
   return JSON.stringify({ turns: persisted, title_derived_from: deriveTitleSnapshot(turns) });
+}
+
+/**
+ * Validate one turn's attachment list (myne-md/myne#913).
+ *
+ * **Validated, not cast.** The payload arrives from the conversation file and,
+ * through sync, from another device: a malformed entry must cost that entry and
+ * never the transcript, and a `name` that is not a string would reach the render
+ * path as `undefined.name`. Anything wrong drops the field; the turn keeps its
+ * text, so user content is never the price of bad metadata.
+ */
+function parseTurnAttachments(raw: unknown): { attachments?: TurnAttachment[] } {
+  if (!Array.isArray(raw)) return {};
+  const out: TurnAttachment[] = [];
+  for (const entry of raw) {
+    if (!isRecord(entry)) continue;
+    const id = entry["id"];
+    const name = entry["name"];
+    const contentType = entry["contentType"];
+    if (typeof id !== "string" || typeof name !== "string") continue;
+    out.push({
+      id,
+      name,
+      contentType: typeof contentType === "string" ? contentType : "",
+    });
+  }
+  return out.length > 0 ? { attachments: out } : {};
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -128,6 +162,7 @@ const KNOWN_TURN_KEYS: ReadonlySet<string> = new Set([
   "answeredBy",
   "scopeLabel",
   "agentSummary",
+  "attachments",
 ]);
 
 /**
@@ -266,6 +301,7 @@ export function parseTranscript(json: string): ChatTurn[] | null {
       // dropped, so user content is never the price of bad metadata.
       ...(parseAgentSummary(raw["agentSummary"]) ?? {}),
       ...(typeof raw["scopeLabel"] === "string" ? { scopeLabel: raw["scopeLabel"] } : {}),
+      ...parseTurnAttachments(raw["attachments"]),
       ...(Object.keys(rest).length > 0 ? { rest } : {}),
     } as ChatTurn);
   }

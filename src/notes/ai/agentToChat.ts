@@ -37,6 +37,7 @@
 
 import { flushBeforeFrontmatterWrite } from "../flushBeforeFrontmatterWrite";
 import { offeredSettingIds } from "../agent/settingCatalogue";
+import type { RunAttachment } from "../../lib/agent-run-core";
 import {
   agentApply,
   agentStart,
@@ -58,6 +59,7 @@ import {
   failRun,
   getAgent,
   landedEditIndices,
+  landedNewNoteIndices,
   openRun,
   reportRunProgress,
   settleApply,
@@ -289,6 +291,9 @@ export async function startAgentRun(
    *  it must be set before the first persist; a vault-general run passes
    *  `null`. */
   anchorNoteId?: string | null,
+  /** The documents this run may read, already read from the vault
+   *  (myne-md/myne#913). Empty for an ordinary run. */
+  attachments: readonly RunAttachment[] = [],
 ): Promise<void> {
   // **Captured BEFORE the turn is appended**, which is the ordering that makes
   // this the conversation so far rather than the conversation including the
@@ -305,7 +310,19 @@ export async function startAgentRun(
   // two are read by the create path and travel onto the catalog row, which is
   // what lets the Hub say what a conversation is about without opening it.
   setPendingAnchorFolderId(grant.kind === "folder" ? grant.value : null);
-  sendAgentTurn(task, copy.scopeLabel);
+  // The turn carries the files it sent (myne-md/myne#913), so a transcript read
+  // back later shows WHAT the question was about instead of only the question.
+  sendAgentTurn(
+    task,
+    copy.scopeLabel,
+    attachments
+      .filter((doc) => doc.id !== undefined)
+      .map((doc) => ({
+        id: doc.id!,
+        name: doc.name,
+        contentType: doc.contentType ?? "",
+      })),
+  );
   // **The conversation exists from the first user message** (myne-md/myne#848),
   // and the run is bound to it before the first step is driven. The id is
   // awaited rather than read later: `beginRun` records ownership, and ownership
@@ -335,6 +352,7 @@ export async function startAgentRun(
       // is a read of a static registry, and a run that outlived a rebuild would
       // otherwise offer a setting the current tree no longer carries.
       offeredSettingIds(),
+      attachments,
       (view) => {
         // The run has an id now, minutes before this call resolves. Same epoch
         // as the settle below, so a run the user let go of mid-flight cannot
@@ -447,7 +465,21 @@ async function autoApplyRun(
       [],
       "bulk",
     );
-    if (!settleApply(outcome, landedEditIndices(indices, outcome), epoch)) return;
+    // The creates are passed for the same reason the edits are: this path DOES
+    // send them (`agentApply` above), so a defaulted-empty argument here left a
+    // created note in the actionable set on the automatic route, the defect the
+    // review screen's own call site fixed, surviving on its twin.
+    if (
+      !settleApply(
+        outcome,
+        landedEditIndices(indices, outcome),
+        epoch,
+        [],
+        landedNewNoteIndices(newNotes, outcome),
+      )
+    ) {
+      return;
+    }
     const changed = [...outcome.notesWritten, ...outcome.notesCreated];
     if (changed.length > 0) onNotesWritten?.(changed);
   } catch {

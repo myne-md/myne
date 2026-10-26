@@ -47,7 +47,7 @@ pub mod commands;
 
 pub use error::DeviceBindingError;
 pub use store::{
-    claim_self_in_dir, device_id_hex, live_row_count, merge_pulled_blob_in_dir,
+    admit_other_in_dir, claim_self_in_dir, device_id_hex, live_row_count, merge_pulled_blob_in_dir,
     read_device_bindings_in_dir, tombstone_devices_for_person, tombstone_member_devices_in_dir,
     write_device_bindings_in_dir, write_mutex, ClaimOutcome, DeviceBindingKey,
 };

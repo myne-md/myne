@@ -8,7 +8,12 @@
 
 import { describe, expect, it } from "vitest";
 import type { EditorView } from "@codemirror/view";
-import { resolveScrollHost, slackFor } from "@myne/editor/scroll-slack";
+import {
+  naturalContentHeight,
+  resolveScrollHost,
+  slackFor,
+  slackForOverflow,
+} from "@myne/editor/scroll-slack";
 
 /** `resolveScrollHost` reads exactly two fields, so a structural stand-in is the
  *  honest fixture — building a real view would test CM6, not the walk. */
@@ -30,13 +35,12 @@ function tree(): { outer: HTMLElement; inner: HTMLElement; editor: HTMLElement; 
 }
 
 describe("slackFor", () => {
-  it("reserves 60% of the viewport below the cap", () => {
-    expect(slackFor(600)).toBe(360);
-  });
-
-  it("clamps at the cap so a tall viewport can't reserve the world", () => {
-    expect(slackFor(1600)).toBe(480);
-    expect(slackFor(100_000)).toBe(480);
+  it("reserves a fixed two-line allowance, not a share of the viewport", () => {
+    // The share was the bug: a note ending three lines into the pane still
+    // scrolled through half a screen of nothing below its tail.
+    expect(slackFor(600)).toBe(48);
+    expect(slackFor(1600)).toBe(48);
+    expect(slackFor(100_000)).toBe(48);
   });
 
   it("reserves nothing for a viewport that hasn't been measured", () => {
@@ -73,5 +77,47 @@ describe("resolveScrollHost", () => {
   it("falls back to the editor's own scroller when no ancestor scrolls", () => {
     const { editor, scroller } = tree();
     expect(resolveScrollHost(viewOver(editor, scroller))).toBe(scroller);
+  });
+});
+
+describe("slackForOverflow (myne-md/myne#908 item 10)", () => {
+  it("reserves nothing for a note shorter than the host", () => {
+    // The reported shape: a two-line note carried 60% of the viewport as
+    // scrollable blank space.
+    expect(slackForOverflow(700, 180)).toBe(0);
+    expect(slackForOverflow(700, 700)).toBe(0);
+  });
+
+  it("reserves slack once the content is taller than the host", () => {
+    expect(slackForOverflow(700, 900)).toBe(48);
+  });
+
+  it("ignores a measurement that has not happened yet", () => {
+    expect(slackForOverflow(0, 0)).toBe(0);
+    expect(slackForOverflow(700, Number.NaN)).toBe(0);
+  });
+
+  it("is not fooled by a one-pixel rounding wobble at the boundary", () => {
+    expect(slackForOverflow(700, 701)).toBe(0);
+    expect(slackForOverflow(700, 702)).toBe(48);
+  });
+});
+
+describe("naturalContentHeight (the anti-feedback arithmetic)", () => {
+  it("subtracts the slack the plugin wrote last pass", () => {
+    // A short note that was wrongly given 360px of slack: scrollHeight reads 540
+    // BECAUSE of that padding, so the natural height is the 180 it really has.
+    expect(naturalContentHeight(540, 360)).toBe(180);
+    // Which is the whole point: the next pass then declines to reserve slack.
+    expect(slackForOverflow(700, naturalContentHeight(540, 360))).toBe(0);
+  });
+
+  it("still reports overflow for a note that genuinely outgrows the host", () => {
+    expect(slackForOverflow(700, naturalContentHeight(1260, 360))).toBe(48);
+  });
+
+  it("never goes negative on a stale applied value", () => {
+    expect(naturalContentHeight(100, 999)).toBe(0);
+    expect(naturalContentHeight(Number.NaN, 10)).toBe(0);
   });
 });

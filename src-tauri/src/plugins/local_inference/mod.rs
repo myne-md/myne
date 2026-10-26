@@ -53,6 +53,7 @@ pub mod endpoint_config;
 pub mod engine_candle;
 pub mod engine_ollama;
 pub mod model_store;
+pub mod seed_memory;
 pub mod whisper;
 
 // The inference seam moved to `myne-core` (myne-md/myne#456): the `Engine`
@@ -116,7 +117,7 @@ const LOCAL_INFERENCE_CAPABILITY: &str = r#"{
   "identifier": "local-inference",
   "description": "On-device AI inference commands (infer) for the main window; no core/fs/dialog/clipboard. This grant confers no network capability, but that is a property of the ACL entry, not of the AI path: since decisions.md 2026-08-09 the path may open a socket to a user-named provider, and since myne-md/myne#805 it may also fetch a model on explicit user action from the compiled-in origin downloads.myne.md (no note content, digest-verified before registration; decisions/ai/0627, threat-model TB14).",
   "windows": ["main"],
-  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-infer-batch", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models", "local-inference:allow-download-model", "local-inference:allow-cancel-model-download", "local-inference:allow-remove-model"]
+  "permissions": ["local-inference:allow-infer", "local-inference:allow-infer-ambient", "local-inference:allow-infer-batch", "local-inference:allow-chat-stop", "local-inference:allow-transcribe", "local-inference:allow-read-transcript", "local-inference:allow-suggest-tags", "local-inference:allow-tag-model-available", "local-inference:allow-set-model-path", "local-inference:allow-get-model-path", "local-inference:allow-ai-capability-report", "local-inference:allow-get-ai-endpoint", "local-inference:allow-set-ai-endpoint", "local-inference:allow-list-provider-models", "local-inference:allow-download-model", "local-inference:allow-cancel-model-download", "local-inference:allow-remove-model", "local-inference:allow-seed-memory-status", "local-inference:allow-seed-memory-payload", "local-inference:allow-seed-memory-generate", "local-inference:allow-seed-memory-cancel"]
 }"#;
 
 /// Best-effort teardown of the plugin's vault-derived RAM state on lock
@@ -174,7 +175,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::list_provider_models,
             commands::download_model,
             commands::cancel_model_download,
-            commands::remove_model
+            commands::remove_model,
+            seed_memory::seed_memory_status,
+            seed_memory::seed_memory_payload,
+            seed_memory::seed_memory_generate,
+            seed_memory::seed_memory_cancel
         ])
         .setup(|app, _api| {
             // Path resolution only — the engine decision itself lives in
@@ -231,6 +236,11 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // is pending. The single `compute` mutex cannot express an ordering
             // on its own — this is that ordering.
             app.manage(compute_priority::ComputePriority::default());
+            // One cancel flag per running reviewed seed (myne-md/myne#915). No
+            // vault-derived text lives here, so it needs no lock-teardown hook:
+            // a lock fails the job's next vault read and its buffers drop with
+            // the returned future.
+            app.manage(seed_memory::SeedJobs::default());
             // Per-download cancel tokens (myne-md/myne#805): the download
             // command registers here for the length of its fetch, and
             // `cancel_model_download` cancels one by the id the surface minted.
@@ -551,12 +561,16 @@ mod resolve_engine_tests {
             .find("tauri::generate_handler![")
             .expect("generate_handler! must exist");
         let handler = &this_file[h_start..h_start + this_file[h_start..].find(']').unwrap()];
+        // Every entry is a path (`commands::infer`, `seed_memory::seed_memory_status`),
+        // so take the final segment. The earlier `split("commands::")` shape
+        // silently swallowed a sibling module's commands into one token; this
+        // reads the shape the macro actually accepts.
         let mut registered: Vec<String> = handler
-            .split("commands::")
-            .skip(1)
-            .map(|t| {
-                t.trim_matches(|c: char| !(c.is_ascii_lowercase() || c == '_'))
-                    .to_string()
+            .split(',')
+            .filter_map(|entry| {
+                let name = entry.trim().rsplit("::").next()?.trim();
+                (!name.is_empty() && name.chars().all(|c| c.is_ascii_lowercase() || c == '_'))
+                    .then(|| name.to_string())
             })
             .collect();
         registered.sort();

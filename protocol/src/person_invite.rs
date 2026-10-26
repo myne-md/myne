@@ -35,6 +35,15 @@ pub const INVITE_PREFIX: &[u8] = b"myne.vault-invite v1|";
 /// Signature class for an owner-authored NTV6 group roster.
 pub const GROUP_ROSTER_PREFIX: &[u8] = b"myne.group-roster v1|";
 
+/// Signature class for a **device-signed** owner roster (`decisions/protocol/0731`
+/// stage 2, `0733`).
+///
+/// The roster names PEOPLE and its payload still carries the owner's person
+/// fingerprint; only the key that signs it moves. A distinct class rather than a byte
+/// inside the payload, so the two classes cannot be confused at verification, and a
+/// reader that predates this refuses a device-signed roster rather than guessing.
+pub const GROUP_ROSTER_PREFIX_V2: &[u8] = b"myne.group-roster v2|";
+
 /// Signature class for one recipient's group-key package.
 pub const GROUP_PACKAGE_PREFIX: &[u8] = b"myne.group-package v1|";
 
@@ -128,6 +137,11 @@ pub struct GroupPackagePayload {
     pub group_key_epoch: u64,
     pub recipient_fingerprint_hex: String,
     pub wrapped_group_key_hex: String,
+    /// The owner's device attestation, present once the owner signs rosters with a
+    /// device key. OPTIONAL and omitted when absent, so a package from a build without
+    /// a device key encodes exactly the bytes the previous release reads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_device: Option<OwnerDeviceAttestation>,
 }
 
 /// Owner-signed recipient package.
@@ -135,6 +149,56 @@ pub struct GroupPackagePayload {
 pub struct SignedGroupPackage {
     pub payload: Vec<u8>,
     pub signature: PersonSigned,
+}
+
+/// The owner's own device, as it travels inside an invite package so a recipient can
+/// resolve the DEVICE that signed the roster (`decisions/protocol/0733`).
+///
+/// Carrying the whole person-signed row rather than the two public halves is
+/// deliberate: the recipient verifies the person's signature over the row ITSELF,
+/// against the owner public half it pinned out of band, instead of trusting the
+/// package's word that these halves belong to the owner. The bytes are the same; the
+/// difference is who has to be believed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OwnerDeviceAttestation {
+    /// The device's 16-byte id, lowercase hex (the `device_id` the roster's signature
+    /// was made under is not in the roster, so the recipient needs it here).
+    pub device_id_hex: String,
+    /// The person-signed binding row for that device (`MYU5`, `format_version 0x02`,
+    /// which is the schema that carries the device public halves).
+    pub entry: crate::device_binding_blob::DeviceBindingEntry,
+}
+
+impl OwnerDeviceAttestation {
+    /// The device public halves the row carries, when the row is complete.
+    #[must_use]
+    pub fn device_public_half(&self) -> Option<crate::device_key::DevicePublicHalf> {
+        crate::device_binding_blob::device_public_half_from_entry(&self.entry)
+    }
+
+    /// The device id as raw bytes.
+    #[must_use]
+    pub fn device_id(&self) -> Option<[u8; 16]> {
+        if !is_lower_hex_of_len(&self.device_id_hex, 16) {
+            return None;
+        }
+        let bytes = crate::hex::decode_lower::<16>(&self.device_id_hex)?;
+        Some(bytes)
+    }
+
+    /// Whether the OWNER personally signed this row, which is the only thing that
+    /// makes the halves inside it usable as a roster signer. Checked against the owner
+    /// public half the caller already trusts, exactly like a binding row read from the
+    /// store.
+    #[must_use]
+    pub fn verifies_against(&self, owner: &crate::person_key::PersonPublicHalf) -> bool {
+        let Some(device_id) = self.device_id() else {
+            return false;
+        };
+        self.entry.device_ed_pk.is_some()
+            && !self.entry.tombstone
+            && crate::device_binding_blob::verify_device_binding(owner, &device_id, &self.entry)
+    }
 }
 
 fn encode_signed_group_frame(payload: &[u8], signature: &PersonSigned) -> Option<Vec<u8>> {
@@ -150,6 +214,26 @@ fn encode_signed_group_frame(payload: &[u8], signature: &PersonSigned) -> Option
     out.extend_from_slice(&signature.ed25519_sig);
     out.extend_from_slice(&signature.mldsa_sig);
     Some(out)
+}
+
+/// Decode a signed group frame into its payload and signature.
+///
+/// Public because a PORT has to do exactly this before it can verify anything, and because
+/// the companion category's runner drives it over whole frames rather than hand-built
+/// envelopes. Not a second codec: `decode_signed_group_package` and the roster reader both
+/// call this one.
+pub fn decode_signed_group_frame_public(bytes: &[u8]) -> Option<(Vec<u8>, PersonSigned)> {
+    decode_signed_group_frame(bytes)
+}
+
+/// Encode a signed group frame. Public for the same reason: the vectors pin whole frames,
+/// and the generator needs to produce them.
+#[must_use]
+pub fn encode_signed_group_frame_public(
+    payload: &[u8],
+    signature: &PersonSigned,
+) -> Option<Vec<u8>> {
+    encode_signed_group_frame(payload, signature)
 }
 
 fn decode_signed_group_frame(bytes: &[u8]) -> Option<(Vec<u8>, PersonSigned)> {
@@ -313,6 +397,65 @@ pub fn sign_group_roster(
     Ok(SignedGroupRoster { payload, signature })
 }
 
+/// Double-sign a canonical roster with a DEVICE key (`decisions/protocol/0731` stage 2).
+///
+/// The payload is unchanged: it still names the owner by PERSON fingerprint, and the
+/// roster's semantic content is still people. What moves is the key that vouches for it,
+/// which is the whole point of the stage: inviting and removing stop needing the phrase
+/// once the owner's device holds a signing key.
+///
+/// The `SignedGroupRoster` frame is class-agnostic bytes (a 64-byte Ed25519 half and a
+/// 3309-byte ML-DSA half), so a device signature fits it byte for byte and no envelope
+/// changes. Which key may verify a given envelope is decided by the class prefix it was
+/// signed under, never by the frame.
+pub fn sign_group_roster_with_device(
+    device: &crate::device_key::DeviceKeyPair,
+    payload: &GroupRosterPayload,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<SignedGroupRoster, crate::person_key::PersonKeyError> {
+    let payload =
+        encode_group_roster(payload).ok_or(crate::person_key::PersonKeyError::SignatureVerify)?;
+    let signature = device
+        .sign(&class_message(GROUP_ROSTER_PREFIX_V2, &payload), rng)
+        .map_err(|_| crate::person_key::PersonKeyError::SignatureVerify)?;
+    Ok(SignedGroupRoster {
+        payload,
+        signature: PersonSigned {
+            ed25519_sig: signature.ed25519_sig,
+            mldsa_sig: signature.mldsa_sig,
+        },
+    })
+}
+
+/// Who a roster may have been signed by: the owner's PERSON key, and any device this
+/// reader believes is bound to that owner.
+///
+/// A roster is signed by exactly one of them, so verification walks the candidate list
+/// and stops at the class that matches. Two lists rather than one because the two
+/// classes are not interchangeable: a person signed `v1`, a device signed `v2`, and a
+/// signature from one class must never satisfy the other.
+#[derive(Clone, Copy)]
+pub struct RosterTrust<'a> {
+    /// The owner's person public half, from the out-of-band identity code (a member) or
+    /// from the held identity (the owner).
+    pub owner_person: &'a crate::person_key::PersonPublicHalf,
+    /// Device public halves that may have signed this roster. Empty on the owner's
+    /// creation and migration paths, which sign with the person key.
+    pub owner_devices: &'a [crate::device_key::DevicePublicHalf],
+}
+
+impl<'a> RosterTrust<'a> {
+    /// Person key only, which is what every roster before stage 2 was signed with and
+    /// what the creation and `NTV5` migration paths still use.
+    #[must_use]
+    pub fn person_only(owner_person: &'a crate::person_key::PersonPublicHalf) -> Self {
+        Self {
+            owner_person,
+            owner_devices: &[],
+        }
+    }
+}
+
 /// Verify both signature halves, the canonical roster structure, AND that the
 /// roster is for the vault the reader is opening.
 ///
@@ -321,21 +464,51 @@ pub fn sign_group_roster(
 /// another of the SAME owner's vaults, and a rotation would then tombstone and
 /// repackage against a foreign member set.
 pub fn verify_group_roster(
-    owner: &crate::person_key::PersonPublicHalf,
+    trust: RosterTrust<'_>,
     envelope: &SignedGroupRoster,
     expected_account_number_hash: &[u8; 16],
 ) -> Result<GroupRosterPayload, crate::person_key::PersonKeyError> {
-    owner.verify(
-        &class_message(GROUP_ROSTER_PREFIX, &envelope.payload),
-        &envelope.signature,
-    )?;
+    // The PERSON class first: it is what every roster before stage 2 used, and a
+    // failure there costs one verification while the common case stays one attempt.
+    let person_ok = trust
+        .owner_person
+        .verify(
+            &class_message(GROUP_ROSTER_PREFIX, &envelope.payload),
+            &envelope.signature,
+        )
+        .is_ok();
+    let signed_by_device = if person_ok {
+        false
+    } else {
+        let message = class_message(GROUP_ROSTER_PREFIX_V2, &envelope.payload);
+        let signature = crate::device_key::DeviceSigned {
+            ed25519_sig: envelope.signature.ed25519_sig,
+            mldsa_sig: envelope.signature.mldsa_sig.clone(),
+        };
+        let mut matched = false;
+        for device in trust.owner_devices {
+            if device.verify(&message, &signature).is_ok() {
+                matched = true;
+                break;
+            }
+        }
+        if !matched {
+            return Err(crate::person_key::PersonKeyError::SignatureVerify);
+        }
+        true
+    };
     let payload = parse_group_roster(&envelope.payload)
         .ok_or(crate::person_key::PersonKeyError::SignatureVerify)?;
-    if crate::hex::encode_lower(owner.fingerprint()) != payload.owner_fingerprint_hex
+    // The owner binding is checked the same way in both classes: the payload names the
+    // OWNER, so a device-signed roster still has to name the person this reader pinned.
+    if crate::hex::encode_lower(trust.owner_person.fingerprint()) != payload.owner_fingerprint_hex
         || payload.account_number_hash_hex != crate::hex::encode_lower(expected_account_number_hash)
     {
         return Err(crate::person_key::PersonKeyError::SignatureVerify);
     }
+    // A device signature is only accepted when the device list was non-empty; that is
+    // implied by reaching here, and stated so a reader changing this function keeps it.
+    let _ = signed_by_device;
     Ok(payload)
 }
 
@@ -348,8 +521,45 @@ pub fn create_group_package(
     group_key_epoch: u64,
     rng: &mut (impl rand_core::CryptoRng + ?Sized),
 ) -> Result<SignedGroupPackage, crate::person_key::PersonKeyError> {
+    create_group_package_with_attestation(
+        owner,
+        recipient,
+        group_key,
+        account_number_hash,
+        group_key_epoch,
+        None,
+        rng,
+    )
+}
+
+/// [`create_group_package`] carrying the owner's device attestation, which a recipient
+/// needs to verify a roster the owner signed with a DEVICE key rather than the person
+/// key (`decisions/protocol/0733`).
+///
+/// A package WITHOUT the attestation is still valid and still verifies a person-signed
+/// roster: the field is optional, and its absence means "this owner authors rosters with
+/// the person key", which is every build that predates the change and every platform
+/// with no device-key rung.
+pub fn create_group_package_with_attestation(
+    owner: &crate::person_key::PersonKeyPair,
+    recipient: &crate::person_key::PersonPublicHalf,
+    group_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    group_key_epoch: u64,
+    owner_device: Option<&OwnerDeviceAttestation>,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<SignedGroupPackage, crate::person_key::PersonKeyError> {
     if group_key_epoch == 0 {
         return Err(crate::person_key::PersonKeyError::AeadFailure);
+    }
+    // An attestation that does not verify against the signer is refused HERE rather
+    // than shipped: a package carrying a row its own author did not sign would leave
+    // every recipient unable to resolve the roster, one network round trip away from
+    // the mistake.
+    if let Some(attestation) = owner_device {
+        if !attestation.verifies_against(&owner.public_half()) {
+            return Err(crate::person_key::PersonKeyError::SignatureVerify);
+        }
     }
     let wrapped = recipient.wrap_key(group_key, account_number_hash, rng)?;
     let payload = GroupPackagePayload {
@@ -357,6 +567,7 @@ pub fn create_group_package(
         group_key_epoch,
         recipient_fingerprint_hex: crate::hex::encode_lower(recipient.fingerprint()),
         wrapped_group_key_hex: encode_wrapped_key(&wrapped),
+        owner_device: owner_device.cloned(),
     };
     let payload =
         serde_json::to_vec(&payload).map_err(|_| crate::person_key::PersonKeyError::AeadFailure)?;
@@ -789,7 +1000,56 @@ pub fn rotate_group_roster(
     items_key_id: &[u8; 16],
     rng: &mut (impl rand_core::CryptoRng + ?Sized),
 ) -> Result<RotatedGroup, crate::person_key::PersonKeyError> {
+    rotate_group_roster_signed_by(
+        owner,
+        None,
+        None,
+        current,
+        removed_fingerprint_hex,
+        new_group_key,
+        account_number_hash,
+        items_key_id,
+        rng,
+    )
+}
+
+/// [`rotate_group_roster`] with the roster and the per-member packages signed by the
+/// owner's DEVICE key, and each package carrying the attestation a recipient needs to
+/// verify that roster (`decisions/protocol/0731` stage 2, `0733`).
+///
+/// `device` and `attestation` travel together and are either both `Some` or both `None`:
+/// a device-signed roster whose packages carry no attestation is a rotation no member can
+/// open, so the pair is a single decision at this boundary rather than two parameters a
+/// caller could get half right. Passing `None` for both is exactly
+/// [`rotate_group_roster`].
+///
+/// Removal stays PERSON-signed on the retirement records either way. Those records are
+/// not read by members to decide what to open: they name a retired namespace for the
+/// server's reclaim path, and every member's trust decision is the roster. Moving them
+/// would widen this change for no friction removed.
+#[allow(clippy::too_many_arguments)]
+pub fn rotate_group_roster_signed_by(
+    owner: &crate::person_key::PersonKeyPair,
+    device: Option<&crate::device_key::DeviceKeyPair>,
+    attestation: Option<&OwnerDeviceAttestation>,
+    current: &GroupRosterPayload,
+    removed_fingerprint_hex: &str,
+    new_group_key: &[u8; 32],
+    account_number_hash: &[u8; 16],
+    items_key_id: &[u8; 16],
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<RotatedGroup, crate::person_key::PersonKeyError> {
     use crate::person_key::PersonPublicHalf;
+    // One decision, checked here: a device signature without an attestation would make
+    // every member's roster verification fail, one network round trip after the mistake.
+    if device.is_some() != attestation.is_some() {
+        return Err(crate::person_key::PersonKeyError::SignatureVerify);
+    }
+    if let Some(attestation) = attestation {
+        if !attestation.verifies_against(&owner.public_half()) {
+            return Err(crate::person_key::PersonKeyError::SignatureVerify);
+        }
+    }
     let removed = current
         .members
         .iter()
@@ -830,12 +1090,13 @@ pub fn rotate_group_roster(
             &member.member_ed_pk_hex,
             &member.member_mldsa_vk_hex,
         )?;
-        let package = create_group_package(
+        let package = create_group_package_with_attestation(
             owner,
             &public,
             new_group_key,
             account_number_hash,
             new_epoch,
+            attestation,
             rng,
         )?;
         let payload: GroupPackagePayload = serde_json::from_slice(&package.payload)
@@ -853,7 +1114,10 @@ pub fn rotate_group_roster(
         owner_fingerprint_hex: current.owner_fingerprint_hex.clone(),
         members,
     };
-    let signed_roster = sign_group_roster(owner, &new_roster, rng)?;
+    let signed_roster = match device {
+        Some(device) => sign_group_roster_with_device(device, &new_roster, rng)?,
+        None => sign_group_roster(owner, &new_roster, rng)?,
+    };
 
     let mut retirements = Vec::with_capacity(2);
     for (kind, id) in [
@@ -1280,6 +1544,7 @@ fn hex_of(bytes: &[u8]) -> String {
 mod tests {
     use super::*;
     use crate::person_key::PersonKeyPair;
+    use alloc::vec;
 
     const ACCT: [u8; 16] = [0x44; 16];
 
@@ -1372,6 +1637,473 @@ mod tests {
         }
     }
 
+    fn device_pair(seed: u8) -> crate::device_key::DeviceKeyPair {
+        crate::device_key::DeviceKeyPair::generate_raw(&[seed; 32], &[seed ^ 0x3c; 32])
+    }
+
+    /// A person-signed `v2` binding row for `device`, exactly what an invite package
+    /// carries as its attestation.
+    fn attestation(
+        owner: &PersonKeyPair,
+        device: &crate::device_key::DeviceKeyPair,
+        device_id: [u8; 16],
+    ) -> OwnerDeviceAttestation {
+        let entry = crate::device_binding_blob::sign_device_binding_v2(
+            owner,
+            &device_id,
+            owner.fingerprint(),
+            1,
+            false,
+            &device.public_half(),
+            &mut SeededRng(77),
+        )
+        .expect("sign binding row");
+        OwnerDeviceAttestation {
+            device_id_hex: hex_of(&device_id),
+            entry,
+        }
+    }
+
+    /// Vector generator for the `group-roster` companion category: the two signature
+    /// CLASSES over one payload, the verification verdicts that separate them, and the
+    /// package payload that carries (or omits) the owner device attestation.
+    /// `#[ignore]`-gated; prints JSON to stdout.
+    ///
+    /// `cargo test -p protocol --lib emit_group_roster_vectors_for_paste -- --ignored --nocapture`
+    #[test]
+    #[ignore = "vector generator, prints JSON on demand"]
+    fn emit_group_roster_vectors_for_paste() {
+        extern crate std;
+        use crate::test_vector_fmt::json_escape;
+        use alloc::format;
+        use alloc::string::String;
+        use alloc::string::ToString as _;
+
+        let owner = owner_pair();
+        let member = member_pair();
+        let device = device_pair(0x91);
+        let device_id = [0x0d; 16];
+        let group_key = fixture_seed(b"group-roster-vector-key");
+        let attestation = attestation(&owner, &device, device_id);
+        let epoch = 3u64;
+        // A LIVE member row must carry a wrap in the CANONICAL payload, so the vector
+        // roster carries a well-shaped one rather than an empty string.
+        let wrapped = hex_of(&vec![0x5au8; WRAPPED_32_BYTE_KEY_LEN]);
+        let roster = GroupRosterPayload {
+            account_number_hash_hex: hex_of(&ACCT),
+            group_key_epoch: epoch,
+            owner_fingerprint_hex: hex_of(owner.fingerprint()),
+            members: vec![
+                roster_member(&owner, GroupRosterRole::Owner, GroupMemberState::Live, None),
+                roster_member(
+                    &member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    Some(wrapped),
+                ),
+            ],
+        };
+        let person_signed =
+            sign_group_roster(&owner, &roster, &mut SeededRng(31)).expect("person roster");
+        let device_signed = sign_group_roster_with_device(&device, &roster, &mut SeededRng(32))
+            .expect("device roster");
+        let payload = person_signed.payload.clone();
+        assert_eq!(payload, device_signed.payload, "one payload, two classes");
+        let class_bytes = |prefix: &[u8]| -> String {
+            let mut message = Vec::new();
+            message.extend_from_slice(prefix);
+            message.extend_from_slice(&payload);
+            hex_of(&message)
+        };
+
+        let mut dump = String::new();
+        dump.push_str("{\n  \"schema\": \"group-roster\",\n  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md \\u00a79.3.3\",\n");
+        dump.push_str(&format!(
+            "  \"description\": \"{}\",\n",
+            json_escape(
+                "Pins the owner-signed group roster's TWO signature classes (decisions/protocol/0731 stage 2 + 0733). The frame and the canonical payload are identical in both: what moves is the key that vouches for the roster, from the owner's person key under \"myne.group-roster v1|\" to one of the owner's devices under \"myne.group-roster v2|\". A reader MUST accept both and MUST resolve the device from an attestation it trusts (the owner_device field carried inside a person-signed group package), from its own device key, or from a verified vault.device-bindings row. The cases pin the exact signed message of each class, the verdicts that separate them, and the package payload that carries or omits the attestation. Generated by `cargo test -p protocol --lib emit_group_roster_vectors_for_paste -- --ignored --nocapture` (protocol/src/person_invite.rs)."
+            )
+        ));
+        dump.push_str(&format!(
+            "  \"informational_owner\": {{\"kem_ek_hex\": \"{}\", \"ed_pk_hex\": \"{}\", \"mldsa_vk_hex\": \"{}\"}},\n",
+            hex_of(owner.public_half().kem_ek()),
+            hex_of(owner.public_half().ed_pk()),
+            hex_of(owner.public_half().mldsa_vk()),
+        ));
+        dump.push_str("\n  \"cases\": [\n");
+
+        let mut n = 0usize;
+        let total = 8usize;
+        let mut case =
+            |dump: &mut String, slug: &str, kind: &str, description: &str, body: &str| {
+                n += 1;
+                dump.push_str("    {\n");
+                dump.push_str(&format!(
+                    "      \"vector_id\": \"group-roster/v0.2/{slug}\",\n"
+                ));
+                dump.push_str(&format!(
+                    "      \"description\": \"{}\",\n",
+                    json_escape(description)
+                ));
+                dump.push_str(&format!("      \"case_kind\": \"{kind}\",\n"));
+                dump.push_str(body);
+                dump.push_str(if n < total { "    },\n" } else { "    }\n" });
+            };
+
+        case(
+            &mut dump,
+            "signed-bytes-v1-person-class",
+            "signed_bytes",
+            "The exact bytes a PERSON-signed roster's hybrid signature covers: the class prefix, then the canonical payload. Pinned rather than described so a port reproduces the message without guessing where the prefix ends.",
+            &format!(
+                "      \"input_class\": \"v1\",\n      \"input_payload_hex\": \"{}\",\n      \"expected_signed_bytes_hex\": \"{}\"\n",
+                hex_of(&payload),
+                class_bytes(GROUP_ROSTER_PREFIX)
+            ),
+        );
+        case(
+            &mut dump,
+            "signed-bytes-v2-device-class",
+            "signed_bytes",
+            "The same payload under the DEVICE class. The two messages differ by their prefix and by nothing else, which is why a person signature can never satisfy a device verifier: the class is inside the bytes.",
+            &format!(
+                "      \"input_class\": \"v2\",\n      \"input_payload_hex\": \"{}\",\n      \"expected_signed_bytes_hex\": \"{}\"\n",
+                hex_of(&payload),
+                class_bytes(GROUP_ROSTER_PREFIX_V2)
+            ),
+        );
+
+        // Four verdicts, and each turns on a DIFFERENT fact: the class decides which
+        // key may verify, and the trust list decides whether that key is known.
+        let other_device = crate::device_key::DeviceKeyPair::generate_raw(&[0x92; 32], &[0x93; 32]);
+        let device_hex = hex_of(device.public_half().ed_pk());
+        let device_vk_hex = hex_of(device.public_half().mldsa_vk());
+        let other_hex = hex_of(other_device.public_half().ed_pk());
+        let other_vk_hex = hex_of(other_device.public_half().mldsa_vk());
+        for (slug, description, frame, device_field, expected) in [
+            (
+                "verify-v1-with-person-key",
+                "The pre-stage-2 case every existing vault is in: a person-signed roster verified against the owner's public half. A device in the trust list would change nothing here, which is why the class is read from the frame rather than assumed from the list.",
+                &person_signed,
+                None,
+                true,
+            ),
+            (
+                "verify-v2-with-the-vouched-device",
+                "The stage-2 case: a device-signed roster verified against the device the reader trusted, which it got from the attestation inside the invite package.",
+                &device_signed,
+                Some((device_hex.as_str(), device_vk_hex.as_str())),
+                true,
+            ),
+            (
+                "verify-v2-without-trusting-the-device",
+                "A device-signed roster offered to a reader with no attestation. Refused: a roster carries no key of its own, so a device is only ever trusted because something else vouched for it.",
+                &device_signed,
+                None,
+                false,
+            ),
+            (
+                "verify-v2-with-another-device",
+                "The substitution refusal: a device-signed roster offered with a DIFFERENT device in the trust list. The list is a set of specific keys, not a flag, so this is refused.",
+                &device_signed,
+                Some((other_hex.as_str(), other_vk_hex.as_str())),
+                false,
+            ),
+        ] {
+            let half = device_field.map(|(ed, vk)| {
+                crate::device_key::DevicePublicHalf::from_parts_hex(ed, vk).expect("halves")
+            });
+            let devices: Vec<crate::device_key::DevicePublicHalf> = half.into_iter().collect();
+            let got = verify_group_roster(
+                RosterTrust {
+                    owner_person: &owner.public_half(),
+                    owner_devices: &devices,
+                },
+                frame,
+                &ACCT,
+            )
+            .is_ok();
+            assert_eq!(got, expected, "[{slug}] the case must match the codec");
+            let body = format!(
+                "      \"input_frame_hex\": \"{}\",\n      \"input_account_number_hash_hex\": \"{}\",\n      \"input_device_ed_pk_hex\": {},\n      \"input_device_mldsa_vk_hex\": {},\n      \"expected_verified\": {}\n",
+                hex_of(&encode_signed_group_frame(&frame.payload, &frame.signature).expect("frame")),
+                hex_of(&ACCT),
+                device_field
+                    .map(|(ed, _)| format!("\"{ed}\""))
+                    .unwrap_or_else(|| "null".to_string()),
+                device_field
+                    .map(|(_, vk)| format!("\"{vk}\""))
+                    .unwrap_or_else(|| "null".to_string()),
+                expected,
+            );
+            case(&mut dump, slug, "verify", description, &body);
+        }
+
+        // The package payload, with and without the attestation.
+        let with = create_group_package_with_attestation(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            epoch,
+            Some(&attestation),
+            &mut SeededRng(33),
+        )
+        .expect("package with attestation");
+        let without = create_group_package(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            epoch,
+            &mut SeededRng(34),
+        )
+        .expect("package without attestation");
+        let with_payload = verify_group_package(&owner.public_half(), &with).expect("verify");
+        let without_payload = verify_group_package(&owner.public_half(), &without).expect("verify");
+        assert!(with_payload.owner_device.is_some());
+        assert!(without_payload.owner_device.is_none());
+        case(
+            &mut dump,
+            "package-payload-with-owner-device-attestation",
+            "package_payload",
+            "One recipient's canonical group-key package payload carrying the owner's device attestation: the device id and the owner's PERSON-SIGNED binding row, inside the payload the person key signs. A recipient verifies the row's own signature against the owner half it pinned out of band, which is what makes the device half usable without trusting the package's word for it.",
+            &format!(
+                "      \"input_payload_hex\": \"{}\",\n      \"expected_person_fingerprint_hex\": \"{}\",\n      \"expected_device_id_hex\": \"{}\",\n      \"expected_device_ed_pk_hex\": \"{}\"\n",
+                hex_of(&with.payload),
+                hex_of(owner.fingerprint()),
+                hex_of(&device_id),
+                device_hex
+            ),
+        );
+        case(
+            &mut dump,
+            "package-payload-without-attestation",
+            "package_payload",
+            "The same package from a build with no device key: the field is ABSENT from the canonical payload rather than null, so the bytes are exactly what the previous release produced and an older reader verifies it unchanged. This is the case that makes the field additive rather than a format break.",
+            &format!(
+                "      \"input_payload_hex\": \"{}\",\n      \"expected_person_fingerprint_hex\": \"{}\",\n      \"expects_no_field\": \"owner_device\"\n",
+                hex_of(&without.payload),
+                hex_of(owner.fingerprint())
+            ),
+        );
+
+        dump.push_str("  ]\n}\n");
+        std::println!("{dump}");
+    }
+
+    #[test]
+    fn a_device_signed_roster_verifies_only_when_the_device_is_vouched_for() {
+        let owner = owner_pair();
+        let device = device_pair(0x61);
+        let roster = GroupRosterPayload {
+            account_number_hash_hex: hex_of(&ACCT),
+            group_key_epoch: 1,
+            owner_fingerprint_hex: hex_of(owner.fingerprint()),
+            members: vec![roster_member(
+                &owner,
+                GroupRosterRole::Owner,
+                GroupMemberState::Live,
+                None,
+            )],
+        };
+        let signed =
+            sign_group_roster_with_device(&device, &roster, &mut SeededRng(1)).expect("sign");
+
+        // With the device vouched for: accepted, and the payload is the same semantic
+        // roster a person-signed one carries.
+        let devices = [device.public_half()];
+        assert_eq!(
+            verify_group_roster(
+                RosterTrust {
+                    owner_person: &owner.public_half(),
+                    owner_devices: &devices,
+                },
+                &signed,
+                &ACCT
+            )
+            .expect("device-signed roster verifies"),
+            roster
+        );
+
+        // Person-only trust refuses it: a device signature is not a person signature,
+        // and a reader with no reason to trust the device must not accept one.
+        assert!(verify_group_roster(
+            RosterTrust::person_only(&owner.public_half()),
+            &signed,
+            &ACCT
+        )
+        .is_err());
+
+        // A DIFFERENT device in the trust list does not verify it either, so the list is
+        // a set of specific keys and not a flag.
+        let other = [device_pair(0x62).public_half()];
+        assert!(verify_group_roster(
+            RosterTrust {
+                owner_person: &owner.public_half(),
+                owner_devices: &other,
+            },
+            &signed,
+            &ACCT
+        )
+        .is_err());
+
+        // And a device-signed roster is still bound to its vault and to its owner.
+        let mut other_acct = ACCT;
+        other_acct[0] ^= 1;
+        assert!(verify_group_roster(
+            RosterTrust {
+                owner_person: &owner.public_half(),
+                owner_devices: &devices,
+            },
+            &signed,
+            &other_acct
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn a_package_carries_the_owner_device_attestation_and_refuses_a_forged_one() {
+        let owner = owner_pair();
+        let member = member_pair();
+        let stranger = second_member_pair();
+        let device = device_pair(0x71);
+        let device_id = [0x0b; 16];
+        let group_key = fixture_seed(b"group-key-epoch-2");
+        let good = attestation(&owner, &device, device_id);
+
+        // The attestation travels inside the person-signed package.
+        let package = create_group_package_with_attestation(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            2,
+            Some(&good),
+            &mut SeededRng(2),
+        )
+        .expect("package with attestation");
+        let payload = verify_group_package(&owner.public_half(), &package).expect("verify package");
+        let carried = payload.owner_device.expect("the attestation travelled");
+        assert_eq!(carried, good);
+        // The recipient can resolve the device half out of it after checking the person
+        // signature over the row itself.
+        assert!(carried.verifies_against(&owner.public_half()));
+        assert_eq!(carried.device_public_half(), Some(device.public_half()));
+
+        // A package that does NOT carry one encodes exactly as before: the field is
+        // omitted, which is what keeps a pre-stage-2 package byte-identical.
+        let plain = create_group_package(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            2,
+            &mut SeededRng(3),
+        )
+        .expect("plain package");
+        let plain_payload =
+            verify_group_package(&owner.public_half(), &plain).expect("verify plain package");
+        assert!(plain_payload.owner_device.is_none());
+        assert!(
+            !core::str::from_utf8(&plain.payload)
+                .expect("utf8")
+                .contains("owner_device"),
+            "an absent attestation must be omitted from the canonical payload"
+        );
+
+        // A row signed by SOMEBODY ELSE is refused at creation: shipping it would make
+        // every recipient fail to resolve the roster, one round trip later.
+        let forged = attestation(&stranger, &device, device_id);
+        assert!(create_group_package_with_attestation(
+            &owner,
+            &member.public_half(),
+            &group_key,
+            &ACCT,
+            2,
+            Some(&forged),
+            &mut SeededRng(4),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn a_rotation_signed_by_a_device_refuses_to_leave_its_packages_unattested() {
+        let owner = owner_pair();
+        let member = member_pair();
+        let device = device_pair(0x81);
+        let device_id = [0x0c; 16];
+        let good = attestation(&owner, &device, device_id);
+        let roster = GroupRosterPayload {
+            account_number_hash_hex: hex_of(&ACCT),
+            group_key_epoch: 5,
+            owner_fingerprint_hex: hex_of(owner.fingerprint()),
+            members: vec![
+                roster_member(&owner, GroupRosterRole::Owner, GroupMemberState::Live, None),
+                roster_member(
+                    &member,
+                    GroupRosterRole::Member,
+                    GroupMemberState::Live,
+                    None,
+                ),
+            ],
+        };
+        let new_group_key = fixture_seed(b"group-key-epoch-6");
+        let items_key_id = [0x09; 16];
+
+        // Device signature AND attestation: the rotated roster verifies against the
+        // attested device, and each remaining member's package carries the attestation.
+        let rotated = rotate_group_roster_signed_by(
+            &owner,
+            Some(&device),
+            Some(&good),
+            &roster,
+            &hex_of(member.fingerprint()),
+            &new_group_key,
+            &ACCT,
+            &items_key_id,
+            &mut SeededRng(5),
+        )
+        .expect("rotate");
+        let devices = [device.public_half()];
+        verify_group_roster(
+            RosterTrust {
+                owner_person: &owner.public_half(),
+                owner_devices: &devices,
+            },
+            &rotated.signed_roster,
+            &ACCT,
+        )
+        .expect("rotated roster verifies against the device");
+        // Only the owner remains, so there are no packages to check in this roster; the
+        // pairing rule is what the two calls below pin.
+        assert!(rotate_group_roster_signed_by(
+            &owner,
+            Some(&device),
+            None,
+            &roster,
+            &hex_of(member.fingerprint()),
+            &new_group_key,
+            &ACCT,
+            &items_key_id,
+            &mut SeededRng(6),
+        )
+        .is_err());
+        assert!(rotate_group_roster_signed_by(
+            &owner,
+            None,
+            Some(&good),
+            &roster,
+            &hex_of(member.fingerprint()),
+            &new_group_key,
+            &ACCT,
+            &items_key_id,
+            &mut SeededRng(7),
+        )
+        .is_err());
+    }
+
     #[test]
     fn group_package_opens_only_for_the_recipient_and_exact_epoch() {
         let owner = owner_pair();
@@ -1430,8 +2162,12 @@ mod tests {
         let signed = sign_group_roster(&owner, &roster, &mut SeededRng(30)).expect("sign");
         let bytes = encode_signed_group_roster(&signed).expect("frame");
         let decoded = decode_signed_group_roster(&bytes).expect("decode frame");
-        let verified =
-            verify_group_roster(&owner.public_half(), &decoded, &ACCT).expect("verify roster");
+        let verified = verify_group_roster(
+            RosterTrust::person_only(&owner.public_half()),
+            &decoded,
+            &ACCT,
+        )
+        .expect("verify roster");
 
         assert_eq!(verified.group_key_epoch, 1);
         assert!(package_matches_roster(&verified, &package_payload));
@@ -1445,7 +2181,12 @@ mod tests {
 
         let mut tampered = decoded.clone();
         tampered.signature.ed25519_sig[0] ^= 1;
-        assert!(verify_group_roster(&owner.public_half(), &tampered, &ACCT).is_err());
+        assert!(verify_group_roster(
+            RosterTrust::person_only(&owner.public_half()),
+            &tampered,
+            &ACCT
+        )
+        .is_err());
     }
 
     #[test]
@@ -1842,8 +2583,12 @@ mod tests {
         // One package, for the REMAINING member only.
         assert_eq!(rotated.packages.len(), 1);
 
-        let verified = verify_group_roster(&owner.public_half(), &rotated.signed_roster, &ACCT)
-            .expect("roster");
+        let verified = verify_group_roster(
+            RosterTrust::person_only(&owner.public_half()),
+            &rotated.signed_roster,
+            &ACCT,
+        )
+        .expect("roster");
         assert_eq!(verified.group_key_epoch, 6);
         let removed_row = verified
             .members

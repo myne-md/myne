@@ -10,14 +10,15 @@
 // first run itself lives on its own stage (`FirstRun`), because it replaces the
 // fork rather than sitting on top of this screen.
 //
-// The two secondary doors stay, and they are secondary by position rather than
-// by being hidden: RESTORE is for a device whose vault exists somewhere else,
-// and JOIN is for a device that already belongs to an account. Neither creates
-// anything, so neither is a variant of "create".
+// The three secondary doors stay, and they are secondary by the COLOUR of one
+// button rather than by position or by being hidden: create's action is the only
+// accent-filled one on the screen. RESTORE is for a device whose vault exists
+// somewhere else, and JOIN is for a device that already belongs to an account.
+// Neither creates anything, so neither is a variant of "create".
 import { useTranslation } from "react-i18next";
 import { Button } from "../components/primitives/Button";
 import { MyneMark } from "../components/primitives/MyneMark";
-import { ChoiceCard, ChoiceRow } from "../components/ChoiceList";
+import { CHOICE_ACTION_STYLE, ChoiceCard, ChoiceRow } from "../components/ChoiceList";
 import { RepairResidueBanner } from "../components/RepairResidueBanner";
 import { stageRootStyle } from "../components/primitives/stageRoot";
 import { SearchableSelect } from "../components/primitives/SearchableSelect";
@@ -110,41 +111,35 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: W
           <RepairResidueBanner />
         </div>
 
-        {/* The primary door, on its own so it reads as the thing this screen is
-            asking for rather than the first of four equal rows. */}
+        {/* The four doors are ONE list (2026-10-24, the owner's read), not a
+            banner above a card. Creating an identity and vault is the flow most
+            people should follow, so it is the FIRST row and it is marked by the
+            colour of its button rather than by a full-width accent block: that
+            block read as the name of the screen, not as one of four doors, and the
+            hint sentence under it has gone with it. All four rows say what they
+            are for in one sentence, because "restore", "invite" and "join" are
+            only distinguishable to someone who already knows which situation they
+            are in. */}
         <div style={{ width: "100%", marginTop: "var(--space-5)" }}>
-          <Button
-            variant="primary"
-            onClick={onStart}
-            data-testid="welcome.create-cta"
-            style={{ width: "100%", justifyContent: "center" }}
-          >
-            {t("welcome.startAction")}
-          </Button>
-          <div
-            style={{
-              marginTop: "var(--space-2)",
-              fontSize: "var(--text-xs)",
-              color: "var(--fg-3)",
-              textAlign: "center",
-              lineHeight: 1.5,
-            }}
-          >
-            {t("welcome.startHint")}
-          </div>
-        </div>
-
-        {/* The two doors that create nothing, plus the invited door, which
-            creates an IDENTITY and deliberately not a vault. All three say what
-            they are for in one sentence, because "restore", "invite" and "join"
-            are only distinguishable to someone who already knows which
-            situation they are in. */}
-        <div style={{ width: "100%", marginTop: "var(--space-4)" }}>
           <ChoiceCard>
-            {/* FIRST, because it is the arm a person who has never used Myne
-                arrives on: someone invited their identity to a vault they do not
-                own yet. It runs the same identity ceremony as Create and lands
-                on the identity home, where the invite is listed (myne-md/myne#911
+            <ChoiceRow
+              title={t("welcome.startAction")}
+              body={t("welcome.startBody")}
+              action={
+                <Button
+                  variant="primary"
+                  onClick={onStart}
+                  data-testid="welcome.create-cta"
+                  style={CHOICE_ACTION_STYLE}
+                >
+                  {t("welcome.createAction")}
+                </Button>
+              }
+            />
+            {/* SECOND, though it used to be first: a person who has never used
+                Myne often arrives already invited, and the row is kept for exactly
+                that reason. It is still not the default arm, because it runs the
+                same identity ceremony and creates no vault (myne-md/myne#911
                 follow-up). */}
             <ChoiceRow
               title={t("welcome.invitedTitle")}
@@ -154,6 +149,7 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: W
                   variant="secondary"
                   onClick={onInvited}
                   data-testid="welcome.invited-cta"
+                  style={CHOICE_ACTION_STYLE}
                 >
                   {t("welcome.invitedAction")}
                 </Button>
@@ -167,6 +163,7 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: W
                   variant="secondary"
                   onClick={onRestoreBackup}
                   data-testid="welcome.restore-cta"
+                  style={CHOICE_ACTION_STYLE}
                 >
                   {t("welcome.restoreAction")}
                 </Button>
@@ -180,6 +177,7 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: W
                   variant="secondary"
                   onClick={onJoinDevice}
                   data-testid="welcome.join-cta"
+                  style={CHOICE_ACTION_STYLE}
                 >
                   {t("welcome.joinAction")}
                 </Button>

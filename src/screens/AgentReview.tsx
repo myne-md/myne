@@ -77,6 +77,7 @@ import {
 import { bumpPrefsNonce } from "../notes/prefsNonce";
 import {
   approvedNewNoteIndices,
+  landedNewNoteIndices,
   currentRunEpoch,
   failRun,
   keptEdits,
@@ -250,6 +251,18 @@ export function AgentReview({
     () => bulkApprovableCount > 0 || approvedNewNoteIndices(agent).length > 0,
     [bulkApprovableCount, agent],
   );
+  /**
+   * What Approve-all will actually send, across BOTH verbs (myne-md/myne#913).
+   *
+   * The label counted edits only, so a run that proposed one new note and no
+   * edits offered a live primary button reading "Approve 0 changes" (reported
+   * from a real run: the agent created a note, asked two questions, and the card
+   * arrived with a zero). A decision surface may not understate its own payload:
+   * the count is the payload, which is `bulkApprovable` plus the approved new
+   * notes, the same two lists `approveAll` hands `apply`.
+   */
+  const approveAllCount =
+    bulkApprovableCount + approvedNewNoteIndices(agent).length;
 
   async function apply(
     edits: ProposedEdit[],
@@ -305,6 +318,12 @@ export function AgentReview({
           landedEditIndices(indices, outcome),
           epoch,
           settingIndices,
+          // The creates that LANDED are resolved, not pending (myne-md/myne#913):
+          // without this the card offered "Approve 1 change" beside "2 changes
+          // applied" and a second press re-sent an index the host had consumed.
+          // `landed`, not `sent`: a create the host REFUSED has to stay
+          // actionable, or the card calls a failed create done.
+          landedNewNoteIndices(newNoteIndices, outcome),
         )
       ) {
         return;
@@ -612,6 +631,7 @@ export function AgentReview({
           <NewNotesGroup
             notes={agent.proposal.newNotes}
             rejected={agent.rejectedNewNotes}
+            created={agent.appliedNewNotes}
             onToggle={toggleNewNote}
           />
         ) : null}
@@ -746,7 +766,7 @@ export function AgentReview({
           onClick={() => void approveAll()}
           data-testid="agentReview.approveAll"
         >
-          {t("agent.review.approveAll", { count: bulkApprovableCount })}
+          {t("agent.review.approveAll", { count: approveAllCount })}
         </Button>
       </footer>
     </div>
@@ -1237,10 +1257,14 @@ function NewNotesGroup({
   notes,
   rejected,
   onToggle,
+  /** Indices whose create LANDED (myne-md/myne#913): the row reports what
+   *  happened instead of offering an act that has already been done. */
+  created,
 }: {
   notes: readonly ProposedNote[];
   rejected: ReadonlySet<number>;
   onToggle: (index: number) => void;
+  created: ReadonlySet<number>;
 }) {
   const { t } = useTranslation();
   /* One row per note, in the same shape as an edit row: the title and where it
@@ -1299,15 +1323,27 @@ function NewNotesGroup({
               {note.folder ?? t("agent.review.vaultRoot")}
             </span>
             <span style={{ flex: 1 }} />
-            <Button
-              variant="ghost"
-              onClick={() => onToggle(index)}
-              data-testid="agentReview.toggleNewNote"
-            >
-              {rejected.has(index)
-                ? t("agent.review.restoreEdit")
-                : t("agent.review.rejectEdit")}
-            </Button>
+            {created.has(index) ? (
+              // **The act already happened.** A Reject control on a note that is
+              // on disk would invite a press that changes nothing the user can
+              // see, beside a header saying "changes applied".
+              <span
+                data-testid="agentReview.newNoteCreated"
+                style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}
+              >
+                {t("agent.review.createdBadge")}
+              </span>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => onToggle(index)}
+                data-testid="agentReview.toggleNewNote"
+              >
+                {rejected.has(index)
+                  ? t("agent.review.restoreEdit")
+                  : t("agent.review.rejectEdit")}
+              </Button>
+            )}
             <IconButton
               icon={open.has(index) ? "chevron-up" : "chevron-down"}
               iconSize={12}

@@ -750,6 +750,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_published_state", Class::Unsupported),
     ("plugin:sync|sync_person_list_invites", Class::Unsupported),
     ("plugin:sync|sync_list_vault_invites", Class::Unsupported),
+    ("plugin:sync|sync_person_decline_invite", Class::Unsupported),
     ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
     ("plugin:sync|sync_member_join_vault", Class::Unsupported),
     (
@@ -791,8 +792,10 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // The member display-name store (`vault.member-names`, `MYO5`;
     // myne-md/myne#851). A separate plugin namespace, same refusal as the rest of
     // the B2B member surface above: a page holds no person identity to sign a name
-    // row with, and the store is group-tier sealed and `NTV6`-only, so no part of it
-    // becomes reachable by porting more. `member_names_list` carries no binding in
+    // row with, and the store is group-tier sealed, so no part of it becomes
+    // reachable by porting more. (It is not `NTV6`-only any more: `0730` taught the
+    // resolver both tail generations. The refusal here is about the person identity,
+    // not the generation.) `member_names_list` carries no binding in
     // the shared tree to classify: the roster view already reports a row's resolved
     // name, and `src/lib/memberNames.ts` says why it is not wrapped.
     (

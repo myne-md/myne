@@ -55,6 +55,7 @@ pub mod config;
 pub mod conflict;
 pub mod corpus;
 pub mod crdt_doc;
+pub mod device_identity;
 pub mod devices;
 /// The typed `vault.dictionary` inner payload (`0x02`) and its §10.2.1 merge
 /// (myne-md/myne#640).
@@ -79,6 +80,7 @@ pub mod member_removal;
 // every sync cycle / unlock drains it until each recipient's POST has succeeded.
 // Host-only for the same reason `person_account` is: it drives the rustls
 // transport.
+pub mod roster_trust;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rotation_outbox;
 // Ungated as of phase3-web-client task 84 — but only half of it compiles for a

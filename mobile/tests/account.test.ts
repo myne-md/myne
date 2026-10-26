@@ -18,10 +18,13 @@ import { describe, expect, it } from "vitest";
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p: string) => readFileSync(sib(p), "utf8");
 
-const THE_FOUR = ["account_list", "account_rename", "account_move", "account_split"];
+// Three since `design-notes/ui/0728` removed `account_rename`: an account has
+// no name, so the command is gone from every site rather than left authorized
+// with nothing behind it.
+const THE_COMMANDS = ["account_list", "account_move", "account_split"];
 
 describe("the account ACL is mirrored, not half-mirrored", () => {
-  it("registers all four commands at every backend site", () => {
+  it("registers all three commands at every backend site", () => {
     const sites = [
       "../src-tauri/build.rs",
       "../src-tauri/permissions/account/default.toml",
@@ -29,7 +32,7 @@ describe("the account ACL is mirrored, not half-mirrored", () => {
     ];
     for (const site of sites) {
       const source = read(site);
-      for (const command of THE_FOUR) {
+      for (const command of THE_COMMANDS) {
         expect(source, `${site} must register ${command}`).toContain(command);
       }
     }
@@ -42,7 +45,6 @@ describe("the account ACL is mirrored, not half-mirrored", () => {
     expect(declared).toEqual([
       "allow-account-list",
       "allow-account-move",
-      "allow-account-rename",
       "allow-account-split",
     ]);
     expect(bundled).toEqual(declared);

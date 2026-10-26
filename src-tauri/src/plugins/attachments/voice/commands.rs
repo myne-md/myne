@@ -231,6 +231,9 @@ pub(crate) async fn encode_and_import_clip<R: Runtime>(
             bytes: wav,
             filename: Some(filename),
         },
+        // A voice note is a library attachment: it is recorded from the
+        // microphone, not pasted into a conversation (myne-md/myne#913).
+        myne_core::plugins::attachments::commands::scope_for_wire(None),
     )
     .await
     .map_err(VoiceRecordError::Import)

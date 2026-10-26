@@ -125,6 +125,20 @@ describe("VaultPicker — the action block", () => {
     expect(props.onSelect).not.toHaveBeenCalled();
   });
 
+  // The unpublishable-count case: an identity this device created but never
+  // registered cannot list its invitations, so a zero count there means "cannot
+  // be known". The row stays, says which state it is in, and opens the same door.
+  it("keeps the invitation row for an identity that cannot list yet", async () => {
+    const { props } = renderPicker(
+      { ok: TWO },
+      { inviteCount: 0, invitesUnavailable: "not-enrolled" },
+    );
+    const row = await screen.findByTestId("picker.invites-notice");
+    expect(row.getAttribute("data-invites")).toBe("not-enrolled");
+    fireEvent.click(row);
+    expect(props.onInvites).toHaveBeenCalledTimes(1);
+  });
+
   it("keeps the join affordance on the defensive empty/failed surface", async () => {
     // The picker is reached only at ≥2 vaults, so an empty list here is an
     // exotic transient — and exactly when a user needs a door out. The

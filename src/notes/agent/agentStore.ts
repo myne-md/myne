@@ -22,6 +22,7 @@ import type {
   ProposedSetting,
 } from "../../lib/agent-protocol";
 import { hasRefusals } from "../../lib/agent-protocol";
+import { resetConversationBinding } from "../ai/conversationBinding";
 
 /** The client's prefs-changed nonce bump (myne-md/myne#850).
  *
@@ -94,6 +95,18 @@ export interface AgentState {
   rejected: ReadonlySet<number>;
   /** Indices into `proposal.newNotes` the user has rejected. Same convention. */
   rejectedNewNotes: ReadonlySet<number>;
+  /**
+   * Indices into `proposal.newNotes` whose create LANDED (myne-md/myne#913).
+   *
+   * The per-row answer this store was missing: the type's own comment on
+   * `applyWasCleanAndComplete` called it "the honest per-row fix", because
+   * without it the only question available was the approved COUNT versus
+   * `notesCreated.length`, and counts stay equal while membership diverges. The
+   * reported defect was the visible half of that: after a successful apply the
+   * card still offered "Approve 1 change" beside "2 changes applied", and
+   * pressing it re-sent an index the host had already consumed.
+   */
+  appliedNewNotes: ReadonlySet<number>;
   /** Indices into `proposal.settings` the user has rejected
    *  (myne-md/myne#850). Same convention as the two above, and it is the reason
    *  a settings-only run can be reviewed at all: without it the dialog has no
@@ -223,6 +236,7 @@ const INITIAL: AgentState = {
   memoryUpdated: 0,
   rejected: new Set(),
   rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
   rejectedSettings: new Set(),
   appliedEdits: new Set(),
   appliedSettings: new Set(),
@@ -336,6 +350,7 @@ export function beginRun(conversationId: string | null): void {
     running: true,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
     rejectedSettings: new Set(),
     appliedEdits: new Set(),
     appliedSettings: new Set(),
@@ -612,12 +627,13 @@ export function reviewableRun(s: AgentState = state): { runId: string } | null {
   return { runId: s.view.runId };
 }
 
-/** The indices of new notes the user has NOT rejected. This is what the apply
- *  sends; a note that is not in it is not created. */
+/** The indices of new notes the user has NOT rejected and that have not already
+ *  been created. This is what the apply sends; a note that is not in it is not
+ *  created. */
 export function approvedNewNoteIndices(s: AgentState = state): number[] {
   return s.proposal.newNotes
     .map((_, i) => i)
-    .filter((i) => !s.rejectedNewNotes.has(i));
+    .filter((i) => !s.rejectedNewNotes.has(i) && !s.appliedNewNotes.has(i));
 }
 
 /** Reject every edit in a set of indices. */
@@ -751,6 +767,30 @@ export function landedEditIndices(
 }
 
 /**
+ * Which of the SENT new-note indices actually landed.
+ *
+ * **The new-note twin of `landedEditIndices`, and it was missing for the same
+ * reason that one exists.** `settleApply` was handed the SENT list, so a create
+ * the host refused at apply time (an unsafe title, an excluded folder, a write
+ * failure) was recorded as `applied`: the row rendered "Created" and
+ * `approvedNewNoteIndices` filtered it out, so that note could never be
+ * re-approved for the life of the run. Found in the review of myne-md/myne#913,
+ * one round after the fix that introduced it.
+ *
+ * `apply.rs` defines `RefusedNewNote::index` as the position in the run's
+ * PROPOSAL new-note list, which is the same space `sent` is expressed in, so the
+ * subtraction is direct rather than positional (unlike `landedEditIndices`,
+ * whose refusals are indexed against the approved list).
+ */
+export function landedNewNoteIndices(
+  sent: number[],
+  outcome: Pick<AgentApplyResult, "refusedNewNotes">,
+): number[] {
+  const refused = new Set(outcome.refusedNewNotes.map((r) => r.index));
+  return sent.filter((i) => !refused.has(i));
+}
+
+/**
  * The setting rows that actually LANDED, as indices into the PROPOSAL.
  *
  * **The twin of `landedEditIndices`, added because the settings half shipped
@@ -835,6 +875,18 @@ export function settleApply(
   appliedIndices: number[],
   epoch: number,
   appliedSettingIndices: number[] = [],
+  /**
+   * The new-note indices the caller SENT (myne-md/myne#913). A landed create is
+   * RESOLVED, not pending: excluding it is what stops the card offering an
+   * approval for a note the host has already written.
+   *
+   * Required in practice at BOTH call sites. It carries a default because the
+   * signature predates the automatic path's creates, and the first version of
+   * this comment claimed that path "sends no new notes" while
+   * `autoApplyRun` sends `approvedNewNoteIndices(agent)`, a comment that made a
+   * forgotten call site look wired. Both sites pass it now.
+   */
+  appliedNewNoteIndices: number[] = [],
 ): boolean {
   // **The same guard `setUndoable` takes, and for the same data.**
   // `AgentApplyResult` carries `notesWritten`, `notesCreated` and
@@ -876,7 +928,10 @@ export function settleApply(
   for (const i of appliedIndices) nextApplied.add(i);
   const nextAppliedSettings = new Set(state.appliedSettings);
   for (const i of appliedSettingIndices) nextAppliedSettings.add(i);
+  const nextAppliedNewNotes = new Set(state.appliedNewNotes);
+  for (const i of appliedNewNoteIndices) nextAppliedNewNotes.add(i);
   set({
+    appliedNewNotes: nextAppliedNewNotes,
     applied: merged,
     appliedEdits: nextApplied,
     appliedSettings: nextAppliedSettings,
@@ -992,6 +1047,7 @@ export function clearAgent(): void {
     unreadConversations: state.unreadConversations,
     rejected: new Set(),
     rejectedNewNotes: new Set(),
+  appliedNewNotes: new Set(),
     rejectedSettings: new Set(),
     appliedEdits: new Set(),
     appliedSettings: new Set(),
@@ -1011,6 +1067,11 @@ export function clearAgentForLock(): void {
   // The epoch bump comes from `clearAgent`, which every leaving path goes
   // through: a reply that lands after the teardown cannot repopulate the store.
   clearAgent();
+  // **And the conversation binding** (myne-md/myne#913): the pin and the
+  // deferred switch are session state, and a lock ends the session. Dropped here
+  // rather than in the panel because the panel is unmounted on most tabs and a
+  // lock is the one event that must not depend on it being mounted.
+  resetConversationBinding();
   // **And the automatic-apply mode**, which `clearAgent` deliberately keeps.
   // The mode says a finished run may write without a second act, and the act
   // that granted it was the user choosing it while this vault was open. A lock
