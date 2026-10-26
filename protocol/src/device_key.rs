@@ -30,11 +30,13 @@
 //! [`crate::person_key::PersonPublicHalf::verify`] states: a distinguishing
 //! answer is a downgrade oracle for the weaker half.
 
+use alloc::string::String;
 use alloc::vec::Vec;
 use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::error::ProtocolError;
-use crate::hex::encode_lower;
+use crate::hex::{encode_lower, is_lower_hex};
+use sha2::{Digest, Sha256};
 
 /// Ed25519 secret seed length (the seed, not the expanded key).
 pub const DEVICE_ED25519_SEED_LEN: usize = 32;
@@ -348,6 +350,149 @@ impl From<DeviceKeyError> for ProtocolError {
     }
 }
 
+/// Whole-string prefix of a **device admission code** (`decisions/protocol/0735`).
+///
+/// The code is the out-of-band carrier between a device that is joining and a device that
+/// already holds the account. It is NOT a secret in the vault sense and it is NOT a
+/// magic: it carries a device's public halves plus the SCRAM verifier that device will
+/// authenticate with, all of which the server stores anyway. It is load-bearing as a
+/// STRING, though, so it is written whole and greppable like the identity code: changing
+/// it invalidates codes already shown to a user.
+pub const DEVICE_ADMISSION_PREFIX: &str = "MYNE-DEVICE-1:";
+
+/// The SAS class prefix. A short authentication string is what a human compares between
+/// two screens, so its derivation is a message class of its own: changing the prefix
+/// changes every SAS, which silently breaks the comparison rather than a parser.
+pub const DEVICE_ADMISSION_SAS_PREFIX: &[u8] = b"myne.device-admission-sas v1|";
+
+/// A device admission code, split into what each side needs.
+///
+/// The joining device BUILDS this from a secret it just minted; the admitting device
+/// PARSES it and forwards the verifier. Neither side ever holds the other's secret: the
+/// verifier is one-way over it, which is why forwarding it is not the same as forwarding
+/// the credential itself.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceAdmission {
+    /// The joining device's id, which the admitting device also approves server-side.
+    pub device_id: [u8; crate::vault_head::DEVICE_ID_LEN],
+    /// The PERSON account this device is joining, as lowercase hex. Public: it is the
+    /// same id the admitting device already knows (it is the account it is signed in to),
+    /// and carrying it is what lets the joining device address a handshake at all. It is
+    /// also why a code cannot be applied to the wrong account by accident: the admitting
+    /// device refuses a code naming an account other than its own session's.
+    pub person_id_hex: String,
+    /// The joining device's signing halves, when it has a device key (`0731` stage 1).
+    /// Absent on a platform with no storage rung, and their absence is not an error: the
+    /// device is still admittable, it just cannot author `0x03` heads.
+    pub public: Option<DevicePublicHalf>,
+    /// The SCRAM salt the joining device chose, in lowercase hex.
+    pub salt_hex: String,
+    /// The PBKDF2 iteration count the joining device used.
+    pub iterations: u32,
+    /// The SCRAM verifier halves over that device's own secret.
+    pub stored_key_hex: String,
+    pub server_key_hex: String,
+}
+
+impl DeviceAdmission {
+    /// The code as the joining device shows it.
+    ///
+    /// Field order is fixed and `None` halves are the empty string, so one admission has
+    /// exactly one spelling: two devices comparing the same admission compare the same
+    /// bytes, which is what makes the SAS meaningful.
+    #[must_use]
+    pub fn encode(&self) -> String {
+        let (ed, ml) = match &self.public {
+            Some(half) => (half.ed_pk_hex(), half.mldsa_vk_hex()),
+            None => (String::new(), String::new()),
+        };
+        alloc::format!(
+            "{DEVICE_ADMISSION_PREFIX}{}:{}:{ed}:{ml}:{}:{}:{}:{}",
+            self.person_id_hex,
+            encode_lower(&self.device_id),
+            self.salt_hex,
+            self.iterations,
+            self.stored_key_hex,
+            self.server_key_hex,
+        )
+    }
+
+    /// Parse a code a user pasted or scanned. Round-trip exact: whitespace is trimmed at
+    /// the ends only, and every field is validated rather than coerced, because a code
+    /// that parses loosely is a code whose SAS can differ from what the other screen
+    /// showed.
+    pub fn decode(code: &str) -> Result<Self, DeviceKeyError> {
+        let body = code
+            .trim()
+            .strip_prefix(DEVICE_ADMISSION_PREFIX)
+            .ok_or(DeviceKeyError::MalformedHex)?;
+        let parts: alloc::vec::Vec<&str> = body.split(':').collect();
+        // person id, device id, ed half, mldsa half, salt, iterations, stored key,
+        // server key: eight fields, and the count is checked before anything is read.
+        if parts.len() != 8 {
+            return Err(DeviceKeyError::MalformedHex);
+        }
+        if !is_lower_hex(parts[0]) || parts[0].len() != 32 {
+            return Err(DeviceKeyError::MalformedHex);
+        }
+        // `decode_lower` is const-generic over the byte length, so the id's width is
+        // checked by the type rather than by a later comparison.
+        let device_id = crate::hex::decode_lower::<{ crate::vault_head::DEVICE_ID_LEN }>(parts[1])
+            .ok_or(DeviceKeyError::MalformedHex)?;
+        let public = if parts[2].is_empty() && parts[3].is_empty() {
+            None
+        } else {
+            Some(DevicePublicHalf::from_parts_hex(parts[2], parts[3])?)
+        };
+        if !is_lower_hex(parts[4]) || parts[4].len() != 32 {
+            return Err(DeviceKeyError::MalformedHex);
+        }
+        let iterations: u32 = parts[5].parse().map_err(|_| DeviceKeyError::MalformedHex)?;
+        if iterations < 1 {
+            return Err(DeviceKeyError::MalformedHex);
+        }
+        for half in [parts[6], parts[7]] {
+            if !is_lower_hex(half) || half.len() != 64 {
+                return Err(DeviceKeyError::MalformedHex);
+            }
+        }
+        Ok(Self {
+            device_id,
+            person_id_hex: alloc::string::String::from(parts[0]),
+            public,
+            salt_hex: alloc::string::String::from(parts[4]),
+            iterations,
+            stored_key_hex: alloc::string::String::from(parts[6]),
+            server_key_hex: alloc::string::String::from(parts[7]),
+        })
+    }
+
+    /// The short authentication string both screens show.
+    ///
+    /// It is derived over the WHOLE code, so a substituted device id, a substituted
+    /// signing half and a substituted verifier all move it. That matters because the code
+    /// carries a credential-equivalent value: the verifier lets whoever holds it complete a
+    /// SCRAM handshake as that device. The SAS is what turns "I pasted some code" into "the
+    /// device in my hand produced this code".
+    #[must_use]
+    pub fn sas(&self) -> String {
+        let mut h = Sha256::new();
+        h.update(DEVICE_ADMISSION_SAS_PREFIX);
+        h.update(self.encode().as_bytes());
+        let digest = h.finalize();
+        // Eight characters of a hash a human compares out loud: long enough that a
+        // substituted code does not collide by chance (32 bits), short enough to read.
+        let mut out = alloc::string::String::with_capacity(9);
+        for (i, byte) in digest.iter().take(4).enumerate() {
+            if i == 2 {
+                out.push('-');
+            }
+            out.push_str(&alloc::format!("{byte:02x}"));
+        }
+        out
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,6 +610,137 @@ mod tests {
             DevicePublicHalf::from_parts_hex("00", &half.mldsa_vk_hex()),
             Err(DeviceKeyError::MalformedHex)
         );
+    }
+
+    fn admission(seed: u8, with_halves: bool) -> DeviceAdmission {
+        let public = with_halves.then(|| pair(seed).public_half());
+        DeviceAdmission {
+            device_id: [seed; crate::vault_head::DEVICE_ID_LEN],
+            person_id_hex: encode_lower(&[seed ^ 0x11; 16]),
+            public,
+            salt_hex: encode_lower(&[seed ^ 0x5a; 16]),
+            iterations: 4096,
+            stored_key_hex: encode_lower(&[seed; 32]),
+            server_key_hex: encode_lower(&[seed ^ 0xff; 32]),
+        }
+    }
+
+    #[test]
+    fn admission_code_round_trips_and_the_sas_moves_with_every_field() {
+        let a = admission(7, true);
+        let code = a.encode();
+        assert!(code.starts_with(DEVICE_ADMISSION_PREFIX));
+        assert_eq!(DeviceAdmission::decode(&code), Ok(a.clone()));
+        // Surrounding whitespace only: a pasted code often carries a newline.
+        assert_eq!(
+            DeviceAdmission::decode(&alloc::format!("  {code}\n")),
+            Ok(a.clone())
+        );
+
+        let sas = a.sas();
+        assert_eq!(sas.len(), 9, "eight hex characters plus the separator");
+        assert_eq!(sas.split('-').count(), 2);
+
+        // Each field is inside the SAS, so a substituted one is VISIBLE to the human who
+        // is comparing two screens. That is the whole defence: the code carries a
+        // credential-equivalent verifier, and this is what makes substitution detectable
+        // rather than silent.
+        let mut other_device = a.clone();
+        other_device.device_id[0] ^= 1;
+        assert_ne!(other_device.sas(), sas);
+
+        let mut other_store = a.clone();
+        other_store.stored_key_hex = encode_lower(&[0x11; 32]);
+        assert_ne!(other_store.sas(), sas);
+
+        let mut other_server = a.clone();
+        other_server.server_key_hex = encode_lower(&[0x22; 32]);
+        assert_ne!(other_server.sas(), sas);
+
+        let mut other_iters = a.clone();
+        other_iters.iterations = 2048;
+        assert_ne!(other_iters.sas(), sas);
+
+        let half_less = admission(7, false);
+        assert_ne!(
+            half_less.sas(),
+            sas,
+            "dropping the halves must move the SAS"
+        );
+    }
+
+    #[test]
+    fn admission_code_refuses_a_loose_parse() {
+        let code = admission(9, false).encode();
+        let body = code.strip_prefix(DEVICE_ADMISSION_PREFIX).unwrap();
+        let parts: alloc::vec::Vec<&str> = body.split(':').collect();
+        let join = |p: &[&str]| alloc::format!("{DEVICE_ADMISSION_PREFIX}{}", p.join(":"));
+
+        // Wrong prefix, wrong field count, an uppercase field, a truncated salt, a zero
+        // iteration count, and a half-empty pair of halves are each refused rather than
+        // normalized. A loose parse is how two screens end up showing different SAS values
+        // for what a user believes is one code.
+        assert!(DeviceAdmission::decode(body).is_err());
+        assert!(DeviceAdmission::decode(&join(&parts[..7])).is_err());
+        // Uppercase hex: refused rather than normalized. Built from an explicit salt,
+        // because the fixture's own salt is all digits and `to_uppercase` on it would be a
+        // no-op that made this assertion vacuous.
+        let upper = alloc::format!(
+            "{DEVICE_ADMISSION_PREFIX}{}:{}:{}:{}:AB{}:{}:{}:{}",
+            parts[0],
+            parts[1],
+            parts[2],
+            parts[3],
+            &parts[4][2..],
+            parts[5],
+            parts[6],
+            parts[7],
+        );
+        assert!(DeviceAdmission::decode(&upper).is_err());
+        assert!(DeviceAdmission::decode(&join(&[
+            parts[0],
+            parts[1],
+            parts[2],
+            parts[3],
+            &parts[4][..30],
+            parts[5],
+            parts[6],
+            parts[7],
+        ]))
+        .is_err());
+        assert!(DeviceAdmission::decode(&join(&[
+            parts[0], parts[1], "", "", parts[4], "0", parts[6], parts[7],
+        ]))
+        .is_err());
+        // One half present and the other absent is not "no device key": it is malformed.
+        let with_halves = admission(3, true).encode();
+        let wh_body =
+            alloc::string::String::from(with_halves.strip_prefix(DEVICE_ADMISSION_PREFIX).unwrap());
+        let wh_parts: alloc::vec::Vec<&str> = wh_body.split(':').collect();
+        // The ed half dropped while the ML-DSA half stays: one present and one absent is
+        // malformed, not "this device has no key".
+        assert!(DeviceAdmission::decode(&join(&[
+            wh_parts[0],
+            wh_parts[1],
+            "",
+            wh_parts[3],
+            wh_parts[4],
+            wh_parts[5],
+            wh_parts[6],
+            wh_parts[7],
+        ]))
+        .is_err());
+        assert!(DeviceAdmission::decode(&join(&[
+            wh_parts[0],
+            wh_parts[1],
+            wh_parts[2],
+            "",
+            wh_parts[4],
+            wh_parts[5],
+            wh_parts[6],
+            wh_parts[7],
+        ]))
+        .is_err());
     }
 
     #[test]

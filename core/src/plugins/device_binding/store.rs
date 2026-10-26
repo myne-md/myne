@@ -214,6 +214,61 @@ pub async fn claim_self_in_dir(
     Ok((map, ClaimOutcome::Written))
 }
 
+/// Bind `device_id` to `person` on ANOTHER device's behalf, signed by that person
+/// (`decisions/protocol/0735`).
+///
+/// This is `claim_self_in_dir`'s sibling, and the difference is the whole feature: the
+/// person key signs a row for a device that is not this one, because a device that joined
+/// without the recovery phrase holds no person key and therefore cannot claim itself. The
+/// admitting device does hold one, and it is the device the user already trusts.
+///
+/// Idempotent in the same direction: a row that is live, names this person and carries
+/// these halves is left alone. A tombstone is re-claimed at a strictly higher version, the
+/// re-bind `beats` was written to allow; what enforces a removal is the group-key rotation,
+/// not the row.
+pub async fn admit_other_in_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    key: &DeviceBindingKey<'_>,
+    person: &protocol::PersonKeyPair,
+    device_id: &[u8; 16],
+    device_public: Option<&protocol::device_key::DevicePublicHalf>,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
+    let mut map = read_device_bindings_in_dir(io, vault_dir, key).await?;
+    let id = device_id_hex(device_id);
+    let mine = fingerprint_hex(person.fingerprint());
+    if let Some(existing) = map.get(&id) {
+        let halves_match = match device_public {
+            None => true,
+            Some(public) => {
+                existing.device_ed_pk.as_deref() == Some(public.ed_pk_hex().as_str())
+                    && existing.device_mldsa_vk.as_deref() == Some(public.mldsa_vk_hex().as_str())
+            }
+        };
+        if !existing.tombstone && existing.person_fingerprint == mine && halves_match {
+            return Ok((map, ClaimOutcome::AlreadyCurrent));
+        }
+    }
+    let version = next_version(&map, &id);
+    let row = match device_public {
+        Some(public) => protocol::sign_device_binding_v2(
+            person,
+            device_id,
+            person.fingerprint(),
+            version,
+            false,
+            public,
+            rng,
+        ),
+        None => sign_device_binding(person, device_id, person.fingerprint(), version, false, rng),
+    }
+    .map_err(|_| DeviceBindingError::Codec)?;
+    map.insert(id, row);
+    write_device_bindings_in_dir(io, vault_dir, key, &map).await?;
+    Ok((map, ClaimOutcome::Written))
+}
+
 /// Merge a PULLED copy of the blob into the local map, entry by entry, and persist the
 /// result. A pulled copy that does not decode is refused rather than merged as empty
 /// (the same direction the read path takes), because `merge(local, empty) == local` would
@@ -835,6 +890,97 @@ mod tests {
             .expect("an absent person is not an error");
             assert_eq!(none, 0);
             assert_eq!(untouched, after);
+        });
+    }
+
+    /// The row an admitting device writes for ANOTHER device (`0735`): signed by the
+    /// person who holds the key, naming the device that does not, and carrying that
+    /// device's signing halves inside the signature so a peer can resolve the heads it
+    /// later authors.
+    ///
+    /// This is the property the whole phrase-free join rests on. A device that joined
+    /// without the recovery phrase holds no person key, so it cannot claim itself; the
+    /// admitting device is the one that can, and the row it writes has to be
+    /// indistinguishable from a self-claim to every READER, or peers would refuse the new
+    /// device's heads.
+    #[test]
+    fn admit_other_writes_a_row_the_read_side_verifies() {
+        with_key(|k| {
+            let dir = ScopedTempDir::new("admit_other").unwrap();
+            let io = StdVaultIo;
+            let owner = pair(b"owner-admitting");
+            let mut rng = SeededRng(11);
+            let new_device = DEV_B;
+            let halves =
+                protocol::device_key::DeviceKeyPair::generate_raw(&[0x51; 32], &[0x52; 32])
+                    .public_half();
+
+            let (map, outcome) = block_on(admit_other_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &new_device,
+                Some(&halves),
+                &mut rng,
+            ))
+            .expect("admit");
+            assert_eq!(outcome, ClaimOutcome::Written);
+            let row = map.get(&device_id_hex(&new_device)).expect("the row");
+            // The READ side is the test, not the writer's own return value: a row the
+            // admitting device believes in and a peer refuses would be the failure that
+            // matters, and only `verify_device_binding` speaks for the peer.
+            assert!(
+                verify_device_binding(&owner.public_half(), &new_device, row),
+                "a peer must accept the admitted row against the person's half"
+            );
+            assert_eq!(
+                row.device_ed_pk.as_deref(),
+                Some(halves.ed_pk_hex().as_str())
+            );
+            assert!(!row.tombstone);
+
+            // A second admit is a no-op: the same person, the same halves, nothing to say.
+            let (again, outcome) = block_on(admit_other_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &new_device,
+                Some(&halves),
+                &mut rng,
+            ))
+            .expect("re-admit");
+            assert_eq!(outcome, ClaimOutcome::AlreadyCurrent);
+            assert_eq!(again, map);
+
+            // Different halves are a REAL change (the device re-minted its key) and climb
+            // the version, because `beats` decides the merge on it.
+            let rotated =
+                protocol::device_key::DeviceKeyPair::generate_raw(&[0x61; 32], &[0x62; 32])
+                    .public_half();
+            let (after, outcome) = block_on(admit_other_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &new_device,
+                Some(&rotated),
+                &mut rng,
+            ))
+            .expect("re-admit with new halves");
+            assert_eq!(outcome, ClaimOutcome::Written);
+            let row = after.get(&device_id_hex(&new_device)).expect("the row");
+            assert_eq!(row.version, 2, "a changed row must outrank the old one");
+            assert_eq!(
+                row.device_ed_pk.as_deref(),
+                Some(rotated.ed_pk_hex().as_str())
+            );
+            assert!(verify_device_binding(
+                &owner.public_half(),
+                &new_device,
+                row
+            ));
         });
     }
 

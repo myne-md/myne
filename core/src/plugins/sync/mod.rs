@@ -80,6 +80,7 @@ pub mod member_removal;
 // every sync cycle / unlock drains it until each recipient's POST has succeeded.
 // Host-only for the same reason `person_account` is: it drives the rustls
 // transport.
+pub mod device_admission;
 pub mod roster_trust;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod rotation_outbox;
