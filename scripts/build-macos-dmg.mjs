@@ -58,12 +58,43 @@ if (!ID) {
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { stdio: "inherit", cwd: ROOT, ...opts });
 
-// 1. Tauri writes bundle_dmg.sh + support/ into the bundle's dmg directory during
-//    a dmg bundle, and builds a first DMG from the app before we fix the signatures.
-run("pnpm", ["tauri", "build", "--bundles", "dmg", ...TARGET_ARGS]);
+// 1. Build first and bundle second when a target triple is given, because the
+//    universal bundler expects a cargo `[[bin]]` that is ALSO an `externalBin` to
+//    exist at `target/<triple>/release/<name>`, and tauri's universal step lipos
+//    only the app binary. That one is `myne-clipper-host` here, and its absence
+//    fails the DMG bundle with "Failed to copy binary from ... does not exist"
+//    after the whole universal compile, which is how this was found.
+const cargoBins = (() => {
+  const toml = readFileSync(join(ROOT, "src-tauri/Cargo.toml"), "utf8");
+  const names = [...toml.matchAll(/^\[\[bin\]\][\s\S]*?^name = "([^"]+)"/gm)].map((m) => m[1]);
+  const external = (CONF.bundle.externalBin ?? []).map((p) => p.replace(/^binaries\//, ""));
+  return names.filter((n) => external.includes(n));
+})();
 
-// 2. The dmg run cleaned the .app; rebuild it so we can fix and reuse it.
-run("pnpm", ["tauri", "bundle", "--bundles", "app", ...TARGET_ARGS]);
+if (TARGET) {
+  run("pnpm", ["tauri", "build", "--no-bundle", ...TARGET_ARGS]);
+  if (TARGET === "universal-apple-darwin") {
+    for (const bin of cargoBins) {
+      const arms = ["aarch64-apple-darwin", "x86_64-apple-darwin"].map((t) =>
+        join(ROOT, "target", t, "release", bin),
+      );
+      for (const p of arms) {
+        if (!existsSync(p)) {
+          console.error(`cargo bin missing for the universal lipo: ${p}`);
+          process.exit(1);
+        }
+      }
+      run("lipo", ["-create", ...arms, "-output", join(ROOT, "target", TARGET, "release", bin)]);
+    }
+  }
+  // A dmg bundle also writes bundle_dmg.sh + support/ into the bundle directory,
+  // which step 4 reuses, so it runs before the signature repair rather than after.
+  run("pnpm", ["tauri", "bundle", "--bundles", "dmg", ...TARGET_ARGS]);
+  run("pnpm", ["tauri", "bundle", "--bundles", "app", ...TARGET_ARGS]);
+} else {
+  run("pnpm", ["tauri", "build", "--bundles", "dmg"]);
+  run("pnpm", ["tauri", "bundle", "--bundles", "app"]);
+}
 
 // 3. Re-sign the sidecars WITHOUT entitlements, then re-sign the app WITH them.
 const sidecars = (CONF.bundle.externalBin ?? []).map((p) => p.replace(/^binaries\//, ""));
