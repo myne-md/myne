@@ -243,10 +243,15 @@ async fn bind_admitted_device(
         .app_data_dir()
         .map_err(|_| SyncDeviceError::Internal)?;
     let root = crate::paths::active_vault_root_from_base(&base, state.active_vault_id().await);
-    let bytes = io
-        .read(&root.join("vault.meta"))
-        .await
-        .map_err(|_| SyncDeviceError::Transport)?;
+    // A meta that cannot be READ is treated exactly like a meta that is not B2B yet: the
+    // row is not written, and the caller is told so (`bound: false`). Propagating here was
+    // wrong in a way that hides: the credential install has already succeeded by this
+    // point, so an error would abort a half-finished admission and report it as a
+    // transport failure, and a brand-new vault whose meta was never written would fail
+    // admission outright instead of degrading.
+    let Ok(bytes) = io.read(&root.join("vault.meta")).await else {
+        return Ok(false);
+    };
     let Ok(b2b) = protocol::parse_b2b_tail_any(&bytes) else {
         return Ok(false);
     };

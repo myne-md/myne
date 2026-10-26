@@ -160,9 +160,11 @@ describe("phrase-free admission, admitting device", () => {
       });
     });
     const error = await screen.findByTestId("sync.phrase-free-error");
-    // The sentence names what actually happened: the code did not come from the
-    // screen the user is looking at.
-    expect(error.textContent).not.toBe("");
+    // The SENTENCE, not merely "something was rendered": the refusal has to name what
+    // happened, and any non-empty string would pass a weaker assertion while the wrong
+    // arm showed the wrong remedy.
+    expect(error.textContent).toContain("does not match the other screen");
+    expect(error.textContent).not.toContain("Try again");
     expect(screen.queryByTestId("sync.phrase-free-admitted")).toBeNull();
   });
 
@@ -186,9 +188,10 @@ describe("phrase-free admission, admitting device", () => {
     fireEvent.click(screen.getByTestId("sync.phrase-free-admit-confirm"));
 
     const admitted = await screen.findByTestId("sync.phrase-free-admitted");
-    // `bound: false` is not an error and must not read as one: the device is
-    // admitted and can sign in, and only the signing half is still owed.
-    expect(admitted.textContent).not.toBe("");
+    // `bound: false` is not an error and must not read as one: the device is admitted
+    // and can sign in, and only the signing half is still owed. The sentence is what
+    // says which of the two happened, so it is what the assertion names.
+    expect(admitted.textContent).toContain("not bound in this vault yet");
     expect(screen.queryByTestId("sync.phrase-free-error")).toBeNull();
   });
 });

@@ -4775,7 +4775,9 @@
       "sasMismatch": "The code does not match the other screen. Nothing was added. Check both screens and try again.",
       "wrongAccount": "That code belongs to a different account. Nothing was added.",
       "alreadyInstalled": "That device is already on this account with a different credential. Nothing was changed.",
-      "admitFailed": "Could not add the device. Try again."
+      "admitFailed": "Could not add the device. Try again.",
+      "resumeFailed": "Could not check whether this device already started joining. Starting again will add a second device, so reload before you continue.",
+      "copyFailed": "Could not copy the code."
     }
   },
   "tasks": {

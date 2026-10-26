@@ -37,7 +37,8 @@ import { EmptyState } from "../primitives/EmptyState";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import type { AccountPlane } from "../../hooks/useMemberVault";
-import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import { copySecretToClipboard } from "../../lib/secret-export";
+import { useActionStatus } from "../ActionStatus";
 import {
   admitDevice,
   claimDeviceAdmission,
@@ -291,7 +292,10 @@ function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
   const { t } = useTranslation();
   const [identityCode, setIdentityCode] = useState("");
   const [mine, setMine] = useState<AdmissionCodeView | null>(null);
-  const [copied, setCopied] = useState<"code" | null>(null);
+  // The copy feedback lives ON the control that was pressed (a tick plus a pop), not
+  // in a toast and not on a line under the field: a code that is copied and then
+  // reported somewhere else is a code the user has to go looking for a confirmation of.
+  const { feedbackFor } = useActionStatus<"code">();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -310,8 +314,13 @@ function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
         if (live && view) setMine(view);
       })
       .catch(() => {
-        // Nothing pending is the ordinary answer; a read failure must not turn the
-        // join screen into an error screen.
+        // "Nothing pending" and "could not read" are different answers, and only the
+        // first is ordinary. Collapsing them was a fallback that made a failed call look
+        // like a successful one: a device whose pending admission could not be read would
+        // silently start a SECOND admission, and the admitting device would approve a row
+        // nobody can use. The screen stays usable either way, so this is a note rather
+        // than an error arm.
+        if (live) setFailure(t("sync.phraseFree.resumeFailed"));
       });
     return () => {
       live = false;
@@ -405,11 +414,16 @@ function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  void clipboardWriteText(mine.code).then(() => setCopied("code"));
+                  // Through the SECRET path, not the ordinary one. The admission code
+                  // carries a credential-equivalent SCRAM verifier (whoever holds it can
+                  // complete a handshake as this device), so it belongs to the same
+                  // clipboard class as the recovery phrase: written once, reported, and
+                  // cleared by the host after the window where the platform can do that.
+                  void copySecretToClipboard(mine.code, feedbackFor("code"));
                 }}
                 data-testid="sync.phrase-free-copy"
               >
-                {copied === "code" ? t("sync.phraseFree.copied") : t("sync.phraseFree.copyCode")}
+                {t("sync.phraseFree.copyCode")}
               </Button>
               <Button
                 variant="secondary"

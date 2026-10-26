@@ -588,17 +588,17 @@ const V = {
     "The person-account bindings are substituted out of the web bundle. The identity-only screens are absent and the backend is capability-refused there, so retaining these bindings would only preserve an unreachable path.",
     "person-account-binding",
   ],
-  // The phrase-free device admission (`decisions/protocol/0735`). `excluded`
-  // rather than `adapted`, and the marker is the module's own absence constant:
-  // the four bindings it exports are `Class::Unsupported` in
-  // `web/wasm/src/capability.rs`, and the reason is structural on both arms. The
-  // admitting arm needs the held person identity and the active vault's group
-  // key; the joining arm needs a device key at rest, and a browser has no storage
-  // rung at all. Nothing about this module becomes reachable by porting more.
+  // The phrase-free device admission (`decisions/protocol/0735`). `ported`, and
+  // deliberately WITHOUT an absence marker, for the same correction the `plainFile`
+  // row above records: this module SHIPS in the bundle (the Devices panel imports
+  // it) and is merely unreachable, because the four commands it wraps are
+  // `Class::Unsupported` in `web/wasm/src/capability.rs`. A marker would have been a
+  // claim that cannot fail, and that was measured rather than assumed: planting the
+  // string in a bundled module and rebuilding did not make the guard fire, because the
+  // constant is an unused export and gets tree-shaken even when its module ships.
   "src/lib/deviceAdmission.ts": [
-    "excluded",
-    "Phrase-free device admission is refused on web: the admitting arm needs the held person identity and the vault's group key, and the joining arm needs a device key at rest, which a browser has no rung for.",
-    "device-admission-binding",
+    "ported",
+    "Ships unchanged and is unreachable on web: all four commands are capability-refused, because the admitting arm needs the held person identity and the vault's group key and the joining arm needs a device key at rest, which a browser has no rung for.",
   ],
   "src/hooks/useEnroll.ts": ["adapted", "The phrase credential is refused at the last door (task 92); password enrolment is the web path."],
   "src/hooks/useFocusTrap.ts": ["ported", "Pure DOM."],
