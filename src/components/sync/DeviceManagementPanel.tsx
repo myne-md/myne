@@ -17,7 +17,7 @@
 // mobile SY-05 shows (SYNC-40 carries both ends in 459). Ship-gate: the SYNC-17
 // primitive-level review of the fingerprint substrate is recorded, not passed.
 
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import {
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
@@ -34,7 +34,18 @@ import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitiv
 import { Icon } from "../primitives/Icon";
 import { Tooltip } from "../primitives/Tooltip";
 import { EmptyState } from "../primitives/EmptyState";
+import { Button } from "../primitives/Button";
+import { Input } from "../primitives/Input";
 import type { AccountPlane } from "../../hooks/useMemberVault";
+import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
+import {
+  admitDevice,
+  claimDeviceAdmission,
+  deviceAdmissionCode,
+  pendingDeviceAdmission,
+  type AdmitOutcomeView,
+  type AdmissionCodeView,
+} from "../../lib/deviceAdmission";
 
 const ROOT: CSSProperties = {
   display: "flex",
@@ -261,6 +272,238 @@ function removeDeviceSurface(busy: boolean): InteractiveSurfaceHandlers {
       e.currentTarget.style.color = "var(--fg-2)";
     },
   };
+}
+
+/**
+ * Adding a device WITHOUT the recovery phrase (`decisions/protocol/0735`).
+ *
+ * Two shapes, and which one renders is a fact about this device rather than a
+ * choice the user makes: a device with no account yet SHOWS its code, and a
+ * device that is already signed in READS one. Offering both at once would ask a
+ * user to work out which device they are holding, which is exactly the confusion
+ * the flow exists to remove.
+ *
+ * The code carries a credential-equivalent SCRAM verifier, so this surface treats
+ * it the way the identity code is treated: shown, copied, never logged, and never
+ * sent to the server from here.
+ */
+function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
+  const { t } = useTranslation();
+  const [identityCode, setIdentityCode] = useState("");
+  const [mine, setMine] = useState<AdmissionCodeView | null>(null);
+  const [copied, setCopied] = useState<"code" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [sas, setSas] = useState("");
+  const [admitted, setAdmitted] = useState<AdmitOutcomeView | null>(null);
+
+  // Resume an admission this device already started. A restart mid-join would
+  // otherwise mint a SECOND device id, and the admitting device would approve a
+  // row nobody can use.
+  useEffect(() => {
+    if (!notEnrolled) return;
+    let live = true;
+    void pendingDeviceAdmission()
+      .then((view) => {
+        if (live && view) setMine(view);
+      })
+      .catch(() => {
+        // Nothing pending is the ordinary answer; a read failure must not turn the
+        // join screen into an error screen.
+      });
+    return () => {
+      live = false;
+    };
+  }, [notEnrolled]);
+
+  const start = async () => {
+    // The person id is the first field of the identity code another device shows;
+    // it is public material (the same id the server keys the account on).
+    const personIdHex = identityCode.trim().split(":")[1] ?? "";
+    if (!/^[0-9a-f]{32}$/.test(personIdHex)) {
+      setFailure(t("sync.phraseFree.badIdentityCode"));
+      return;
+    }
+    setBusy(true);
+    setFailure(null);
+    try {
+      setMine(await deviceAdmissionCode(personIdHex));
+    } catch {
+      setFailure(t("sync.phraseFree.startFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const claim = async () => {
+    setBusy(true);
+    setFailure(null);
+    try {
+      const signedIn = await claimDeviceAdmission();
+      setNote(t(signedIn ? "sync.phraseFree.claimed" : "sync.phraseFree.stillWaiting"));
+    } catch {
+      setFailure(t("sync.phraseFree.claimFailed"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const admit = async () => {
+    if (code.trim() === "" || sas.trim() === "") return;
+    setBusy(true);
+    setFailure(null);
+    setAdmitted(null);
+    try {
+      const outcome = await admitDevice(code.trim(), sas.trim());
+      setAdmitted(outcome);
+      setCode("");
+      setSas("");
+    } catch (e) {
+      // Three refusals, each with its own sentence: a SAS that does not match means
+      // the text did not come from the screen the user is looking at; a different
+      // account means the code belongs to somebody else; anything else is the
+      // ordinary failure.
+      const message = String(e);
+      setFailure(
+        t(
+          message.includes("SasMismatch")
+            ? "sync.phraseFree.sasMismatch"
+            : message.includes("WrongAccount")
+              ? "sync.phraseFree.wrongAccount"
+              : message.includes("AlreadyInstalled")
+                ? "sync.phraseFree.alreadyInstalled"
+                : "sync.phraseFree.admitFailed",
+        ),
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (notEnrolled) {
+    return (
+      <div style={SECTION} data-testid="sync.phrase-free-join">
+        <div style={SECTION_LABEL}>{t("sync.phraseFree.joinTitle")}</div>
+        {mine ? (
+          <>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
+              {t("sync.phraseFree.showCode")}
+            </span>
+            <Input
+              readOnly
+              mono
+              value={mine.code}
+              spellCheck={false}
+              data-testid="sync.phrase-free-code"
+            />
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }} data-testid="sync.phrase-free-sas">
+              {t("sync.phraseFree.sasHere", { sas: mine.sas })}
+            </span>
+            <div style={{ display: "flex", gap: "var(--space-2)" }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  void clipboardWriteText(mine.code).then(() => setCopied("code"));
+                }}
+                data-testid="sync.phrase-free-copy"
+              >
+                {copied === "code" ? t("sync.phraseFree.copied") : t("sync.phraseFree.copyCode")}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void claim()}
+                data-testid="sync.phrase-free-claim"
+              >
+                {t("sync.phraseFree.imApproved")}
+              </Button>
+            </div>
+            {!mine.has_device_key ? (
+              <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }} data-testid="sync.phrase-free-no-device-key">
+                {t("sync.phraseFree.noDeviceKey")}
+              </span>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
+              {t("sync.phraseFree.pasteIdentityCode")}
+            </span>
+            <Input
+              value={identityCode}
+              onChange={(e) => setIdentityCode(e.target.value)}
+              spellCheck={false}
+              mono
+              data-testid="sync.phrase-free-identity-code"
+            />
+            <Button
+              variant="secondary"
+              disabled={busy || identityCode.trim() === ""}
+              onClick={() => void start()}
+              data-testid="sync.phrase-free-start"
+            >
+              {t("sync.phraseFree.showMyCode")}
+            </Button>
+          </>
+        )}
+        {note ? (
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }} data-testid="sync.phrase-free-note">
+            {note}
+          </span>
+        ) : null}
+        {failure ? (
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="sync.phrase-free-error">
+            {failure}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div style={SECTION} data-testid="sync.phrase-free-admit">
+      <div style={SECTION_LABEL}>{t("sync.phraseFree.admitTitle")}</div>
+      <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
+        {t("sync.phraseFree.admitHint")}
+      </span>
+      <Input
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+        spellCheck={false}
+        mono
+        placeholder="MYNE-DEVICE-1:…"
+        data-testid="sync.phrase-free-admit-code"
+      />
+      <Input
+        value={sas}
+        onChange={(e) => setSas(e.target.value)}
+        placeholder={t("sync.phraseFree.sasPlaceholder")}
+        data-testid="sync.phrase-free-admit-sas"
+      />
+      <Button
+        variant="primary"
+        disabled={busy || code.trim() === "" || sas.trim() === ""}
+        onClick={() => void admit()}
+        data-testid="sync.phrase-free-admit-confirm"
+      >
+        {t("sync.phraseFree.admit")}
+      </Button>
+      {admitted ? (
+        <span style={{ fontSize: "var(--text-sm)", color: "var(--fg-2)" }} data-testid="sync.phrase-free-admitted">
+          {t(admitted.bound ? "sync.phraseFree.admittedBound" : "sync.phraseFree.admittedUnbound", {
+            sas: admitted.sas,
+          })}
+        </span>
+      ) : null}
+      {failure ? (
+        <span style={{ fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="sync.phrase-free-error">
+          {failure}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function DeviceManagementPanel({
@@ -754,6 +997,14 @@ export function DeviceManagementPanel({
           </div>
         )}
       </div>
+
+      {/* Adding a device without the recovery phrase
+          (`decisions/protocol/0735`). Last in the panel on purpose: it is the
+          recovery route for a NEW device, not an everyday control, and putting it
+          above the roster would give it the prominence of the device list itself.
+          A device with no account sees the arm that shows its code, which is the
+          only thing it can act on. */}
+      <PhraseFreeAddDevice notEnrolled={error === "NotEnrolled"} />
     </div>
   );
 }

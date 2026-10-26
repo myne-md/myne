@@ -2603,6 +2603,18 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
+**device admission.** The act of adding a device to a person account without typing the recovery phrase
+(`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
+has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
+them, compares a short authentication string between the two screens, and installs the credential
+(`POST /auth/devices/credential`, which also approves the device) and binds the newcomer's row in
+`vault.device-bindings`. The phrase keeps two jobs and loses the routine one: it is still the account's own
+credential and still the only path when no working device is left. A device that joined this way holds no person
+keypair, so it signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display
+name; the admitting device is the one that signs. Not to be confused with **device join**, the older flow that
+scans a QR carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
+
+
 Used in: `design-notes/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
 ### **person-identity carrier** &nbsp; 🗝️ *Key/identifier*
