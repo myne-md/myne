@@ -24,7 +24,7 @@ import {
   closeSettings,
   dismissImporterOffer,
   ipcOk,
-  openSettings,
+  openSyncDevices,
   unlockToEditor,
 } from "./support/flows";
 import { seedVault } from "./support/fixtures";
@@ -48,8 +48,7 @@ const RENAMED_B = "Renamed From A";
 
 /** Open Settings → Sync and wait for the device list to render. */
 async function openDeviceList(session: Session): Promise<void> {
-  await openSettings(session);
-  await (await session.byTestId("settings.tab-sync")).click();
+  await openSyncDevices(session);
   await session.byTestId("sync.device-management", { timeoutMs: 30_000 });
 }
 
@@ -196,8 +195,7 @@ describeNames("device friendly names (two devices)", () => {
         try {
           await unlockToEditor(a.session, password);
           await dismissImporterOffer(a.session);
-          await openSettings(a.session);
-          await (await a.session.byTestId("settings.tab-sync")).click();
+          await openSyncDevices(a.session);
 
           const field = await a.session.byTestId("sync.enroll.device-name-input", {
             timeoutMs: 30_000,

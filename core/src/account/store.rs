@@ -3,15 +3,19 @@
 //! (`decisions.md` 2026-09-07).
 //!
 //! One sealed file per device, at `<app_config_dir>/account.json`, holding a
-//! list of accounts. Each account carries an account id, a label, and its member
-//! vault ids. It is what lets the LOCKED picker group vaults under a name before
-//! any unlock, and it is the device-local counterpart of the sealed membership
-//! field inside each member vault's `vault.meta` (§9.3.1).
+//! list of accounts. Each account carries an account id and its member vault
+//! ids. It is what lets the LOCKED picker group vaults before any unlock, and it
+//! is the device-local counterpart of the sealed membership field inside each
+//! member vault's `vault.meta` (§9.3.1).
+//!
+//! An account has no name (`docs/decisions/ui/0728`): the heading a picker draws
+//! for a group is derived from the group's own vault names, so nothing in this
+//! record is user-authored text.
 //!
 //! ## Why sealed, and why under a keychain key
 //!
-//! The record carries the account label (AS3-sensitive, the user's own text) and
-//! the grouping itself (a privacy signal: which vaults belong together). It must
+//! The record carries the grouping itself (a privacy signal: which vaults belong
+//! together). It must
 //! be readable while every vault is LOCKED, so it cannot be sealed under a
 //! `root_key`-derived KEK. It is sealed under a device-local keychain wrap key
 //! (see `key::KEYCHAIN_ACCOUNT` for the shared-service namespace partition),
@@ -51,7 +55,7 @@ pub const ACCOUNT_FILE_NAME: &str = "account.json";
 /// §10.3 registry entry; it exists only so a corrupt or foreign file is
 /// detected before any decryption. Sealed at rest, which is what makes it safe
 /// inside a platform backup: a backup carries the ciphertext, never the
-/// labels or the grouping in the clear (`threat-model.md` §7 records this).
+/// grouping in the clear (`threat-model.md` §7 records this).
 const ACCOUNT_MAGIC: [u8; 4] = *b"MYAC";
 
 /// `protocol_version` byte at offset 4.
@@ -65,19 +69,11 @@ const ACCOUNT_AAD: &[u8] = b"myne.v0.1 account-record";
 /// `account_number_hash`. 16 raw bytes.
 pub const ACCOUNT_ID_LEN: usize = 16;
 
-/// Maximum account label length in bytes. A label is picker chrome, not vault
-/// content: an unbounded label bloats the sealed record on every write, and it
-/// is reachable pre-unlock over IPC, so the bound is enforced at the command
-/// layer (myne-md/myne#684 review).
-pub const ACCOUNT_LABEL_MAX_LEN: usize = 512;
-
-/// One account: an account id, a label, and its member vault ids.
+/// One account: an account id and its member vault ids.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Account {
     /// The account id (16 raw bytes, hex-encoded in the JSON).
     pub account_id: [u8; ACCOUNT_ID_LEN],
-    /// The account label (the user's own text; empty means unlabelled).
-    pub label: String,
     /// The member vault ids, in no particular order.
     pub vaults: Vec<VaultId>,
 }
@@ -115,7 +111,6 @@ fn serialize_record(record: &AccountRecord) -> Vec<u8> {
             .iter()
             .map(|a| serde_json::json!({
                 "account_id": hex(a.account_id),
-                "label": a.label,
                 "vaults": a.vaults.iter().map(|v| v.to_string()).collect::<Vec<_>>(),
             }))
             .collect::<Vec<_>>(),
@@ -141,18 +136,16 @@ fn parse_record(bytes: &[u8]) -> Option<AccountRecord> {
             // spelling to accept (protocol::hex::decode_lower, R1.2).
             let account_id =
                 protocol::hex::decode_lower::<ACCOUNT_ID_LEN>(a.get("account_id")?.as_str()?)?;
-            let label = a.get("label")?.as_str()?.to_string();
+            // A record written before `docs/decisions/ui/0728` still carries a
+            // `label` member. It is not read and not required: an unknown key
+            // parses fine, so an old file opens and the next write drops it.
             let vaults = a
                 .get("vaults")?
                 .as_array()?
                 .iter()
                 .map(|v| v.as_str().and_then(|s| VaultId::parse(s).ok()))
                 .collect::<Option<Vec<_>>>()?;
-            Some(Account {
-                account_id,
-                label,
-                vaults,
-            })
+            Some(Account { account_id, vaults })
         })
         .collect::<Option<Vec<_>>>()?;
     Some(AccountRecord { accounts })
@@ -266,7 +259,6 @@ pub fn reconcile(
         .iter()
         .map(|a| Account {
             account_id: a.account_id,
-            label: a.label.clone(),
             vaults: a
                 .vaults
                 .iter()
@@ -304,7 +296,7 @@ pub fn reconcile(
 }
 
 /// Build a fresh record from the disk-scan: one account holding every
-/// discovered vault, with a freshly minted account id and no label.
+/// discovered vault, with a freshly minted account id.
 ///
 /// Corrupted directories join too (PRD story 13): the record tracks
 /// membership, not health, and the picker keeps rendering the corrupted badge
@@ -319,11 +311,7 @@ pub fn build_from_scan(discovered: &[DiscoveredVault]) -> Result<Option<Account>
     }
     let mut account_id = [0u8; ACCOUNT_ID_LEN];
     getrandom::getrandom(&mut account_id).map_err(|_| AccountError::Backend)?;
-    Ok(Some(Account {
-        account_id,
-        label: String::new(),
-        vaults,
-    }))
+    Ok(Some(Account { account_id, vaults }))
 }
 
 /// The most recently unlocked vault id, from the registry's last-unlock stamps.
@@ -406,12 +394,12 @@ impl LoadedAccount {
 /// READ-ONLY by construction: reconciling, rebuilding, and pruning all happen
 /// in memory and nothing here writes. Merely listing the picker must not
 /// regroup vaults, so persistence belongs to the mutation paths
-/// (`rename/move/split`, [`ensure_vault_membership`]), which write back
-/// explicitly and propagate the failure. In particular an `Unreadable` source
-/// (key destroyed, or a record restored onto a device that never held it) is
-/// never overwritten: the undecryptable bytes stay on disk and the caller gets
-/// the in-memory rebuild, so keychain loss costs the labels but cannot also
-/// destroy the evidence.
+/// (`move/split`, [`ensure_vault_membership`]), which write back explicitly and
+/// propagate the failure. In particular an `Unreadable` source (key destroyed,
+/// or a record restored onto a device that never held it) is never overwritten:
+/// the undecryptable bytes stay on disk and the caller gets the in-memory
+/// rebuild, so keychain loss costs the grouping but cannot also destroy the
+/// evidence.
 ///
 /// Returns an empty record when there is no account (no vaults, or the keychain
 /// is unavailable), which is the standalone state, never an error.
@@ -523,10 +511,10 @@ pub(crate) async fn hide_names_on(io: &dyn VaultIo, config_dir: &Path) -> bool {
 /// file is a successful delete) and destroy its keychain wrap key.
 ///
 /// The working half of the hide-vault-names option alongside
-/// `vault_label::erase_all_labels`: enabling hide must destroy the account
-/// labels with the same cryptographic-erase semantics as the vault names, or
-/// the lock screen keeps naming accounts while claiming names are hidden
-/// (myne-md/myne#684 review). Idempotent.
+/// `vault_label::erase_all_labels`: enabling hide must destroy the grouping
+/// with the same cryptographic-erase semantics as the vault names, or the lock
+/// screen keeps showing which vaults belong together while claiming names are
+/// hidden (myne-md/myne#684 review). Idempotent.
 pub async fn delete_account_record(
     io: &dyn VaultIo,
     config_dir: &Path,
@@ -619,7 +607,6 @@ pub async fn ensure_vault_membership(
     } else {
         record.accounts.push(Account {
             account_id,
-            label: String::new(),
             vaults: vec![vault_id],
         });
     }
@@ -739,7 +726,6 @@ mod tests {
     fn account() -> Account {
         Account {
             account_id: [0xAB; ACCOUNT_ID_LEN],
-            label: "Work".to_string(),
             vaults: vec![VaultId::mint(), VaultId::mint()],
         }
     }
@@ -761,16 +747,30 @@ mod tests {
     }
 
     #[test]
-    fn the_sealed_blob_carries_no_label_substring() {
+    fn the_sealed_blob_carries_no_plaintext_record() {
         let key = [0x11; ACCOUNT_WRAP_KEY_LEN];
         let nonce = [0x22; AEAD_NONCE_LEN];
         let r = record();
         let blob = seal_record(&key, &r, &nonce).expect("seal");
         assert_eq!(&blob[0..4], b"MYAC");
+        // The grouping is what this file seals: which vaults belong together,
+        // and under which account id. Both are asserted against the values the
+        // record actually holds rather than against a literal planted in the
+        // fixture, so the check can fail for the reason it exists (the record
+        // carried user-authored text until `docs/decisions/ui/0728`, and this
+        // test named that text instead: the shape outlived its subject).
+        let id = hex(r.accounts[0].account_id);
         assert!(
-            !blob.windows(4).any(|w| w == b"Work"),
-            "the plaintext label must not appear anywhere in the file"
+            !blob.windows(id.len()).any(|w| w == id.as_bytes()),
+            "the plaintext account id must not appear anywhere in the file"
         );
+        for vault in &r.accounts[0].vaults {
+            let v = vault.to_string();
+            assert!(
+                !blob.windows(v.len()).any(|w| w == v.as_bytes()),
+                "a plaintext member vault id must not appear anywhere in the file"
+            );
+        }
     }
 
     #[test]
@@ -791,7 +791,6 @@ mod tests {
         let r = AccountRecord {
             accounts: vec![Account {
                 account_id: [0xAB; ACCOUNT_ID_LEN],
-                label: "Work".to_string(),
                 vaults: vec![a, b],
             }],
         };
@@ -818,7 +817,6 @@ mod tests {
         let r = AccountRecord {
             accounts: vec![Account {
                 account_id: [0xAB; ACCOUNT_ID_LEN],
-                label: "Work".to_string(),
                 vaults: vec![a],
             }],
         };
@@ -874,7 +872,6 @@ mod tests {
         let r = AccountRecord {
             accounts: vec![Account {
                 account_id: [0xAB; ACCOUNT_ID_LEN],
-                label: String::new(),
                 vaults: vec![a],
             }],
         };
@@ -893,12 +890,10 @@ mod tests {
             accounts: vec![
                 Account {
                     account_id: [0x01; ACCOUNT_ID_LEN],
-                    label: String::new(),
                     vaults: vec![a],
                 },
                 Account {
                     account_id: [0x02; ACCOUNT_ID_LEN],
-                    label: String::new(),
                     vaults: vec![b],
                 },
             ],
@@ -918,12 +913,10 @@ mod tests {
             accounts: vec![
                 Account {
                     account_id: [0x01; ACCOUNT_ID_LEN],
-                    label: String::new(),
                     vaults: vec![a],
                 },
                 Account {
                     account_id: [0x02; ACCOUNT_ID_LEN],
-                    label: String::new(),
                     vaults: vec![b],
                 },
             ],

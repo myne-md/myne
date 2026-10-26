@@ -21,10 +21,11 @@ import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { launchDevice, syncConfigSeed } from "./support/multi-device";
 import { seedVault } from "./support/fixtures";
 import {
+  clickByTestId,
   closeSettings,
   completePasswordReset,
   dismissImporterOffer,
-  openSettings,
+  openSyncDevices,
   unlockToEditor,
 } from "./support/flows";
 
@@ -64,8 +65,7 @@ async function accountOnServer(url: string) {
   });
   await unlockToEditor(a.session, password);
   await dismissImporterOffer(a.session);
-  await openSettings(a.session);
-  await (await a.session.byTestId("settings.tab-sync")).click();
+  await openSyncDevices(a.session);
   await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
   await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
   await (await a.session.byTestId("sync.enroll.submit")).click();
@@ -127,7 +127,13 @@ describeJr("JR sync join with the recovery phrase", () => {
         // The warning is on screen before the grid is filled.
         await b.session.byTestId("join.phrase-warning");
         await typePhrase(b.session, phrase);
-        await (await b.session.byTestId("join.submit")).click();
+        // `clickByTestId`, not a raw click: the join card grew a device-name
+        // field and a 24-cell grid, so its submit sits below the fold of the
+        // modal's own scrolling body, and WebDriver's scroll-into-view does not
+        // reliably reach a nested `overflow: auto` in WebKit. Measured
+        // 2026-10-24: `element not interactable` for the full 10 s budget on a
+        // button that was enabled and on screen one scroll away.
+        await clickByTestId(b.session, "join.submit");
 
         // No waiting screen at all: self-approved, then the chained reset.
         await b.session.byTestId("recover.reset.password-input", { timeoutMs: 60_000 });

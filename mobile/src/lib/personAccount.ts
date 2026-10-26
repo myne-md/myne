@@ -58,6 +58,25 @@ export function personStatus(): Promise<PersonStatusView> {
   return invoke<PersonStatusView>("plugin:sync|sync_person_status");
 }
 
+/** What an unlocked identity reports to the UI: public halves only. */
+export interface PersonIdentityView {
+  fingerprint_hex: string;
+  person_id_hex: string;
+  identity_code: string;
+}
+
+/**
+ * Unlock this device's sealed person identity for the session (myne-md/myne#911).
+ *
+ * Desktop has had this door since the identity home shipped; the phone did not,
+ * so a phone whose identity was sealed could only be told `PersonLocked` with no
+ * surface that clears it. The phrase is the proof of possession and the only
+ * input, and it crosses IPC once.
+ */
+export function personUnlock(phrase: string): Promise<PersonIdentityView> {
+  return invoke<PersonIdentityView>("plugin:sync|sync_person_unlock", { phrase });
+}
+
 export function personRegister(phrase: string): Promise<PersonSetupView> {
   return invoke<PersonSetupView>("plugin:sync|sync_person_register", { phrase });
 }

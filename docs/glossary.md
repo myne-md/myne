@@ -102,12 +102,14 @@ Used in: `docs/decisions/sync/0688`
 
 ### **account record** &nbsp; 📦 *Product*
 
-The device-local half of the account/vault split: a sealed record holding the account id, the member
-vault ids and the account label, stored under an OS-keychain wrap key (the sealed-label-store
-pattern). It is rebuilt from the on-disk vault scan when missing or corrupt, reconciled against
-discovery (adopting appearing vaults, pruning deleted ones, pruning emptied accounts), and never
-written in plaintext on any platform. Where the keychain is unavailable there is no record and no
-grouping. The per-vault half is the **vault membership** field.
+The device-local half of the account/vault split: a sealed record holding the account id and its
+member vault ids, stored under an OS-keychain wrap key (the sealed-label-store pattern). It carries
+no user-authored text: an account has no name, and a surface that groups vaults by account derives
+the group's heading from the group's own vault names (`decisions/ui/0728`). It is rebuilt from the
+on-disk vault scan when missing or corrupt, reconciled against discovery (adopting appearing vaults,
+pruning deleted ones, pruning emptied accounts), and never written in plaintext on any platform.
+Where the keychain is unavailable there is no record and no grouping. The per-vault half is the
+**vault membership** field.
 
 Used in: `spec/protocol.md` §9.3.1
 
@@ -203,6 +205,14 @@ Used in: `decisions/ai/0634`; `decisions/ai/0636`; `decisions/ai/0637`
 What the AI assistant remembers about the user across runs: a small, curated set of distilled claims (preferences, conventions, standing facts) the model wrote itself through the `remember` verb and the user can read, edit or delete in full. Persisted as vault content (`MYN1` catalog + `MYX1` per-entry blobs, `protocol.md` §9.25/§9.26): encrypted, synced Class-1, backed up, existing only while the `ai_enabled` opt-in is on. Writes are automatic (one per run, no approval dialog; `decisions/ai/0591`), and the compensating control is transparency plus gates: every entry is visible in the Settings panel and the chat popover, every model-written entry passed the schema + character-cap + injection scan + authorship + exclusion checks at write time and the scan again at injection time (a rejected update or user write is refused before it reaches disk, never persisted, never injected; a rejected MODEL create persists as `quarantined`, listed for review but never injected until a user edit clears it; `decisions/ai/0590`). Distinct from [conversations](#conversation) (the transcript, append-only) and from a note (never a write target). Cross-device by sync; delete-everywhere via the catalog tombstone.
 
 Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; `threat-model.md` TB12/TB13 (2026-09-10 amendments)
+
+### **seed memory** &nbsp; 📦 *Product*
+
+*(Alias: `seed_memory`, "Teach Myne your vault"; the reviewed one-shot pass from a vault into [agent memory](#agent-memory).)*
+
+A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0742`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
+
+Used in: `decisions/ai/0742`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
 
 ### **agent-writability verdict** &nbsp; 🛠️ *Tooling*
 
@@ -367,9 +377,15 @@ A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleto
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **attached document** &nbsp; 📦 *Product*
+
+A file a message carries so the run can READ it (myne-md/myne#913), as opposed to an attachment the run may propose a write to. Chosen per message, through the composer's `+` picker or a paste, and limited to four per message; the run receives the text extracted from each (the device-local [`MYE1`](#mye1) cache, §9.15), cut at 20,000 unicode scalar values per document by the host (`core/src/plugins/agent/prompt.rs`). The bytes never leave: only that text, carried as untrusted content beside note text, so the same sanitizer and the same off-device character count apply. A chosen document with no extracted text refuses the send by name rather than entering the run empty. `threat-model.md` TB12/TB13 carries it as a payload class because the file need not be the user's own: a received PDF is a third party's words.
+
+Used in: `spec/protocol.md` §9.10.2, §9.15; `threat-model.md` TB12, TB13; `decisions/protocol/0718`
+
 ### **attachment** &nbsp; 📋 *Protocol*
 
-An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
+An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). Every attachment has a **placement** (myne-md/myne#913): the [attachment library](#attachment-library) unless its catalog row carries `scope: "chat"`, which is the [chat-scoped attachment](#chat-scoped-attachment). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
 
 ### **attachment catalog tombstone** &nbsp; 📋 *Protocol*
 
@@ -391,7 +407,19 @@ The custom WebView protocol scheme that serves a decrypted [attachment](#attachm
 
 ### **attachment_import** &nbsp; 📋 *Protocol*
 
-The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
+The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). It also takes a `scope` (`None` / `Some("chat")`): a file pasted into a conversation is stored the same way and kept out of the library listing (myne-md/myne#913, [chat-scoped attachment](#chat-scoped-attachment)). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
+
+### **attached document** &nbsp; 📦 *Product*
+
+A file a message carries so the run can READ it (myne-md/myne#913), as opposed to an attachment the run may propose a write to. Chosen per message, through the composer's `+` picker or a paste, and limited to four per message; the run receives the text extracted from each (the device-local [`MYE1`](#mye1) cache, §9.15), cut at 20,000 unicode scalar values per document by the host (`core/src/plugins/agent/prompt.rs`). The bytes never leave: only that text, carried as untrusted content beside note text, so the same sanitizer and the same off-device character count apply. A chosen document with no extracted text refuses the send by name rather than entering the run empty. `threat-model.md` TB12/TB13 carries it as a payload class because the file need not be the user's own: a received PDF is a third party's words.
+
+Used in: `spec/protocol.md` §9.10.2, §9.15; `threat-model.md` TB12, TB13; `decisions/protocol/0718`
+
+### **chat-scoped attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) whose [`vault.attachments`](#vaultattachments) row carries the optional `scope: "chat"` (§9.10.2, myne-md/myne#913): it was pasted into one conversation and belongs to that surface. It is **not a second store**: the file is the same encrypted [`MYA1`](#mya1) blob, under the same key lineage, synced and backed up like any other attachment; the field only says which surface lists it, and the [attachment library](#attachment-library) filters it out (`catalog_list`). `library` is never emitted (the absent value IS the library), so every pre-#913 catalog encodes byte-identically and [`MYC1`](#myc1) keeps its magic. Decode tolerates an unknown scope value by reading it as library rather than failing the catalog, and a tombstone carries none. Its reference is a conversation turn, not a note, so the unused-attachment sweep never offers it (`decisions/protocol/0718`).
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`; `myne-test-vectors` `attachments-catalog/v0.1/encrypt-chat-scope`
 
 ### **attachment_export** &nbsp; 📋 *Protocol*
 
@@ -400,6 +428,12 @@ The Tauri command that writes one [attachment](#attachment)'s **decrypted** byte
 ### **attachment file-card** &nbsp; 📦 *Product*
 
 The editor representation of a non-renderable (generic) [attachment](#attachment) — a `.docx`, `.zip`, `.txt`, etc. stored as `application/octet-stream`. Unlike an inline image/PDF, the file's content never auto-renders; the form-C embed `![[att:<id>|filename]]` renders as a compact atomic card showing a file-type icon, the [`vault.attachments`](#vaultattachments) filename (the single source of truth — `Rename` edits it globally via `attachment_rename`, not the per-embed alias), a "type · size" line (the type label is derived from the filename extension TS-side, since the catalog stores only `octet-stream`), and a "⋯" overflow menu: Export (→ [attachment_export](#attachment_export)), Rename, Remove from note, Reveal in library. "Using" the file means exporting it. A missing id renders the shared [deleted-attachment tombstone](#deleted-attachment-tombstone). Text-like files (`.txt`/code/`.csv`) and `.docx`/`.xlsx` cards can additionally expand an inline read-only [attachment text preview](#attachment-text-preview) (MYND-268; `.pptx` and the rest stay export-only). (MYND-173; `decisions.md` 2026-06-14)
+
+### **attachment library** &nbsp; 📦 *Product*
+
+The surface that lists the vault's [attachments](#attachment) as files a user can browse, open, rename, export and clean up, and the default placement of every attachment that is not a [chat-scoped attachment](#chat-scoped-attachment) (myne-md/myne#913). It is a VIEW over the one [`vault.attachments`](#vaultattachments) catalog, not a directory and not a second store: the rows it omits (`scope: "chat"`) are still stored, encrypted, synced and backed up exactly like the ones it shows, and its listing command (`catalog_list`) is where the omission is enforced. The same list is what a message's document picker offers, so a pasted conversation file is not re-offered as a document.
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`
 
 ### **attachment search doc** &nbsp; 📋 *Protocol*
 
@@ -638,9 +672,15 @@ A test whose assertions pin the code's **current** behaviour rather than the beh
 Used in: `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#750
 
 
+### **chat-scoped attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) whose [`vault.attachments`](#vaultattachments) row carries the optional `scope: "chat"` (§9.10.2, myne-md/myne#913): it was pasted into one conversation and belongs to that surface. It is **not a second store**: the file is the same encrypted [`MYA1`](#mya1) blob, under the same key lineage, synced and backed up like any other attachment; the field only says which surface lists it, and the [attachment library](#attachment-library) filters it out (`catalog_list`). `library` is never emitted (the absent value IS the library), so every pre-#913 catalog encodes byte-identically and [`MYC1`](#myc1) keeps its magic. Decode tolerates an unknown scope value by reading it as library rather than failing the catalog, and a tombstone carries none. Its reference is a conversation turn rather than a note, so the unused-attachment sweep reads the conversations too and offers the row only when no live conversation names it; if a conversation cannot be read, or the vault is a B2B one (`NTV6`, so some conversations belong to another person and cannot be enumerated here), the sweep refuses outright rather than erasing, because a library file picked into a message is referenced only by a turn too (`decisions/protocol/0718`). On such a vault the marker is a library-listing fact rather than a confidentiality boundary: the blob and its catalog row are group-tier and readable by every member.
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`; `myne-test-vectors` `attachments-catalog/v0.1/encrypt-chat-scope`
+
 ### **chat turn** &nbsp; 📦 *Product*
 
-One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic. A user turn may also carry `attachments` (myne-md/myne#913): the files that message sent into the run, as `{id, name, contentType}` referencing [attachments](#attachment), absent when it carried none, so the transcript names what a question was about after the composer's chips are gone.
 
 Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
 
@@ -656,7 +696,9 @@ Used in: `spec/protocol.md` §9.5.2
 
 One persisted AI chat history unit: an ordered, immutable list of settled [chat turns](#chat-turn) plus a record (id, title, created/updated timestamps, causal version, tombstone) in the [conversation catalog](#conversation-catalog). Conversations survive lock, restart and device changes (encrypted at rest as `MYJ1` files under `chats/`, synced, backed up), are listed by updated-at, continue from where the last one left off when the AI tab opens, and delete everywhere via a catalog tombstone with no trash or undo (`decisions/ai/0581`). Titles derive deterministically from the first user turn (first 48 Unicode scalar values, newlines stripped, no model call) and are user-renameable. An agent turn's frozen [proposal](#agent-run) persists inside its conversation **read-only**: no historical re-apply exists (`decisions/ai/0583`).
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`
+**A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
+
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0740`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 
@@ -994,11 +1036,19 @@ The v2 layout also keeps a version of the two carried fields that a reader must 
 
 Used in: `decisions.md` 2026-07-19; `decisions/protocol/0689`; `threat-model.md` §7
 
-### **device key** &nbsp; 🗝️ *Key/identifier*
+### **device key** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-Reserved term for a later major version's multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
+**Status: stages 1 and 2 ship, stage 3 does not.** A device keypair exists (`protocol/src/device_key.rs`), signs vault heads at `0x03` and the owner group roster under `"myne.group-roster v2|"`, and its public halves travel in the `MYU5` `format_version 0x02` row (and, for a member, inside the invite package's `owner_device` attestation); the keys live in the Apple Keychain, and every other platform sits at rung 4 of the ladder below and keeps the phrase path. The [person keypair](#person-keypair) still signs the device-binding row, the member display-name rows and vault creation, because stage 3 and the name rows are not built (`decisions/protocol/0733` states exactly what is and is not). The term is defined here because the decision is recorded and the sentences that describe it would otherwise be read as a shipped guarantee (`decisions/protocol/0731`, sharpened by `0733`).
 
-Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+The per-device asymmetric key pair that takes over **daily authority** from the person key: it signs every vault head, the owner-signed [group roster](#group-roster) (so create, invite and removal), its own [device-to-person binding](#device-to-person-binding) row and the member display-name rows, while the person key does one thing per device: it signs that device's own binding row, once, when the device joins the account. The phrase keeps one job, recovery: the phrase opens the account when there is no working device, and every vault still opens with its own password.
+
+Four constants and one invariant are load-bearing. The head format is **`0x03`** (so `0x02` keeps meaning "signed by the person key"), the signature is **double, Ed25519 + ML-DSA-65**, and the record is the same length as `0x02` with the device id in the author slot; the head signature class becomes `"myne.head-signature v2|"`. The binding row's inner schema is `MYU5` format version `0x02` and carries the **device public halves** (a device-signed head cannot be verified without them) under the class `"myne.device-binding v2|"`; rows written under `v1` stay readable and a device re-signs itself on its first write. And the private half is **never on disk in plaintext**: OS keychain with `thisDeviceOnly` semantics, else the Linux Secret Service, else a `0600` file sealed by a user PIN reusing the [quick-unlock credential](#quick-unlock-credential) `MYQ1` attempt-and-wipe machinery, and if the user declines a PIN **no device key is created on that machine** and it keeps the phrase path.
+
+The invariant that makes the whole thing safe is a negative one: **a device key unwraps nothing.** The person key is deliberately NOT cached in a keychain, because on an `NTV7` vault every owned vault's `root_key` is sealed to it, so a keychain-held person key would let one biometric open every vault without a password, which is the cross-vault escalation `person_vault_carrier::carrier_applies` already refuses. What a stolen device key buys an adversary is the ability to sign as that device until its binding is revoked; what it does not buy is any vault.
+
+Not to be confused with the reserved sense the term used to carry (a hardware-held device key participating in MLS group formation): that reading stays out of scope, and `0731` gives the term a different, narrower job.
+
+Used in: `docs/decisions/protocol/0731-daily-authority-moves-to-a-device-key.md`; `docs/decisions/protocol/0733-the-device-keys-open-questions-are-answered.md`; `docs/decisions/protocol/0670-the-device-binding-signature-class.md`
 
 ### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
 
@@ -1527,9 +1577,9 @@ Used in: `docs/decisions/sync/0627-hosted-sync-access-is-gated-by-a-server-confi
 
 ### **invite relay** &nbsp; 📦 *Product*
 
-The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, plus the owner-side claimed-versus-pending list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
+The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, `DELETE /b2b/invites/{invite_id}` (the recipient's refusal, which drops the sealed payload and leaves a payload-free tombstone so the sender's list can say "declined" rather than "not accepted yet", `decisions/protocol/0732`), plus the owner-side three-state list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
 
-Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/decisions/protocol/0732-an-invitation-decline-is-a-real-server-side-delete.md`; `docs/spec/server-protocol.md` §3.1
 
 ### **heading record** &nbsp; 📦 *Product*
 
@@ -2037,6 +2087,14 @@ A peer's live caret and its name label, drawn in the open note as one CodeMirror
 
 Used in: `decisions/ui/0659`; `myne-agents/features/collab-presence-ui/`
 
+### **photo to note** &nbsp; 📦 *Product*
+
+The mobile capture flow (myne-md/myne#926) that turns a photograph of a page, a whiteboard or a slide into note text. One entry in the editor's pinned format bar opens the OS file picker, whose own action sheet offers **Take Photo** beside **Photo Library**, so the camera is the OS camera app and Myne opens no stream of its own (the picker's camera usage string already existed for the attach path, MYND-474). The picked file is imported through the ordinary [attachment](#attachment) path, which runs [image OCR](#image-ocr) on the device into the device-local [`MYE1`](#mye1) cache; the flow then opens a **draft sheet** showing the photograph and that cached text in an editable field, and writes nothing until the user commits. Distinct from the plain attach button, which still inserts a bare embed with no reading.
+
+Not to be confused with [image OCR](#image-ocr): OCR is the extractor, and this is the one surface where its output is offered for review. The photograph is always kept, because an [`MYE1`](#mye1) entry is generation-bound and a better extractor can only re-read an original that is still in the vault. The reviewed text lands under the image embed as ordinary note markdown. Discarding a draft deletes the import only when the flow created it: `attachment_import` is content-addressed and dedups, so a photograph the vault already held is left alone. (`decisions/ui/0731`)
+
+Used in: `decisions/ui/0731`; `mobile/src/app/flows/PhotoNoteSheet.tsx`
+
 ### **policy refusal** &nbsp; 📦 *Product*
 
 A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.
@@ -2116,6 +2174,14 @@ Used in: `docs/decisions/protocol/0666-member-display-names-a-group-tier-sealed-
 The verdict a reader attaches to a member display-name row: `verified` (the row's signature checks out against the public half of the person the row names), `unverified` (a record exists and the signature does not check out, or names somebody else), or `absent` (no record for that person). The three are deliberately separate rather than collapsed into a boolean or into "no name", because "this member has not chosen a name" and "somebody wrote a row for this member that nobody signed" are different things to tell a reader. The verification happens where the roster's public halves are already available, and the unverified record's CONTENT is not carried out of that partition, so a tampered name never reaches a surface that could render it.
 
 Used in: `docs/spec/protocol.md` §9.29.4; `docs/decisions/protocol/0667-the-member-name-signature-class.md`; `protocol/src/member_names_blob.rs` (`partition_verified`).
+
+### **member plane** &nbsp; 📋 *Protocol*
+
+The half of the shared-vault protocol that a **member** (not the owner) speaks, as opposed to the account plane and the [awareness plane](#awareness-plane). It is the set of acts a member performs against a vault it does not own: unlocking the vault from its own phrase, reading the [group roster](#group-key-epoch) and the two member-writable families, adopting a rotated group epoch from a delivered package rather than authenticating the rotated meta itself, and writing its own [display name](#member-display-name) and [device binding](#device-to-person-binding). Its credential is a `(person, vault)` **membership token**, not the vault's own device token, and it never holds the vault's `root_key`: the `group_key` and `itemsKey` arrive in the invite package and the root stays sealed to the owner's person key, which is why a member cannot re-sign an owner-signed record.
+
+The term became load-bearing when the plane stopped being `NTV6`-only. A vault born under a person identity is `NTV7` (the generation wraps `root_key` to the owner's person key), and the member plane used to resolve the group tail through a reader that asked for the `NTV6` frame specifically, so every member act answered `BadRequest` on exactly the vaults the product made shareable. The plane now reads the tail generation-agnostically through `parse_b2b_tail_any` and re-emits the generation it found (`decisions/protocol/0730`), which is a reader change and not a format change: `NTV7` keeps the `NTV6` tail byte for byte.
+
+Used in: `docs/decisions/protocol/0730-the-member-plane-reads-the-ntv7-generation.md`; `docs/spec/protocol.md` §9.3.5, §9.29.6, §9.30.6; `docs/spec/server-protocol.md` §3.1a; `core/src/plugins/sync/person_account.rs`.
 
 ### **member removal** &nbsp; 📦 *Product*
 
@@ -2602,6 +2668,18 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 (`docs/spec/protocol.md` §9.28.4), so the code DOES now reach the sync server, as
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
+
+**device admission.** The act of adding a device to a person account without typing the recovery phrase
+(`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
+has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
+them, compares a short authentication string between the two screens, and installs the credential
+(`POST /auth/devices/credential`, which also approves the device) and binds the newcomer's row in
+`vault.device-bindings`. The phrase keeps two jobs and loses the routine one: it is still the account's own
+credential and still the only path when no working device is left. A device that joined this way holds no person
+keypair, so it signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display
+name; the admitting device is the one that signs. Not to be confused with **device join**, the older flow that
+scans a QR carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
+
 
 Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
@@ -3464,9 +3542,15 @@ Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src
 
 ### **size class** &nbsp; 📦 *Product*
 
-The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
+The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `compactWide` (600 to 700px on a phone-class screen: ONE column, the note at its own measure, the list as an overlay drawer — the [folded band](#folded-band)), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing), which **yields when the window is wider than the widest dimension of the screen it reports** (a foldable can report the panel the user is not looking at, and that stale reading looks exactly like this). "Can this layout mount a second pane" is answered by `isRegularSizeClass`, never by comparing to `"compact"`: the band is one column and is not regular. Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
 
-Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/formfactor/SizeClassContext.tsx`
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `decisions/clients/0724` (the folded band); `mobile/src/formfactor/SizeClassContext.tsx`
+
+### **folded band** &nbsp; 📦 *Product*
+
+The one-column layout an unfolded foldable gets: a window of 600 to 700px whose screen's smaller dimension is under 700px, which every iPad clears (744 and up), so an iPad Split View pane at the same width keeps the phone layout it has always had. Inside it the note takes the full width with the [size class](#size-class) measure (`maxWidth` 664 with the phone's 22px gutter, so 620px of text at the top of the band) and the list arrives as a ~320px overlay drawer on the inline-start edge instead of replacing the note, because at that width a persistent pane would put the note below the desktop centre floor. A [size-class](#size-class) transition restores the caret, the selection and the scroll offset and knowingly not the undo history (`mobile/src/app/flows/editor/caretRestore.ts`).
+
+Used in: `decisions/clients/0724`; `mobile/AGENTS.md`; `mobile/src/formfactor/SizeClassContext.tsx`
 
 ### **skip (a recurring task)** &nbsp; 📦 *Product*
 
@@ -4236,7 +4320,7 @@ Used in: `docs/decisions/protocol/0592`; `docs/decisions/protocol/0593`; `core/s
 
 ### **vault picker** &nbsp; 📦 *Product*
 
-The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped under that account's label, which is user-renamable and likewise readable pre-unlock from the sealed device-local account record. Pre-unlock it surfaces only the vault **count + last-unlock timing** plus account **labels and grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and account labels both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped by account, a relation likewise readable pre-unlock from the sealed device-local account record. An account has no name of its own: a surface that draws a group heading builds it from the names of the vaults inside it (`decisions/ui/0728`), and the desktop picker draws no heading at all (myne-md/myne#772). Pre-unlock it surfaces only the vault **count + last-unlock timing** plus the account **grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and the grouping both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
 

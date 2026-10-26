@@ -41,6 +41,8 @@ import {
   waitForSaved,
   contextMenuPick,
   createFolder,
+  pageSeatInvoke,
+  searchAndOpenNote,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -153,6 +155,14 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         const mentions = await s.findElements(testIdSelector("ai.mention-link"));
         expect(mentions.length).toBeGreaterThan(0);
         expect((await mentions[0]!.textContent()).trim()).toBe("stub run");
+        // **Pin the conversation before the mention moves the editor**
+        // (myne-md/myne#913). Pressing a mention opens its note, and opening a
+        // different note starts a FRESH conversation, which is the shipped
+        // binding (`ac3` asserts it). This scenario is about the transcript and
+        // the lock, not about the binding, so it uses the explicit pin the user
+        // has for exactly this case; without it the follow-up below would be the
+        // first turn of a new conversation and the count would never reach four.
+        await (await s.byTestId("ai.keep-conversation")).click();
         await mentions[0]!.click();
         // `openMention` is `ws.openNewTabInFocused`, so the note becomes the
         // ACTIVE tab, the one signal that says the press reached the
@@ -376,6 +386,206 @@ aiDescribe("ac3 the run's footprint is one line in the transcript", () => {
           timeoutMs: 10_000,
         });
         void scroller;
+      },
+    );
+  });
+});
+
+// ── ac2: a run reads an attached document, and a sent file rides the turn ──
+//
+// The flow this covers (myne-md/myne#913): pick a document for a message,
+// watch it become a chip on the composer, send, and find it on the user's turn
+// in the transcript rather than only in the box that sent it. The two halves
+// that cannot be driven as UI are set up through PRODUCTION IPC from the page
+// seat, the `al1` precedent: an import terminates at a native file dialog
+// WebDriver cannot drive (`attachment_import` with inline bytes), and the
+// chat-scope half is the command a PASTED file goes through: a real clipboard
+// file cannot be placed by WebDriver either, so the command is invoked with the
+// scope the composer's paste handler sends and the RESULT is what is asserted.
+//
+// What is deliberately NOT re-driven here: the paste handler's own wiring and
+// the cap at four documents are Vitest component tests (`ChatComposer`). This
+// scenario is the real-IPC path a user takes with the picker, plus the at-rest
+// consequence of the scope marker.
+
+/** Import bytes through the production desktop import command. */
+async function importDoc(
+  s: Session,
+  text: string,
+  filename: string,
+  scope?: "chat",
+): Promise<string> {
+  const bytes = Array.from(new TextEncoder().encode(text));
+  const args: Record<string, unknown> = { source: { kind: "bytes", bytes, filename } };
+  if (scope !== undefined) args.scope = scope;
+  const r = await pageSeatInvoke(s, "plugin:attachments|attachment_import", args, 20_000);
+  expect(r.err, `attachment_import ${filename} should succeed`).toBeUndefined();
+  return (r.ok as { id: string }).id;
+}
+
+/** The ids the attachment LIBRARY lists, the same command the picker reads. */
+async function libraryIds(s: Session): Promise<string[]> {
+  const r = await pageSeatInvoke(s, "plugin:attachments|catalog_list", {}, 20_000);
+  expect(r.err, "catalog_list should succeed").toBeUndefined();
+  return (r.ok as Array<{ id: string }>).map((entry) => entry.id);
+}
+
+aiDescribe("ac2 chat attachments → picker → sent on the turn", () => {
+  it("attaches a library document, sends it, and keeps a chat-scoped file out of the library", async () => {
+    let password = "";
+    await scenario(
+      "ac2-ai-attachments",
+      { seed: (dir) => void (password = seedVault(dir).password) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, password);
+        await dismissImporterOffer(s);
+
+        await createNote(s, "ac2notealfa7k2m9qx4w8e5rj0aa");
+        await typeIntoEditor(s, "Field notes for the attachment run.");
+        await waitForSaved(s);
+
+        // A library document: the picker offers it, and a picked file is NOT
+        // re-scoped, because it is the library's file, and the library keeps it.
+        const docId = await importDoc(
+          s,
+          "Field notes. The lake was still and the road was empty.\n",
+          "ac2-field-notes.txt",
+        );
+        expect(await libraryIds(s)).toContain(docId);
+
+        // A chat-scoped file, imported through the command the paste handler
+        // calls with the scope it sends: stored and readable, absent from the
+        // library listing.
+        const pastedId = await importDoc(s, "pasted into one conversation\n", "ac2-pasted.txt", "chat");
+        expect(await libraryIds(s)).not.toContain(pastedId);
+
+        await enableAi(s);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+
+        // ---- the picker offers the library and nothing else ----
+        await (await s.byTestId("ai.composer-attach")).click();
+        await s.waitForElement(testIdSelector("ai.attachment-picker-body"), {
+          timeoutMs: 10_000,
+        });
+        const options = await s.byTestIdAll("ai.attachment-option");
+        const optionNames: string[] = [];
+        for (const option of options) optionNames.push((await option.textContent()) ?? "");
+        const offered = optionNames.join("\n");
+        expect(offered).toContain("ac2-field-notes.txt");
+        expect(offered).not.toContain("ac2-pasted.txt");
+
+        for (const option of options) {
+          if (((await option.textContent()) ?? "").includes("ac2-field-notes.txt")) {
+            await option.click();
+            break;
+          }
+        }
+        await (await s.byTestId("ai.attachment-picker-confirm")).click();
+        await s.waitForElement(testIdSelector("ai.composer-attachment"), {
+          timeoutMs: 10_000,
+        });
+
+        // ---- send, and the file rides the message it was sent with ----
+        const composer = await s.byTestId("ai.composer-input");
+        await composer.sendKeys("what does the attached file say?");
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+
+        await s.waitForElement(testIdSelector("ai.turn-attachment"), {
+          timeoutMs: 15_000,
+        });
+        const chip = await s.byTestId("ai.turn-attachment");
+        expect(await chip.textContent()).toContain("ac2-field-notes.txt");
+        // The composer let the file go with the message: one file, one place.
+        expect((await s.byTestIdAll("ai.composer-attachment")).length).toBe(0);
+        // The send did not fail on the document read.
+        expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
+      },
+    );
+  });
+});
+
+// ── ac3: a conversation belongs to its note, and the pin is the escape ──
+//
+// The issue's first item (myne-md/myne#913): opening a different note starts a
+// fresh conversation, because the turns were about the note the user was in. The
+// escape hatch is an explicit, session-scoped pin. Both halves are user-visible
+// and neither can be reached from a unit test: the panel is mounted by the right
+// sidebar, and what "switching notes" means is which note the workspace has
+// focused.
+//
+// Notes are created through PRODUCTION IPC from the page seat and the WebView is
+// refreshed before driving, the `al1` precedent: a page-seat create does not
+// reach the frontend's note cache, and a scenario that skipped the refresh would
+// be asserting against a stale sidebar.
+
+aiDescribe("ac3 a conversation belongs to its note", () => {
+  it("starts fresh on a note switch, and the pin keeps it", async () => {
+    let seeded: { password: string };
+    await scenario(
+      "ac3-note-bound-chat",
+      { seed: (dir) => void (seeded = seedVault(dir)) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+
+        const makeNote = async (plaintext: string): Promise<string> => {
+          const r = await pageSeatInvoke(
+            s,
+            "plugin:notes|note_create",
+            { plaintext },
+            20_000,
+          );
+          expect(r.err, "note_create should succeed").toBeUndefined();
+          return r.ok as string;
+        };
+        const a = await makeNote("note A: the first conversation\n");
+        const b = await makeNote("note B: somewhere else\n");
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+
+        await enableAi(s);
+
+        // ---- on note A: send a turn ----
+        await searchAndOpenNote(s, "note A", a);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+        await (await s.byTestId("ai.composer-input", { timeoutMs: 10_000 })).sendKeys(
+          "what is in this note",
+        );
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "a turn on note A", timeoutMs: 20_000 },
+        );
+
+        // ---- switching to note B starts a fresh conversation ----
+        await searchAndOpenNote(s, "note B", b);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length === 0 ? true : null),
+          { label: "note B's transcript is empty", timeoutMs: 15_000 },
+        );
+
+        // ---- pinned on B, the conversation follows to A ----
+        await (await s.byTestId("ai.composer-input")).sendKeys("what is in this one");
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "a turn on note B", timeoutMs: 20_000 },
+        );
+        await (await s.byTestId("ai.keep-conversation")).click();
+        await searchAndOpenNote(s, "note A", a);
+        // Still here, and the mark is on: the escape hatch the issue asks for.
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "the pinned conversation survived the switch", timeoutMs: 15_000 },
+        );
+        expect(
+          await (await s.byTestId("ai.keep-conversation")).attribute("aria-pressed"),
+        ).toBe("true");
       },
     );
   });

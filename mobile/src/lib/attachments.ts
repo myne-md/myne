@@ -1,8 +1,9 @@
 // Tauri IPC wrappers for the mobile `attachments` plugin (MYA1 blob / MYC1
-// catalog / ref graph — shared core in `myne-core::plugins::attachments`). Mobile
-// registers the 10 CRUD/refs/export commands (no voice, no text-extraction) +
-// the `attachment://` scheme. Mirrors the desktop `src/lib/attachments.ts` DTOs
-// so an attachment imported on mobile is byte-identical on desktop.
+// catalog / ref graph; shared core in `myne-core::plugins::attachments`). Mobile
+// registers the CRUD/refs/export commands plus the `attachment://` scheme and,
+// since myne-md/myne#926, the MYE1 extracted-text read-back. Mirrors the desktop
+// `src/lib/attachments.ts` DTOs so an attachment imported on mobile is
+// byte-identical on desktop.
 
 import { invoke } from "../platform/core";
 import type { IoFailureKind } from "../types/vault-unlock-error";
@@ -137,6 +138,76 @@ export function attachmentRefsRemove(noteId: string): Promise<void> {
 /** Note-ids referencing an attachment ("used in N notes"). */
 export function attachmentRefsReferencing(attachmentId: string): Promise<string[]> {
   return invoke<string[]>("plugin:attachments|attachment_refs_referencing", { attachmentId });
+}
+
+/** The decrypted MYE1 entry: mirror of the Rust `AttachmentExtractedText`. */
+export interface AttachmentExtractedText {
+  /** The extracted text (an image's OCR output on mobile). PLAINTEXT of
+   *  note-body class: DENY-listed, never logged or traced. */
+  text: string;
+  /** Producing extractor's source format, lowercased: "audio" | "pdf" | "docx" |
+   *  "text" | "image" | "other". */
+  source_format: string;
+  /** True when the cache hit the 1 MiB cap and `text` is the head. */
+  truncated: boolean;
+}
+
+/** Outcome of {@link attachmentReadExtractedText}.
+ *
+ *  Four arms rather than the desktop binding's `AttachmentExtractedText | null`,
+ *  because the mobile surface has to tell two things apart that `null` collapses:
+ *  a page with NO text (offer the image alone, blame nobody) and a vault that
+ *  LOCKED under the sheet (stop, drop the plaintext, ask for the unlock). The
+ *  difference is deliberate and is why this is not a twin of the desktop
+ *  signature; the DECODED payload is the same one. */
+export type ExtractedTextRead =
+  /** A usable cache entry. An empty or whitespace-only one reads as `none`. */
+  | { kind: "text"; entry: AttachmentExtractedText }
+  /** No usable cache entry for this id: never extracted, extraction failed,
+   *  generation-stale, or undecryptable. Not an error. */
+  | { kind: "none" }
+  /** `Slot` was not unlocked when the read arrived. */
+  | { kind: "locked" }
+  /** Anything else (host IO, a join failure). Retryable, and never reported as
+   *  "no text" because a failure is not an empty page. */
+  | { kind: "failed" };
+
+/** Normalize the Rust error surface to the union above. Tauri serializes the
+ *  `#[serde(tag = "kind")]` enum as `{ kind: "Locked" }`, but a unit variant can
+ *  arrive as its bare identifier on some paths, so both spellings are read (the
+ *  same normalization `transcribe.ts` uses for its own enum). */
+function normalizeReadFailure(raw: unknown): "locked" | "failed" {
+  const tag =
+    typeof raw === "string"
+      ? raw
+      : raw !== null && typeof raw === "object" && "kind" in raw
+        ? String((raw as { kind: unknown }).kind)
+        : "";
+  return tag.toLowerCase() === "locked" ? "locked" : "failed";
+}
+
+/**
+ * Read one attachment's cached MYE1 extracted text (Slot::Unlocked-gated;
+ * `protocol.md` § 9.15). On mobile the producer is the import's eager image OCR
+ * (MYND-441), so this is how a photographed page's text becomes readable.
+ *
+ * The text decrypts in Rust RAM and crosses IPC as plaintext (note-body class).
+ * Render it as inert, editable text: never as interpreted markdown or HTML, and
+ * never in a log.
+ */
+export async function attachmentReadExtractedText(
+  id: string,
+): Promise<ExtractedTextRead> {
+  try {
+    const entry = await invoke<AttachmentExtractedText | null>(
+      "plugin:attachments|attachment_read_extracted_text",
+      { id },
+    );
+    if (entry === null || entry.text.trim().length === 0) return { kind: "none" };
+    return { kind: "text", entry };
+  } catch (raw) {
+    return { kind: normalizeReadFailure(raw) };
+  }
 }
 
 /** Error surface shared across the commands (mirror of the Rust enums). */

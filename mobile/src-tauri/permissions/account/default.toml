@@ -1,13 +1,13 @@
 # Permissions for the in-app `account` Tauri plugin, mobile (myne-md/myne#684).
 # Mirror of the desktop `src-tauri/permissions/account/default.toml`, down to
-# the four identifiers and what each one is allowed to reach. Picked up under
+# the three identifiers and what each one is allowed to reach. Picked up under
 # the `account:` ACL namespace only because `build.rs` declares this as an
 # `InlinedPlugin`. Capability files reference these as `account:default`.
 #
-# All four commands are reachable PRE-UNLOCK, deliberately: the surface they
+# All three commands are reachable PRE-UNLOCK, deliberately: the surface they
 # govern is the vault picker, which renders before any vault is open. None
-# reaches vault content: the only values crossing are the account label (the
-# user's own text) and vault ids. Adding a command here without a matching
+# reaches vault content: the only values crossing are hex account ids and vault
+# ids. Adding a command here without a matching
 # entry in `src-tauri/src/plugins/account/mod.rs`'s `generate_handler!` ships
 # it dead (root AGENTS.md: an ACL entry does not wire a command, and nothing
 # checks that it does).
@@ -19,10 +19,9 @@
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the account plugin: read the account grouping, rename an account, move a vault between accounts, and split a vault into a fresh account."
+description = "Default permission set for the account plugin: read the account grouping, move a vault between accounts, and split a vault into a fresh account."
 permissions = [
   "allow-account-list",
-  "allow-account-rename",
   "allow-account-move",
   "allow-account-split",
 ]
@@ -31,11 +30,6 @@ permissions = [
 identifier = "allow-account-list"
 description = "Allow invoking account:account_list (read the device-local account grouping from app_config_dir/account.json; absent means no grouping, a damaged file rebuilds from the disk-scan). A list of accounts out; no vault content, no keychain write."
 commands.allow = ["account_list"]
-
-[[permission]]
-identifier = "allow-account-rename"
-description = "Allow invoking account:account_rename (rename the account owning a vault). Takes a vault id and a label; writes the sealed record. No vault content."
-commands.allow = ["account_rename"]
 
 [[permission]]
 identifier = "allow-account-move"

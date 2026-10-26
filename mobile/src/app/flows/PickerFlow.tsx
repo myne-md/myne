@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark, Sheet, ListGroup, ListRow } from "../../components";
 import { listVaults, orderByLastUnlock, stableVaultNumber } from "../../lib/vault-list";
-import { listAccounts, renameAccount, moveVault, splitVault, accountIdForVault, accountCommandErrorKind, groupVaultsByAccount, truncateLabelToBytes } from "../../lib/account";
+import { listAccounts, moveVault, splitVault, accountHeading, accountIdForVault, accountCommandErrorKind, groupVaultsByAccount } from "../../lib/account";
 import type { AccountView, AccountCommandErrorKind } from "../../lib/account";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { isVaultUnlocked } from "../../lib/vault-unlock";
@@ -22,10 +22,12 @@ import type { PickerFlowProps } from "./types";
  * the sync-join flow (`onJoin`, myne-mobile#40). Carries no secret material —
  * the list is the DENY-list-clean `VaultSummary` projection only.
  *
- * The account/vault split (myne-md/myne#684) groups rows under the account
- * label; a long-press on a row opens a sheet with rename / move-to-new-account /
- * move-to-account. On Android the keychain has no backend, so `account_list`
- * answers empty and every vault shows standalone (no header, no error).
+ * The account/vault split (myne-md/myne#684) groups rows, and a group's heading
+ * is the names of the vaults inside it (`docs/decisions/ui/0728`: an account has
+ * no name of its own). A long-press on a row opens a sheet with
+ * move-to-new-account / move-to-account. On Android the keychain has no
+ * backend, so `account_list` answers empty and every vault shows standalone (no
+ * header, no error).
  */
 
 /** Dot palette for labeled vaults (cycled by position); placeholder rows use a muted dot. */
@@ -210,14 +212,12 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   // locked (backend `Locked`), so the hold sheet opens only when unlocked;
   // the locked picker stays a read surface.
   const [unlocked, setUnlocked] = useState(false);
-  // Sheet mode: the action menu, the inline rename form, or the
-  // destination-account list for a move. One sheet, three faces.
-  const [sheetMode, setSheetMode] = useState<"menu" | "rename" | "move">("menu");
-  const [renameDraft, setRenameDraft] = useState("");
+  // Sheet mode: the action menu, or the destination-account list for a move.
+  // One sheet, two faces.
+  const [sheetMode, setSheetMode] = useState<"menu" | "move">("menu");
 
   const accountErrorCopy = (kind: AccountCommandErrorKind | null): string => {
     if (kind === "Hidden") return t("picker.accountHidden");
-    if (kind === "LabelTooLong") return t("picker.labelTooLong");
     if (kind === "RecordUnreadable") return t("picker.accountUnreadable");
     return t("picker.accountError");
   };
@@ -282,15 +282,28 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   };
 
   // Grouping lives in `../../lib/account` (`groupVaultsByAccount`, shared with
-  // both desktop pickers); this file keeps only the label.
+  // both desktop pickers); this file keeps only the heading.
   const groupVaults = (): { account: AccountView | null; vaults: VaultSummary[] }[] => {
     if (vaults === null) return [];
     return groupVaultsByAccount(vaults, accounts);
   };
 
+  // A heading is the group's own vault names (`docs/decisions/ui/0728`). The
+  // neutral fallback is left only for the case with nothing to name.
   const accountLabel = (account: AccountView | null): string => {
     if (account === null) return "";
-    return account.label === "" ? t("picker.accountFallback") : account.label;
+    return accountHeading(
+      account,
+      (id) => {
+        const vault = (vaults ?? []).find((v) => v.id === id);
+        if (vault === undefined) return null;
+        return vaultDisplayLabel(
+          vault.label,
+          stableVaultNumber(vaults ?? [], id),
+        );
+      },
+      t("picker.accountFallback"),
+    );
   };
 
   const holdActions = (vault: VaultSummary): void => {
@@ -299,7 +312,7 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
     // is the mutation surface, so it opens only when unlocked.
     if (!unlocked) return;
     // Account actions are offered only for member vaults: a standalone
-    // vault has no account to rename or move from, and every command would
+    // vault has no account to move from, and every command would
     // answer VaultNotFound.
     if (accountIdForVault(accounts, vault.id) === null) return;
     setSheetMode("menu");
@@ -334,7 +347,7 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
                 {group.account !== null && (
                   <div
                     data-testid="picker.account-header"
-                    style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--fg-3)", padding: "var(--space-1) var(--space-1) 0" }}
+                    style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-semibold)", color: "var(--fg-3)", padding: "var(--space-1) var(--space-1) 0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
                   >
                     {accountLabel(group.account)}
                   </div>
@@ -386,64 +399,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
             const destinations = accounts.filter(
               (a) => a.id !== heldAccountId && a.vaults.length > 0,
             );
-            if (sheetMode === "rename") {
-              return (
-                <ListGroup>
-                  <ListRow
-                    title={
-                      <input
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
-                        autoFocus
-                        value={renameDraft}
-                        maxLength={512}
-                        placeholder={t("picker.renamePlaceholder")}
-                        aria-label={t("picker.renameAccount")}
-                        data-testid="picker.rename-input"
-                        style={{
-                          width: "100%",
-                          fontSize: "var(--text-base)",
-                          color: "var(--fg-1)",
-                          background: "transparent",
-                          border: "none",
-                          outline: "none",
-                        }}
-                        onChange={(e) =>
-                          setRenameDraft(truncateLabelToBytes(e.target.value, 512))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Escape") {
-                            setHeldVault(null);
-                            setSheetMode("menu");
-                          }
-                        }}
-                      />
-                    }
-                    isLast={false}
-                  />
-                  <ListRow
-                    title={t("picker.renameSave")}
-                    isLast={false}
-                    testID="picker.rename-save"
-                    onClick={() => {
-                      const vault = heldVault;
-                      const label = renameDraft.trim();
-                      if (label === "") return;
-                      runAccountAction(() => renameAccount(vault.id, label));
-                      setSheetMode("menu");
-                    }}
-                  />
-                  <ListRow
-                    title={t("picker.renameCancel")}
-                    isLast
-                    testID="picker.rename-cancel"
-                    onClick={() => {
-                      setHeldVault(null);
-                      setSheetMode("menu");
-                    }}
-                  />
-                </ListGroup>
-              );
-            }
             if (sheetMode === "move") {
               return (
                 <ListGroup>
@@ -467,17 +422,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
             }
             return (
               <ListGroup>
-                <ListRow
-                  title={t("picker.renameAccount")}
-                  isLast={false}
-                  testID="picker.account-rename"
-                  onClick={() => {
-                    const current =
-                      accounts.find((a) => a.id === heldAccountId)?.label ?? "";
-                    setRenameDraft(current);
-                    setSheetMode("rename");
-                  }}
-                />
                 <ListRow
                   title={t("picker.moveToNewAccount")}
                   isLast={destinations.length === 0}

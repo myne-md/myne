@@ -364,6 +364,7 @@ mod tests {
                 bytes: bytes.to_vec(),
                 filename: Some(filename.to_string()),
             },
+            crate::plugins::attachments::commands::scope_for_wire(None),
         )
         .await
         .expect("fixture attachment import must succeed")

@@ -113,7 +113,7 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     // deleted the form would pass every assertion below.
     mountWith("not_enrolled");
     await waitFor(() => {
-      expect(screen.getByText("Add a device")).toBeTruthy();
+      expect(screen.getByText("Sign in this device")).toBeTruthy();
     });
     expect(screen.queryByTestId("sync.panel.awaiting-approval")).toBeNull();
   });
@@ -126,7 +126,7 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     // The heart of it. Enrolling again mints a new `device_id` and strands a
     // second pending record; the affordance is OMITTED, not disabled, which is
     // this codebase's rule for something a client cannot honour.
-    expect(screen.queryByText("Add a device")).toBeNull();
+    expect(screen.queryByText("Sign in this device")).toBeNull();
   });
 
   it("says why it is waiting, in the load-bearing wording", async () => {
@@ -150,7 +150,7 @@ describe("the enrol gate, for a device that cannot read the roster", () => {
     await waitFor(() => {
       expect(screen.getByTestId("sync.device-management")).toBeTruthy();
     });
-    expect(screen.queryByText("Add a device")).toBeNull();
+    expect(screen.queryByText("Sign in this device")).toBeNull();
     expect(screen.queryByTestId("sync.panel.awaiting-approval")).toBeNull();
   });
 
@@ -279,7 +279,7 @@ describe("the members section, per client", () => {
       ).toBeNull();
       // The section it sits beside is unaffected, so the absence above is about
       // this section and not about a panel that failed to render.
-      expect(document.querySelector('section[aria-label="Enrolled devices"]')).not.toBeNull();
+      expect(document.querySelector('section[aria-label="Devices on your account"]')).not.toBeNull();
     } finally {
       absentCaps.clear();
     }

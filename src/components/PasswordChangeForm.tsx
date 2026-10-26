@@ -73,19 +73,24 @@ export function PasswordChangeForm({
   const [showNext, setShowNext] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
-  const { ready: zxcvbnReady, result } = usePasswordStrength(next);
+  const { ready: zxcvbnReady, result, unavailable } = usePasswordStrength(next);
 
   // Unicode scalar values, not `.length` — same unit as the backend
   // floor (see `passwordLength`).
   const nextLen = passwordLength(next);
   const tooShort = nextLen > 0 && nextLen < MIN_PASSWORD_LEN;
   const mismatch = confirm.length > 0 && confirm !== next;
+  // Same fallback as `PasswordCreateForm`, and it has to be the same one: a
+  // failed strength chunk is a property of the session, so one form continuing on
+  // the length floor while the other stayed dead would be two answers to the same
+  // accident. The caption states it.
+  const strengthUnavailable = unavailable && !zxcvbnReady;
   const submitReady =
     current.length > 0 &&
     nextLen >= MIN_PASSWORD_LEN &&
     next === confirm &&
-    result !== null &&
-    result.score >= MIN_ZXCVBN_SCORE;
+    (strengthUnavailable ||
+      (result !== null && result.score >= MIN_ZXCVBN_SCORE));
 
   let nextCaption: string | undefined;
   let nextTone: "muted" | "danger" | "pending" = "muted";
@@ -97,6 +102,9 @@ export function PasswordChangeForm({
   } else if (tooShort) {
     nextCaption = t("settings.changePassword.tooShort", { n: MIN_PASSWORD_LEN });
     nextTone = "danger";
+  } else if (strengthUnavailable) {
+    nextCaption = t("settings.changePassword.strengthUnavailable");
+    nextTone = "muted";
   } else if (!zxcvbnReady || !result) {
     nextCaption = t("settings.changePassword.checkingStrength");
     nextTone = "pending";

@@ -126,7 +126,7 @@ export const ROSTER = Object.freeze([
       "src/notes/agent/applyFailure.ts",
       "src/notes/ai/ConversationSurface.tsx",
       "src/notes/ai/reviewOwnership.ts",
-      "src/notes/components/ProposalDiffModal.tsx",
+      "src/notes/components/ProposalDiffBody.tsx",
       "src/notes/agent/components/RunCostLine.tsx",
       "src/notes/ai/agentToChat.ts",
       "src/lib/agent-run.ts",
@@ -272,6 +272,9 @@ export const ROSTER = Object.freeze([
       "src/notes/agent/agentStore.ts",
       "src/notes/components/MemoryPopover.tsx",
       "src/components/settings/MemorySection.tsx",
+      "src/components/settings/SeedMemoryWizard.tsx",
+      "src/notes/components/SeedMemoryCard.tsx",
+      "src/lib/seed-memory.ts",
       "src-tauri/src/plugins/local_inference/",
       "src-tauri/src/plugins/memory/",
       "core/src/plugins/memory/",
@@ -298,10 +301,18 @@ export const ROSTER = Object.freeze([
       "e2e/ai-remote-providers.e2e.ts",
       "e2e/chat-history.e2e.ts",
       "e2e/memory.e2e.ts",
+      "e2e/seed-memory.e2e.ts",
       "e2e-web/chat-history-reload.e2e.ts",
       "mobile/tests/flow-logic/ai/chat-history.flow.ts",
     ],
     manual: [
+      {
+        see: "On a DISPOSABLE vault with a real generation model side-loaded, open Settings → AI → Memory, start Teach Myne your vault, and read the scope step: confirm the counts match the vault, expand the payload and confirm it carries titles/folders/tags and no note body, then run it. On the review step confirm the three to ten entries are plausible summaries rather than copied titles, uncheck one, edit one, and save. Open the Memory panel and confirm the saved entries appear under From your vault, then press Remove all and confirm only those entries disappear. Repeat once with a remote provider and confirm the run refuses until the consent box names that provider.",
+        whyNotAutomated: "Whether a distilled entry is a fair summary of the vault, and whether an edited one reads the way the user meant, is a judgement about model output; the stub answers three fixed strings so every assertion around it is about the flow rather than about quality. The remote-consent half needs a real provider and a real key, which no test fake may occupy.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 10,
+        tier: "standard",
+      },
       {
         see: "With a real generation model side-loaded, ask three questions whose answers are in the vault and one whose answer is not. For each: read the answer against the cited notes and confirm it is actually supported by them, click each citation and confirm it opens the note it names, and confirm the out-of-vault question is answered with an \"I don't know\" rather than an invented one. Check the visible scope count is plausible for the vault.",
         whyNotAutomated: "Every AI scenario runs StubEngine behind --features local-inference-stub, so no Candle/GGUF weights ever load; whether an answer is supported by the notes it cites is a judgement no assertion expresses.",
@@ -357,6 +368,27 @@ export const ROSTER = Object.freeze([
         clients: ["ios", "android"],
         estimateMin: 12,
         tier: "core",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
+    id: "editor.photo-to-note",
+    title: "Photo to note (mobile)",
+    paths: [
+      "mobile/src/app/flows/PhotoNoteSheet.tsx",
+      "mobile/src/lib/photoNoteBody.ts",
+      "mobile/src-tauri/src/plugins/attachments/read_extracted.rs",
+    ],
+    clients: ["ios", "android"],
+    automatedBy: ["mobile/tests/flow-logic/photo-to-note.flow.ts"],
+    manual: [
+      {
+        see: "On a real iPhone and a real Android phone with a page of paper in front of you: tap Photo to note in the editor bar, choose Take Photo in the OS sheet that appears, allow the camera prompt if it is the first time, and photograph the page. Confirm the draft sheet opens over the note with the photograph visible and then its text in the editable field; correct one character; commit into this note and confirm the image embed lands with the corrected text directly below it, and that one undo removes both. Repeat choosing Photo Library, then once with the device OCR switch off (Settings > Data) and confirm the sheet says reading is off instead of claiming the page had no text. Then repeat with a blank sheet of paper and confirm the no-text state still offers the image alone.",
+        whyNotAutomated: "The camera and the photo library are reached through the OS file-picker action sheet and its camera and photo permission prompts, which are operating-system UI a WebView driver cannot click; the flow-logic tier mocks both the picker and the Tauri IPC, so no lane in this repository ever hands the app a real photograph captured by a camera app. Whether the sheet opens on the picture, whether OCR completes on a real page within a tolerable time, and whether the OS offers Take Photo alongside Photo Library for this input are properties of the device and its picker.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "standard",
       },
     ],
     exemptionReason: "",
@@ -744,12 +776,16 @@ export const ROSTER = Object.freeze([
   },
   {
     // myne-md/myne#860. A new surface: the opt-in device-local diagnostic log
-    // and the bug-report rows in Settings, About.
+    // and the bug-report rows, which since 2026-10-25 are Settings → Diagnostics
+    // rather than the last section of About. `AboutPanel.tsx` stays on this entry's
+    // paths because the panel it was split out of is still where a reader starts
+    // looking; the walkthrough sentence below names the new place.
     id: "app.diagnostic-log",
     title: "Diagnostic log and bug reports",
     paths: [
       "src/platform/diagnostics.ts",
       "src/hooks/useDiagnostics.ts",
+      "src/components/settings/DiagnosticsPanel.tsx",
       "src/components/settings/AboutPanel.tsx",
       "src/components/FailClosedError.tsx",
       "src-tauri/src/logging/",
@@ -760,7 +796,7 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/diagnostics-copy.e2e.ts"],
     manual: [
       {
-        see: "On a real desktop session on macOS and on Windows, open Settings, About. Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm About lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
+        see: "On a real desktop session on macOS and on Windows, open Settings → Diagnostics (its own rail item since 2026-10-25; it used to be the last section of About). Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm Diagnostics lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
         whyNotAutomated:
           "The platform file manager is an OS session the Linux container does not have, and the permission half is per-platform file-mode and ACL observation: the container is Linux, so it can speak for 0600/0700 there and for neither WKWebView-era macOS nor WebView2 Windows ACL inheritance. The toggle, the block preview, the manifest line and the report actions are driven by the scenario named in automatedBy, but that scenario HAS NEVER EXECUTED in a container on this branch (the release compile dies with signal 9 on the machine it was written on, which scripts/lib/e2e-docker.sh documents), so nothing on this surface is automation-proven today and this item also covers that walkthrough until a green run is recorded here.",
         clients: ["desktop-macos", "desktop-windows"],
@@ -3587,6 +3623,8 @@ export const ROSTER = Object.freeze([
       "mobile/src/formfactor/SizeClassContext.tsx",
       "mobile/src/app/flows/editor/SidebarPane.tsx",
       "mobile/src/app/flows/EditorFlow.tsx",
+      "mobile/src/app/flows/editor/sheets/ListDrawer.tsx",
+      "mobile/src/app/flows/editor/caretRestore.ts",
       "mobile/src/ipad",
       "mobile/src/formfactor/",
       "mobile/src/app/AppShell.tsx",
@@ -3594,6 +3632,8 @@ export const ROSTER = Object.freeze([
     clients: ["ios", "android"],
     automatedBy: [
       "mobile/tests/flow-logic/settings/format-bar.flow.ts",
+      "mobile/tests/flow-logic/duo/band.flow.ts",
+      "mobile/tests/size-class.test.ts",
     ],
     manual: [
       {
@@ -3609,6 +3649,13 @@ export const ROSTER = Object.freeze([
         clients: ["ios", "android"],
         estimateMin: 6,
         tier: "core",
+      },
+      {
+        see: "On an iPhone Duo, open a note, put the caret in the middle of a paragraph and scroll to the middle of a long note, then fold the device in half. Confirm the note keeps every character, the caret stays where it was, the view does not jump to the top, the keyboard does not fight the transition, and the layout becomes the phone single-pane form. Unfold it and confirm the note returns to ONE wider column rather than the two-pane tablet layout, the caret is still where you left it, and the list opens over the note as a drawer instead of replacing it. Swipe the drawer toward its own edge and confirm it closes with the note underneath unmoved. Then run Myne beside another app and confirm the half-width window uses the phone layout with nothing clipped.",
+        whyNotAutomated: "The fold is a physical hinge event on a handset no CI lane has, and what `window.screen` reports across a real fold is the one thing this feature could not measure in a container: the flow tier pins both possible readings instead. The keyboard behaviour across the transition belongs to the iOS input system, and the hinge gesture itself has no driver equivalent.",
+        clients: ["ios"],
+        estimateMin: 12,
+        tier: "standard",
       },
     ],
     exemptionReason: "",
@@ -5019,8 +5066,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows are grouped under one account header (the neutral \"Account\" label, since no label was set). Right-click a row and rename the account to \"Work\"; confirm the header updates. Right-click another row and choose \"Move to new account\"; confirm it now sits under a second header. Right-click it again and choose \"Move to account…\" back into the first; confirm the two headers collapse to one.",
-        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, rename, move and split all need a real Apple keychain.",
+        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows sit in one account group with no header over them (the desktop picker deliberately draws no group heading, myne-md/myne#772) and that Settings → Account shows the three vaults. Right-click a row, choose \"Move to account…\" where a destination exists, and confirm the grouping changes in Settings → Account. Open Settings → Account and confirm the person account number is the panel's first block and that no control anywhere offers to name the account.",
+        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, move and split all need a real Apple keychain.",
         clients: ["desktop-macos"],
         estimateMin: 10,
         tier: "core",

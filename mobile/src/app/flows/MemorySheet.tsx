@@ -190,6 +190,13 @@ export function MemorySheet({
     }
   }
 
+  const seedRows = rows === null ? [] : rows.filter((row) => row.origin === "seed");
+  const ordinaryRows = rows === null ? [] : rows.filter((row) => row.origin !== "seed");
+  const seedDate =
+    seedRows.length === 0
+      ? null
+      : new Date(Math.max(...seedRows.map((row) => row.created_at))).toLocaleDateString();
+
   return (
     <div
       role="dialog"
@@ -263,7 +270,7 @@ export function MemorySheet({
           ) : null}
           {rows !== null && rows.length > 0 ? (
             <ul style={{ margin: 0, padding: 0, listStyle: "none" }} data-testid="ai.memory-list">
-              {rows.map((row) => (
+              {ordinaryRows.map((row) => (
                 <li key={row.id} style={ROW} data-testid="ai.memory-row">
                   {failedIds.has(row.id) ? (
                     <p style={ROW_TEXT} data-testid="ai.memory-row-unreadable">
@@ -307,6 +314,64 @@ export function MemorySheet({
                 </li>
               ))}
             </ul>
+          ) : null}
+          {seedRows.length > 0 ? (
+            <div data-testid="ai.memory-seed-group">
+              <h3 data-testid="ai.memory-seed-title" style={{ ...TITLE, fontSize: "var(--text-base)", marginTop: "var(--space-4)" }}>
+                {t("settings.memory.seed.groupTitle")}
+              </h3>
+              <p data-testid="ai.memory-seed-meta" style={META}>
+                {t("settings.memory.seed.groupMeta", {
+                  date: seedDate ?? "",
+                  count: seedRows.length,
+                })}
+              </p>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none" }} data-testid="ai.memory-seed-list">
+                {seedRows.map((row) => (
+                  <li key={row.id} style={ROW} data-testid="ai.memory-seed-row">
+                    {failedIds.has(row.id) ? (
+                      <p style={ROW_TEXT} data-testid="ai.memory-row-unreadable">
+                        {t("settings.memory.entryUnreadable")}
+                      </p>
+                    ) : (
+                      <p style={ROW_TEXT}>{texts[row.id] ?? ""}</p>
+                    )}
+                    <p style={ROW_META}>v{row.version}</p>
+                    {deletingId === row.id ? (
+                      <div style={ROW_ACTIONS}>
+                        <Button
+                          variant="danger"
+                          full={false}
+                          data-testid="ai.memory-delete-confirm"
+                          onClick={() => void commitDelete(row.id)}
+                        >
+                          {t("settings.memory.deleteLabel")}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          full={false}
+                          data-testid="ai.memory-delete-cancel"
+                          onClick={() => setDeletingId(null)}
+                        >
+                          {t("settings.memory.cancelLabel")}
+                        </Button>
+                      </div>
+                    ) : (
+                      <div style={ROW_ACTIONS}>
+                        <Button
+                          variant="secondary"
+                          full={false}
+                          data-testid="ai.memory-delete"
+                          onClick={() => setDeletingId(row.id)}
+                        >
+                          {t("settings.memory.deleteLabel")}
+                        </Button>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           ) : null}
         </div>
         <div style={STACK}>

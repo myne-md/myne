@@ -23,6 +23,10 @@ const BUNDLE_IDENTIFIER: &str = "md.myne.desktop";
 /// Basename of the command socket inside the app-data dir — matches
 /// `src-tauri/src/cli_bridge/socket.rs::SOCKET_BASENAME` exactly (a wire
 /// contract, not shared code).
+///
+/// Unix-only: the Windows transport is a named pipe, whose name is derived by
+/// `crate::windows_pipe::pipe_path` rather than joined onto this directory.
+#[cfg(unix)]
 pub const SOCKET_BASENAME: &str = "cli.sock";
 
 /// Basename of the status marker inside the app-data dir — matches
@@ -38,6 +42,7 @@ pub fn app_data_dir() -> Option<PathBuf> {
 }
 
 /// Resolve the command-socket path under an already-resolved app-data dir.
+#[cfg(unix)]
 pub fn socket_path(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(SOCKET_BASENAME)
 }
@@ -51,6 +56,7 @@ pub fn status_path(app_data_dir: &Path) -> PathBuf {
 mod tests {
     use super::*;
 
+    #[cfg(unix)]
     #[test]
     fn socket_path_joins_the_basename() {
         assert_eq!(

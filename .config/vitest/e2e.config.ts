@@ -55,6 +55,29 @@ const shardCount = ((): number => {
   return Math.max(2, Math.min(6, Math.floor(cpus().length / 2)));
 })();
 
+/** See `e2e/support/webdriver.ts`'s `TIMEOUT_SCALE` for why this exists. */
+const timeoutScale = ((): number => {
+  const raw = process.env.MYNE_E2E_TIMEOUT_SCALE;
+  if (raw === undefined || raw.trim() === "") return 1;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+})();
+
+/**
+ * Which lane this run is. One name, read by three places: the report filename
+ * here, `scripts/ci-e2e-lane.sh` (which sets it) and
+ * `scripts/check-e2e-floor.mjs --lane <name>`.
+ *
+ * The lanes are not decoration: the gate runs `stable`, the AI inference suites
+ * run as `ai` on their own schedule, and `quarantine` runs the contended specs
+ * the gate skips. A shared report path would let whichever lane finished last
+ * overwrite the other's floor evidence, which is the failure the old
+ * `quarantine ? quarantine : stable` ternary only half-closed.
+ */
+const lane =
+  process.env.MYNE_E2E_LANE ??
+  (process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable");
+
 export default defineConfig({
   test: {
     include: ["e2e/**/*.e2e.ts"],
@@ -85,8 +108,12 @@ export default defineConfig({
     maxConcurrency: 1,
     // Production-KDF unlocks (m=256 MiB, t=3) and full create flows run
     // inside scenarios; budget generously, fail loudly.
-    testTimeout: 180_000,
-    hookTimeout: 120_000,
+    // Scaled by the same `MYNE_E2E_TIMEOUT_SCALE` the harness applies to every
+    // wait (`e2e/support/webdriver.ts`): a 45 s wait doubled to 90 s inside a
+    // 180 s test budget would fail the test rather than the wait, and the report
+    // would then name the whole scenario instead of the step that starved.
+    testTimeout: 180_000 * timeoutScale,
+    hookTimeout: 120_000 * timeoutScale,
     // Retry a failed e2e test (up to 3 attempts total). The whole suite drives a
     // real tauri-driver + production binary across MYNE_E2E_SHARDS parallel
     // worker processes (default 2) for ~84 files — so running the full suite puts
@@ -121,8 +148,8 @@ export default defineConfig({
     // the other's floor evidence.
     reporters: process.env.CI ? ["default", "json", "junit"] : ["verbose"],
     outputFile: {
-      json: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.json`,
-      junit: `.e2e-report/${process.env.MYNE_E2E_QUARANTINE === "1" ? "quarantine" : "stable"}.junit.xml`,
+      json: `.e2e-report/${lane}.json`,
+      junit: `.e2e-report/${lane}.junit.xml`,
     },
   },
 });

@@ -392,8 +392,32 @@ describeE2E("sc5 the escape is one Shift+Tab from the unlock screen (myne#482)",
           { label: "password field autofocused", timeoutMs: 10_000 },
         );
 
+        // **One Shift+Tab lands on the back control now, and the claim this
+        // scenario checks had to be re-stated rather than quietly widened.**
+        // The unlock screen gained a leading `back-to-picker` door for a
+        // SINGLE vault too (`Unlock.tsx`: the picker's create/join/restore
+        // doors are what a user with one unopenable vault had no route to), and
+        // it sits before the form in the tab order — so the escape trigger is
+        // two presses back from the password field, not one.
+        //
+        // What is normative is REACHABILITY and it still holds:
+        // `threat-model.md` §6 says the override is "reachable from a
+        // keyboard-focusable control on every pre-unlock screen". The
+        // one-press version was myne#482's design wording, which this scenario
+        // had pinned as an invariant; the pinned facts now are the tab order as
+        // it is (named, so a third control in front of the field is a
+        // deliberate act rather than a silent slide) and the trigger's
+        // reachability from the autofocused field.
         await tab(s, { shift: true });
-        expect(await activeTestId(s)).toBe(TRIGGER);
+        expect(
+          await activeTestId(s),
+          "the unlock screen's leading control is the picker door",
+        ).toBe("unlock.back-to-picker");
+        await tab(s, { shift: true });
+        expect(
+          await activeTestId(s),
+          "the screen-capture escape is reachable backwards from the autofocused field",
+        ).toBe(TRIGGER);
       },
     );
   });

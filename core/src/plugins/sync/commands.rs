@@ -611,6 +611,41 @@ pub async fn sync_person_unlock<R: Runtime>(
     {
         return Err(SyncDeviceError::Transport);
     }
+    // Record the code this device just derived, so the roster panel and the sync cycle
+    // can verify an owner-signed roster on a later cold start without the phrase. The
+    // device key took over SIGNING at `0731` stage 1; this is what stops the same change
+    // from still demanding the phrase to READ.
+    {
+        let base = host.app_data_dir().ok();
+        if let Some(base) = base {
+            let root = crate::paths::active_vault_root_from_base(
+                &base,
+                state.inner().active_vault_id().await,
+            );
+            let _ = super::state::remember_own_identity_code(
+                &crate::vault_io::StdVaultIo,
+                &root,
+                &view.identity_code,
+            )
+            .await;
+            // Claim this device in the ACTIVE vault, now that the person key is in hand.
+            //
+            // The unlock pipeline claims too, but it needs the person session to be held
+            // at the moment the VAULT unlocks, and on a person-born (`NTV7`) vault the
+            // carrier that would install one is deliberately excluded. So the ordinary
+            // order, unlock the vault and then unlock the identity, left the device
+            // UNCLAIMED, and an unclaimed device cannot author a `0x03` head, so every
+            // later sync still needed the phrase. That is the loop this closes: unlock the
+            // identity once and the claim happens, and from then on the device signs for
+            // itself.
+            crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                &crate::vault_io::StdVaultIo,
+                state.inner(),
+                &root,
+            )
+            .await;
+        }
+    }
     if super::person_account::refresh_person_auth_public_material(
         &host,
         &crate::vault_io::StdVaultIo,
@@ -968,21 +1003,6 @@ pub async fn invite_member_from_host(
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
         return Err(SyncDeviceError::MigrationRequired);
     }
-    // Sharing is not available on the person-wrapped generation yet, and the
-    // refusal is explicit rather than a fall-through. Before this, an `NTV7`
-    // frame took the legacy branch below, ran a whole invite and then died in
-    // `write_roster_row` because the `NTV5` membership field is absent, which
-    // surfaced as a generic bad request with no reason (myne-md/myne#911 review).
-    // The upgrade that could create such a vault is gated on a single-member
-    // roster for the same reason; see `vault_migrate::ntv7`.
-    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
-        tracing::warn!(
-            stage = "member_invite",
-            event = "person_generation_sharing_unsupported",
-            "refusing to invite a member to a person-wrapped vault"
-        );
-        return Err(SyncDeviceError::BadRequest);
-    }
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
         // The `NTV6` invite writes the owner-signed roster, and the member's
         // grant is a group-key package rather than an `itemsKey` wrap.
@@ -996,6 +1016,34 @@ pub async fn invite_member_from_host(
             member_public,
             member_person_id_hex,
             group_key.as_deref(),
+            None,
+            &_permit,
+        )
+        .await;
+    }
+    // A person-born vault (`NTV7`) invites through the SAME writer, because its tail
+    // is `NTV6`'s byte for byte: the roster, the group-key package and the epoch are
+    // the same objects. What differs is the frame it is sealed back into, so the
+    // writer takes the person wrap and re-emits `NTV7` verbatim around the new tail.
+    //
+    // This used to answer a flat `BadRequest` with a warning, because sharing a
+    // person-born vault was out of scope (`decisions/ui/0729`). It is in scope now:
+    // a generation that is born with the group tier and can never be shared is a
+    // vault type the product no longer has.
+    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
+        let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes)
+            .map_err(|_| SyncDeviceError::BadRequest)?;
+        return write_ntv6_invite(
+            state,
+            io,
+            &root,
+            &meta_path,
+            &meta_bytes,
+            &owner,
+            member_public,
+            member_person_id_hex,
+            group_key.as_deref(),
+            Some(parsed.person_wrap),
             &_permit,
         )
         .await;
@@ -1182,13 +1230,19 @@ pub async fn create_invite_from_host(
     Ok(view)
 }
 
-/// **Invite a member to an `NTV6` vault** (B2B, myne-md/myne#712).
+/// **Invite a member to an `NTV6` or `NTV7` vault** (B2B, myne-md/myne#712).
 ///
-/// The `NTV6` grant is a GROUP-key package, not an `itemsKey` wrap: the member
-/// receives the current epoch's `group_key`, which is what opens the vault's
-/// shared content. This opens the sealed owner-signed roster, appends the new
-/// live member row (with the package's wrap), re-signs and re-seals it at the
-/// SAME epoch, and writes `vault.meta`. The epoch only advances on a removal.
+/// The grant is a GROUP-key package, not an `itemsKey` wrap: the member receives the
+/// current epoch's `group_key`, which is what opens the vault's shared content. This
+/// opens the sealed owner-signed roster, appends the new live member row (with the
+/// package's wrap), re-signs and re-seals it at the SAME epoch, and writes
+/// `vault.meta`. The epoch only advances on a removal.
+///
+/// `person_wrap` is the generation: `None` writes an `NTV6` frame, `Some` writes the
+/// `NTV7` frame with that wrap preserved. `NTV7` keeps the `NTV6` tail byte for byte,
+/// so only the envelope around the new roster differs; a caller that passed `None`
+/// for a person-born vault would silently downgrade it to `NTV6` and retire the very
+/// credential (`root_key` sealed to the owner's person key) the vault was born with.
 ///
 /// The member-accept path and the wire that carries the package are Grill 4; the
 /// frame is returned in `invite_wire` so the caller can relay it.
@@ -1203,11 +1257,11 @@ async fn write_ntv6_invite(
     member_public: &protocol::person_key::PersonPublicHalf,
     member_person_id_hex: Option<&str>,
     group_key: Option<&[u8; 32]>,
+    person_wrap: Option<protocol::PersonWrap>,
     _permit: &tokio::sync::SemaphorePermit<'_>,
 ) -> Result<InviteCommandView, SyncDeviceError> {
     use protocol::person_invite as pi;
-    let b2b =
-        protocol::parse_vault_meta_ntv6(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
+    let b2b = protocol::parse_b2b_tail_any(meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let account_number_hash = b2b.base.account_number_hash;
     // An `NTV6` invite wraps the shared `group_key`, so an owner session that
     // does not carry the group tier cannot seal one. This is the typed refusal
@@ -1223,8 +1277,33 @@ async fn write_ntv6_invite(
         &b2b.signed_roster_envelope,
     )
     .ok_or(SyncDeviceError::BadRequest)?;
-    let roster = pi::verify_group_roster(&owner.public_half(), &current, &account_number_hash)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
+    // A vault whose owner signs with a device key has a roster this call must be able
+    // to read back before it re-signs it (`decisions/protocol/0731` stage 2). The
+    // candidates are this owner's own device half plus every verified row of the store
+    // that names the owner.
+    let owner_public = owner.public_half();
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        group_key,
+        account_number_hash,
+        epoch,
+    );
+    let own_device =
+        super::device_identity::load_for_fallback("roster_verify").map(|key| key.public_half());
+    let owner_devices = super::roster_trust::device_halves_for_owner(
+        io,
+        root,
+        Some(&bindings_key.borrow()),
+        own_device.as_ref(),
+        None,
+        &owner_public,
+    )
+    .await;
+    let roster = pi::verify_group_roster(
+        super::roster_trust::trust(&owner_public, &owner_devices),
+        &current,
+        &account_number_hash,
+    )
+    .map_err(|_| SyncDeviceError::BadRequest)?;
     let member_fp = crate::account::person_identity::hex_lower(member_public.fingerprint());
     if roster
         .members
@@ -1236,12 +1315,27 @@ async fn write_ntv6_invite(
     }
 
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
-    let package = pi::create_group_package(
+    // The owner's DEVICE attestation, if it has one (`0731` stage 2): the package carries
+    // it so the recipient can resolve a roster this device is about to sign. Absent on a
+    // platform with no device-key rung, which keeps the person-key path exactly as it
+    // was.
+    let own_device_attestation = super::roster_trust::own_device_signing_pair(
+        io,
+        root,
+        group_key,
+        account_number_hash,
+        epoch,
+        &owner.public_half(),
+    )
+    .await
+    .map(|(_, attestation)| attestation);
+    let package = pi::create_group_package_with_attestation(
         owner,
         member_public,
         group_key,
         &account_number_hash,
         epoch,
+        own_device_attestation.as_ref(),
         &mut rng,
     )
     .map_err(|_| SyncDeviceError::BadRequest)?;
@@ -1282,8 +1376,20 @@ async fn write_ntv6_invite(
             &person_id,
         );
     }
-    let signed = pi::sign_group_roster(owner, &new_roster, &mut rng)
-        .map_err(|_| SyncDeviceError::BadRequest)?;
+    // Signed by the DEVICE key when this owner holds one and the package above carries
+    // its attestation, so inviting stops needing the recovery phrase. Otherwise the
+    // person key signs, which is the pre-stage-2 behaviour and still the only option on a
+    // platform with no device-key rung.
+    let signed = match (
+        own_device_attestation.is_some(),
+        super::device_identity::load(),
+    ) {
+        (true, Ok(Some(device_key))) => {
+            pi::sign_group_roster_with_device(&device_key, &new_roster, &mut rng)
+        }
+        _ => pi::sign_group_roster(owner, &new_roster, &mut rng),
+    }
+    .map_err(|_| SyncDeviceError::BadRequest)?;
     let mut roster_nonce = [0u8; protocol::AEAD_NONCE_LEN];
     getrandom::getrandom(&mut roster_nonce).map_err(|_| SyncDeviceError::Transport)?;
     let sealed = pi::seal_group_roster(
@@ -1294,13 +1400,25 @@ async fn write_ntv6_invite(
         &signed,
     )
     .ok_or(SyncDeviceError::BadRequest)?;
-    let new_meta = protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
-        base: b2b.base,
-        group_key_nonce: b2b.group_key_nonce,
-        enc_group_key: b2b.enc_group_key,
-        group_key_epoch: epoch,
-        signed_roster_envelope: sealed,
-    })
+    let new_meta = match person_wrap {
+        Some(person_wrap) => {
+            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+                base: b2b.base,
+                group_key_nonce: b2b.group_key_nonce,
+                enc_group_key: b2b.enc_group_key,
+                group_key_epoch: epoch,
+                signed_roster_envelope: sealed,
+                person_wrap,
+            })
+        }
+        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+            base: b2b.base,
+            group_key_nonce: b2b.group_key_nonce,
+            enc_group_key: b2b.enc_group_key,
+            group_key_epoch: epoch,
+            signed_roster_envelope: sealed,
+        }),
+    }
     .map_err(|_| SyncDeviceError::BadRequest)?;
 
     let old_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes);
@@ -1520,28 +1638,63 @@ pub async fn sync_list_roster<R: Runtime>(
             &b2b.signed_roster_envelope,
         )
         .ok_or(SyncDeviceError::BadRequest)?;
-        let owner_public =
-            if authority == crate::plugins::vault_unlock::state::VaultAuthority::Owner {
-                state
-                    .inner()
-                    .clone_person_identity()
-                    .await
-                    .ok_or(SyncDeviceError::NotOwner)?
-                    .public_half()
-            } else {
-                // A member holds the owner's public half only as the pinned
-                // out-of-band code recorded at invite accept.
-                let code = super::state::read_sync_state(&io, &root)
-                    .await
-                    .map_err(|_| SyncDeviceError::Transport)?
-                    .owner_identity_code
-                    .ok_or(SyncDeviceError::BadRequest)?;
-                super::invite::decode_person_identity_code(&code)
-                    .map_err(|_| SyncDeviceError::BadRequest)?
-                    .public
-            };
-        let roster = protocol::person_invite::verify_group_roster(
+        let is_owner = authority == crate::plugins::vault_unlock::state::VaultAuthority::Owner;
+        // One state read serves both the pinned owner code and the pinned owner-DEVICE
+        // attestation, which arrive together at accept.
+        let sync_state = super::state::read_sync_state(&io, &root)
+            .await
+            .map_err(|_| SyncDeviceError::Transport)?;
+        let owner_public = if is_owner {
+            // An owner session holds the identity directly, so it is the first source. A
+            // COLD start holds nothing, and refusing here is why the panel used to show
+            // "Unlock member identity" after the device key had already taken over
+            // signing: the roster carries the owner's FINGERPRINT, not their public half,
+            // so verifying it needs the half from somewhere. This device derived its own
+            // half the last time the phrase was entered and cached it, which is public
+            // material only.
+            let held = state.inner().clone_person_identity().await;
+            match held {
+                Some(identity) => identity.public_half(),
+                None => {
+                    let code = sync_state
+                        .own_identity_code
+                        .as_deref()
+                        .ok_or(SyncDeviceError::NotOwner)?;
+                    super::invite::decode_person_identity_code(code)
+                        .map_err(|_| SyncDeviceError::BadRequest)?
+                        .public
+                }
+            }
+        } else {
+            // A member holds the owner's public half only as the pinned out-of-band
+            // code recorded at invite accept.
+            let code = sync_state
+                .owner_identity_code
+                .ok_or(SyncDeviceError::BadRequest)?;
+            super::invite::decode_person_identity_code(&code)
+                .map_err(|_| SyncDeviceError::BadRequest)?
+                .public
+        };
+        let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+            &group_key,
+            b2b.base.account_number_hash,
+            b2b.group_key_epoch,
+        );
+        let own_device = is_owner
+            .then(|| super::device_identity::load_for_fallback("invite_verify"))
+            .flatten()
+            .map(|key| key.public_half());
+        let owner_devices = super::roster_trust::device_halves_for_owner(
+            &io,
+            &root,
+            Some(&bindings_key.borrow()),
+            own_device.as_ref(),
+            sync_state.owner_device.as_ref(),
             &owner_public,
+        )
+        .await;
+        let roster = protocol::person_invite::verify_group_roster(
+            super::roster_trust::trust(&owner_public, &owner_devices),
             &envelope,
             &b2b.base.account_number_hash,
         )

@@ -43,6 +43,10 @@ const V = {
     "ported",
     "Build identity and links; no host call. Carries the Developer mode toggle, which since #181 renders here too — it used to be withheld on a `localAi`-less capability set, which on web left the mode's other members (the Vim row) unreachable.",
   ],
+  "src/components/settings/DiagnosticsPanel.tsx": [
+    "adapted",
+    "Ships, and it is the one settings panel whose WEB arm is the point rather than a compromise. The report block and its Copy button render on every client on purpose: a browser user cannot open a devtools panel and read a failure back to anyone, so the copy is the half that matters most there. The logging half (the switch, the crash record, the folder reveal and the saved bundle) is capability-gated on `diagnosticLog`, which the web descriptor does not carry because a served bundle installs no `tracing` subscriber, so those rows are absent rather than disabled. Split out of AboutPanel on 2026-10-25; the verdict is unchanged in kind, because it is the same code with the same gate.",
+  ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
     "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",
@@ -62,6 +66,10 @@ const V = {
   "src/components/settings/AiOnboardingSurface.tsx": [
     "adapted",
     "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0628). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
+  ],
+  "src/components/settings/SeedMemoryWizard.tsx": [
+    "ported",
+    "The reviewed vault seed (myne-md/myne#915). Rendered from MemorySection and the chat zero state, both unreachable where `localAi` is absent (the AI panel is filtered from the rail and the card's own gate reads the same pref). Its host calls are the `local-inference` seed commands and `memory_seed_apply`, all classified absent-on-web, so on the web bundle it is code that never runs rather than a second implementation.",
   ],
   "src/components/settings/MemorySection.tsx": [
     "adapted",
@@ -244,6 +252,8 @@ const V = {
   "src/components/settings/search/foldAccents.ts": ["ported", "Pure Unicode folding."],
 
   // ── src/lib ─────────────────────────────────────────────────────────────
+  "src/lib/agent-events.ts": ["ported", "One string: the wire name of the agent's notes-changed event, mirroring the Rust constant. The web build never runs an agent (the plugin is Class::Unsupported in web/wasm/src/capability.rs), so nothing listens for it there, and a module that only holds a name has nothing to adapt."],
+  "src/lib/autoApplyTags.ts": ["ported", "Device-local automatic-tagging permission (localStorage), same shape as aiOnboardingSeen. Runs as written on web, where it is inert: the tag pass this gates is local-inference only, so no web build reaches a write."],
   "src/lib/accentColor.ts": ["ported", "Device-local accent-colour pref (localStorage) applied as CSS custom properties on :root; runs as written."],
   "src/lib/aiOnboardingSeen.ts": ["ported", "Device-local first-run AI-onboarding seen flag (localStorage), same shape as accentColor/viewsEnabled; runs as written. On web the surface it gates is only reachable with `downloads: false`, but this module holds no host call."],
   "src/lib/ai-model-download.ts": [
@@ -365,6 +375,10 @@ const V = {
   "src/lib/chats.ts": [
     "ported",
     "The conversations plugin's IPC bindings (create/append/read/list/rename/delete, myne-md/myne#675). All six commands are Dispatched in web/wasm/src/dispatch.rs against the OPFS-backed store, so the history list/open/rename/delete run in the browser exactly as written. That makes it the one AI surface that survives the `agent` plugin's Unsupported classification.",
+  ],
+  "src/lib/seed-memory.ts": [
+    "ported",
+    "The seed bindings (myne-md/myne#915): status, payload, generate, cancel and the batch apply. Every one names a command in a plugin classified absent-on-web (`local-inference`, `memory`); no web path calls them because there is no AI surface, so this is reachable code whose every call is refused by the dispatcher rather than a missing module.",
   ],
   "src/lib/memory.ts": [
     "adapted",
@@ -510,7 +524,7 @@ const V = {
   ],
   "src/lib/account.ts": [
     "adapted",
-    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the four `plugin:account|...` wrappers. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
+    "Ships, and nothing on this client calls it. The account-record command mirrors (myne-md/myne#684): the three `plugin:account|...` wrappers, plus the pure grouping and heading helpers every picker shares. The picker grouping UI that would call them is omitted where `accountGrouping` is absent, which it is on web (one vault per origin, no OS keychain). The dispatcher answers `Unsupported` for the whole plugin to match.",
   ],
   "src/lib/vault-list.ts": ["adapted", "One constant vault id per origin (task 85)."],
   "src/lib/vaultDisplayName.ts": [

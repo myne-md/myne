@@ -670,3 +670,53 @@ describe("hydrateActiveConversation", () => {
     expect(isChatHydrateFailed()).toBe(true);
   });
 });
+
+describe("a message's attachments survive the round trip (myne-md/myne#913)", () => {
+  it("re-hydrates the files a user turn carried", () => {
+    // The turn's own record of what it sent. A transcript that loses it on the
+    // next settle is a transcript that shows a question about a document with no
+    // sign of which document, which is the state this field exists to end.
+    sendAgentTurn("summarise this", "This note", [
+      { id: "aa11", name: "lecture.pdf", contentType: "application/pdf" },
+    ]);
+    const payload = serializeTranscript(getChat().turns);
+    const back = parseTranscript(payload);
+    const userTurn = back?.find((t) => t.role === "user");
+    expect(userTurn?.attachments).toEqual([
+      { id: "aa11", name: "lecture.pdf", contentType: "application/pdf" },
+    ]);
+  });
+
+  it("drops a malformed entry and keeps the turn's text", () => {
+    // The payload arrives from the conversation file and, through sync, from
+    // another device. Bad metadata must never cost user content.
+    const back = parseTranscript(
+      JSON.stringify({
+        turns: [
+          {
+            id: "t1",
+            kind: "agent",
+            role: "user",
+            text: "keep me",
+            error: false,
+            attachments: [{ id: 7, name: null }, { id: "bb22", name: "ok.png" }],
+          },
+        ],
+        title_derived_from: "keep me",
+      }),
+    );
+    const turn = back?.find((t) => t.id === "t1");
+    expect(turn?.text).toBe("keep me");
+    // The valid entry survives; the malformed one is dropped rather than
+    // rendered as an undefined name.
+    expect(turn?.attachments).toEqual([
+      { id: "bb22", name: "ok.png", contentType: "" },
+    ]);
+  });
+
+  it("writes nothing for a message that carried no files", () => {
+    sendAgentTurn("plain question", "This note");
+    const payload = serializeTranscript(getChat().turns);
+    expect(payload).not.toContain("attachments");
+  });
+});

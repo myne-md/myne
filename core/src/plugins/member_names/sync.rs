@@ -79,10 +79,19 @@ pub fn names_key_for_group(
 /// is read ONCE, so the account hash and the epoch cannot come from two different
 /// files.
 ///
-/// A `vault.meta` that is not `NTV6` is [`MemberNamesError::NotASharedVault`]: this
-/// family does not exist in a pre-B2B vault, where there is no `group_key` a member
-/// could read a member-writable name with. A caller holding only the owner root
-/// answers that before it gets here.
+/// A `vault.meta` with no B2B tail is [`MemberNamesError::NotASharedVault`]: this family
+/// does not exist in a pre-B2B vault, where there is no `group_key` a member could read a
+/// member-writable name with. A caller holding only the owner root answers that before it
+/// gets here.
+///
+/// **Both tail generations are read, through `parse_b2b_tail_any`.** The question this
+/// function asks is "does this frame carry the group tail", and `NTV7` carries `NTV6`'s
+/// tail byte for byte (`PersonWrappedVaultMeta::as_ntv6_tail`), so parsing only `NTV6`
+/// answered `NotASharedVault` for a vault that has the tier this family is sealed under.
+/// The 16 bytes the AAD binds are offset 6 of the base either way: an account-number hash
+/// on a migrated vault and the vault's namespace id on a born-`NTV7` one, which is why the
+/// field is read as "the vault's 16-byte binding" rather than assumed to be an account
+/// number.
 pub async fn resolve_names_from_group_key(
     io: &dyn VaultIo,
     group_key: &[u8; AEAD_KEY_LEN],
@@ -93,7 +102,7 @@ pub async fn resolve_names_from_group_key(
         .await
         .map_err(|io_error_kind| MemberNamesError::Io { io_error_kind })?;
     let b2b =
-        protocol::parse_vault_meta_ntv6(&bytes).map_err(|_| MemberNamesError::NotASharedVault)?;
+        protocol::parse_b2b_tail_any(&bytes).map_err(|_| MemberNamesError::NotASharedVault)?;
     Ok(names_key_for_group(
         group_key,
         b2b.base.account_number_hash,
@@ -210,5 +219,64 @@ mod tests {
         let kek =
             protocol::derive_group_subkey_v0_2(&GroupKey::new(GROUP), GroupRole::MemberNamesKey);
         assert_ne!(names_sync_id(&GROUP), kek[..16]);
+    }
+
+    /// **A person-born (`NTV7`) `vault.meta` resolves this family's keyspace.**
+    ///
+    /// The parse used to be `parse_vault_meta_ntv6`, so every reader on a vault born
+    /// under a person identity answered `NotASharedVault` for a frame that carries the
+    /// group tier, the epoch and the signed roster this map is sealed under. Reverting
+    /// the parse to the `NTV6` one makes this test fail with that variant.
+    #[test]
+    fn a_person_born_meta_resolves_the_same_tail() {
+        let dir = std::path::Path::new("/vault");
+        let io = crate::vault_io::test_io::MemoryVaultIo::with_file(
+            dir.join("vault.meta"),
+            crate::test_support::person_born_meta_frame(0x5a),
+        );
+        let resolved =
+            crate::test_support::block_on(resolve_names_from_group_key(&io, &GROUP, dir))
+                .expect("an NTV7 frame carries the tail this family reads");
+
+        // The 16 bytes at offset 6 and the epoch, not a re-derived guess: this is the
+        // pair the AAD binds, and on a born-NTV7 vault the 16 bytes are the vault's
+        // namespace rather than an account-number hash.
+        assert_eq!(resolved.account_number_hash, [0x5a; 16]);
+        assert_eq!(resolved.group_key_epoch, 1);
+        assert_eq!(
+            resolved.key.as_slice(),
+            protocol::derive_group_subkey_v0_2(&GroupKey::new(GROUP), GroupRole::MemberNamesKey)
+                .as_slice()
+        );
+    }
+
+    /// A frame with no tail is still refused: widening the parse must not make the
+    /// family claim a keyspace that a pre-B2B vault does not have.
+    #[test]
+    fn a_vault_with_no_group_tier_is_still_refused() {
+        let dir = std::path::Path::new("/vault");
+        let io = crate::vault_io::test_io::MemoryVaultIo::with_file(
+            dir.join("vault.meta"),
+            protocol::serialize_vault_meta(&protocol::VaultMeta {
+                account_number_hash: [0x11; 16],
+                kdf_params: crate::test_support::FAST_TEST_KDF,
+                random_salt_password: [1u8; 16],
+                random_salt_recovery: [2u8; 16],
+                nonce_password_wrap: [3u8; 24],
+                enc_root_key_password: [4u8; 64],
+                nonce_recovery_wrap: [5u8; 24],
+                enc_root_key_recovery: [6u8; 64],
+                items_key_id: [7u8; 16],
+                items_key_nonce: [8u8; 24],
+                enc_items_key: [9u8; 64],
+                membership: None,
+                person_binding: None,
+            })
+            .to_vec(),
+        );
+        let err = crate::test_support::block_on(resolve_names_from_group_key(&io, &GROUP, dir))
+            .err()
+            .expect("a v0.1 vault has no group tier");
+        assert!(matches!(err, MemberNamesError::NotASharedVault));
     }
 }

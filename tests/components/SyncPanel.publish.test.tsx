@@ -40,12 +40,18 @@ import {
 } from "../../src/components/settings/SettingsTabs";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
-// The publish row lives on the panel's DEVICES topic (it is an account-plane act,
-// beside the roster), and only the active topic body is mounted. Selecting it is
-// what a user does to reach the row, so the spec does the same rather than
-// reaching into the component.
-function mount(route: Parameters<typeof syncPanelCommandRouter>[0]): void {
-  setActiveSettingsTopic("sync", "devices");
+// The publish row lives on the panel's CONNECTION topic, in the account section
+// directly under the identity and the server (2026-10-25). It used to sit under
+// "Enrolled devices", which read as a device operation: it is an identity act,
+// and its refusals are `PersonSessionRequired` and `PersonNotRegistered`. Only
+// the active topic body is mounted, so selecting the topic is what a user does to
+// reach the row and the spec does the same rather than reaching into the
+// component. `it("is not on the devices topic")` below holds the placement.
+function mount(
+  route: Parameters<typeof syncPanelCommandRouter>[0],
+  topic: "connection" | "devices" = "connection",
+): void {
+  setActiveSettingsTopic("sync", topic);
   invokeMock.mockImplementation(syncPanelCommandRouter(route));
   renderSyncPanel();
 }
@@ -93,15 +99,48 @@ describe("the publish row", () => {
     // The browser and mobile answer this command with a refusal, so the row is
     // absent rather than present-and-broken.
     mount({ syncState: "not_enrolled" });
+    await waitFor(() => expect(screen.getByTestId("settings.sync-topic-connection")).toBeTruthy());
+    expect(screen.queryByTestId("sync.panel.publish")).toBeNull();
+  });
+
+  // 2026-10-25. The row sat under "Enrolled devices", so a published vault's
+  // first sight of it was a devices heading over a vault-publishing action. The
+  // placement is a fact about the panel and nothing else asserted it, so this
+  // fails on the section the row actually renders in rather than on a comment.
+  it("is not on the devices topic, which is about devices", async () => {
+    invokeMock.mockImplementation(
+      syncPanelCommandRouter({ syncState: "not_enrolled", publishState: { published: true } }),
+    );
+    setActiveSettingsTopic("sync", "devices");
+    renderSyncPanel();
     await waitFor(() => expect(screen.getByTestId("settings.sync-topic-devices")).toBeTruthy());
     expect(screen.queryByTestId("sync.panel.publish")).toBeNull();
+  });
+
+  // The record carries `published_at_ms` and the panel used to render "Published."
+  // and nothing else, so the one fact that turns the claim into a record reached
+  // no surface. `useTick` keeps it honest while the panel stays open.
+  it("says WHEN it was published, from the recorded ms", async () => {
+    mount({
+      syncState: "not_enrolled",
+      publishState: {
+        published: true,
+        person_born: true,
+        namespace_hex: "ab".repeat(16),
+        published_at_ms: Date.now() - 3 * 60_000,
+      },
+    });
+    await waitFor(() => expect(screen.getByTestId("sync.panel.publish")).toBeTruthy());
+    const helper = screen.getByTestId("sync.panel.publish-state").textContent ?? "";
+    expect(helper).toContain("Published");
+    expect(helper).toMatch(/min(t)? ago/);
   });
 
   it("cannot publish with no endpoint configured", async () => {
     // `disabled` is a device with nowhere to publish TO; the Server section is
     // the remedy, so the button is not offered as a way to fail.
     mount({ syncState: "disabled", publishState: { published: false } });
-    await waitFor(() => expect(screen.getByTestId("settings.sync-topic-devices")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("settings.sync-topic-connection")).toBeTruthy());
     expect(screen.queryByTestId("sync.panel.publish")).toBeNull();
   });
 
@@ -122,7 +161,7 @@ describe("the publish row", () => {
       }
       return syncPanelCommandRouter({ syncState: "not_enrolled" })(cmd);
     });
-    setActiveSettingsTopic("sync", "devices");
+    setActiveSettingsTopic("sync", "connection");
     renderSyncPanel();
     await waitFor(() => expect(screen.getByTestId("sync.panel.publish")).toBeTruthy());
     fireEvent.click(screen.getByTestId("sync.panel.publish"));
@@ -137,7 +176,12 @@ describe("the publish row", () => {
 
 describe("the legacy add-device form", () => {
   it("is offered for a legacy vault with no token", async () => {
-    mount({ syncState: "not_enrolled", publishState: { published: false, person_born: false } });
+    // The add-device form is the DEVICES topic's, which is the point: this row
+    // stayed where it belongs when the publish row moved out from above it.
+    mount(
+      { syncState: "not_enrolled", publishState: { published: false, person_born: false } },
+      "devices",
+    );
     await waitFor(() => expect(screen.getByTestId("sync.enroll")).toBeTruthy());
   });
 
@@ -166,7 +210,7 @@ describe("the publish refusal", () => {
       }
       return syncPanelCommandRouter({ syncState: "not_enrolled" })(cmd);
     });
-    setActiveSettingsTopic("sync", "devices");
+    setActiveSettingsTopic("sync", "connection");
     renderSyncPanel();
     await waitFor(() => expect(screen.getByTestId("sync.panel.publish")).toBeTruthy());
     fireEvent.click(screen.getByTestId("sync.panel.publish"));

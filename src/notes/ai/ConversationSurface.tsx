@@ -32,6 +32,7 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { EmptyState } from "../../components/primitives/EmptyState";
+import { SeedMemoryCard } from "../components/SeedMemoryCard";
 import { restingBody, restingLabel, type RestingId } from "./restingCause";
 import type { MentionTarget } from "./noteMentions";
 import { IconButton } from "../../components/primitives/IconButton";
@@ -40,7 +41,7 @@ import { ScrollArea } from "../../components/primitives/ScrollArea";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { agentLastRun, agentUndo, hasRefusals } from "../../lib/agent-run";
-import type { AgentApplyResult, AgentUndoResult, Proposal } from "../../lib/agent-protocol";
+import type { AgentApplyResult, AgentUndoResult } from "../../lib/agent-protocol";
 import { providerErrorKey } from "../../lib/engine-error";
 import {
   getActiveConversationId,
@@ -61,6 +62,9 @@ import {
   subscribeChatPersistHealth,
 } from "./chatPersist";
 import { markConversationRead, clearAgent, reviewableRun, useAgent } from "../agent/agentStore";
+import { AttachmentThumbnail } from "../../components/attachments/AttachmentThumbnail";
+import { showAttachmentLightbox } from "../../editor/attachments/lightbox";
+import { attachmentUrl } from "../attachmentRef";
 import { useResolverNotes } from "../resolverNotes";
 import { reviewCardBelongsToTurn } from "./reviewOwnership";
 // This client's nonce, passed into the shared undo hook below.
@@ -72,7 +76,7 @@ import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { CAPTION_STYLE } from "../components/sharedStyles";
 import { ChatComposer } from "../components/ChatComposer";
-import { ProposalDiffModal } from "../components/ProposalDiffModal";
+import { ProposalDiffBody } from "../components/ProposalDiffBody";
 import { AgentReview, RefusalBlock } from "../../screens/AgentReview";
 
 /** The translation function shape every helper here takes. */
@@ -312,7 +316,6 @@ function AgentTurnView({
   folderOf,
   t,
   canRevert,
-  onOpenDiff,
   onRequestRevert,
   revertBusy,
   undoReport,
@@ -345,7 +348,6 @@ function AgentTurnView({
   folderOf: (noteId: string) => string | null;
   t: TFn;
   canRevert: boolean;
-  onOpenDiff: (proposal: Pick<Proposal, "edits" | "newNotes">) => void;
   onRequestRevert: (runId: string) => void;
   revertBusy: boolean;
   undoReport: AgentUndoResult | null;
@@ -368,6 +370,19 @@ function AgentTurnView({
     reviewing &&
     s !== undefined &&
     (s.edits > 0 || s.newNotes > 0 || (s.settings ?? 0) > 0);
+  /**
+   * **The frozen proposal's diff opens HERE, under its own turn**
+   * (myne-md/myne#913). The state used to live on the surface and the diff in a
+   * full-width modal, so pressing the turn's own diff control painted it
+   * somewhere the user had not come from, over the conversation that explains
+   * it. Local state is what makes "under this turn" true rather than a
+   * coincidence of there being one open conversation.
+   *
+   * Closed by default: the trigger is one line, and a settled proposal is a
+   * record the user consults rather than a decision waiting on them (the live
+   * one is the review card, which is not collapsible).
+   */
+  const [diffOpen, setDiffOpen] = useState(false);
   return (
     <div
       data-testid="ai.turn"
@@ -399,7 +414,12 @@ function AgentTurnView({
                 label={t("editor.chrome.rightPanel.aiChat.viewDiff")}
                 testId="ai.turn-diff"
                 iconSize={14}
-                onClick={() => onOpenDiff(s.proposal!)}
+                // A disclosure, so it says whether it is open. The modal it
+                // replaced had nothing to report: it covered the screen or it
+                // did not.
+                expanded={diffOpen}
+                active={diffOpen}
+                onClick={() => setDiffOpen((open) => !open)}
               />
             ) : null}
             {canRevert ? (
@@ -629,6 +649,15 @@ function AgentTurnView({
           />
         </div>
       ) : null}
+      {/* **The frozen proposal, in place** (myne-md/myne#913). Below the card
+          rather than above it: the card is the live decision, and this is the
+          record of what was proposed, which is what the card is asking about. */}
+      {diffOpen && s?.proposal !== undefined ? (
+        <ProposalDiffBody
+          proposal={s.proposal}
+          titleOf={titleOf}
+        />
+      ) : null}
     </div>
   );
 }
@@ -681,6 +710,86 @@ const ChatTurnView = memo(function ChatTurnView({
       {turn.scopeLabel !== undefined ? (
         <div data-testid="ai.turn-scope" style={CAPTION_STYLE}>
           {t("agent.composer.scopeLabel")}: {turn.scopeLabel}
+        </div>
+      ) : null}
+      {/* **What the message carried** (myne-md/myne#913). The chips used to live
+          only above the composer and were cleared on send, so a transcript read
+          back later showed a question about a document with no sign of which
+          document and no way to open it. The file belongs to the message: it is
+          drawn here, and a click opens it.
+
+          `attachment://` serves the bytes on demand, so this is a reference and
+          not a second copy. The thumbnail primitive is the library's own, so a
+          PDF shows its first page rather than an invented icon. */}
+      {isUser && turn.attachments !== undefined && turn.attachments.length > 0 ? (
+        <div
+          data-testid="ai.turn-attachments"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "var(--space-1)",
+            marginTop: "var(--space-1)",
+          }}
+        >
+          {turn.attachments.map((file) => (
+            <Button
+              key={file.id}
+              variant="ghost"
+              type="button"
+              data-testid="ai.turn-attachment"
+              data-attachment-id={file.id}
+              title={file.name}
+              onClick={() =>
+                showAttachmentLightbox({
+                  url: attachmentUrl(file.id),
+                  alt: file.name,
+                  kind: file.contentType.startsWith("application/pdf")
+                    ? "pdf"
+                    : "image",
+                  id: file.id,
+                })
+              }
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "var(--space-1)",
+                padding: "2px var(--space-2) 2px 2px",
+                background: "var(--bg-2)",
+                border: "1px solid var(--line-1)",
+                borderRadius: "var(--radius-1)",
+                color: "var(--fg-2)",
+                fontSize: "var(--text-xs)",
+                maxWidth: "100%",
+                cursor: "zoom-in",
+              }}
+            >
+              <span
+                style={{
+                  flexShrink: 0,
+                  width: 24,
+                  height: 24,
+                  borderRadius: "var(--radius-1)",
+                  overflow: "hidden",
+                }}
+              >
+                <AttachmentThumbnail
+                  id={file.id}
+                  contentType={file.contentType}
+                  filename={file.name}
+                  size={24}
+                />
+              </span>
+              <span
+                style={{
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {file.name}
+              </span>
+            </Button>
+          ))}
         </div>
       ) : null}
       {/* **A model's answer is markdown, always** (myne-md/myne#771). It was
@@ -773,6 +882,9 @@ export interface ConversationSurfaceProps {
   onInsert?: (text: string) => void;
   /** The open note: the agent's default scope in the composer. */
   openNoteId?: string | null;
+  /** That note's display name, when the caller knows it (myne-md/myne#913): the
+   *  run's `Working on:` line names the note instead of pointing at "this one". */
+  openNoteTitle?: string | null;
   /**
    * The note the SESSION is anchored to, when it was opened from one
    * (myne-md/myne#848): the composer pins its scope to it and renders no picker.
@@ -846,6 +958,7 @@ export function ConversationSurface({
   surface,
   onInsert,
   openNoteId = null,
+  openNoteTitle = null,
   anchoredNoteId = null,
   folders = NO_FOLDERS,
   onNotesWritten,
@@ -891,10 +1004,6 @@ export function ConversationSurface({
     bumpPrefsNonce,
     ...(onRunUndone === undefined ? {} : { onReverted: onRunUndone }),
   });
-  const [diffProposal, setDiffProposal] = useState<Pick<
-    Proposal,
-    "edits" | "newNotes"
-  > | null>(null);
   const [revertConfirmRunId, setRevertConfirmRunId] = useState<string | null>(null);
   const runOpen = agent.view !== null;
 
@@ -1174,7 +1283,6 @@ export function ConversationSurface({
                     turn.agentSummary !== undefined &&
                     turn.agentSummary.runId === undo.run.runId
                   }
-                  onOpenDiff={setDiffProposal}
                   onRequestRevert={setRevertConfirmRunId}
                   revertBusy={undo.busy}
                   undoReport={
@@ -1213,6 +1321,7 @@ export function ConversationSurface({
           // above the composer, not a bordered card at the top of it
           // (docs/decisions/ui/0643). The same component serves the narrow
           // right panel and the agent tab, and filling is what fits both.
+          <>
           <EmptyState
             variant={degraded ? "error" : "firstRun"}
             icon={degraded ? "circle-alert" : "message-square"}
@@ -1235,6 +1344,12 @@ export function ConversationSurface({
                 : ({ "data-ai-cause": restingCause } as Record<string, string>)
             }
           />
+          {/* The once-only seed offer (myne-md/myne#915). It renders only in the
+              healthy zero state: a degraded surface is already saying what is
+              wrong, and an offer on top of it would be advice for a feature that
+              cannot run. */}
+          {degraded ? null : <SeedMemoryCard />}
+          </>
         )}
       </ScrollArea>
 
@@ -1246,18 +1361,12 @@ export function ConversationSurface({
       <ChatComposer
         surface={surface}
         openNoteId={openNoteId}
+        openNoteTitle={openNoteTitle}
         anchoredNoteId={anchoredNoteId}
         folders={folders}
         onNotesWritten={onNotesWritten}
       />
 
-      {diffProposal !== null ? (
-        <ProposalDiffModal
-          open
-          onClose={() => setDiffProposal(null)}
-          proposal={diffProposal}
-        />
-      ) : null}
       {/* Revert is a write, so it confirms first. The sentence states the one
           asymmetry the offer always carries: edits go back, creates stay. */}
       {revertConfirmRunId !== null ? (

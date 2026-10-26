@@ -180,15 +180,22 @@ pub async fn upgrade_vault_to_ntv7(
         &ntv6.signed_roster_envelope,
     )
     .ok_or(Ntv7UpgradeError::CannotDecrypt)?;
-    let roster =
-        protocol::person_invite::verify_group_roster(owner_public, &signed_roster, &account_hash)
-            .map_err(|_| Ntv7UpgradeError::PersonMismatch)?;
+    let roster = protocol::person_invite::verify_group_roster(
+        protocol::person_invite::RosterTrust::person_only(owner_public),
+        &signed_roster,
+        &account_hash,
+    )
+    .map_err(|_| Ntv7UpgradeError::PersonMismatch)?;
 
-    // A shared vault is refused: the frame keeps the B2B tail, but the member
-    // plane writes that tail through `NTV6`-only paths today (invite, removal,
-    // rotation adoption). Upgrading one would produce a vault whose members
-    // cannot be re-wrapped, so the refusal is the safe arm rather than a
-    // half-supported state.
+    // A shared vault is refused, and the reason is a ROLLOUT one rather than a
+    // capability one. The member plane now reads and writes the person generation
+    // (invite, accept, removal and the two member-writable families all read the
+    // tail through `parse_b2b_tail_any`), so the frame itself would be fine. What is
+    // not fine is the fleet: a client that predates `NTV7` REJECTS the magic outright
+    // (`protocol.md` §10.3, by design), and a shared vault's members are other
+    // people's devices, which this operator does not upgrade. Changing the
+    // generation under a live second person would therefore take their vault away
+    // until each of them updates.
     //
     // The count is LIVE rows only, and the owner is one of them. Counting
     // `members.len()` made a vault that was shared and then un-shared permanently

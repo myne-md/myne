@@ -62,7 +62,13 @@ export type MemoryMutateErrorKind =
   // The write was learned from a note in an `ai_excluded_folders` folder
   // (myne-md/myne#709, write-time exclusion).
   | "ExcludedSource"
-  | "RandomnessUnavailable";
+  | "RandomnessUnavailable"
+  // The reviewed seed batch refused as a whole (myne-md/myne#915).
+  | "SeedEmpty"
+  // One candidate failed the write-time gate; `detail.index` names it.
+  | "SeedCandidateRefused"
+  // The batch would exceed the roster cap; `detail` carries the arithmetic.
+  | "SeedCapExceeded";
 
 /** Mirror of Rust `MemoryMutateError` (serde `tag = "kind", content = "detail"`). */
 export interface MemoryMutateError {
@@ -83,6 +89,10 @@ export interface MemoryEntryRow {
   // Held for user review: tripped the injection scan on a model create, listed
   // but never injected until a user edit clears it (myne-md/myne#709).
   quarantined: boolean;
+  // `"seed"` for a row a reviewed vault seed wrote (myne-md/myne#915). Absent
+  // means an ordinary row; any other value is also ordinary (a newer client may
+  // write one, and an old reader must not treat it as seed).
+  origin?: string;
 }
 
 /** One roster row as the list command returns it: id + row. */
@@ -93,6 +103,7 @@ export interface MemoryListRow {
   updated_at: number;
   version: number;
   quarantined: boolean;
+  origin?: string;
 }
 
 /** One voice directive (§ 9.27): the standing rule text and its update time. */

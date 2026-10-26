@@ -994,6 +994,7 @@ function App() {
               // that is absent. Passed only with its opener, so a count can never
               // render without a door.
               inviteCount={inviteCount}
+              invitesUnavailable={pendingInvites.unavailable}
               onInvites={onInvitesFromEditor}
               onRestoreBackup={() =>
                 dispatch({ type: "editor.restore-backup" })
@@ -1042,6 +1043,7 @@ function App() {
             // straight over the picker.
             onJoinDevice={() => setJoinOpen(true)}
             inviteCount={inviteCount}
+            invitesUnavailable={pendingInvites.unavailable}
             onInvites={() => setInvitesOpen(true)}
           />
         );

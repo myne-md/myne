@@ -100,6 +100,19 @@ export function beginScrollRestore(noteId: string, now = Date.now()): void {
   restoring.set(noteId, now);
 }
 
+/** How long `noteId`'s restore window still has to run, in ms (0 when none).
+ *
+ *  Deliberately NOT exported: its one consumer is `restoreDelay` two hundred
+ *  lines down, and an export with no caller outside this file is exactly what
+ *  `check-export-callers.mjs` reports. It read as part of the module's public
+ *  surface for no reason. */
+function scrollRestoreRemaining(noteId: string, now = Date.now()): number {
+  const started = restoring.get(noteId);
+  if (started === undefined) return 0;
+  const left = RESTORE_SUPPRESSION_MS - (now - started);
+  return left > 0 ? left : 0;
+}
+
 /** Whether a restore of `noteId` is still settling. */
 export function isRestoringScroll(noteId: string, now = Date.now()): boolean {
   const started = restoring.get(noteId);
@@ -151,6 +164,19 @@ export function rememberScroll(
   scroller.dataset.scrollAnchorTop = String(Math.round(scroller.scrollTop));
   if (isRestoringScroll(noteId)) {
     scroller.dataset.scrollAnchorWrite = "suppressed";
+    // **A suppressed write is DEFERRED, not dropped.** The suppression window
+    // exists to keep a restore from writing its own rounding error back over the
+    // anchor it came from, and it lasts 500 ms. A position the reader takes
+    // inside that window is a real position, and the pane only calls this on a
+    // scroll: drop it here and nothing runs again until the next scroll, so the
+    // anchor stays at whatever the restore left.
+    //
+    // Measured 2026-10-25 on `scroll-memory` sm2, which is the reproduction: a
+    // stale `pos: 0` restore finished three frames before the reader scrolled,
+    // the settle remember arrived inside the window, and the note's anchor was
+    // still `0` afterwards with `liveTop=1200` on screen — so the split that
+    // follows opens at the top, which is the reported myne#600 symptom.
+    scheduleDeferredRemember(noteId, view, scroller);
     return;
   }
   const anchor = readScrollAnchor(view, scroller);
@@ -162,6 +188,50 @@ export function rememberScroll(
   } else {
     scroller.dataset.scrollAnchorWrite = "unreadable";
   }
+}
+
+/**
+ * One pending re-remember per scroller, for a write the restore window swallowed.
+ *
+ * Keyed on the SCROLLER rather than on the note: the retry captures that
+ * element's position, and the same note can be mounted in two panes, each with
+ * its own scroller and its own reading position.
+ */
+const deferredRemember = new WeakMap<HTMLElement, ReturnType<typeof setTimeout>>();
+
+function scheduleDeferredRemember(
+  noteId: string,
+  view: EditorView,
+  scroller: HTMLElement,
+): void {
+  // A second suppressed write would only re-arm the same timer; the closure reads
+  // the scroller live, so the latest position is what lands.
+  if (deferredRemember.has(scroller)) return;
+  // Relative to what is LEFT of the window, not to its full width: the write that
+  // got suppressed usually arrives a few hundred ms into it (the pane coalesces
+  // scroll on a trailing timer), and waiting the whole window again would land
+  // the retry past the point a caller is entitled to see a position.
+  const delay = scrollRestoreRemaining(noteId) + 32;
+  const timer = setTimeout(() => {
+    deferredRemember.delete(scroller);
+    // The pane this was for may be gone by now: a swapped view, a closed tab, a
+    // split that unmounted it. Reading a detached view's coordinates is how a
+    // "remember" turns into a crash, and there is nothing to remember anyway.
+    if (!scroller.isConnected || !view.dom.isConnected) return;
+    if (isRestoringScroll(noteId)) {
+      scheduleDeferredRemember(noteId, view, scroller);
+      return;
+    }
+    const anchor = readScrollAnchor(view, scroller);
+    if (anchor === null) {
+      scroller.dataset.scrollAnchorWrite = "unreadable";
+      return;
+    }
+    anchors.set(noteId, anchor);
+    scroller.dataset.scrollAnchorPos = String(anchor.pos);
+    scroller.dataset.scrollAnchorWrite = "deferred-ok";
+  }, delay);
+  deferredRemember.set(scroller, timer);
 }
 
 /** The anchor remembered for `noteId`, if any. */

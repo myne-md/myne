@@ -601,6 +601,21 @@ export const myneTheme = EditorView.theme({
   // scroller. With the `.cm-scroller { overflow-x: hidden }` floor now in place
   // that shows up as a clip rather than a sideways swipe, which is the failure
   // the floor's own comment says it converts silence into.
+  // Two labelled runs when the band carries both kinds (myne-md/myne#908
+  // item 1). The group owns its own wrap so one group's chips never scatter
+  // around the other's label.
+  ".cm-tag-suggestion-group": {
+    display: "inline-flex",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: "6px",
+    minWidth: 0,
+  },
+  ".cm-tag-suggestion-group-label": {
+    color: "var(--fg-3, #6b6a64)",
+    fontSize: "11px",
+    letterSpacing: "0.02em",
+  },
   ".cm-tag-suggestion-chip": {
     display: "inline-flex",
     alignItems: "center",
