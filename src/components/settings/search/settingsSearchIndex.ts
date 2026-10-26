@@ -1306,6 +1306,17 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.aiMemory",
   },
   {
+    id: "ai.memorySeed",
+    agentWritability: WRITABILITY_NONE,
+    capability: "localAi",
+    developerGated: true,
+    panelId: "ai",
+    topic: "advanced",
+    titleKey: "settings.memory.seed.rowTitle",
+    descriptionKey: "settings.memory.seed.rowHelper",
+    keywordsKey: "settings.search.keywords.aiMemory",
+  },
+  {
     id: "ai.personality",
     agentWritability: WRITABILITY_NONE,
     capability: "localAi",

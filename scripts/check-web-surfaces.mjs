@@ -67,6 +67,10 @@ const V = {
     "adapted",
     "Rendered only by Editor.tsx, and only where `has(\"localAi\")` is true (the whole surface is gated on that capability, not just its `downloads` prop), so on web, where `localAi` is absent, it is not mounted at all and no AI affordance appears (decisions/ai/0628). Its download cards are further gated on `downloads`, whose only `true` caller is the desktop Editor; mobile mounts its own copy with `downloads: false` (opt-in + Chat only). Its host calls are the `local-inference` download bindings (whole plugin `Unsupported` on web) plus prefs, and none is reachable on web because the component never renders there.",
   ],
+  "src/components/settings/SeedMemoryWizard.tsx": [
+    "ported",
+    "The reviewed vault seed (myne-md/myne#915). Rendered from MemorySection and the chat zero state, both unreachable where `localAi` is absent (the AI panel is filtered from the rail and the card's own gate reads the same pref). Its host calls are the `local-inference` seed commands and `memory_seed_apply`, all classified absent-on-web, so on the web bundle it is code that never runs rather than a second implementation.",
+  ],
   "src/components/settings/MemorySection.tsx": [
     "adapted",
     "Rendered only by AiPanel.tsx, so it inherits that panel's rail filter exactly: where `localAi` is absent the panel is never mounted and this section is unreachable. Holds no host call of its own beyond the `memory:` bindings (Unsupported on web), so there is nothing here that would need a web substitution even if it were reachable.",
@@ -371,6 +375,10 @@ const V = {
   "src/lib/chats.ts": [
     "ported",
     "The conversations plugin's IPC bindings (create/append/read/list/rename/delete, myne-md/myne#675). All six commands are Dispatched in web/wasm/src/dispatch.rs against the OPFS-backed store, so the history list/open/rename/delete run in the browser exactly as written. That makes it the one AI surface that survives the `agent` plugin's Unsupported classification.",
+  ],
+  "src/lib/seed-memory.ts": [
+    "ported",
+    "The seed bindings (myne-md/myne#915): status, payload, generate, cancel and the batch apply. Every one names a command in a plugin classified absent-on-web (`local-inference`, `memory`); no web path calls them because there is no AI surface, so this is reachable code whose every call is refused by the dispatcher rather than a missing module.",
   ],
   "src/lib/memory.ts": [
     "adapted",

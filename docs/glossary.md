@@ -206,6 +206,14 @@ What the AI assistant remembers about the user across runs: a small, curated set
 
 Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; `threat-model.md` TB12/TB13 (2026-09-10 amendments)
 
+### **seed memory** &nbsp; 📦 *Product*
+
+*(Alias: `seed_memory`, "Teach Myne your vault"; the reviewed one-shot pass from a vault into [agent memory](#agent-memory).)*
+
+A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0742`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
+
+Used in: `decisions/ai/0742`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
+
 ### **agent-writability verdict** &nbsp; 🛠️ *Tooling*
 
 The per-setting declaration of whether the agent may change it, carried by EVERY entry in the
@@ -400,6 +408,18 @@ The custom WebView protocol scheme that serves a decrypted [attachment](#attachm
 ### **attachment_import** &nbsp; 📋 *Protocol*
 
 The single Tauri command that ingests a file into the attachment store — from inline bytes (clipboard paste / WebView drop) or a path (file picker). Computes the [attachment-id](#attachment-id), performs id-existence dedup, encrypts + stores the [`MYA1`](#mya1) blob, and upserts the [`vault.attachments`](#vaultattachments) metadata; enforces the 64 MiB cap. Since MYND-173 it accepts **any file type** — a file the sniffer does not recognize is stored as `application/octet-stream` (not rejected); the locked reject taxonomy is now oversize / locked (the render allowlist is a serve-time authority on [attachment://](#attachment), not an import gate). It also takes a `scope` (`None` / `Some("chat")`): a file pasted into a conversation is stored the same way and kept out of the library listing (myne-md/myne#913, [chat-scoped attachment](#chat-scoped-attachment)). Unlock-gated, main-window-scoped. (MYND-164; `decisions.md` 2026-06-14)
+
+### **attached document** &nbsp; 📦 *Product*
+
+A file a message carries so the run can READ it (myne-md/myne#913), as opposed to an attachment the run may propose a write to. Chosen per message, through the composer's `+` picker or a paste, and limited to four per message; the run receives the text extracted from each (the device-local [`MYE1`](#mye1) cache, §9.15), cut at 20,000 unicode scalar values per document by the host (`core/src/plugins/agent/prompt.rs`). The bytes never leave: only that text, carried as untrusted content beside note text, so the same sanitizer and the same off-device character count apply. A chosen document with no extracted text refuses the send by name rather than entering the run empty. `threat-model.md` TB12/TB13 carries it as a payload class because the file need not be the user's own: a received PDF is a third party's words.
+
+Used in: `spec/protocol.md` §9.10.2, §9.15; `threat-model.md` TB12, TB13; `decisions/protocol/0718`
+
+### **chat-scoped attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) whose [`vault.attachments`](#vaultattachments) row carries the optional `scope: "chat"` (§9.10.2, myne-md/myne#913): it was pasted into one conversation and belongs to that surface. It is **not a second store**: the file is the same encrypted [`MYA1`](#mya1) blob, under the same key lineage, synced and backed up like any other attachment; the field only says which surface lists it, and the [attachment library](#attachment-library) filters it out (`catalog_list`). `library` is never emitted (the absent value IS the library), so every pre-#913 catalog encodes byte-identically and [`MYC1`](#myc1) keeps its magic. Decode tolerates an unknown scope value by reading it as library rather than failing the catalog, and a tombstone carries none. Its reference is a conversation turn, not a note, so the unused-attachment sweep never offers it (`decisions/protocol/0718`).
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`; `myne-test-vectors` `attachments-catalog/v0.1/encrypt-chat-scope`
 
 ### **attachment_export** &nbsp; 📋 *Protocol*
 
@@ -672,7 +692,7 @@ One persisted AI chat history unit: an ordered, immutable list of settled [chat 
 
 **A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0719`
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0740`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 

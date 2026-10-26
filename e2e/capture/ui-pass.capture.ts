@@ -254,8 +254,10 @@ runner(
       // runs of this spec waited out the pane's whole budget with the row
       // right there on screen: the capture was reading "the row exists" as
       // "the row works".
+      let aiReady = false;
       await safe("ai opt-in", async () => {
         await enableAi(s);
+        aiReady = true;
         await sleep(400);
         await closeSettings(s);
         await sleep(600);
@@ -344,6 +346,79 @@ runner(
           await sleep(700);
         },
       );
+
+
+      // ── The reviewed vault seed (myne-md/myne#915) ────────────────────
+      // The card needs the floor of ten live notes, so the frames come last.
+      // They are gated on the earlier AI opt-in because the card's own gate
+      // reads it: a pass where that step did not land would otherwise report
+      // four timeouts for a surface that is correctly absent.
+      // The generation frames are best-effort: this capture build does not
+      // define `local-inference-stub`, so a run without a real model stops at
+      // the scope screen and the candidate frame is skipped rather than
+      // failing the pass. The E2E suite runs the same path against the stub.
+      if (aiReady) {
+      await safe("ten notes for the card's floor", async () => {
+        for (let i = 0; i < 10; i += 1) {
+          await runPaletteAction(s, "note.new", "new note");
+          await sleep(120);
+        }
+      });
+
+      await frame(
+        s,
+        "60-seed-card",
+        "The chat zero state's once-only offer: AI on, memory empty, enough notes to distil.",
+        async () => {
+          const tab = await s.waitForElement(
+            testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "ai-chat" }),
+            { timeoutMs: 20_000 },
+          );
+          await tab.click();
+          await s.byTestId("ai.seed-card", { timeoutMs: 25_000 });
+          await sleep(500);
+        },
+      );
+
+      await frame(
+        s,
+        "61-seed-scope",
+        "Teach Myne your vault, step one: provider, counts, excluded notes and the real payload.",
+        async () => {
+          await (await s.byTestId("ai.seed-card-start")).click();
+          await s.byTestId("settings.memory.seed.scope", { timeoutMs: 20_000 });
+          await (await s.byTestId("settings.memory.seed.toggle-payload")).click();
+          await sleep(600);
+        },
+      );
+
+      await frame(
+        s,
+        "62-seed-candidates",
+        "Step two: the model's three entries, each editable and counted before anything is saved.",
+        async () => {
+          await (await s.byTestId("settings.memory.seed.continue")).click();
+          await s.byTestId("settings.memory.seed.candidate-list", { timeoutMs: 60_000 });
+          await sleep(600);
+        },
+      );
+
+      await frame(
+        s,
+        "63-seed-memory",
+        "The Memory panel after a reviewed seed: the From your vault group and its date.",
+        async () => {
+          await (await s.byTestId("settings.memory.seed.apply")).click();
+          await s.byTestId("settings.memory.seed.done", { timeoutMs: 30_000 });
+          await (await s.byTestId("settings.memory.seed.finish")).click();
+          await openSettings(s, "ai");
+          await s.waitForElement(testIdSelector("settings.memory.seed-group"), {
+            timeoutMs: 20_000,
+          });
+          await sleep(600);
+        },
+      );
+      }
 
     } finally {
       // eslint-disable-next-line no-console

@@ -252,6 +252,14 @@ export function MemoryPopover(props: {
           ) : (
             rows.slice(0, 8).map((row) => (
               <div key={row.id} style={ROW_STYLE} data-testid="ai.memory-popover-row">
+                {row.origin === "seed" ? (
+                  <p
+                    data-testid="ai.memory-popover-seed-label"
+                    style={{ ...TEXT_STYLE, color: "var(--fg-3)", fontSize: "var(--text-xs)" }}
+                  >
+                    {t("settings.memory.seed.groupTitle")}
+                  </p>
+                ) : null}
                 {failedIds.has(row.id) ? (
                   <p style={TEXT_STYLE} data-testid="ai.memory-popover-row-unreadable">
                     {t("editor.chrome.rightPanel.aiChat.memoryPopoverEntryFailed")}

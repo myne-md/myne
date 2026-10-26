@@ -17,6 +17,7 @@ permissions = [
     "allow-memory-read",
     "allow-memory-write",
     "allow-memory-delete",
+    "allow-memory-seed-apply",
     "allow-personality-read",
     "allow-personality-write",
 ]
@@ -40,6 +41,11 @@ commands.allow = ["memory_write"]
 identifier = "allow-memory-delete"
 description = "Allow invoking memory:memory_delete (Slot::Unlocked-gated tombstone delete: marks the catalog row, removes the MYX1 file; idempotent)."
 commands.allow = ["memory_delete"]
+
+[[permission]]
+identifier = "allow-memory-seed-apply"
+description = "Allow invoking memory:memory_seed_apply (Slot::Unlocked-gated reviewed bulk write of seed entries: whole-batch validation, roster cap accounted against previous seed rows, replace-only-own-rows, myne-md/myne#915)."
+commands.allow = ["memory_seed_apply"]
 
 [[permission]]
 identifier = "allow-personality-read"

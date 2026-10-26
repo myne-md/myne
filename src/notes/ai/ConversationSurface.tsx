@@ -32,6 +32,7 @@ import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { EmptyState } from "../../components/primitives/EmptyState";
+import { SeedMemoryCard } from "../components/SeedMemoryCard";
 import { restingBody, restingLabel, type RestingId } from "./restingCause";
 import type { MentionTarget } from "./noteMentions";
 import { IconButton } from "../../components/primitives/IconButton";
@@ -1320,6 +1321,7 @@ export function ConversationSurface({
           // above the composer, not a bordered card at the top of it
           // (docs/decisions/ui/0643). The same component serves the narrow
           // right panel and the agent tab, and filling is what fits both.
+          <>
           <EmptyState
             variant={degraded ? "error" : "firstRun"}
             icon={degraded ? "circle-alert" : "message-square"}
@@ -1342,6 +1344,12 @@ export function ConversationSurface({
                 : ({ "data-ai-cause": restingCause } as Record<string, string>)
             }
           />
+          {/* The once-only seed offer (myne-md/myne#915). It renders only in the
+              healthy zero state: a degraded surface is already saying what is
+              wrong, and an offer on top of it would be advice for a feature that
+              cannot run. */}
+          {degraded ? null : <SeedMemoryCard />}
+          </>
         )}
       </ScrollArea>
 
