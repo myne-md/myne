@@ -1517,6 +1517,11 @@ pub async fn reseal_attachment(
     let filename = entry.filename.clone();
     let created_at = entry.created_at;
     let content_type = entry.content_type.clone();
+    // **The placement travels with the file** (myne-md/myne#913, review round
+    // eight): re-importing a chat-scoped row as a library row would list a file
+    // its author filed into one conversation, and would make it sweepable once
+    // that conversation's turns moved on. The row already carries the answer.
+    let source_scope = entry.scope;
 
     let blob = io
         .read(&source_root.join("attachments").join(&attachment_id_hex))
@@ -1560,9 +1565,7 @@ pub async fn reseal_attachment(
         IngestPolicy {
             created_at_override: Some(created_at),
             compression: IngestCompression::SkipAlreadyCanonical,
-            // A restored / imported file is a library attachment: the import
-            // path has no conversation to belong to (myne-md/myne#913).
-            scope: protocol::AttachmentScope::Library,
+            scope: source_scope,
         },
         |_ct: &str, _fn_: &str, _b: &[u8]| {
             crate::plugins::attachments::extract_types::ExtractedText::negative(

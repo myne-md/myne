@@ -58,6 +58,7 @@ function summary(id: string, kind: "Exists" | "Corrupted"): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   } as VaultSummary;
 }
 

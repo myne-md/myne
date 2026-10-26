@@ -273,11 +273,6 @@ describe("AiChatTab", () => {
       expect(screen.getByTestId("ai.turn-streaming")).toBeTruthy();
     });
 
-
-
-
-
-
     it("hides the empty hint once the transcript has turns", () => {
       sendChatMessage("q");
       render(<AiChatTab />);
@@ -1831,6 +1826,22 @@ describe("AiChatTab: scope card and note binding", () => {
 
     rerender(<AiChatTab openNoteId={null} />);
     rerender(<AiChatTab openNoteId="note-b" />);
+
+    expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
+  });
+
+  it("starts fresh when the note changes while the tab was unmounted", () => {
+    // The panel only mounts while its tab is the AI one, so the note can move
+    // while it is away. A component-local "which note is this conversation
+    // about" ref died with the unmount, and the remount adopted the NEW note as
+    // the conversation's note, so A's transcript continued under B (review round
+    // three). The ref is module state now.
+    sendAgentTurn("what is in this note", "This note");
+    const first = render(<AiChatTab openNoteId="note-a" />);
+    expect(screen.queryAllByTestId("ai.turn").length).toBeGreaterThan(0);
+    first.unmount();
+
+    render(<AiChatTab openNoteId="note-b" />);
 
     expect(screen.queryAllByTestId("ai.turn").length).toBe(0);
   });

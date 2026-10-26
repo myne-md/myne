@@ -45,7 +45,12 @@ import {
   orderByLastUnlock,
   stableVaultNumber,
 } from "../../lib/vault-list";
-import { listAccounts, accountCommandErrorKind, groupVaultsByAccount } from "../../lib/account";
+import {
+  accountCommandErrorKind,
+  accountHeading,
+  groupVaultsByAccount,
+  listAccounts,
+} from "../../lib/account";
 import type { AccountView } from "../../lib/account";
 import { resolveVaultByAccountNumber } from "../../lib/vault-recover";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
@@ -104,10 +109,22 @@ function lastUnlockText(lastUnlock: number | null): string {
 }
 
 /** Grouping lives in `../../lib/account` (`groupVaultsByAccount`, shared with
- *  the picker and the mobile flow); this file keeps only the label. */
-function accountLabel(account: AccountView | null): string {
+ *  the picker and the mobile flow); this file keeps only the heading, which is
+ *  the group's own vault names (`design-notes/ui/0728`: an account has no name
+ *  of its own). */
+function accountLabel(
+  account: AccountView | null,
+  vaults: readonly VaultSummary[],
+): string {
   if (account === null) return "";
-  return account.label === "" ? i18n.t("vaultRecover.select.accountFallback") : account.label;
+  return accountHeading(
+    account,
+    (id) => {
+      const vault = vaults.find((v) => v.id === id);
+      return vault === undefined ? null : rowLabel(vault, vaults);
+    },
+    i18n.t("vaultRecover.select.accountFallback"),
+  );
 }
 
 const LIST_STYLE: CSSProperties = {
@@ -341,7 +358,7 @@ export function RecoverySelectStep({
             >
               {group.account !== null && (
                 <p style={GROUP_HEADER_STYLE} data-testid="recover.select-account-header">
-                  {accountLabel(group.account)}
+                  {accountLabel(group.account, list.vaults)}
                 </p>
               )}
               {group.vaults.map((vault) => (

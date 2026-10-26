@@ -8,8 +8,12 @@ import { invoke } from "../platform/core";
  */
 
 export interface BeginResult {
-  /** 24 BIP-39 words, in order. */
-  phrase: string[];
+  /**
+   * 24 BIP-39 words, in order, or `null` when the vault is born under a person
+   * identity (myne-md/myne#911 task 5). That generation retires the vault
+   * phrase, so the identity phrase is the only recovery credential.
+   */
+  phrase: string[] | null;
   /** Display-form account number, e.g. "MY-4F2A-9C17-8E2D-1B5F-K". */
   account_number: string;
   /** Opaque session token scoped to this creation session. */

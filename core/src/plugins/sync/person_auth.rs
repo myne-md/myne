@@ -37,6 +37,16 @@ pub const PERSON_AUTH_FILE: &str = "person-auth.json";
 pub struct PersonAuth {
     pub person_id_hex: String,
     pub device_id_hex: String,
+    /// Whether this identity has been registered with a server (myne-md/myne#911).
+    ///
+    /// The persistent half of the three-state lifecycle: a sealed identity with
+    /// `registered == false` is `reserved` and has sent nothing; `true` with an
+    /// empty token is `pending`. `#[serde(default)]` keeps a pre-feature
+    /// credential file readable, and the status derivation deliberately decides
+    /// `enrolled` from the TOKEN rather than from this flag, so a legacy file
+    /// with a token still reads as enrolled rather than as reserved.
+    #[serde(default)]
+    pub registered: bool,
     pub token_hex: String,
     #[serde(default)]
     pub kem_ek_hex: String,
@@ -44,6 +54,27 @@ pub struct PersonAuth {
     pub ed_pk_hex: String,
     #[serde(default)]
     pub mldsa_vk_hex: String,
+    /// This device's OWN server-auth secret, when it joined with a device credential
+    /// instead of the recovery phrase (`decisions/protocol/0735`).
+    ///
+    /// It is stored beside `token_hex` on purpose, and the reason is a threat-model
+    /// statement rather than a convenience: the token already authenticates every request
+    /// this device makes, so a second credential that grants the same account authority
+    /// adds no exposure this file did not already carry. Hiding it behind a keychain rung
+    /// would protect the weaker of the two secrets and leave the stronger one in the same
+    /// file, which is the kind of asymmetry that reads as security and is not.
+    ///
+    /// Absent on every device that joined with the phrase, and on every pre-feature file.
+    /// Redacted from `Debug` like the token.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_secret_hex: Option<String>,
+    /// The salt this device's credential was derived under (lowercase hex). Public
+    /// material: the server echoes it back on every handshake.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_salt_hex: Option<String>,
+    /// The PBKDF2 iteration count of this device's credential.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub device_iterations: Option<u32>,
 }
 
 /// Redacting `Debug`: the public halves are shown, but `token_hex` is never
@@ -139,6 +170,7 @@ mod tests {
             let auth = PersonAuth {
                 person_id_hex: "11".repeat(16),
                 device_id_hex: "22".repeat(16),
+                registered: false,
                 token_hex: "33".repeat(32),
                 ..Default::default()
             };

@@ -10,6 +10,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personListInvites = vi.hoisted(() => vi.fn());
+const personRegister = vi.hoisted(() => vi.fn());
+const readSyncConfig = vi.hoisted(() => vi.fn());
+const writeSyncEndpoint = vi.hoisted(() => vi.fn());
 const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
@@ -31,6 +34,9 @@ vi.mock("../../src/components/PasswordInput", async (importOriginal) => {
 vi.mock("../../src/lib/personAccount", () => ({
   personListInvites,
   personAcceptInvite,
+  personRegister,
+  readSyncConfig,
+  writeSyncEndpoint,
 }));
 
 vi.mock("../../src/lib/invite", () => ({
@@ -46,8 +52,17 @@ vi.mock("../../src/lib/memberNames", async (importOriginal) => {
 vi.mock("../../src/lib/clipboard", () => ({ copyText: vi.fn() }));
 vi.mock("../../src/platform/clipboardManager", () => ({ writeText: vi.fn() }));
 vi.mock("../../src/components/toast/toastStore", () => ({ toast: vi.fn() }));
+// The register door is behind the beta-terms gate (operations#15). Settled here so
+// a submit reaches `personRegister`; the gate has its own specs.
+vi.mock("../../src/hooks/useBetaTermsGate", () => ({
+  useBetaTermsGate: () => ({ pending: false, needed: false, accept: vi.fn() }),
+}));
 
 import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 import { MIN_PASSWORD_LEN } from "../../src/components/PasswordInput";
 
@@ -59,7 +74,13 @@ function continueAccept(): void {
 }
 
 beforeEach(() => {
+  resetPersonIdentityState();
   personListInvites.mockReset().mockResolvedValue([]);
+  personRegister.mockReset().mockResolvedValue({});
+  readSyncConfig
+    .mockReset()
+    .mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: null });
+  writeSyncEndpoint.mockReset().mockResolvedValue(undefined);
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(undefined);
   listRoster.mockReset();
@@ -68,6 +89,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetPersonIdentityState();
   vi.useRealTimers();
 });
 
@@ -75,16 +97,48 @@ describe("IdentityHome accept path", () => {
   const OWNER_CODE = `MYNE-PERSON-1:${"11".repeat(16)}:${"22".repeat(32)}:${"33".repeat(32)}:${"44".repeat(48)}`;
 
   it("offers a vault creation from the identity landing in one action", async () => {
+    // The identity is UNLOCKED for this session, which is what the CTA needs: a
+    // vault born under an identity signs its first member list with that key, so
+    // the button is withheld (not disabled) while it is sealed. The next case
+    // pins the locked arm.
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:owner" });
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     await waitFor(() => expect(personListInvites).toHaveBeenCalled());
     expect(screen.getByTestId("identity-home.create-vault-cta")).toBeTruthy();
+  });
+
+  it("offers the unlock door instead of a CTA it cannot honour while the identity is locked", async () => {
+    // 2026-10-25 owner report: the CTA was offered while the identity was locked,
+    // the creation flow answered `PersonLocked`, and that sentence pointed at a
+    // door this screen did not have. On a device with zero vaults this screen is
+    // the only surface reachable, so the dead end was total.
+    setPersonIdentityState({ ready: false, ownerCode: "MYNE-PERSON-1:owner" });
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    expect(await screen.findByTestId("identity-home.create-vault-locked")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.create-vault-cta")).toBeNull();
+    // The door is mounted here, not pointed at: the same modal Settings uses.
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
   });
 
   it("lists a pending invite and opens the accept form with the member phrase", async () => {
@@ -94,9 +148,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     const open = await screen.findByTestId("identity-home.accept-open");
@@ -121,9 +178,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -181,9 +241,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -200,9 +263,12 @@ describe("IdentityHome accept path", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={onForgotten}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
 
@@ -220,6 +286,72 @@ describe("IdentityHome accept path", () => {
     await waitFor(() => expect(personLock).toHaveBeenCalledWith(true));
     await waitFor(() => expect(onForgotten).toHaveBeenCalled());
   });
+
+  // The confirmation is a DIALOG rather than a box expanding in the card
+  // (2026-10-24). What that buys the user has to be asserted, or the shell could
+  // be swapped back for a div and every test above would still pass: the surface
+  // says it is a modal, and Escape answers it without the erase running.
+  it("opens the forget confirmation as a dialog that Escape dismisses", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    // Nothing is expanded before the press: the card states the action, and the
+    // warning lives in the dialog.
+    expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+
+    const dialog = await screen.findByTestId("identity-home.forget-confirm");
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(screen.getByTestId("identity-home.forget-warning")).toBeTruthy();
+
+    fireEvent.keyDown(window, { key: "Escape" });
+    await waitFor(() =>
+      expect(screen.queryByTestId("identity-home.forget-confirm")).toBeNull(),
+    );
+    expect(personLock).not.toHaveBeenCalled();
+  });
+
+  // The acknowledgement is the dialog's own state, not the screen's, so closing
+  // the dialog throws it away instead of leaving a ticked box behind for whoever
+  // opens it next (which is what the inline box did by hand).
+  it("does not carry the acknowledgement across a close", async () => {
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    fireEvent.click(await screen.findByTestId("identity-home.forget-cta"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-ack"));
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
+
+    fireEvent.click(screen.getByTestId("identity-home.forget-cancel"));
+    fireEvent.click(screen.getByTestId("identity-home.forget-cta"));
+
+    expect(
+      (screen.getByTestId("identity-home.forget-confirm-cta") as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
 });
 
 // myne-md/myne#794: an invite that arrives while the identity home is already
@@ -233,9 +365,12 @@ describe("IdentityHome invite refresh (myne-md/myne#794)", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
 
@@ -332,9 +467,12 @@ describe("IdentityHome accept requires a device password", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={() => {}}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -434,9 +572,12 @@ describe("IdentityHome accept requires a device password", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -484,9 +625,12 @@ describe("IdentityHome accept reaches the name gate", () => {
     render(
       <IdentityHome
         identityCode="code"
+        accountNumber={null}
         onCreateVault={() => {}}
         onAccepted={onAccepted}
         onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
       />,
     );
     fireEvent.click(await screen.findByTestId("identity-home.accept-open"));
@@ -570,5 +714,199 @@ describe("IdentityHome accept reaches the name gate", () => {
     cleanup();
     expect(setMyMemberName).not.toHaveBeenCalled();
     expect(onAccepted).not.toHaveBeenCalled();
+  });
+});
+
+// 2026-10-23. The invitation list is addressed to a `person_id_hash` the server
+// holds, so a `reserved` identity (nothing sent) or a `pending` one (no token)
+// has none to miss. The screen used to ask the relay anyway and paint the
+// refusal as "could not load invites. Check your connection and sync server",
+// which turned a normal first-run state into a fault and pointed the user at
+// the one cause that was not the problem.
+describe("IdentityHome invitation state follows the account lifecycle", () => {
+  const renderWith = (accountState: "reserved" | "pending" | "enrolled") =>
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState={accountState}
+        onRegistered={() => {}}
+      />,
+    );
+
+  it("does not ask the relay for a reserved identity, and says why", async () => {
+    renderWith("reserved");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(personListInvites).not.toHaveBeenCalled();
+    expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
+      "identityHome.invitesUnregistered",
+    );
+    // The explanation and the action that ends the state are ONE block
+    // (2026-10-24): the paragraph says no invitation can reach this identity, and
+    // the register control sits under it rather than in a second block below the
+    // list. Injection: moving the control back out reddens this.
+    expect(screen.getByTestId("identity-home.register-cta")).toBeTruthy();
+    expect(screen.getByTestId("identity-home.account-state").textContent).toContain(
+      "identityHome.invitesUnregistered",
+    );
+    expect(screen.queryByTestId("identity-home.error")).toBeNull();
+  });
+
+  it("does not ask the relay for a pending device, and says why", async () => {
+    renderWith("pending");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(personListInvites).not.toHaveBeenCalled();
+    expect(screen.getByTestId("identity-home.invites-unavailable").textContent).toBe(
+      "identityHome.invitesPending",
+    );
+    // A wait has no action: the register control belongs to `reserved` alone.
+    expect(screen.queryByTestId("identity-home.register-cta")).toBeNull();
+  });
+
+  it("reads a NotEnrolled refusal as the same state, not as a connection error", async () => {
+    // A stale `accountState` (registered on another surface this session) can
+    // still reach the relay; the refusal is the same fact as the prop's and must
+    // land in the same place. Injection: mapping it back to `failed` reddens this.
+    personListInvites.mockRejectedValue({ kind: "NotEnrolled" });
+    renderWith("enrolled");
+    await screen.findByTestId("identity-home.invites-unavailable");
+    expect(screen.queryByTestId("identity-home.error")).toBeNull();
+  });
+
+  it("keeps a genuine failure as the connection banner", async () => {
+    personListInvites.mockRejectedValue({ kind: "Transport" });
+    renderWith("enrolled");
+    await screen.findByTestId("identity-home.error");
+    expect(screen.queryByTestId("identity-home.invites-unavailable")).toBeNull();
+  });
+});
+
+// 2026-10-24: the register act is a DIALOG (it used to expand a 24-cell grid
+// inside the card, which is what pushed the card past the window), in TWO STEPS
+// (the server is a decision, the phrase is a secret, and one view made the user
+// read both before understanding either), and the server step comes first, because
+// which server the identity is written to is a decision with a place rather than a
+// value inherited in silence. This screen is reachable at zero vaults, where
+// Settings does not exist, so the address has to be answerable here.
+describe("IdentityHome registration", () => {
+  const P = "identity-home.register";
+  const PHRASE = Array.from({ length: PHRASE_CELL_COUNT }, (_, i) => `word${i + 1}`);
+
+  const renderReserved = (onRegistered: () => void = () => {}) =>
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="reserved"
+        onRegistered={onRegistered}
+      />,
+    );
+
+  const fillCells = (prefix: string) => {
+    for (let i = 0; i < PHRASE_CELL_COUNT; i += 1) {
+      const id = i === 0 ? `${prefix}-phrase` : `${prefix}-phrase-cell-${i + 1}`;
+      fireEvent.change(screen.getByTestId(id), { target: { value: PHRASE[i] } });
+    }
+  };
+
+  /** Step one's Continue, the only way to the phrase. */
+  const toPhraseStep = async (prefix: string = P) => {
+    fireEvent.click(await screen.findByTestId(`${prefix}-continue`));
+    await screen.findByTestId(`${prefix}-phrase-grid`);
+  };
+
+  it("opens as a dialog on the server step, with the card left as it was", async () => {
+    renderReserved();
+    // Nothing of the form is in the card before the press.
+    expect(screen.queryByTestId(`${P}-server`)).toBeNull();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    // Mounted through a portal on `document.body`, and the form is inside it.
+    const dialog = await screen.findByTestId(`${P}-dialog`);
+    expect(dialog.parentElement).toBe(document.body);
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    // The phrase is not in the same view as the address.
+    expect(screen.queryByTestId(`${P}-phrase-grid`)).toBeNull();
+  });
+
+  it("asks for the phrase in 24 cells, and keeps Register disabled until they are full", async () => {
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await toPhraseStep();
+    const submit = screen.getByTestId(`${P}-submit`) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+
+    fireEvent.change(screen.getByTestId(`${P}-phrase`), {
+      target: { value: PHRASE[0] },
+    });
+    expect(submit.disabled).toBe(true);
+
+    fillCells(P);
+    expect(submit.disabled).toBe(false);
+  });
+
+  it("shows the server the identity will be registered on, prefilled", async () => {
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    const server = (await screen.findByTestId(`${P}-server`)) as HTMLInputElement;
+    await waitFor(() => expect(server.value).toBe("https://sync.example"));
+    // Unchanged, so it is not re-written (each write re-verifies TLS).
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
+    expect(writeSyncEndpoint).not.toHaveBeenCalled();
+  });
+
+  it("takes an address when the device has none, and sets it before any phrase", async () => {
+    readSyncConfig.mockResolvedValue({ endpoint_url: null, invite_code: null });
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    const server = await screen.findByTestId(`${P}-server`);
+    // No address, no way forward: the order the 2026-10-24 report asked for.
+    expect((screen.getByTestId(`${P}-continue`) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(server, { target: { value: "https://sync.example" } });
+    await toPhraseStep();
+    expect(writeSyncEndpoint).toHaveBeenCalledWith("https://sync.example", null);
+    expect(personRegister).not.toHaveBeenCalled();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(personRegister).toHaveBeenCalledWith(PHRASE.join(" ")));
+  });
+
+  it("goes back to the server step on NotConfigured, with the words kept", async () => {
+    // The defect the report named: the address was hidden, the register call
+    // refused `NotConfigured`, and the 24 words were wiped before the address
+    // field appeared. Injection: restoring `resetCells()` on this arm reddens it.
+    personRegister.mockRejectedValue({ kind: "NotConfigured" });
+    renderReserved();
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+
+    expect((await screen.findByTestId(`${P}-error`)).textContent).toBe(
+      "identityHome.registerServerError",
+    );
+    // Back where the fix is, and the words survived the round trip.
+    expect(screen.getByTestId(`${P}-server`)).toBeTruthy();
+    await toPhraseStep();
+    expect((screen.getByTestId(`${P}-phrase`) as HTMLInputElement).value).toBe(PHRASE[0]);
+  });
+
+  it("closes the dialog and reprobes once the registration lands", async () => {
+    const onRegistered = vi.fn();
+    renderReserved(onRegistered);
+    fireEvent.click(await screen.findByTestId("identity-home.register-cta"));
+    await toPhraseStep();
+    fillCells(P);
+    fireEvent.click(screen.getByTestId(`${P}-submit`));
+    await waitFor(() => expect(onRegistered).toHaveBeenCalled());
+    expect(screen.queryByTestId(`${P}-dialog`)).toBeNull();
   });
 });

@@ -18,10 +18,27 @@ import { REPO_ROOT } from "./session";
 export interface RealisticFixture {
   vaultId: string;
   password: string;
-  /** 24 space-joined lowercase BIP-39 words (DOM-scraped at reveal). */
-  phrase: string;
-  /** 27-char display account number. */
-  account: string;
+  /**
+   * 24 space-joined lowercase BIP-39 words, or `null`.
+   *
+   * `null` since myne-md/myne#911 task 6: the first run creates an IDENTITY
+   * first, so the vault VC-1 creates is person-born and has no vault phrase to
+   * scrape. A suite whose subject is PHRASE RECOVERY must not consume this
+   * fixture; it seeds a legacy production-KDF vault instead
+   * (`seedVault(appDataDir, { kdf: "production" })`), which is the only shape
+   * that still has a phrase. Reading a `null` here and typing it into a recovery
+   * screen would test nothing while looking like coverage.
+   */
+  phrase: string | null;
+  /**
+   * 27-char display account number, or `null`.
+   *
+   * `null` for the same reason: the person-born flow has no kit sheet, so the
+   * creation walk never sees a number to capture. Nothing reads this field
+   * today; it is recorded so the fixture shape stays honest about what the run
+   * could and could not observe.
+   */
+  account: string | null;
 }
 
 const FIXTURE_DIR = join(REPO_ROOT, "e2e", "artifacts", "realistic-fixture");
@@ -53,9 +70,13 @@ export function seedRealisticVault(
   writeFileSync(join(dir, "vault.meta"), fixture.vaultMeta);
 }
 
-/** The production-KDF seed every unlock/recovery suite wants: the VC-1
- *  realistic fixture when captured, else a generator-seeded
- *  production-KDF vault (standalone runs). Returns the credentials. */
+/** The production-KDF seed the unlock suites want: the VC-1 realistic fixture
+ *  when captured, else a generator-seeded production-KDF vault (standalone
+ *  runs). Returns the credentials.
+ *
+ * **Not for recovery.** The fixture's vault is person-born and carries no phrase
+ * (see `RealisticFixture.phrase`), so a suite that types a phrase must seed with
+ * `seedVault(..., { kdf: "production" })` and take the phrase from there. */
 export function seedProductionVault(appDataDir: string): RealisticFixture {
   const realistic = loadRealisticFixture();
   if (realistic) {

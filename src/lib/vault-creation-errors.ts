@@ -215,6 +215,18 @@ export function mapAppErrorToUserMessage(error: AppError): ErrorState {
         primaryAction: "retry",
         displayMode: "inline",
       };
+    case "PersonLocked":
+      // myne-md/myne#911 task 5. A person-born vault signs its owner roster with
+      // the identity's PRIVATE half, so creating one while the identity is
+      // sealed-but-locked is refused rather than degraded to the legacy birth,
+      // which would mint a second recovery phrase. Retryable: unlocking the
+      // identity is one action, and the session is still live.
+      return {
+        title: i18n.t("vaultCreation.errors.personLocked.title"),
+        body: i18n.t("vaultCreation.errors.personLocked.body"),
+        primaryAction: "retry",
+        displayMode: "inline",
+      };
     case "WeakNewPassword":
       // myne#289 — the variant the mirror had drifted past. `assertNever`
       // THROWS, and it throws inside the creation flow's own catch, so the

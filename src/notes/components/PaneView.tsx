@@ -42,6 +42,7 @@ import { noteRead } from "../readNote";
 import { saveNote } from "../saveNote";
 import {
   closeLiveNote,
+  isLiveNote,
   openLiveNote,
   patchEpoch,
   readLiveNote,
@@ -90,6 +91,7 @@ import { useVaultHeadings } from "../useVaultHeadings";
 import { useVaultBlockAnchors } from "../useVaultBlockAnchors";
 import { useWorkspace } from "../workspaceContext";
 import { usePrefs } from "../../hooks/usePrefs";
+import { listFolderPaths } from "../listFolderPaths";
 import { typographyStyle } from "../../editor/typography";
 import { useAutosave, type FlushOptions, type SaveStatus, type SavedBodyPatch } from "../useAutosave";
 import type { LiveSaveContext } from "../saveNote";
@@ -132,7 +134,7 @@ import { CoverPicker, type CoverChoice } from "../../components/attachments/Cove
 import { Toast } from "../../components/Toast";
 import { panesNotSettledMessage } from "../workspaceContext";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
-import { paneScrimStyle } from "./sharedStyles";
+import { paneDimStyle } from "./sharedStyles";
 import { Button } from "../../components/primitives/Button";
 import { buildCardMenuItems } from "../views/cardMenu";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
@@ -399,15 +401,56 @@ export function PaneView({
   // reference only when the set actually changed, so an unrelated bump no longer
   // reconfigures this pane's editor (myne#217).
   const notes = useLiveResolverNotes();
-  // Every folder that holds a note, for the agent tab's scope picker. Memoized
-  // because `notes` changes identity on every save and this sorts; the right
-  // panel's own copy gates on its tab being open for the same reason, and the
-  // gate here is the pane's kind, checked where it is used.
-  const agentFolders = useMemo(
+  // **The same folder derivation the sidebar and every other picker use**
+  // (myne-md/myne#913, review round five). This pane and the right panel show the
+  // same agent surface, and deriving from notes here while the panel used the
+  // shared derivation meant the two offered DIFFERENT folders for the same
+  // control: no deliberately created empty folder, no parent that holds no note
+  // directly, and a folder that survives only on an archived note still on the
+  // list. `listFolderPaths` unions the live note set with `deliberate_folders`,
+  // synthesizes ancestors and filters archived ones.
+  //
+  // Keyed on the note set's FOLDER SIGNATURE rather than on `notes`, which
+  // changes identity on every save, plus the prefs that change with no note write
+  // at all.
+  const [agentFolders, setAgentFolders] = useState<readonly string[]>([]);
+  const folderSignature = useMemo(
     () =>
-      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+      [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))]
+        .sort()
+        .join("\u0000"),
     [notes],
   );
+  const deliberateKey = (prefs.deliberate_folders ?? []).join("\u0000");
+  const archivedKey = (prefs.archived_folders ?? []).join("\u0000");
+  useEffect(() => {
+    // **Gated on the pane kind and given a failure path** (review round seven).
+    // Without the gate every plain note pane paid a full folder read per
+    // signature change for a prop only `AgentPane` reads; without the catch a
+    // rejected read left `[]`, which the picker renders as a vault with no
+    // folders, indistinguishable from an empty vault. On failure the note-only
+    // list this pane already holds is the honest fallback.
+    if (!isAgent) return;
+    let cancelled = false;
+    void listFolderPaths()
+      .then((options) => {
+        if (cancelled) return;
+        setAgentFolders([...new Set(options.map((option) => option.path))].sort());
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAgentFolders(
+          [...new Set(notes.map((n) => n.folder ?? "").filter((f) => f !== ""))].sort(),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+    // `notes` is deliberately absent: it changes identity on every save, and the
+    // signature above already tracks the only part of it this cares about. The
+    // catch reads the render's own , which is correct at the moment the
+    // effect fires.
+  }, [isAgent, folderSignature, deliberateKey, archivedKey]);
   /** What an agent apply in THIS pane written to disk owes the rest of the app.
    *
    *  **The agent tab had no half of this at all** (myne-md/myne#894, on the
@@ -1042,6 +1085,24 @@ export function PaneView({
         if (sc !== null) sc.scrollTop = 0;
         return;
       }
+      // **A remembered position of ZERO is the pane's default, so applying it can
+      // only ever MOVE somebody.** Every freshly opened note is already at the
+      // top, which means a `pos: 0` anchor adds nothing on the open it was
+      // recorded for — and it does damage on a later one: a body written through
+      // `note_update` re-runs this effect, the anchor from the moment the note was
+      // still empty is still `0`, and the deferred apply then fires after the
+      // reader (or a scenario) has scrolled, marks the restore window, and
+      // suppresses their own write-back for 500 ms.
+      //
+      // Measured 2026-10-25 on `scroll-memory` sm2: `liveTop=1200|pos=0|
+      // write=suppressed|restore=anchor|frames=3|stable=2|applied=0` — the apply
+      // landed three frames in over a pane already at 1200, and the position the
+      // reader had was never remembered. Skipping it leaves the pane where the
+      // reader put it and lets the settle remember write a real anchor.
+      if (anchor.pos === 0 && sc !== null && sc.scrollTop > 4) {
+        sc.dataset.scrollRestore = "skip-top";
+        return;
+      }
       applyScrollAnchor(v, anchor, noteId);
     };
 
@@ -1655,13 +1716,36 @@ export function PaneView({
   // Not the text the core returns: when the core merged a peer edit into this
   // save the returned text holds it and the buffer does not, so a mirror there
   // would hide it from the next drain and the save after would delete it.
+  /** The save's live context — **only while a live session really owns `id`**.
+   *
+   *  This used to answer for EVERY note, and that answer was a data loss. A
+   *  session exists only for an `NC05` note: `live_session_open` decodes the
+   *  durable blob and refuses anything else. For a legacy `MY01` note the open
+   *  therefore fails, no session exists, and handing `saveNote` a session base
+   *  anyway sent the stateless `note_update` to disk with a base taken from the
+   *  editor's session MIRROR — a body the file never held. The write came back
+   *  `BaseMismatch`, the keep-both handler preserved the keystrokes into a
+   *  duplicate note, and the note the user was typing in adopted the pre-edit
+   *  body: the text vanished and a copy appeared beside it.
+   *
+   *  Measured 2026-10-24 on a v0.1 vault, instrumented: `live: "session"` while
+   *  `live_session_read` answered `{"kind":"NotOpen"}`, then `BaseMismatch` on
+   *  the second save of a freshly created note. `NC05` notes are unaffected —
+   *  there the session exists and the base is its own text.
+   *
+   *  Without a session the stateless path is correct BY CONSTRUCTION: it sends
+   *  `sha256(savedBodyRef)`, which is what this hook last saw land.
+   */
   const liveSaveFor = useCallback(
-    (id: string): LiveSaveContext => ({
-      base: sessionMirrorRef.current.get(id),
-      onSent: (sent) => {
-        sessionMirrorRef.current.set(id, sent);
-      },
-    }),
+    (id: string): LiveSaveContext | undefined =>
+      isLiveNote(id)
+        ? {
+            base: sessionMirrorRef.current.get(id),
+            onSent: (sent) => {
+              sessionMirrorRef.current.set(id, sent);
+            },
+          }
+        : undefined,
     [],
   );
   const autosave = useAutosave(
@@ -2439,6 +2523,35 @@ export function PaneView({
     isDrawing,
     setContent,
     drawingIo,
+    // **The peer set, and its absence was a whole feature that never drew.** The
+    // editor element is built INSIDE this memo, so `awareness={paneAwareness}`
+    // only reaches it when the memo recomputes — and this array did not name it.
+    // A remote awareness frame updated the store, re-rendered the pane, mapped
+    // the peer (the Who's-here roster showed it) and then handed the editor the
+    // SAME old prop object, so the decoration effect never fired: the caret
+    // appeared only after an unrelated render invalidated one of the deps above.
+    //
+    // Measured 2026-10-24 on `collab-presence`, instrumented on both sides: the
+    // pane re-rendered with `peers: 1`, and the editor's awareness effect logged
+    // NO dispatch for that frame (`peers: 0` twice, then nothing).
+    paneAwareness,
+    // **The suggestion chips, and their absence is the same failure one band
+    // over (myne-md/myne#651).** The editor element is built inside this memo,
+    // so `tagSuggestions={tagSuggestions}` only reaches it when the memo
+    // recomputes. A dismissal updated the hook's `hidden` set and re-rendered
+    // the pane, and the editor then received the SAME old array, so its
+    // `setTagSuggestions` push never fired and the chip the reader had just
+    // crossed out stayed on screen until an unrelated render invalidated one of
+    // the deps above. Measured 2026-10-24 on `tag-suggestion-band` tsb1: the
+    // band still read `[stub-tag, notes]` 30 s after the dismiss click, while
+    // `useTagSuggestions`' own unit tests passed because they never involve
+    // this memo.
+    tagSuggestions,
+    // Both chip handlers are read here too, and one of them closes over
+    // `editorView`: naming them keeps the memo from handing the editor a
+    // callback that targets a view this pane has already swapped out.
+    handleAcceptTagSuggestion,
+    handleDismissTagSuggestion,
   ]);
 
   return (
@@ -2469,14 +2582,11 @@ export function PaneView({
           focused && ws.leaves.length > 1
             ? "inset 0 2px 0 0 var(--accent-soft)"
             : "none",
+        // Brightness, not a wash: see `paneDimStyle`. The one treatment that
+        // reads as "not the active one" on light, dark and true-black alike.
+        ...(paneDimStyle(focused, ws.leaves.length) ?? {}),
       }}
     >
-      {(() => {
-        const scrim = paneScrimStyle(focused, ws.leaves.length);
-        return scrim === null ? null : (
-          <div aria-hidden="true" data-testid="editor.pane-scrim" style={scrim} />
-        );
-      })()}
       <TabStrip
         paneId={leaf.id}
         tabs={leaf.tabs.map(itemKey)}

@@ -3943,7 +3943,6 @@
         "ribbon": "linker lint rail vastmaken pin opdracht opdrachten aanpassen herschikken losmaken werkbalk snelkoppelingen",
         "folderNotes": "map notitie index folder_index landingspagina dubbelklik maplink projecten uit schakel uitschakelen",
         "syncMembers": "leden, delen, uitnodigen, team, samenwerking, kluis",
-        "accountName": "accountnaam account groep groeperen hernoemen label apparaat lokaal",
         "accountVaults": "account kluizen gegroepeerd welke kluizen horen groep lijst",
         "aiMeetingPrompt": "vergadering samenvatting prompt instructie aangepast transcript actiepunten besluiten",
         "update": "update bijwerken controleren op updates nieuwe versie release downloaden",
@@ -4025,14 +4024,10 @@
       "atCap": "De lijst is vol, dus er kan niets nieuws worden onthouden. Verwijder een vermelding om ruimte te maken."
     },
     "account": {
-      "nameLabel": "Accountnaam",
-      "nameHelper": "Een naam voor deze groep kluizen op dit apparaat. De kluiskiezer gebruikt hem als kop van de groep. Hij blijft op dit apparaat en wordt nooit in een kluis opgeslagen, dus hij synchroniseert niet en een ander apparaat kan dezelfde kluizen anders groeperen en benoemen.",
-      "namePlaceholder": "Een naam toevoegen…",
-      "nameSave": "Opslaan",
-      "nameSaving": "Opslaan…",
       "vaultsLabel": "Kluizen in dit account",
       "vaultsHelper": "De kluizen die dit apparaat onder de naam hierboven groepeert. Groeperen is een organisatorische keuze per apparaat, dus het maakt geen deel uit van de inhoud van een kluis en reist er niet mee.",
-      "vaultsCount": "{{count}} kluizen",
+      "vaultsCount_one": "{{count}} kluizen",
+      "vaultsCount_other": "{{count}} kluizen",
       "currentVault": "Deze kluis",
       "unknownVault": "Een andere kluis op dit apparaat",
       "standaloneHelper": "Deze kluis is op dit apparaat niet onder een account gegroepeerd, dus staat hij op zichzelf. Groeperen is per apparaat: een ander apparaat kan hem binnen een account tonen.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Namen kunnen worden ingesteld zodra deze kluis is gedeeld.",
       "nameErrorLocked": "Ontgrendel de kluis om je naam te wijzigen.",
       "nameErrorGeneric": "Kon je naam niet opslaan. Probeer het opnieuw.",
-      "nameInvite": "Je hebt nog geen weergavenaam. De andere leden zien je vingerafdruk.",
       "nameInviteCta": "Een naam instellen",
-      "nameInviteDismiss": "Niet nu",
       "noInvitations": "Nog geen uitnodigingen verstuurd.",
       "identityHeading": "Je identiteit",
       "membersHeading": "Leden",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Herstelzin — als je je wachtwoord vergeet",
       "save": "Herstelkit opslaan",
       "saveFailed": "Kon het bestand niet opslaan. Kopieer in plaats daarvan de kit, of schrijf beide delen op.",
-      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst dat beide geheimen bevat, dus bewaar het op een plek waar alleen jij het kunt lezen.",
-      "whyEnglish": "De woorden zijn Engels in elke taal. Ze maken deel uit van de BIP-39-standaard, zodat elke Myne-client een zin kan lezen die door een andere is geschreven. Vertaal ze niet: vertaalde woorden staan niet in de woordenlijst, en de zin zou ophouden te werken."
+      "savedToFile": "Opgeslagen. Het is een bestand met platte tekst dat beide geheimen bevat, dus bewaar het op een plek waar alleen jij het kunt lezen."
     },
     "name": {
       "back": "Terug",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Account",
     "moveToAccount": "Verplaatsen naar account…",
     "moveToNewAccount": "Verplaatsen naar nieuw account",
-    "renameAccount": "Account hernoemen",
     "accountError": "De accountgroepering kon niet worden bijgewerkt. Er is niets gewijzigd.",
     "accountHidden": "Accountacties zijn niet beschikbaar terwijl kluinamen verborgen zijn.",
-    "labelTooLong": "Die naam is te lang. Houd hem onder 512 tekens.",
-    "renameCancel": "Annuleren",
-    "renamePlaceholder": "Accountnaam",
-    "renameSave": "Hernoemen",
     "accountUnreadable": "De accountgroepering kon op dit apparaat niet worden gelezen. Er is niets gewijzigd.",
     "createShort": "Nieuwe kluis",
     "joinShort": "Apparaat toevoegen",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Achtergebleven bestanden van een onderbroken verwijdering ({{n}}). Ruim ze op voordat je een kluis aanmaakt.",
     "cleanUpFiles": "Achtergebleven bestanden opruimen",
     "connect": "Verbinden met mijn account",
-    "startIdentity": "Een identiteit aanmaken",
-    "startLocal": "In plaats daarvan een lokale kluis aanmaken",
     "tagline": "Versleutelde markdown-notities. Geen e-mailadres bij het aanmelden.",
-    "identityTitle": "Een identiteit aanmaken",
-    "identityBody": "Eén identiteit voor al je kluizen, zodat mensen je kunnen uitnodigen. Vereist een synchronisatieserver.",
-    "localTitle": "Een lokale kluis aanmaken",
-    "localBody": "Een versleutelde kluis op dit apparaat. Voeg later synchronisatie of een identiteit toe.",
     "restoreTitle": "Herstellen vanuit back-up",
     "restoreBody": "Open een .myne-backup-bestand dat je eerder hebt opgeslagen.",
     "joinTitle": "Dit apparaat aan een account toevoegen",
     "joinBody": "Gebruik een kluis die je al op een ander apparaat hebt.",
-    "createAction": "Aanmaken",
     "restoreAction": "Herstellen",
     "joinAction": "Apparaat toevoegen",
     "version": "Versie {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "{{count}} jaar geleden geopend",
     "corruptedBadge": "Beschadigd",
     "accountFallback": "Account",
-    "renameAccount": "Account hernoemen",
     "moveToNewAccount": "Verplaatsen naar nieuw account",
     "moveToAccount": "Verplaatsen naar account…",
     "accountError": "De accountgroepering kon niet worden bijgewerkt. Er is niets gewijzigd.",
     "accountHidden": "Accountacties zijn niet beschikbaar terwijl kluinamen verborgen zijn.",
-    "labelTooLong": "Die naam is te lang. Houd hem onder 512 tekens.",
-    "renameCancel": "Annuleren",
-    "renamePlaceholder": "Accountnaam",
-    "renameSave": "Hernoemen",
     "accountUnreadable": "De accountgroepering kon op dit apparaat niet worden gelezen. Er is niets gewijzigd."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identiteit hersteld.",
     "title": "Een identiteit aanmaken",
     "errorAlreadyHeld": "Dit apparaat bevat al een identiteit. Herstel hem met zijn herstelzin, of vergeet hem en maak een nieuwe aan.",
-    "errorNotConfigured": "Kon de identiteit niet instellen. Controleer of er een synchronisatieserver is geconfigureerd en probeer het opnieuw.",
     "forgetCancel": "Bewaren",
     "forgetConfirm": "Vergeten en nieuwe aanmaken",
     "forgetCta": "Deze identiteit vergeten en een nieuwe aanmaken",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Herstel hem op dit apparaat met zijn herstelzin van 24 woorden.",
     "recoverAction": "Herstellen",
     "back": "Terug",
-    "changeServer": "Synchronisatieserver wijzigen of verifiëren",
-    "errorTlsFailure": "Kon het HTTPS-certificaat van de server niet verifiëren. Controleer het serveradres en het certificaat ervan.",
     "phraseTitle": "Sla je identiteitszin op",
     "phraseContinue": "Doorgaan",
     "confirmTitle": "Bevestig je zin"
@@ -5509,15 +5481,6 @@
       "hint": "Opnieuw proberen begint de download vanaf het begin.",
       "retry": "Opnieuw proberen",
       "back": "Terug naar ontgrendelen"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Kies een synchronisatieserver",
-      "intro": "Myne heeft een server nodig om je versleutelde notities te bewaren en om je te bereiken voor uitnodigingen. Je notities blijven op dit apparaat versleuteld voordat ze het verlaten; de server bewaart alleen ciphertext.",
-      "notConfigured": "Voer hierboven een serveradres in en druk op Verbinden om door te gaan.",
-      "back": "Terug",
-      "continue": "Doorgaan"
     }
   },
   "identityFlow": {

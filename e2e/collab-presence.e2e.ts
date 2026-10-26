@@ -44,7 +44,13 @@ import { describe, expect, it } from "vitest";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { setupTwoSyncedDevices } from "./support/multi-device";
-import { activeNoteId, clickNoteRow, ipcOk, pageSeatInvoke } from "./support/flows";
+import {
+  activeNoteId,
+  clickNoteRow,
+  emitEventToSelf,
+  ipcOk,
+  pageSeatInvoke,
+} from "./support/flows";
 import { sleep } from "./support/member-fleet";
 
 const driver = harnessSupported();
@@ -164,12 +170,14 @@ describeCanary("remote presence rendering (collab-verification)", () => {
         // file header: the native producer is missing, so this is the only
         // honest way to exercise the renderer today.
         const startedAt = Date.now();
-        await pageSeatInvoke(
-          b.session,
-          "plugin:event|emit",
-          { event: "sync://awareness", payload },
-          10_000,
-        );
+        // **`emit_to`, not `emit`.** A broadcast `plugin:event|emit` from the page
+        // seat does NOT reach a listener in the SAME webview — measured 2026-10-24
+        // by registering one through the plugin's own `plugin:event|listen` and
+        // counting deliveries: 0 for `emit`, 1 for `emit_to` naming this window.
+        // The scenario had been broadcasting and waiting for a decoration that
+        // could never arrive, which reads as "the renderer is broken" on a
+        // renderer nothing could reach. `emitEventToSelf` carries the detail.
+        await emitEventToSelf(b.session, "sync://awareness", payload);
 
         // The cursor decoration, with the expected attributes.
         const cursor = await b.session.byTestId("editor.remote-cursor", { timeoutMs: 5_000 });

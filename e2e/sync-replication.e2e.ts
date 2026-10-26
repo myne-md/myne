@@ -34,7 +34,7 @@ import {
   clickByTestId,
   dismissImporterOffer,
   ipcOk,
-  openSettings,
+  openSyncDevices,
   pageSeatInvoke,
   clickNoteRow,
   rightClickBySelector,
@@ -143,8 +143,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
       try {
         await unlockToEditor(a.session, password);
         await dismissImporterOffer(a.session);
-        await openSettings(a.session);
-        await (await a.session.byTestId("settings.tab-sync")).click();
+        await openSyncDevices(a.session);
         await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
         await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
         await (await a.session.byTestId("sync.enroll.submit")).click();
@@ -168,8 +167,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
 
         // A approves and STAYS on the verify screen — the state `sr1` leaves.
-        await openSettings(a.session);
-        await (await a.session.byTestId("settings.tab-sync")).click();
+        await openSyncDevices(a.session);
         await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
         await a.session.byTestId("sync.approve-verify", { timeoutMs: 30_000 });
         await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
@@ -245,8 +243,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // --- A: unlock → enroll (first device self-approves) → write a note ---
         await unlockToEditor(a.session, password);
         await dismissImporterOffer(a.session);
-        await openSettings(a.session);
-        await (await a.session.byTestId("settings.tab-sync")).click();
+        await openSyncDevices(a.session);
         await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
         await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
         await (await a.session.byTestId("sync.enroll.submit")).click();
@@ -278,8 +275,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
 
         // --- A: approve B while it is pending (its row appears via the roster poll) ---
-        await openSettings(a.session);
-        await (await a.session.byTestId("settings.tab-sync")).click();
+        await openSyncDevices(a.session);
         await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
         await closeSettings(a.session);
 
@@ -381,6 +377,20 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // semantics, and against a MY01 note they would all be vacuous.
         expect(noteBlobMagics(a.appDataDir)).toEqual([CRDT_MAGIC]);
         expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
+
+        // **Both panes hold this note, so both LIVE SESSIONS are dropped before
+        // the out-of-band writes below.** A live co-editing session is the
+        // note's single durable writer (`SYNC-33`, `collab-editor-bridge`), and
+        // `note_update` refuses with `{"kind":"LiveSessionOpen"}` while one is
+        // open — by design, so a stateless save cannot race the session's
+        // persistence. That refusal is what this scenario hit on 2026-10-24,
+        // having been written when nothing opened a session on an idle note.
+        // Dropping them makes the note a plain durable-plane subject, which is
+        // exactly the plane these merges are asserted on; `collab-presence`
+        // takes the same step for the same reason.
+        for (const session of [a.session, b.session]) {
+          await pageSeatInvoke(session, "plugin:live|live_session_close", { noteId }, 15_000);
+        }
 
         // A shared base both devices agree on, carrying a marker that belongs to
         // NEITHER edit. That marker is the whole discriminator — see below.

@@ -70,6 +70,13 @@
 //! strict struct-match, for forward-compat). Field removal, type changes,
 //! and structural restructuring are MAJOR-version events (MYP5).
 //!
+//! ## Additive fields
+//!
+//! A field documented below as omitted at its default is an additive field: an
+//! untouched vault keeps emitting the bare pre-feature form, so the golden and
+//! KAT vectors are unaffected and no magic, version or header byte moves. Each
+//! docblock names the earlier field whose shape it copies.
+//!
 //! ## Migration-less semantic (spec § 9.5.5)
 //!
 //! The caller-side `read_or_default` discipline (Tauri plugin layer,
@@ -241,20 +248,16 @@ pub struct PrefsView {
     /// Default `true` matches MYND-78's structural default-ON.
     pub screen_capture_protection: bool,
 
-    /// Show the per-note "last edited" timestamp under each note row in the
-    /// sidebar (sidebar-note-timestamps feature). Default `true` (timestamps
-    /// visible — the pre-feature behaviour). **Omitted entirely from the
-    /// canonical JSON when `true`** (the default), so a vault that never touched
-    /// this toggle is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected — a migration-less additive field on `MYP1`,
-    /// the `item_colors` / `spell_enabled` precedent class). Only the non-default
-    /// `false` is persisted. **Non-load-bearing** (a tampered / replayed value
-    /// can at worst show or hide a date) — no protective-envelope clamp. NOTE the
-    /// default polarity is INVERTED vs `spell_enabled`: this is a plain `bool`
-    /// defaulting `true`, so the serde-derive path needs `default = "default_true"`
-    /// (a bare `#[serde(default)]` would yield `false`). Canonical key
-    /// `show_note_timestamps` — sorts after `screen_capture_protection`
-    /// (`scr` < `sho`), before `spell_enabled` (`sho` < `spe`).
+    /// Show the per-note "last edited" timestamp under each note row in the sidebar
+    /// (sidebar-note-timestamps feature). Default `true` (timestamps visible — the pre-feature
+    /// behaviour). **Omitted entirely from the canonical JSON when `true`** (the default;
+    /// precedent: `item_colors` / `spell_enabled`). Only the non-default `false` is persisted.
+    /// **Non-load-bearing** (a tampered / replayed value can at worst show or hide a date) — no
+    /// protective-envelope clamp. NOTE the default polarity is INVERTED vs `spell_enabled`: this is
+    /// a plain `bool` defaulting `true`, so the serde-derive path needs `default = "default_true"`
+    /// (a bare `#[serde(default)]` would yield `false`). Canonical key `show_note_timestamps` —
+    /// sorts after `screen_capture_protection` (`scr` < `sho`), before `spell_enabled` (`sho` <
+    /// `spe`).
     #[serde(default = "default_true")]
     pub show_note_timestamps: bool,
 
@@ -346,39 +349,27 @@ pub struct PrefsView {
     #[serde(default)]
     pub deliberate_folders: Vec<alloc::string::String>,
 
-    /// Developer mode master switch (developer-mode feature, MYND-593).
-    /// `false` ≡ off (the default). **Omitted entirely from the canonical
-    /// JSON when `false`**, so a vault that never enabled it is
-    /// byte-identical to a pre-feature `vault.prefs` (existing golden
-    /// vectors unaffected — migration-less additive field on `MYP1`, the
-    /// same emit-only-when-true convention as [`PrefsView::ai_enabled`]).
-    /// Canonical key `developer_mode` — sorts after `deliberate_folders`
-    /// (`deliberate_` < `developer_`, `l`=0x6C < `v`=0x76 at the 3rd byte),
-    /// before `device_names` (`develope` < `device_n`, `e`=0x65 < `i`=0x69
-    /// at the 4th byte). Classified **device-local** in
-    /// `sync-protocol.md` §10.2: it gates a device-local model-path
-    /// override, so a synced flag would read "on" on a device with no
-    /// override behind it. **Non-load-bearing** — a tampered/replayed
-    /// value can at worst reveal or hide the AI/local-model developer
-    /// surface; no protective-envelope clamp.
+    /// Developer mode master switch (developer-mode feature, MYND-593). `false` ≡ off (the
+    /// default). **Omitted entirely from the canonical JSON when `false`**. Canonical key
+    /// `developer_mode` — sorts after `deliberate_folders` (`deliberate_` < `developer_`, `l`=0x6C
+    /// < `v`=0x76 at the 3rd byte), before `device_names` (`develope` < `device_n`, `e`=0x65 <
+    /// `i`=0x69 at the 4th byte). Classified **device-local** in `sync-protocol.md` §10.2: it gates
+    /// a device-local model-path override, so a synced flag would read "on" on a device with no
+    /// override behind it. **Non-load-bearing** — a tampered/replayed value can at worst reveal or
+    /// hide the AI/local-model developer surface; no protective-envelope clamp.
     #[serde(default)]
     pub developer_mode: bool,
 
-    /// Friendly device names (device-management, SYNC-41) — a map of
-    /// `device_id` (hex) → user-chosen display name. **The single home** for
-    /// device names so no client ships a second default-name heuristic; both
-    /// clients read/write it and it rides the already-synced, AEAD'd `MYP1`
-    /// prefs. A `BTreeMap` so the canonical encoder emits keys in lexicographic
-    /// order (the `folder_icons` / `item_colors` precedent class). **Same
-    /// canonical string→string map encoding as `folder_icons`** (NFC-normalized
-    /// keys + values, lexicographic key order) and **omitted entirely from the
-    /// canonical JSON when empty**, so a vault that never named a device is
-    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
-    /// unaffected — a migration-less additive field on `MYP1`). Default empty.
-    /// Canonical key `device_names` — sorts after `deliberate_folders`
-    /// (`del` < `dev`), before the `editor_*` block (`d` < `e`).
-    /// **Non-load-bearing** (a tampered/replayed value can at worst mislabel a
-    /// device in the device list) — no protective-envelope clamp.
+    /// Friendly device names (device-management, SYNC-41) — a map of `device_id` (hex) →
+    /// user-chosen display name. **The single home** for device names so no client ships a second
+    /// default-name heuristic; both clients read/write it and it rides the already-synced, AEAD'd
+    /// `MYP1` prefs. A `BTreeMap` so the canonical encoder emits keys in lexicographic order
+    /// (precedent: `folder_icons` / `item_colors`). **Same canonical string→string map encoding as
+    /// `folder_icons`** (NFC-normalized keys + values, lexicographic key order) and **omitted
+    /// entirely from the canonical JSON when empty**. Default empty. Canonical key `device_names` —
+    /// sorts after `deliberate_folders` (`del` < `dev`), before the `editor_*` block (`d` < `e`).
+    /// **Non-load-bearing** (a tampered/replayed value can at worst mislabel a device in the device
+    /// list) — no protective-envelope clamp.
     #[serde(default)]
     pub device_names: BTreeMap<String, String>,
 
@@ -395,24 +386,19 @@ pub struct PrefsView {
     #[serde(default)]
     pub auto_lock_seconds: Option<u32>,
 
-    /// The **remote AI provider** the user named, or `None` for the default —
-    /// which is not "off" but **unreachable**: with no provider selected there
-    /// is no remote code path to reach (`decisions.md` 2026-08-09). A closed
-    /// value, stored as its wire string: `"ollama-cloud"` or `"openrouter"`.
-    /// Kept as a `String` rather than an enum because this codec is `no_std`
-    /// canonical JSON and an unknown value must decode to *something* a newer
-    /// client wrote; the host validates it against its own registry and treats
-    /// an unrecognized name as no provider.
+    /// The **remote AI provider** the user named, or `None` for the default — which is not "off"
+    /// but **unreachable**: with no provider selected there is no remote code path to reach
+    /// (`decisions.md` 2026-08-09). A closed value, stored as its wire string: `"ollama-cloud"` or
+    /// `"openrouter"`. Kept as a `String` rather than an enum because this codec is `no_std`
+    /// canonical JSON and an unknown value must decode to *something* a newer client wrote; the
+    /// host validates it against its own registry and treats an unrecognized name as no provider.
     ///
-    /// **The destination is NOT stored here.** Each provider's base URL is a
-    /// compiled-in constant, so a tampered `vault.prefs` cannot redirect
-    /// traffic to a host of the attacker's choosing.
+    /// **The destination is NOT stored here.** Each provider's base URL is a compiled-in constant,
+    /// so a tampered `vault.prefs` cannot redirect traffic to a host of the attacker's choosing.
     ///
-    /// Canonical key `ai_provider` — sorts after `ai_excluded_folders`
-    /// (`ai_e` < `ai_p`), before `ai_provider_consent` (a shorter string sorts
-    /// before its own extension) and `archive_disabled` (`ai` < `ar`). Omitted
-    /// entirely when `None`, so a vault that never named a provider is
-    /// byte-identical to a pre-feature `vault.prefs`.
+    /// Canonical key `ai_provider` — sorts after `ai_excluded_folders` (`ai_e` < `ai_p`), before
+    /// `ai_provider_consent` (a shorter string sorts before its own extension) and
+    /// `archive_disabled` (`ai` < `ar`). Omitted entirely when `None`.
     #[serde(default)]
     pub ai_provider: Option<String>,
 
@@ -467,39 +453,31 @@ pub struct PrefsView {
 
     /// **Which model** at [`PrefsView::ai_provider`] answers, or `None`.
     ///
-    /// There is no default and Myne ships no per-provider fallback (SYNC-24):
-    /// the user picks from the list the provider itself reports. A pinned
-    /// model tag rots faster than the release that pinned it, and on a metered
-    /// API a default nobody chose is a bill nobody chose. `None` therefore
-    /// means *not yet chosen*, and the remote arm has nothing to ask with —
-    /// which is a refusal, not a silent substitution.
+    /// There is no default and Myne ships no per-provider fallback (SYNC-24): the user picks from
+    /// the list the provider itself reports. A pinned model tag rots faster than the release that
+    /// pinned it, and on a metered API a default nobody chose is a bill nobody chose. `None`
+    /// therefore means *not yet chosen*, and the remote arm has nothing to ask with — which is a
+    /// refusal, not a silent substitution.
     ///
-    /// **Not `skip_serializing`, unlike the key.** The panel renders the
-    /// current selection back to the user, so this value has to cross IPC; it
-    /// is a model name the provider published, not a credential.
+    /// **Not `skip_serializing`, unlike the key.** The panel renders the current selection back to
+    /// the user, so this value has to cross IPC; it is a model name the provider published, not a
+    /// credential.
     ///
-    /// Canonical key `ai_provider_model` — after `ai_provider_key`
-    /// (`k` < `m`), before `archive_disabled` (`ai` < `ar`). Omitted when
-    /// `None`, so a vault that never named a provider stays byte-identical to
-    /// a pre-feature `vault.prefs`.
+    /// Canonical key `ai_provider_model` — after `ai_provider_key` (`k` < `m`), before
+    /// `archive_disabled` (`ai` < `ar`). Omitted when `None`, so a vault that never named a
+    /// provider stays byte-identical to a pre-feature `vault.prefs`.
     #[serde(default)]
     pub ai_provider_model: Option<String>,
 
-    /// Automatic on-device tag suggestion toggle (on-device-tag-suggestion,
-    /// MYND-651). `false` ≡ off (the default). **Omitted entirely from the
-    /// canonical JSON when `false`**, so a vault that never enabled it is
-    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
-    /// unaffected — a migration-less additive field on `MYP1`, the same
-    /// emit-only-when-`true` positive-opt-in convention as
-    /// [`PrefsView::ai_enabled`] and `cli_enabled`). Canonical key
-    /// `auto_tag_enabled` — sorts after `auto_lock_seconds` (`auto_l` <
-    /// `auto_t`), before `bar_items_order` (`a` < `b`).
+    /// Automatic on-device tag suggestion toggle (on-device-tag-suggestion, MYND-651). `false` ≡
+    /// off (the default). **Omitted entirely from the canonical JSON when `false`**. Canonical key
+    /// `auto_tag_enabled` — sorts after `auto_lock_seconds` (`auto_l` < `auto_t`), before
+    /// `bar_items_order` (`a` < `b`).
     ///
-    /// It is the SECOND half of a two-key gate: the tag pass runs only when
-    /// this AND `ai_enabled` are both on, and the host re-reads both before it
-    /// touches the model, so a tampered or replayed value cannot start
-    /// inference on a vault whose AI opt-in is off. **Non-load-bearing /
-    /// AS-low** — no protective-envelope clamp.
+    /// It is the SECOND half of a two-key gate: the tag pass runs only when this AND `ai_enabled`
+    /// are both on, and the host re-reads both before it touches the model, so a tampered or
+    /// replayed value cannot start inference on a vault whose AI opt-in is off. **Non-load-bearing
+    /// / AS-low** — no protective-envelope clamp.
     #[serde(default)]
     pub auto_tag_enabled: bool,
 
@@ -549,23 +527,19 @@ pub struct PrefsView {
     #[serde(default)]
     pub daily_template: Option<alloc::string::String>,
 
-    /// Display date format (myne#279) — a closed enum string chosen from
-    /// `system` / `iso` / `dmy` / `mdy` / `dmmmy`. `None` ≡ `system` (follow the
-    /// OS locale), applied host-side. Stored as a free `Option<String>` here:
-    /// the enum interpretation + unknown→default fallback live on the client, no
-    /// codec-level validation (the `editor_content_width` precedent class).
+    /// Display date format (myne#279) — a closed enum string chosen from `system` / `iso` / `dmy` /
+    /// `mdy` / `dmmmy`. `None` ≡ `system` (follow the OS locale), applied host-side. Stored as a
+    /// free `Option<String>` here: the enum interpretation + unknown→default fallback live on the
+    /// client, no codec-level validation (precedent: `editor_content_width`).
     ///
-    /// **Display only.** It never enters a `.myn` file as a formatting
-    /// instruction: `dialect/src/taskFields.ts` keeps the on-disk bytes
-    /// zone-free and format-free, and this decides how they are printed,
-    /// nothing else. It does of course live in a blob, namely this one, and it
-    /// is Shared scalar-LWW, so it reaches every device by design. The "or a
-    /// blob or the sync wire" this line used to carry was simply wrong
-    /// (myne-md/myne#609). Canonical key `date_format`, sorting after
-    /// `daily_template` (`dai` < `dat`), before `deliberate_folders`
-    /// (`da` < `de`). Omitted when `None`, so a vault that never chose a format
-    /// is byte-identical to a pre-feature `vault.prefs`. **Non-load-bearing**
-    /// cosmetic (AS-low) — no protective-envelope clamp.
+    /// **Display only.** It never enters a `.myn` file as a formatting instruction:
+    /// `dialect/src/taskFields.ts` keeps the on-disk bytes zone-free and format-free, and this
+    /// decides how they are printed, nothing else. It does of course live in a blob, namely this
+    /// one, and it is Shared scalar-LWW, so it reaches every device by design. The "or a blob or
+    /// the sync wire" this line used to carry was simply wrong (myne-md/myne#609). Canonical key
+    /// `date_format`, sorting after `daily_template` (`dai` < `dat`), before `deliberate_folders`
+    /// (`da` < `de`). Omitted when `None`. **Non-load-bearing** cosmetic (AS-low) — no
+    /// protective-envelope clamp.
     #[serde(default)]
     pub date_format: Option<alloc::string::String>,
 
@@ -629,76 +603,53 @@ pub struct PrefsView {
     #[serde(default)]
     pub item_order: BTreeMap<alloc::string::String, Vec<alloc::string::String>>,
 
-    /// Active workspace slot id (MYND-308) — the id of the workspace slot the
-    /// editor should restore on unlock. `None` ≡ unset → the host applies its
-    /// default (first / last-used) workspace policy. A free `Option<String>`
-    /// stored verbatim (NFC-normalized at encode time); no codec-level value
-    /// validation (the `daily_folder` precedent class — the client owns the
-    /// slot-id interpretation + unknown→default fallback). Omitted entirely from
-    /// the canonical JSON when `None`, so a vault that never set an active
-    /// workspace is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected — migration-less additive field on `MYP1`).
-    /// **Non-load-bearing** (a tampered / replayed value can at worst restore
-    /// the wrong workspace) — no protective-envelope clamp. Canonical key
-    /// `active_workspace` — sorts FIRST, before `auto_lock_seconds`
-    /// (`ac` < `au`).
+    /// Active workspace slot id (MYND-308) — the id of the workspace slot the editor should restore
+    /// on unlock. `None` ≡ unset → the host applies its default (first / last-used) workspace
+    /// policy. A free `Option<String>` stored verbatim (NFC-normalized at encode time); no
+    /// codec-level value validation (precedent: `daily_folder`). Omitted entirely from the
+    /// canonical JSON when `None`. **Non-load-bearing** (a tampered / replayed value can at worst
+    /// restore the wrong workspace) — no protective-envelope clamp. Canonical key
+    /// `active_workspace` — sorts FIRST, before `auto_lock_seconds` (`ac` < `au`).
     #[serde(default)]
     pub active_workspace: Option<alloc::string::String>,
 
-    /// AI opt-in toggle (local-ai epic, ai-ux-surface MYND-408, SYNC-12).
-    /// `false` ≡ AI off (the default). **Omitted entirely from the canonical
-    /// JSON when `false`**, so a vault that never enabled AI is byte-identical
-    /// to a pre-feature `vault.prefs` (existing golden vectors unaffected —
-    /// migration-less additive field on `MYP1`, the `archive_disabled`
-    /// precedent class; per-vault + encrypted so the at-rest "uses AI"
-    /// fingerprint never leaks). Canonical key `ai_enabled` — sorts after
-    /// `active_workspace` (`ac` < `ai`), before `archive_disabled`
-    /// (`ai` < `ar`). **Non-load-bearing / AS-low** — no protective-envelope
-    /// clamp; the host treats a tampered/replayed value as a cosmetic toggle.
+    /// AI opt-in toggle (local-ai epic, ai-ux-surface MYND-408, SYNC-12). `false` ≡ AI off (the
+    /// default). **Omitted entirely from the canonical JSON when `false`** (precedent:
+    /// `archive_disabled`). Canonical key `ai_enabled` — sorts after `active_workspace` (`ac` <
+    /// `ai`), before `archive_disabled` (`ai` < `ar`). **Non-load-bearing / AS-low** — no
+    /// protective-envelope clamp; the host treats a tampered/replayed value as a cosmetic toggle.
     #[serde(default)]
     pub ai_enabled: bool,
 
-    /// Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
-    /// MYND-408, SYNC-14) — canonical trailing-slash display form. **Same
-    /// canonical encoding as `deliberate_folders`** (NFC-normalized,
-    /// lexicographically sorted, exact-deduped set) and **omitted entirely when
-    /// empty**, so a vault with no exclusions is byte-identical to a pre-feature
-    /// `vault.prefs`. Default empty (whole vault in scope; AI is already
-    /// opt-in). Canonical key `ai_excluded_folders` — sorts after `ai_enabled`
-    /// (`ai_en` < `ai_ex`), before `archive_disabled` (`ai` < `ar`).
-    /// **Non-load-bearing** — a tampered value can at worst widen/narrow this
-    /// device's AI read scope; no protective-envelope clamp.
+    /// Folders excluded from every AI read/index (local-ai epic, ai-ux-surface MYND-408, SYNC-14) —
+    /// canonical trailing-slash display form. **Same canonical encoding as `deliberate_folders`**
+    /// (NFC-normalized, lexicographically sorted, exact-deduped set) and **omitted entirely when
+    /// empty**. Default empty (whole vault in scope; AI is already opt-in). Canonical key
+    /// `ai_excluded_folders` — sorts after `ai_enabled` (`ai_en` < `ai_ex`), before
+    /// `archive_disabled` (`ai` < `ar`). **Non-load-bearing** — a tampered value can at worst
+    /// widen/narrow this device's AI read scope; no protective-envelope clamp.
     #[serde(default)]
     pub ai_excluded_folders: Vec<alloc::string::String>,
 
-    /// User toggle that disables the note-archive feature (archive-disable,
-    /// MYND-…). `None` ≡ unset → the host applies the default-OFF policy
-    /// (archiving enabled — the pre-feature behaviour). Omitted entirely from
-    /// the canonical JSON when `None`, so a vault that never touched the toggle
-    /// is byte-identical to a pre-feature `vault.prefs` (existing golden vectors
-    /// unaffected — migration-less additive field on `MYP1`, the
-    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
-    /// replayed value can at worst show or hide the archive entry points; the
-    /// underlying `archived:` frontmatter surgery is untouched) — no
-    /// protective-envelope clamp. Canonical key `archive_disabled` — sorts after
-    /// `active_workspace` (`ac` < `ar`), before `auto_lock_seconds`
-    /// (`ar` < `au`).
+    /// User toggle that disables the note-archive feature (archive-disable, MYND-…). `None` ≡ unset
+    /// → the host applies the default-OFF policy (archiving enabled — the pre-feature behaviour).
+    /// Omitted entirely from the canonical JSON when `None` (precedent: `editor_line_numbers`).
+    /// **Non-load-bearing** (a tampered / replayed value can at worst show or hide the archive
+    /// entry points; the underlying `archived:` frontmatter surgery is untouched) — no
+    /// protective-envelope clamp. Canonical key `archive_disabled` — sorts after `active_workspace`
+    /// (`ac` < `ar`), before `auto_lock_seconds` (`ar` < `au`).
     #[serde(default)]
     pub archive_disabled: Option<bool>,
 
-    /// Folders archived as a unit (folder-archive) — canonical trailing-slash
-    /// display form. **Same canonical encoding as `deliberate_folders` /
-    /// `ai_excluded_folders`** (NFC-normalized, lexicographically sorted,
-    /// exact-deduped set) and **omitted entirely when empty**, so a vault with no
-    /// archived folders is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected — migration-less additive field on `MYP1`, the
-    /// `ai_excluded_folders` precedent class). Default empty. A folder in this set
-    /// (and its subtree) drops out of the working-set sidebar/tree while its notes
-    /// stay resolvable (backlink / graph / search) — the folder-level twin of the
-    /// per-note `archived:` marker. Canonical key `archived_folders` — sorts after
-    /// `archive_disabled` (`archive_` `_`=0x5F < `archived` `d`=0x64), before
-    /// `auto_lock_seconds` (`ar` < `au`). **Non-load-bearing** — a tampered value
-    /// can at worst show/hide a folder subtree; no protective-envelope clamp.
+    /// Folders archived as a unit (folder-archive) — canonical trailing-slash display form. **Same
+    /// canonical encoding as `deliberate_folders` / `ai_excluded_folders`** (NFC-normalized,
+    /// lexicographically sorted, exact-deduped set) and **omitted entirely when empty** (precedent:
+    /// `ai_excluded_folders`). Default empty. A folder in this set (and its subtree) drops out of
+    /// the working-set sidebar/tree while its notes stay resolvable (backlink / graph / search) —
+    /// the folder-level twin of the per-note `archived:` marker. Canonical key `archived_folders` —
+    /// sorts after `archive_disabled` (`archive_` `_`=0x5F < `archived` `d`=0x64), before
+    /// `auto_lock_seconds` (`ar` < `au`). **Non-load-bearing** — a tampered value can at worst
+    /// show/hide a folder subtree; no protective-envelope clamp.
     #[serde(default)]
     pub archived_folders: Vec<alloc::string::String>,
 
@@ -748,16 +699,13 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_layout: Option<EditorLayout>,
 
-    /// Editor line-number gutter toggle (editor-line-numbers, MYND-314). `None` ≡
-    /// unset → the host applies the default-OFF policy (prose-first; the gutter is
-    /// opt-in). Omitted entirely from the canonical JSON when `None`, so a vault
-    /// that never touched the toggle is byte-identical to a pre-feature
-    /// `vault.prefs` (existing golden vectors unaffected — migration-less additive
-    /// field on `MYP1`, the `spell_enabled` precedent class). **Non-load-bearing**
-    /// (a tampered / replayed value can at worst show or hide the line-number
-    /// gutter) — no protective-envelope clamp. Canonical key `editor_line_numbers`
-    /// — sorts after `editor_layout` (`editor_la` < `editor_li`), before
-    /// `editor_line_spacing` (`editor_line_n` < `editor_line_s`).
+    /// Editor line-number gutter toggle (editor-line-numbers, MYND-314). `None` ≡ unset → the host
+    /// applies the default-OFF policy (prose-first; the gutter is opt-in). Omitted entirely from
+    /// the canonical JSON when `None` (precedent: `spell_enabled`). **Non-load-bearing** (a
+    /// tampered / replayed value can at worst show or hide the line-number gutter) — no
+    /// protective-envelope clamp. Canonical key `editor_line_numbers` — sorts after `editor_layout`
+    /// (`editor_la` < `editor_li`), before `editor_line_spacing` (`editor_line_n` <
+    /// `editor_line_s`).
     #[serde(default)]
     pub editor_line_numbers: Option<bool>,
 
@@ -795,57 +743,42 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_toolbar_order: Vec<alloc::string::String>,
 
-    /// Editor content max-width preset (editor-typography). `None` ≡ the
-    /// canonical default `normal`, applied host-side. A closed enum string
-    /// (`narrow`/`normal`/`wide`/`full`); stored as a free `Option<String>`
-    /// here — the enum interpretation + unknown→default fallback live on the
-    /// client (no codec-level validation, the `daily_date_format` precedent
-    /// class). Omitted entirely when `None`, so a vault that never customized
-    /// the measure is byte-identical to a pre-feature `vault.prefs`.
-    /// **Non-load-bearing** cosmetic (AS-low) — no protective-envelope clamp.
-    /// Canonical key `editor_content_width` — sorts after `deliberate_folders`
-    /// (`d` < `e`), before `editor_default_view_mode`
-    /// (`editor_c` < `editor_d`).
+    /// Editor content max-width preset (editor-typography). `None` ≡ the canonical default
+    /// `normal`, applied host-side. A closed enum string (`narrow`/`normal`/`wide`/`full`); stored
+    /// as a free `Option<String>` here — the enum interpretation + unknown→default fallback live on
+    /// the client (precedent: `daily_date_format`). Omitted entirely when `None`.
+    /// **Non-load-bearing** cosmetic (AS-low) — no protective-envelope clamp. Canonical key
+    /// `editor_content_width` — sorts after `deliberate_folders` (`d` < `e`), before
+    /// `editor_default_view_mode` (`editor_c` < `editor_d`).
     #[serde(default)]
     pub editor_content_width: Option<alloc::string::String>,
 
-    /// Editor default view-mode preset (MYND-299) — the mode a note opens in:
-    /// `live` / `reading` / `source`. `None` ≡ the canonical default applied
-    /// host-side. A closed enum string stored as a free `Option<String>` — the
-    /// enum interpretation + unknown→default fallback live on the client (no
-    /// codec-level validation, the `editor_content_width` precedent class).
-    /// Omitted entirely from the canonical JSON when `None`, so a vault that
-    /// never customized the default view is byte-identical to a pre-feature
-    /// `vault.prefs`. **Non-load-bearing** cosmetic — no protective-envelope
-    /// clamp. Canonical key `editor_default_view_mode` — sorts after
-    /// `editor_content_width` (`editor_c` < `editor_d`), before
-    /// `editor_focus_dim_inactive` (`editor_d` < `editor_f`).
+    /// Editor default view-mode preset (MYND-299) — the mode a note opens in: `live` / `reading` /
+    /// `source`. `None` ≡ the canonical default applied host-side. A closed enum string stored as a
+    /// free `Option<String>` — the enum interpretation + unknown→default fallback live on the
+    /// client (precedent: `editor_content_width`). Omitted entirely from the canonical JSON when
+    /// `None`. **Non-load-bearing** cosmetic — no protective-envelope clamp. Canonical key
+    /// `editor_default_view_mode` — sorts after `editor_content_width` (`editor_c` < `editor_d`),
+    /// before `editor_focus_dim_inactive` (`editor_d` < `editor_f`).
     #[serde(default)]
     pub editor_default_view_mode: Option<alloc::string::String>,
 
-    /// Editor focus-mode dim-inactive toggle (MYND-348). `None` ≡ unset → the
-    /// host applies its default focus-mode policy at read time. Omitted entirely
-    /// from the canonical JSON when `None`, so a vault that never touched the
-    /// toggle is byte-identical to a pre-feature `vault.prefs` (existing golden
-    /// vectors unaffected — migration-less additive field on `MYP1`, the
-    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
-    /// replayed value can at worst dim or undim the inactive paragraphs) — no
-    /// protective-envelope clamp. Canonical key `editor_focus_dim_inactive` —
-    /// sorts after `editor_default_view_mode` (`editor_d` < `editor_f`), before
-    /// `editor_focus_typewriter` (`editor_focus_d` < `editor_focus_t`).
+    /// Editor focus-mode dim-inactive toggle (MYND-348). `None` ≡ unset → the host applies its
+    /// default focus-mode policy at read time. Omitted entirely from the canonical JSON when `None`
+    /// (precedent: `editor_line_numbers`). **Non-load-bearing** (a tampered / replayed value can at
+    /// worst dim or undim the inactive paragraphs) — no protective-envelope clamp. Canonical key
+    /// `editor_focus_dim_inactive` — sorts after `editor_default_view_mode` (`editor_d` <
+    /// `editor_f`), before `editor_focus_typewriter` (`editor_focus_d` < `editor_focus_t`).
     #[serde(default)]
     pub editor_focus_dim_inactive: Option<bool>,
 
-    /// Editor focus-mode typewriter-scrolling toggle (MYND-348). `None` ≡ unset →
-    /// the host applies its default focus-mode policy at read time. Omitted
-    /// entirely from the canonical JSON when `None`, so a vault that never touched
-    /// the toggle is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected — the `editor_line_numbers` precedent class).
-    /// **Non-load-bearing** (a tampered / replayed value can at worst enable or
-    /// disable typewriter scrolling) — no protective-envelope clamp. Canonical
-    /// key `editor_focus_typewriter` — sorts after `editor_focus_dim_inactive`
-    /// (`editor_focus_d` < `editor_focus_t`), before `editor_font_family`
-    /// (`editor_focus` < `editor_font`: `c` < `n`).
+    /// Editor focus-mode typewriter-scrolling toggle (MYND-348). `None` ≡ unset → the host applies
+    /// its default focus-mode policy at read time. Omitted entirely from the canonical JSON when
+    /// `None` (precedent: `editor_line_numbers`). **Non-load-bearing** (a tampered / replayed value
+    /// can at worst enable or disable typewriter scrolling) — no protective-envelope clamp.
+    /// Canonical key `editor_focus_typewriter` — sorts after `editor_focus_dim_inactive`
+    /// (`editor_focus_d` < `editor_focus_t`), before `editor_font_family` (`editor_focus` <
+    /// `editor_font`: `c` < `n`).
     #[serde(default)]
     pub editor_focus_typewriter: Option<bool>,
 
@@ -880,16 +813,12 @@ pub struct PrefsView {
     #[serde(default)]
     pub editor_text_size: Option<alloc::string::String>,
 
-    /// Vim keyboard-mode toggle (vim-keyboard-mode, MYND-313). `None` ≡ unset →
-    /// the host applies the default-OFF policy (modal editing is opt-in). Omitted
-    /// entirely from the canonical JSON when `None`, so a vault that never touched
-    /// the toggle is byte-identical to a pre-feature `vault.prefs` (existing golden
-    /// vectors unaffected — migration-less additive field on `MYP1`, the
-    /// `editor_line_numbers` precedent class). **Non-load-bearing** (a tampered /
-    /// replayed value can at worst turn modal editing on or off; it grants no
-    /// capability and reaches no key material) — no protective-envelope clamp.
-    /// Canonical key `editor_vim_mode` — sorts after `editor_toolbar_order`
-    /// (`editor_to` < `editor_v`), before `favorites` (`e` < `f`).
+    /// Vim keyboard-mode toggle (vim-keyboard-mode, MYND-313). `None` ≡ unset → the host applies
+    /// the default-OFF policy (modal editing is opt-in). Omitted entirely from the canonical JSON
+    /// when `None` (precedent: `editor_line_numbers`). **Non-load-bearing** (a tampered / replayed
+    /// value can at worst turn modal editing on or off; it grants no capability and reaches no key
+    /// material) — no protective-envelope clamp. Canonical key `editor_vim_mode` — sorts after
+    /// `editor_toolbar_order` (`editor_to` < `editor_v`), before `favorites` (`e` < `f`).
     #[serde(default)]
     pub editor_vim_mode: Option<bool>,
 
@@ -904,33 +833,29 @@ pub struct PrefsView {
     #[serde(default)]
     pub theme: Option<ThemeChoice>,
 
-    /// Whether speech-to-text may run on this vault's audio attachments
-    /// (MYND-592). Canonical key `transcription_enabled` — sorts after `theme`
-    /// (`the` < `tra`), before `view_order` (`t` < `v`).
+    /// Whether speech-to-text may run on this vault's audio attachments (MYND-592). Canonical key
+    /// `transcription_enabled` — sorts after `theme` (`the` < `tra`), before `view_order` (`t` <
+    /// `v`).
     ///
-    /// **Default ON**, hence the explicit default function — the same polarity
-    /// as `attachment_ocr_enabled` and for the same two reasons: a bare
-    /// `#[serde(default)]` would yield `false` and silently disable the feature
-    /// for every vault whose blob predates the field, and emitting only the
-    /// non-default `false` keeps such a vault byte-identical to a pre-feature
-    /// `vault.prefs` (existing golden vectors unaffected).
+    /// **Default ON**, hence the explicit default function — the same polarity as
+    /// `attachment_ocr_enabled` and for the same two reasons: a bare `#[serde(default)]` would
+    /// yield `false` and silently disable the feature for every vault whose blob predates the
+    /// field, and emitting only the non-default `false` keeps such a vault byte-identical to a
+    /// pre-feature `vault.prefs`.
     ///
-    /// This field exists because transcription was previously gated on
-    /// `ai_enabled` — the *embedding store's* opt-in, which it has nothing to
-    /// do with. Speech-to-text ships a bundled model, runs entirely on-device
-    /// and does one bounded, user-initiated thing, so it is a product feature
-    /// rather than a lab experiment and carries its own switch.
+    /// This field exists because transcription was previously gated on `ai_enabled` — the
+    /// *embedding store's* opt-in, which it has nothing to do with. Speech-to-text ships a bundled
+    /// model, runs entirely on-device and does one bounded, user-initiated thing, so it is a
+    /// product feature rather than a lab experiment and carries its own switch.
     ///
-    /// **Non-load-bearing / AS-low** — no protective-envelope clamp. A tampered
-    /// value can at worst enable or disable a user-initiated local computation;
-    /// it grants no read access the vault did not already have, and the host
-    /// re-reads it rather than trusting the WebView.
-    /// Display time format (myne#279) — a closed enum string chosen from
-    /// `system` / `24h` / `12h`. `None` ≡ `system` (follow the OS locale),
-    /// applied host-side. Same free-`Option<String>` + client-side validation
-    /// discipline as [`PrefsView::date_format`]. Canonical key `time_format` —
-    /// sorts after `theme` (`th` < `ti`), before `timezone` (`_` < `z`).
-    /// Omitted when `None`. **Non-load-bearing** cosmetic — no clamp.
+    /// **Non-load-bearing / AS-low** — no protective-envelope clamp. A tampered value can at worst
+    /// enable or disable a user-initiated local computation; it grants no read access the vault did
+    /// not already have, and the host re-reads it rather than trusting the WebView. Display time
+    /// format (myne#279) — a closed enum string chosen from `system` / `24h` / `12h`. `None` ≡
+    /// `system` (follow the OS locale), applied host-side. Same free-`Option<String>` + client-side
+    /// validation discipline as [`PrefsView::date_format`]. Canonical key `time_format` — sorts
+    /// after `theme` (`th` < `ti`), before `timezone` (`_` < `z`). Omitted when `None`.
+    /// **Non-load-bearing** cosmetic — no clamp.
     #[serde(default)]
     pub time_format: Option<alloc::string::String>,
 
@@ -997,199 +922,149 @@ pub struct PrefsView {
     #[serde(default)]
     pub folder_notes_enabled: bool,
 
-    /// Hidden bottom-bar item ids (MYND bottom-bar customization) — the
-    /// **set** of `BottomBar` element ids the user chose to hide via the
-    /// bar's right-click menu (e.g. `graph`, `tags`, `word-count`). A
-    /// `set`-semantics array: NFC-normalized, lexicographically sorted,
-    /// exact-deduped, and **omitted entirely when empty** so a vault whose
-    /// bar is fully visible (the default) is byte-identical to a pre-feature
-    /// `vault.prefs` (existing golden vectors unaffected — migration-less
-    /// additive field on `MYP1`, the `spell_languages` precedent class). An
-    /// unknown id is ignored at render and pruned on the next write (no
-    /// codec-level GC). **Non-load-bearing** (a tampered / replayed value can
-    /// at worst hide or reveal a bar affordance) — no protective-envelope
-    /// clamp. Canonical key 'h' — sorts after `folder_icons` (`f` < `h`),
-    /// before `item_colors` (`h` < `i`).
+    /// Hidden bottom-bar item ids (MYND bottom-bar customization) — the **set** of `BottomBar`
+    /// element ids the user chose to hide via the bar's right-click menu (e.g. `graph`, `tags`,
+    /// `word-count`). A `set`-semantics array: NFC-normalized, lexicographically sorted,
+    /// exact-deduped, and **omitted entirely when empty** (precedent: `spell_languages`). An
+    /// unknown id is ignored at render and pruned on the next write (no codec-level GC).
+    /// **Non-load-bearing** (a tampered / replayed value can at worst hide or reveal a bar
+    /// affordance) — no protective-envelope clamp. Canonical key 'h' — sorts after `folder_icons`
+    /// (`f` < `h`), before `item_colors` (`h` < `i`).
     #[serde(default)]
     pub hidden_bar_items: Vec<String>,
 
-    /// User-chosen bottom-bar item display order (MYND bottom-bar
-    /// customization, drag-to-reorder twin of [`PrefsView::hidden_bar_items`]).
-    /// A `sequence`-semantics array of right-cluster `BottomBar` element ids
-    /// (e.g. `view-mode`, `tags`, `graph`) in the order the user arranged them
-    /// by dragging or via the bar's right-click "move left / move right"
-    /// actions. Order is MEANINGFUL, so the array is preserved **verbatim** —
-    /// NOT sorted, NOT deduped — exactly like [`PrefsView::favorites`] /
-    /// [`PrefsView::item_order`] / [`PrefsView::view_order`]. NFC-normalized per
-    /// element and **omitted entirely when empty** so a vault that never
-    /// reordered its bar (the default) is byte-identical to a pre-feature
-    /// `vault.prefs` (existing golden vectors unaffected — migration-less
-    /// additive field on `MYP1`, the `view_order` precedent class). An id not in
-    /// the host's known set is ignored at render and pruned on the next write
-    /// (no codec-level GC); a known id absent from the array falls back to its
-    /// canonical default position. **Non-load-bearing** (a tampered / replayed
-    /// value can at worst reorder a bar affordance) — no protective-envelope
-    /// clamp. Canonical key 'b' — sorts after `auto_lock_seconds` (`au` < `b`),
-    /// before `custom_theme` (`b` < `c`).
+    /// User-chosen bottom-bar item display order (MYND bottom-bar customization, drag-to-reorder
+    /// twin of [`PrefsView::hidden_bar_items`]). A `sequence`-semantics array of right-cluster
+    /// `BottomBar` element ids (e.g. `view-mode`, `tags`, `graph`) in the order the user arranged
+    /// them by dragging or via the bar's right-click "move left / move right" actions. Order is
+    /// MEANINGFUL (precedent: `view_order`). An id not in the host's known set is ignored at render
+    /// and pruned on the next write (no codec-level GC); a known id absent from the array falls
+    /// back to its canonical default position. **Non-load-bearing** (a tampered / replayed value
+    /// can at worst reorder a bar affordance) — no protective-envelope clamp. Canonical key 'b' —
+    /// sorts after `auto_lock_seconds` (`au` < `b`), before `custom_theme` (`b` < `c`).
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
-    /// How many characters of visible chat history an agent run may be seeded
-    /// with (myne-md/myne#617). `None` means the host applies its own default.
+    /// How many characters of visible chat history an agent run may be seeded with
+    /// (myne-md/myne#617). `None` means the host applies its own default.
     ///
-    /// **A bound rather than a feature toggle.** `build_request` re-sends every
-    /// message on every iteration, up to the loop's 24-iteration ceiling, so
-    /// this number is multiplied by the iteration count, and on the remote arm
-    /// it is multiplied into characters that leave the device. TB13 and
-    /// `design-notes/ai/0515` both record that no per-run volume cap exists
+    /// **A bound rather than a feature toggle.** `build_request` re-sends every message on every
+    /// iteration, up to the loop's 24-iteration ceiling, so this number is multiplied by the
+    /// iteration count, and on the remote arm it is multiplied into characters that leave the
+    /// device. TB13 and `design-notes/ai/0515` both record that no per-run volume cap exists
     /// anywhere else, which is why the host clamps it.
     ///
-    /// **The clamp is WRITE-side, which is a weaker class than
-    /// `auto_lock_seconds`, and saying otherwise would overstate it.** That
-    /// field resolves `clamp(...)` in code at every read, so a replayed or
-    /// tampered `vault.prefs` can only make auto-lock stricter no matter who
-    /// wrote it. This one is clamped in its setter, so the bound holds while
-    /// every writer clamps: a property of today's call sites rather than of the
-    /// value. Nothing reachable exploits the difference (the blob is AEAD-sealed
-    /// and AAD-bound, so a replay can only restore a previously-clamped value),
-    /// and the read path deliberately does not re-clamp so a second copy of the
-    /// ceiling cannot drift from the real one. A second writer, on the mobile
-    /// port or anywhere else, is the case that would make this matter, and it is
-    /// the reason the distinction is written down rather than glossed.
+    /// **The clamp is WRITE-side, which is a weaker class than `auto_lock_seconds`, and saying
+    /// otherwise would overstate it.** That field resolves `clamp(..)` in code at every read, so a
+    /// replayed or tampered `vault.prefs` can only make auto-lock stricter no matter who wrote it.
+    /// This one is clamped in its setter, so the bound holds while every writer clamps: a property
+    /// of today's call sites rather than of the value. Nothing reachable exploits the difference
+    /// (the blob is AEAD-sealed and AAD-bound, so a replay can only restore a previously-clamped
+    /// value), and the read path deliberately does not re-clamp so a second copy of the ceiling
+    /// cannot drift from the real one. A second writer, on the mobile port or anywhere else, is the
+    /// case that would make this matter, and it is the reason the distinction is written down
+    /// rather than glossed.
     ///
-    /// Additive on `MYP1` and omitted entirely when unset, so a vault that
-    /// never touched it is byte-identical to a pre-feature `vault.prefs` (the
-    /// `archive_disabled` precedent class). Canonical key
-    /// `chat_history_budget`, which sorts after `bar_items_order` (`b` < `c`)
-    /// before `cli_enabled` (`ch` < `cl`).
+    /// Additive on `MYP1` and omitted entirely when unset (precedent: `archive_disabled`).
+    /// Canonical key `chat_history_budget`, which sorts after `bar_items_order` (`b` < `c`) before
+    /// `cli_enabled` (`ch` < `cl`).
     ///
-    /// **That position is the load-bearing part of the name, not a preference.**
-    /// The decoder locates every field up to and including `auto_lock_seconds`
-    /// by `strip_prefix`, so an unknown key inside that run is not skipped: it
-    /// sits in front of the next marker and every prefix-chained field behind it
-    /// misses and takes its default. A field named for its consumer
-    /// (`agent_history_budget`) sorted into exactly that run, and an already
-    /// shipped client reading a blob that carried it would have decoded
-    /// SUCCESSFULLY while silently losing `auto_lock_seconds`,
-    /// `ai_excluded_folders` and the `Zeroizing`-wrapped `ai_provider_key`, then
-    /// persisted that loss on its next read-modify-write. Successfully is the
-    /// bad part: `update_prefs_with_dir` refuses to write over a read that
-    /// ERRORED, and this degrades without erroring. Named for what is budgeted
-    /// instead, the key lands in the cursor-scanned region, where
-    /// `find_top_level_marker` scans forward and an unknown key between two
-    /// known ones is skipped. `docs/spec/protocol.md` §9.5.2's forward-compat
-    /// clause is only true of that region, and an additive field belongs there.
+    /// **That position is the load-bearing part of the name, not a preference.** The decoder
+    /// locates every field up to and including `auto_lock_seconds` by `strip_prefix`, so an unknown
+    /// key inside that run is not skipped: it sits in front of the next marker and every
+    /// prefix-chained field behind it misses and takes its default. A field named for its consumer
+    /// (`agent_history_budget`) sorted into exactly that run, and an already shipped client reading
+    /// a blob that carried it would have decoded SUCCESSFULLY while silently losing
+    /// `auto_lock_seconds`, `ai_excluded_folders` and the `Zeroizing`-wrapped `ai_provider_key`,
+    /// then persisted that loss on its next read-modify-write. Successfully is the bad part:
+    /// `update_prefs_with_dir` refuses to write over a read that ERRORED, and this degrades without
+    /// erroring. Named for what is budgeted instead, the key lands in the cursor-scanned region,
+    /// where `find_top_level_marker` scans forward and an unknown key between two known ones is
+    /// skipped. `docs/spec/protocol.md` §9.5.2's forward-compat clause is only true of that region,
+    /// and an additive field belongs there.
     #[serde(default)]
     pub chat_history_budget: Option<u32>,
 
-    /// CLI terminal-access door toggle (myne-cli epic, MYND-490; `cli-thin-client`
-    /// task 2). `false` ≡ the door is closed (the default) — the local socket the
-    /// `myne` CLI dials is never created regardless of unlock state. **Omitted
-    /// entirely from the canonical JSON when `false`**, so a vault that never
-    /// enabled the CLI is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected — migration-less additive field on `MYP1`, the
-    /// `ai_enabled` precedent class exactly). Class `DeviceLocal` (see
-    /// `core/src/plugins/sync/prefs_classification.rs`): the CLI door is a
-    /// per-machine decision, so this value never travels in a merge — a laptop
-    /// and a desktop each carry their own. Rationale for the no-identity-gatekeeper
-    /// design this toggle is one leg of: `design-notes.md` "CLI terminal access
-    /// is a default-off, unlock-gated local socket with a folder exclusion list
-    /// (MYND-490)" and `docs/threat-model.md` §7. **Non-load-bearing / AS-low** —
-    /// no protective-envelope clamp; the host treats a tampered/replayed value as
-    /// a cosmetic toggle, same as `ai_enabled`. Canonical key `cli_enabled` —
-    /// sorts after `bar_items_order` (`b` < `c`), before `cli_excluded_folders`
-    /// (`cli_en` < `cli_ex`) and `custom_theme` (`cli` < `cu`).
+    /// CLI terminal-access door toggle (myne-cli epic, MYND-490; `cli-thin-client` task 2). `false`
+    /// ≡ the door is closed (the default) — the local socket the `myne` CLI dials is never created
+    /// regardless of unlock state. **Omitted entirely from the canonical JSON when `false`**
+    /// (precedent: `ai_enabled`). Class `DeviceLocal` (see
+    /// `core/src/plugins/sync/prefs_classification.rs`): the CLI door is a per-machine decision, so
+    /// this value never travels in a merge — a laptop and a desktop each carry their own. Rationale
+    /// for the no-identity-gatekeeper design this toggle is one leg of: `design-notes.md` "CLI
+    /// terminal access is a default-off, unlock-gated local socket with a folder exclusion list
+    /// (MYND-490)" and `docs/threat-model.md` §7. **Non-load-bearing / AS-low** — no
+    /// protective-envelope clamp; the host treats a tampered/replayed value as a cosmetic toggle,
+    /// same as `ai_enabled`. Canonical key `cli_enabled` — sorts after `bar_items_order` (`b` <
+    /// `c`), before `cli_excluded_folders` (`cli_en` < `cli_ex`) and `custom_theme` (`cli` < `cu`).
     #[serde(default)]
     pub cli_enabled: bool,
 
-    /// Folders excluded from the CLI's reach (myne-cli epic, MYND-490;
-    /// `cli-thin-client` task 2) — canonical trailing-slash display form.
-    /// **Same canonical encoding as `deliberate_folders` / `ai_excluded_folders`**
-    /// (NFC-normalized, lexicographically sorted, exact-deduped set) and
-    /// **omitted entirely when empty**, so a vault with no CLI exclusions is
-    /// byte-identical to a pre-feature `vault.prefs`. Default empty (whole vault
-    /// in scope once the door is opened). Class `Shared(SetUnion)`: an exclusion
-    /// added on one device must never be lost in a merge with a device that lacks
-    /// it — union is the fail-safe discipline, exactly the `ai_excluded_folders`
-    /// precedent. Enforcement of the exclusion (filtering `list`/`search`/writes)
-    /// is out of scope for this field's codec — see `cli-thin-client` task 5;
-    /// this field only stores and syncs the set. **Non-load-bearing** — a
-    /// tampered value can at worst widen/narrow the CLI's reach; no
-    /// protective-envelope clamp. Canonical key `cli_excluded_folders` — sorts
-    /// after `cli_enabled` (`cli_en` < `cli_ex`), before `cli_rate_limit_disabled`
-    /// (`cli_ex` < `cli_r`) and `custom_theme` (`cli` < `cu`).
+    /// Folders excluded from the CLI's reach (myne-cli epic, MYND-490; `cli-thin-client` task 2) —
+    /// canonical trailing-slash display form. **Same canonical encoding as `deliberate_folders` /
+    /// `ai_excluded_folders`** (NFC-normalized, lexicographically sorted, exact-deduped set) and
+    /// **omitted entirely when empty**. Default empty (whole vault in scope once the door is
+    /// opened). Class `Shared(SetUnion)`: an exclusion added on one device must never be lost in a
+    /// merge with a device that lacks it — union is the fail-safe discipline, exactly the
+    /// `ai_excluded_folders` precedent. Enforcement of the exclusion (filtering
+    /// `list`/`search`/writes) is out of scope for this field's codec — see `cli-thin-client` task
+    /// 5; this field only stores and syncs the set. **Non-load-bearing** — a tampered value can at
+    /// worst widen/narrow the CLI's reach; no protective-envelope clamp. Canonical key
+    /// `cli_excluded_folders` — sorts after `cli_enabled` (`cli_en` < `cli_ex`), before
+    /// `cli_rate_limit_disabled` (`cli_ex` < `cli_r`) and `custom_theme` (`cli` < `cu`).
     #[serde(default)]
     pub cli_excluded_folders: Vec<alloc::string::String>,
 
-    /// CLI socket rate-limit opt-out (myne-cli epic, MYND-490; `cli-thin-client`
-    /// task 2). **Shape decision, made by this field** (task 2's "What to build"
-    /// flagged the rate-limit field's shape as an open question): modeled
-    /// **exactly on the `archive_disabled` precedent** — `Option<bool>`, not a
-    /// numeric requests-per-second value, because the control the user is given
-    /// in Settings is a single on/off switch ("remove the default slowdown"), not
-    /// a tunable rate. `None` ≡ unset → the default-ON rate limit applies (a
-    /// runaway or hostile script cannot drain the vault at full speed).
-    /// `Some(true)` ≡ the user explicitly disabled the limit in Settings (task 10
-    /// reads this to skip rate-limiting the socket). `Some(false)` is a legal
-    /// value — re-enabling the limit after disabling it — but the UI is not
-    /// expected to ever produce it: omitting the field again (returning to
-    /// `None`) has the identical effect, and which one a "re-enable" control
-    /// writes is the client's choice, not something this codec cares about.
-    /// Omitted entirely from the canonical JSON when `None`, so a vault that
-    /// never touched the toggle is byte-identical to a pre-feature `vault.prefs`
-    /// (existing golden vectors unaffected — migration-less additive field on
-    /// `MYP1`). Class `DeviceLocal`: a machine-local performance knob — a laptop
-    /// and a desktop may legitimately want different limits. **Non-load-bearing**
-    /// (a tampered/replayed value can at worst speed up or slow down the CLI
-    /// socket; it grants no capability the door does not already grant) — no
-    /// protective-envelope clamp. Canonical key `cli_rate_limit_disabled` —
-    /// sorts after `cli_excluded_folders` (`cli_ex` < `cli_r`), before
-    /// `custom_theme` (`cli` < `cu`).
+    /// CLI socket rate-limit opt-out (myne-cli epic, MYND-490; `cli-thin-client` task 2). **Shape
+    /// decision, made by this field** (task 2's "What to build" flagged the rate-limit field's
+    /// shape as an open question): modeled **exactly on the `archive_disabled` precedent** —
+    /// `Option<bool>`, not a numeric requests-per-second value, because the control the user is
+    /// given in Settings is a single on/off switch ("remove the default slowdown"), not a tunable
+    /// rate. `None` ≡ unset → the default-ON rate limit applies (a runaway or hostile script cannot
+    /// drain the vault at full speed). `Some(true)` ≡ the user explicitly disabled the limit in
+    /// Settings (task 10 reads this to skip rate-limiting the socket). `Some(false)` is a legal
+    /// value — re-enabling the limit after disabling it — but the UI is not expected to ever
+    /// produce it: omitting the field again (returning to `None`) has the identical effect, and
+    /// which one a "re-enable" control writes is the client's choice, not something this codec
+    /// cares about. Omitted entirely from the canonical JSON when `None`. Class `DeviceLocal`: a
+    /// machine-local performance knob — a laptop and a desktop may legitimately want different
+    /// limits. **Non-load-bearing** (a tampered/replayed value can at worst speed up or slow down
+    /// the CLI socket; it grants no capability the door does not already grant) — no
+    /// protective-envelope clamp. Canonical key `cli_rate_limit_disabled` — sorts after
+    /// `cli_excluded_folders` (`cli_ex` < `cli_r`), before `custom_theme` (`cli` < `cu`).
     #[serde(default)]
     pub cli_rate_limit_disabled: Option<bool>,
-    /// Color-group rules (graph-connection-ux-polish, MYND-604) — the ordered
-    /// list of user-authored `{id, name, color, enabled, filter}` rules the
-    /// knowledge-graph pane paints matching notes with at render time. ONE
-    /// structured field, not a field per rule (the `saved_views` precedent
-    /// class). Order is MEANINGFUL and IS the rule precedence — first match
-    /// wins — so unlike `saved_views` (sorted by id; its display order lives
-    /// in the separate `view_order`) this array is preserved **verbatim**,
-    /// never re-sorted (the `bar_items_order` / `favorites` sequence
-    /// discipline, but classified whole-value LWW, not sequence-LWW — see
-    /// `core::plugins::sync::prefs_classification`). A disabled rule stays in
-    /// the list, evaluated as a no-match. Each element is a nested canonical
-    /// [`crate::color_group::ColorGroup`] object; `filter` reuses the same
-    /// `FilterNode` AST `saved_views` already persists. Default empty;
-    /// **omitted entirely from the canonical JSON when empty**, so a vault
-    /// that never opens the feature stays byte-identical to a pre-feature
-    /// `vault.prefs` (no outer-envelope / magic change — migration-less
-    /// additive field on `MYP1`). AS3-Sensitive (a rule's name / filter /
-    /// referenced tag or folder) — rides the existing prefs AEAD envelope;
-    /// **non-load-bearing** (no protective-envelope clamp — a tampered or
-    /// replayed `vault.prefs` can at worst reset rules to empty or apply a
-    /// stale rule set, never expose or corrupt note content). Canonical key
-    /// `color_groups` — sorts after `bar_items_order` (`b` < `c`), before
+    /// Color-group rules (graph-connection-ux-polish, MYND-604) — the ordered list of user-authored
+    /// `{id, name, color, enabled, filter}` rules the knowledge-graph pane paints matching notes
+    /// with at render time. ONE structured field, not a field per rule (precedent: `saved_views`).
+    /// Order is MEANINGFUL and IS the rule precedence — first match wins — so unlike `saved_views`
+    /// (sorted by id; its display order lives in the separate `view_order`) this array is preserved
+    /// **verbatim**, never re-sorted (the `bar_items_order` / `favorites` sequence discipline, but
+    /// classified whole-value LWW, not sequence-LWW — see
+    /// `core::plugins::sync::prefs_classification`). A disabled rule stays in the list, evaluated
+    /// as a no-match. Each element is a nested canonical [`crate::color_group::ColorGroup`] object;
+    /// `filter` reuses the same `FilterNode` AST `saved_views` already persists. Default empty;
+    /// **omitted entirely from the canonical JSON when empty**, so a vault that never opens the
+    /// feature stays byte-identical to a pre-feature `vault.prefs`. AS3-Sensitive (a rule's name /
+    /// filter / referenced tag or folder) — rides the existing prefs AEAD envelope;
+    /// **non-load-bearing** (no protective-envelope clamp — a tampered or replayed `vault.prefs`
+    /// can at worst reset rules to empty or apply a stale rule set, never expose or corrupt note
+    /// content). Canonical key `color_groups` — sorts after `bar_items_order` (`b` < `c`), before
     /// `custom_theme` (`col` < `cus`).
     #[serde(default)]
     pub color_groups: Vec<crate::color_group::ColorGroup>,
 
-    /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name
-    /// the in-app vault switcher shows beside this vault's name, replacing the
-    /// default `M` wordmark. `None` ≡ no icon set → the switcher shows the
-    /// neutral `M` fallback. Drawn from the client's curated glyph set (the same
-    /// `FOLDER_ICON_PATHS` family as [`PrefsView::folder_icons`]); an unknown
-    /// name is ignored at render (falls back to the wordmark). A
-    /// **non-load-bearing** cosmetic preference (AS-low) — a tampered/replayed
-    /// `vault.prefs` can at worst surface a different glyph — so no
-    /// protective-envelope clamp. Like [`PrefsView::label`], the icon lives
-    /// **encrypted-only** inside `vault.prefs` (SYNC-3): it decrypts into a
-    /// per-session RAM cache on unlock and the switcher reads that cache (never
-    /// re-derivable from disk without the `prefs_key`). NFC-normalized +
-    /// **omitted entirely when `None`**, so a vault that never set an icon is
-    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
-    /// unaffected — this rides the existing `MYP1` format as a migration-less
-    /// additive field, exactly like `label`). Canonical key `icon` — sorts after
-    /// `hidden_bar_items` (`h` < `i`), before `item_colors` (`ico` < `ite`).
+    /// Per-vault decorative icon (vault-icons) — the curated stroke-glyph name the in-app vault
+    /// switcher shows beside this vault's name, replacing the default `M` wordmark. `None` ≡ no
+    /// icon set → the switcher shows the neutral `M` fallback. Drawn from the client's curated
+    /// glyph set (the same `FOLDER_ICON_PATHS` family as [`PrefsView::folder_icons`]); an unknown
+    /// name is ignored at render (falls back to the wordmark). A **non-load-bearing** cosmetic
+    /// preference (AS-low) — a tampered/replayed `vault.prefs` can at worst surface a different
+    /// glyph — so no protective-envelope clamp. Like [`PrefsView::label`], the icon lives
+    /// **encrypted-only** inside `vault.prefs` (SYNC-3): it decrypts into a per-session RAM cache
+    /// on unlock and the switcher reads that cache (never re-derivable from disk without the
+    /// `prefs_key`). NFC-normalized + **omitted entirely when `None`**. Canonical key `icon` —
+    /// sorts after `hidden_bar_items` (`h` < `i`), before `item_colors` (`ico` < `ite`).
     #[serde(default)]
     pub icon: Option<String>,
 
@@ -1269,36 +1144,27 @@ pub struct PrefsView {
     #[serde(default)]
     pub last_backup_at: Option<u64>,
 
-    /// **Meeting AI prompt** (meeting-ai): the user's replacement for the
-    /// meeting AI pass's reduce instruction. `None` or empty means the built-in
-    /// default instruction (which carries the section headings and the language
-    /// line); a non-empty value is used verbatim and replaces that machinery.
-    /// It scopes to the meeting AI feature only, not the other AI surfaces.
-    /// Omitted entirely from the canonical JSON when `None`, so a vault that
-    /// never set it is byte-identical to a pre-feature `vault.prefs` (existing
-    /// golden vectors unaffected; additive field on `MYP1`). **Non-load-bearing**
-    /// (a tampered / replayed value changes only what the user's own model is
-    /// asked to produce), no protective-envelope clamp. Canonical key
-    /// `meeting_ai_prompt` sorts after `last_backup_at` (`l` < `m`), before
+    /// **Meeting AI prompt** (meeting-ai): the user's replacement for the meeting AI pass's reduce
+    /// instruction. `None` or empty means the built-in default instruction (which carries the
+    /// section headings and the language line); a non-empty value is used verbatim and replaces
+    /// that machinery. It scopes to the meeting AI feature only, not the other AI surfaces. Omitted
+    /// entirely from the canonical JSON when `None`. **Non-load-bearing** (a tampered / replayed
+    /// value changes only what the user's own model is asked to produce), no protective-envelope
+    /// clamp. Canonical key `meeting_ai_prompt` sorts after `last_backup_at` (`l` < `m`), before
     /// `new_note_location` (`m` < `n`).
     #[serde(default)]
     pub meeting_ai_prompt: Option<alloc::string::String>,
 
-    /// Default location for newly-created notes (MYND-462, "Files" settings
-    /// panel) — the MODE: `root` (vault root), `current` (the active note's
-    /// folder), or `specific` (the folder named by
-    /// [`PrefsView::new_note_location_folder`]). `None` ≡ the canonical default
-    /// `root`, applied host-side. A closed enum string stored as a free
-    /// `Option<String>` — the enum interpretation + unknown→default fallback live
-    /// on the client (the `editor_default_view_mode` precedent class, no
-    /// codec-level validation). Omitted entirely from the canonical JSON when
-    /// `None`, so a vault that never customized the new-note location is
-    /// byte-identical to a pre-feature `vault.prefs` (existing golden vectors
-    /// unaffected — migration-less additive field on `MYP1`). **Non-load-bearing**
-    /// (a tampered / replayed value can at worst place a new note in the wrong
-    /// folder) — no protective-envelope clamp. Canonical key `new_note_location` —
-    /// sorts after `last_backup_at` (`l` < `n`), before `new_note_location_folder`
-    /// (prefix) and `paired_extensions` (`n` < `p`).
+    /// Default location for newly-created notes (MYND-462, "Files" settings panel) — the MODE:
+    /// `root` (vault root), `current` (the active note's folder), or `specific` (the folder named
+    /// by [`PrefsView::new_note_location_folder`]). `None` ≡ the canonical default `root`, applied
+    /// host-side. A closed enum string stored as a free `Option<String>` — the enum interpretation
+    /// and the unknown→default fallback live on the client (precedent:
+    /// `editor_default_view_mode`).
+    /// Omitted entirely from the canonical JSON when `None`. **Non-load-bearing** (a tampered /
+    /// replayed value can at worst place a new note in the wrong folder) — no protective-envelope
+    /// clamp. Canonical key `new_note_location` — sorts after `last_backup_at` (`l` < `n`), before
+    /// `new_note_location_folder` (prefix) and `paired_extensions` (`n` < `p`).
     #[serde(default)]
     pub new_note_location: Option<alloc::string::String>,
 
@@ -1335,20 +1201,16 @@ pub struct PrefsView {
     #[serde(default)]
     pub spell_languages: Vec<String>,
 
-    /// Which file opens on app startup (MYND-462, "Files" settings panel) — the
-    /// MODE: `last` (restore the last workspace layout — the pre-feature
-    /// behaviour), `empty` (open a fresh empty editor), or `specific` (open the
-    /// note named by [`PrefsView::startup_open_note`]). `None` ≡ the canonical
-    /// default `last`, applied host-side. A closed enum string stored as a free
-    /// `Option<String>` — the enum interpretation + unknown→default fallback live
-    /// on the client (the `editor_default_view_mode` precedent class). Omitted
-    /// entirely from the canonical JSON when `None`, so a vault that never changed
-    /// the startup behaviour is byte-identical to a pre-feature `vault.prefs`.
-    /// **Non-load-bearing** (a tampered / replayed value can at worst open the
-    /// wrong note or an empty editor; the saved workspace is never destroyed) — no
-    /// protective-envelope clamp. Canonical key `startup_open` — sorts after
-    /// `spell_languages` (`spe` < `sta`), before `startup_open_note` (prefix) and
-    /// `theme` (`sta` < `the`).
+    /// Which file opens on app startup (MYND-462, "Files" settings panel) — the MODE: `last`
+    /// (restore the last workspace layout — the pre-feature behaviour), `empty` (open a fresh empty
+    /// editor), or `specific` (open the note named by [`PrefsView::startup_open_note`]). `None` ≡
+    /// the canonical default `last`, applied host-side. A closed enum string stored as a free
+    /// `Option<String>` — the enum interpretation + unknown→default fallback live on the client
+    /// (precedent: `editor_default_view_mode`). Omitted entirely from the canonical JSON when
+    /// `None`. **Non-load-bearing** (a tampered / replayed value can at worst open the wrong note
+    /// or an empty editor; the saved workspace is never destroyed) — no protective-envelope clamp.
+    /// Canonical key `startup_open` — sorts after `spell_languages` (`spe` < `sta`), before
+    /// `startup_open_note` (prefix) and `theme` (`sta` < `the`).
     #[serde(default)]
     pub startup_open: Option<alloc::string::String>,
 
@@ -1423,51 +1285,37 @@ pub struct PrefsView {
     #[serde(default)]
     pub periodic_notes: BTreeMap<String, String>,
 
-    /// Active right-panel tab id (right-panel tabs) — the id of the right
-    /// sidebar tab the editor should restore (e.g. `backlinks`, `unlinked`,
-    /// `outline`). `None` ≡ unset → the host applies its default (the first
-    /// visible tab in canonical order). A free `Option<String>` stored verbatim
-    /// (NFC-normalized at encode time); no codec-level value validation (the
-    /// `active_workspace` precedent class — the client owns the tab-id
-    /// interpretation + unknown→default fallback). Omitted entirely from the
-    /// canonical JSON when `None`, so a vault that never switched the right-panel
-    /// tab is byte-identical to a pre-feature `vault.prefs` (existing golden
-    /// vectors unaffected — migration-less additive field on `MYP1`).
-    /// **Non-load-bearing** (a tampered / replayed value can at worst restore the
-    /// wrong tab) — no protective-envelope clamp. Canonical key
-    /// `right_panel_active_tab` — sorts after `paired_extensions` (`p` < `r`),
-    /// before `right_panel_hidden_tabs`.
+    /// Active right-panel tab id (right-panel tabs) — the id of the right sidebar tab the editor
+    /// should restore (e.g. `backlinks`, `unlinked`, `outline`). `None` ≡ unset → the host applies
+    /// its default (the first visible tab in canonical order). A free `Option<String>` stored
+    /// verbatim (NFC-normalized at encode time); no codec-level value validation (precedent:
+    /// `active_workspace`). Omitted entirely from the canonical JSON when `None`.
+    /// **Non-load-bearing** (a tampered / replayed value can at worst restore the wrong tab) — no
+    /// protective-envelope clamp. Canonical key `right_panel_active_tab` — sorts after
+    /// `paired_extensions` (`p` < `r`), before `right_panel_hidden_tabs`.
     #[serde(default)]
     pub right_panel_active_tab: Option<alloc::string::String>,
 
-    /// Hidden right-panel tab ids (right-panel tabs) — the **set** of right
-    /// sidebar tab ids the user chose to hide via the panel's right-click menu.
-    /// A `set`-semantics array: NFC-normalized, lexicographically sorted,
-    /// exact-deduped (`canonical_folder_list`, the `hidden_bar_items` precedent
-    /// class), and **omitted entirely when empty** so a vault whose right panel
-    /// shows every tab (the default) is byte-identical to a pre-feature
-    /// `vault.prefs`. An unknown id is ignored at render and pruned on the next
-    /// write (no codec-level GC). **Non-load-bearing** (a tampered / replayed
-    /// value can at worst hide or reveal a tab) — no protective-envelope clamp.
-    /// Canonical key `right_panel_hidden_tabs` — sorts after
-    /// `right_panel_active_tab`, before `right_panel_tab_order`.
+    /// Hidden right-panel tab ids (right-panel tabs) — the **set** of right sidebar tab ids the
+    /// user chose to hide via the panel's right-click menu. A `set`-semantics array:
+    /// NFC-normalized, lexicographically sorted, exact-deduped (precedent: `canonical_folder_list`
+    /// / `hidden_bar_items`), and **omitted entirely when empty**. An unknown id is ignored at
+    /// render and pruned on the next write (no codec-level GC). **Non-load-bearing** (a tampered /
+    /// replayed value can at worst hide or reveal a tab) — no protective-envelope clamp. Canonical
+    /// key `right_panel_hidden_tabs` — sorts after `right_panel_active_tab`, before
+    /// `right_panel_tab_order`.
     #[serde(default)]
     pub right_panel_hidden_tabs: Vec<String>,
 
-    /// User-chosen right-panel tab display order (right-panel tabs, drag-to-reorder
-    /// twin of [`PrefsView::right_panel_hidden_tabs`]). A `sequence`-semantics
-    /// array of right sidebar tab ids in the order the user arranged them by
-    /// dragging or via the panel's "move left / move right" actions. Order is
-    /// MEANINGFUL, so the array is preserved **verbatim** — NOT sorted, NOT
-    /// deduped — exactly like [`PrefsView::bar_items_order`]. NFC-normalized per
-    /// element and **omitted entirely when empty** so a vault that never reordered
-    /// its right-panel tabs (the default) is byte-identical to a pre-feature
-    /// `vault.prefs`. An id not in the host's known set is ignored at render and
-    /// pruned on the next write (no codec-level GC); a known id absent from the
-    /// array falls back to its canonical default position. **Non-load-bearing**
-    /// (a tampered / replayed value can at worst reorder a tab) — no
-    /// protective-envelope clamp. Canonical key `right_panel_tab_order` — sorts
-    /// after `right_panel_hidden_tabs`, before `saved_views` (`r` < `sav`).
+    /// User-chosen right-panel tab display order (right-panel tabs, drag-to-reorder twin of
+    /// [`PrefsView::right_panel_hidden_tabs`]). A `sequence`-semantics array of right sidebar tab
+    /// ids in the order the user arranged them by dragging or via the panel's "move left / move
+    /// right" actions. Order is MEANINGFUL. An id not in the host's known set is ignored at render
+    /// and pruned on the next write (no codec-level GC); a known id absent from the array falls
+    /// back to its canonical default position. **Non-load-bearing** (a tampered / replayed value
+    /// can at worst reorder a tab) — no protective-envelope clamp. Canonical key
+    /// `right_panel_tab_order` — sorts after `right_panel_hidden_tabs`, before `saved_views` (`r` <
+    /// `sav`).
     #[serde(default)]
     pub right_panel_tab_order: Vec<String>,
 
@@ -1721,35 +1569,27 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     let mut out = Vec::with_capacity(64);
     out.push(b'{');
 
-    // active_workspace (canonically FIRST — 'ac' < 'au' = auto_lock_seconds,
-    // MYND-308). A free enum string; omitted entirely when None so a vault
-    // that never set an active workspace is byte-identical to a pre-feature
-    // vault.prefs (preserves existing KAT vectors). NFC-normalized like the
-    // daily_* / custom_theme string fields.
+    // active_workspace (canonically FIRST — 'ac' < 'au' = auto_lock_seconds, MYND-308). A free enum
+    // string; omitted entirely when None. NFC-normalized like the daily_* / custom_theme string
+    // fields.
     if let Some(ref slot) = prefs.active_workspace {
         out.extend_from_slice(b"\"active_workspace\":");
         push_json_string(&mut out, &slot.nfc().collect::<String>());
         out.push(b',');
     }
 
-    // ai_enabled (canonical key 'ai_enabled' — after active_workspace
-    // ['ai' > 'ac'], before ai_excluded_folders ['ai_en' < 'ai_ex'] and
-    // archive_disabled ['ai' < 'ar']). AI opt-in toggle (local-ai epic,
-    // SYNC-12). Emitted ONLY when true; omitted entirely when false (the
-    // default) so a vault that never enabled AI is byte-identical to a
-    // pre-feature vault.prefs (preserves existing KAT vectors). Per-vault +
-    // encrypted — no at-rest "uses AI" fingerprint.
+    // ai_enabled (canonical key 'ai_enabled' — after active_workspace ['ai' > 'ac'], before
+    // ai_excluded_folders ['ai_en' < 'ai_ex'] and archive_disabled ['ai' < 'ar']). AI opt-in toggle
+    // (local-ai epic, SYNC-12). Emitted ONLY when true; omitted entirely when false (the default).
+    // Per-vault + encrypted — no at-rest "uses AI" fingerprint.
     if prefs.ai_enabled {
         out.extend_from_slice(b"\"ai_enabled\":true,");
     }
 
-    // ai_excluded_folders (canonical key 'ai_ex…' — after ai_enabled
-    // ['ai_en' < 'ai_ex'], before archive_disabled ['ai' < 'ar']). Folders the
-    // AI never reads/indexes (local-ai epic, SYNC-14). SAME canonical encoding
-    // as deliberate_folders (NFC-normalized, sorted, exact-deduped set),
-    // OMITTED entirely when empty so a vault with no exclusions is
-    // byte-identical to a pre-feature vault.prefs (preserves existing KAT
-    // vectors).
+    // ai_excluded_folders (canonical key 'ai_ex…' — after ai_enabled ['ai_en' < 'ai_ex'], before
+    // archive_disabled ['ai' < 'ar']). Folders the AI never reads/indexes (local-ai epic, SYNC-14).
+    // SAME canonical encoding as deliberate_folders (NFC-normalized, sorted, exact-deduped set),
+    // OMITTED entirely when empty.
     let ai_folders = canonical_folder_list(&prefs.ai_excluded_folders);
     if !ai_folders.is_empty() {
         out.extend_from_slice(b"\"ai_excluded_folders\":[");
@@ -1762,14 +1602,11 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // ai_provider / ai_provider_consent / ai_provider_key (canonical keys
-    // 'ai_provider…' — after ai_excluded_folders ['ai_ex' < 'ai_pr'], before
-    // archive_disabled ['ai' < 'ar']; among themselves, the bare key sorts
-    // before its own extensions and 'c' < 'k'). The remote-provider triple
-    // (ai-remote-providers, SYNC-15/SYNC-22). Each omitted entirely when
-    // unset/false, so a vault that never named a provider is byte-identical to
-    // a pre-feature vault.prefs (preserves existing KAT vectors) — and, more to
-    // the point, the DEFAULT STATE leaves no trace in the blob at all.
+    // ai_provider / ai_provider_consent / ai_provider_key (canonical keys 'ai_provider…' — after
+    // ai_excluded_folders ['ai_ex' < 'ai_pr'], before archive_disabled ['ai' < 'ar']; among
+    // themselves, the bare key sorts before its own extensions and 'c' < 'k'). The remote-provider
+    // triple (ai-remote-providers, SYNC-15/SYNC-22). Each omitted entirely when unset/false — and,
+    // more to the point, the DEFAULT STATE leaves no trace in the blob at all.
     if let Some(ref provider) = prefs.ai_provider {
         out.extend_from_slice(b"\"ai_provider\":");
         push_json_string(&mut out, &provider.nfc().collect::<String>());
@@ -1799,24 +1636,18 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // archive_disabled (canonical key 'a', AFTER active_workspace
-    // ['ar' > 'ac'] and BEFORE auto_lock_seconds ['ar' < 'au']). A bool;
-    // omitted entirely when None so a vault that never touched the archive
-    // toggle is byte-identical to a pre-feature vault.prefs (preserves existing
-    // KAT vectors).
+    // archive_disabled (canonical key 'a', AFTER active_workspace ['ar' > 'ac'] and BEFORE
+    // auto_lock_seconds ['ar' < 'au']). A bool; omitted entirely when None.
     if let Some(on) = prefs.archive_disabled {
         out.extend_from_slice(b"\"archive_disabled\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
-    // archived_folders (canonical key 'archived_folders' — after archive_disabled
-    // ['archive_' '_'=0x5F < 'archived' 'd'=0x64], before auto_lock_seconds
-    // ['ar' < 'au']). Folders archived as a unit (folder-archive). SAME canonical
-    // encoding as deliberate_folders / ai_excluded_folders (NFC-normalized,
-    // sorted, exact-deduped set), OMITTED entirely when empty so a vault with no
-    // archived folders is byte-identical to a pre-feature vault.prefs (preserves
-    // existing KAT vectors).
+    // archived_folders (canonical key 'archived_folders' — after archive_disabled ['archive_'
+    // '_'=0x5F < 'archived' 'd'=0x64], before auto_lock_seconds ['ar' < 'au']). Folders archived as
+    // a unit (folder-archive). SAME canonical encoding as deliberate_folders / ai_excluded_folders
+    // (NFC-normalized, sorted, exact-deduped set), OMITTED entirely when empty.
     let archived_folder_list = canonical_folder_list(&prefs.archived_folders);
     if !archived_folder_list.is_empty() {
         out.extend_from_slice(b"\"archived_folders\":[");
@@ -1829,26 +1660,23 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // attachment_compression_enabled (canonical key
-    // 'attachment_compression_enabled' — after archived_folders
-    // ['archived_' < 'attachment_c'], before attachment_ocr_enabled
-    // ['attachment_c' < 'attachment_o']). Ingest-time image compression
-    // opt-out (ingest-image-compression). Emitted ONLY when FALSE — same
-    // inverse-of-`ai_enabled` rule as attachment_ocr_enabled, because this
-    // one also defaults to TRUE. A vault that never touched the toggle is
-    // therefore byte-identical to a pre-feature vault.prefs, which preserves
-    // the existing KAT vectors.
+    // attachment_compression_enabled (canonical key 'attachment_compression_enabled' — after
+    // archived_folders ['archived_' < 'attachment_c'], before attachment_ocr_enabled
+    // ['attachment_c' < 'attachment_o']). Ingest-time image compression opt-out
+    // (ingest-image-compression). Emitted ONLY when FALSE — same inverse-of-`ai_enabled` rule as
+    // attachment_ocr_enabled, because this one also defaults to TRUE. A vault that never touched
+    // the toggle is therefore byte-identical to a pre-feature vault.prefs, which preserves the
+    // existing KAT vectors.
     if !prefs.attachment_compression_enabled {
         out.extend_from_slice(b"\"attachment_compression_enabled\":false,");
     }
 
     // attachment_ocr_enabled (canonical key 'attachment_ocr_enabled' — after
-    // attachment_compression_enabled ['attachment_c' < 'attachment_o'], before
-    // auto_lock_seconds ['att' < 'aut']).
-    // Image-OCR opt-out (MYND-441). Emitted ONLY when FALSE — the inverse of the
-    // `ai_enabled` rule, because this one defaults to TRUE. A vault that never
-    // touched the toggle is therefore byte-identical to a pre-feature
-    // vault.prefs, which preserves the existing KAT vectors.
+    // attachment_compression_enabled ['attachment_c' < 'attachment_o'], before auto_lock_seconds
+    // ['att' < 'aut']). Image-OCR opt-out (MYND-441). Emitted ONLY when FALSE — the inverse of the
+    // `ai_enabled` rule, because this one defaults to TRUE. A vault that never touched the toggle
+    // is therefore byte-identical to a pre-feature vault.prefs, which preserves the existing KAT
+    // vectors.
     if !prefs.attachment_ocr_enabled {
         out.extend_from_slice(b"\"attachment_ocr_enabled\":false,");
     }
@@ -1863,63 +1691,49 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after
-    // auto_lock_seconds ['auto_l' < 'auto_t'], before bar_items_order
-    // ['a' < 'b']). Automatic on-device tag suggestion (MYND-651). Emitted
-    // ONLY when true; omitted entirely when false (the default) so a vault
-    // that never enabled it is byte-identical to a pre-feature vault.prefs
-    // (preserves existing KAT vectors) — same discipline as ai_enabled.
+    // auto_tag_enabled (canonical key 'auto_tag_enabled' — after auto_lock_seconds ['auto_l' <
+    // 'auto_t'], before bar_items_order ['a' < 'b']). Automatic on-device tag suggestion
+    // (MYND-651). Emitted ONLY when true; omitted entirely when false (the default) — same
+    // discipline as ai_enabled.
     if prefs.auto_tag_enabled {
         out.extend_from_slice(b"\"auto_tag_enabled\":true,");
     }
 
-    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b],
-    // before custom_theme [b < c]). The bottom-bar display sequence (MYND
-    // bottom-bar customization); same order-preserving discipline as favorites /
-    // item_order / view_order — preserved verbatim, NOT sorted/deduped. Trailing
-    // comma (a pre-screen_capture_protection field); omitted entirely when empty
-    // so a vault that never reordered its bar is byte-identical to a pre-feature
-    // vault.prefs.
+    // bar_items_order (canonical key 'b' — after auto_lock_seconds [au < b], before custom_theme [b
+    // < c]). The bottom-bar display sequence (MYND bottom-bar customization); same order-preserving
+    // discipline as favorites / item_order / view_order — preserved verbatim, NOT sorted/deduped.
+    // Trailing comma (a pre-screen_capture_protection field); omitted entirely when empty.
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
         out.push(b',');
     }
 
-    // chat_history_budget (canonical key 'chat_history_budget', after
-    // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
-    // characters of chat history an agent run may be seeded with
-    // (myne-md/myne#617). Deliberately in the CURSOR-scanned region rather than
-    // the strip_prefix run: an unknown key inside that run blinds every field
-    // behind it in an older client, which is silent rather than an error. See
-    // the field's own doc on PrefsView. Omitted entirely when None so a vault
-    // that never set it is byte-identical to a pre-feature vault.prefs
-    // (preserves existing KAT vectors).
+    // chat_history_budget (canonical key 'chat_history_budget', after bar_items_order ['b' < 'c'],
+    // before cli_enabled ['ch' < 'cl']). How many characters of chat history an agent run may be
+    // seeded with (myne-md/myne#617). Deliberately in the CURSOR-scanned region rather than the
+    // strip_prefix run: an unknown key inside that run blinds every field behind it in an older
+    // client, which is silent rather than an error. See the field's own doc on PrefsView. Omitted
+    // entirely when None.
     if let Some(budget) = prefs.chat_history_budget {
         out.extend_from_slice(b"\"chat_history_budget\":");
         push_json_uint(&mut out, budget);
         out.push(b',');
     }
 
-    // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' <
-    // 'c'], before cli_excluded_folders ['cli_en' < 'cli_ex'] and custom_theme
-    // ['cli' < 'cu']). CLI terminal-access door toggle (myne-cli epic,
-    // MYND-490). Emitted ONLY when true; omitted entirely when false (the
-    // default) so a vault that never enabled the CLI is byte-identical to a
-    // pre-feature vault.prefs (preserves existing KAT vectors) — same
-    // discipline as ai_enabled.
+    // cli_enabled (canonical key 'cli_enabled' — after bar_items_order ['b' < 'c'], before
+    // cli_excluded_folders ['cli_en' < 'cli_ex'] and custom_theme ['cli' < 'cu']). CLI
+    // terminal-access door toggle (myne-cli epic, MYND-490). Emitted ONLY when true; omitted
+    // entirely when false (the default) — same discipline as ai_enabled.
     if prefs.cli_enabled {
         out.extend_from_slice(b"\"cli_enabled\":true,");
     }
 
-    // cli_excluded_folders (canonical key 'cli_excluded_folders' — after
-    // cli_enabled ['cli_en' < 'cli_ex'], before cli_rate_limit_disabled
-    // ['cli_ex' < 'cli_r'] and custom_theme ['cli' < 'cu']). Folders the CLI
-    // never reaches (myne-cli epic, MYND-490). SAME canonical encoding as
-    // deliberate_folders / ai_excluded_folders (NFC-normalized, sorted,
-    // exact-deduped set), OMITTED entirely when empty so a vault with no CLI
-    // exclusions is byte-identical to a pre-feature vault.prefs (preserves
-    // existing KAT vectors).
+    // cli_excluded_folders (canonical key 'cli_excluded_folders' — after cli_enabled ['cli_en' <
+    // 'cli_ex'], before cli_rate_limit_disabled ['cli_ex' < 'cli_r'] and custom_theme ['cli' <
+    // 'cu']). Folders the CLI never reaches (myne-cli epic, MYND-490). SAME canonical encoding as
+    // deliberate_folders / ai_excluded_folders (NFC-normalized, sorted, exact-deduped set), OMITTED
+    // entirely when empty.
     let cli_folders = canonical_folder_list(&prefs.cli_excluded_folders);
     if !cli_folders.is_empty() {
         out.extend_from_slice(b"\"cli_excluded_folders\":[");
@@ -1932,28 +1746,20 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // cli_rate_limit_disabled (canonical key 'cli_rate_limit_disabled' — after
-    // cli_excluded_folders ['cli_ex' < 'cli_r'], before custom_theme ['cli' <
-    // 'cu']). CLI socket rate-limit opt-out (myne-cli epic, MYND-490); shape
-    // decision recorded on the field's rustdoc — Option<bool>, the
-    // archive_disabled precedent class. A bool; omitted entirely when None so
-    // a vault that never touched the rate-limit toggle is byte-identical to a
-    // pre-feature vault.prefs (preserves existing KAT vectors).
+    // cli_rate_limit_disabled (canonical key 'cli_rate_limit_disabled' — after cli_excluded_folders
+    // ['cli_ex' < 'cli_r'], before custom_theme ['cli' < 'cu']). CLI socket rate-limit opt-out
+    // (myne-cli epic, MYND-490); shape decision recorded on the field's rustdoc — Option<bool>, the
+    // archive_disabled precedent class. A bool; omitted entirely when None.
     if let Some(on) = prefs.cli_rate_limit_disabled {
         out.extend_from_slice(b"\"cli_rate_limit_disabled\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
         out.push(b',');
     }
 
-    // custom_theme (canonical key 'c' — after auto_lock_seconds 'a', before the
-    // daily_* block 'd'; the only 'c' key). The active custom-theme name; takes
-    // color_groups (canonical key 'col' — after bar_items_order [b < c], before
-    // custom_theme [col < cus], MYND-604 graph-connection-ux-polish). The
-    // ordered color-group rule list; order IS rule precedence, so the array is
-    // encoded via the canonical codec's OWN verbatim-order encoder (never
-    // re-sorted — contrast `saved_views`, which the codec sorts by id).
-    // Omitted entirely when empty so a vault that never opens the feature is
-    // byte-identical to a pre-feature vault.prefs.
+    // custom_theme (canonical key 'c' — after auto_lock_seconds 'a', before the daily_* block 'd';
+    // the only 'c' key). The active custom-theme name; takes color_groups (canonical key 'col' —
+    // after bar_items_order [b < c], before custom_theme [col < cus], MYND-604
+    // graph-connection-ux-polish). The ordered color-group rule list; order IS rule precedence.
     if !prefs.color_groups.is_empty() {
         out.extend_from_slice(b"\"color_groups\":");
         out.extend_from_slice(&crate::color_group::canonical_encode_color_groups(
@@ -1993,11 +1799,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // date_format (myne#279) — canonical key 'dat…', after daily_template
-    // (`dai` < `dat`) and before deliberate_folders (`da` < `de`). A free enum
-    // string; the client validates + maps unknown→default. Omitted when None so
-    // a vault that never chose a format is byte-identical to a pre-feature
-    // vault.prefs.
+    // date_format (myne#279) — canonical key 'dat…', after daily_template (`dai` < `dat`) and
+    // before deliberate_folders (`da` < `de`). A free enum string; the client validates + maps
+    // unknown→default. Omitted when None.
     if let Some(ref v) = prefs.date_format {
         out.extend_from_slice(b"\"date_format\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -2016,35 +1820,28 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // developer_mode (canonical key 'd' — after deliberate_folders
-    // [`deliberate_` < `developer_`], before device_names [`develope` <
-    // `device_n`]). Emitted only when `true` (the `ai_enabled` positive-opt-in
-    // convention), so a vault that never enabled it is byte-identical to a
-    // pre-feature vault.prefs.
+    // developer_mode (canonical key 'd' — after deliberate_folders [`deliberate_` < `developer_`],
+    // before device_names [`develope` < `device_n`]). Emitted only when `true` (the `ai_enabled`
+    // positive-opt-in convention).
     if prefs.developer_mode {
         out.extend_from_slice(b"\"developer_mode\":true,");
     }
 
-    // device_names (canonical key 'd' — after deliberate_folders [`del` < `dev`],
-    // before the editor_* block [`d` < `e`]). A device_id-hex → friendly-name
-    // string→string object (SYNC-41, the single home for device names); omitted
-    // entirely when empty so a vault that never named a device is byte-identical
-    // to a pre-feature vault.prefs (existing KAT vectors unaffected —
-    // migration-less additive field on MYP1, the folder_icons / item_colors
-    // precedent class). Keys emitted in lexicographic order, NFC-normalized
-    // (push_canonical_string_map).
+    // device_names (canonical key 'd' — after deliberate_folders [`del` < `dev`], before the
+    // editor_* block [`d` < `e`]). A device_id-hex → friendly-name string→string object (SYNC-41,
+    // the single home for device names); omitted entirely when empty (existing KAT vectors
+    // unaffected — migration-less additive field on MYP1, the folder_icons / item_colors precedent
+    // class). Keys emitted in lexicographic order, NFC-normalized (push_canonical_string_map).
     if !prefs.device_names.is_empty() {
         out.extend_from_slice(b"\"device_names\":");
         push_canonical_string_map(&mut out, &prefs.device_names);
         out.push(b',');
     }
 
-    // editor-typography string presets (canonical key 'e'). content_width +
-    // default_view_mode + font_family sort BEFORE editor_layout
-    // (`editor_c`/`editor_d`/`editor_f` < `editor_l`), the focus bools + the
-    // other typography presets AFTER it (below). Each omitted when None so a
-    // vault that never customized typography is byte-identical to a pre-feature
-    // vault.prefs. Free enum strings — the client validates + maps unknown→default.
+    // editor-typography string presets (canonical key 'e'). content_width + default_view_mode +
+    // font_family sort BEFORE editor_layout (`editor_c`/`editor_d`/`editor_f` < `editor_l`), the
+    // focus bools + the other typography presets AFTER it (below). Each omitted when None. Free
+    // enum strings — the client validates + maps unknown→default.
     if let Some(ref v) = prefs.editor_content_width {
         out.extend_from_slice(b"\"editor_content_width\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -2059,12 +1856,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         push_json_string(&mut out, &v.nfc().collect::<String>());
         out.push(b',');
     }
-    // editor_focus_* bools (MYND-348) — after editor_default_view_mode
-    // (`editor_d` < `editor_f`), before editor_font_family (`editor_focus` <
-    // `editor_font`: 'c' < 'n'). dim_inactive < typewriter
-    // (`editor_focus_d` < `editor_focus_t`). Bare bools; omitted when None so a
-    // vault that never touched focus mode is byte-identical to a pre-feature
-    // vault.prefs.
+    // editor_focus_* bools (MYND-348) — after editor_default_view_mode (`editor_d` < `editor_f`),
+    // before editor_font_family (`editor_focus` < `editor_font`: 'c' < 'n'). dim_inactive <
+    // typewriter (`editor_focus_d` < `editor_focus_t`). Bare bools; omitted when None.
     if let Some(on) = prefs.editor_focus_dim_inactive {
         out.extend_from_slice(b"\"editor_focus_dim_inactive\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
@@ -2107,11 +1901,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"},");
     }
 
-    // editor_line_numbers (canonical key 'e', AFTER editor_layout
-    // [`editor_li` > `editor_la`] and BEFORE editor_line_spacing
-    // [`editor_line_n` < `editor_line_s`]). A bool; omitted entirely when None so
-    // a vault that never touched the line-number gutter is byte-identical to a
-    // pre-feature vault.prefs (preserves existing KAT vectors).
+    // editor_line_numbers (canonical key 'e', AFTER editor_layout [`editor_li` > `editor_la`] and
+    // BEFORE editor_line_spacing [`editor_line_n` < `editor_line_s`]). A bool; omitted entirely
+    // when None.
     if let Some(on) = prefs.editor_line_numbers {
         out.extend_from_slice(b"\"editor_line_numbers\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
@@ -2126,11 +1918,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         push_json_string(&mut out, &v.nfc().collect::<String>());
         out.push(b',');
     }
-    // editor_slash_hidden (set — sorted+deduped, canonical_folder_list) then
-    // editor_slash_order (sequence — verbatim). MYND-336. Both omitted when empty
-    // so a vault that never customized the slash menu is byte-identical to a
-    // pre-feature vault.prefs. Canonical: after editor_line_spacing, before
-    // editor_text_size (editor_li < editor_s < editor_te).
+    // editor_slash_hidden (set — sorted+deduped, canonical_folder_list) then editor_slash_order
+    // (sequence — verbatim). MYND-336. Both omitted when empty. Canonical: after
+    // editor_line_spacing, before editor_text_size (editor_li < editor_s < editor_te).
     let editor_slash_hidden = canonical_folder_list(&prefs.editor_slash_hidden);
     if !editor_slash_hidden.is_empty() {
         out.extend_from_slice(b"\"editor_slash_hidden\":[");
@@ -2171,11 +1961,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // editor_vim_mode (canonical key 'e', AFTER editor_toolbar_order
-    // [`editor_to` < `editor_v`] and BEFORE favorites [`e` < `f`]). A bool;
-    // omitted entirely when None so a vault that never touched the vim toggle is
-    // byte-identical to a pre-feature vault.prefs (preserves existing KAT
-    // vectors). vim-keyboard-mode, MYND-313.
+    // editor_vim_mode (canonical key 'e', AFTER editor_toolbar_order [`editor_to` < `editor_v`] and
+    // BEFORE favorites [`e` < `f`]). A bool; omitted entirely when None. vim-keyboard-mode,
+    // MYND-313.
     if let Some(on) = prefs.editor_vim_mode {
         out.extend_from_slice(b"\"editor_vim_mode\":");
         out.extend_from_slice(if on { b"true" } else { b"false" });
@@ -2216,22 +2004,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b',');
     }
 
-    // folder_notes_enabled (canonical key 'folder_n', after 'folder_icons'
-    // ['folder_i' < 'folder_n'], before 'hidden_bar_items' ['f' < 'h']). The
-    // folder-notes feature off-switch (myne-md/myne#661). Emitted ONLY when
-    // true; omitted entirely when false (the default) so a vault that never
-    // enabled folder notes is byte-identical to a pre-feature vault.prefs
-    // (preserves existing KAT vectors), the same discipline as auto_tag_enabled.
+    // folder_notes_enabled (canonical key 'folder_n', after 'folder_icons' ['folder_i' <
+    // 'folder_n'], before 'hidden_bar_items' ['f' < 'h']). The folder-notes feature off-switch
+    // (myne-md/myne#661). Emitted ONLY when true; omitted entirely when false (the default), the
+    // same discipline as auto_tag_enabled.
     if prefs.folder_notes_enabled {
         out.extend_from_slice(b"\"folder_notes_enabled\":true,");
     }
 
-    // hidden_bar_items (canonical key 'h' — after 'folder_icons' [f < h], before
-    // 'item_colors' [h < i]). A set-semantics array: NFC-normalized, sorted,
-    // exact-deduped (canonical_folder_list, shared with deliberate_folders /
-    // spell_languages); omitted entirely when empty so a vault whose bottom bar
-    // is fully visible (the default) is byte-identical to a pre-feature
-    // vault.prefs.
+    // hidden_bar_items (canonical key 'h' — after 'folder_icons' [f < h], before 'item_colors' [h <
+    // i]). A set-semantics array: NFC-normalized, sorted, exact-deduped (canonical_folder_list,
+    // shared with deliberate_folders / spell_languages); omitted entirely when empty.
     let hidden_bar = canonical_folder_list(&prefs.hidden_bar_items);
     if !hidden_bar.is_empty() {
         out.extend_from_slice(b"\"hidden_bar_items\":[");
@@ -2244,11 +2027,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // icon (canonical key 'icon' — after 'hidden_bar_items' [h < i], before
-    // 'item_colors' ['ico' < 'ite']). The per-vault switcher glyph name
-    // (vault-icons); omitted entirely when None so a vault that never set an icon
-    // is byte-identical to a pre-feature vault.prefs (existing KAT vectors
-    // unaffected). NFC-normalized like label.
+    // icon (canonical key 'icon' — after 'hidden_bar_items' [h < i], before 'item_colors' ['ico' <
+    // 'ite']). The per-vault switcher glyph name (vault-icons); omitted entirely when None
+    // (existing KAT vectors unaffected). NFC-normalized like label.
     if let Some(ref icon) = prefs.icon {
         out.extend_from_slice(b"\"icon\":");
         push_json_string(&mut out, &icon.nfc().collect::<String>());
@@ -2319,16 +2100,12 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     }
 
     // new_note_location (canonical key 'n' — after last_backup_at [l < n], before
-    // new_note_location_folder [prefix] and paired_extensions [n < p], MYND-462).
-    // The new-note default-location MODE (root/current/specific); omitted entirely
-    // when None so a vault that never set it is byte-identical to a pre-feature
-    // vault.prefs (preserves existing KAT vectors). Trailing comma like
-    // last_backup_at (screen_capture_protection is mandatory and canonically
-    // later).
-    // meeting_ai_prompt (canonical key 'm', after last_backup_at [l < m], before
-    // new_note_location [m < n], meeting-ai). The user's replacement for the
-    // meeting AI reduce instruction; omitted entirely when None so a vault that
-    // never set it is byte-identical to a pre-feature vault.prefs.
+    // new_note_location_folder [prefix] and paired_extensions [n < p], MYND-462). The new-note
+    // default-location MODE (root/current/specific); omitted entirely when None. Trailing comma
+    // like last_backup_at (screen_capture_protection is mandatory and canonically later).
+    // meeting_ai_prompt (canonical key 'm', after last_backup_at [l < m], before new_note_location
+    // [m < n], meeting-ai). The user's replacement for the meeting AI reduce instruction; omitted
+    // entirely when None.
     if let Some(ref v) = prefs.meeting_ai_prompt {
         out.extend_from_slice(b"\"meeting_ai_prompt\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -2413,23 +2190,19 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"\"ribbon_visible\":false,");
     }
 
-    // right_panel_active_tab (canonical key 'right_panel_a…' — after
-    // paired_extensions ['p' < 'r'], before right_panel_hidden_tabs). A free
-    // enum string; omitted entirely when None so a vault that never switched the
-    // right-panel tab is byte-identical to a pre-feature vault.prefs (preserves
-    // existing KAT vectors). NFC-normalized like active_workspace.
+    // right_panel_active_tab (canonical key 'right_panel_a…' — after paired_extensions ['p' < 'r'],
+    // before right_panel_hidden_tabs). A free enum string; omitted entirely when None.
+    // NFC-normalized like active_workspace.
     if let Some(ref tab) = prefs.right_panel_active_tab {
         out.extend_from_slice(b"\"right_panel_active_tab\":");
         push_json_string(&mut out, &tab.nfc().collect::<String>());
         out.push(b',');
     }
 
-    // right_panel_hidden_tabs (canonical key 'right_panel_h…' — after
-    // right_panel_active_tab, before right_panel_tab_order ['h' < 't']). A
-    // set-semantics array: NFC-normalized, sorted, exact-deduped
-    // (canonical_folder_list, shared with hidden_bar_items); omitted entirely
-    // when empty so a vault whose right panel shows every tab (the default) is
-    // byte-identical to a pre-feature vault.prefs.
+    // right_panel_hidden_tabs (canonical key 'right_panel_h…' — after right_panel_active_tab,
+    // before right_panel_tab_order ['h' < 't']). A set-semantics array: NFC-normalized, sorted,
+    // exact-deduped (canonical_folder_list, shared with hidden_bar_items); omitted entirely when
+    // empty.
     let right_panel_hidden = canonical_folder_list(&prefs.right_panel_hidden_tabs);
     if !right_panel_hidden.is_empty() {
         out.extend_from_slice(b"\"right_panel_hidden_tabs\":[");
@@ -2442,12 +2215,10 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.extend_from_slice(b"],");
     }
 
-    // right_panel_tab_order (canonical key 'right_panel_t…' — after
-    // right_panel_hidden_tabs, before saved_views ['r' < 'sav']). The
-    // right-panel tab display sequence; same order-preserving discipline as
-    // bar_items_order — preserved verbatim, NOT sorted/deduped. Omitted entirely
-    // when empty so a vault that never reordered its right-panel tabs is
-    // byte-identical to a pre-feature vault.prefs.
+    // right_panel_tab_order (canonical key 'right_panel_t…' — after right_panel_hidden_tabs, before
+    // saved_views ['r' < 'sav']). The right-panel tab display sequence; same order-preserving
+    // discipline as bar_items_order — preserved verbatim, NOT sorted/deduped. Omitted entirely when
+    // empty.
     if !prefs.right_panel_tab_order.is_empty() {
         out.extend_from_slice(b"\"right_panel_tab_order\":");
         push_ordered_string_array(&mut out, &prefs.right_panel_tab_order);
@@ -2473,12 +2244,11 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         b"false"
     });
 
-    // show_note_timestamps (canonical key 'sho…' — after
-    // screen_capture_protection [scr < sho], before spell_enabled [sho < spe]).
-    // OMIT-WHEN-DEFAULT, inverted polarity vs spell_enabled: the default is
-    // `true`, so ONLY the non-default `false` is emitted (prepending a comma like
-    // spell_enabled). A vault that never touched the toggle stays byte-identical
-    // to a pre-feature vault.prefs (preserves existing KAT vectors).
+    // show_note_timestamps (canonical key 'sho…' — after screen_capture_protection [scr < sho],
+    // before spell_enabled [sho < spe]). OMIT-WHEN-DEFAULT, inverted polarity vs spell_enabled: the
+    // default is `true`, so ONLY the non-default `false` is emitted (prepending a comma like
+    // spell_enabled). A vault that never touched the toggle stays byte-identical to a pre-feature
+    // vault.prefs.
     if !prefs.show_note_timestamps {
         out.extend_from_slice(b",\"show_note_timestamps\":false");
     }
@@ -2519,11 +2289,9 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b']');
     }
 
-    // startup_open (canonical key 'sta…' — after spell_languages [spl < sta],
-    // before startup_open_note [prefix] and theme [sta < the], MYND-462). The
-    // startup-open MODE (last/empty/specific); leading comma like theme. Omitted
-    // entirely when None so a vault that never changed startup behaviour is
-    // byte-identical to a pre-feature vault.prefs (preserves existing KAT vectors).
+    // startup_open (canonical key 'sta…' — after spell_languages [spl < sta], before
+    // startup_open_note [prefix] and theme [sta < the], MYND-462). The startup-open MODE
+    // (last/empty/specific); leading comma like theme. Omitted entirely when None.
     if let Some(ref v) = prefs.startup_open {
         out.extend_from_slice(b",\"startup_open\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -2552,12 +2320,10 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         out.push(b'"');
     }
 
-    // time_format + timezone (myne#279) — canonical keys 'ti…', between theme
-    // ['th' < 'ti'] and transcription_enabled ['ti' < 'tr']. Leading comma like
-    // theme, since this region is emitted after the last comma-terminated block.
-    // Free enum / IANA strings; the client validates + maps unknown→default.
-    // Each omitted when None so a vault that never chose one is byte-identical
-    // to a pre-feature vault.prefs.
+    // time_format + timezone (myne#279) — canonical keys 'ti…', between theme ['th' < 'ti'] and
+    // transcription_enabled ['ti' < 'tr']. Leading comma like theme, since this region is emitted
+    // after the last comma-terminated block. Free enum / IANA strings; the client validates + maps
+    // unknown→default. Each omitted when None.
     if let Some(ref v) = prefs.time_format {
         out.extend_from_slice(b",\"time_format\":");
         push_json_string(&mut out, &v.nfc().collect::<String>());
@@ -2567,12 +2333,11 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
         push_json_string(&mut out, &v.nfc().collect::<String>());
     }
 
-    // transcription_enabled (canonical key 'transcription_enabled' — after
-    // theme ['the' < 'tra'], before view_order ['t' < 'v']). Speech-to-text
-    // opt-OUT (MYND-592). Emitted ONLY when FALSE — the same inverse rule as
-    // attachment_ocr_enabled, because this one defaults to TRUE. A vault that
-    // never touched the toggle is therefore byte-identical to a pre-feature
-    // vault.prefs, which preserves the existing KAT vectors.
+    // transcription_enabled (canonical key 'transcription_enabled' — after theme ['the' < 'tra'],
+    // before view_order ['t' < 'v']). Speech-to-text opt-OUT (MYND-592). Emitted ONLY when FALSE —
+    // the same inverse rule as attachment_ocr_enabled, because this one defaults to TRUE. A vault
+    // that never touched the toggle is therefore byte-identical to a pre-feature vault.prefs, which
+    // preserves the existing KAT vectors.
     if !prefs.transcription_enabled {
         out.extend_from_slice(b",\"transcription_enabled\":false");
     }
@@ -6033,10 +5798,10 @@ mod tests {
         assert!(!decoded.transcription_enabled);
     }
 
-    /// `auto_tag_enabled` (MYND-651) is a default-off positive opt-in, so it is
-    /// emitted ONLY when `true` — the `ai_enabled` / `cli_enabled` discipline.
-    /// A vault that never enabled it therefore stays byte-identical to a
-    /// pre-feature blob, which is what preserves the existing KAT vectors.
+    /// `auto_tag_enabled` (MYND-651) is a default-off positive opt-in, so it is emitted ONLY when
+    /// `true` — the `ai_enabled` / `cli_enabled` discipline. A vault that never enabled it
+    /// therefore stays byte-identical to a pre-feature blob, which is what preserves the existing
+    /// KAT vectors.
     #[test]
     fn auto_tag_enabled_omitted_when_false_emitted_only_when_true() {
         let off = canonical_json_encode(&PrefsView {
@@ -6175,11 +5940,10 @@ mod tests {
         );
     }
 
-    /// The inverse of the `ai_enabled` rule, same shape as
-    /// `attachment_ocr_enabled`'s coverage: it is emitted only when the user
-    /// turned it OFF. A vault that never touched the toggle therefore stays
-    /// byte-identical to a pre-feature blob, which is what preserves the
-    /// existing KAT vectors.
+    /// The inverse of the `ai_enabled` rule, same shape as `attachment_ocr_enabled`'s coverage: it
+    /// is emitted only when the user turned it OFF. A vault that never touched the toggle therefore
+    /// stays byte-identical to a pre-feature blob, which is what preserves the existing KAT
+    /// vectors.
     #[test]
     fn attachment_compression_omitted_when_true_emitted_only_when_false() {
         let on = canonical_json_encode(&PrefsView {
@@ -7332,8 +7096,8 @@ mod tests {
 
     #[test]
     fn encode_omits_show_note_timestamps_when_default() {
-        // Default `true` is omit-when-default → a vault that never touched the
-        // toggle is byte-identical to a pre-feature vault.prefs (no key emitted).
+        // Default `true` is omit-when-default → a vault that never touched the toggle is
+        // byte-identical to a pre-feature vault.prefs (no key emitted).
         let encoded = canonical_json_encode(&PrefsView::default());
         assert!(
             find_subslice(&encoded, b"show_note_timestamps").is_none(),
@@ -8704,8 +8468,7 @@ mod tests {
 
     #[test]
     fn encode_omits_hidden_bar_items_when_empty() {
-        // Empty (the default — bar fully visible) → byte-identical to a
-        // pre-feature vault.prefs (preserves existing KAT vectors + vaults).
+        // Empty (the default — bar fully visible) → byte-identical to a pre-feature vault.prefs.
         let encoded = canonical_json_encode(&PrefsView::default());
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
@@ -8714,8 +8477,7 @@ mod tests {
 
     #[test]
     fn encode_omits_bar_items_order_when_empty() {
-        // Empty (the default — canonical bar order) → byte-identical to a
-        // pre-feature vault.prefs (preserves existing KAT vectors + vaults).
+        // Empty (the default — canonical bar order) → byte-identical to a pre-feature vault.prefs.
         let encoded = canonical_json_encode(&PrefsView::default());
         assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
     }
@@ -11932,22 +11694,19 @@ mod tests {
         .expect("write last_backup_at prefs vectors dump");
     }
 
-    /// Generator for the editor-line-numbers (MYND-314) `editor_line_numbers`
-    /// vector cases (appended to the companion repo's `vault-prefs` family;
-    /// per-feature generator, keeps the originals byte-stable — the
-    /// [`emit_amoled_theme_prefs_vector`] pattern):
+    /// Generator for the editor-line-numbers (MYND-314) `editor_line_numbers` vector cases
+    /// (appended to the companion repo's `vault-prefs` family; per-feature generator, keeps the
+    /// originals byte-stable — the [`emit_amoled_theme_prefs_vector`] pattern):
     ///
     /// `cargo test -p protocol --lib emit_line_numbers_prefs_vector -- --ignored`
     ///
-    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
-    /// optional line-number gutter toggle (`editor_line_numbers: Some(true)` →
-    /// canonical `"editor_line_numbers":true`). Pins the bool encoding and its
-    /// canonical key slot (after `editor_layout`, before
-    /// `screen_capture_protection`) plus the round-trip back through the decoder.
-    /// Nonce `0xF4` is the next free entry in the family's nonce registry
-    /// (0x77–0xF3 taken by the sibling generators). Omit-when-`None` keeps an
-    /// untouched vault byte-identical to a pre-feature blob (no encrypt case
-    /// needed for that — `encrypt-default` already pins the bare form).
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the optional line-number
+    /// gutter toggle (`editor_line_numbers: Some(true)` → canonical `"editor_line_numbers":true`).
+    /// Pins the bool encoding and its canonical key slot (after `editor_layout`, before
+    /// `screen_capture_protection`) plus the round-trip back through the decoder. Nonce `0xF4` is
+    /// the next free entry in the family's nonce registry (0x77–0xF3 taken by the sibling
+    /// generators). Omit-when-`None` keeps an untouched vault byte-identical to a pre-feature blob
+    /// (no encrypt case needed for that — `encrypt-default` already pins the bare form).
     #[test]
     #[ignore]
     fn emit_line_numbers_prefs_vector() {
@@ -12026,21 +11785,18 @@ mod tests {
         .expect("write line_numbers prefs vector dump");
     }
 
-    /// Generator for the `archive_disabled` (archive-disable) vector cases —
-    /// appended to the companion repo's `vault-prefs` family (per-feature
-    /// generator, keeps the originals byte-stable — the
-    /// [`emit_line_numbers_prefs_vector`] pattern):
+    /// Generator for the `archive_disabled` (archive-disable) vector cases — appended to the
+    /// companion repo's `vault-prefs` family (per-feature generator, keeps the originals
+    /// byte-stable — the [`emit_line_numbers_prefs_vector`] pattern):
     ///
     /// `cargo test -p protocol --lib emit_archive_disabled_prefs_vector -- --ignored`
     ///
-    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
-    /// optional archive-disable toggle (`archive_disabled: Some(true)` → canonical
-    /// `"archive_disabled":true`). Pins the bool encoding and its canonical key
-    /// slot (after `active_workspace`, before `auto_lock_seconds`) plus the
-    /// round-trip back through the decoder. Nonce `0xA7` is a free entry in the
-    /// family's nonce registry. Omit-when-`None` keeps an untouched vault
-    /// byte-identical to a pre-feature blob (no encrypt case needed for that —
-    /// `encrypt-default` already pins the bare form).
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the optional archive-disable
+    /// toggle (`archive_disabled: Some(true)` → canonical `"archive_disabled":true`). Pins the bool
+    /// encoding and its canonical key slot (after `active_workspace`, before `auto_lock_seconds`)
+    /// plus the round-trip back through the decoder. Nonce `0xA7` is a free entry in the family's
+    /// nonce registry. Omit-when-`None` keeps an untouched vault byte-identical to a pre-feature
+    /// blob (no encrypt case needed for that — `encrypt-default` already pins the bare form).
     #[test]
     #[ignore]
     fn emit_archive_disabled_prefs_vector() {
@@ -12119,21 +11875,18 @@ mod tests {
         .expect("write archive_disabled prefs vector dump");
     }
 
-    /// Generator for the `archived_folders` (folder-archive) vector cases —
-    /// appended to the companion repo's `vault-prefs` family (per-feature
-    /// generator, keeps the originals byte-stable — the
-    /// [`emit_archive_disabled_prefs_vector`] pattern):
+    /// Generator for the `archived_folders` (folder-archive) vector cases — appended to the
+    /// companion repo's `vault-prefs` family (per-feature generator, keeps the originals
+    /// byte-stable — the [`emit_archive_disabled_prefs_vector`] pattern):
     ///
     /// `cargo test -p protocol --lib emit_archived_folders_prefs_vectors -- --ignored`
     ///
-    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the
-    /// folder-archive set (`archived_folders: ["Alpha/","Zeta/"]`, given unsorted
-    /// with a duplicate to pin the set-canonical sort+dedup). Its canonical key
-    /// slot sits between `archive_disabled` and `auto_lock_seconds`, so both
-    /// neighbors are present to pin the exact ordering. Nonce `0xAF` is a free
-    /// entry in the family's nonce registry. Omit-when-empty keeps an untouched
-    /// vault byte-identical to a pre-feature blob (`encrypt-default` pins the
-    /// bare form).
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying the folder-archive set
+    /// (`archived_folders: ["Alpha/","Zeta/"]`, given unsorted with a duplicate to pin the
+    /// set-canonical sort+dedup). Its canonical key slot sits between `archive_disabled` and
+    /// `auto_lock_seconds`, so both neighbors are present to pin the exact ordering. Nonce `0xAF`
+    /// is a free entry in the family's nonce registry. Omit-when-empty keeps an untouched vault
+    /// byte-identical to a pre-feature blob (`encrypt-default` pins the bare form).
     #[test]
     #[ignore]
     fn emit_archived_folders_prefs_vectors() {
@@ -12226,23 +11979,21 @@ mod tests {
         .expect("write archived_folders prefs vector dump");
     }
 
-    /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348)
-    /// vector cases (appended to the companion repo's `vault-prefs` family;
-    /// per-feature generator, keeps the originals byte-stable — the
-    /// [`emit_line_numbers_prefs_vector`] pattern):
+    /// Generator for the batch editor-prefs (MYND-308 / MYND-299 / MYND-348) vector cases (appended
+    /// to the companion repo's `vault-prefs` family; per-feature generator, keeps the originals
+    /// byte-stable — the [`emit_line_numbers_prefs_vector`] pattern):
     ///
     /// `cargo test -p protocol --lib emit_batch_editor_prefs_vector -- --ignored`
     ///
-    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying all four
-    /// optional batch fields at once — `active_workspace` (canonical FIRST key),
-    /// `editor_default_view_mode` (string), `editor_focus_dim_inactive` +
-    /// `editor_focus_typewriter` (bools). Pins the canonical key slots
-    /// (active_workspace < … < editor_content_width < editor_default_view_mode <
-    /// editor_focus_dim_inactive < editor_focus_typewriter < editor_font_family)
-    /// and the string-vs-bare-bool encoding plus the round-trip back through the
-    /// decoder. Nonce `0x95` is a free entry in the family's nonce registry.
-    /// Omit-when-`None` keeps an untouched vault byte-identical to a pre-feature
-    /// blob (no encrypt case needed for that — `encrypt-default` already pins it).
+    /// One `encrypt` + one `decrypt_ok` case for a prefs blob carrying all four optional batch
+    /// fields at once — `active_workspace` (canonical FIRST key), `editor_default_view_mode`
+    /// (string), `editor_focus_dim_inactive` + `editor_focus_typewriter` (bools). Pins the
+    /// canonical key slots (active_workspace < … < editor_content_width < editor_default_view_mode
+    /// < editor_focus_dim_inactive < editor_focus_typewriter < editor_font_family) and the
+    /// string-vs-bare-bool encoding plus the round-trip back through the decoder. Nonce `0x95` is a
+    /// free entry in the family's nonce registry. Omit-when-`None` keeps an untouched vault
+    /// byte-identical to a pre-feature blob (no encrypt case needed for that — `encrypt-default`
+    /// already pins it).
     #[test]
     #[ignore]
     fn emit_batch_editor_prefs_vector() {

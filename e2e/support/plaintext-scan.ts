@@ -10,7 +10,7 @@
 // ≥24 chars. NEVER individual BIP-39 words (they collide with random
 // ciphertext bytes or legitimate UI asset content) and NEVER
 // dash-joined or uppercase markers: the search tokenizer
-// (src-tauri/src/search/mod.rs) lowercases and splits on every
+// (core/src/search/mod.rs) lowercases and splits on every
 // non-alphanumeric character, so a hypothetical plaintext-index leak
 // would only ever contain markers that survive tokenization verbatim.
 //

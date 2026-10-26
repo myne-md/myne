@@ -69,6 +69,7 @@ import {
 } from "./settings/SettingsTabs";
 import { livePanelTopics } from "./settings/settingsTopics";
 import { AboutPanel } from "./settings/AboutPanel";
+import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { AccountPanel } from "./settings/AccountPanel";
 import { VaultPanel } from "./settings/VaultPanel";
 import * as capabilities from "../platform/capabilities";
@@ -109,7 +110,10 @@ export type PanelId =
   | "hotkeys"
   | "appearance"
   | "storage"
-  | "about";
+  | "about"
+  // The diagnostics surface, split out of About on 2026-10-25: "what is this build"
+  // and "what is going wrong" are different questions asked at different moments.
+  | "diagnostics";
 
 /** Rail sections. `core` is the standard settings set; `developer` groups the
  *  panels that leave the path Myne vouches for, under a divider header
@@ -192,6 +196,10 @@ const PANELS_BASE: readonly PanelMeta[] = [
   },
   { id: "storage", labelKey: "settings.shell.panels.storage", icon: "hard-drive" },
   { id: "about", labelKey: "settings.shell.panels.about", icon: "info" },
+  // After About and NOT in the developer group, deliberately: the gate hides
+  // capabilities a normal user does not configure, and this is the front door of a
+  // feature built for the user who has hit a bug (`DiagnosticsPanel`'s header).
+  { id: "diagnostics", labelKey: "settings.shell.panels.diagnostics", icon: "circle-help" },
   {
     id: "ai",
     labelKey: "settings.shell.panels.ai",
@@ -634,6 +642,7 @@ export function SettingsModal({
     appearance: null,
     storage: null,
     about: null,
+    diagnostics: null,
   });
 
   // Refs so the keydown handler reads current values without re-
@@ -805,6 +814,7 @@ export function SettingsModal({
 
   const panelContent: Record<PanelId, ReactNode> = {
     account: <AccountPanel vaultId={vaultId} />,
+    diagnostics: <DiagnosticsPanel />,
     vault: (
       <VaultPanel
         vaultId={vaultId}

@@ -6,8 +6,16 @@ import { vaultResidueScan, vaultRepair } from "../../lib/vault-repair";
 import type { WelcomeFlowProps } from "./types";
 
 /** 01 · Welcome — wired. Routes into create / join. Surfaces a repair banner
- *  when a partial-fail vault_delete left orphan residue behind (MYND-159). */
-export function WelcomeFlow({ onCreate, onJoin, onIdentity }: WelcomeFlowProps) {
+ *  when a partial-fail vault_delete left orphan residue behind (MYND-159).
+ *
+ *  **One create action** (myne-md/myne#911 task 12). This screen used to offer a
+ *  primary "Create an identity" AND a ghost "Create a local vault instead", which
+ *  was the desktop's identity/local fork: two credential models, one of which
+ *  minted a per-vault recovery phrase the person account exists to retire. The
+ *  fork is gone, so the primary door starts the identity chain and the vault
+ *  follows from the identity home. The join door stays, because adding this
+ *  device to an account that already exists is not a create. */
+export function WelcomeFlow({ onJoin, onIdentity }: WelcomeFlowProps) {
   const { t } = useTranslation();
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
@@ -86,9 +94,10 @@ export function WelcomeFlow({ onCreate, onJoin, onIdentity }: WelcomeFlowProps) 
         {repairMsg && (
           <div style={{ fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
         )}
-        <Button onClick={onIdentity}>{t("welcome.startIdentity")}</Button>
-        <Button variant="ghost" onClick={onCreate}>{t("welcome.startLocal")}</Button>
-        <Button variant="ghost" onClick={onJoin}>
+        <Button onClick={onIdentity} data-testid="welcome.create-cta">
+          {t("welcome.startAction")}
+        </Button>
+        <Button variant="ghost" onClick={onJoin} data-testid="welcome.join-cta">
           {t("welcome.connect")}
         </Button>
       </div>

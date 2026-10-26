@@ -221,7 +221,7 @@ export async function ingestClipImages(
 /**
  * Import one image, folding ANY rejection (a typed `{ ok: false }` returned by
  * the port, OR a thrown error) into `{ ok: false }` — never throws. Mirrors
- * `importOne` in `editor/attachments/insert.ts`: a flaky single import becomes a
+ * `importOne` in `editor/src/attachments/insert.ts`: a flaky single import becomes a
  * clean per-image degrade rather than aborting the whole pass.
  */
 async function importOne(

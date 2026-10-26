@@ -373,6 +373,27 @@ export const ROSTER = Object.freeze([
     exemptionReason: "",
   },
   {
+    id: "editor.photo-to-note",
+    title: "Photo to note (mobile)",
+    paths: [
+      "mobile/src/app/flows/PhotoNoteSheet.tsx",
+      "mobile/src/lib/photoNoteBody.ts",
+      "mobile/src-tauri/src/plugins/attachments/read_extracted.rs",
+    ],
+    clients: ["ios", "android"],
+    automatedBy: ["mobile/tests/flow-logic/photo-to-note.flow.ts"],
+    manual: [
+      {
+        see: "On a real iPhone and a real Android phone with a page of paper in front of you: tap Photo to note in the editor bar, choose Take Photo in the OS sheet that appears, allow the camera prompt if it is the first time, and photograph the page. Confirm the draft sheet opens over the note with the photograph visible and then its text in the editable field; correct one character; commit into this note and confirm the image embed lands with the corrected text directly below it, and that one undo removes both. Repeat choosing Photo Library, then once with the device OCR switch off (Settings > Data) and confirm the sheet says reading is off instead of claiming the page had no text. Then repeat with a blank sheet of paper and confirm the no-text state still offers the image alone.",
+        whyNotAutomated: "The camera and the photo library are reached through the OS file-picker action sheet and its camera and photo permission prompts, which are operating-system UI a WebView driver cannot click; the flow-logic tier mocks both the picker and the Tauri IPC, so no lane in this repository ever hands the app a real photograph captured by a camera app. Whether the sheet opens on the picture, whether OCR completes on a real page within a tolerable time, and whether the OS offers Take Photo alongside Photo Library for this input are properties of the device and its picker.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
+  },
+  {
     id: "ai.on-device-transcription",
     title: "On-device audio transcription (mobile)",
     paths: [
@@ -755,12 +776,16 @@ export const ROSTER = Object.freeze([
   },
   {
     // myne-md/myne#860. A new surface: the opt-in device-local diagnostic log
-    // and the bug-report rows in Settings, About.
+    // and the bug-report rows, which since 2026-10-25 are Settings → Diagnostics
+    // rather than the last section of About. `AboutPanel.tsx` stays on this entry's
+    // paths because the panel it was split out of is still where a reader starts
+    // looking; the walkthrough sentence below names the new place.
     id: "app.diagnostic-log",
     title: "Diagnostic log and bug reports",
     paths: [
       "src/platform/diagnostics.ts",
       "src/hooks/useDiagnostics.ts",
+      "src/components/settings/DiagnosticsPanel.tsx",
       "src/components/settings/AboutPanel.tsx",
       "src/components/FailClosedError.tsx",
       "src-tauri/src/logging/",
@@ -771,7 +796,7 @@ export const ROSTER = Object.freeze([
     automatedBy: ["e2e/diagnostics-copy.e2e.ts"],
     manual: [
       {
-        see: "On a real desktop session on macOS and on Windows, open Settings, About. Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm About lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
+        see: "On a real desktop session on macOS and on Windows, open Settings → Diagnostics (its own rail item since 2026-10-25; it used to be the last section of About). Switch Diagnostic logging on, use the app for a minute, and press Reveal logs folder: the platform file manager must open the log directory itself. Then read the log and confirm it holds no note text, no note title and no file path. On macOS confirm the log files are owner-only (ls -l shows rw-------) and the directory is drwx------; on Windows confirm the ACL on the log folder grants no other local account read access. Switch logging off and confirm the log files are gone and a crash record, if there was one, is still listed. Then force a crash with logging OFF, relaunch, and confirm Diagnostics lists the record with a date and that Delete removes it, and that Save report as file writes one file at a destination you choose.",
         whyNotAutomated:
           "The platform file manager is an OS session the Linux container does not have, and the permission half is per-platform file-mode and ACL observation: the container is Linux, so it can speak for 0600/0700 there and for neither WKWebView-era macOS nor WebView2 Windows ACL inheritance. The toggle, the block preview, the manifest line and the report actions are driven by the scenario named in automatedBy, but that scenario HAS NEVER EXECUTED in a container on this branch (the release compile dies with signal 9 on the machine it was written on, which scripts/lib/e2e-docker.sh documents), so nothing on this surface is automation-proven today and this item also covers that walkthrough until a green run is recorded here.",
         clients: ["desktop-macos", "desktop-windows"],
@@ -2745,12 +2770,13 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "identity.first-run",
-    title: "Identity-first first run: fork, server step, identity phrase",
+    title: "Identity-first first run: one door, identity phrase, then the vault",
     paths: [
       "src/screens/Welcome.tsx",
+      "src/screens/FirstRun.tsx",
+      "src/components/IdentitySetupPanel.tsx",
       "src/components/IdentitySetupDialog.tsx",
       "src/components/SecretPhraseReveal.tsx",
-      "src/components/sync/FirstRunServerStep.tsx",
       "src/components/sync/EndpointConfig.tsx",
       "src/screens/IdentityHome.tsx",
       "mobile/src/app/flows/WelcomeFlow.tsx",
@@ -2761,8 +2787,11 @@ export const ROSTER = Object.freeze([
       "mobile/src/components/layout.tsx",
       "mobile/src-tauri/src/plugins/member_names/",
     ],
-    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
+      "e2e/first-run-offline.e2e.ts",
+      "e2e-web/identity-first-entry.e2e.ts",
+      "e2e-web/person-unlock.e2e.ts",
       "e2e/member-roster.e2e.ts",
       "e2e/member-devices.e2e.ts",
       "mobile/tests/flow-logic/sync/member-accept.flow.ts",
@@ -2771,8 +2800,8 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "On a fresh profile with no vault and no server configured, take the identity door. Confirm the sync-server step appears before any identity is created, that a trusted HTTPS certificate connects without asking for a fingerprint, and that the identity phrase then renders hidden until revealed and re-hides when the window loses focus or the tab is hidden. Confirm the phrase is followed by a SEPARATE type-back step whose Done is gated on four matching words, and that while that challenge is unanswered Esc, a backdrop click and the close button all leave the dialog open. It must be the words, not a click, that finish the ceremony, because the identity already exists server-side by then and the phrase is shown once.",
-        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same device walk also observes HTTPS trust on the native WebView and host.",
+        see: "On a fresh profile with no vault and no server configured, press the one create button and confirm the FIRST thing asked for is the identity, with no server address field anywhere and no way to skip to a vault. Then confirm the identity phrase renders hidden until revealed and re-hides when the window loses focus or the tab is hidden, that it is followed by a SEPARATE type-back step whose Continue is gated on four matching words, and that a wrong word leaves it refused. Finish the ceremony and confirm vault creation follows with no phrase of its own: no kit screen, no type-back, and nothing asking you to write a second set of words down. Then leave the app at that point and reopen it: it must land on the identity home rather than refusing the vault it half-created. The desktop walk is where the blur re-hide and the 'no second phrase' claim are observable at all.",
+        whyNotAutomated: "Blur and visibilitychange re-hiding needs a real window losing focus or a real tab switch, neither of which the harness produces; the same walk observes that the first run asks for no server address, which a driver cannot assert beyond the absence of the control (the E2E scenario covers that half).",
         clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
         estimateMin: 20,
         tier: "core",
@@ -3594,6 +3623,8 @@ export const ROSTER = Object.freeze([
       "mobile/src/formfactor/SizeClassContext.tsx",
       "mobile/src/app/flows/editor/SidebarPane.tsx",
       "mobile/src/app/flows/EditorFlow.tsx",
+      "mobile/src/app/flows/editor/sheets/ListDrawer.tsx",
+      "mobile/src/app/flows/editor/caretRestore.ts",
       "mobile/src/ipad",
       "mobile/src/formfactor/",
       "mobile/src/app/AppShell.tsx",
@@ -3601,6 +3632,8 @@ export const ROSTER = Object.freeze([
     clients: ["ios", "android"],
     automatedBy: [
       "mobile/tests/flow-logic/settings/format-bar.flow.ts",
+      "mobile/tests/flow-logic/duo/band.flow.ts",
+      "mobile/tests/size-class.test.ts",
     ],
     manual: [
       {
@@ -3616,6 +3649,13 @@ export const ROSTER = Object.freeze([
         clients: ["ios", "android"],
         estimateMin: 6,
         tier: "core",
+      },
+      {
+        see: "On an iPhone Duo, open a note, put the caret in the middle of a paragraph and scroll to the middle of a long note, then fold the device in half. Confirm the note keeps every character, the caret stays where it was, the view does not jump to the top, the keyboard does not fight the transition, and the layout becomes the phone single-pane form. Unfold it and confirm the note returns to ONE wider column rather than the two-pane tablet layout, the caret is still where you left it, and the list opens over the note as a drawer instead of replacing it. Swipe the drawer toward its own edge and confirm it closes with the note underneath unmoved. Then run Myne beside another app and confirm the half-width window uses the phone layout with nothing clipped.",
+        whyNotAutomated: "The fold is a physical hinge event on a handset no CI lane has, and what `window.screen` reports across a real fold is the one thing this feature could not measure in a container: the flow tier pins both possible readings instead. The keyboard behaviour across the transition belongs to the iOS input system, and the hinge gesture itself has no driver equivalent.",
+        clients: ["ios"],
+        estimateMin: 12,
+        tier: "standard",
       },
     ],
     exemptionReason: "",
@@ -5026,8 +5066,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows are grouped under one account header (the neutral \"Account\" label, since no label was set). Right-click a row and rename the account to \"Work\"; confirm the header updates. Right-click another row and choose \"Move to new account\"; confirm it now sits under a second header. Right-click it again and choose \"Move to account…\" back into the first; confirm the two headers collapse to one.",
-        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, rename, move and split all need a real Apple keychain.",
+        see: "On macOS with three vaults, unlock each once, then quit and relaunch to the locked picker. Confirm the three rows sit in one account group with no header over them (the desktop picker deliberately draws no group heading, myne-md/myne#772) and that Settings → Account shows the three vaults. Right-click a row, choose \"Move to account…\" where a destination exists, and confirm the grouping changes in Settings → Account. Open Settings → Account and confirm the person account number is the panel's first block and that no control anywhere offers to name the account.",
+        whyNotAutomated: "The account record is sealed under a keychain key (core/src/account/key.rs reuses platform_keychain, Apple-only), so account-grouping.e2e.ts can only exercise the no-keychain branch in the Linux container; the grouped picker, move and split all need a real Apple keychain.",
         clients: ["desktop-macos"],
         estimateMin: 10,
         tier: "core",
@@ -5470,15 +5510,19 @@ export const ROSTER = Object.freeze([
   },
   {
     // The panel split out of Account: the vault's own label, icon, change
-    // password and danger zone. Machines judge these (see the exemptionReason),
-    // so it carries no manual item; the entry exists because the panel is a
-    // surface a release plan schedules against and the guard fails on a file in
-    // the denominator that no entry claims.
+    // password, danger zone and the explicit upgrade to one-phrase recovery
+    // (myne-md/myne#911). The split controls are machine-checked; the upgrade's
+    // item is not, because the two sentences a person reads before an
+    // irreversible credential change have to be read on the platforms that ship
+    // them, and the scenario written for the container half has never executed
+    // (its whyNotAutomated says so rather than implying otherwise).
     id: "settings.panel.vault",
     title: "Vault panel",
     paths: [
       "src/components/settings/VaultPanel.tsx",
+      "src/components/settings/VaultFormatUpgrade.tsx",
       "src/lib/vault-delete.ts",
+      "src/lib/vault-format-upgrade.ts",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
@@ -5487,10 +5531,20 @@ export const ROSTER = Object.freeze([
       "e2e/state-machine.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
+      "e2e/vault-format-upgrade.e2e.ts",
       "e2e-web/vault-delete.e2e.ts",
     ],
-    manual: [],
-    exemptionReason: "Every control here is asserted by a scenario on this entry's automatedBy list, including the danger-zone copy branch and the web client's sign-out variant, and the part-way-failed delete is producible on Linux with the existing chmod fault layer rather than needing Windows mandatory locking (myne-md/myne#554).",
+    manual: [
+      {
+        see: "On macOS, the Linux AppImage and Windows, open an existing vault that still carries its own recovery phrase, run the upgrade from the Vault panel, and read the confirmation before pressing it. Confirm both consequences are stated where the button is: that the saved vault phrase stops opening this vault, and that an older version of the app cannot open it once the upgrade syncs. Then attempt the retired vault phrase once and confirm it is REFUSED, confirm the password still opens the vault, and confirm the identity phrase opens it from the lock screen. Finally open the same vault on a second device still running the previous released build, let the upgrade sync, and confirm that build REFUSES the vault rather than opening it.",
+        whyNotAutomated:
+          "The one automated lane that could reach this is a Linux container against WebKitGTK, and the scenario written for it (`e2e/vault-format-upgrade.e2e.ts`) is WRITTEN AND HAS NEVER EXECUTED on this branch: four container builds died at `myne_desktop_lib` with signal 9 (the OOM recorded in `agent-tooling/features/person-account/progress.md`), and the decision was to run the suite once at the end of the feature, so no run has touched even the Linux half. Until a green run is recorded here, this item carries the walkthrough on all three desktop clients, including the Linux one the container would otherwise cover. macOS and Windows have no automated UI lane at all, so the two sentences a user must read before an irreversible credential change are verified on the platforms that ship them and nowhere else, and a second build is a second install rather than a filter. `e2e/vault-format-upgrade.e2e.ts` stays in automatedBy because the guard requires every scenario file to be credited somewhere; what it must not do is tell the manual half that CI already covers this.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 15,
+        tier: "standard",
+      },
+    ],
+    exemptionReason: "",
   },
   {
     id: "settings.panel.ai",
@@ -5742,6 +5796,8 @@ export const ROSTER = Object.freeze([
       "e2e/device-join-qr.e2e.ts",
       "e2e/sync-cert-reverify.e2e.ts",
       "e2e/invite-code-gate.e2e.ts",
+      "e2e/publish-vault.e2e.ts",
+      "e2e/person-device-enrolment.e2e.ts",
     ],
     manual: [
       {
@@ -6714,6 +6770,7 @@ export const ROSTER = Object.freeze([
       "e2e/vault-label.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/workspace-state.e2e.ts",
+      "e2e-web/multi-vault.e2e.ts",
     ],
     manual: [
       {
@@ -7079,7 +7136,7 @@ export const ROSTER = Object.freeze([
       "web/src/components/settings/ConnectedExtensions.tsx",
       "web/src/components/sync/EndpointConfig.tsx",
       "web/src/screens/Welcome.tsx",
-      "web/src/screens/VaultPicker.tsx",
+      "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
       "web/src/components/sync/DeviceAttributionPanel.tsx",
       "web/src/components/settings/MigrateVaultForm.tsx",

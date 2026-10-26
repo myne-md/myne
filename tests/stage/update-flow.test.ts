@@ -31,6 +31,7 @@ function existsVault(): VaultSummary {
     label: null,
     icon: null,
     last_unlock: null,
+    published: false,
   };
 }
 

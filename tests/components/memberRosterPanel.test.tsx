@@ -71,6 +71,14 @@ let mockMembers: RosterMemberView[] = [
 let mockAuthority: "owner" | "member" = "owner";
 // The group-key epoch per test (`null` = legacy roster, no epoch line).
 let mockGroupKeyEpoch: number | null = null;
+// The owner's sent-invitation rows per test. Empty by default: most cases are
+// about the member list, not the invitations section.
+let mockVaultInvites: Array<{
+  invite_id_hex: string;
+  recipient_person_id_hex: string;
+  claimed: boolean;
+  declined: boolean;
+}> = [];
 
 /** One row over the base fixture, so a test states only what it is about. */
 const rowView = (over: Partial<RosterMemberView>): RosterMemberView => ({
@@ -94,7 +102,7 @@ vi.mock("../../src/hooks/useRoster", () => ({
     inviting: false,
     lastInvite: null,
     invite: vi.fn(() => Promise.resolve(null)),
-    vaultInvites: [],
+    vaultInvites: mockVaultInvites,
     removing: false,
     remove: vi.fn(() => Promise.resolve()),
   }),
@@ -246,6 +254,35 @@ describe("MemberRosterPanel roles", () => {
       expect(empty.contains(buttons[0])).toBe(true);
     } finally {
       mockMembers = saved;
+      cleanup();
+    }
+  });
+});
+
+// The owner's view of the invitations it sent (myne-md/myne#911 follow-up). It
+// used to carry two states; the recipient's refusal is a third, and it is the only
+// one that says "they said no" rather than "not yet", which is what decides whether
+// the owner waits or invites somebody else.
+describe("MemberRosterPanel invitation rows", () => {
+  it("tells a declined invitation apart from one nobody has opened yet", () => {
+    mockAuthority = "owner";
+    mockVaultInvites = [
+      { invite_id_hex: "aa", recipient_person_id_hex: "11".repeat(16), claimed: false, declined: false },
+      { invite_id_hex: "bb", recipient_person_id_hex: "22".repeat(16), claimed: true, declined: false },
+      { invite_id_hex: "cc", recipient_person_id_hex: "33".repeat(16), claimed: false, declined: true },
+    ];
+    render(<MemberRosterPanel />);
+    try {
+      const states = screen
+        .getAllByTestId("member-roster.invitation-status")
+        .map((el) => el.getAttribute("data-declined") + ":" + el.textContent);
+      expect(states).toEqual([
+        "false:sync.memberRoster.invitationPending",
+        "false:sync.memberRoster.invitationClaimed",
+        "true:sync.memberRoster.invitationDeclined",
+      ]);
+    } finally {
+      mockVaultInvites = [];
       cleanup();
     }
   });
@@ -507,6 +544,17 @@ describe("MemberRosterPanel rename", () => {
     render(<MemberRosterPanel />);
     try {
       fireEvent.click(screen.getByTestId("member-roster.name-edit"));
+      // 2026-10-25: the editor is a DIALOG, not an inline field that reflows the
+      // row. Asserted rather than implied, because the testids are the same either
+      // way and a regression to the row shape would keep every other case green.
+      const dialog = screen.getByTestId("member-roster.name-dialog");
+      expect(dialog.getAttribute("role")).toBe("dialog");
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      // P4 (2026-10-25): the dialog runs on the shared `ModalShell`, so it has a
+      // backdrop, a card and a centred position. Asserted because the testids and
+      // the copy are identical on the hand-rolled `role="dialog"` div this
+      // replaced, so a regression to that shape would keep every other case green.
+      expect(dialog.className).toContain("myne-modal-backdrop");
       fireEvent.change(screen.getByTestId("member-roster.name-input"), {
         target: { value: "  Ada  " },
       });
@@ -577,8 +625,9 @@ describe("MemberRosterPanel rename", () => {
 });
 
 // myne-md/myne#851 task 9 (story 22): a member who accepted before the name step
-// shipped is invited once, on their OWN row, and the invitation goes away once a
-// name is set. It writes nothing and blocks nothing.
+// shipped still needs a way to set one. It is the `Set a name` button on their
+// OWN unverified row and nothing else (2026-10-23: the sentence beside it and its
+// session-scoped `Not now` were removed, see the panel's own comment).
 describe("MemberRosterPanel name invitation", () => {
   const setup = () => {
     mockGroupKeyEpoch = 3; // shared: the store exists, so a name can be set
@@ -587,7 +636,7 @@ describe("MemberRosterPanel name invitation", () => {
     namesMocks.clearMyMemberName.mockClear();
   };
 
-  it("invites the caller whose row has no name, and only their own row", () => {
+  it("offers the setter on the caller's own row, and only there", () => {
     const previous = mockMembers;
     setup();
     mockMembers = [
@@ -606,16 +655,17 @@ describe("MemberRosterPanel name invitation", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      const invites = screen.getAllByTestId("member-roster.name-invite");
-      expect(invites).toHaveLength(1);
-      // ...on the caller's row, and the affordance beside it sets rather than renames.
       const ownRow = screen
         .getAllByTestId("member-roster.row")
         .find((li) => li.getAttribute("data-fingerprint") === "aa".repeat(32).slice(0, 16));
-      expect(within(ownRow!).getByTestId("member-roster.name-invite")).toBeDefined();
       expect(within(ownRow!).getByTestId("member-roster.name-edit").textContent).toBe(
         "sync.memberRoster.nameInviteCta",
       );
+      // The sentence and its `Not now` link are gone: the button is the whole
+      // invitation, so the row has exactly one affordance to set a name.
+      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
+      expect(screen.queryByTestId("member-roster.name-invite-dismiss")).toBeNull();
+      expect(screen.getAllByTestId("member-roster.name-edit")).toHaveLength(1);
     } finally {
       cleanup();
       mockMembers = previous;
@@ -623,7 +673,7 @@ describe("MemberRosterPanel name invitation", () => {
     }
   });
 
-  it("goes away once a name is set", () => {
+  it("offers only a rename once a name is set", () => {
     const previous = mockMembers;
     setup();
     mockMembers = [
@@ -636,32 +686,11 @@ describe("MemberRosterPanel name invitation", () => {
     ];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
-      // The row still offers a rename: an invitation to SET a name is not the same
+      // The row still offers a rename: the ability to SET a name is not the same
       // as the standing ability to change one.
       expect(screen.getByTestId("member-roster.name-edit").textContent).toBe(
         "sync.memberRoster.nameEdit",
       );
-    } finally {
-      cleanup();
-      mockMembers = previous;
-      mockGroupKeyEpoch = null;
-    }
-  });
-
-  it("is dismissible, and dismissing writes nothing", () => {
-    const previous = mockMembers;
-    setup();
-    mockMembers = [
-      rowView({ is_self: true, display_name: "", name_state: "absent" }),
-    ];
-    render(<MemberRosterPanel />);
-    try {
-      fireEvent.click(screen.getByTestId("member-roster.name-invite-dismiss"));
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
-      expect(namesMocks.setMyMemberName).not.toHaveBeenCalled();
-      // The affordance stays: dismissing the ASK must not take away the ability.
-      expect(screen.getByTestId("member-roster.name-edit")).toBeDefined();
     } finally {
       cleanup();
       mockMembers = previous;
@@ -676,7 +705,6 @@ describe("MemberRosterPanel name invitation", () => {
     mockMembers = [rowView({ is_self: true, display_name: "", name_state: "absent" })];
     render(<MemberRosterPanel />);
     try {
-      expect(screen.queryByTestId("member-roster.name-invite")).toBeNull();
       expect(screen.queryByTestId("member-roster.name-edit")).toBeNull();
     } finally {
       cleanup();

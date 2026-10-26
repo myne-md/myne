@@ -42,6 +42,7 @@ import {
   contextMenuPick,
   createFolder,
   pageSeatInvoke,
+  searchAndOpenNote,
 } from "./support/flows";
 import { testIdSelector, type Session } from "./support/webdriver";
 
@@ -154,6 +155,14 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         const mentions = await s.findElements(testIdSelector("ai.mention-link"));
         expect(mentions.length).toBeGreaterThan(0);
         expect((await mentions[0]!.textContent()).trim()).toBe("stub run");
+        // **Pin the conversation before the mention moves the editor**
+        // (myne-md/myne#913). Pressing a mention opens its note, and opening a
+        // different note starts a FRESH conversation, which is the shipped
+        // binding (`ac3` asserts it). This scenario is about the transcript and
+        // the lock, not about the binding, so it uses the explicit pin the user
+        // has for exactly this case; without it the follow-up below would be the
+        // first turn of a new conversation and the count would never reach four.
+        await (await s.byTestId("ai.keep-conversation")).click();
         await mentions[0]!.click();
         // `openMention` is `ws.openNewTabInFocused`, so the note becomes the
         // ACTIVE tab, the one signal that says the press reached the
@@ -492,6 +501,91 @@ aiDescribe("ac2 chat attachments → picker → sent on the turn", () => {
         expect((await s.byTestIdAll("ai.composer-attachment")).length).toBe(0);
         // The send did not fail on the document read.
         expect((await s.byTestIdAll("ai.turn-error")).length).toBe(0);
+      },
+    );
+  });
+});
+
+// ── ac3: a conversation belongs to its note, and the pin is the escape ──
+//
+// The issue's first item (myne-md/myne#913): opening a different note starts a
+// fresh conversation, because the turns were about the note the user was in. The
+// escape hatch is an explicit, session-scoped pin. Both halves are user-visible
+// and neither can be reached from a unit test: the panel is mounted by the right
+// sidebar, and what "switching notes" means is which note the workspace has
+// focused.
+//
+// Notes are created through PRODUCTION IPC from the page seat and the WebView is
+// refreshed before driving, the `al1` precedent: a page-seat create does not
+// reach the frontend's note cache, and a scenario that skipped the refresh would
+// be asserting against a stale sidebar.
+
+aiDescribe("ac3 a conversation belongs to its note", () => {
+  it("starts fresh on a note switch, and the pin keeps it", async () => {
+    let seeded: { password: string };
+    await scenario(
+      "ac3-note-bound-chat",
+      { seed: (dir) => void (seeded = seedVault(dir)) },
+      async (app) => {
+        const s = app.session;
+        await unlockToEditor(s, seeded.password);
+        await dismissImporterOffer(s);
+
+        const makeNote = async (plaintext: string): Promise<string> => {
+          const r = await pageSeatInvoke(
+            s,
+            "plugin:notes|note_create",
+            { plaintext },
+            20_000,
+          );
+          expect(r.err, "note_create should succeed").toBeUndefined();
+          return r.ok as string;
+        };
+        const a = await makeNote("note A: the first conversation\n");
+        const b = await makeNote("note B: somewhere else\n");
+        await s.refresh();
+        await s.byTestId("editor.root", { timeoutMs: 30_000 });
+
+        await enableAi(s);
+
+        // ---- on note A: send a turn ----
+        await searchAndOpenNote(s, "note A", a);
+        await runPaletteAction(s, "ai.open-chat", "chat");
+        await (await s.byTestId("ai.composer-input", { timeoutMs: 10_000 })).sendKeys(
+          "what is in this note",
+        );
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "a turn on note A", timeoutMs: 20_000 },
+        );
+
+        // ---- switching to note B starts a fresh conversation ----
+        await searchAndOpenNote(s, "note B", b);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length === 0 ? true : null),
+          { label: "note B's transcript is empty", timeoutMs: 15_000 },
+        );
+
+        // ---- pinned on B, the conversation follows to A ----
+        await (await s.byTestId("ai.composer-input")).sendKeys("what is in this one");
+        await (await s.byTestId("ai.composer-send")).click();
+        await dismissRunProposal(s);
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "a turn on note B", timeoutMs: 20_000 },
+        );
+        await (await s.byTestId("ai.keep-conversation")).click();
+        await searchAndOpenNote(s, "note A", a);
+        // Still here, and the mark is on: the escape hatch the issue asks for.
+        await s.waitUntil(
+          async () => ((await s.byTestIdAll("ai.turn")).length >= 2 ? true : null),
+          { label: "the pinned conversation survived the switch", timeoutMs: 15_000 },
+        );
+        expect(
+          await (await s.byTestId("ai.keep-conversation")).attribute("aria-pressed"),
+        ).toBe("true");
       },
     );
   });

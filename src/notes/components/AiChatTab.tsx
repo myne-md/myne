@@ -46,8 +46,10 @@ import {
 import { reviewableRun, useAgent } from "../agent/agentStore";
 import { useChat } from "../ai/chatStore";
 import {
+  conversationNoteId,
   keepConversationPinned,
   requestNoteSwitch,
+  setConversationNote,
   setKeepConversationPinned,
   takeNoteSwitch,
 } from "../ai/conversationBinding";
@@ -238,9 +240,7 @@ export function AiChatTab({
    * move to "no note open", so closing note A and then opening note B looked
    * like a first mount and B kept A's transcript.
    */
-  const lastConversationNoteRef = useRef<string | null>(
-    chat.turns.length > 0 ? openNoteId : null,
-  );
+  const lastConversationNoteRef = useRef<string | null>(conversationNoteId());
   const turnsRef = useRef(0);
   turnsRef.current = chat.turns.length;
   const runningRef = useRef(false);
@@ -258,6 +258,7 @@ export function AiChatTab({
     }
     if (previous === openNoteId) return;
     lastConversationNoteRef.current = openNoteId;
+    setConversationNote(openNoteId);
     if (keepConversation) return;
     // Nothing to abandon yet.
     if (turnsRef.current === 0) return;
@@ -285,6 +286,7 @@ export function AiChatTab({
     if (openNoteId === null || openNoteId === "") return;
     if (chat.turns.length === 0) return;
     lastConversationNoteRef.current = openNoteId;
+    setConversationNote(openNoteId);
   }, [chat.turns.length, openNoteId]);
 
   /**

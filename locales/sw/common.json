@@ -3943,7 +3943,6 @@
         "ribbon": "utepe wa kushoto bandika amri mipangilio mpangilio ondoa baru ya zana mishale mafupi",
         "folderNotes": "folda notisi faharasa folder_index ukurasa lengo mbili-bofya kiungo kwa folda miradi zima",
         "syncMembers": "wanachama, shiriki, karibisha, timu, ushirikiano, hazina",
-        "accountName": "jina la akaunti kundi upangaji badilisha jina lebo kifaa cha ndani",
         "accountVaults": "akaunti makasha yaliyopangwa makasha yapi ni ya kundi orodha",
         "aiMeetingPrompt": "mkutano muhtasari kidokezo maelekezo maalum unukuzi hoja za kufanyia kazi maamuzi",
         "update": "sasisha sasisho kagua masasisho toleo jipya toleo pakua",
@@ -4025,14 +4024,10 @@
       "atCap": "Orodha imejaa, hivyo hakuna kipya kinachoweza kukumbukwa. Futa kijikumbusho ili kupata nafasi."
     },
     "account": {
-      "nameLabel": "Jina la akaunti",
-      "nameHelper": "Jina la kundi hili la makasha kwenye kifaa hiki. Kichagua kasha hulitumia kama kichwa cha kundi. Linabaki kwenye kifaa hiki na haliweki kamwe ndani ya kasha, hivyo halisawazishwi na kifaa kingine kinaweza kupanga na kuita makasha yale yale kwa njia tofauti.",
-      "namePlaceholder": "Ongeza jina…",
-      "nameSave": "Hifadhi",
-      "nameSaving": "Inahifadhi…",
       "vaultsLabel": "Makasha katika akaunti hii",
       "vaultsHelper": "Makasha ambayo kifaa hiki kinapanga chini ya jina lililo juu. Kupanga ni chaguo la mpangilio la kila kifaa, hivyo si sehemu ya maudhui ya kasha lolote na havisafiri navyo.",
-      "vaultsCount": "Makasha {{count}}",
+      "vaultsCount_one": "Makasha {{count}}",
+      "vaultsCount_other": "Makasha {{count}}",
       "currentVault": "Kasha hili",
       "unknownVault": "Kasha jingine kwenye kifaa hiki",
       "standaloneHelper": "Kasha hili halijapangwa chini ya akaunti kwenye kifaa hiki, hivyo linajitegemea. Kupanga ni kwa kila kifaa: kifaa kingine kinaweza kukionyesha ndani ya moja.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Majina yanaweza kuwekwa mara kasha hili linaposhirikiwa.",
       "nameErrorLocked": "Fungua kasha ili kubadilisha jina lako.",
       "nameErrorGeneric": "Imeshindwa kuhifadhi jina lako. Jaribu tena.",
-      "nameInvite": "Bado huna jina la kuonyesha. Wanachama wengine wanaona alama yako ya kidole.",
       "nameInviteCta": "Weka jina",
-      "nameInviteDismiss": "Si sasa",
       "noInvitations": "Hakuna mialiko iliyotumwa bado.",
       "identityHeading": "Utambulisho wako",
       "membersHeading": "Wanachama",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Kifungu cha urejeshaji — ikiwa utasahau nenosiri lako",
       "save": "Hifadhi kifurushi cha urejeshaji",
       "saveFailed": "Imeshindwa kuhifadhi faili. Nakili kifurushi badala yake, au andika sehemu zote mbili.",
-      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi lenye siri zote mbili, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma.",
-      "whyEnglish": "Maneno ni ya Kiingereza katika kila lugha. Ni sehemu ya kiwango cha BIP-39, hivyo mteja yeyote wa Myne anaweza kusoma kifungu kilichoandikwa na mwingine yeyote. Usiyatafsiri: maneno yaliyotafsiriwa hayapo kwenye orodha ya maneno, na kifungu kitaacha kufanya kazi."
+      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi lenye siri zote mbili, hivyo lihifadhi mahali ambapo wewe pekee unaweza kulisoma."
     },
     "name": {
       "back": "Nyuma",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Akaunti",
     "moveToAccount": "Hamisha kwenye akaunti…",
     "moveToNewAccount": "Hamisha kwenye akaunti mpya",
-    "renameAccount": "Badilisha jina la akaunti",
     "accountError": "Unganisho wa akaunti haukuweza kusasishwa. Hakuna kilichobadilika.",
     "accountHidden": "Vitendo vya akaunti havipatikani majina ya hazina yakifichwa.",
-    "labelTooLong": "Jina ni ndefu mno. Fupisha hadi herufi 512.",
-    "renameCancel": "Ghairi",
-    "renamePlaceholder": "Jina la akaunti",
-    "renameSave": "Badilisha jina",
     "accountUnreadable": "Unganisho wa akaunti haukuweza kusomeka kwenye kifaa hiki. Hakuna kilichobadilika.",
     "createShort": "Kasha jipya",
     "joinShort": "Ongeza kifaa",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Mafaili yaliyobaki kutoka kwenye ufutaji uliokatizwa ({{n}}). Yasafishe kabla ya kuunda kasha.",
     "cleanUpFiles": "Safisha mafaili yaliyobaki",
     "connect": "Unganisha kwenye akaunti yangu",
-    "startIdentity": "Tengeneza utambulisho",
-    "startLocal": "Tengeneza kasha la ndani badala yake",
     "tagline": "Madokezo ya markdown yaliyosimbwa. Hakuna barua pepe wakati wa kujisajili.",
-    "identityTitle": "Tengeneza utambulisho",
-    "identityBody": "Utambulisho mmoja kwa makasha yako yote, ili watu wakukaribishe. Unahitaji seva ya usawazishaji.",
-    "localTitle": "Tengeneza kasha la ndani",
-    "localBody": "Kasha lililosimbwa kwenye kifaa hiki. Ongeza usawazishaji au utambulisho baadaye.",
     "restoreTitle": "Rejesha kutoka hifadhi rudufu",
     "restoreBody": "Fungua faili la .myne-backup ulilohifadhi awali.",
     "joinTitle": "Ongeza kifaa hiki kwenye akaunti",
     "joinBody": "Tumia kasha ulilo nalo tayari kwenye kifaa kingine.",
-    "createAction": "Tengeneza",
     "restoreAction": "Rejesha",
     "joinAction": "Ongeza kifaa",
     "version": "Toleo {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "limefunguliwa miaka {{count}} iliyopita",
     "corruptedBadge": "Limeharibika",
     "accountFallback": "Akaunti",
-    "renameAccount": "Badilisha jina la akaunti",
     "moveToNewAccount": "Hamisha kwenye akaunti mpya",
     "moveToAccount": "Hamisha kwenye akaunti…",
     "accountError": "Unganisho wa akaunti haukuweza kusasishwa. Hakuna kilichobadilika.",
     "accountHidden": "Vitendo vya akaunti havipatikani majina ya hazina yakifichwa.",
-    "labelTooLong": "Jina ni ndefu mno. Fupisha hadi herufi 512.",
-    "renameCancel": "Ghairi",
-    "renamePlaceholder": "Jina la akaunti",
-    "renameSave": "Badilisha jina",
     "accountUnreadable": "Unganisho wa akaunti haukuweza kusomeka kwenye kifaa hiki. Hakuna kilichobadilika."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Utambulisho umerejeshwa.",
     "title": "Unda utambulisho",
     "errorAlreadyHeld": "Kifaa hiki tayari kina utambulisho. Kirejeshe kwa kifungu chake cha urejeshaji, au kisahau na utengeneze kipya.",
-    "errorNotConfigured": "Imeshindwa kusanidi utambulisho. Hakikisha seva ya usawazishaji imesanidiwa, kisha ujaribu tena.",
     "forgetCancel": "Ihifadhi",
     "forgetConfirm": "Sahau na tengeneza mpya",
     "forgetCta": "Sahau utambulisho huu na utengeneze mpya",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Urejeshe kwenye kifaa hiki kwa kifungu chake cha urejeshaji cha maneno 24.",
     "recoverAction": "Rejesha",
     "back": "Nyuma",
-    "changeServer": "Badilisha au thibitisha seva ya usawazishaji",
-    "errorTlsFailure": "Imeshindwa kuthibitisha cheti cha HTTPS cha seva. Kagua anwani ya seva na cheti chake.",
     "phraseTitle": "Hifadhi kifungu chako cha utambulisho",
     "phraseContinue": "Endelea",
     "confirmTitle": "Thibitisha kifungu chako"
@@ -5509,15 +5481,6 @@
       "hint": "Kujaribu tena huanza upakuaji upya.",
       "retry": "Jaribu tena",
       "back": "Rudi kwenye kufungua"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Chagua seva ya usawazishaji",
-      "intro": "Myne inahitaji seva ya kuhifadhi madokezo yako yaliyosimbwa na kukufikia kwa mialiko. Madokezo yako yanabaki yamesimbwa kwenye kifaa hiki kabla ya kuondoka; seva huhifadhi maandishi yaliyosimbwa pekee.",
-      "notConfigured": "Weka anwani ya seva juu na ubonyeze Unganisha ili kuendelea.",
-      "back": "Nyuma",
-      "continue": "Endelea"
     }
   },
   "identityFlow": {

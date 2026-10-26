@@ -111,7 +111,7 @@ describeE2E("boot routing buckets (MYND-127 task 1)", () => {
   // the spec'd injection (chmod fault on `vaults/`) does NOT reach the
   // unlock(IoError) arm on the production binary. `discover_vaults`
   // treats an unreadable `vaults/` dir as EMPTY discovery
-  // (`src-tauri/src/vault_registry.rs:133` — "Discovery never fails on a
+  // (`core/src/vault_registry.rs:133` — "Discovery never fails on a
   // missing root"), so the boot lands FAIL-OPEN on Welcome; the only
   // remaining Err arm of `vault_list` is `app_data_dir` resolution
   // failure, which is not injectable at-rest. Whether list-level

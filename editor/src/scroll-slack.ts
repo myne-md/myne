@@ -25,10 +25,20 @@
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import type { Extension } from "@codemirror/state";
 
-/** Share of the visible viewport reserved below the last line. */
-const SLACK_FRACTION = 0.6;
-/** Upper bound on that share, in px. */
-const SLACK_CAP_PX = 480;
+/** Space reserved below the last line, in px.
+ *
+ *  It used to be 60% of the viewport (capped at 480px), which is what #375 asked
+ *  for: enough room to scroll the LAST line up to the middle of the pane. In use
+ *  it read as a broken scrollbar rather than breathing room, because a note that
+ *  ends three lines into the viewport still scrolled through half a screen of
+ *  nothing below its tail (myne-md/myne#908 item 10, second pass).
+ *
+ *  A fixed two-line allowance does the only thing the slack is actually for: it
+ *  keeps the last line off the very bottom edge, so typing there is not writing
+ *  into the one place you cannot scroll away from. It is deliberately NOT enough
+ *  to centre the tail, and that trade is the product decision, not an oversight.
+ */
+const SLACK_PX = 48;
 
 const SCROLLING_OVERFLOW = new Set(["auto", "scroll", "overlay"]);
 
@@ -61,8 +71,10 @@ export function resolveScrollHost(view: EditorView): HTMLElement {
  * the value settles at the cap instead of growing on every measure.
  */
 export function slackFor(hostHeight: number): number {
+  // A host that has not been measured reserves nothing: a padding written before
+  // layout is a padding the first measure has to correct.
   if (!Number.isFinite(hostHeight) || hostHeight <= 0) return 0;
-  return Math.round(Math.min(hostHeight * SLACK_FRACTION, SLACK_CAP_PX));
+  return SLACK_PX;
 }
 
 /** Slack that a note actually needs (myne-md/myne#908 item 10).

@@ -238,6 +238,14 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:workspace|workspace_stage",
     // Task 12 — the first command holding state past its own return.
     "plugin:vault-unlock|unlock",
+    // The person-wrapped vault's second credential (myne-md/myne#911 task 13).
+    // The probe lets the Unlock screen offer the identity-phrase door, and the
+    // unlock itself is the door: without it a browser could create an `NTV7`
+    // vault and then have no in-page way back in with the phrase. Both cores
+    // already took a host and an io seam; only this classification was missing,
+    // and the plugin default (`vault-unlock`, Pending) was refusing them.
+    "plugin:vault-unlock|vault_is_person_wrapped",
+    "plugin:vault-unlock|unlock_with_person_phrase",
     // Erase this browser's copy (task 72, owner decision 2026-07-27). The same
     // command as desktop's, on the same slot matrix and the same partial-fail
     // posture, driven through the storage seam instead of `std::fs`. What it
@@ -307,6 +315,28 @@ pub const DISPATCHED: &[&str] = &[
     // blocking closure, and what crosses back is an identity plus a revocable
     // token, never a key.
     "plugin:sync|sync_enroll",
+    // The person IDENTITY plane (myne-md/myne#911 task 13). What makes these
+    // dispatchable is not the cryptography: the phrase-derived keypair, the
+    // sealing and the signatures are the same code the native clients run, but
+    // WHERE the two person files live: `web/wasm/src/person_io.rs` keeps them in
+    // the Worker's memory, so a browser holds no phrase-derived keypair and no
+    // bearer token at rest (threat-model A15/TB11, A18). Everything else in
+    // `<app_config_dir>` (`sync-config.json`, `legal-consent.json`) still
+    // persists.
+    //
+    // The MEMBER half of this plugin stays refused below. `sync_person_unlock` is
+    // the one identity command still there, and its reason is a to-do rather than
+    // a boundary: its logic is inline in a `#[tauri::command]` wrapper and needs
+    // extracting into a host-taking core first. The web identity flow does not
+    // need it, the gate's recover door goes through `sync_person_setup`'s phrase
+    // arm, which derives and installs the same keypair.
+    "plugin:sync|sync_person_status",
+    "plugin:sync|sync_person_setup",
+    "plugin:sync|sync_person_register",
+    "plugin:sync|sync_person_account_number",
+    "plugin:sync|sync_person_join_device",
+    "plugin:sync|sync_person_claim_device",
+    "plugin:sync|sync_person_list_vaults",
     // First-run bootstrap (task 85) — the "log in" leg. The last precondition
     // for a browser that has never seen this account; everything else in this
     // plugin assumes a vault already exists. Its vault id is a constant, which
@@ -508,9 +538,11 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // The whole-vault v0.1 → v0.2 migration (#420) is a DESKTOP flow: it re-keys
     // and re-encrypts the entire vault at rest and requires the 24-word recovery
     // phrase, which is never typed into served code (the same reason
-    // `vault-creation` and `vault-recover` are absent on web — `decisions.md`
-    // 2026-07-26). A browser client joins an already-current account over sync;
-    // it does not migrate one.
+    // `vault-migrate` stays absent on web; `decisions.md` 2026-07-26). A browser
+    // client joins an already-current account over sync; it does not migrate one.
+    // Do not read the old parenthetical here: `vault-creation` and
+    // `vault-recover` are DISPATCHED now (`decisions.md` 2026-08-15 and
+    // 2026-10-22), and this row is about the migration alone.
     ("vault-migrate", Class::Unsupported),
     // Markdown tree export to an OS path chosen through a native Save-As
     // dialog. `core-wasm-assessment.md`: `cannot-exist-in-browser` — "The
@@ -682,20 +714,32 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
 /// ten (myne-md/myne#535), which is the failure mode of every hand-maintained
 /// tally sitting next to the thing it counts.
 const PER_COMMAND: &[(&str, Class)] = &[
-    // The B2B member surface (myne-md/myne#698). A browser cannot hold the
-    // person identity: it has no OS keychain (the phrase-derived sealed file
-    // also lives in `<app_config_dir>`, outside OPFS), and the phrase is
-    // deliberately not an enrolment credential in served code
-    // (`decisions.md` 2026-07-26, entry 0514). Member removal additionally
-    // walks the whole `notes/` and `attachments/` trees to re-wrap every
-    // blob, a directory walk this client does not do. `Class::Unsupported`
-    // rather than `Pending`: none of it becomes reachable by porting more,
-    // the carrier itself is the blocker.
+    // The B2B MEMBER surface (myne-md/myne#698), and since myne-md/myne#911 task
+    // 13 that is the whole of it: the IDENTITY plane (create, register, status,
+    // the person device join, the vault listing) is DISPATCHED above, through
+    // `person_vault_io()` so the two person files stay in the Worker's memory.
+    // What is left here needs a group key and a SIGNED roster this client does
+    // not carry: invites, the roster, member names, the device-binding map, and
+    // member removal, which walks the whole `notes/` and `attachments/` trees to
+    // re-wrap every blob. `Class::Unsupported` rather than `Pending`: none of it
+    // becomes reachable by porting more, the group tier itself is the blocker.
+    // Their cores are gated `#[cfg(not(target_arch = "wasm32"))]` inside
+    // `person_account` for the same reason.
     ("plugin:sync|sync_person_unlock", Class::Unsupported),
-    ("plugin:sync|sync_person_setup", Class::Unsupported),
-    ("plugin:sync|sync_person_status", Class::Unsupported),
+    // Publishing a person-born vault (myne-md/myne#911 task 8) stays
+    // `Unsupported`, and the reason is narrower than it used to be. The person
+    // session EXISTS here since task 13; what a browser still lacks is the
+    // device-local namespace record the publish act writes, and the container
+    // layout that record addresses. `Unsupported` rather than `Pending` because
+    // the missing piece is the storage shape, not a port.
+    ("plugin:sync|sync_publish_vault", Class::Unsupported),
+    // The durable publish state (myne-md/myne#911 task 8) is the same refusal one
+    // command over: it reads the namespace record the publish above writes, and
+    // that record does not exist in this container layout.
+    ("plugin:sync|sync_published_state", Class::Unsupported),
     ("plugin:sync|sync_person_list_invites", Class::Unsupported),
     ("plugin:sync|sync_list_vault_invites", Class::Unsupported),
+    ("plugin:sync|sync_person_decline_invite", Class::Unsupported),
     ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
     ("plugin:sync|sync_member_join_vault", Class::Unsupported),
     (
@@ -737,8 +781,10 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // The member display-name store (`vault.member-names`, `MYO5`;
     // myne-md/myne#851). A separate plugin namespace, same refusal as the rest of
     // the B2B member surface above: a page holds no person identity to sign a name
-    // row with, and the store is group-tier sealed and `NTV6`-only, so no part of it
-    // becomes reachable by porting more. `member_names_list` carries no binding in
+    // row with, and the store is group-tier sealed, so no part of it becomes
+    // reachable by porting more. (It is not `NTV6`-only any more: `0730` taught the
+    // resolver both tail generations. The refusal here is about the person identity,
+    // not the generation.) `member_names_list` carries no binding in
     // the shared tree to classify: the roster view already reports a row's resolved
     // name, and `src/lib/memberNames.ts` says why it is not wrapped.
     (
@@ -955,6 +1001,11 @@ pub const BOOT_PATH: &[&str] = &[
     // same screen polls.
     "plugin:vault-unlock|vault_is_unlocked",
     "plugin:vault-unlock|vault_storage_health",
+    // The Unlock screen's mount-time probe for the identity-phrase door. Its
+    // failure answer is `false`, which is also what "not a person vault" looks
+    // like, so an unported name here would silently hide the only way back into
+    // a person-born vault on this client.
+    "plugin:vault-unlock|vault_is_person_wrapped",
     // The awaiting-approval verdict's two reads. Not boot any more, since #535
     // moved that verdict to the first screen AFTER unlock, and they are here
     // anyway because the membership rule is about the CALLER, not the moment:

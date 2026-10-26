@@ -17,7 +17,7 @@
 import { useEffect, useState } from "react";
 import i18n from "@myne/i18n";
 import { devicePlatform } from "./prefs";
-import { computeSizeClass } from "../formfactor/SizeClassContext";
+import { computeSizeClass, isRegularSizeClass } from "../formfactor/SizeClassContext";
 
 /** The maximum device-name length the UI accepts (MYND-548) — a readability
  *  bound, mirroring the desktop constant. There is no Rust-side cap; the prefs
@@ -27,7 +27,7 @@ export const DEVICE_NAME_MAX_LEN = 40;
 /** The display word for a platform token, falling back to a neutral label for a
  *  target the catalogue does not know (or the browser dev shim, where the command
  *  is unavailable). */
-function deviceNameForPlatform(token: string, tablet: boolean): string {
+export function deviceNameForPlatform(token: string, tablet: boolean): string {
   const tabletKey =
     token === "ios" ? "sync.devices.platform.ipad" : "sync.devices.platform.androidTablet";
   return i18n.t([
@@ -42,7 +42,10 @@ function deviceNameForPlatform(token: string, tablet: boolean): string {
 export async function suggestedDeviceName(): Promise<string> {
   try {
     const token = await devicePlatform();
-    return deviceNameForPlatform(token, computeSizeClass() !== "compact");
+    // `isRegularSizeClass`, not `!== "compact"`: the folded band (myne-md/myne#918)
+    // is a phone-class device in one column, so "this is not the phone layout" is
+    // the wrong question and suggested an iPad for an unfolded iPhone.
+    return deviceNameForPlatform(token, isRegularSizeClass(computeSizeClass()));
   } catch {
     return i18n.t("sync.devices.platform.unknown");
   }

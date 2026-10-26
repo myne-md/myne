@@ -29,6 +29,7 @@ import {
   closeSettings,
   openSettings,
   dismissImporterOffer,
+  selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
 
@@ -168,6 +169,16 @@ describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
       await dismissImporterOffer(a.session);
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
+      // The enrolment form lives on the DEVICES topic (myne-md/myne#885 split),
+      // and it is behind the beta-terms gate (operations#15): until the terms are
+      // accepted the form is not rendered at all, so waiting for its first field
+      // waits for a control one dialog away. Both were found by RUNNING this
+      // spec; neither is visible by reading the scenario.
+      await selectSettingsTopic(a.session, "sync", "devices");
+      if ((await a.session.byTestIdAll("sync.beta-terms.open")).length > 0) {
+        await (await a.session.byTestId("sync.beta-terms.open")).click();
+        await (await a.session.byTestId("sync.beta-terms.accept")).click();
+      }
       await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
@@ -193,30 +204,9 @@ describe.skipIf(!uiSupported)("ic-ui · invite code in client settings", () => {
   });
 });
 
-// ic7 is the zero-vault first-run path, so it launches on the Welcome screen with
-// no seeded vault. The server step offers one door now: the free-text URL form.
-// There is no hosted door, because Myne offers no sync service to point one at,
-// and nothing pre-fills the address.
-describe.skipIf(!uiSupported)("ic-ui · first-run server step", () => {
-  it("ic7: the server step offers an empty URL form and no hosted door", async () => {
-    const a = await launchDevice(0, {
-      // No vault: boot routes to Welcome, whose identity CTA opens the dialog.
-      seedConfig: () => {},
-    });
-    try {
-      await (await a.session.byTestId("welcome.identity-cta")).click();
-      // First-run server step fronts the dialog (no endpoint yet).
-      const url = await a.session.byTestId("sync.endpoint-input", {
-        timeoutMs: 20_000,
-      });
-      expect(url).toBeTruthy();
-      // Editable and empty, and the invite field a gated server needs is there.
-      expect(await url.attribute("readonly")).toBeNull();
-      expect(await url.property<string>("value")).toBe("");
-      expect(await a.session.byTestId("sync.endpoint-invite-input")).toBeTruthy();
-      expect(await a.session.byTestIdAll("first-run-server.myne-sync")).toHaveLength(0);
-    } finally {
-      await a.teardown();
-    }
-  });
-});
+// RETIRED (myne-md/myne#911 task 6): "ic7 · the first-run server step offered an
+// empty URL form and no hosted door" tested `FirstRunServerStep` as mounted by
+// the identity flow. Onboarding no longer asks for a server address at all, so
+// the surface it drove is unreachable by design. The invite-code gate itself is
+// still covered above, at the server and at enrolment; the endpoint form moved
+// to Settings, where the sync scenarios drive `sync.endpoint-input`.

@@ -3943,7 +3943,6 @@
         "ribbon": "左侧 功能条 轨道 固定 命令 定制 重新排序 取消固定 工具栏 快捷键",
         "folderNotes": "文件夹 笔记 索引 folder_index 落地页 双击 文件夹链接 项目 关闭 开关 禁用",
         "syncMembers": "成员、分享、邀请、团队、协作、保险库",
-        "accountName": "账户名称 账户 分组 组 重命名 标签 设备 本地 account name group grouping rename label device local",
         "accountVaults": "账户 保险库 分组 属于 哪些保险库 组 列表 account vaults grouped which vaults belong group list",
         "aiMeetingPrompt": "会议 摘要 提示词 指令 自定义 文字记录 行动项 决策 meeting summary prompt instruction custom transcript action items decisions",
         "update": "更新 升级 检查更新 新版本 发布 下载 update upgrade check for updates new version release download",
@@ -4025,14 +4024,10 @@
       "atCap": "列表已满，无法再记住新的内容。删除一条记录以腾出空间。"
     },
     "account": {
-      "nameLabel": "账户名称",
-      "nameHelper": "为这台设备上的这组保险库起的名称。保险库选择器会用它作为该组的标题。它只保留在本设备上，绝不存储在保险库内，因此不会同步，另一台设备可能会以不同方式对相同的保险库分组和命名。",
-      "namePlaceholder": "添加名称…",
-      "nameSave": "保存",
-      "nameSaving": "正在保存…",
       "vaultsLabel": "此账户中的保险库",
       "vaultsHelper": "本设备归在上方名称之下的保险库。分组是每台设备各自的组织方式，因此不属于任何保险库的内容，也不会随之传送。",
-      "vaultsCount": "{{count}} 个保险库",
+      "vaultsCount_one": "{{count}} 个保险库",
+      "vaultsCount_other": "{{count}} 个保险库",
       "currentVault": "此保险库",
       "unknownVault": "本设备上的另一个保险库",
       "standaloneHelper": "此保险库在本设备上未归入任何账户，因此独立存在。分组按设备进行：另一台设备可能将它显示在某个账户内。",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "此保险库共享之后才能设置名称。",
       "nameErrorLocked": "请解锁保险库以更改你的名称。",
       "nameErrorGeneric": "无法保存你的名称。请重试。",
-      "nameInvite": "你还没有显示名称。其他成员看到的是你的指纹。",
       "nameInviteCta": "设置名称",
-      "nameInviteDismiss": "暂不",
       "noInvitations": "还没有发出邀请。",
       "identityHeading": "你的身份",
       "membersHeading": "成员",
@@ -4974,8 +4967,7 @@
       "phraseFor": "恢复短语——当你忘记密码时使用",
       "save": "保存恢复套件",
       "saveFailed": "无法保存文件。请改为复制恢复套件，或把两部分都写下来。",
-      "savedToFile": "已保存。它是一个包含两项机密的纯文本文件，请存放在只有你能读取的地方。",
-      "whyEnglish": "这些单词在任何语言中都是英文。它们属于 BIP-39 标准的一部分，因此任何 Myne 客户端都能读取由任何其他客户端写下的短语。请勿翻译它们：翻译后的单词不在词表中，短语将无法使用。"
+      "savedToFile": "已保存。它是一个包含两项机密的纯文本文件，请存放在只有你能读取的地方。"
     },
     "name": {
       "back": "返回",
@@ -5001,13 +4993,8 @@
     "accountFallback": "账户",
     "moveToAccount": "移动到账户…",
     "moveToNewAccount": "移动到新账户",
-    "renameAccount": "重命名账户",
     "accountError": "无法更新账户分组。没有任何更改。",
     "accountHidden": "保险库名称隐藏时，账户操作不可用。",
-    "labelTooLong": "该名称太长。请保持在 512 个字符以内。",
-    "renameCancel": "取消",
-    "renamePlaceholder": "账户名称",
-    "renameSave": "重命名",
     "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。",
     "createShort": "新建保险库",
     "joinShort": "添加设备",
@@ -5106,18 +5093,11 @@
     "residueBanner": "上次中断的删除留下的残留文件（{{n}}）。请在创建保险库前清理它们。",
     "cleanUpFiles": "清理残留文件",
     "connect": "连接到我的账户",
-    "startIdentity": "创建身份",
-    "startLocal": "改为创建本地保险库",
     "tagline": "加密的 markdown 笔记。注册无需邮箱。",
-    "identityTitle": "创建身份",
-    "identityBody": "一个身份统辖你的所有保险库，让人们可以邀请你。需要同步服务器。",
-    "localTitle": "创建本地保险库",
-    "localBody": "本设备上的加密保险库。以后再添加同步或身份。",
     "restoreTitle": "从备份恢复",
     "restoreBody": "打开你先前保存的 .myne-backup 文件。",
     "joinTitle": "将此设备添加到账户",
     "joinBody": "使用你在另一台设备上已有的保险库。",
-    "createAction": "创建",
     "restoreAction": "恢复",
     "joinAction": "添加设备",
     "version": "版本 {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "{{count}} 年前打开",
     "corruptedBadge": "已损坏",
     "accountFallback": "账户",
-    "renameAccount": "重命名账户",
     "moveToNewAccount": "移动到新账户",
     "moveToAccount": "移动到账户…",
     "accountError": "无法更新账户分组。没有任何更改。",
     "accountHidden": "保险库名称隐藏时，账户操作不可用。",
-    "labelTooLong": "该名称太长。请保持在 512 个字符以内。",
-    "renameCancel": "取消",
-    "renamePlaceholder": "账户名称",
-    "renameSave": "重命名",
     "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。"
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "身份已恢复。",
     "title": "创建身份",
     "errorAlreadyHeld": "此设备已持有一个身份。请用其恢复短语恢复它，或忘记它并创建一个新的。",
-    "errorNotConfigured": "无法设置身份。请确认已配置同步服务器，然后重试。",
     "forgetCancel": "保留",
     "forgetConfirm": "忘记并新建",
     "forgetCta": "忘记此身份并创建一个新的",
@@ -5359,8 +5333,6 @@
     "recoverHint": "用其 24 个单词的恢复短语在此设备上恢复它。",
     "recoverAction": "恢复",
     "back": "返回",
-    "changeServer": "更改或核对同步服务器",
-    "errorTlsFailure": "无法验证服务器的 HTTPS 证书。请检查服务器地址及其证书。",
     "phraseTitle": "保存你的身份短语",
     "phraseContinue": "继续",
     "confirmTitle": "确认你的短语"
@@ -5509,15 +5481,6 @@
       "hint": "重试会重新开始下载。",
       "retry": "重试",
       "back": "返回解锁"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "选择同步服务器",
-      "intro": "Myne 需要一台服务器来存放你加密的笔记，并在有邀请时联系你。你的笔记在离开本设备之前都保持加密；服务器只存储密文。",
-      "notConfigured": "请在上方输入服务器地址，然后按“连接”继续。",
-      "back": "返回",
-      "continue": "继续"
     }
   },
   "identityFlow": {

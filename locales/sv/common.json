@@ -3943,7 +3943,6 @@
         "ribbon": "vänster list skena fäst pin kommando kommandon anpassa ordna lossa verktygsfält genvägar",
         "folderNotes": "mapp anteckning index folder_index landningssida dubbelklick mapplänk projekt av stäng av inaktivera",
         "syncMembers": "medlemmar, dela, bjuda in, team, samarbete, vault",
-        "accountName": "konto namn grupp gruppering byt namn etikett enhet lokal",
         "accountVaults": "konto valv grupperade vilka valv tillhör grupp lista",
         "aiMeetingPrompt": "möte sammanfattning instruktion anpassad transkription åtgärdspunkter beslut",
         "update": "uppdatering uppgradera sök efter uppdateringar ny version utgåva ladda ner",
@@ -4025,14 +4024,10 @@
       "atCap": "Listan är full, så inget nytt kan kommas ihåg. Ta bort en post för att göra plats."
     },
     "account": {
-      "nameLabel": "Kontonamn",
-      "nameHelper": "Ett namn för den här gruppen av valv på den här enheten. Valvväljaren använder det som gruppens rubrik. Det stannar på den här enheten och lagras aldrig inuti ett valv, så det synkroniseras inte och en annan enhet kan gruppera och namnge samma valv annorlunda.",
-      "namePlaceholder": "Lägg till ett namn…",
-      "nameSave": "Spara",
-      "nameSaving": "Sparar…",
       "vaultsLabel": "Valv i det här kontot",
       "vaultsHelper": "Valven som den här enheten grupperar under namnet ovan. Gruppering är ett organisatoriskt val per enhet, så det är inte en del av något valvs innehåll och följer inte med det.",
-      "vaultsCount": "{{count}} valv",
+      "vaultsCount_one": "{{count}} valv",
+      "vaultsCount_other": "{{count}} valv",
       "currentVault": "Det här valvet",
       "unknownVault": "Ett annat valv på den här enheten",
       "standaloneHelper": "Det här valvet är inte grupperat under ett konto på den här enheten, så det står för sig självt. Gruppering gäller per enhet: en annan enhet kan visa det inuti en grupp.",
@@ -4472,9 +4467,7 @@
       "nameErrorUnshared": "Namn kan anges när valvet har delats.",
       "nameErrorLocked": "Lås upp valvet för att ändra ditt namn.",
       "nameErrorGeneric": "Det gick inte att spara ditt namn. Försök igen.",
-      "nameInvite": "Du har inget visningsnamn än. De andra medlemmarna ser ditt fingeravtryck.",
       "nameInviteCta": "Ange ett namn",
-      "nameInviteDismiss": "Inte nu",
       "noInvitations": "Inga inbjudningar skickade än.",
       "identityHeading": "Din identitet",
       "membersHeading": "Medlemmar",
@@ -4974,8 +4967,7 @@
       "phraseFor": "Återställningsfras — om du glömmer ditt lösenord",
       "save": "Spara återställningspaket",
       "saveFailed": "Det gick inte att spara filen. Kopiera paketet i stället, eller skriv ner båda delarna.",
-      "savedToFile": "Sparat. Det är en klartextfil som innehåller båda hemligheterna, så förvara den någonstans där bara du kan läsa den.",
-      "whyEnglish": "Orden är engelska på alla språk. De är en del av BIP-39-standarden, så vilken Myne-klient som helst kan läsa en fras skriven av en annan. Översätt dem inte: översatta ord finns inte i ordlistan, och frasen skulle sluta fungera."
+      "savedToFile": "Sparat. Det är en klartextfil som innehåller båda hemligheterna, så förvara den någonstans där bara du kan läsa den."
     },
     "name": {
       "back": "Tillbaka",
@@ -5001,13 +4993,8 @@
     "accountFallback": "Konto",
     "moveToAccount": "Flytta till konto…",
     "moveToNewAccount": "Flytta till nytt konto",
-    "renameAccount": "Byt namn på konto",
     "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
     "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
-    "labelTooLong": "Det namnet är för långt. Håll det under 512 tecken.",
-    "renameCancel": "Avbryt",
-    "renamePlaceholder": "Kontonamn",
-    "renameSave": "Byt namn",
     "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades.",
     "createShort": "Nytt valv",
     "joinShort": "Lägg till enhet",
@@ -5106,18 +5093,11 @@
     "residueBanner": "Kvarvarande filer från en avbruten borttagning ({{n}}). Rensa dem innan du skapar ett valv.",
     "cleanUpFiles": "Rensa kvarvarande filer",
     "connect": "Anslut till mitt konto",
-    "startIdentity": "Skapa en identitet",
-    "startLocal": "Skapa ett lokalt valv i stället",
     "tagline": "Krypterade markdown-anteckningar. Ingen e-post vid registrering.",
-    "identityTitle": "Skapa en identitet",
-    "identityBody": "En identitet för alla dina valv, så att människor kan bjuda in dig. Kräver en synkserver.",
-    "localTitle": "Skapa ett lokalt valv",
-    "localBody": "Ett krypterat valv på den här enheten. Lägg till synkronisering eller en identitet senare.",
     "restoreTitle": "Återställ från säkerhetskopia",
     "restoreBody": "Öppna en .myne-backup-fil du sparade tidigare.",
     "joinTitle": "Lägg till den här enheten i ett konto",
     "joinBody": "Använd ett valv du redan har på en annan enhet.",
-    "createAction": "Skapa",
     "restoreAction": "Återställ",
     "joinAction": "Lägg till enhet",
     "version": "Version {{version}} · pre-alpha"
@@ -5199,15 +5179,10 @@
     "openedYearsAgo_other": "öppnad för {{count}} år sedan",
     "corruptedBadge": "Skadad",
     "accountFallback": "Konto",
-    "renameAccount": "Byt namn på konto",
     "moveToNewAccount": "Flytta till nytt konto",
     "moveToAccount": "Flytta till konto…",
     "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
     "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
-    "labelTooLong": "Det namnet är för långt. Håll det under 512 tecken.",
-    "renameCancel": "Avbryt",
-    "renamePlaceholder": "Kontonamn",
-    "renameSave": "Byt namn",
     "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades."
   },
   "join": {
@@ -5344,7 +5319,6 @@
     "recovered": "Identitet återställd.",
     "title": "Skapa en identitet",
     "errorAlreadyHeld": "Den här enheten har redan en identitet. Återställ den med dess återställningsfras, eller glöm den och skapa en ny.",
-    "errorNotConfigured": "Det gick inte att ställa in identiteten. Kontrollera att en synkserver är konfigurerad och försök sedan igen.",
     "forgetCancel": "Behåll den",
     "forgetConfirm": "Glöm och skapa ny",
     "forgetCta": "Glöm den här identiteten och skapa en ny",
@@ -5359,8 +5333,6 @@
     "recoverHint": "Återställ den på den här enheten med dess återställningsfras med 24 ord.",
     "recoverAction": "Återställ",
     "back": "Tillbaka",
-    "changeServer": "Ändra eller verifiera synkserver",
-    "errorTlsFailure": "Det gick inte att verifiera serverns HTTPS-certifikat. Kontrollera serveradressen och dess certifikat.",
     "phraseTitle": "Spara din identitetsfras",
     "phraseContinue": "Fortsätt",
     "confirmTitle": "Bekräfta din fras"
@@ -5509,15 +5481,6 @@
       "hint": "Att försöka igen börjar om nedladdningen från början.",
       "retry": "Försök igen",
       "back": "Tillbaka till upplåsningen"
-    }
-  },
-  "firstRun": {
-    "server": {
-      "heading": "Välj en synkserver",
-      "intro": "Myne behöver en server för att lagra dina krypterade anteckningar och för att nå dig med inbjudningar. Dina anteckningar förblir krypterade på den här enheten innan de lämnar den; servern lagrar bara chiffertext.",
-      "notConfigured": "Ange en serveradress ovan och tryck på Anslut för att fortsätta.",
-      "back": "Tillbaka",
-      "continue": "Fortsätt"
     }
   },
   "identityFlow": {

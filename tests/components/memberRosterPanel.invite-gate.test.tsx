@@ -118,6 +118,35 @@ describe("MemberRosterPanel invitation loading gate", () => {
     await waitFor(() => expect(migrationCalls()).toBe(1));
   });
 
+  it("names the missing publish when the server refuses for want of a record", async () => {
+    // A vault born under an identity invites with the person session, and a vault
+    // that was never published has no selector to address, so the backend answers
+    // `NotEnrolled` before any round trip. "The invite could not be created" reads
+    // as a broken product when the act that is missing is publishing.
+    groupKeyEpoch = 1;
+    const prev = invokeMock.getMockImplementation();
+    invokeMock.mockImplementation(async (command: string, args?: unknown) => {
+      if (command === "plugin:sync|sync_person_create_invite") throw { kind: "NotEnrolled" };
+      return prev?.(command, args);
+    });
+    render(<MemberRosterPanel />);
+    await unlockPerson();
+
+    fireEvent.click(screen.getByTestId("member-roster.invite-button"));
+    fireEvent.change(screen.getByTestId("member-roster.invite-code"), {
+      target: { value: "MYNE-PERSON-1:" + "ab".repeat(16) + ":" + "00".repeat(1088) + ":" + "00".repeat(32) + ":" + "00".repeat(1952) },
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("member-roster.invite-confirm"));
+    });
+
+    await waitFor(() =>
+      expect(screen.getByTestId("member-roster.action-error").textContent).toBe(
+        "sync.memberRoster.inviteNotOnServer",
+      ),
+    );
+  });
+
   it("keeps the unlocked person identity available after the panel remounts", async () => {
     const first = render(<MemberRosterPanel />);
     await unlockPerson();
@@ -128,6 +157,52 @@ describe("MemberRosterPanel invitation loading gate", () => {
     await screen.findByTestId("member-roster.person-ready");
     expect((screen.getByTestId("member-roster.owner-code") as HTMLInputElement).value).toBe(
       "MYNE-PERSON-1:owner",
+    );
+  });
+});
+
+// 2026-10-25, second report. A vault born under an identity used to be
+// owner-only (`protocol.md` §9.29; `decisions/ui/0729` item 4 withheld the invite
+// and explained why). The member plane reads that generation's tail now, so the
+// panel offers the same controls on every vault: no generation branch, no sentence
+// about a limit that no longer exists. What still decides is the person identity
+// (a locked one cannot invite) and the vault's own shared state.
+describe("MemberRosterPanel on a vault born under an identity", () => {
+  it("offers the invite, and states no generation limit", async () => {
+    groupKeyEpoch = 1;
+    render(<MemberRosterPanel />);
+    await unlockPerson();
+    await act(async () => {});
+
+    expect(screen.getByTestId("member-roster.invite-button")).toBeTruthy();
+    expect(screen.queryByTestId("member-roster.generation-notice")).toBeNull();
+    // The zero state asks for an invite again, because the vault can take one.
+    expect(screen.getByText("sync.memberRoster.empty")).toBeTruthy();
+    expect(screen.queryByText("sync.memberRoster.emptyOwnedAlone")).toBeNull();
+  });
+
+  it("still offers the invite on a legacy vault, which could already be shared", async () => {
+    groupKeyEpoch = null;
+    render(<MemberRosterPanel />);
+    await unlockPerson();
+
+    expect(screen.getByTestId("member-roster.invite-button")).toBeTruthy();
+    expect(screen.queryByTestId("member-roster.generation-notice")).toBeNull();
+  });
+
+  it("names the locked identity and mounts the door, instead of a dead button", async () => {
+    groupKeyEpoch = 1;
+    // NOT unlocked: this is the state the panel answered with silence. Its whole
+    // identity section is gated on `personReady`, and the Identity row that owns
+    // the unlock lives in the Connection topic, so from this panel the fix was
+    // unreachable and the disabled control gave no reason.
+    render(<MemberRosterPanel />);
+    await act(async () => {});
+
+    expect(screen.getByTestId("member-roster.identity-locked")).toBeTruthy();
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
+    expect((screen.getByTestId("member-roster.invite-button") as HTMLButtonElement).disabled).toBe(
+      true,
     );
   });
 });

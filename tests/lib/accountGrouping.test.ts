@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountHeading,
   accountIdForVault,
-  truncateLabelToBytes,
   type AccountView,
 } from "../../src/lib/account";
 
@@ -10,7 +10,7 @@ const VAULT_B = "22222222-2222-7222-8222-222222222222";
 const VAULT_C = "33333333-3333-7333-8333-333333333333";
 
 function view(id: string, vaults: string[]): AccountView {
-  return { id, label: "", vaults };
+  return { id, vaults };
 }
 
 describe("accountIdForVault", () => {
@@ -35,21 +35,30 @@ describe("accountIdForVault", () => {
   });
 });
 
-describe("truncateLabelToBytes", () => {
-  it("passes short drafts through", () => {
-    expect(truncateLabelToBytes("Work", 512)).toBe("Work");
+// `design-notes/ui/0728`: an account has no name, so a surface identifies a
+// group by the vaults inside it. One implementation, three callers (desktop
+// picker, recover picker, mobile picker).
+describe("accountHeading", () => {
+  const names: Record<string, string> = {
+    [VAULT_A]: "Personal",
+    [VAULT_B]: "Work",
+  };
+  const nameOf = (id: string) => names[id] ?? null;
+
+  it("joins the group's own vault names in the record's order", () => {
+    expect(accountHeading(view("aa", [VAULT_B, VAULT_A]), nameOf, "Account")).toBe(
+      "Work · Personal",
+    );
   });
 
-  it("cuts ascii at the byte cap", () => {
-    expect(truncateLabelToBytes("abcdef", 4)).toBe("abcd");
+  it("drops a vault it cannot name rather than printing a placeholder inside the heading", () => {
+    expect(accountHeading(view("aa", [VAULT_A, VAULT_C]), nameOf, "Account")).toBe(
+      "Personal",
+    );
   });
 
-  it("never splits a multibyte character", () => {
-    // "é" is 2 bytes: cap 3 keeps "aé" (3 bytes), never "aé" cut mid-char.
-    expect(truncateLabelToBytes("aér", 3)).toBe("aé");
-    // 4-byte emoji: cap 4 keeps "a" + nothing, not a lone surrogate.
-    expect(truncateLabelToBytes("a😀", 4)).toBe("a");
-    // Exact fit passes through untouched.
-    expect(truncateLabelToBytes("a😀", 5)).toBe("a😀");
+  it("falls back only when nothing in the group could be named", () => {
+    expect(accountHeading(view("aa", [VAULT_C]), nameOf, "Account")).toBe("Account");
+    expect(accountHeading(view("aa", []), nameOf, "Account")).toBe("Account");
   });
 });

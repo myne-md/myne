@@ -27,15 +27,17 @@
 
 import { test, expect } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { createIdentityToHome, startVaultFromIdentityHome, IDENTITY_SETUP_RESULT } from "../helpers";
 
 const PASSWORD = "correct horse battery staple";
 
 /** Walk Welcome to briefing to name to password to the recovery kit. */
 async function reachKitStep(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
-  // First run is identity-first (myne-md/myne#768): the vault path is the
-  // "Create a local vault instead" ghost button, not the old "Create a vault".
-  await page.getByRole("button", { name: "Create a local vault instead" }).click();
+  // One door (myne-md/myne#911 task 12): the identity is created first and the
+  // vault follows from the identity home.
+  await createIdentityToHome(page);
+  await startVaultFromIdentityHome(page);
 
   // The briefing's three acknowledgements, clicked by TEXT: the rows are labels
   // wrapping a checkbox, and checking the input alone does not enable Continue.
@@ -66,7 +68,11 @@ async function reachKitStep(page: import("@playwright/test").Page): Promise<void
 
 test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
   test("iOS: no Copy while the pasteboard behaviour is unverified", async ({ page }) => {
-    await installMockIpc(page, { freshDevice: true, devicePlatform: "ios" });
+    await installMockIpc(page, {
+      freshDevice: true,
+      devicePlatform: "ios",
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await reachKitStep(page);
 
     // Save to file first, as the control: this assertion is an ABSENCE, and an
@@ -76,7 +82,11 @@ test.describe("recovery-phrase Copy is gated on what the OS can hold", () => {
   });
 
   test("Android: no Copy, and that one does not change when the gate opens", async ({ page }) => {
-    await installMockIpc(page, { freshDevice: true, devicePlatform: "android" });
+    await installMockIpc(page, {
+      freshDevice: true,
+      devicePlatform: "android",
+      personSetupResult: IDENTITY_SETUP_RESULT,
+    });
     await reachKitStep(page);
 
     await expect(page.getByRole("button", { name: "Save to file" })).toBeVisible();

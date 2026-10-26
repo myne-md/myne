@@ -52,24 +52,29 @@ import { PhraseGrid } from "@app/components/PhraseGrid";
 import { PhraseTypeBack } from "@app/components/PhraseTypeBack";
 import { SecretDisplayCaveats } from "@app/components/SecretDisplayCaveats";
 import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
+import { InvitesDialog } from "@app/components/sync/InvitesDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
+import { PersonPhraseUnlock } from "@app/components/PersonPhraseUnlock";
+import { VaultFormatUpgrade } from "@app/components/settings/VaultFormatUpgrade";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
 import { PhraseEntryGrid } from "@app/components/PhraseEntryGrid";
 import { ErrorBanner } from "@app/components/ErrorBanner";
 import { ExportEgressNotice } from "@app/components/export/ExportEgressNotice";
 import { FailClosedError } from "@app/components/FailClosedError";
-import { FirstRunServerStep } from "@app/components/sync/FirstRunServerStep";
 import { Icon } from "@app/components/primitives/Icon";
 import { IdentityHome } from "@app/screens/IdentityHome";
 import { AcceptInviteWizard, JoinVaultWizard } from "@app/components/sync/InviteWizard";
 import { IdentitySetupDialog } from "@app/components/IdentitySetupDialog";
+import { IdentitySetupPanel } from "@app/components/IdentitySetupPanel";
 import { ImportPlainFileButton } from "@app/components/plain/ImportPlainFileButton";
 import { IntegrityAlertBanner } from "@app/components/sync/IntegrityAlertBanner";
 import { JoinDeviceModal } from "@app/components/sync/JoinDeviceModal";
 import { Keycaps } from "@app/components/primitives/Keycaps";
 import { MemberNameGate } from "@app/components/sync/MemberNameGate";
 import { MemberRosterPanel } from "@app/components/sync/MemberRosterPanel";
+import { PersonRegisterForm } from "@app/components/sync/PersonRegisterForm";
+import { PersonRegisterDialog } from "@app/components/sync/PersonRegisterDialog";
 import { MemberVaultUnlockCard } from "@app/components/sync/MemberVaultUnlockCard";
 import { ModalShell } from "@app/components/primitives/ModalShell";
 import { MyneMark } from "@app/components/primitives/MyneMark";
@@ -1163,18 +1168,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "components/firstrunserverstep/default",
-    group: "components",
-    surface: "FirstRunServerStep",
-    state: "default",
-    description:
-      "The first-run step that points the client at a sync server, with Connect and Back. It is the door for a fresh install that will sync rather than stay local.",
-    tags: ["components", "sync", "first-run", "server", "onboarding", "connect"],
-    render: () => (
-      <FirstRunServerStep onConnected={action("onConnected")} onBack={action("onBack")} />
-    ),
-  },
-  {
     id: "components/integrityalertbanner/default",
     group: "components",
     surface: "IntegrityAlertBanner",
@@ -1192,7 +1185,14 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description:
       "The modal for pairing a new device: it runs the join flow and reports back joined, or recovering when a device has to fall back to the phrase.",
     tags: ["components", "sync", "join", "device", "pairing", "modal"],
-    render: () => <JoinDeviceModal onCancel={action("onCancel")} onJoined={action("onJoined")} onRecovering={action("onRecovering")} />,
+    render: () => (
+      <JoinDeviceModal
+        onCancel={action("onCancel")}
+        onJoined={action("onJoined")}
+        onRecovering={action("onRecovering")}
+        onAccountJoined={action("onAccountJoined")}
+      />
+    ),
   },
   {
     id: "components/membernamegate/default",
@@ -1248,6 +1248,55 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       },
     },
     render: () => <MemberRosterPanel />,
+  },
+  {
+    id: "components/personregisterform/server-step",
+    group: "components",
+    surface: "PersonRegisterForm",
+    state: "server-step",
+    description:
+      "The register act's FIRST step: which server the identity is written to, plus the optional admission code a gated server asks for. The address is a decision and the phrase is a secret, so they never share a view, and a mistyped URL is refused here, before any word of the phrase is typed. Mounted by the identity home and by Settings → Sync, so the two doors cannot answer 'which server' differently.",
+    tags: ["components", "sync", "identity", "register", "server", "b2b"],
+    fixture: {
+      description: "a device with no sync server configured yet",
+      handlers: {
+        "plugin:sync|sync_get_endpoint": () => ({ endpoint_url: null, invite_code: null }),
+        "plugin:sync|sync_beta_terms_accepted": () => true,
+      },
+    },
+    render: () => (
+      <PersonRegisterForm
+        testIdPrefix="story.register"
+        onRegistered={() => {}}
+      />
+    ),
+  },
+  {
+    id: "components/personregisterdialog/server-step",
+    group: "components",
+    surface: "PersonRegisterDialog",
+    state: "server-step",
+    description:
+      "The register act as a dialog, which is how both doors open it: the identity home's card stays readable instead of growing a 24-cell grid inside its scroll region. The action row is pinned below the scroll region, so Register can never scroll out of view.",
+    tags: ["components", "sync", "identity", "register", "dialog", "b2b"],
+    fixture: {
+      description: "a device whose sync server is already configured",
+      handlers: {
+        "plugin:sync|sync_get_endpoint": () => ({
+          endpoint_url: "https://sync.example",
+          invite_code: null,
+        }),
+        "plugin:sync|sync_beta_terms_accepted": () => true,
+      },
+    },
+    render: () => (
+      <PersonRegisterDialog
+        open
+        testIdPrefix="story.register"
+        onRegistered={() => {}}
+        onClose={action("onClose")}
+      />
+    ),
   },
   {
     id: "components/membervaultunlockcard/default",
@@ -1625,6 +1674,32 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     },
   },
   {
+    id: "components/invitesdialog/default",
+    group: "components",
+    surface: "InvitesDialog",
+    state: "default",
+    description:
+      "The invitations dialog a device that already holds a vault uses to accept one: the recipient-scoped list, one row per invitation addressed to this identity, with the accept wizard behind the row. It exists because the identity home, which carried this list, renders only at ZERO vaults, so a device with a vault had no surface on which an invitation could be accepted.",
+    tags: ["components", "invites", "dialog", "b2b", "member", "onboarding"],
+    render: () => (
+      <InvitesDialog
+        open
+        invites={[
+          {
+            invite_id_hex: "aa".repeat(16),
+            vault_account_hash_hex: "bb".repeat(32),
+            claimed: false,
+          },
+        ]}
+        loading={false}
+        unavailable={null}
+        onClose={action("onClose")}
+        onRetry={action("onRetry")}
+        onAccepted={action("onAccepted")}
+      />
+    ),
+  },
+  {
     id: "components/identitysetupdialog/default",
     group: "components",
     surface: "IdentitySetupDialog",
@@ -1634,6 +1709,19 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     tags: ["components", "identity", "setup", "dialog", "recovery-phrase", "b2b"],
     fixture: "unlocked",
     render: () => <IdentitySetupDialog open onClose={action("onClose")} />,
+  },
+  {
+    id: "components/identitysetuppanel/default",
+    group: "components",
+    surface: "IdentitySetupPanel",
+    state: "default",
+    description:
+      "The identity ceremony as a PANEL: the same body the Settings dialog mounts, and the body the first run mounts inline. One create row and one recover row, no server address anywhere, because creating an identity is network-free and registration is a separate act. Look for the absence of an endpoint field and of any modal chrome.",
+    tags: ["components", "identity", "setup", "panel", "recovery-phrase", "offline", "first-run"],
+    fixture: "unlocked",
+    render: () => (
+      <IdentitySetupPanel onDone={action("onDone")} onCancel={action("onCancel")} />
+    ),
   },
   {
     id: "components/newnotefromtemplatemodal/default",
@@ -1860,7 +1948,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description:
       "The provisioning step of vault creation: the blocking surface while the fresh vault's device-local artefacts are created and the runtime slot is populated.",
     tags: ["components", "vault-creation", "provisioning", "step", "progress", "ceremony"],
-    render: () => <ProvisioningStep />,
+    render: () => <ProvisioningStep expectsPhrase />,
   },
   {
     id: "components/readystep/default",
@@ -2002,6 +2090,30 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/identityhome/enrolled",
+    group: "components",
+    surface: "IdentityHome",
+    state: "enrolled",
+    description:
+      "The same home with the identity's own material on screen: the account number and the invite code, each one field with its Copy control beside it, and the reservation paragraph that carries the Register action when the identity is not on a sync server yet. Look for one paragraph per state rather than two saying the same thing.",
+    tags: ["components", "identity", "home", "account-number", "invite-code", "register", "b2b"],
+    fixture: "unlocked",
+    render: () => (
+      <IdentityHome
+        identityCode={
+          "MYNE-PERSON-1:9a0bc51b14d2e6460450a9224ff49b9f3:eaf9564cc57dd8ae3f2b1a02cd77a41b:" +
+          "7d118c51239d2573e48aa3def8cf1b257d141f7c8be55516305269d42a8ab08d"
+        }
+        accountNumber="MY-M2Y5-3CAD-5SJ6-0H8A-J8JM"
+        onCreateVault={action("onCreateVault")}
+        onAccepted={action("onAccepted")}
+        onForgotten={action("onForgotten")}
+        accountState="reserved"
+        onRegistered={action("onRegistered")}
+      />
+    ),
+  },
+  {
     id: "components/identityhome/default",
     group: "components",
     surface: "IdentityHome",
@@ -2013,9 +2125,12 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => (
       <IdentityHome
         identityCode={null}
+        accountNumber={null}
         onCreateVault={action("onCreateVault")}
         onAccepted={action("onAccepted")}
         onForgotten={action("onForgotten")}
+        accountState={null}
+        onRegistered={action("onRegistered")}
       />
     ),
   },
@@ -2103,6 +2218,8 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onRestoreBackup={action("onRestoreBackup")}
         onCreateAnother={action("onCreateAnother")}
         onJoinDevice={action("onJoinDevice")}
+        inviteCount={0}
+        onInvites={action("onInvites")}
       />
     ),
   },
@@ -2294,5 +2411,53 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       "The prompt that unlocks a person's identity keypair when an action needs it outside a vault session. It is the person-plane credential prompt, separate from the vault unlock.",
     tags: ["components", "identity", "person", "unlock", "prompt", "b2b"],
     render: () => <PersonIdentityUnlock open onOpenChange={action("onOpenChange")} />,
+  },
+  {
+    id: "components/personphraseunlock/default",
+    group: "components",
+    surface: "PersonPhraseUnlock",
+    state: "default",
+    description:
+      "The identity-phrase credential for an upgraded vault, as the unlock screen's sub-view: 24 cells, one paste target and one non-distinguishing failure. It replaces the vault-recovery link on a person-wrapped vault, because the explicit upgrade retired that vault's own phrase.",
+    tags: [
+      "components",
+      "unlock",
+      "identity",
+      "phrase",
+      "person",
+      "one-phrase",
+      "a11y",
+    ],
+    render: () => (
+      <PersonPhraseUnlock
+        onUnlocked={action("onUnlocked")}
+        onCancel={action("onCancel")}
+      />
+    ),
+  },
+  {
+    id: "components/vaultformatupgrade/default",
+    group: "components",
+    surface: "VaultFormatUpgrade",
+    state: "default",
+    description:
+      "The explicit upgrade of an existing vault to one-phrase recovery, as the Settings row offers it: one CTA, and the confirmation appears only after a press. The fixture answers the person-wrap probe with false, which is the only state in which the row renders anything at all.",
+    tags: [
+      "components",
+      "settings",
+      "vault",
+      "format",
+      "migration",
+      "one-phrase",
+      "irreversible",
+    ],
+    fixture: {
+      description:
+        "a vault that has not been upgraded yet, so the row offers the upgrade",
+      handlers: {
+        "plugin:vault-unlock|vault_is_person_wrapped": () => false,
+      },
+    },
+    render: () => <VaultFormatUpgrade />,
   },
 ];

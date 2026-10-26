@@ -152,7 +152,15 @@ export function SettingRow({
       )}
       {children}
       {error != null && error !== "" && (
-        <p role="alert" style={ERROR_STYLE}>
+        // The error slot is a state a scenario has to be able to WAIT ON, and a
+        // `role="alert"` with no id cannot be addressed from the driver. Derived
+        // from the row's own testid so the two cannot drift, and absent when the
+        // row passes none (nothing to address it by).
+        <p
+          role="alert"
+          style={ERROR_STYLE}
+          data-testid={testId === undefined ? undefined : `${testId}-error`}
+        >
           {error}
         </p>
       )}

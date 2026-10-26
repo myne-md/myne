@@ -92,24 +92,51 @@ describe the member's own devices rather than the vault's, which is also why `Re
 mean "cut that device off this vault" there (only the vault's owner can revoke a binding).
 Implemented once in `core/src/plugins/sync/devices.rs::account_plane_from_host`; the sync plane is
 deliberately NOT switched, because a person device token on `/sync/*` resolves to the person
-account's namespace rather than the vault's.
+account's namespace rather than the vault's. **Amended 2026-10-22 (myne-md/myne#911 task 7):** the
+sync plane now reaches a vault explicitly instead, with the `?account=<account_number_hash>`
+selector `server-protocol.md` §3.1a authorizes per request ([account sync](#account-sync)). So a
+person session still speaks for the person account on `/auth/*` and names its vault on `/sync/*`,
+and this resolver stays the account-level one rather than becoming the sync path.
 
 Used in: `design-notes/sync/0688`
 
 ### **account record** &nbsp; 📦 *Product*
 
-The device-local half of the account/vault split: a sealed record holding the account id, the member
-vault ids and the account label, stored under an OS-keychain wrap key (the sealed-label-store
-pattern). It is rebuilt from the on-disk vault scan when missing or corrupt, reconciled against
-discovery (adopting appearing vaults, pruning deleted ones, pruning emptied accounts), and never
-written in plaintext on any platform. Where the keychain is unavailable there is no record and no
-grouping. The per-vault half is the **vault membership** field.
+The device-local half of the account/vault split: a sealed record holding the account id and its
+member vault ids, stored under an OS-keychain wrap key (the sealed-label-store pattern). It carries
+no user-authored text: an account has no name, and a surface that groups vaults by account derives
+the group's heading from the group's own vault names (`decisions/ui/0728`). It is rebuilt from the
+on-disk vault scan when missing or corrupt, reconciled against discovery (adopting appearing vaults,
+pruning deleted ones, pruning emptied accounts), and never written in plaintext on any platform.
+Where the keychain is unavailable there is no record and no grouping. The per-vault half is the
+**vault membership** field.
 
 Used in: `spec/protocol.md` §9.3.1
 
+### **account sync** &nbsp; 📦 *Product*
+
+The person-level sync plane (myne-md/myne#911, `decisions/sync/0720`): one
+[person token](#person-token) covers an account's vaults, and a request names the
+vault it is for with an `?account=<account_number_hash>` parameter that the
+server resolves against its membership table per request. It exists so
+"unlimited vaults" costs one credential and one device enrolment rather than one
+of each per vault. **What stays per vault, deliberately:** the `root_key`, the
+`group_key`, the vault password, the sync cursor, the head, the manifest and the
+namespace. Two vaults owned by the same person are unrelated cryptographic
+domains that happen to share a credential, so an account-level compromise is not a
+vault-level one and a vault can in principle be detached. **What becomes
+account-level:** device approval and revocation (one act covers every vault),
+publishing (an explicit act per vault, which binds the owner on first write),
+discovery (`GET /b2b/vaults` lists the bindings and authorizes nothing), and the
+usage figure, which is the sum over the vaults the person OWNS and is reported
+rather than enforced. A vault the person merely joined does not count.
+
+Used in: `docs/spec/server-protocol.md` §3.1a, `docs/spec/sync-protocol.md` §8.1,
+`design-notes/sync/0720`
+
 ### **account_number** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-Myne's user identifier. A 20-character canonical value composed of 19 random Crockford base32 characters (95 bits of entropy) plus 1 Damm-32 check character, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. The account number replaces email at signup; it is bearer-token semantics in Phase 2+ (anyone in possession of it can authenticate sync requests for that account, like a Mullvad VPN account) but it is **not** a key — it does not encrypt anything, and possession alone does not unlock a vault. The cryptographic role is via `account_number_hash`, which binds Argon2id salts to this account and prevents pre-computation attacks across accounts. In **multi-vault recovery** the account number gains an *optional selector* role: a user **may** type it so the host matches `account_number_hash` against on-disk `vault.meta` headers and jumps to that vault — **never required** (the picker is the primary path; the 24-word phrase stays the sole recovery secret; `decisions.md` 2026-06-09 "Multi-vault recovery").
+Myne's user identifier. A 20-character canonical value composed of 19 Crockford base32 characters (95 bits) plus 1 Damm-32 check character, displayed as `MY-XXXX-XXXX-XXXX-XXXX-X`. The account number replaces email at signup. **It is not a credential.** It was described here as having bearer-token semantics in Phase 2+ ("anyone in possession of it can authenticate"), and that was the wrong frame: possessing a number authenticates nothing, because access is a SCRAM session on that account, and the server stores only the hash. It is not a key either: it encrypts nothing, and possession alone does not unlock a vault. The cryptographic role is via `account_number_hash`. Two entry points fill the same 95 bits: a **vault-era** number is sampled from the OS CSPRNG, and a **person** number is derived from the [identity phrase](#identity-phrase) ([person account number](#person-account-number)). In **multi-vault recovery** the account number gains an *optional selector* role: a user **may** type it so the host matches `account_number_hash` against on-disk `vault.meta` headers and jumps to that vault, which is **never required** (the picker is the primary path; the 24-word phrase stays the sole recovery secret). That selector is a legacy-vault path only: an `NTV7` vault has no account-number hash to match ([vault id](#vault-id)).
 
 Used in: `spec/account-number.md`, `spec/protocol.md` §8
 
@@ -183,9 +210,9 @@ Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; 
 
 *(Alias: `seed_memory`, "Teach Myne your vault"; the reviewed one-shot pass from a vault into [agent memory](#agent-memory).)*
 
-A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0720`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
+A user-triggered pass that reads the vault's structure once (note titles, folder paths, tags and counts), asks the model for three to ten distilled memory entries, and writes only the lines the user accepts on a review screen. Phase two reads the bodies of up to ten folders the model asked for, under a character budget, and never an attachment. The write is a **second bulk path** outside the agent run loop: its bounds are the review screen, the 100-entry roster ceiling, the 2000-character cap, the injection scan, user authorship and replace-only-own-rows (`decisions/ai/0742`). The seed's rows carry `origin: "seed"` on the catalog row (`protocol.md` §9.25), which is what lets a rebuild replace its own rows without touching anything the user or the model wrote. A remote provider needs its own per-run confirmation naming the provider and the payload size. The injected block marks seed lines with one provenance sentence and keeps them in the same untrusted span as every other memory line. Desktop-only; mobile shows the group read-only.
 
-Used in: `decisions/ai/0720`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
+Used in: `decisions/ai/0742`; `protocol.md` §9.25; `threat-model.md` TB12/TB13 (2026-10-22 amendments)
 
 ### **agent-writability verdict** &nbsp; 🛠️ *Tooling*
 
@@ -350,6 +377,12 @@ A capacity-1 `tokio::sync::Semaphore` on `VaultRuntimeState` (Rust-side singleto
 
 Used in: `decisions.md` 2026-05-02 "Slot state machine + auth_permits generalization"
 
+### **attached document** &nbsp; 📦 *Product*
+
+A file a message carries so the run can READ it (myne-md/myne#913), as opposed to an attachment the run may propose a write to. Chosen per message, through the composer's `+` picker or a paste, and limited to four per message; the run receives the text extracted from each (the device-local [`MYE1`](#mye1) cache, §9.15), cut at 20,000 unicode scalar values per document by the host (`core/src/plugins/agent/prompt.rs`). The bytes never leave: only that text, carried as untrusted content beside note text, so the same sanitizer and the same off-device character count apply. A chosen document with no extracted text refuses the send by name rather than entering the run empty. `threat-model.md` TB12/TB13 carries it as a payload class because the file need not be the user's own: a received PDF is a third party's words.
+
+Used in: `spec/protocol.md` §9.10.2, §9.15; `threat-model.md` TB12, TB13; `decisions/protocol/0718`
+
 ### **attachment** &nbsp; 📋 *Protocol*
 
 An arbitrary file of **any type** stored as an encrypted blob in the vault, separate from notes (`threat-model.md` AS7). Each attachment is an [`MYA1`](#mya1) blob (`spec/protocol.md` §9.9) under `attachments/<attachment-id-hex>`, keyed by a per-attachment key wrapped under `itemsKey`; its metadata lives authoritatively in the [`vault.attachments`](#vaultattachments) catalog. Attachments ship in v0.1 (`decisions.md` 2026-06-07, superseding the 2026-04-27 skip-and-placeholder plan). Every attachment has a **placement** (myne-md/myne#913): the [attachment library](#attachment-library) unless its catalog row carries `scope: "chat"`, which is the [chat-scoped attachment](#chat-scoped-attachment). A file the magic-byte sniffer recognizes as a renderable type (`image/*` + SVG + PDF) renders inline; **any other file is stored as `application/octet-stream` and surfaces as an export-only [attachment file-card](#attachment-file-card)** (`decisions.md` 2026-06-14, MYND-173). No remote URL is ever fetched; decrypted bytes never touch disk except on explicit user [export](#export). See [attachment-id](#attachment-id), [MYC1](#myc1). (MYND-164)
@@ -508,7 +541,7 @@ An Obsidian-style `^block-id` marker at the end of a line, addressable from a [w
 
 ### **birth format** &nbsp; 📋 *Protocol*
 
-The major protocol version a **newly created** vault is written in — as of `decisions.md` 2026-08-13, **v0.2** (`NTV5` `vault.meta`, [`NC05`](#nc05) notes, `MY?5` singletons). Named separately from "current version" because the two are not the same thing: v0.1 stays fully **readable** (it is what a [cross-major migration](#migration-cross-major) reads *from*, and pre-flip vaults keep working unmigrated) while no client **produces** it any more. Pinned normatively in `spec/protocol.md` §10.3.1 and carried in code by the single constant `vault_creation::BIRTH_GENERATION`.
+The major protocol version a **newly created** vault is written in, v0.2 since `decisions.md` 2026-08-13, and since `decisions/storage/0723` its `vault.meta` frame is **`NTV7`** wherever the client has a person identity, with `NTV5` the transitional birth for a client that cannot create one ([`NC05`](#nc05) notes and `MY?5` singletons in both). Named separately from "current version" because the two are not the same thing: v0.1 stays fully **readable** (it is what a [cross-major migration](#migration-cross-major) reads *from*, and pre-flip vaults keep working unmigrated) while no client **produces** it any more. Pinned normatively in `spec/protocol.md` §10.3.1 and carried in code by the single constant `vault_creation::BIRTH_GENERATION`.
 
 Changing it is a fleet event, not a client-local choice: §10.5's anti-downgrade refusal means a client without v0.2 read support refuses an `NTV5` vault outright, so every supported client needs read support before — or in the same release as — the flip.
 
@@ -633,9 +666,15 @@ A test whose assertions pin the code's **current** behaviour rather than the beh
 Used in: `design-notes/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`; myne-md/myne#750
 
 
+### **chat-scoped attachment** &nbsp; 📋 *Protocol*
+
+An [attachment](#attachment) whose [`vault.attachments`](#vaultattachments) row carries the optional `scope: "chat"` (§9.10.2, myne-md/myne#913): it was pasted into one conversation and belongs to that surface. It is **not a second store**: the file is the same encrypted [`MYA1`](#mya1) blob, under the same key lineage, synced and backed up like any other attachment; the field only says which surface lists it, and the [attachment library](#attachment-library) filters it out (`catalog_list`). `library` is never emitted (the absent value IS the library), so every pre-#913 catalog encodes byte-identically and [`MYC1`](#myc1) keeps its magic. Decode tolerates an unknown scope value by reading it as library rather than failing the catalog, and a tombstone carries none. Its reference is a conversation turn rather than a note, so the unused-attachment sweep reads the conversations too and offers the row only when no live conversation names it; if a conversation cannot be read, or the vault is a B2B one (`NTV6`, so some conversations belong to another person and cannot be enumerated here), the sweep refuses outright rather than erasing, because a library file picked into a message is referenced only by a turn too (`decisions/protocol/0718`). On such a vault the marker is a library-listing fact rather than a confidentiality boundary: the blob and its catalog row are group-tier and readable by every member.
+
+Used in: `spec/protocol.md` §9.10.2; `decisions/protocol/0718`; `myne-test-vectors` `attachments-catalog/v0.1/encrypt-chat-scope`
+
 ### **chat turn** &nbsp; 📦 *Product*
 
-One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic.
+One settled message in a [conversation](#conversation): a `text` turn (the ask flow's question and the model's streamed answer) or an `agent` turn (a run's task, and its frozen counts + finish summary + proposal). Turns are immutable once settled, with one monotone exception: an agent turn's decision marker (`agentSummary.outcome`, written after the reader decides and never unset or changed, reconciled as decided-wins in sync). The write path is **append-at-finalize** (a turn persists the moment its stream closes, its run settles, or it fails, including the partial text of a stream interrupted by a lock), and nothing rewrites a turn in place (`protocol.md` §9.24.2). Turn ids are monotonic per client and embed a client discriminator, which is what makes the concurrent-append sync merge deterministic. A user turn may also carry `attachments` (myne-md/myne#913): the files that message sent into the run, as `{id, name, contentType}` referencing [attachments](#attachment), absent when it carried none, so the transcript names what a question was about after the composer's chips are gone.
 
 Used in: `protocol.md` §9.24.2; `decisions/ai/0581`
 
@@ -653,7 +692,7 @@ One persisted AI chat history unit: an ordered, immutable list of settled [chat 
 
 **A conversation belongs to the note it was started on** (myne-md/myne#913): opening a different note starts a fresh conversation, because the turns were about the note the user was in, and switching back does not restore the old one (the history list does). The escape hatch is the **keep pin** (`keepConversation`), an explicitly pressed, session-scoped control that lets one conversation follow the user across notes; it is session state rather than a preference, so it does not survive a lock. A switch during a run is deferred until the run settles, and a proposal awaiting review is the one case that keeps the conversation instead of clearing it. A [chat-scoped attachment](#chat-scoped-attachment) belongs to the conversation that carried it.
 
-Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0720`
+Used in: `protocol.md` §9.23/§9.24; `decisions/ai/0581`, `decisions/ai/0583`, `decisions/ai/0740`
 
 ### **conversation catalog** &nbsp; 📦 *Product*
 
@@ -975,20 +1014,29 @@ Used in: `spec/server-protocol.md` §3.1, §4 (MYND-425)
 
 A QR the trusted desktop displays and a phone scans to add itself to an account (MYND-466), in place of manually typing the [account_number](#account_number). A scanner-only frame carrying only non-secret material and **never** a password or recovery phrase (SYNC-47). Ephemeral (≈3-min TTL) to enforce live co-presence. The scan is the out-of-band channel for the [device-approval gate](#device-approval-gate)'s [bootstrap-fingerprint](#bootstrap-fingerprint) SAS, which runs post-approval; it says nothing about the server's certificate, which every client verifies against public CA roots ([in-transit encryption](#in-transit-encryption)). `MYQR` lives outside the `protocol` crate (no ciphertext → not a major-version event). iOS-only for v1 (Android: MYND-465).
 
-**Two target kinds since `MYQR2`** (`decisions/protocol/0689`), tagged by a one-character field:
+**Three target kinds since myne-md/myne#911** (`decisions/protocol/0689` for the first two, `core/src/plugins/sync/qr_join.rs` for the third), tagged by a one-character field and legal only at the version that introduced them:
 
-- `a` — the vault **account**, in canonical Crockford form: the owner's device-join. The account number is supplied by a one-time user paste on the desktop (it is a bearer token, [AS9](#account_number), never persisted at rest; `spec/account-number.md` §8), and the scanning device proves `{account# + password}`.
+- `a` — the vault **account**, in canonical Crockford form: the owner's device-join. The account number is supplied by a one-time user paste on the desktop (it is an identifier and **not** a credential, [AS9](#account_number), never persisted at rest; `spec/account-number.md` §8), and the scanning device proves `{account# + password}`.
 - `m` — a **shared vault**, named by its 32-lowercase-hex [account_number_hash](#account_number_hash): a [member vault](#member vault key store)'s own second device. A member holds neither the display-form account number nor the vault password, so the scanner proves its 24-word recovery phrase instead, self-approves, and fetches the vault's keys from the group package the owner already pushed. The payload carries `{endpoint_url, account_hash}` and nothing else.
+- `p` — the **person**, named by 32 lowercase hex of the 16-byte person id: a device added to the whole account rather than to one vault. Legal only at `MYQR3` (`QR_JOIN_VERSION = 3`), because a `MYQR2` producer that emitted `p` would be claiming a kind that version never defined. The payload carries `{endpoint_url, person_id}` and nothing else, no part of it is a secret, and the scanning device proves possession of the person's 24 words; a code whose id does not match the phrase that arrives with it is refused `PersonMismatch` before anything is written. Its target is a cross-vault pseudonym rather than one vault, so a tampered code can redirect the device to an attacker's endpoint, which is the residual §7 already accepts, but it cannot obtain the phrase.
 
 The v2 layout also keeps a version of the two carried fields that a reader must know: a v2 scanner decodes a v1 payload (older desktop, account kind), while a v1 scanner refuses a v2 payload as an unknown version and is told to update. Both kinds are produced by the DESKTOP only, which is unchanged from MYND-466 (the `qrcode` crate stays off the mobile build), and both are scanned by a phone.
 
 Used in: `decisions.md` 2026-07-19; `decisions/protocol/0689`; `threat-model.md` §7
 
-### **device key** &nbsp; 🗝️ *Key/identifier*
+### **device key** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-Reserved term for a later major version's multi-device support: a per-device asymmetric key pair stored in hardware (Secure Enclave / TPM / Android Keystore) that participates in MLS group formation. **Not used in v0.1** — single-device protocol does not need device keys.
+**Status: stages 1 and 2 ship, stage 3 does not.** A device keypair exists (`protocol/src/device_key.rs`), signs vault heads at `0x03` and the owner group roster under `"myne.group-roster v2|"`, and its public halves travel in the `MYU5` `format_version 0x02` row (and, for a member, inside the invite package's `owner_device` attestation); the keys live in the Apple Keychain, and every other platform sits at rung 4 of the ladder below and keeps the phrase path. The [person keypair](#person-keypair) still signs the device-binding row, the member display-name rows and vault creation, because stage 3 and the name rows are not built (`decisions/protocol/0733` states exactly what is and is not). The term is defined here because the decision is recorded and the sentences that describe it would otherwise be read as a shipped guarantee (`decisions/protocol/0731`, sharpened by `0733`).
 
-Used in: `spec/protocol.md` §11 (out of scope for v0.1)
+The per-device asymmetric key pair that takes over **daily authority** from the person key: it signs every vault head, the owner-signed [group roster](#group-roster) (so create, invite and removal), its own [device-to-person binding](#device-to-person-binding) row and the member display-name rows, while the person key does one thing per device: it signs that device's own binding row, once, when the device joins the account. The phrase keeps one job, recovery: the phrase opens the account when there is no working device, and every vault still opens with its own password.
+
+Four constants and one invariant are load-bearing. The head format is **`0x03`** (so `0x02` keeps meaning "signed by the person key"), the signature is **double, Ed25519 + ML-DSA-65**, and the record is the same length as `0x02` with the device id in the author slot; the head signature class becomes `"myne.head-signature v2|"`. The binding row's inner schema is `MYU5` format version `0x02` and carries the **device public halves** (a device-signed head cannot be verified without them) under the class `"myne.device-binding v2|"`; rows written under `v1` stay readable and a device re-signs itself on its first write. And the private half is **never on disk in plaintext**: OS keychain with `thisDeviceOnly` semantics, else the Linux Secret Service, else a `0600` file sealed by a user PIN reusing the [quick-unlock credential](#quick-unlock-credential) `MYQ1` attempt-and-wipe machinery, and if the user declines a PIN **no device key is created on that machine** and it keeps the phrase path.
+
+The invariant that makes the whole thing safe is a negative one: **a device key unwraps nothing.** The person key is deliberately NOT cached in a keychain, because on an `NTV7` vault every owned vault's `root_key` is sealed to it, so a keychain-held person key would let one biometric open every vault without a password, which is the cross-vault escalation `person_vault_carrier::carrier_applies` already refuses. What a stolen device key buys an adversary is the ability to sign as that device until its binding is revoked; what it does not buy is any vault.
+
+Not to be confused with the reserved sense the term used to carry (a hardware-held device key participating in MLS group formation): that reading stays out of scope, and `0731` gives the term a different, narrower job.
+
+Used in: `design-notes/protocol/0731-daily-authority-moves-to-a-device-key.md`; `design-notes/protocol/0733-the-device-keys-open-questions-are-answered.md`; `design-notes/protocol/0670-the-device-binding-signature-class.md`
 
 ### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
 
@@ -1082,7 +1130,7 @@ Used in: `spec/protocol.md` §10.5
 
 ### **dual-credential wrap** &nbsp; 🏗️ *Construction* (deep entry, *Myne-divergent*)
 
-Myne's pattern for unlocking the vault under either of two independent credentials. The 32-byte random `root_key` is wrapped under two keys: `password_wrap_key` (Argon2id of the master password) and `recovery_wrap_key` (Argon2id of the BIP-39 phrase). Both encrypted copies — `enc_root_key_password` and `enc_root_key_recovery` — live in `vault.meta` (§9.3). Either credential alone reconstructs the root_key; both must be lost to render the vault unrecoverable. The architecture cleanly extends to a third wrap (e.g., a hardware-backed WebAuthn-PRF unlock) in a later major version.
+Myne's pattern for unlocking the vault under either of two independent credentials. The 32-byte random `root_key` is wrapped under two keys: `password_wrap_key` (Argon2id of the master password) and `recovery_wrap_key` (Argon2id of the BIP-39 phrase). Both encrypted copies, `enc_root_key_password` and `enc_root_key_recovery`, live in `vault.meta` (§9.3). Either credential alone reconstructs the root_key; both must be lost to render the vault unrecoverable. **`NTV7` replaces the second half**: the password copy stays, the recovery copy is required to be zero, and a person envelope seals `root_key` to the owner's person key (§9.3.5), so the two credentials are the master password and the identity phrase. The architecture cleanly extends to a third wrap (e.g., a hardware-backed WebAuthn-PRF unlock) in a later major version.
 
 Used in: `spec/protocol.md` §3.1, §9.3
 
@@ -1424,6 +1472,27 @@ The managed keys of a note's frontmatter (`title:`, `folder:`, `updated:`, `dele
 
 Used in: `spec/sync-protocol.md` §10.1; `decisions/sync/0658`; `agent-tooling/epics/live-collab/`
 
+### **reserved identity** &nbsp; 📦 *Product*
+
+A [person identity](#person-identity) that exists on this device and has **no
+server account**: the sealed keypair is present, the credential holds no token,
+and the registration flag is false. It is one of three account states, all
+DERIVED on every read rather than stored (the others are *pending*, registered
+but this device not yet approved, and *enrolled*, a token is held). It is a
+legitimate resting state rather than an error: a person who never registers has a
+complete local product, and "create an identity" transmits nothing
+(`decisions/protocol/0719`). Registration is a separate explicit act that asks
+for the 24 words, because the phrase is both the SCRAM credential and the proof
+of possession, and a registration that cannot reach the server leaves the
+identity reserved instead of failing. **Nothing rolls a reserved identity back**:
+the old seal-erasure on a failed enrolment is removed, not narrowed, because by
+the time the user has seen the phrase the sealed frame is the only local copy of
+the account. An abandoned first run therefore lands on the identity home rather
+than on a welcome screen offering a second identity.
+
+Used in: `core/src/plugins/sync/person_account.rs`; `src/screens/IdentityHome.tsx`;
+`mobile/src/app/flows/IdentityFlow.tsx`; `design-notes/protocol/0719`
+
 ### **resting cause** &nbsp; 📦 *Product*
 
 Why an AI surface is not answering, as ONE closed label rather than a sentence (`src/notes/ai/restingCause.ts`, myne-md/myne#867). Three of the values name states of the app rather than failures (`off`, `unavailable`, `ready`), and the remaining members are the host's own error causes, so a chip can say "no model" or "key rejected" in one or two words without each surface inventing its own sentence for the same condition. `restingIsDegraded` marks the subset that means the surface CANNOT answer rather than that it is merely idle, which is the distinction a caller branches on, and the label and body tables are exhaustive over the type on purpose: adding a cause fails at the compiler rather than rendering a blank chip.
@@ -1496,9 +1565,9 @@ Used in: `design-notes/sync/0627-hosted-sync-access-is-gated-by-a-server-configu
 
 ### **invite relay** &nbsp; 📦 *Product*
 
-The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, plus the owner-side claimed-versus-pending list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
+The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, `DELETE /b2b/invites/{invite_id}` (the recipient's refusal, which drops the sealed payload and leaves a payload-free tombstone so the sender's list can say "declined" rather than "not accepted yet", `decisions/protocol/0732`), plus the owner-side three-state list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
 
-Used in: `design-notes/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+Used in: `design-notes/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `design-notes/protocol/0732-an-invitation-decline-is-a-real-server-side-delete.md`; `docs/spec/server-protocol.md` §3.1
 
 ### **heading record** &nbsp; 📦 *Product*
 
@@ -2000,6 +2069,14 @@ A peer's live caret and its name label, drawn in the open note as one CodeMirror
 
 Used in: `decisions/ui/0659`; `agent-tooling/features/collab-presence-ui/`
 
+### **photo to note** &nbsp; 📦 *Product*
+
+The mobile capture flow (myne-md/myne#926) that turns a photograph of a page, a whiteboard or a slide into note text. One entry in the editor's pinned format bar opens the OS file picker, whose own action sheet offers **Take Photo** beside **Photo Library**, so the camera is the OS camera app and Myne opens no stream of its own (the picker's camera usage string already existed for the attach path, MYND-474). The picked file is imported through the ordinary [attachment](#attachment) path, which runs [image OCR](#image-ocr) on the device into the device-local [`MYE1`](#mye1) cache; the flow then opens a **draft sheet** showing the photograph and that cached text in an editable field, and writes nothing until the user commits. Distinct from the plain attach button, which still inserts a bare embed with no reading.
+
+Not to be confused with [image OCR](#image-ocr): OCR is the extractor, and this is the one surface where its output is offered for review. The photograph is always kept, because an [`MYE1`](#mye1) entry is generation-bound and a better extractor can only re-read an original that is still in the vault. The reviewed text lands under the image embed as ordinary note markdown. Discarding a draft deletes the import only when the flow created it: `attachment_import` is content-addressed and dedups, so a photograph the vault already held is left alone. (`decisions/ui/0731`)
+
+Used in: `decisions/ui/0731`; `mobile/src/app/flows/PhotoNoteSheet.tsx`
+
 ### **policy refusal** &nbsp; 📦 *Product*
 
 A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.
@@ -2079,6 +2156,14 @@ Used in: `design-notes/protocol/0666-member-display-names-a-group-tier-sealed-my
 The verdict a reader attaches to a member display-name row: `verified` (the row's signature checks out against the public half of the person the row names), `unverified` (a record exists and the signature does not check out, or names somebody else), or `absent` (no record for that person). The three are deliberately separate rather than collapsed into a boolean or into "no name", because "this member has not chosen a name" and "somebody wrote a row for this member that nobody signed" are different things to tell a reader. The verification happens where the roster's public halves are already available, and the unverified record's CONTENT is not carried out of that partition, so a tampered name never reaches a surface that could render it.
 
 Used in: `docs/spec/protocol.md` §9.29.4; `design-notes/protocol/0667-the-member-name-signature-class.md`; `protocol/src/member_names_blob.rs` (`partition_verified`).
+
+### **member plane** &nbsp; 📋 *Protocol*
+
+The half of the shared-vault protocol that a **member** (not the owner) speaks, as opposed to the account plane and the [awareness plane](#awareness-plane). It is the set of acts a member performs against a vault it does not own: unlocking the vault from its own phrase, reading the [group roster](#group-key-epoch) and the two member-writable families, adopting a rotated group epoch from a delivered package rather than authenticating the rotated meta itself, and writing its own [display name](#member-display-name) and [device binding](#device-to-person-binding). Its credential is a `(person, vault)` **membership token**, not the vault's own device token, and it never holds the vault's `root_key`: the `group_key` and `itemsKey` arrive in the invite package and the root stays sealed to the owner's person key, which is why a member cannot re-sign an owner-signed record.
+
+The term became load-bearing when the plane stopped being `NTV6`-only. A vault born under a person identity is `NTV7` (the generation wraps `root_key` to the owner's person key), and the member plane used to resolve the group tail through a reader that asked for the `NTV6` frame specifically, so every member act answered `BadRequest` on exactly the vaults the product made shareable. The plane now reads the tail generation-agnostically through `parse_b2b_tail_any` and re-emits the generation it found (`decisions/protocol/0730`), which is a reader change and not a format change: `NTV7` keeps the `NTV6` tail byte for byte.
+
+Used in: `design-notes/protocol/0730-the-member-plane-reads-the-ntv7-generation.md`; `docs/spec/protocol.md` §9.3.5, §9.29.6, §9.30.6; `docs/spec/server-protocol.md` §3.1a; `core/src/plugins/sync/person_account.rs`.
 
 ### **member removal** &nbsp; 📦 *Product*
 
@@ -2497,31 +2582,53 @@ Used in: `design-notes/protocol/0656`; `docs/spec/protocol.md` §5.2, §10.7
 
 A person-level server account independent of any vault (`decisions/protocol/0603`, myne-md/myne#711). It authenticates with SCRAM whose secret derives from the person's recovery phrase under `"myne.v0.2 argon2id-person-server-auth|"` plus `person_id_hash`, so one person holds one account across every vault they belong to. A vault keeps its own `account_number` as its public id, its namespace and its pre-auth `GET /vault.meta` bootstrap key. Access to a vault is an authenticated membership binding (owner at registration, member at acceptance) that issues a per-vault bearer token, so revoking one binding affects one vault and no other. The server knows the pseudonymous person-to-vault mapping, which is the collaboration social graph accepted by decisions 0459, but reads no roster plaintext.
 
+**Amended 2026-10-22 (myne-md/myne#911):** the owner is no longer the last principal on the old model. A person account now owns vaults rather than needing one account per vault: it has a stable [person account number](#person-account-number) derived from its phrase, one [person token](#person-token) per device that addresses any of its vaults with the `?account=` selector ([account sync](#account-sync)), a [reserved identity](#reserved-identity) state for existing before it is registered, and an entitlement figure aggregated over the vaults it owns. Its devices are approved and revoked once for the whole account. A vault's own account number and token stay readable and working for vaults created before this, and their production has ended ([vault id](#vault-id), `decisions/storage/0723`).
+
 Used in: `design-notes/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/spec/server-protocol.md` §3
+
+### **person account number** &nbsp; 🗝️ *Key/identifier*
+
+The 20-character [account number](#account_number) of a [person account](#person-account), derived rather than sampled: the **leading 95 bits of the person id**, encoded with the same Crockford alphabet, the same Damm-32 check character, the same `MY-` display prefix and the same grouping a generated number uses (`account-number.md` §3.1, `decisions/protocol/0718`). Because `person_id = SHA-256("myne.person-id|" || phrase_normalized)[:16]`, the number is a pure function of the identity phrase: it is **derived, never stored, and never part of a [recovery kit](#recovery-kit)**, so a user who loses the printed number has lost nothing. It is not a secret and not a credential; it is the account identifier and the support handle, not a billing identity (Myne operates no paid tier, `decisions/sync/0696`), and knowing it authenticates nothing, though it does select the pre-authenticated metadata fetch for a legacy vault (see the account-number entry and `threat-model.md` §5). It is **never mixed into vault cryptography**: an `NTV7` vault binds its salts to its own random [vault id](#vault-id), not to any account-number hash.
+
+Used in: `docs/spec/account-number.md` §1, §3.1; `protocol/src/account_number.rs`; `design-notes/protocol/0718`
 
 ### **person identity** &nbsp; 📦 *Product*
 
-The addressable, recoverable person that Myne's first run is now rooted at (myne-md/myne#768, `decisions/ui/0615`). It is the [person account](#person-account) plus the [person keypair](#person-keypair) and the out-of-band [person identity code](#person-identity-code): the thing that can be invited to a vault and that owns zero or more vaults. It is vault-independent, so one identity spans every vault a person owns or belongs to, and it is created before a server-registered account can exist, which is why the first run configures a sync server before creating one. Distinct from a [vault](#vault), whose recovery phrase, account number and `root_key` stay its own, and distinct from the client-side account record, which is device-local grouping and carries no identity.
+The addressable, recoverable person that Myne's first run is now rooted at (myne-md/myne#768, `decisions/ui/0615`). It is the [person account](#person-account) plus the [person keypair](#person-keypair) and the out-of-band [person identity code](#person-identity-code): the thing that can be invited to a vault and that owns zero or more vaults. It is vault-independent, so one identity spans every vault a person owns or belongs to. It is minted **offline**, with no server present: the recovery phrase derives the person id and the keypair locally, and registration is a later explicit act the user performs from Settings or the identity home (`decisions/protocol/0719`), so a person who never registers has a complete local product and holds a [reserved identity](#reserved-identity). Distinct from a [vault](#vault): a vault born under the identity keeps no recovery phrase and no account number of its own, sealing its `root_key` to the person key in an `NTV7` frame whose salts bind a random [vault id](#vault-id) (`decisions/storage/0723`), while a vault created before the person plane keeps its own phrase, number and `root_key`. Distinct too from the client-side account record, which is device-local grouping and carries no identity.
 
 Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
 
+### **person token** &nbsp; 🗝️ *Key/identifier*
+
+The device token a person's SCRAM session on its [person account](#person-account) yields (`server-protocol.md` §3.1a, `decisions/sync/0720`). It is the SAME credential class as any device token, not a second kind: the server cannot tell a person id from a vault id, which is the property the whole B2B model leans on, and a new class would have had to be minted, stored, revoked and rotated beside the one that exists. What differs is what it addresses. A vault device token carries its vault, and a per-vault membership token carries its binding; a person token carries **no** vault, so a request names one with the `?account=<account_number_hash>` selector and the server authorizes it against the membership table per request (unbound is `403`, malformed is `400`, and neither falls back to the caller's own namespace). It lives in `person-auth.json`, one per device, and is revoked by revoking the device ([reserved identity](#reserved-identity) covers the token-less states).
+
+Used in: `docs/spec/server-protocol.md` §3.1a; `design-notes/sync/0720`
+
+### **person wrap** &nbsp; 🏗️ *Construction*
+
+*(Alias: person envelope.)*
+
+The 1208-byte envelope that seals a vault's `root_key` to its owner's [person keypair](#person-keypair), appended to an `NTV7` `vault.meta` (`spec/protocol.md` §9.3.5, `decisions/protocol/0717`). It is the same PQ-hybrid construction the per-recipient `itemsKey` wrap uses (ML-KEM-768 ciphertext, classical ephemeral Ed25519 public key, XChaCha20-Poly1305 ciphertext and the 32-byte CTX commitment), so opening it needs the private half of the person key, which the [identity phrase](#identity-phrase) derives, and a classical or a PQ break alone opens nothing. Its AAD is `AAD_person_wrap_root_key` (role `"person-wrap-root-key"`), bound to the recipient fingerprint and the vault's `items_key_id`, never to the vault id or `account_number_hash`. **It is a different message class from `AAD_person_wrap`** (role `"person-wrap-items-key"`), which wraps an `itemsKey` to a member: a wrap from one class must not be presentable as the other, which is why the two role strings are distinct. Its presence is what replaces the vault recovery phrase, so the owner's second credential is the identity phrase.
+
+Used in: `docs/spec/protocol.md` §9.3.5, §5.2; `protocol/src/vault_meta_ntv7.rs`; `design-notes/protocol/0717`
+
 ### **identity ceremony** &nbsp; 📦 *Product*
 
-The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0682`). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the identity is already registered server-side by the time the phrase renders, and the phrase is shown once, so Esc, a backdrop click and the close control are all withheld until the four words match. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
+The two-step flow that creates a [person identity](#person-identity) on desktop and mobile (`decisions/ui/0682`), and since myne-md/myne#911 the ceremony that fronts the first run (embedded in the first-run screen rather than only in a dialog). The first step shows the 24-word [identity phrase](#identity-phrase) behind a reveal; the second asks for four of its words, which is the [type-back challenge](#type-back-challenge). It deliberately does NOT dismiss while the challenge is unanswered: the phrase is shown once and the sealed frame is the only local copy of the account, so Esc, a backdrop click and the close control are all withheld until the four words match. **Amended 2026-10-22 (myne-md/myne#911):** the reason is no longer "the identity is already registered server-side by the time the phrase renders", because creation is offline and registration is a separate act. The non-dismissal is about the phrase being unrecoverable, which is a stronger reason than the one it replaces. A recovered identity draws no challenge and keeps ordinary dismissal, because typing all 24 words is already the demonstration.
 
 Used in: `src/components/IdentitySetupDialog.tsx`, `mobile/src/app/flows/IdentityFlow.tsx`, `decisions/ui/0682`
 
 ### **identity-first first run** &nbsp; 📦 *Product*
 
-The zero-vault first-run shape on desktop and mobile in which the person identity is offered before a vault (`decisions/ui/0615`, myne-md/myne#768). It forks between creating an identity and starting with a local vault; the identity arm runs a sync-server step, creates the identity, and lands on the identity home from which a bound vault is created or a pending invite accepted. The identity step is skippable, and a skipped user owns an identity-less vault and can add an identity later from Settings. The web client has no identity-first first run, because identity setup is unsupported there and the browser first run stays at account bootstrap.
+The zero-vault first-run shape on desktop and mobile, in which the person identity is created **before** any vault and there is no other door (`decisions/ui/0721`, which supersedes the fork and skip clauses of `decisions/ui/0615`). One primary action, "Create your identity and vault", runs the [identity ceremony](#identity-ceremony) and then vault creation. There is no fork between an identity and a local vault, no skip path, and no sync-server step: creation is offline (`decisions/protocol/0719`), and registration plus the endpoint are explicit acts in Settings and on the identity home. Leaving the flow is a **re-probe**, not a stage rollback, because the identity exists on disk by then. The web client has no identity-first ENTRY yet; its boot route still lands on account entry, which is the outstanding half of its person-plane work (`decisions/clients/0722`).
 
-Used in: `design-notes/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
+Used in: `src/screens/FirstRun.tsx`, `src/lib/stage.ts`, `mobile/src/app/flows/WelcomeFlow.tsx`, `design-notes/ui/0721`.
 
 ### **identity phrase** &nbsp; 🗝️ *Key/identifier*
 
-The person's 24-word recovery credential. It derives the deterministic person keypair and server-auth secret, and derives the key that seals a member's shared-vault keys on that device. It does not wrap a vault's `root_key`; that is the separate [recovery phrase](#recovery-phrase). The phrase itself stays on the device.
+The person's 24-word recovery credential. It derives the deterministic person keypair and server-auth secret, and derives the key that seals a member's shared-vault keys on that device. **Since myne-md/myne#911 it also recovers the vaults the person owns**: an `NTV7` vault seals `root_key` to the owner's person key (`protocol.md` §9.3.5), so the phrase opens the vault through the keypair instead of through a second, vault-specific phrase. That is why the separate [recovery phrase](#recovery-phrase) is retired for vaults born this way, and why a vault born before the change keeps its own phrase until its owner upgrades it explicitly. The phrase itself stays on the device, sealed.
 
-Used in: `design-notes/protocol/0604-deterministic-phrase-derived-person-identity.md`, `design-notes/protocol/0606-member-vault-key-store.md`, `design-notes/ui/0615-first-run-is-identity-first.md`.
+Used in: `design-notes/protocol/0604-deterministic-phrase-derived-person-identity.md`, `design-notes/protocol/0606-member-vault-key-store.md`, `design-notes/ui/0615-first-run-is-identity-first.md`, `design-notes/protocol/0717`.
 
 ### **person identity code** &nbsp; 🔑 *Identifier*
 
@@ -2543,6 +2650,18 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 (`docs/spec/protocol.md` §9.28.4), so the code DOES now reach the sync server, as
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
+
+**device admission.** The act of adding a device to a person account without typing the recovery phrase
+(`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
+has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
+them, compares a short authentication string between the two screens, and installs the credential
+(`POST /auth/devices/credential`, which also approves the device) and binds the newcomer's row in
+`vault.device-bindings`. The phrase keeps two jobs and loses the routine one: it is still the account's own
+credential and still the only path when no working device is left. A device that joined this way holds no person
+keypair, so it signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display
+name; the admitting device is the one that signs. Not to be confused with **device join**, the older flow that
+scans a QR carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
+
 
 Used in: `design-notes/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
 
@@ -2724,6 +2843,12 @@ Used in: `decisions/ai/0555`, `threat-model.md` TB13
 One change an [agent run](#agent-run) suggests to a note. It comes in three kinds. A REPLACE carries an [edit anchor](#edit-anchor) plus the text that replaces it. An APPEND carries no anchor at all, because there is nothing to anchor to: it adds text at the end of the body, which is the only shape that can write into an empty note (see [append verb](#append-verb)). A MOVE carries no anchor either, and its `replacement` is the destination FOLDER rather than note text, which is what lets the review show where the note would land and the [folder lock](#folder-lock) read the destination before the write (see [move verb](#move-verb)). One kind field on one list, rather than a second list, so every check that already runs over proposed edits keeps running over all three by construction. Proposed, never applied: it reaches the vault only through the user's per-note or per-edit approval on the review card, which is what SYNC-17's "explicit user action" now means. An edit whose replacement introduces a `trashed:` frontmatter timestamp is a deletion wearing a body edit's clothes, and is excluded from the bulk approve by construction rather than by a label.
 
 Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
+
+### **publish** &nbsp; 📦 *Product*
+
+The explicit act that turns a **device-only** vault into a server vault (myne-md/myne#911 task 8, `decisions/sync/0720`). A vault created from a person identity exists only on this device until its owner publishes it; publishing `PUT`s `vault.meta` to the vault's namespace and records that namespace on the device so every later sync request addresses it. The act is **idempotent** (a retry after a failure is safe) and **owner-at-first-write** on the server: a vault with no owner binding gains the publishing person as owner, a vault owned by this person is written, and a vault owned by anyone else is refused with `403` before any bytes are stored. The panel therefore reads **device only** or **published**, and an unpublished vault is the honest state a user can see and act on rather than a silent one. Distinct from **registration**, which is the account reaching a server at all, and from **enabling sync**, which is pointing a device at one.
+
+Used in: `docs/spec/server-protocol.md` §3.1a, `src/lib/sync-publish.ts`, `decisions/sync/0720`
 
 ### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
 
@@ -2960,9 +3085,11 @@ Used in: `spec/sync-protocol.md` §10.2, §10.2.1, `spec/protocol.md` §9.5.2, �
 
 ### **recovery kit** &nbsp; 📦 *Product*
 
-The single saveable artifact handed over at vault creation, carrying both the 24-word [recovery phrase](#recovery-phrase) and the vault's [account number](#account_number) (myne-md/myne#468). Before this the phrase and the account number were separate steps; the kit presents them together as plain text to save or copy, and the user's one acknowledgement covers the whole sheet. The account number identifies the vault for a second device and is never stored or re-displayed on the device itself, so creation is the only point at which it can be captured. The phrase and the account number landing in one artifact is a deliberate concentration and the reason `threat-model.md` TB3 records it: each alone is insufficient, the pair is account takeover.
+The single saveable artifact handed over at creation, carrying the 24-word [recovery phrase](#recovery-phrase) and the vault's [account number](#account_number) (myne-md/myne#468). Before this the phrase and the account number were separate steps; the kit presents them together as plain text to save or copy, and the user's one acknowledgement covers the whole sheet. The account number identifies the vault for a second device and is never stored or re-displayed on the device itself, so creation is the only point at which it can be captured. The phrase and the account number landing in one artifact is a deliberate concentration and the reason `threat-model.md` TB3 records it: each alone is insufficient, the pair is account takeover.
 
-Used in: `spec/recovery-flow.md` §2.2, `decisions/ui/0642`, `threat-model.md` TB3
+**Amended 2026-10-22 (myne-md/myne#911):** a vault born under the person plane has no phrase and no number of its own, and its creation shows **no kit at all**. The flow goes from the password step straight to writing the vault, with no phrase reveal and no type-back: the identity ceremony already revealed the [identity phrase](#identity-phrase) behind a reveal and put it through a four-word type-back before that vault existed (`decisions/ui/0682`, `spec/protocol.md` §7), so a second kit would ask the user to save the same 24 words twice. The number is absent because it is derived from that phrase ([person account number](#person-account-number)). The concentration this entry describes is unchanged in kind and larger in scope: the one value the ceremony handed over now recovers every vault the person owns, not one vault. The vault-phrase kit described above remains what a legacy vault shows and what the explicit upgrade retires.
+
+Used in: `spec/recovery-flow.md` §2.2, `decisions/ui/0642`, `design-notes/protocol/0717`, `threat-model.md` TB3
 
 ### **recovery drill** &nbsp; 📦 *Product*
 
@@ -2972,13 +3099,13 @@ Used in: `spec/recovery-flow.md` §3.6, `decisions/security/0640`, `decisions/se
 
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 
-The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as Myne's secondary credential for vault unlock. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation** — that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
+The 24-word BIP-39-encoded representation of 256 bits of secret entropy plus an 8-bit checksum, used as the **vault's** secondary credential. Generated at vault creation from OS CSPRNG output, presented to the user with a forced-confirmation flow before vault creation completes (`spec/protocol.md` §7.2; full UX in `spec/recovery-flow.md` §2). **Since `decisions/protocol/0717` a vault born under a person identity has NO vault phrase**: the recovery wrap is required to be all zero and the identity phrase ([identity phrase](#identity-phrase)) is the second credential, because `root_key` is sealed to the person key instead. This entry therefore describes `MYV1`/`NTV5`/`NTV6` vaults, which stay readable and recoverable forever. The phrase string, after NFKD normalization, is fed directly to Argon2id with `salt_recovery` to derive `recovery_wrap_key`. **Myne does not use BIP-39's standard PBKDF2-HMAC-SHA512 derivation**, that step is replaced by Argon2id with the same parameters as the password path. The phrase is never sent to any server. If the user loses both the phrase and the master password, the vault is permanently unrecoverable; this is a hard architectural commitment.
 
 Used in: `spec/protocol.md` §7, `spec/recovery-flow.md`
 
 ### **recovery_wrap_key** &nbsp; 🗝️ *Key/identifier*
 
-The 32-byte key derived from the recovery phrase via Argon2id with `salt_recovery`. Encrypts the second of the two copies of `root_key` in `vault.meta` (`enc_root_key_recovery`).
+The 32-byte key derived from the recovery phrase via Argon2id with `salt_recovery`. Encrypts the second of the two copies of `root_key` in `vault.meta` (`enc_root_key_recovery`) on `MYV1`/`NTV5`/`NTV6` vaults. On `NTV7` there is no such copy: its three fields are required to be zero (`spec/protocol.md` §9.3.5) and the second credential is the person envelope.
 
 Used in: `spec/protocol.md` §3.1, §7
 
@@ -3395,9 +3522,15 @@ Used in: `decisions.md` 2026-07-26 (web E2E policy); `docs/dev/e2e.md`; `web/src
 
 ### **size class** &nbsp; 📦 *Product*
 
-The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing). Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
+The mobile client's layout axis — the discriminator that decides which pane composition the wired app renders, **derived from window geometry, never from device brand**: `compact` (the phone's full-screen list ⇄ editor swap), `compactWide` (600 to 700px on a phone-class screen: ONE column, the note at its own measure, the list as an overlay drawer — the [folded band](#folded-band)), `medium` (≥700px: list + detail two-pane), `expanded` (≥1000px: the WS-01 three-pane — sidebar 248 / list 316 / editor). Two inputs: the **window width** (`window.innerWidth`, so an iPad Split View pane narrowed to phone width falls back to the phone layout, and the Playwright flow tier drives every layout purely by viewport) and a **phone guard** on `window.screen`'s smaller dimension (< 480px → always `compact`; reading `screen` rather than window height keeps the Android IME — which shrinks the layout viewport — from flipping the layout and remounting the editor mid-typing), which **yields when the window is wider than the widest dimension of the screen it reports** (a foldable can report the panel the user is not looking at, and that stale reading looks exactly like this). "Can this layout mount a second pane" is answered by `isRegularSizeClass`, never by comparing to `"compact"`: the band is one column and is not regular. Orthogonal to [platform](#platform) (`PlatformContext` keeps owning biometric copy / brand concerns; `SizeClassContext` owns layout). Breakpoint budget mirrors the desktop `layoutClamp.ts` discipline (editor pane ≥ 360px, the desktop `CENTER_MIN_WIDTH`).
 
-Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `mobile/src/formfactor/SizeClassContext.tsx`
+Used in: `decisions.md` 2026-07-12 "Mobile tablet strategy"; `decisions/clients/0724` (the folded band); `mobile/src/formfactor/SizeClassContext.tsx`
+
+### **folded band** &nbsp; 📦 *Product*
+
+The one-column layout an unfolded foldable gets: a window of 600 to 700px whose screen's smaller dimension is under 700px, which every iPad clears (744 and up), so an iPad Split View pane at the same width keeps the phone layout it has always had. Inside it the note takes the full width with the [size class](#size-class) measure (`maxWidth` 664 with the phone's 22px gutter, so 620px of text at the top of the band) and the list arrives as a ~320px overlay drawer on the inline-start edge instead of replacing the note, because at that width a persistent pane would put the note below the desktop centre floor. A [size-class](#size-class) transition restores the caret, the selection and the scroll offset and knowingly not the undo history (`mobile/src/app/flows/editor/caretRestore.ts`).
+
+Used in: `decisions/clients/0724`; `mobile/AGENTS.md`; `mobile/src/formfactor/SizeClassContext.tsx`
 
 ### **skip (a recurring task)** &nbsp; 📦 *Product*
 
@@ -4055,6 +4188,46 @@ The `uuid → content_nonce` map of a vault's **content blobs only** (notes + at
 
 Used in: `spec/sync-protocol.md` (vault head)
 
+### **vault id** &nbsp; 📋 *Protocol*
+
+The 16-byte value an `NTV7` vault writes into the `vault.meta` offset-6 slot
+(`protocol.md` §9.3, §9.3.5; `decisions/protocol/0717`). Both Argon2id salts bind
+it (§3.1), every singleton AAD in §5.2 uses it as the vault binding, and the
+roster and the sync wire carry the same bytes, so it is what makes a vault bound
+to itself rather than to an account. **It is random only at BIRTH.** A vault
+upgraded from `NTV6` to `NTV7` keeps the 16 bytes it already had, which are its
+historical `account_number_hash`, because the server's blobs are stored under that
+value; `decisions/protocol/0717` scopes its linkability argument to the born case
+for the same reason, and the magic cannot tell the two apart. It is **created once, at birth, and shared by every device of that
+vault**: a second device reads it out of the metadata it fetched. **The word is
+overloaded, and the overloading has already cost a design round, so the two
+senses are named here.** A *container id* is device-local: the directory name
+under `vaults/<id>/` (a browser's OPFS layout is the visible case) that a device
+mints when it creates or joins a vault. A container id is never on the wire, never
+enters vault cryptography, and **cannot** be the salt binding, because a second
+device mints its own and the password wrap would not re-derive there. The third
+value in this neighbourhood is the legacy **vault account number**, whose hash
+occupied the same offset-6 slot in `MYV1`/`NTV5`/`NTV6`; that number is still what
+a legacy vault displays and still what its recovery-by-number path matches.
+
+Used in: `docs/spec/protocol.md` §3.1, §9.3, §9.3.5; `core/src/plugins/vault_creation/commands.rs`;
+`design-notes/protocol/0717`
+
+### **vault format upgrade** &nbsp; 📋 *Protocol*
+
+The explicit, owner-only, in-place move of an existing `vault.meta` from `NTV5` or
+`NTV6` to `NTV7` (`protocol.md` §10.4.2; `decisions/storage/0723`). It appends the
+person envelope over `root_key` sealed to the owner's person key and zeroes the
+three recovery-phrase-wrap fields in ONE atomic write, so **the saved vault phrase
+stops opening the vault**: the identity phrase replaces it, and the vault password
+keeps working. Irreversible, refused on a shared vault, and it makes the frame
+unreadable to any client that predates `NTV7` once it syncs. Distinct from
+[migration (cross-major)](#migration-cross-major), which re-keys and re-encrypts
+the whole vault between major versions and is what a `MYV1` vault needs first.
+
+Used in: `docs/spec/protocol.md` §10.4.2; `design-notes/storage/0723`;
+`core/src/plugins/vault_migrate/ntv7.rs`; the Settings "Vault format" row
+
 ### **vault invite** &nbsp; 📦 *Product*
 
 The B2B member invitation (`myne-md/myne#698`, `design-notes/protocol/0592`):
@@ -4127,7 +4300,7 @@ Used in: `design-notes/protocol/0592`; `design-notes/protocol/0593`; `core/src/p
 
 ### **vault picker** &nbsp; 📦 *Product*
 
-The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped under that account's label, which is user-renamable and likewise readable pre-unlock from the sealed device-local account record. Pre-unlock it surfaces only the vault **count + last-unlock timing** plus account **labels and grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and account labels both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
+The startup vault-selection surface, shown **only when ≥2 vaults exist** (0 vaults → Welcome; exactly 1 → unlock directly): a payload-free `{ name: "picker" }` [Stage](#slot) variant produced only by the boot probe `initialStageFromProbe(vaultList, slotMap)`, never via `transition`. Lists each discovered vault (disk-scan + [vault registry](#vault-registry)) by a neutral fallback label ("Vault N", ordered most-recently-opened first); real labels stay encrypted in each vault's [vault.prefs](#vaultprefs) and show only for a this-session-unlocked vault. Selecting a row opens that vault (its [VaultId](#vaultid) flows to the unlock IPC; lock-then-unlock evicts any prior open vault). A distinct "Create another vault" affordance routes to vault creation. Vaults that belong to an [account](#account) are grouped by account, a relation likewise readable pre-unlock from the sealed device-local account record. An account has no name of its own: a surface that draws a group heading builds it from the names of the vaults inside it (`decisions/ui/0728`), and the desktop picker draws no heading at all (myne-md/myne#772). Pre-unlock it surfaces only the vault **count + last-unlock timing** plus the account **grouping** (accepted leaks, `threat-model.md` §7). It never shows note content, passwords, or recovery material. Vault names and the grouping both follow the [hide vault names](#hide-vault-names) option: with it on, the picker lists every vault individually with no headers and the account actions are refused. The recovery picker reuses the same view-model.
 
 Used in: `decisions.md` 2026-06-09 "Multi-vault onboarding + vault picker"
 
@@ -4155,7 +4328,9 @@ Used in: `decisions.md` 2026-06-09 "Multi-vault in-app switcher + label manageme
 
 The single binary file holding vault-level cryptographic state. Magic bytes `MYV1` for v0.1. Layout per `spec/protocol.md` §9.3: protocol version, account_number_hash, the 11-byte canonical KDF parameters block, both salt-randomness fields (`random_salt_password_16`, `random_salt_recovery_16`), nonces and ciphertexts for both wrapped root-key copies (`enc_root_key_password`, `enc_root_key_recovery`), and the items_key_id, items_key_nonce, and `enc_items_key`. `vault.meta` plus the `.myn` files are the only artifacts that leave the device in any future sync scenario; both are opaque ciphertext plus a small public header.
 
-Used in: `spec/protocol.md` §9.3
+**Three generations exist and all three stay readable** (`spec/protocol.md` §10.3): `NTV5` (v0.2, both credential wraps, the birth format until the person plane), `NTV6` (adds the B2B tail: owner-wrapped group key, epoch, signed roster) and `NTV7` (adds the person wrap of `root_key` and requires the phrase wrap to be all zero, `spec/protocol.md` §9.3.5). `NTV7` is what a vault born under a person identity carries, and it is what the explicit upgrade targets. On an `NTV7` vault the offset-6 field holds a random [vault id](#vault-id) rather than an account-number hash.
+
+Used in: `spec/protocol.md` §9.3, §9.3.2, §9.3.5
 
 ### **vault.prefs** &nbsp; 📦 *Product*
 
@@ -4406,7 +4581,7 @@ The **Library** column names what Myne's own clients actually link — `protocol
 | `server-auth` subkey | Sync-server authentication secret — **active**: the SCRAM-SHA-256 credential the sync client derives at enroll and on every cycle (`core/src/plugins/sync/{cycle,enroll,orchestrator}.rs`) | Derived only; **never transmitted** (SCRAM proves it, the server stores only a verifier) | Session |
 | `backup-key` | Reserved for a future sealed-backup variant — not used in v0.1 (demoted 2026-06-10) | Derived only (reserved) | — |
 | `head_mac_key` | [Vault head](#vault-head) fork-consistency MAC (`vault-head-mac`) — **active**: every pull MAC-verifies the head before reading it (`protocol/src/vault_head.rs::open_vault_head`, called from `core/src/plugins/sync/engine.rs`) | Derived only | Session |
-| `account_number` (95-bit + Damm) | User identifier; bearer token in P2+ | User offline storage | Permanent |
+| `account_number` (95-bit + Damm) | User identifier, **not a credential** (`decisions/protocol/0718`); a person number is derived from the phrase rather than stored | User offline storage (a person number is never stored: it is re-derived) | Permanent |
 | `account_number_hash` (SHA-256[:16]) | Argon2id salt binding | `vault.meta` | Vault lifetime |
 
 ### Index 3 — Magic bytes and context-prefix registries
@@ -4414,7 +4589,7 @@ The **Library** column names what Myne's own clients actually link — `protocol
 | Major version | Per-note magic | Vault-meta magic | AAD prefix | Context-string prefix | Status |
 |---|---|---|---|---|---|
 | v0.1 | `MY01` | `MYV1` | `"myne.v0.1|"` | `"myne.v0.1 "` | Active (this document) |
-| v0.2 | `NC05` | `NTV5` | `"myne.v0.2\|"` | `"myne.v0.2 "` | Active: the birth format since 2026-08-13 (§10.3.1); `MYP5`/`MYA5`/`MYC5`/`MYD5`/`MYT5` ship with it |
+| v0.2 | `NC05` | `NTV5` / `NTV6` / `NTV7` | `"myne.v0.2\|"` | `"myne.v0.2 "` | Active: the birth format since 2026-08-13 (§10.3.1); `MYP5`/`MYA5`/`MYC5`/`MYD5`/`MYT5` ship with it |
 | next major (reserved) | `NT05` | `NTV5` | not pre-allocated | not pre-allocated | Reserved; the next major version defines its own AAD/HKDF prefix. Note `NTV5` is consumed by v0.2 above, so which magic the next major's `vault.meta` carries is an open question rather than a settled reservation |
 
 The four prefixes for a single major version are deliberately non-interchangeable: each lives in a different cryptographic call site, and using one in place of another is a protocol violation. See entry **`myne.v0.1` prefix** and `spec/protocol.md` §10.3.

@@ -13,6 +13,9 @@ pub struct Args {
     pub help: bool,
     /// Unlock with the recovery phrase instead of the master password.
     pub recovery: bool,
+    /// Unlock with the IDENTITY phrase instead of the master password
+    /// (`NTV7` vaults, whose second credential is the person's, not a vault's).
+    pub identity: bool,
     /// Also export note snapshots.
     pub history: bool,
     /// Skip the cloud-sync warning.
@@ -28,6 +31,7 @@ pub struct Args {
 pub fn parse(raw: &[String]) -> Result<Args, String> {
     let mut help = false;
     let mut recovery = false;
+    let mut identity = false;
     let mut history = false;
     let mut yes = false;
     let mut positional: Vec<String> = Vec::new();
@@ -36,6 +40,7 @@ pub fn parse(raw: &[String]) -> Result<Args, String> {
         match arg.as_str() {
             "--help" | "-h" => help = true,
             "--recovery" => recovery = true,
+            "--identity" => identity = true,
             "--history" => history = true,
             "--yes" => yes = true,
             s if s.starts_with("--") => {
@@ -49,11 +54,19 @@ pub fn parse(raw: &[String]) -> Result<Args, String> {
         return Ok(Args {
             help,
             recovery,
+            identity,
             history,
             yes,
             source: String::new(),
             out_dir: String::new(),
         });
+    }
+
+    // Two credentials, two flags, and passing both is a usage error rather than
+    // a silent precedence: the person phrase and a vault recovery phrase are
+    // different secrets and only one of them can open a given vault.
+    if recovery && identity {
+        return Err("--recovery and --identity are different credentials; pass one".into());
     }
 
     if positional.len() != 2 {
@@ -67,6 +80,7 @@ pub fn parse(raw: &[String]) -> Result<Args, String> {
     Ok(Args {
         help,
         recovery,
+        identity,
         history,
         yes,
         source: it.next().expect("len checked"),
@@ -87,13 +101,23 @@ mod tests {
         let a = parse(&v(&["/vault", "/out"])).expect("parse");
         assert_eq!(a.source, "/vault");
         assert_eq!(a.out_dir, "/out");
-        assert!(!a.recovery && !a.history && !a.yes);
+        assert!(!a.recovery && !a.identity && !a.history && !a.yes);
     }
 
     #[test]
     fn flags_parse_in_any_order() {
         let a = parse(&v(&["--recovery", "--history", "--yes", "v", "o"])).expect("parse");
         assert!(a.recovery && a.history && a.yes);
+    }
+
+    #[test]
+    fn the_identity_flag_is_its_own_credential_mode() {
+        let a = parse(&v(&["--identity", "v", "o"])).expect("parse");
+        assert!(a.identity && !a.recovery);
+        assert!(
+            parse(&v(&["--identity", "--recovery", "v", "o"])).is_err(),
+            "two credential modes at once is a usage error"
+        );
     }
 
     #[test]

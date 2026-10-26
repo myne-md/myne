@@ -8,6 +8,12 @@
 //! (`docs/spec/protocol.md` § 3.1) so vault keys cannot be precomputed
 //! across accounts.
 //!
+//! Two entry points fill those 95 bits, and they share the encoder below
+//! (`from_entropy_95`) so the framing cannot drift between them:
+//! [`generate_account_number`] samples them from the OS CSPRNG (the
+//! vault-era number), and [`account_number_from_person_id`] takes the
+//! leading 95 bits of a person id (the person account, § 3.1 of the spec).
+//!
 //! ## Damm-32 quasigroup
 //!
 //! Spec `account-number.md` § 4.2 freezes the 32×32 quasigroup table.
@@ -42,6 +48,11 @@ const CROCKFORD: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 /// 19 entropy characters × 5 bits = 95 bits.
 pub const ENTROPY_CHARS: usize = 19;
+
+/// Bits the canonical form carries: [`ENTROPY_CHARS`] × 5. The width both
+/// entry points encode, whether the bits came from the OS CSPRNG or from the
+/// leading bits of a person id.
+pub const ENTROPY_BITS: u32 = (ENTROPY_CHARS as u32) * 5;
 
 /// 1 Damm-32 check character.
 pub const CHECK_CHARS: usize = 1;
@@ -244,7 +255,45 @@ pub fn generate_account_number() -> Result<AccountNumber, ProtocolError> {
     // arithmetic simple.
     let mut buf = [0u8; 16];
     buf[4..16].copy_from_slice(&bytes);
-    let n = u128::from_be_bytes(buf);
+    Ok(from_entropy_95(u128::from_be_bytes(buf)))
+}
+
+/// The person's account number, derived rather than generated
+/// (`account-number.md` §3.1, myne-md/myne#911).
+///
+/// The 20-character canonical form is a display encoding of the **leading
+/// 95 bits** of the person id: the top 95 bits of the big-endian 16-byte
+/// value, encoded most-significant-group-first into the 19 Crockford
+/// characters, with the Damm-32 check character over them. Every structural
+/// element is unchanged from [`generate_account_number`] (alphabet, bit
+/// width, check character, display grouping), so the same parser validates
+/// both and the frozen table in §4.2 still applies.
+///
+/// **Why the top bits.** A person id is `SHA-256(...)[:16]`, so every 95-bit
+/// window of it is uniformly random and the choice carries no security
+/// weight. It is frozen here because it is load-bearing through *identity*:
+/// two implementations that picked different 95 bits would show a different
+/// number for the same phrase, and the number is what a support handoff or a
+/// self-host operator reads out loud. `person-account-number` vectors pin it.
+///
+/// The number is derived, never stored, and never part of a recovery kit: it
+/// is not a secret, and knowing it grants nothing because access is
+/// authenticated (`account-number.md` §1).
+pub fn account_number_from_person_id(person_id: &[u8; 16]) -> AccountNumber {
+    // Big-endian means the first byte holds the most significant bits, and
+    // shifting the 128-bit value right by `128 - 95` discards the 33 LOW
+    // bits, which is what "the leading 95 bits" means. Do not reach for a
+    // mask: `>> 33` and `& 0x7FFF…` select opposite windows.
+    from_entropy_95(u128::from_be_bytes(*person_id) >> (128 - ENTROPY_BITS))
+}
+
+/// Encode a 95-bit value into the canonical form, its Damm-32 check
+/// character, the display grouping and the salt hash.
+///
+/// The one encoder for both entry points, so the derived number and the
+/// generated one cannot drift in how the bits become characters.
+fn from_entropy_95(n: u128) -> AccountNumber {
+    debug_assert!(n >> ENTROPY_BITS == 0, "value wider than 95 bits");
 
     let mut canonical = [0u8; CANONICAL_LEN];
     let mut digits = [0u8; ENTROPY_CHARS];
@@ -258,11 +307,11 @@ pub fn generate_account_number() -> Result<AccountNumber, ProtocolError> {
     let check = damm32_checksum(&digits);
     canonical[ENTROPY_CHARS] = CROCKFORD[check as usize];
 
-    Ok(AccountNumber {
+    AccountNumber {
         display: format_display(&canonical),
         canonical,
         hash: sha256_first_16(&canonical),
-    })
+    }
 }
 
 /// Liberal-parse an account number per `account-number.md` § 5.
@@ -796,7 +845,294 @@ mod tests {
         assert_eq!(&acct.canonical, b"0123456789ABCDEFGHJT");
     }
 
+    // ---- person-derived number (myne-md/myne#911) ---------------------
+
+    /// The phrase the `person-keypair` vectors already use, so the person id
+    /// below is the same value two vector families pin.
+    const PERSON_PHRASE: &str =
+        "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about";
+
+    #[test]
+    fn person_id_of_the_pinned_phrase_is_the_vector_value() {
+        // Computed OUTSIDE this crate and independent of it:
+        // `printf 'myne.person-id|<phrase>' | sha256sum | head -c 32`. Pinning
+        // it here is what makes the number below a claim about the CHAIN
+        // (phrase -> id -> number) rather than about this crate agreeing with
+        // itself.
+        let id = crate::kdf::person_id_hash(PERSON_PHRASE);
+        assert_eq!(
+            &id,
+            b"\xf0\xec\x05\xd8\x20\x51\xc0\xae\x19\x0e\xf7\x14\xc5\x13\x7d\x03"
+        );
+    }
+
+    #[test]
+    fn person_account_number_is_pinned_for_the_known_phrase() {
+        let id = crate::kdf::person_id_hash(PERSON_PHRASE);
+        let acct = account_number_from_person_id(&id);
+
+        // Expected canonical computed independently: the top 95 bits of the
+        // big-endian id (`int.from_bytes(id, "big") >> 33`), grouped five bits
+        // at a time most-significant-first through the Crockford alphabet,
+        // then the Damm-32 check digit over those 19 indices.
+        assert_eq!(&acct.canonical, b"Y3P0BP10A70AW68EYWAZ");
+        assert_eq!(acct.display, "MY-Y3P0-BP10-A70A-W68E-YWAZ");
+        assert_eq!(
+            &acct.hash,
+            b"\xd5\xa0\x58\xff\xbe\x51\x54\x3b\xf8\x64\x97\xf1\x7b\x72\xcb\x50"
+        );
+    }
+
+    #[test]
+    fn person_account_number_reads_the_leading_95_bits() {
+        // Hand-computable orientations. An id whose only set bit is the most
+        // significant one (bit 127, the high bit of byte 0) puts index 16 in
+        // the first character and zero in the other eighteen; an id with no
+        // set bit in the top 95 produces the all-zero canonical. Taking the
+        // LOW 95 bits instead, or reading the bytes little-endian, moves both
+        // of these.
+        let top_bit = {
+            let mut id = [0u8; 16];
+            id[0] = 0x80;
+            id
+        };
+        let acct = account_number_from_person_id(&top_bit);
+        assert_eq!(&acct.canonical, b"G000000000000000000F");
+        assert_eq!(acct.display, "MY-G000-0000-0000-0000-000F");
+
+        // Bytes 4..16 all zero, with the low 33 bits set to 1s: still nothing
+        // in the top 95 bits, so the number is the zero canonical.
+        let low_bits = {
+            let mut id = [0u8; 16];
+            id[12..16].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+            id[11] = 0x01; // bit 32, still below the window
+            id
+        };
+        assert_eq!(
+            &account_number_from_person_id(&low_bits).canonical,
+            b"00000000000000000000"
+        );
+        assert_eq!(
+            account_number_from_person_id(&[0u8; 16]).display,
+            "MY-0000-0000-0000-0000-0000"
+        );
+    }
+
+    #[test]
+    fn person_account_number_parses_back_to_itself() {
+        // The derived form is an ordinary account number: the one parser
+        // validates it, so a number read out loud and typed back is the same
+        // value.
+        let acct = account_number_from_person_id(&crate::kdf::person_id_hash(PERSON_PHRASE));
+        let parsed = parse_account_number(&acct.display).expect("derived display must parse");
+        assert_eq!(parsed, acct);
+
+        // And an altered character still fails: the check character is
+        // computed, not decorative. Pick a replacement that differs whichever
+        // character the vector happens to carry at that index.
+        let mut altered = acct.canonical;
+        altered[7] = if acct.canonical[7] == b'1' {
+            b'2'
+        } else {
+            b'1'
+        };
+        assert!(parse_account_number(core::str::from_utf8(&altered).unwrap()).is_err());
+    }
+
+    #[test]
+    fn person_account_number_uses_the_registered_check_character() {
+        // The derived path adds no second check algorithm: the last character
+        // is `damm32_checksum` over the 19 indices this feature produced, so a
+        // port that computed a check over different bits would still agree with
+        // itself and disagree with us. The TABLE itself is pinned by the two
+        // `damm32_table_*` golden-lock tests above and by the `damm32-table`
+        // companion vectors, which this change does not touch.
+        let acct = account_number_from_person_id(&crate::kdf::person_id_hash(PERSON_PHRASE));
+        let mut digits = [0u8; ENTROPY_CHARS];
+        for (i, &c) in acct.canonical[..ENTROPY_CHARS].iter().enumerate() {
+            digits[i] = crockford_index(c).expect("canonical entropy char is in the alphabet");
+        }
+        assert_eq!(
+            acct.canonical[ENTROPY_CHARS],
+            CROCKFORD[damm32_checksum(&digits) as usize]
+        );
+    }
+
     // ---- KAT vector regenerator (companion repo) ---------------------
+
+    /// Emits the `person-account-number` cross-implementation vector set for
+    /// `myne-test-vectors/vectors/person-account-number/v0.2/cases.json`.
+    ///
+    /// Five `derive` cases pin one thing: phrase or person id in, the 20-char
+    /// canonical body out. `input_person_id_hex` is the NORMATIVE input (this
+    /// family owns the second hop, id -> number); `input_phrase` is carried so
+    /// a port can also pin the first hop (`person_id_hash`) end to end.
+    ///
+    /// Two of the cases are hand-computable, which is what makes the family
+    /// worth anything beyond a self-portrait: the all-zero id yields the
+    /// all-zero canonical, and an id whose only set bit is bit 127 yields
+    /// `G` followed by eighteen `0`s. Both are asserted here at mint, so a
+    /// swapped window (`>> 33` vs a low-95-bit mask), a little-endian read or a
+    /// moved bit order fails the GENERATOR rather than being frozen as truth.
+    ///
+    /// `#[ignore]`. Run:
+    /// `cargo test -p protocol --lib emit_person_account_number_vectors_for_paste -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_person_account_number_vectors_for_paste() {
+        extern crate std;
+        use alloc::format;
+        use alloc::string::String;
+
+        struct DeriveCase {
+            slug: &'static str,
+            description: &'static str,
+            phrase: Option<&'static str>,
+            person_id: [u8; 16],
+        }
+
+        let second_phrase =
+            "legal winner thank year wave sausage worth useful legal winner thank yellow";
+
+        let top_bit = {
+            let mut id = [0u8; 16];
+            id[0] = 0x80;
+            id
+        };
+        let below_window = {
+            let mut id = [0u8; 16];
+            id[12..16].copy_from_slice(&[0xff, 0xff, 0xff, 0xff]);
+            id[11] = 0x01;
+            id
+        };
+        let lowest_window_bit = {
+            let mut id = [0u8; 16];
+            id[11] = 0x02; // bit 33, the least significant bit the window keeps
+            id
+        };
+
+        let cases: [DeriveCase; 5] = [
+            DeriveCase {
+                slug: "derive-known-phrase",
+                description: "The phrase the person-keypair family already pins. The top 95 bits of its person id, five bits at a time most-significant-first, plus the Damm-32 check digit.",
+                phrase: Some(PERSON_PHRASE),
+                person_id: crate::kdf::person_id_hash(PERSON_PHRASE),
+            },
+            DeriveCase {
+                slug: "derive-second-phrase",
+                description: "A different phrase, so the family cannot pass by ignoring its input.",
+                phrase: Some(second_phrase),
+                person_id: crate::kdf::person_id_hash(second_phrase),
+            },
+            DeriveCase {
+                slug: "derive-all-zero-id",
+                description: "All-zero person id: the canonical body is twenty `0` characters (the Damm-32 check over nineteen zero indices is zero).",
+                phrase: None,
+                person_id: [0u8; 16],
+            },
+            DeriveCase {
+                slug: "derive-top-bit-id",
+                description: "Only bit 127 set. The leading five-bit group carries index 16 (`G`) and the rest are zero; a reader that took the LOW 95 bits would emit all zeros here instead.",
+                phrase: None,
+                person_id: top_bit,
+            },
+            DeriveCase {
+                slug: "derive-below-window-id",
+                description: "Only bits 0..=32 set, all of them outside the window. Must produce the all-zero canonical body; a mask that kept the low 95 bits would not.",
+                phrase: None,
+                person_id: below_window,
+            },
+        ];
+
+        // Mint-time orientation assertions: the two hand-computable cases are
+        // the ones that distinguish this window from any other.
+        assert_eq!(
+            &account_number_from_person_id(&[0u8; 16]).canonical,
+            b"00000000000000000000",
+            "all-zero id must encode as the all-zero body"
+        );
+        assert_eq!(
+            &account_number_from_person_id(&top_bit).canonical,
+            b"G000000000000000000F",
+            "bit 127 must land in the FIRST five-bit group"
+        );
+        assert_eq!(
+            &account_number_from_person_id(&below_window).canonical,
+            b"00000000000000000000",
+            "bits below the window must not reach the body"
+        );
+        // The lowest bit the window keeps reaches the LAST entropy character.
+        assert_eq!(
+            &account_number_from_person_id(&lowest_window_bit).canonical,
+            b"00000000000000000012",
+            "bit 33 must land in the LAST five-bit group"
+        );
+
+        let mut dump = String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"person-account-number\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §3.1 + account-number.md §3.1\",\n");
+        dump.push_str("  \"description\": \"Pins the person-derived account number: the leading 95 bits of the big-endian 16-byte person id, encoded five bits at a time most-significant-first through the Crockford alphabet, plus the frozen Damm-32 check character over the 19 indices. The alphabet, the check character, the display grouping and the account_number_hash rule are unchanged from account-number.md §2 to §6; only the bit source differs from a generated number. `input_person_id_hex` is the normative input, `input_phrase` is informational so a port can pin the phrase-to-id hop too.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        for (i, case) in cases.iter().enumerate() {
+            let acct = account_number_from_person_id(&case.person_id);
+            // Every emitted number must survive the one parser: a frozen
+            // vector that its own validator rejects is worse than no vector.
+            let reparsed = parse_account_number(&acct.display)
+                .expect("mint-time self-check: the emitted display must parse");
+            assert_eq!(reparsed, acct);
+
+            dump.push_str("    {\n");
+            dump.push_str(&format!(
+                "      \"vector_id\": \"person-account-number/v0.2/{}\",\n",
+                case.slug
+            ));
+            dump.push_str(&format!(
+                "      \"description\": \"{}\",\n",
+                case.description
+            ));
+            dump.push_str("      \"case_kind\": \"derive\",\n");
+            if let Some(phrase) = case.phrase {
+                dump.push_str(&format!(
+                    "      \"input_phrase_utf8_hex\": \"{}\",\n",
+                    hex_lower(phrase.as_bytes())
+                ));
+            }
+            dump.push_str(&format!(
+                "      \"input_person_id_hex\": \"{}\",\n",
+                hex_lower(&case.person_id)
+            ));
+            dump.push_str(&format!(
+                "      \"expected_canonical_ascii\": \"{}\",\n",
+                core::str::from_utf8(&acct.canonical).unwrap()
+            ));
+            dump.push_str(&format!(
+                "      \"expected_display_ascii\": \"{}\",\n",
+                acct.display
+            ));
+            dump.push_str(&format!(
+                "      \"expected_account_number_hash_hex\": \"{}\"\n",
+                hex_lower(&acct.hash)
+            ));
+            if i + 1 < cases.len() {
+                dump.push_str("    },\n");
+            } else {
+                dump.push_str("    }\n");
+            }
+        }
+
+        dump.push_str("  ]\n");
+        dump.push_str("}\n");
+
+        std::fs::write(
+            "/tmp/myne_person_account_number_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write person-account-number vectors dump");
+        std::println!("{dump}");
+    }
 
     /// Emits the full `cases.json` for
     /// `myne-test-vectors/vectors/account-number/v0.1/cases.json` as a

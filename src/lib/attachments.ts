@@ -1,9 +1,9 @@
 // Tauri IPC wrappers for the `attachments` plugin (MYND-169 / MYND-170).
 //
 // Mirrors the Rust DTOs + error enums in:
-//   - src-tauri/src/plugins/attachments/commands.rs (ImportSource,
+//   - core/src/plugins/attachments/commands.rs (ImportSource,
 //     ImportedAttachment, CatalogEntry, attachment_rename)
-//   - src-tauri/src/plugins/attachments/error.rs    (AttachmentImportError,
+//   - core/src/plugins/attachments/error.rs    (AttachmentImportError,
 //     CatalogListError, AttachmentDeleteError, AttachmentRenameError)
 //
 // No mock layer (src/AGENTS.md "Tauri command bindings") — the real
@@ -151,6 +151,11 @@ export type AttachmentUnusedListError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** The vault is a shared (`NTV6`) one, so every conversation lives in a
+   *  person-scoped store this session cannot fully read: no attachment can be
+   *  proven unused, and the list is refused rather than returned empty
+   *  (myne-md/myne#913). */
+  | { kind: "ConversationsNotProvable" }
   /** This device has not finished syncing, so the unused set would be computed
    *  over a fraction of the corpus (phase3-web-client task 89). */
   | { kind: "CorpusIncomplete" }
@@ -163,6 +168,10 @@ export type AttachmentCleanUnusedError =
   | { kind: "Io"; detail: { io_error_kind: IoFailureKind } }
   | { kind: "InvalidVaultMeta" }
   | { kind: "NoteScanFailed" }
+  /** A conversation could not be read while re-verifying references, so the
+   *  sweep refused and erased nothing. Fail-closed for EVERY row, because a
+   *  library attachment can be referenced only by a conversation turn. */
+  | { kind: "ConversationScanFailed" }
   /** See {@link AttachmentUnusedListError}. Re-checked at the destructive step,
    *  because the list is advisory and storage can shrink between the two. */
   | { kind: "CorpusIncomplete" }

@@ -73,6 +73,44 @@ describe("SyncUsageBlock", () => {
     expect(screen.getByTestId("sync.usage-frozen")).toBeTruthy();
   });
 
+  it("renders ONE account figure, with no meter, when the status is a person total", () => {
+    // myne-md/myne#911 task 11: a person account's stored bytes are a SUM over
+    // its owned vaults, and the ceiling beside them is reported rather than
+    // enforced (server-protocol §7.1). So this arm shows the total and what it
+    // spans, and NO meter: a meter would claim an enforcement the server does not
+    // perform, and the denominator would be a ceiling no single vault is judged
+    // against.
+    render(
+      <SyncUsageBlock
+        showStorage
+        status={status({ stored_bytes: 5 * GIB, person: true, vault_count: 2 })}
+      />,
+    );
+
+    const storage = screen.getByTestId("sync.usage-storage").textContent ?? "";
+    expect(storage).toContain("5 GiB");
+    // Not the per-vault "of <total>" shape, even with a ceiling set.
+    expect(storage).not.toContain("10 GiB");
+    expect(screen.queryByTestId("sync.usage-meter")).toBeNull();
+    expect(screen.getByTestId("sync.usage-vault-count").textContent).toContain("2");
+  });
+
+  it("still renders a per-vault figure and meter when the status is not a person total", () => {
+    // The same component, one bit different: a vault session keeps today's
+    // rendering, which is what makes the person arm additive rather than a
+    // replacement.
+    render(
+      <SyncUsageBlock
+        showStorage
+        status={status({ stored_bytes: 3 * GIB, person: false, vault_count: 0 })}
+      />,
+    );
+
+    expect(screen.getByTestId("sync.usage-storage").textContent).toContain("10 GiB");
+    expect(screen.getByTestId("sync.usage-meter")).toBeTruthy();
+    expect(screen.queryByTestId("sync.usage-vault-count")).toBeNull();
+  });
+
   it("clamps the meter when usage exceeds the ceiling", () => {
     // An over-quota account must not render a >100% bar.
     render(

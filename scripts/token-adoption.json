@@ -88,7 +88,7 @@
   "mobile/src/app/flows/AttachmentsSheet.tsx": 44,
   "mobile/src/app/flows/CreateVaultFlow.tsx": 56,
   "mobile/src/app/flows/EditorFlow.tsx": 89,
-  "mobile/src/app/flows/JoinFlow.tsx": 38,
+  "mobile/src/app/flows/JoinFlow.tsx": 37,
   "mobile/src/app/flows/MemorySheet.tsx": 1,
   "mobile/src/app/flows/PickerFlow.tsx": 17,
   "mobile/src/app/flows/RecordingSheet.tsx": 13,
