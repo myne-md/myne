@@ -29,50 +29,16 @@ import {
   writeViewsEnabled,
   VIEWS_ENABLED_EVENT,
 } from "../../src/lib/viewsEnabled";
+import { ensureUsableStorage } from "./_storage";
 
 const KEY = "myne.viewsEnabled";
 
-/**
- * A working Storage stand-in when the ambient one is unusable.
- *
- * CI's vitest step runs `image: node:25`, which exposes a global `localStorage`
- * WITHOUT `clear`/`getItem` (incomplete experimental storage; often paired with
- * `--localstorage-file was provided without a valid path`). That global shadows
- * what `@vitest-environment jsdom` would otherwise provide, so the bare
- * `localStorage` binding in this file is the broken one and every test dies in
- * `beforeEach` with `TypeError: localStorage.clear is not a function` — while
- * the same file passes on local Node 22, which has no such global and lets
- * jsdom win. Same posture as `tests/screens/web-walls.test.tsx`: install a
- * minimal in-memory store over `window.localStorage` when the ambient one
- * cannot answer.
- *
- * Key enumeration in this file goes through the Storage API (`length` +
- * `key(i)`), not `Object.keys`: a plain stand-in and Node's experimental
- * localStorage both expose methods as own properties, while a real Storage
- * exposes only data keys. Only the Storage API answers correctly on all three.
- * Tests that need to force a refusal spy on THIS `localStorage` object (after
- * `ensureUsableStorage` has run), not on `Storage.prototype`: the stand-in is
- * not a `Storage` instance, so a prototype spy never reaches it and the test
- * would pass for the wrong reason on exactly the CI arm this helper exists for.
- */
-function ensureUsableStorage(): void {
-  const s = globalThis.localStorage as Storage | undefined;
-  if (s && typeof s.clear === "function" && typeof s.getItem === "function") return;
-  const map = new Map<string, string>();
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: {
-      getItem: (k: string) => map.get(k) ?? null,
-      setItem: (k: string, v: string) => void map.set(k, String(v)),
-      removeItem: (k: string) => void map.delete(k),
-      clear: () => map.clear(),
-      key: (i: number) => [...map.keys()][i] ?? null,
-      get length() {
-        return map.size;
-      },
-    },
-  });
-}
+// The storage stand-in and its reasoning live in `_storage.ts`, shared with the
+// other suites that need one. Tests here that force a refusal spy on THIS
+// `localStorage` object (after `ensureUsableStorage` has run), not on
+// `Storage.prototype`: the stand-in is not a `Storage` instance, so a prototype
+// spy never reaches it and the test would pass for the wrong reason on exactly
+// the CI arm the helper exists for.
 
 beforeEach(() => {
   ensureUsableStorage();

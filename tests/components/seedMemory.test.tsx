@@ -16,6 +16,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { ensureUsableStorage } from "../lib/_storage";
 
 const {
   mockStatus,
@@ -113,6 +114,7 @@ beforeEach(() => {
   mockMemoryList.mockResolvedValue({ rows: [], cap: 100 });
   mockAiEnabled.value = true;
   mockOnboardingSeen.mockReturnValue(true);
+  ensureUsableStorage();
   localStorage.clear();
 });
 afterEach(() => {
