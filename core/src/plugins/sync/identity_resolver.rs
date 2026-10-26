@@ -245,10 +245,31 @@ async fn verified_roster(
             }
         }
     }
+    // Device-signed rosters (`0731` stage 2) are resolved through the SAME candidate
+    // loop: the attestation is a member's pinned owner device or a verified row, and
+    // both are read where the roster is read rather than re-derived here, so this
+    // attribution path accepts exactly what the verify path accepts.
+    let mut devices: Vec<protocol::device_key::DevicePublicHalf> = Vec::new();
+    if let Ok(sync_state) = crate::plugins::sync::state::read_sync_state(io, vault_dir).await {
+        if let Some(attestation) = sync_state.owner_device.as_ref() {
+            for candidate in &candidates {
+                if attestation.verifies_against(candidate) {
+                    if let Some(half) = attestation.device_public_half() {
+                        devices.push(half);
+                    }
+                }
+            }
+        }
+    }
     for candidate in candidates {
-        if let Ok(roster) =
-            protocol::person_invite::verify_group_roster(&candidate, envelope, account)
-        {
+        if let Ok(roster) = protocol::person_invite::verify_group_roster(
+            protocol::person_invite::RosterTrust {
+                owner_person: &candidate,
+                owner_devices: &devices,
+            },
+            envelope,
+            account,
+        ) {
             return Some((candidate, roster));
         }
     }
@@ -432,8 +453,11 @@ pub async fn join_durable_attribution(
         return DurableAttribution::empty();
     };
     // A pre-B2B (`NTV5`) vault has no group tier, so this family does not exist there and
-    // there is nothing to join.
-    let Ok(b2b) = protocol::parse_vault_meta_ntv6(&meta_bytes) else {
+    // there is nothing to join. BOTH tail generations do carry it: `NTV7` keeps the `NTV6`
+    // tail byte for byte, and a member vault bootstrapped from an owner's person-born meta
+    // is `NTV7`, so asking for the `NTV6` frame specifically dropped every device binding
+    // on exactly the vaults sharing now produces (parse_b2b_tail_any).
+    let Ok(b2b) = protocol::parse_b2b_tail_any(&meta_bytes) else {
         return DurableAttribution::empty();
     };
     let account = b2b.base.account_number_hash;
@@ -1136,6 +1160,7 @@ mod join_tests {
                 &bindings_key.borrow(),
                 &member,
                 &DEVICE,
+                None,
                 &mut rng,
             )
             .await

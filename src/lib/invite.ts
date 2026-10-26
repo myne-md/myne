@@ -130,6 +130,14 @@ export interface VaultInviteSummary {
   invite_id_hex: string;
   recipient_person_id_hex: string;
   claimed: boolean;
+  /**
+   * The recipient refused it (`DELETE /b2b/invites/{id}`), which really deletes
+   * the sealed payload server-side. It is a third state beside claimed and
+   * pending because "nobody has opened the app yet" and "they said no" call for
+   * different acts: the first is worth waiting on or reminding, the second is
+   * answered by inviting somebody else.
+   */
+  declined: boolean;
 }
 
 /** Owner-side claimed-versus-pending view of this vault's invitations. */

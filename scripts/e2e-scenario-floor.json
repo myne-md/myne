@@ -995,5 +995,30 @@
     "than skip.",
     "",
     "`stable_max_failures` stays 0."
-  ]
+  ],
+  "_comment_ai_lane_floor": [
+    "`ai`: 41, `ai_max_failures`: 0 — the FIRST measurement of the AI lane as its",
+    "own lane, taken from CI rather than from a laptop, which is the standing this",
+    "file's own preamble demands.",
+    "",
+    "Source: pipeline 949, the first nightly cron run on commit 4abc0875, step",
+    "`e2e-ai`. Its log ends `Test Files 17 passed (17)` / `Tests 41 passed (41)` in",
+    "329 s: 41 executed, 0 failed, 0 skipped. The file list is derived from the",
+    "specs themselves (`grep -rl MYNE_E2E_AI e2e/*.e2e.ts`), and 17 files against 16",
+    "names is that derivation working rather than miscounting: the name `memory`",
+    "matches both `memory.e2e.ts` and `scroll-memory.e2e.ts`.",
+    "",
+    "Why a number at all on a lane that gates nothing: `e2e-ai` is",
+    "`failure: ignore`, exactly like the stable gate, and a lane that executes",
+    "NOTHING exits 0 and reads green. The floor is a MINIMUM, so adding AI",
+    "scenarios never requires touching it; the ceiling is a DEBT, and it only goes",
+    "down.",
+    "",
+    "`quarantine` is still owed, and it is NOT the same job. Its executed count has",
+    "no recorded baseline yet; more importantly its ceiling cannot be 0, because",
+    "that lane runs the specs that fail BY DEFINITION, so a number there is a",
+    "tolerance somebody has to choose and defend rather than a measurement to copy."
+  ],
+  "ai": 41,
+  "ai_max_failures": 0
 }

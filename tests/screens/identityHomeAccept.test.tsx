@@ -59,6 +59,10 @@ vi.mock("../../src/hooks/useBetaTermsGate", () => ({
 }));
 
 import { IdentityHome, acceptErrorKey } from "../../src/screens/IdentityHome";
+import {
+  resetPersonIdentityState,
+  setPersonIdentityState,
+} from "../../src/components/sync/personIdentityState";
 import { PHRASE_CELL_COUNT } from "../../src/components/PhraseEntryGrid";
 import { MIN_PASSWORD_LEN } from "../../src/components/PasswordInput";
 
@@ -70,6 +74,7 @@ function continueAccept(): void {
 }
 
 beforeEach(() => {
+  resetPersonIdentityState();
   personListInvites.mockReset().mockResolvedValue([]);
   personRegister.mockReset().mockResolvedValue({});
   readSyncConfig
@@ -84,6 +89,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  resetPersonIdentityState();
   vi.useRealTimers();
 });
 
@@ -91,6 +97,11 @@ describe("IdentityHome accept path", () => {
   const OWNER_CODE = `MYNE-PERSON-1:${"11".repeat(16)}:${"22".repeat(32)}:${"33".repeat(32)}:${"44".repeat(48)}`;
 
   it("offers a vault creation from the identity landing in one action", async () => {
+    // The identity is UNLOCKED for this session, which is what the CTA needs: a
+    // vault born under an identity signs its first member list with that key, so
+    // the button is withheld (not disabled) while it is sealed. The next case
+    // pins the locked arm.
+    setPersonIdentityState({ ready: true, ownerCode: "MYNE-PERSON-1:owner" });
     render(
       <IdentityHome
         identityCode="code"
@@ -104,6 +115,30 @@ describe("IdentityHome accept path", () => {
     );
     await waitFor(() => expect(personListInvites).toHaveBeenCalled());
     expect(screen.getByTestId("identity-home.create-vault-cta")).toBeTruthy();
+  });
+
+  it("offers the unlock door instead of a CTA it cannot honour while the identity is locked", async () => {
+    // 2026-10-25 owner report: the CTA was offered while the identity was locked,
+    // the creation flow answered `PersonLocked`, and that sentence pointed at a
+    // door this screen did not have. On a device with zero vaults this screen is
+    // the only surface reachable, so the dead end was total.
+    setPersonIdentityState({ ready: false, ownerCode: "MYNE-PERSON-1:owner" });
+    render(
+      <IdentityHome
+        identityCode="code"
+        accountNumber={null}
+        onCreateVault={() => {}}
+        onAccepted={() => {}}
+        onForgotten={() => {}}
+        accountState="enrolled"
+        onRegistered={() => {}}
+      />,
+    );
+
+    expect(await screen.findByTestId("identity-home.create-vault-locked")).toBeTruthy();
+    expect(screen.queryByTestId("identity-home.create-vault-cta")).toBeNull();
+    // The door is mounted here, not pointed at: the same modal Settings uses.
+    expect(screen.getByTestId("sync.panel.identity-unlock.open")).toBeTruthy();
   });
 
   it("lists a pending invite and opens the accept form with the member phrase", async () => {

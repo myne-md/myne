@@ -30,8 +30,11 @@ import { BINDABLE_COMMANDS } from "../../commands/bindableCatalog";
 import { effectiveChords } from "../../commands/keymap";
 import { reorderByDrop, moveBarItem } from "../barItemsOrder";
 
-/** Column width in px. Slim, icon-only; the design canon has no rail token. */
-const RAIL_WIDTH = 40;
+/** Column width in px. Slim, icon-only; the design canon has no rail token.
+ *  EXPORTED because the title-bar sidebar toggle centres itself on this column
+ *  in fullscreen (myne-md/myne#908): the alignment is arithmetic over this
+ *  number, so a copy of it in `Editor.tsx` is a second value that can drift. */
+export const RAIL_WIDTH = 40;
 const BUTTON_SIZE = 28;
 const ICON_SIZE = 17;
 

@@ -68,6 +68,7 @@ pub mod chats_catalog_blob;
 pub mod color_group;
 pub mod crdt_note_blob;
 pub mod device_binding_blob;
+pub mod device_key;
 pub mod dictionary_blob;
 pub mod error;
 pub mod graph_layout_blob;
@@ -215,14 +216,18 @@ pub use crdt_note_blob::{
     NC05_MAGIC, NC05_MAX_PLAINTEXT_LEN, NC05_PROTOCOL_VERSION,
 };
 pub use device_binding_blob::{
-    decode_device_binding_blob, decode_device_bindings_or_empty, device_binding_signed_bytes,
-    encode_device_binding_blob, encode_device_binding_blob_raw, encode_device_bindings_map,
-    live_device_bindings, merge_device_bindings, parse_device_bindings_map,
-    partition_verified_bindings, sign_device_binding, verify_device_binding,
+    binding_message_for_entry, decode_device_binding_blob, decode_device_bindings_or_empty,
+    device_binding_signed_bytes, device_binding_signed_bytes_v2, device_public_half_from_entry,
+    encode_device_binding_blob, encode_device_binding_blob_raw,
+    encode_device_binding_blob_raw_with_format, encode_device_bindings_map, live_device_bindings,
+    merge_device_bindings, parse_device_bindings_map, partition_verified_bindings,
+    sign_device_binding, sign_device_binding_v2, verify_device_binding,
     verify_device_binding_removal, DeviceBindingBlobError, DeviceBindingEntry, DeviceBindingsMap,
-    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_HEADER_LEN,
-    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_PREFIX, DEVICE_BINDING_SIGNATURE_HEX_LEN,
-    DEVICE_BINDING_SIGNATURE_LEN, MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
+    DEVICE_BINDING_BLOB_AAD_ROLE, DEVICE_BINDING_BLOB_FORMAT_CURRENT,
+    DEVICE_BINDING_BLOB_FORMAT_V1, DEVICE_BINDING_BLOB_FORMAT_V2, DEVICE_BINDING_BLOB_HEADER_LEN,
+    DEVICE_BINDING_BLOB_MAGIC, DEVICE_BINDING_BLOB_SUPPORTED_FORMATS, DEVICE_BINDING_PREFIX,
+    DEVICE_BINDING_PREFIX_V2, DEVICE_BINDING_SIGNATURE_HEX_LEN, DEVICE_BINDING_SIGNATURE_LEN,
+    MAX_DEVICE_BINDINGS_PLAINTEXT_LEN,
 };
 pub use dictionary_blob::{
     decode_dictionary_blob, decode_dictionary_blob_versioned,

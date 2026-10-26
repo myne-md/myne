@@ -187,6 +187,13 @@ fi
 # Opt-in like the other two: unset on the host, the command line is
 # byte-identical to what it was, so a machine with room still builds at
 # opt-level 3.
+# The lane name the vitest config keys its report filename on
+# (`.config/vitest/e2e.config.ts`), forwarded into the container so a local run
+# writes the same file the CI step of that lane would. Without this a local
+# `MYNE_E2E_LANE=ai` run quietly wrote `stable.json` and the floor guard read a
+# report from the wrong lane.
+E2E_LANE_ENV="MYNE_E2E_LANE=${MYNE_E2E_LANE:-stable}"
+
 E2E_CARGO_OPT_LEVEL=""
 if [[ -n "${CARGO_PROFILE_RELEASE_OPT_LEVEL:-}" ]]; then
   E2E_CARGO_OPT_LEVEL="CARGO_PROFILE_RELEASE_OPT_LEVEL=$CARGO_PROFILE_RELEASE_OPT_LEVEL"

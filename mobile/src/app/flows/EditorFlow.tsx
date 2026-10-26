@@ -178,7 +178,9 @@ import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import type { VaultId } from "../../lib/stage";
 import { SettingsSheet, applyStoredTheme, type Panel } from "./SettingsSheet";
-import { useSizeClass } from "../../formfactor/SizeClassContext";
+import { isRegularSizeClass, useSizeClass } from "../../formfactor/SizeClassContext";
+import { ListDrawer } from "./editor/sheets/ListDrawer";
+import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRestore";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
@@ -508,7 +510,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // pane on regular (the invariant `view === "editor" ⟺ editing != null`
   // already holds on compact).
   const { sizeClass } = useSizeClass();
-  const isRegular = sizeClass !== "compact";
+  // `compactWide` is a single column with an overlay list, not a two-pane
+  // layout, so "regular" is the medium/expanded pair and nothing else.
+  const isRegular = isRegularSizeClass(sizeClass);
 
   // Slide the incoming tab page in from the side its tab sits on (Notes ← … →
   // Templates). Same Web-Animations technique as the Settings drawer; the first
@@ -520,8 +524,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     prevTabRef.current = tab;
     if (tab === prev) return;
     // Regular layouts don't page-flip - the prev ref still updates above so a
-    // later rotation back to compact can't replay a stale slide.
-    if (sizeClass !== "compact") return;
+    // later rotation back to compact can't replay a stale slide. The folded band
+    // DOES page-flip: it is one column with the same list chrome, so a tab switch
+    // there is the same navigation the phone does.
+    if (isRegular) return;
     const el = tabPaneRef.current;
     if (!el || typeof el.animate !== "function") return;
     const forward = TAB_ORDER[tab] >= TAB_ORDER[prev];
@@ -548,9 +554,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const prev = prevViewRef.current;
     prevViewRef.current = view;
     if (view === prev) return;
-    // The push/pop is compact-only: on regular both panes are persistent (no
-    // screen swap). Updating the prev ref unconditionally above prevents a
-    // stale animation when rotating back to compact.
+    // The push/pop belongs to the compact swap alone: the band's list is a
+    // DRAWER over the note, so animating the whole screen when `view` flips
+    // would slide the page out from under an overlay. Updating the prev ref
+    // unconditionally above prevents a stale animation after a rotation.
     if (sizeClass !== "compact") return;
     const el = screenRef.current;
     if (!el || typeof el.animate !== "function") return;
@@ -711,6 +718,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       // later, and a note switch inside that window would otherwise report this
       // note's offset as presence on the next one (myne-md/myne#849 review).
       presenceLastRef.current = { noteId: liveNoteIdRef.current, cursor, selection };
+      // A caret that moved somewhere other than the restored offset is the user
+      // typing, and the fold's snapshot is stale from that moment on.
+      if (pendingCaretRef.current && cursor !== pendingCaretRef.current.head) {
+        pendingCaretRef.current = null;
+      }
       if (presenceTimerRef.current !== null) return;
       presenceTimerRef.current = setTimeout(() => {
         presenceTimerRef.current = null;
@@ -971,15 +983,37 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     };
   }, [t]);
 
+  // "Back to the list" means two different things by layout. On the phone it is
+  // the save-then-pop contract: the note closes and the list replaces it. In the
+  // folded band the note must STAY MOUNTED under the drawer, so it is pure
+  // navigation: no write, no `exitEditor` (which clears `editing` and would take
+  // the page out from under the overlay). The bytes are safe either way, because
+  // the background flush and the note's own save paths own them.
+  const openList = () => {
+    if (sizeClass === "compactWide") {
+      // Navigation, not exit: the note stays mounted under the drawer, and the
+      // bytes are not written here. Every control in that drawer that REPLACES
+      // the buffer writes it first through `persistOpenBuffer`, which is the
+      // only place the write is actually owed.
+      setView("list");
+      return;
+    }
+    void saveNote();
+  };
+
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
   // function declaration, so referencing it here is fine.
   useSwipeBack(
     screenRef,
     () => {
+      if (sizeClass === "compactWide") {
+        setView("list");
+        return;
+      }
       if (!editorBusy) void saveNote();
     },
-    sizeClass === "compact" && view === "editor",
+    !isRegular && view === "editor",
   );
   // Attachment insert: the editor textarea + hidden file input, and a busy flag
   // while the picked file is encrypted (MYA1) on the host.
@@ -1009,6 +1043,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // The same view, in a ref, for the listeners below: they are registered ONCE, so
   // they cannot read a state value from their closure.
   const editorViewRef = useRef<EditorView | null>(null);
+  // The element that actually scrolls the note (the pane's `.m-scroll`
+  // wrapper). The fold hands the reader's position across a remount through it.
+  const editorScrollRef = useRef<HTMLDivElement | null>(null);
+  // The size class the CURRENT tree was rendered for, and the offsets captured
+  // when it changed (caretRestore.ts). `null` means there was nothing to carry.
+  const lastSizeClassRef = useRef(sizeClass);
+  const pendingCaretRef = useRef<CaretSnapshot | null>(null);
   const [manageAttachments, setManageAttachments] = useState(false);
   // Voice-note recording sheet open (mic button / widget voice capture / the
   // shared editor's `/record` slash all raise this).
@@ -1618,7 +1659,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // effect above keeps working on all size classes. Deps intentionally narrow:
   // this reconciles ONLY when the size class itself flips.
   useEffect(() => {
-    if (sizeClass === "compact") setView(editing ? "editor" : "list");
+    if (isRegular) return;
+    // Land on a concrete one-column screen without discarding the one the user
+    // is on: folding from the band with the drawer up leaves `view` at "list",
+    // and forcing "editor" here silently replaced the list they were browsing
+    // (myne-md/myne#918 review, D7). Only an editor with nothing open has to
+    // move, and it moves to the list.
+    setView((current) => (current === "editor" && editing == null ? "list" : current));
   }, [sizeClass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stop filtering when the active view is deleted elsewhere (prefs refresh).
@@ -2502,7 +2549,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setView("editor");
   }, [currentFolder]);
 
-  const newDrawing = useCallback(() => {
+  const newDrawing = useCallback(async () => {
+    if (!(await persistOpenBuffer())) return;
     // Seed a `kind: drawing` body so the first render routes to the canvas (SF2);
     // saveNote persists it through the same note_create path as a text note.
     setEditorText(
@@ -2715,19 +2763,47 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * ADD only and fire-and-forget: it can never claim a removal, so a failure
    * costs at most that this folder is not remembered yet.
    */
-  async function openFromList(id: string) {
-    if (isRegular && editing != null && editing.id === null && editorText.trim() !== "") {
-      try {
-        const stamped = stampUpdated(editorText);
+  /**
+   * Write the open buffer if disk does not already have it, WITHOUT leaving the
+   * note. `saveNote` is the EXIT path (it calls `exitEditor`), so anything that
+   * replaces the buffer while a list is reachable owes this first: this client
+   * has no autosave and no snapshot, so a replaced buffer exists nowhere
+   * (mobile/AGENTS.md). Returns false when the write failed, and every caller
+   * then stays put rather than navigating away from text nobody can recover.
+   *
+   * The folded band is why this is not layout-gated any more: its list is a
+   * drawer over a LIVE note, so "the list is only reachable with no editor open"
+   * stopped being true (myne-md/myne#918 review, D8).
+   */
+  async function persistOpenBuffer(): Promise<boolean> {
+    if (editing == null) return true;
+    if (editing.id === null && editorText.trim() === "") return true;
+    try {
+      const stamped = stampUpdated(editorText);
+      if (editing.id === null) {
         const newId = HAS_TAURI
           ? await noteCreate(stamped, readNoteFolder(stamped) || null)
           : crypto.randomUUID();
         if (!HAS_TAURI) devStore().set(newId, stamped);
         applyOne(newId, stamped);
-      } catch {
-        // Best-effort persist; still navigate so the tap isn't dead.
+        loadedTextRef.current = { id: newId, text: editorText };
+        setEditing({ id: newId });
+        return true;
       }
+      if (editorUnchanged(editing.id)) return true;
+      if (HAS_TAURI) await editorSave(editing.id, stamped);
+      else devStore().set(editing.id, stamped);
+      loadedTextRef.current = { id: editing.id, text: editorText };
+      applyOne(editing.id, stamped);
+      return true;
+    } catch {
+      setEditorError(t("editor.flow.saveFailed"));
+      return false;
     }
+  }
+
+  async function openFromList(id: string) {
+    if (!(await persistOpenBuffer())) return;
     await openRelated(id);
   }
 
@@ -2868,7 +2944,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   /** New note directly in `path` (folder long-press → "New note"). Mirrors
    *  `newNote` but seeds the note's `folder:` with the target folder. */
-  function newNoteInFolder(path: string) {
+  async function newNoteInFolder(path: string) {
+    if (!(await persistOpenBuffer())) return;
     setFolderActions(null);
     setEditorText(buildInitialPlaintext(normalizeFolderPath(path)));
     setEditing({ id: null });
@@ -2879,7 +2956,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   /** New drawing note directly in `path` (folder long-press → "New drawing").
    *  Mirrors `newDrawing` but seeds the drawing note's `folder:` (MYND-515). */
-  function newDrawingInFolder(path: string) {
+  async function newDrawingInFolder(path: string) {
+    if (!(await persistOpenBuffer())) return;
     setFolderActions(null);
     setEditorText(
       new TextDecoder().decode(buildDrawingNoteBytes(undefined, normalizeFolderPath(path))),
@@ -4567,6 +4645,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // ── Editor pane (the former editor-view return). Same render-helper pattern
   // as the list pane: called by the compact editor screen and by the regular
   // detail pane; its derivations only run when an editor is actually shown. ───
+  // The note's own measure, per layout.
+  //
+  // Regular keeps the WS-01 column: 620px of text plus 56px gutters a side,
+  // centered in the detail pane. Compact keeps the phone's 18/22.
+  //
+  // The folded band sits between them on purpose: it keeps the tablet's 620px
+  // measure (664 - 2x22) but with the PHONE's gutter, because at 626pt the
+  // tablet's 56pt gutters would spend 112 of the 626 points the band exists to
+  // give back, leaving the note 514 wide, narrower than the same phone's own
+  // editor once folded. 664 is the measure plus two phone gutters, so the cap
+  // and the gutter meet at 700 where `medium` takes over.
+  const proseStyle =
+    isRegular
+      ? { width: "100%", maxWidth: 732, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 56px" }
+      : sizeClass === "compactWide"
+        ? { width: "100%", maxWidth: 664, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 22px" }
+        : { width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" };
+
   const renderEditorPane = () => {
     const headerTitle = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
     const isExisting = editing?.id != null;
@@ -4580,7 +4676,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return (
       <>
       <EditorTopBar
-        onBack={sizeClass === "compact" ? () => void saveNote() : undefined}
+        onBack={!isRegular ? openList : undefined}
         onToggleList={isRegular ? () => setPanesRevealed((r) => !r) : undefined}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
@@ -4682,6 +4778,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           // was a horizontal scroll container in its own right, outside
           // `.cm-scroller` (myne-md/myne#630). Wearing the class means the next
           // thing that class learns reaches the app's busiest scroll surface.
+          ref={editorScrollRef}
           className="m-scroll"
           style={{
             background: "var(--bg-1)",
@@ -4695,6 +4792,27 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onReady={(view) => {
               editorViewRef.current = view;
               setEditorView(view);
+              // A fold remounted this view: put the reader back where they were.
+              // `applyCaret` refuses a snapshot from another note, so opening a
+              // different note across the transition inherits nothing.
+              if (!view) return;
+              // The snapshot is NOT consumed here. A development mount happens
+              // twice (StrictMode), and the first view is discarded a tick later:
+              // consuming on the first one restored the caret into a view nobody
+              // saw. It stays armed until the caret moves somewhere else, which
+              // is what `handleCursorChange` below watches for.
+              const pending = pendingCaretRef.current;
+              if (!pending) return;
+              applyCaret(view, pending, liveNoteIdRef.current, editorScrollRef.current);
+              // One frame later the scroller has its real height, and replaying
+              // the same offset is idempotent rather than a second restore.
+              if (typeof requestAnimationFrame === "function") {
+                requestAnimationFrame(() => {
+                  if (editorViewRef.current === view) {
+                    applyCaret(view, pending, liveNoteIdRef.current, editorScrollRef.current);
+                  }
+                });
+              }
             }}
             // Live presence (`collab-presence-ui`, myne-md/myne#849 review): this
             // device's caret/selection is reported so PEERS render its cursor. The
@@ -4754,11 +4872,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure - a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.
-            style={
-              isRegular
-                ? { width: "100%", maxWidth: 732, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 56px" }
-                : { width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" }
-            }
+            style={proseStyle}
           />
         </div>
       )}
@@ -5099,14 +5213,28 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     </>
   );
 
+  // A fold remounts the editor, so the caret and the scroll offset are captured
+  // HERE, during the render that already knows the size class changed: by the
+  // time an effect runs, the old CodeMirror view is gone and its offsets with
+  // it. The undo history is not captured and cannot be; see `caretRestore.ts`.
+  if (lastSizeClassRef.current !== sizeClass) {
+    lastSizeClassRef.current = sizeClass;
+    const previousView = editorViewRef.current;
+    pendingCaretRef.current = previousView
+      ? snapshotCaret(previousView, liveNoteIdRef.current, editorScrollRef.current)
+      : null;
+  }
+
   // ── Layout switch ────────────────────────────────────────────────────────────
-  // compact: the existing full-screen list ⇄ editor swap (unchanged phone
-  // behavior, push/pop animation included). medium: list + detail side by side,
-  // the phone's AppHeader + TabBar scoped to the list column. expanded: the
-  // WS-01 three-pane - sidebar + list + detail; the sidebar absorbs the
-  // AppHeader/TabBar destinations, so neither renders. Graph / Files /
-  // Templates span the full content width on regular (a graph squeezed into a
-  // 316px column is useless).
+  // One column (compact and the folded band): the existing full-screen list ⇄
+  // editor swap (unchanged phone behavior, push/pop animation included). The
+  // band differs only in the note's measure; it is not a two-pane layout, so
+  // `isRegular` is false there and nothing below this block applies to it.
+  // medium: list + detail side by side, the phone's AppHeader + TabBar scoped
+  // to the list column. expanded: the WS-01 three-pane - sidebar + list +
+  // detail; the sidebar absorbs the AppHeader/TabBar destinations, so neither
+  // renders. Graph / Files / Templates span the full content width on regular
+  // (a graph squeezed into a 316px column is useless).
   if (sizeClass === "compact") {
     if (view === "list") {
       return (
@@ -5120,6 +5248,40 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return (
       <Screen ref={screenRef}>
         {renderEditorPane()}
+        {renderEditorOverlays()}
+        {renderSharedOverlays()}
+      </Screen>
+    );
+  }
+
+  // The folded band (600 to 700pt on a phone-class screen): ONE column, the note
+  // at its own measure, and the list as an overlay drawer rather than a screen
+  // swap. `view === "list"` still owns the intent, so the note's back chevron and
+  // the swipe-back keep working: they save and raise the list over the note
+  // instead of replacing it. With no note open there is nothing to overlay, so
+  // the list is the screen.
+  if (sizeClass === "compactWide") {
+    const drawerOpen = view === "list" && editing != null;
+    return (
+      <Screen ref={screenRef}>
+        <div
+          // The note keeps its geometry while the drawer is up; it is taken out
+          // of the accessibility and focus order rather than unmounted.
+          inert={drawerOpen || undefined}
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        >
+          {editing ? renderEditorPane() : renderNotesPane({ header: true, tabBar: true })}
+        </div>
+        {drawerOpen && (
+          <ListDrawer
+            label={t("notes.list.treeLabel")}
+            onClose={() => setView("editor")}
+            returnFocusTo={editorViewRef.current?.contentDOM ?? null}
+          >
+            {renderNotesPane({ header: true, tabBar: false })}
+          </ListDrawer>
+        )}
+        {renderListOverlays()}
         {renderEditorOverlays()}
         {renderSharedOverlays()}
       </Screen>
