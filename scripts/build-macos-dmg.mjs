@@ -24,7 +24,30 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CONF = JSON.parse(readFileSync(join(ROOT, "src-tauri/tauri.conf.json"), "utf8"));
-const BUNDLE = join(ROOT, "target/release/bundle");
+
+// An optional Rust target triple. Without one this behaves exactly as it always
+// has (host arch, `target/release`). With one it follows the target's own output
+// directory, which is what a universal build needs: `universal-apple-darwin`
+// writes under `target/universal-apple-darwin/release` and names its DMG
+// `_universal`, not `_aarch64`, so a script that kept the host's paths would
+// look for artefacts the build never wrote.
+//
+//   node scripts/build-macos-dmg.mjs --target universal-apple-darwin
+//
+// The universal artefact also requires the four sidecars to exist as
+// `binaries/<name>-universal-apple-darwin` before the build starts; the runbook's
+// pre-build hygiene block is what produces them.
+const targetArgIdx = process.argv.indexOf("--target");
+const TARGET = targetArgIdx === -1 ? undefined : process.argv[targetArgIdx + 1];
+if (targetArgIdx !== -1 && !TARGET) {
+  console.error("--target needs a Rust target triple, e.g. universal-apple-darwin");
+  process.exit(1);
+}
+const TARGET_ARGS = TARGET ? ["--target", TARGET] : [];
+const BUNDLE = TARGET
+  ? join(ROOT, "target", TARGET, "release/bundle")
+  : join(ROOT, "target/release/bundle");
+
 const APP = join(BUNDLE, "macos", `${CONF.productName}.app`);
 const ID = process.env.APPLE_SIGNING_IDENTITY;
 if (!ID) {
@@ -35,12 +58,12 @@ if (!ID) {
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { stdio: "inherit", cwd: ROOT, ...opts });
 
-// 1. Tauri writes bundle_dmg.sh + support/ into target/release/bundle/dmg during a
-//    dmg bundle, and builds a first DMG from the app before we fix the signatures.
-run("pnpm", ["tauri", "build", "--bundles", "dmg"]);
+// 1. Tauri writes bundle_dmg.sh + support/ into the bundle's dmg directory during
+//    a dmg bundle, and builds a first DMG from the app before we fix the signatures.
+run("pnpm", ["tauri", "build", "--bundles", "dmg", ...TARGET_ARGS]);
 
 // 2. The dmg run cleaned the .app; rebuild it so we can fix and reuse it.
-run("pnpm", ["tauri", "bundle", "--bundles", "app"]);
+run("pnpm", ["tauri", "bundle", "--bundles", "app", ...TARGET_ARGS]);
 
 // 3. Re-sign the sidecars WITHOUT entitlements, then re-sign the app WITH them.
 const sidecars = (CONF.bundle.externalBin ?? []).map((p) => p.replace(/^binaries\//, ""));
@@ -65,7 +88,11 @@ run("codesign", ["--verify", "--verbose=2", APP]);
 // 4. Rebuild the DMG from the fixed app using Tauri's own script (the chrome, the
 //    background art and the Finder layout come from there, not from hdiutil).
 const dmgConf = CONF.bundle.macOS.dmg;
-const arch = process.arch === "arm64" ? "aarch64" : "x64";
+const arch = TARGET === "universal-apple-darwin"
+  ? "universal"
+  : process.arch === "arm64"
+    ? "aarch64"
+    : "x64";
 const dmgName = `${CONF.productName}_${CONF.version}_${arch}.dmg`;
 const dmgPath = join(BUNDLE, "dmg", dmgName);
 const script = join(BUNDLE, "dmg", "bundle_dmg.sh");
