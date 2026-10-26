@@ -292,17 +292,6 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_person_unlock_member_vault_with_biometric",
     "plugin:sync|sync_member_unlock_status",
     "plugin:sync|sync_person_clear_member_unlock",
-    // Joining an account without the recovery phrase
-    // (`decisions/protocol/0735`). The ADMITTING direction needs the held
-    // person identity and the active vault's group key, which is the same
-    // refusal as every member-plane command above. The JOINING direction needs a
-    // device key at rest to be worth anything, and `device_identity::supported()`
-    // is false on wasm, so the code would admit a device that still cannot author
-    // a head.
-    "plugin:sync|sync_device_admission_code",
-    "plugin:sync|sync_pending_device_admission",
-    "plugin:sync|sync_admit_device",
-    "plugin:sync|sync_claim_device_admission",
     "plugin:sync|sync_person_create_invite",
     "plugin:sync|sync_start_b2b_migration",
     "plugin:sync|sync_list_roster",

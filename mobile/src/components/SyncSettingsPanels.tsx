@@ -26,12 +26,6 @@ import {
   type EnrollCredentialKind,
   type DeviceEntry,
   type AccountStatusView,
-  admitDevice,
-  claimDeviceAdmission,
-  deviceAdmissionCode,
-  pendingDeviceAdmission,
-  type AdmitOutcomeView,
-  type AdmissionCodeView,
 } from "../lib/sync";
 import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
 import { useMemberVault } from "../hooks/useMemberVault";
@@ -743,208 +737,6 @@ interface SasState {
 
 /** SY-06 devices list + inline SY-05 approve-then-verify SAS + SY-07 remove
  *  confirm (verbatim revocation copy). */
-/**
- * Adding a device WITHOUT the recovery phrase (`decisions/protocol/0735`), on mobile.
- *
- * The twin of the desktop block, deliberately the same two arms and the same
- * sentences: which arm renders is a fact about the device (does it have an
- * account?) rather than a choice, and a user who learns one shape should not have
- * to learn the other. Mobile is the client most often on the JOINING side, so the
- * arm that shows a code is the one that earns its place here.
- */
-function PhraseFreeAddDevice({ notEnrolled }: { notEnrolled: boolean }) {
-  const { t } = useTranslation();
-  const [identityCode, setIdentityCode] = useState("");
-  const [mine, setMine] = useState<AdmissionCodeView | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<string | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
-  const [code, setCode] = useState("");
-  const [sas, setSas] = useState("");
-  const [admitted, setAdmitted] = useState<AdmitOutcomeView | null>(null);
-
-  // Resume an admission this device already started: a restart mid-join would
-  // otherwise mint a SECOND device id and leave the owner approving a row nobody
-  // can use.
-  useEffect(() => {
-    if (!notEnrolled) return;
-    let live = true;
-    void pendingDeviceAdmission()
-      .then((view) => {
-        if (live && view) setMine(view);
-      })
-      .catch(() => {
-        // "Nothing pending" and "could not read" are different answers, and only the
-        // first is ordinary. Collapsing them made a failed call look like a successful
-        // one: a device whose pending admission could not be read starts a SECOND
-        // admission, and the admitting device then approves a row nobody can use.
-        if (live) setFailure(t("sync.phraseFree.resumeFailed"));
-      });
-    return () => {
-      live = false;
-    };
-  }, [notEnrolled]);
-
-  const start = async () => {
-    // The person id is the second field of an identity code another device shows.
-    const personIdHex = identityCode.trim().split(":")[1] ?? "";
-    if (!/^[0-9a-f]{32}$/.test(personIdHex)) {
-      setFailure(t("sync.phraseFree.badIdentityCode"));
-      return;
-    }
-    setBusy(true);
-    setFailure(null);
-    try {
-      setMine(await deviceAdmissionCode(personIdHex));
-    } catch {
-      setFailure(t("sync.phraseFree.startFailed"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const claim = async () => {
-    setBusy(true);
-    setFailure(null);
-    try {
-      const signedIn = await claimDeviceAdmission();
-      setNote(t(signedIn ? "sync.phraseFree.claimed" : "sync.phraseFree.stillWaiting"));
-    } catch {
-      setFailure(t("sync.phraseFree.claimFailed"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const admit = async () => {
-    if (code.trim() === "" || sas.trim() === "") return;
-    setBusy(true);
-    setFailure(null);
-    setAdmitted(null);
-    try {
-      setAdmitted(await admitDevice(code.trim(), sas.trim()));
-      setCode("");
-      setSas("");
-    } catch (e) {
-      const message = String(e);
-      setFailure(
-        t(
-          message.includes("SasMismatch")
-            ? "sync.phraseFree.sasMismatch"
-            : message.includes("WrongAccount")
-              ? "sync.phraseFree.wrongAccount"
-              : message.includes("AlreadyInstalled")
-                ? "sync.phraseFree.alreadyInstalled"
-                : "sync.phraseFree.admitFailed",
-        ),
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  if (notEnrolled) {
-    return (
-      <div style={{ marginTop: "var(--space-4)" }} data-testid="sync.phrase-free-join">
-        <SectionLabel>{t("sync.phraseFree.joinTitle")}</SectionLabel>
-        {mine ? (
-          <>
-            <p style={HELP}>{t("sync.phraseFree.showCode")}</p>
-            <p
-              style={{ ...HELP, fontFamily: "var(--font-mono)", wordBreak: "break-all", color: "var(--fg-1)" }}
-              data-testid="sync.phrase-free-code"
-            >
-              {mine.code}
-            </p>
-            <p style={HELP} data-testid="sync.phrase-free-sas">
-              {t("sync.phraseFree.sasHere", { sas: mine.sas })}
-            </p>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void claim()}
-              style={primaryBtn(busy)}
-              data-testid="sync.phrase-free-claim"
-            >
-              {t("sync.phraseFree.imApproved")}
-            </button>
-            {!mine.has_device_key ? (
-              <p style={HELP} data-testid="sync.phrase-free-no-device-key">
-                {t("sync.phraseFree.noDeviceKey")}
-              </p>
-            ) : null}
-          </>
-        ) : (
-          <>
-            <p style={HELP}>{t("sync.phraseFree.pasteIdentityCode")}</p>
-            <input
-              value={identityCode}
-              onChange={(e) => setIdentityCode(e.target.value)}
-              spellCheck={false}
-              data-testid="sync.phrase-free-identity-code"
-              style={FIELD}
-            />
-            <button
-              type="button"
-              disabled={busy || identityCode.trim() === ""}
-              onClick={() => void start()}
-              style={primaryBtn(busy || identityCode.trim() === "")}
-              data-testid="sync.phrase-free-start"
-            >
-              {t("sync.phraseFree.showMyCode")}
-            </button>
-          </>
-        )}
-        {note ? <p style={HELP} data-testid="sync.phrase-free-note">{note}</p> : null}
-        {failure ? (
-          <p style={MEMBERS_ERROR} data-testid="sync.phrase-free-error">{failure}</p>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ marginTop: "var(--space-4)" }} data-testid="sync.phrase-free-admit">
-      <SectionLabel>{t("sync.phraseFree.admitTitle")}</SectionLabel>
-      <p style={HELP}>{t("sync.phraseFree.admitHint")}</p>
-      <input
-        value={code}
-        onChange={(e) => setCode(e.target.value)}
-        spellCheck={false}
-        placeholder="MYNE-DEVICE-1:…"
-        data-testid="sync.phrase-free-admit-code"
-        style={FIELD}
-      />
-      <input
-        value={sas}
-        onChange={(e) => setSas(e.target.value)}
-        placeholder={t("sync.phraseFree.sasPlaceholder")}
-        data-testid="sync.phrase-free-admit-sas"
-        style={FIELD}
-      />
-      <button
-        type="button"
-        disabled={busy || code.trim() === "" || sas.trim() === ""}
-        onClick={() => void admit()}
-        style={primaryBtn(busy || code.trim() === "" || sas.trim() === "")}
-        data-testid="sync.phrase-free-admit-confirm"
-      >
-        {t("sync.phraseFree.admit")}
-      </button>
-      {admitted ? (
-        <p style={HELP} data-testid="sync.phrase-free-admitted">
-          {t(admitted.bound ? "sync.phraseFree.admittedBound" : "sync.phraseFree.admittedUnbound", {
-            sas: admitted.sas,
-          })}
-        </p>
-      ) : null}
-      {failure ? (
-        <p style={MEMBERS_ERROR} data-testid="sync.phrase-free-error">{failure}</p>
-      ) : null}
-    </div>
-  );
-}
-
 export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
@@ -1397,12 +1189,6 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
         </Group>
       )}
 
-      {/* Adding a device without the recovery phrase
-          (`decisions/protocol/0735`). A phone is the device most often added, so
-          the SHOW arm is the one that matters here; the READ arm is the same
-          block so a phone can admit a laptop. `error === "NotEnrolled"` is what
-          says which device the user is holding. */}
-      <PhraseFreeAddDevice notEnrolled={error === "NotEnrolled"} />
     </div>
   );
 }
@@ -1580,21 +1366,4 @@ const MEMBERS_NOTICE: CSSProperties = {
   fontSize: "var(--text-sm)",
   lineHeight: 1.5,
   marginTop: "var(--space-2)",
-};
-
-/** A full-width text field for a code the user pastes or reads back. Monospace and
- *  break-anywhere because these strings are thousands of characters: a
- *  proportional box makes it impossible to see where a paste was truncated. */
-const FIELD: CSSProperties = {
-  width: "100%",
-  marginTop: "var(--space-2)",
-  padding: "var(--space-2) var(--space-3)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  background: "var(--bg-1)",
-  color: "var(--fg-1)",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  boxSizing: "border-box",
-  wordBreak: "break-all",
 };

@@ -683,14 +683,6 @@ pub enum SyncDeviceError {
     /// `already_installed`, `decisions/protocol/0735`). Nothing is broken: the device is
     /// already admitted, and the fix is to sign in on it rather than to admit it again.
     AlreadyInstalled,
-    /// The short authentication string the user confirmed is not the one this code
-    /// produces (`decisions/protocol/0735`). Refused before anything is installed: the code
-    /// carries a credential-equivalent verifier, so a mismatch means the text that arrived
-    /// is not the text the other screen showed.
-    SasMismatch,
-    /// The code names a different account from the one this device is signed in to. Refused
-    /// because installing it here would bind a stranger's device to OUR account.
-    WrongAccount,
     /// Member removal is parked until the roster wire ships (B2B,
     /// myne-md/myne#698). The rotation the removal would run is local-only
     /// with no peer propagation and no tombstone convergence, so the entry
