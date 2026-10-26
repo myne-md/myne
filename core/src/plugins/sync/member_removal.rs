@@ -933,49 +933,27 @@ pub async fn rotate_group_from_host(
     // package must carry so a member can verify the rotated roster (`0731` stage 2).
     // Absent on a platform with no device-key rung, which keeps the person-key path.
     let owner_public_for_rotation = owner.public_half();
-    let bindings_for_rotation = crate::plugins::device_binding::bindings_key_for_group(
-        &old_group_key,
-        account_number_hash,
-        b2b_meta.group_key_epoch,
-    );
-    let rotation_device =
-        crate::plugins::sync::device_identity::load_for_fallback("rotation_roster");
-    let rotation_attestation = match (
-        &rotation_device,
-        super::state::read_sync_state(io, &vault_root).await,
-    ) {
-        (Some(device_key), Ok(sync_state)) => {
-            match sync_state
-                .device_id_hex
-                .as_deref()
-                .and_then(super::devices::hex16)
-            {
-                Some(device_id) => {
-                    let attestation = crate::plugins::sync::roster_trust::own_attestation(
-                        io,
-                        &vault_root,
-                        &bindings_for_rotation.borrow(),
-                        &owner_public_for_rotation,
-                        &device_id,
-                    )
-                    .await;
-                    attestation.filter(|a| a.device_public_half() == Some(device_key.public_half()))
-                }
-                None => None,
-            }
-        }
-        _ => None,
-    };
-    // Both or neither: a device signature with no attestation is a rotation nobody can
-    // open, so the device is only used when the attestation is really there.
-    let (rotation_device, rotation_attestation) = match (&rotation_device, &rotation_attestation) {
-        (Some(device_key), Some(attestation)) => (Some(device_key), Some(attestation)),
-        _ => (None, None),
-    };
+    // One call, one pair: the rotation signer and the attestation the packages carry are
+    // produced together or not at all (`own_device_signing_pair` owns the "same device"
+    // check that used to be rebuilt here by hand, and the both-or-neither rule with it).
+    let (rotation_device, rotation_attestation) =
+        match super::roster_trust::own_device_signing_pair(
+            io,
+            &vault_root,
+            &old_group_key,
+            account_number_hash,
+            b2b_meta.group_key_epoch,
+            &owner_public_for_rotation,
+        )
+        .await
+        {
+            Some((device_key, attestation)) => (Some(device_key), Some(attestation)),
+            None => (None, None),
+        };
     let rotated = rotate_group_roster_signed_by(
         owner,
-        rotation_device,
-        rotation_attestation,
+        rotation_device.as_ref(),
+        rotation_attestation.as_ref(),
         &current_roster,
         removed_fingerprint_hex,
         &new_group_key,

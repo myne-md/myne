@@ -165,6 +165,47 @@ pub fn trust<'a>(
     }
 }
 
+/// This device's own signing key together with the binding row that attests it, or
+/// nothing at all.
+///
+/// Returned as a PAIR because the two are useless apart, and the pairing used to be a
+/// comment at each of the two call sites that rebuilt this by hand: a device signature
+/// with no attestation is a roster or a package nobody can open (the recipient has no way
+/// to resolve the key), and an attestation with no signature is a promise. Making the
+/// pair the return type means neither can be shipped alone by accident.
+///
+/// `None` covers four states, and only the first is a platform limit: no device-key rung,
+/// no `sync-state.json` device id, no binding row for this device, or a row that names a
+/// DIFFERENT key than the one that would sign. The last is the one that matters: the
+/// recipient would otherwise resolve a key that never signed anything.
+pub async fn own_device_signing_pair(
+    io: &dyn crate::vault_io::VaultIo,
+    root: &std::path::Path,
+    group_key: &[u8; 32],
+    account_number_hash: [u8; 16],
+    epoch: u64,
+    owner: &protocol::person_key::PersonPublicHalf,
+) -> Option<(
+    protocol::device_key::DeviceKeyPair,
+    protocol::person_invite::OwnerDeviceAttestation,
+)> {
+    // No device key means no device signature, so there is nothing to attest.
+    let device_key =
+        crate::plugins::sync::device_identity::load_for_fallback("device_attestation")?;
+    let sync_state = crate::plugins::sync::state::read_sync_state(io, root)
+        .await
+        .ok()?;
+    let device_id = crate::plugins::sync::devices::hex16(sync_state.device_id_hex.as_deref()?)?;
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        group_key,
+        account_number_hash,
+        epoch,
+    );
+    let attestation = own_attestation(io, root, &bindings_key.borrow(), owner, &device_id).await?;
+    (attestation.device_public_half() == Some(device_key.public_half()))
+        .then_some((device_key, attestation))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

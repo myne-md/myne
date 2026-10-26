@@ -1211,32 +1211,6 @@ pub async fn create_invite_from_host(
 ///
 /// The member-accept path and the wire that carries the package are Grill 4; the
 /// frame is returned in `invite_wire` so the caller can relay it.
-/// This device's own binding row, when it can sign rosters for this vault.
-async fn own_device_attestation_for(
-    io: &dyn crate::vault_io::VaultIo,
-    root: &std::path::Path,
-    group_key: &[u8; 32],
-    account_number_hash: [u8; 16],
-    epoch: u64,
-    owner: &protocol::person_key::PersonPublicHalf,
-) -> Option<protocol::person_invite::OwnerDeviceAttestation> {
-    // No device key means no device signature, so there is nothing to attest.
-    let device_key = super::device_identity::load_for_fallback("invite_package")?;
-    let sync_state = super::state::read_sync_state(io, root).await.ok()?;
-    let device_id = super::devices::hex16(sync_state.device_id_hex.as_deref()?)?;
-    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
-        group_key,
-        account_number_hash,
-        epoch,
-    );
-    let attestation =
-        super::roster_trust::own_attestation(io, root, &bindings_key.borrow(), owner, &device_id)
-            .await?;
-    // The attestation must describe the SAME device whose key is about to sign, or the
-    // recipient would resolve a key that never signed anything.
-    (attestation.device_public_half() == Some(device_key.public_half())).then_some(attestation)
-}
-
 #[allow(clippy::too_many_arguments)]
 async fn write_ntv6_invite(
     state: &VaultRuntimeState,
@@ -1310,7 +1284,7 @@ async fn write_ntv6_invite(
     // it so the recipient can resolve a roster this device is about to sign. Absent on a
     // platform with no device-key rung, which keeps the person-key path exactly as it
     // was.
-    let own_device_attestation = own_device_attestation_for(
+    let own_device_attestation = super::roster_trust::own_device_signing_pair(
         io,
         root,
         group_key,
@@ -1318,7 +1292,8 @@ async fn write_ntv6_invite(
         epoch,
         &owner.public_half(),
     )
-    .await;
+    .await
+    .map(|(_, attestation)| attestation);
     let package = pi::create_group_package_with_attestation(
         owner,
         member_public,
