@@ -31,6 +31,18 @@ vi.mock("react-i18next", () => ({
 const agentCapability = vi.fn();
 const agentStart = vi.fn();
 const agentPreviewGrant = vi.fn();
+const catalogList = vi.fn();
+const attachmentReadExtractedText = vi.fn();
+const attachmentImport = vi.fn();
+const attachmentDelete = vi.fn();
+vi.mock("../../src/lib/attachments", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/attachments")>()),
+  catalogList: (...a: unknown[]) => catalogList(...a),
+  attachmentReadExtractedText: (...a: unknown[]) => attachmentReadExtractedText(...a),
+  attachmentImport: (...a: unknown[]) => attachmentImport(...a),
+  attachmentDelete: (...a: unknown[]) => attachmentDelete(...a),
+}));
+
 vi.mock("../../src/lib/agent-run", () => ({
   agentCapability: (...a: unknown[]) => agentCapability(...a),
   agentStart: (...a: unknown[]) => agentStart(...a),
@@ -42,6 +54,7 @@ import {
   VAULT_SCOPE_SENTINEL,
 } from "../../src/notes/components/ChatComposer";
 import { clearAgentForLock, getAgent } from "../../src/notes/agent/agentStore";
+import { startNewConversation } from "../../src/notes/ai/startNewConversation";
 import { bumpIndexNonce } from "../../src/notes/indexNonce";
 import {
   clearChat,
@@ -98,6 +111,29 @@ beforeEach(() => {
     excludedCount: 2,
     unknownCount: 0,
     newTotal: 12,
+  });
+  catalogList.mockReset().mockResolvedValue([
+    {
+      id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+      content_type: "application/pdf",
+      created_at: 1,
+      filename: "lecture.pdf",
+      size: 2048,
+    },
+  ]);
+  attachmentReadExtractedText
+    .mockReset()
+    .mockResolvedValue({ text: "the lecture, in words", source_format: "pdf", truncated: false });
+  attachmentDelete.mockReset().mockResolvedValue(undefined);
+  attachmentImport.mockReset().mockResolvedValue({
+    id: "0184a2b3c4d5e6f708192a3b4c5d6e81",
+    content_type: "image/png",
+    filename: "image.png",
+    size: 512,
+    created_at: 2,
+    deduplicated: false,
+    original_size: 512,
+    container_changed: false,
   });
 });
 afterEach(() => {
@@ -271,6 +307,11 @@ describe("ChatComposer", () => {
       // Asserted in the whole-call shape below so a new argument cannot be
       // added without a decision, which is what this expectation is for.
       expect.arrayContaining(["editor.weekly-notes-folder"]),
+      // The documents this message carries (myne-md/myne#913). An ordinary
+      // message carries none, and the empty list is asserted rather than
+      // skipped: a run that silently attached something would change what
+      // leaves the device without the user picking a file.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -305,6 +346,11 @@ describe("ChatComposer", () => {
       // Asserted in the whole-call shape below so a new argument cannot be
       // added without a decision, which is what this expectation is for.
       expect.arrayContaining(["editor.weekly-notes-folder"]),
+      // The documents this message carries (myne-md/myne#913). An ordinary
+      // message carries none, and the empty list is asserted rather than
+      // skipped: a run that silently attached something would change what
+      // leaves the device without the user picking a file.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -825,6 +871,7 @@ describe("ChatComposer — the attached scope belongs to one conversation", () =
         "en",
         expect.any(Array),
         expect.arrayContaining(["editor.weekly-notes-folder"]),
+        [],
         expect.any(Function),
         expect.any(Function),
       );
@@ -1109,5 +1156,303 @@ describe("ChatComposer, the blocked zero state", () => {
     const lines = parseFloat(input.style.maxHeight) / parseFloat(input.style.lineHeight);
     expect(lines).toBe(5);
     expect(input.style.overflowY).toBe("auto");
+  });
+});
+
+// ---- attached documents (myne-md/myne#913) --------------------------------
+//
+// The two properties that must not break: a document reaches the run as TEXT
+// under the user's own pick (not as an id the host re-reads later, and not as
+// part of the task string, which would stop it being counted off-device), and a
+// file with no extractable text is a sentence rather than a message that goes
+// out without it.
+describe("ChatComposer: attached documents", () => {
+  it("keeps a pasted document when a library file is picked afterwards", async () => {
+    // **The picker cannot return a chat-scoped file** (review round five): it
+    // lists the library, so a file already attached from a paste is not among
+    // its rows. The composer used to REPLACE its list with the picker's answer,
+    // so picking a library PDF silently dropped the pasted screenshot's chip and
+    // left that file with nothing naming it, which the sweep would later erase.
+    mount();
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [new File(["png"], "pasted.png", { type: "image/png" })],
+      },
+    });
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(1),
+    );
+
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+    const option = await screen.findByTestId("ai.attachment-option");
+    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(2),
+    );
+    const names = screen
+      .getAllByTestId("ai.composer-attachment")
+      .map((chip) => chip.textContent ?? "")
+      .join(" ");
+    // The mock's import returns  whatever the File was called; what
+    // matters is that the pasted chip survived alongside the picked one.
+    expect(names).toContain("image.png");
+    expect(names).toContain("lecture.pdf");
+  });
+
+  it("sends the chosen document's text with the run", async () => {
+    mount();
+    type("summarise the lecture");
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+
+    const option = await screen.findByTestId("ai.attachment-option");
+    fireEvent.click(option);
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    // The chip names what the message carries, and can be taken off again.
+    const chip = await screen.findByTestId("ai.composer-attachment");
+    expect(chip.textContent).toContain("lecture.pdf");
+    expect(chip.getAttribute("data-attachment-id")).toBe(
+      "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+    );
+
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+    await waitFor(() => expect(agentStart).toHaveBeenCalledTimes(1));
+
+    // Argument five is the attachments list (task, grant, language, history,
+    // settings, attachments, ...). Asserting the POSITION is deliberate: a
+    // shift here is what would silently send documents as the settings list.
+    const call = agentStart.mock.calls[0]!;
+    // `id` and `contentType` ride along here because this layer keeps them for
+    // the transcript's chip; the IPC boundary strips them (asserted in
+    // `tests/lib/agentRunAttachments.test.ts`). What matters at this position is
+    // that the TEXT is what arrives.
+    expect(call[5]).toEqual([
+      expect.objectContaining({
+        name: "lecture.pdf",
+        text: "the lecture, in words",
+      }),
+    ]);
+    // And the task stays the user's words: the document is not spliced into it.
+    expect(call[0]).toBe("summarise the lecture");
+    expect(call[0]).not.toContain("the lecture, in words");
+    // The chips are gone once the run has started.
+    await waitFor(() => expect(screen.queryByTestId("ai.composer-attachment")).toBeNull());
+    // And the message KEEPS the file it sent (myne-md/myne#913): the chip moving
+    // from the composer to the turn is the point, not the chip disappearing.
+    const sent = getChat().turns.find((t) => t.role === "user");
+    expect(sent?.attachments).toEqual([
+      {
+        id: "0184a2b3c4d5e6f708192a3b4c5d6e7f",
+        name: "lecture.pdf",
+        contentType: "application/pdf",
+      },
+    ]);
+  });
+
+  it("keeps the message in the box when the file has no readable text", async () => {
+    attachmentReadExtractedText.mockReset().mockResolvedValue(null);
+    mount();
+    type("summarise the lecture");
+    fireEvent.click(screen.getByTestId("ai.composer-attach"));
+    fireEvent.click(await screen.findByTestId("ai.attachment-option"));
+    fireEvent.click(screen.getByTestId("ai.attachment-picker-confirm"));
+
+    fireEvent.click(screen.getByTestId("ai.composer-send"));
+
+    const error = await screen.findByTestId("ai.composer-attachment-error");
+    expect(error.textContent).toContain("agent.attachments.noText");
+    // Nothing was sent, and the typed message is still there to send again.
+    expect(agentStart).not.toHaveBeenCalled();
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("summarise the lecture");
+    // The chip stays, so the user can remove it rather than re-pick.
+    expect(screen.getByTestId("ai.composer-attachment")).toBeTruthy();
+  });
+});
+
+// ---- pasting a file into a conversation (myne-md/myne#913) ----------------
+describe("ChatComposer: pasted files", () => {
+  it("imports a pasted file as a chat attachment, not a library one", async () => {
+    mount();
+    const file = new File(["hello"], "image.png", { type: "image/png" });
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [file] },
+    });
+
+    // The scope is the whole point: a pasted file is stored encrypted and kept
+    // out of the library, so it must be imported with `chat` and never with the
+    // default. Asserting the argument is what keeps a refactor from silently
+    // filing it in the library.
+    await waitFor(() => expect(attachmentImport).toHaveBeenCalledTimes(1));
+    expect(attachmentImport.mock.calls[0]![1]).toBe("chat");
+    const chip = await screen.findByTestId("ai.composer-attachment");
+    expect(chip.textContent).toContain("image.png");
+  });
+
+  it("refuses a paste past the four-document cap instead of importing it", async () => {
+    // The cap is a POST-STORE rule too (a fifth file would already be encrypted
+    // and synced by the time the host dropped it), so the composer refuses
+    // before the first import. Four pastes fill it; the fifth is a sentence, not
+    // a fifth file.
+    mount();
+    for (let i = 0; i < 4; i++) {
+      fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+        clipboardData: {
+          files: [new File(["x"], `f${i}.png`, { type: "image/png" })],
+        },
+      });
+      // Sequential, because the next paste has to see the previous one's chip:
+      // the room is computed from state, not from a counter.
+      await waitFor(() =>
+        expect(screen.getAllByTestId("ai.composer-attachment")).toHaveLength(i + 1),
+      );
+    }
+    expect(attachmentImport).toHaveBeenCalledTimes(4);
+
+    const notPrevented = fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [new File(["x"], "f5.png", { type: "image/png" })] },
+    });
+    // `preventDefault` means the paste was intercepted, and the refusal is said
+    // out loud rather than the file vanishing into a textarea.
+    expect(notPrevented).toBe(false);
+    expect(attachmentImport).toHaveBeenCalledTimes(4);
+    // The KEY, because this harness renders translation keys rather than the
+    // catalog's sentence (the copy itself is asserted where it lives). The count
+    // rides the key, so the user is told the number rather than "too many".
+    expect((await screen.findByTestId("ai.composer-attachment-error")).textContent).toContain(
+      "agent.attachments.cap:4",
+    );
+  });
+
+  it("never erases a file the batch did not create (a dedup hit)", async () => {
+    // **The library file a user curated, pasted by mistake** (review round four,
+    // data loss): a dedup hit returns an attachment that already existed, so
+    // deleting it on a later file's failure removes the user's library file, its
+    // blob and its catalog row, with no confirmation. `deduplicated` is the
+    // host's answer and the only safe source for "did this batch create it".
+    mount();
+    attachmentImport
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: "lib11",
+        content_type: "image/png",
+        filename: "already-here.png",
+        size: 3,
+        created_at: 2,
+        deduplicated: true,
+        original_size: 3,
+        container_changed: false,
+      })
+      .mockRejectedValueOnce(new Error("no keys"));
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [
+          new File(["one"], "already-here.png", { type: "image/png" }),
+          new File(["two"], "second.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() =>
+      expect(
+        (screen.getByTestId("ai.composer-attachment-error") as HTMLElement).textContent,
+      ).toContain("agent.attachments.pasteFailed"),
+    );
+    expect(attachmentDelete).not.toHaveBeenCalled();
+  });
+
+  it("erases the files a failed batch had already stored", async () => {
+    // A batch that fails on its second file used to leave the first as an
+    // encrypted chat-scoped blob with no chip, no turn and no library row
+    // (myne-md/myne#913, review round two). Nothing named it, and the cleanup
+    // sweep is the last thing a user would think to run.
+    mount();
+    attachmentImport
+      .mockReset()
+      .mockResolvedValueOnce({
+        id: "aa11",
+        content_type: "image/png",
+        filename: "first.png",
+        size: 3,
+        created_at: 2,
+        deduplicated: false,
+        original_size: 3,
+        container_changed: false,
+      })
+      .mockRejectedValueOnce(new Error("no keys"));
+
+    fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: {
+        files: [
+          new File(["one"], "first.png", { type: "image/png" }),
+          new File(["two"], "second.png", { type: "image/png" }),
+        ],
+      },
+    });
+
+    await waitFor(() => expect(attachmentDelete).toHaveBeenCalledWith("aa11"));
+    // Nothing landed on the composer: a half-attached message is not a message.
+    expect(screen.queryAllByTestId("ai.composer-attachment")).toHaveLength(0);
+    expect(
+      (await screen.findByTestId("ai.composer-attachment-error")).textContent,
+    ).toContain("agent.attachments.pasteFailed");
+  });
+
+  it("does not swallow a paste that carries no file", () => {
+    // Ordinary text paste must reach the textarea untouched: intercepting it
+    // would mean typing a sentence into the box stops working.
+    mount();
+    const notPrevented = fireEvent.paste(screen.getByTestId("ai.composer-input"), {
+      clipboardData: { files: [] },
+    });
+    // `fireEvent.paste` returns false when a handler called preventDefault.
+    expect(notPrevented).toBe(true);
+    expect(attachmentImport).not.toHaveBeenCalled();
+  });
+});
+
+describe("ChatComposer: the scope names the note", () => {
+  it("shows the note's name rather than the pointer", () => {
+    // myne-md/myne#913: `Working on: This note` is a pointer, not a name. In a
+    // pane running two notes side by side it does not say WHICH note the run is
+    // about, and in a transcript read back later it says nothing at all.
+    mount({ openNoteId: "n1", openNoteTitle: "Software Testing HW" });
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
+      "Software Testing HW",
+    );
+  });
+
+  it("falls back to the generic label when the caller has no name", () => {
+    // A caller with no note set still has to render, so the fallback is not
+    // dead code: it is the arm a test or an isolated surface takes.
+    mount({ openNoteId: "n1", openNoteTitle: null });
+    expect(screen.getByTestId("ai.composer-scope-value").textContent).toBe(
+      "agent.composer.scopeOpenNote",
+    );
+  });
+});
+
+describe("ChatComposer: the draft belongs to its conversation (myne-md/myne#913)", () => {
+  it("drops a half-typed question when the conversation changes", () => {
+    // The report: a draft followed the user across every note they switched to,
+    // so a question about note A silently became the question sent about note B.
+    mount();
+    type("this was about note A");
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("this was about note A");
+
+    act(() => {
+      startNewConversation();
+    });
+
+    expect(
+      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).value,
+    ).toBe("");
   });
 });

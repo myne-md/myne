@@ -28,10 +28,14 @@
 // already drives this by viewport.
 
 import { afterEach, describe, expect, it } from "vitest";
-import { computeSizeClass } from "../src/formfactor/SizeClassContext";
+import {
+  computeSizeClass,
+  isRegularSizeClass,
+} from "../src/formfactor/SizeClassContext";
 
 /** The documented breakpoints, restated so a change to either fails here. */
 const PHONE_DEVICE_MAX = 480;
+const BAND_MIN = 600;
 const MEDIUM_MIN = 700;
 const EXPANDED_MIN = 1000;
 
@@ -136,6 +140,114 @@ describe("a phone is compact whatever its window says", () => {
     expect(computeSizeClass()).toBe("compact");
   });
 });
+
+// ── 2b. The foldable band ───────────────────────────────────────────────────
+
+describe("a foldable's two panels", () => {
+  // iPhone Duo: 466 x 618 pt folded, 626 x 890 pt unfolded (1878 x 2670 px at
+  // 430 ppi, which is 3x).
+  const FOLDED: [number, number] = [466, 618];
+  const UNFOLDED: [number, number] = [626, 890];
+
+  it("unfolded, reporting the unfolded panel, is the band", () => {
+    device(UNFOLDED[0], UNFOLDED[1], 626);
+    expect(computeSizeClass()).toBe("compactWide");
+  });
+
+  it("unfolded, still reporting the folded panel, is the band", () => {
+    // The reading the guard would otherwise pin to the phone layout: a 626px
+    // window over a screen that claims 466px at its widest. This is the row
+    // that fails the moment the stale-screen exception is removed.
+    device(FOLDED[0], FOLDED[1], 626);
+    expect(computeSizeClass()).toBe("compactWide");
+  });
+
+  it("folded is the phone layout, whichever panel is reported", () => {
+    device(FOLDED[0], FOLDED[1], 466);
+    expect(computeSizeClass()).toBe("compact");
+    device(UNFOLDED[0], UNFOLDED[1], 466);
+    expect(computeSizeClass()).toBe("compact");
+  });
+
+  it("landscape takes the tablet arrangement, whichever panel is reported", () => {
+    device(UNFOLDED[0], UNFOLDED[1], 890);
+    expect(computeSizeClass()).toBe("medium");
+    device(FOLDED[0], FOLDED[1], 890);
+    expect(computeSizeClass()).toBe("medium");
+  });
+
+  it("beside another app, a half-width window is the phone layout", () => {
+    device(UNFOLDED[0], UNFOLDED[1], 313);
+    expect(computeSizeClass()).toBe("compact");
+  });
+
+  it("the band's boundaries", () => {
+    device(UNFOLDED[0], UNFOLDED[1], BAND_MIN);
+    expect(computeSizeClass()).toBe("compactWide");
+    device(UNFOLDED[0], UNFOLDED[1], BAND_MIN - 1);
+    expect(computeSizeClass()).toBe("compact");
+    device(UNFOLDED[0], UNFOLDED[1], MEDIUM_MIN);
+    expect(computeSizeClass()).toBe("medium");
+  });
+
+  it("a stale reading below the band is compact either way, so the exception needs no floor", () => {
+    // The window is wider than the panel it reports AND below the band, so the
+    // guard and its exception disagree about the reason and agree about the
+    // answer. Pinned because the absence of a floor is a decision, not an
+    // oversight.
+    device(300, 400, 550);
+    expect(computeSizeClass()).toBe("compact");
+  });
+});
+
+describe("every other device class keeps the class it has today", () => {
+  // The regression table. Each row is a device or a window shape that exists in
+  // a shipped lane or on a store surface; a change here is a layout change for
+  // somebody who did not ask for this feature.
+  it.each([
+    ["iPhone 17 Pro, portrait", 402, 874, 402, "compact"],
+    ["iPhone 17 Pro, landscape", 402, 874, 874, "compact"],
+    ["iPhone 15 Pro Max, landscape", 430, 932, 932, "compact"],
+    ["iPad mini, portrait", 744, 1133, 744, "medium"],
+    ["iPad 11 inch, landscape", 1194, 834, 1194, "expanded"],
+    ["iPad Split View, half", 1194, 834, 620, "compact"],
+    ["iPad Slide Over, a third", 1194, 834, 320, "compact"],
+    ["Android phone, landscape", 412, 915, 915, "compact"],
+    ["Android 10 inch tablet, portrait", 800, 1280, 800, "medium"],
+  ] as const)("%s stays %s", (_label, screenW, screenH, width, expected) => {
+    device(screenW, screenH, width);
+    expect(computeSizeClass()).toBe(expected);
+  });
+
+  it("a 7 inch portrait tablet lands in the band, which is the one recorded change", () => {
+    // 600px wide on a phone-class screen is the band by construction, and the
+    // class cannot tell this device from an unfolded foldable: both are a tall
+    // 600pt window over a screen under 700. The arrangement is the better one
+    // at that width, and docs/decisions records it as accepted.
+    device(600, 960, 600);
+    expect(computeSizeClass()).toBe("compactWide");
+  });
+
+  it("no iPad window can reach the band", () => {
+    // The gate, asserted directly on the cold edge: the narrowest iPad is 744
+    // across, which is above every band window.
+    for (const width of [600, 620, 699]) {
+      device(744, 1133, width);
+      expect(computeSizeClass()).toBe("compact");
+    }
+  });
+});
+
+describe("the band is never regular", () => {
+  it("isRegularSizeClass agrees with the layout that can mount a second pane", () => {
+    expect(isRegularSizeClass("compact")).toBe(false);
+    expect(isRegularSizeClass("compactWide")).toBe(false);
+    expect(isRegularSizeClass("medium")).toBe(true);
+    expect(isRegularSizeClass("expanded")).toBe(true);
+  });
+});
+
+
 
 // ── 3. The IME guard ────────────────────────────────────────────────────────
 

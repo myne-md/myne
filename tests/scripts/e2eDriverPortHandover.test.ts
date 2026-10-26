@@ -123,8 +123,12 @@ describe("freeDriverPorts", () => {
   });
 
   it("fails by name when every candidate is held", async () => {
+    // The band is injected as four steps rather than read from
+    // `PORT_FALLBACK_ATTEMPTS`, so this case fails only when the LOOP is wrong
+    // and not when somebody widens the band for an unrelated reason. Every port
+    // the loop would visit is held, so the only way out is the error.
     await expect(
-      freeDriverPorts(4444, 4445, busy([4444, 5444, 6444, 7444]), 200),
+      freeDriverPorts(4444, 4445, busy([4444, 5444, 6444, 7444]), 200, 4),
     ).rejects.toThrow(/every candidate WebDriver port from 4444/);
   });
 });

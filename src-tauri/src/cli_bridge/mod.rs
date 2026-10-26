@@ -117,6 +117,8 @@ mod logging_discipline;
 #[cfg(all(test, unix))]
 mod mcp_door_test;
 pub mod path_shim;
+#[cfg(windows)]
+mod pipe;
 pub mod plugin;
 pub mod rate_limit;
 pub mod scope;

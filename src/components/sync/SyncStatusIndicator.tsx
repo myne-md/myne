@@ -56,13 +56,22 @@ interface Presentation {
   label: string;
 }
 
-function present(status: SyncStatus | null): Presentation {
+function present(status: SyncStatus | null, notRegistered: boolean): Presentation {
   if (!status) return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.loading") };
   switch (status.state) {
     case "disabled":
       return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.off") };
     case "not_enrolled":
-      return { dotColor: "var(--fg-3)", label: i18n.t("sync.status.notEnrolled") };
+      // The state is DERIVED (no token), so it covers two different facts, and
+      // the caller is the only one that can tell them apart: a device that was
+      // never added to an account, and an identity that was minted offline and
+      // never registered. "Not enrolled" is the vocabulary of the vault account
+      // and names no act; on a `reserved` identity the act is Register, which the
+      // Identity row above offers by name (2026-10-25 owner report).
+      return {
+        dotColor: "var(--fg-3)",
+        label: i18n.t(notRegistered ? "sync.status.notRegistered" : "sync.status.notEnrolled"),
+      };
     case "pending":
       return { dotColor: "var(--accent)", label: i18n.t("sync.status.awaitingApproval") };
     case "idle":
@@ -138,12 +147,23 @@ export interface SyncStatusIndicatorProps {
    * test) still shows just the label.
    */
   onUnlockIdentity?: () => void;
+  /**
+   * Whether the active identity was minted offline and never registered
+   * (`reserved`). It only re-labels `not_enrolled`, because that state is derived
+   * from the absence of a token and cannot tell “never added” from “never
+   * registered”; the panel that knows says which. Default `false`, so an
+   * isolated render keeps the vault-account reading.
+   */
+  notRegistered?: boolean;
 }
 
-export function SyncStatusIndicator({ onUnlockIdentity }: SyncStatusIndicatorProps = {}) {
+export function SyncStatusIndicator({
+  onUnlockIdentity,
+  notRegistered = false,
+}: SyncStatusIndicatorProps = {}) {
   const { t } = useTranslation();
   const { status, syncNow, busy } = useSyncStatus();
-  const { dotColor, label } = present(status);
+  const { dotColor, label } = present(status, notRegistered);
   const identityLocked =
     status?.state === "error" && status.detail === "identity_locked";
   // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this

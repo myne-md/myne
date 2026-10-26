@@ -768,4 +768,121 @@ mod ocr_survives_compression {
             after.text
         );
     }
+
+    /// **What the test above cannot answer, and photo-to-note needed answered.**
+    ///
+    /// `a_compressed_scan_is_still_readable_by_ocr` asserts that a WORD
+    /// survives. A page full of words can lose a third of them and still satisfy
+    /// it, so it cannot decide whether reading the ORIGINAL bytes instead of the
+    /// stored ones would be worth moving the extraction step (myne-md/myne#926,
+    /// task 1). This test prints the character-level agreement between the two
+    /// readings and holds a floor under it.
+    ///
+    /// **The fixture is a RENDERED page, not a scan and not a photograph.**
+    /// `ocr-page-photo.png` is a 3000 px render (437 KB) that trips BOTH compression rules: the long edge
+    /// exceeds `MAX_LONG_EDGE_PX`, and the PNG is above the lossy floor, so it
+    /// is downscaled to 2400 px AND re-encoded at `JPEG_QUALITY`. That is the
+    /// exact composition a phone photograph goes through at import.
+    ///
+    /// **And the number is a LOWER bound on the cost to a real photograph**,
+    /// which is why it is recorded rather than treated as the answer. Crisp,
+    /// evenly lit, high-contrast glyphs compress far better than the same page
+    /// photographed by hand: no shadow, no perspective, no sensor noise, no
+    /// pen. If crisp text loses this much, paper loses at least as much.
+    #[test]
+    fn the_accuracy_cost_of_compression_is_measured() {
+        if !super::super::ocr::bundled_weights_are_real() {
+            return;
+        }
+        assert!(super::super::ocr::init_bundled_models_for_tests());
+
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests")
+            .join("fixtures")
+            .join("ocr-page-photo.png");
+        let original = std::fs::read(&path).expect("fixture reads");
+
+        let stored = match compress_for_import(&original, "image/png") {
+            CompressOutcome::Compressed { bytes, .. } => bytes,
+            CompressOutcome::Unchanged => panic!(
+                "the fixture is chosen to trip both compression rules, so an \
+                 unchanged result means this test measured nothing"
+            ),
+        };
+
+        let before = super::super::ocr::extract_image(&original);
+        let after = super::super::ocr::extract_image(&stored);
+        assert!(
+            !before.text.trim().is_empty(),
+            "precondition: OCR reads the uncompressed page photo"
+        );
+        assert!(
+            !after.text.trim().is_empty(),
+            "ingest compression left nothing readable: {} bytes in, {} stored",
+            original.len(),
+            stored.len()
+        );
+
+        // Whitespace is collapsed before comparing: mean newlines are a
+        // presentation difference between two runs of the same detector, not an
+        // accuracy loss, and letting them count would make the figure move when
+        // the layout heuristic changes rather than when the pixels do.
+        let a = collapse_ws(&before.text);
+        let b = collapse_ws(&after.text);
+        let similarity = char_agreement(&a, &b);
+        println!(
+            "MEASURE ocr-compression original_bytes={} stored_bytes={} \
+             original_chars={} stored_chars={} char_agreement={:.4}",
+            original.len(),
+            stored.len(),
+            a.chars().count(),
+            b.chars().count(),
+            similarity
+        );
+        println!("MEASURE before={:?}", before.text);
+        println!("MEASURE after={:?}", after.text);
+
+        // The floor sits close to what this fixture measures, with room only for
+        // the run-to-run wobble of the detector itself. It exists so a future
+        // change to the compression constants, the JPEG encoder or the model has
+        // to face the number it moved rather than only the two texts it printed:
+        // at 0.93 a change costing five points would have passed green while the
+        // printed figure stayed nobody's gate.
+        assert!(
+            similarity >= 0.97,
+            "ingest compression cost more character accuracy than this fixture \
+             measured when the floor was set ({similarity:.4} < 0.97)"
+        );
+    }
+
+    /// Every run of whitespace becomes one space, so two readings of the same
+    /// page differ only by their words.
+    fn collapse_ws(text: &str) -> String {
+        text.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
+    /// `1 - levenshtein(a, b) / max(len(a), len(b))` over characters.
+    ///
+    /// A dependency-free DP rather than a crate: this is a measurement, and
+    /// adding a similarity crate to the crate graph to compute one number in a
+    /// test would be a bigger change than the measurement.
+    fn char_agreement(a: &str, b: &str) -> f64 {
+        let a: Vec<char> = a.chars().collect();
+        let b: Vec<char> = b.chars().collect();
+        let longest = a.len().max(b.len());
+        if longest == 0 {
+            return 1.0;
+        }
+        let mut prev: Vec<usize> = (0..=b.len()).collect();
+        let mut cur = vec![0usize; b.len() + 1];
+        for (i, ca) in a.iter().enumerate() {
+            cur[0] = i + 1;
+            for (j, cb) in b.iter().enumerate() {
+                let cost = usize::from(ca != cb);
+                cur[j + 1] = (prev[j + 1] + 1).min(cur[j] + 1).min(prev[j] + cost);
+            }
+            std::mem::swap(&mut prev, &mut cur);
+        }
+        1.0 - (prev[b.len()] as f64 / longest as f64)
+    }
 }

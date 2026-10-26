@@ -34,7 +34,7 @@ use super::prompt::ProposedNote;
 use super::prompt::ProposedSetting;
 use super::run::{AgentRunState, AppliedSetting};
 use super::setting::SettingIntent;
-use crate::folder_key::{canonical_excluded, folder_matches_excluded};
+use crate::folder_key::{canonical_excluded, canonical_folder, folder_matches_excluded};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use zeroize::Zeroizing;
@@ -206,6 +206,18 @@ pub async fn apply_approved(
     // parameter shape exists to make visible at every call site.
     approved_new_notes: &[(usize, ProposedNote)],
     excluded_folders: &[String],
+    // The folders this vault HAS, canonical (myne-md/myne#913). A move may only
+    // land in one of them: a destination the model invented is not a folder
+    // request, it is a second catalog nobody asked for. Built by the caller from
+    // the index plus `deliberate_folders`, because "does this folder exist" is a
+    // question only the host can answer: a folder here is a `folder:` value, not
+    // a directory.
+    known_folders: &BTreeSet<String>,
+    // The user's configured new-note location (myne-md/myne#913). A proposed
+    // note with NO folder means "wherever a new note goes", which is the same
+    // question a manual create asks; treating it as the vault root made the
+    // agent's note disagree with the setting the same batch had just applied.
+    default_new_note_folder: Option<&str>,
     approval: Approval,
     reader: &dyn ApplyReader,
     restore: &dyn RestorePointTaker,
@@ -358,6 +370,18 @@ pub async fn apply_approved(
                 // That is the whole reason the verb exists rather than the lock
                 // being deleted.
                 if edit.kind == EditKind::Move {
+                    // **A destination the vault does not have is refused**
+                    // (myne-md/myne#913). Checked before the exclusion arm so
+                    // the sentence a user reads is about the folder that does
+                    // not exist, not about a clamp that never got the chance.
+                    if !known_folders.contains(&canonical_folder(&folder_of(&next))) {
+                        outcome.refused.push(RefusedEdit {
+                            note_id: edit.note_id.clone(),
+                            index: *index,
+                            reason: EditRejection::UnknownFolder,
+                        });
+                        continue;
+                    }
                     // ENTERING an excluded folder. Leaving one is refused
                     // earlier and unconditionally by `excluded_note` above, which
                     // drops the body of any note whose CURRENT folder is
@@ -436,7 +460,15 @@ pub async fn apply_approved(
 
     // 6. Create. Last, and after the restore point, so a create is never the
     //    thing that leaves a half-applied batch.
-    create_notes(approved_new_notes, excluded_folders, writer, &mut outcome).await?;
+    create_notes(
+        approved_new_notes,
+        excluded_folders,
+        default_new_note_folder,
+        known_folders,
+        writer,
+        &mut outcome,
+    )
+    .await?;
     Ok(outcome)
 }
 
@@ -459,6 +491,13 @@ pub async fn apply_approved(
 async fn create_notes(
     new_notes: &[(usize, ProposedNote)],
     excluded_folders: &[String],
+    default_folder: Option<&str>,
+    // **The same canonical set the MOVE verb is checked against** (myne-md/myne#913,
+    // review round five). The prompt says a new note's folder must be one the vault
+    // has, and `decisions/ai/0741` states that the apply half is what makes a wrong
+    // one impossible; without this the sibling verb could still create `Areas`
+    // beside the user's `02 - AREAS`, which is the exact report that rule exists for.
+    known_folders: &BTreeSet<String>,
     writer: &dyn BatchWriter,
     outcome: &mut ApplyOutcome,
 ) -> Result<(), AgentError> {
@@ -467,6 +506,13 @@ async fn create_notes(
     }
     let excluded = canonical_excluded(excluded_folders);
     for (index, note) in new_notes {
+        // The resolved copy: the writer must receive the folder that was
+        // validated, or the note is checked against one destination and written
+        // to another.
+        let mut note = note.clone();
+        if note.folder.is_none() {
+            note.folder = default_folder.map(str::to_string);
+        }
         // Two refusals, and the second is the one a model-supplied string could
         // otherwise walk around. `folder_matches_excluded` tests the FIELD; a
         // title carrying a newline can emit a second `folder:` line the clamp
@@ -478,6 +524,24 @@ async fn create_notes(
             });
             continue;
         }
+        // **A folder the vault does not have is refused, exactly as a move's
+        // destination is** (myne-md/myne#913, review round five). Scoped to a
+        // folder the MODEL named: the default location is the user's own setting,
+        // and a note that lands there must not be refused because the setting
+        // points at a folder this batch cannot see.
+        if let Some(named) = note.folder.as_deref() {
+            if !named.is_empty() && !known_folders.contains(&canonical_folder(named)) {
+                outcome.refused_new_notes.push(RefusedNewNote {
+                    index: *index,
+                    reason: EditRejection::UnknownFolder,
+                });
+                continue;
+            }
+        }
+        // **No folder means the user's default location, not the root**
+        // (myne-md/myne#913). This is the same question a manual "New note"
+        // asks, and the reported run put its note at the vault root while the
+        // setting the same batch applied pointed at `00 - INBOX/`.
         let folder = note.folder.as_deref().unwrap_or("");
         if folder_matches_excluded(folder, &excluded) {
             outcome.refused_new_notes.push(RefusedNewNote {
@@ -493,7 +557,7 @@ async fn create_notes(
         // that the changes could not be applied while they in fact were. The
         // failed create becomes a refusal like any other, and the rest of the
         // batch keeps its undo.
-        match writer.create_note(note).await {
+        match writer.create_note(&note).await {
             Ok(id) => {
                 outcome.notes_created.push(id);
                 outcome.created_new_note_indices.push(*index);
@@ -895,10 +959,17 @@ mod tests {
                 return Err(AgentError::WriteFailed);
             }
             let id = format!("new-{}", note.title);
-            self.notes
-                .lock()
-                .unwrap()
-                .insert(id.clone(), note.body.clone());
+            // The FOLDER is part of what the writer is handed, and a fake that
+            // dropped it made the default-location rule untestable: the note
+            // landed at the right destination and the assertion could only see
+            // the body. Written as the frontmatter a real writer emits.
+            let text = match note.folder.as_deref() {
+                Some(folder) if !folder.is_empty() => {
+                    format!("---\nfolder: {folder}\n---\n\n{}", note.body)
+                }
+                _ => note.body.clone(),
+            };
+            self.notes.lock().unwrap().insert(id.clone(), text);
             Ok(id)
         }
     }
@@ -914,6 +985,8 @@ mod tests {
             &[edit("a", "world", "there")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -947,6 +1020,8 @@ mod tests {
             &[edit("a", "world", "there")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -976,6 +1051,8 @@ mod tests {
             &[edit("a", "world", "there")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1002,6 +1079,8 @@ mod tests {
             &[edit("a", "beta", "delta")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1025,6 +1104,8 @@ mod tests {
             &[edit("b", "y", "z")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1053,6 +1134,8 @@ mod tests {
             // three tests had been labelling multi-item batches
             // `individual`, which is the gap that finding is about,
             // reachable from the suite itself.
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1077,6 +1160,8 @@ mod tests {
             &[edit("a", "nope", "x")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1126,6 +1211,8 @@ mod tests {
             ],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1153,6 +1240,8 @@ mod tests {
             &[edit("a", "title: A", "title: A2")],
             &[(0, new_note("N", None))],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1176,6 +1265,8 @@ mod tests {
                 &[edit("a", "title: A", line)],
                 &[],
                 &[],
+                &BTreeSet::from([String::new()]),
+                None,
                 Approval::Individual,
                 &disk,
                 &disk,
@@ -1206,6 +1297,8 @@ mod tests {
             ],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1231,6 +1324,8 @@ mod tests {
             &[append_edit("a", "the list")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1256,6 +1351,8 @@ mod tests {
             &[append_edit("b", "text")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1287,6 +1384,8 @@ mod tests {
             &[append_edit("a", &format!("---\ntrashed: {TRASH_TS}\n---"))],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1327,6 +1426,8 @@ mod tests {
             )],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1365,6 +1466,12 @@ mod tests {
                 &[edit("a", "folder: Work", "folder: Secrets")],
                 &[],
                 &[],
+                // The test is about the ANCHORED-edit arm (a move hidden inside
+                // replacement text), so its destination has to be a folder the
+                // vault has, or the newer destination check answers first and
+                // the arm this exists for is never reached.
+                &BTreeSet::from([String::new(), "work/".to_string(), "secrets/".to_string()]),
+                None,
                 approval,
                 &disk,
                 &disk,
@@ -1401,6 +1508,8 @@ mod tests {
             &[edit("a", "folder: Private\n", "")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1427,6 +1536,8 @@ mod tests {
                 &[edit("a", anchor, replacement)],
                 &[],
                 &[],
+                &BTreeSet::from([String::new()]),
+                None,
                 Approval::Individual,
                 &disk,
                 &disk,
@@ -1467,6 +1578,8 @@ mod tests {
             &[move_edit("a", "Projects")],
             &[],
             &[],
+            &BTreeSet::from(["".to_string(), "projects/".to_string()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1480,6 +1593,80 @@ mod tests {
             "{}",
             disk.read_back("a")
         );
+    }
+
+    /// **A destination the vault does not have is refused** (myne-md/myne#913).
+    ///
+    /// The report: a run said it moved a note to "Areas", and the sidebar grew a
+    /// new top-level folder beside the user's `02 - AREAS`. Nothing wrote a
+    /// folder there, a `folder:` value IS the folder, so the app had no way to
+    /// say "that is not a folder you have". This is that way.
+    ///
+    /// The set is the vault's own: the root, the folders notes live in, and the
+    /// deliberate (empty) folders. A name outside it does not create anything.
+    #[test]
+    fn a_move_to_a_folder_the_vault_does_not_have_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let before = note_with("title: T\nfolder: Work");
+        let disk = Disk::with(&[("a", &before)], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            // The exact shape of the defect: a name that differs from the real
+            // folder by a numeric prefix, which reads correct to a model and is
+            // a different folder to the sidebar.
+            &[move_edit("a", "Areas")],
+            &[],
+            &[],
+            &BTreeSet::from([
+                "".to_string(),
+                "work/".to_string(),
+                "02 - areas/".to_string(),
+            ]),
+            None,
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 0);
+        assert_eq!(out.refused.len(), 1);
+        assert_eq!(out.refused[0].reason, EditRejection::UnknownFolder);
+        assert_eq!(disk.read_back("a"), before, "the note is byte-identical");
+    }
+
+    /// And the same destination, matching the vault's spelling, goes through.
+    ///
+    /// The pair is deliberate: the refusal above would also pass if every move
+    /// were refused, and a guard that cannot say yes is not a guard.
+    #[test]
+    fn a_move_to_a_folder_the_vault_has_lands_on_disk() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[("a", &note_with("title: T\nfolder: Work"))], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[move_edit("a", "02 - AREAS")],
+            &[],
+            &[],
+            &BTreeSet::from([
+                "".to_string(),
+                "work/".to_string(),
+                "02 - areas/".to_string(),
+            ]),
+            None,
+            Approval::Individual,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.applied, 1);
+        assert!(out.refused.is_empty());
+        assert!(disk.read_back("a").contains("folder: 02 - AREAS"));
     }
 
     /// The direction the lock never covered, and the one the verb bought its
@@ -1496,6 +1683,11 @@ mod tests {
             &[move_edit("a", "Private")],
             &[],
             &["Private/".to_string()],
+            // Known, so the refusal below is the CLAMP's and not the folder
+            // roster's: a test that let the new check answer first would stop
+            // exercising the clamp it exists for.
+            &BTreeSet::from(["".to_string(), "private/".to_string()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1522,6 +1714,8 @@ mod tests {
             &[move_edit("a", "Work")],
             &[],
             &["Private/".to_string()],
+            &BTreeSet::from(["".to_string(), "work/".to_string()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1548,6 +1742,8 @@ mod tests {
             &[move_edit("a", "work/")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1586,6 +1782,8 @@ mod tests {
                 &[edit("a", "title: T", &format!("title: T\n{line}"))],
                 &[],
                 &[],
+                &BTreeSet::from([String::new()]),
+                None,
                 Approval::Bulk,
                 &disk,
                 &disk,
@@ -1621,6 +1819,8 @@ mod tests {
             ],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1646,6 +1846,8 @@ mod tests {
             &[edit("a", "title: T", "title: T\ntrashed: true")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1669,6 +1871,8 @@ mod tests {
             &[edit("a", "one", "1"), edit("a", "three", "3")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1690,6 +1894,8 @@ mod tests {
             &[edit("a", "world", "there"), edit("a", "world", "X")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1713,6 +1919,8 @@ mod tests {
             &[edit("a", "zzz", "X"), edit("a", "c", "C")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1748,6 +1956,8 @@ mod tests {
             // three tests had been labelling multi-item batches
             // `individual`, which is the gap that finding is about,
             // reachable from the suite itself.
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1784,6 +1994,8 @@ mod tests {
             &[edit("a", "world", "there")],
             &[],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1810,6 +2022,8 @@ mod tests {
             &[edit("a", "hello world", "goodbye")],
             &[],
             &["Private/".to_string()],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1835,6 +2049,8 @@ mod tests {
             &[edit("a", "hello world", "goodbye")],
             &[],
             &["Private/".to_string()],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Individual,
             &disk,
             &disk,
@@ -1864,6 +2080,10 @@ mod tests {
             &[],
             &[(0, new_note("Fresh", Some("Projects")))],
             &[],
+            // The folder the proposal names, because a create is checked against
+            // the vault's folders as a move is (review round five).
+            &BTreeSet::from([String::new(), "projects/".to_string()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1871,7 +2091,109 @@ mod tests {
         ))
         .unwrap();
         assert_eq!(out.notes_created, vec!["new-Fresh".to_string()]);
-        assert_eq!(disk.read_back("new-Fresh"), "body");
+        // The writer now records the folder too, so the assertion is about the
+        // whole note it was handed rather than its body alone.
+        assert!(
+            disk.read_back("new-Fresh").ends_with("body"),
+            "{}",
+            disk.read_back("new-Fresh")
+        );
+        assert!(disk.read_back("new-Fresh").contains("folder: Projects"));
+    }
+
+    /// **A note with no folder lands in the user's default location**
+    /// (myne-md/myne#913).
+    ///
+    /// The report: the agent asked "shall I put it in Inbox?", the user approved,
+    /// the setting the same batch applied pointed at `00 - INBOX/`, and the note
+    /// appeared at the vault root. A proposed note with no folder means "wherever
+    /// a new note goes", which is the question a manual create asks; the vault
+    /// root was only ever the absence of an answer.
+    #[test]
+    fn a_new_note_without_a_folder_lands_in_the_configured_default() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[],
+            &[(0, new_note("Fresh", None))],
+            &[],
+            &BTreeSet::from([String::new(), "00 - inbox/".to_string()]),
+            Some("00 - INBOX"),
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert_eq!(out.notes_created, vec!["new-Fresh".to_string()]);
+        // The folder the writer was handed, not merely the one validated.
+        assert!(
+            disk.read_back("new-Fresh").contains("folder: 00 - INBOX"),
+            "{}",
+            disk.read_back("new-Fresh")
+        );
+    }
+
+    /// **A created note cannot invent a folder** (myne-md/myne#913, review round
+    /// five). The move verb refused one and the create verb accepted any name,
+    /// so `propose_note {folder: "Areas"}` still produced a top-level `Areas`
+    /// beside the user's `02 - AREAS`, which is the report
+    /// `decisions/ai/0741` exists for. Refused, and nothing written.
+    #[test]
+    fn a_new_note_in_a_folder_the_vault_lacks_is_refused() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[], true);
+        let out = block_on(apply_approved(
+            &runs,
+            "r",
+            &[],
+            &[(0, new_note("Stray", Some("Areas")))],
+            &[],
+            &BTreeSet::from([String::new(), "02 - areas/".to_string()]),
+            None,
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert!(out.notes_created.is_empty(), "nothing is written");
+        assert_eq!(out.refused_new_notes.len(), 1);
+        assert_eq!(
+            out.refused_new_notes[0].reason,
+            EditRejection::UnknownFolder
+        );
+    }
+
+    /// And a folder the proposal DOES name still wins over the default.
+    #[test]
+    fn a_named_folder_beats_the_configured_default() {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids(&["a"]));
+        let disk = Disk::with(&[], true);
+        block_on(apply_approved(
+            &runs,
+            "r",
+            &[],
+            &[(0, new_note("Fresh", Some("Projects")))],
+            &[],
+            &BTreeSet::from([String::new(), "projects/".to_string()]),
+            Some("00 - INBOX"),
+            Approval::Bulk,
+            &disk,
+            &disk,
+            &disk,
+        ))
+        .unwrap();
+        assert!(
+            disk.read_back("new-Fresh").contains("folder: Projects"),
+            "{}",
+            disk.read_back("new-Fresh")
+        );
     }
 
     // The clamp the scope model cannot cover: a note that does not exist yet is
@@ -1889,6 +2211,12 @@ mod tests {
             &[],
             &[(0, new_note("Secret", Some("Private/Deep")))],
             &["Private".into()],
+            // The folder EXISTS and is excluded, which is the realistic pair: an
+            // exclusion names a folder the user has. Without it the create would
+            // be refused as unknown first and this test would be asserting the
+            // wrong arm (review round five).
+            &BTreeSet::from([String::new(), "private/deep/".to_string()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1918,6 +2246,12 @@ mod tests {
                 (1, new_note("Fine", Some("Projects"))),
             ],
             &["Private".into()],
+            &BTreeSet::from([
+                String::new(),
+                "private/".to_string(),
+                "projects/".to_string(),
+            ]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1944,6 +2278,8 @@ mod tests {
             &[],
             &[(0, new_note("T\nfolder: Private", Some("Public")))],
             &["Private".into()],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1968,6 +2304,8 @@ mod tests {
             &[],
             &[(0, new_note("T\n---\ntrashed: 2026-08-16T10:00:00Z", None))],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -1991,6 +2329,8 @@ mod tests {
             &[],
             &[(1, new_note("Chosen", None))],
             &[],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -2012,6 +2352,8 @@ mod tests {
             &[],
             &[(0, new_note("Root", None))],
             &["Private".into()],
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,
@@ -2038,6 +2380,8 @@ mod tests {
             // three tests had been labelling multi-item batches
             // `individual`, which is the gap that finding is about,
             // reachable from the suite itself.
+            &BTreeSet::from([String::new()]),
+            None,
             Approval::Bulk,
             &disk,
             &disk,

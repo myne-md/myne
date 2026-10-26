@@ -28,7 +28,7 @@ import {
   AiOnboardingSheet,
   readAiOnboardingSeen,
 } from "../../components";
-import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted } from "../../lib/notes";
+import { noteList, noteRead, noteCreate, noteUpdate, deleteNoteRouted, createTitledNote } from "../../lib/notes";
 import {
   closeLiveNote,
   openLiveNote,
@@ -80,6 +80,7 @@ import { drainPendingShares } from "../../lib/shareImport";
 import { ShareImportToast } from "./ShareImportToast";
 import { ioBanner } from "../../lib/io-banner";
 import { usePrefs } from "../../lib/use-prefs";
+import { normalizeNewNoteLocation } from "../../lib/prefs";
 import { vaultDisplayLabel } from "../../lib/vault-label";
 import { useSwipeBack } from "../../lib/use-swipe-back";
 import { isRtl } from "../../lib/util";
@@ -138,9 +139,16 @@ import { foldDecorationKeys, rewriteFolderPrefix } from "@myne/editor/host/notes
 import { MobileViewRenderHost } from "./editor/views/MobileViewRenderHost";
 import type { SavedView } from "../../lib/prefs";
 import { ViewEditorSheet } from "./ViewEditorSheet";
-import { importFile, ATTACHMENT_ACCEPT } from "../../lib/attachments";
+import { importFile, ATTACHMENT_ACCEPT, attachmentDelete } from "../../lib/attachments";
+import {
+  buildPhotoNoteBlock,
+  localDateStamp,
+  photoNoteTitle,
+  shouldDiscardPhotoDraft,
+} from "../../lib/photoNoteBody";
 import { emitAttachmentEmbed } from "../../lib/attachmentRef";
 import { AttachmentsSheet } from "./AttachmentsSheet";
+import { PhotoNoteSheet, type PhotoNoteDestination } from "./PhotoNoteSheet";
 import { RecordingSheet } from "./RecordingSheet";
 import { VOICE_RECORD_EVENT } from "../../lib/voice-record-bridge";
 import { SnapshotsSheet } from "./SnapshotsSheet";
@@ -170,7 +178,9 @@ import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import type { VaultId } from "../../lib/stage";
 import { SettingsSheet, applyStoredTheme, type Panel } from "./SettingsSheet";
-import { useSizeClass } from "../../formfactor/SizeClassContext";
+import { isRegularSizeClass, useSizeClass } from "../../formfactor/SizeClassContext";
+import { ListDrawer } from "./editor/sheets/ListDrawer";
+import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRestore";
 import { EmptyDetail } from "./editor/EmptyDetail";
 import { SidebarPane } from "./editor/SidebarPane";
 import { AppHeader } from "./editor/chrome/AppHeader";
@@ -418,6 +428,44 @@ const PRESENCE_REPORT_MS = 100;
  *  straight after unlocking does not watch an empty picker. */
 const PICKER_FETCH_RETRY_MS = 1_500;
 
+/** One photo-to-note draft, from the picked file until it lands or is discarded.
+ *
+ *  `id` is null while the import runs, which is what lets the sheet show the
+ *  photograph during the seconds OCR takes. `deduplicated` records whether the
+ *  vault already held this exact image: `attachment_import` is content-addressed
+ *  and returns the existing entry in that case, so the flow does NOT own it and
+ *  must never delete it. */
+interface PhotoDraft {
+  id: string | null;
+  filename: string;
+  /** A local `blob:` URL for the picked file, revoked when the draft ends. */
+  previewUrl: string | null;
+  /** The OCR preference as the IMPORT saw it, not as it stands now. */
+  ocrEnabled: boolean;
+  /** True when the import deduplicated onto an attachment the vault already had. */
+  deduplicated: boolean;
+}
+
+/** Ids whose delete a LOCK refused, retried on the next mount.
+ *
+ *  The import runs before the review, so the bytes exist before the user has
+ *  agreed to keep them; a lock mid-draft unmounts this flow AFTER the slot has
+ *  dropped, so `attachment_delete` is refused and the photograph would otherwise
+ *  sit in the library and sync with nothing saying so. The set lives in the
+ *  module, which survives a lock in the same process (auto-lock does not kill the
+ *  app), and the mount effect below retries it once the vault is unlocked again.
+ *  A kill before that next unlock still leaves the import, which is stated in
+ *  `decisions/ui/0731` rather than pretended away. */
+const pendingPhotoDiscards = new Set<string>();
+
+/** Free a draft's blob URL, if it has one. Guarded because the browser-dev
+ *  harness and jsdom do not both provide `URL.createObjectURL`. */
+function releasePhotoPreview(url: string | null): void {
+  if (url !== null && typeof URL !== "undefined" && typeof URL.revokeObjectURL === "function") {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
   const { t } = useTranslation();
   // The authoritative active-vault id for every vault-targeting surface below,
@@ -462,7 +510,9 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // pane on regular (the invariant `view === "editor" ⟺ editing != null`
   // already holds on compact).
   const { sizeClass } = useSizeClass();
-  const isRegular = sizeClass !== "compact";
+  // `compactWide` is a single column with an overlay list, not a two-pane
+  // layout, so "regular" is the medium/expanded pair and nothing else.
+  const isRegular = isRegularSizeClass(sizeClass);
 
   // Slide the incoming tab page in from the side its tab sits on (Notes ← … →
   // Templates). Same Web-Animations technique as the Settings drawer; the first
@@ -474,8 +524,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     prevTabRef.current = tab;
     if (tab === prev) return;
     // Regular layouts don't page-flip - the prev ref still updates above so a
-    // later rotation back to compact can't replay a stale slide.
-    if (sizeClass !== "compact") return;
+    // later rotation back to compact can't replay a stale slide. The folded band
+    // DOES page-flip: it is one column with the same list chrome, so a tab switch
+    // there is the same navigation the phone does.
+    if (isRegular) return;
     const el = tabPaneRef.current;
     if (!el || typeof el.animate !== "function") return;
     const forward = TAB_ORDER[tab] >= TAB_ORDER[prev];
@@ -502,9 +554,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     const prev = prevViewRef.current;
     prevViewRef.current = view;
     if (view === prev) return;
-    // The push/pop is compact-only: on regular both panes are persistent (no
-    // screen swap). Updating the prev ref unconditionally above prevents a
-    // stale animation when rotating back to compact.
+    // The push/pop belongs to the compact swap alone: the band's list is a
+    // DRAWER over the note, so animating the whole screen when `view` flips
+    // would slide the page out from under an overlay. Updating the prev ref
+    // unconditionally above prevents a stale animation after a rotation.
     if (sizeClass !== "compact") return;
     const el = screenRef.current;
     if (!el || typeof el.animate !== "function") return;
@@ -665,6 +718,11 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       // later, and a note switch inside that window would otherwise report this
       // note's offset as presence on the next one (myne-md/myne#849 review).
       presenceLastRef.current = { noteId: liveNoteIdRef.current, cursor, selection };
+      // A caret that moved somewhere other than the restored offset is the user
+      // typing, and the fold's snapshot is stale from that moment on.
+      if (pendingCaretRef.current && cursor !== pendingCaretRef.current.head) {
+        pendingCaretRef.current = null;
+      }
       if (presenceTimerRef.current !== null) return;
       presenceTimerRef.current = setTimeout(() => {
         presenceTimerRef.current = null;
@@ -925,26 +983,73 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     };
   }, [t]);
 
+  // "Back to the list" means two different things by layout. On the phone it is
+  // the save-then-pop contract: the note closes and the list replaces it. In the
+  // folded band the note must STAY MOUNTED under the drawer, so it is pure
+  // navigation: no write, no `exitEditor` (which clears `editing` and would take
+  // the page out from under the overlay). The bytes are safe either way, because
+  // the background flush and the note's own save paths own them.
+  const openList = () => {
+    if (sizeClass === "compactWide") {
+      // Navigation, not exit: the note stays mounted under the drawer, and the
+      // bytes are not written here. Every control in that drawer that REPLACES
+      // the buffer writes it first through `persistOpenBuffer`, which is the
+      // only place the write is actually owed.
+      setView("list");
+      return;
+    }
+    void saveNote();
+  };
+
   // Compact-only left-edge swipe-back: same semantics as the top-bar chevron
   // (autosave + return to the list), same busy guard. `saveNote` is a hoisted
   // function declaration, so referencing it here is fine.
   useSwipeBack(
     screenRef,
     () => {
+      if (sizeClass === "compactWide") {
+        setView("list");
+        return;
+      }
       if (!editorBusy) void saveNote();
     },
-    sizeClass === "compact" && view === "editor",
+    !isRegular && view === "editor",
   );
   // Attachment insert: the editor textarea + hidden file input, and a busy flag
   // while the picked file is encrypted (MYA1) on the host.
   const attachInputRef = useRef<HTMLInputElement>(null);
   const [attaching, setAttaching] = useState(false);
+  // Photo to note (myne-md/myne#926): the camera/library input, and the one
+  // attachment this flow imported and has not committed yet. `photoNote`
+  // non-null IS the draft sheet being open.
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [photoNote, setPhotoNote] = useState<PhotoDraft | null>(null);
+  // Whether the open draft already landed. A ref, because the unmount cleanup
+  // reads it in a closure registered once, and because React's own unmount is
+  // what runs it.
+  const photoNoteCommittedRef = useRef(false);
+  // The user backed out while the import was still running, so its result must
+  // be undone rather than shown.
+  const photoNoteCancelledRef = useRef(false);
+  // The same value, in a ref, for the unmount cleanup below: it must not delete
+  // an attachment it no longer owns, and a stale closure would.
+  const photoNoteRef = useRef<PhotoDraft | null>(null);
+  photoNoteRef.current = photoNote;
+  // A lock unmounts this flow mid-import; the resolve has to know.
+  const editorMountedRef = useRef(true);
   // The live CMEditor view, handed over via <CMEditor onReady>. Drives the
   // above-keyboard FormatBar through the shared @myne/editor commands.
   const [editorView, setEditorView] = useState<EditorView | null>(null);
   // The same view, in a ref, for the listeners below: they are registered ONCE, so
   // they cannot read a state value from their closure.
   const editorViewRef = useRef<EditorView | null>(null);
+  // The element that actually scrolls the note (the pane's `.m-scroll`
+  // wrapper). The fold hands the reader's position across a remount through it.
+  const editorScrollRef = useRef<HTMLDivElement | null>(null);
+  // The size class the CURRENT tree was rendered for, and the offsets captured
+  // when it changed (caretRestore.ts). `null` means there was nothing to carry.
+  const lastSizeClassRef = useRef(sizeClass);
+  const pendingCaretRef = useRef<CaretSnapshot | null>(null);
   const [manageAttachments, setManageAttachments] = useState(false);
   // Voice-note recording sheet open (mic button / widget voice capture / the
   // shared editor's `/record` slash all raise this).
@@ -1554,7 +1659,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // effect above keeps working on all size classes. Deps intentionally narrow:
   // this reconciles ONLY when the size class itself flips.
   useEffect(() => {
-    if (sizeClass === "compact") setView(editing ? "editor" : "list");
+    if (isRegular) return;
+    // Land on a concrete one-column screen without discarding the one the user
+    // is on: folding from the band with the drawer up leaves `view` at "list",
+    // and forcing "editor" here silently replaced the list they were browsing
+    // (myne-md/myne#918 review, D7). Only an editor with nothing open has to
+    // move, and it moves to the list.
+    setView((current) => (current === "editor" && editing == null ? "list" : current));
   }, [sizeClass]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Stop filtering when the active view is deleted elsewhere (prefs refresh).
@@ -2438,7 +2549,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setView("editor");
   }, [currentFolder]);
 
-  const newDrawing = useCallback(() => {
+  const newDrawing = useCallback(async () => {
+    if (!(await persistOpenBuffer())) return;
     // Seed a `kind: drawing` body so the first render routes to the canvas (SF2);
     // saveNote persists it through the same note_create path as a text note.
     setEditorText(
@@ -2651,19 +2763,47 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
    * ADD only and fire-and-forget: it can never claim a removal, so a failure
    * costs at most that this folder is not remembered yet.
    */
-  async function openFromList(id: string) {
-    if (isRegular && editing != null && editing.id === null && editorText.trim() !== "") {
-      try {
-        const stamped = stampUpdated(editorText);
+  /**
+   * Write the open buffer if disk does not already have it, WITHOUT leaving the
+   * note. `saveNote` is the EXIT path (it calls `exitEditor`), so anything that
+   * replaces the buffer while a list is reachable owes this first: this client
+   * has no autosave and no snapshot, so a replaced buffer exists nowhere
+   * (mobile/AGENTS.md). Returns false when the write failed, and every caller
+   * then stays put rather than navigating away from text nobody can recover.
+   *
+   * The folded band is why this is not layout-gated any more: its list is a
+   * drawer over a LIVE note, so "the list is only reachable with no editor open"
+   * stopped being true (myne-md/myne#918 review, D8).
+   */
+  async function persistOpenBuffer(): Promise<boolean> {
+    if (editing == null) return true;
+    if (editing.id === null && editorText.trim() === "") return true;
+    try {
+      const stamped = stampUpdated(editorText);
+      if (editing.id === null) {
         const newId = HAS_TAURI
           ? await noteCreate(stamped, readNoteFolder(stamped) || null)
           : crypto.randomUUID();
         if (!HAS_TAURI) devStore().set(newId, stamped);
         applyOne(newId, stamped);
-      } catch {
-        // Best-effort persist; still navigate so the tap isn't dead.
+        loadedTextRef.current = { id: newId, text: editorText };
+        setEditing({ id: newId });
+        return true;
       }
+      if (editorUnchanged(editing.id)) return true;
+      if (HAS_TAURI) await editorSave(editing.id, stamped);
+      else devStore().set(editing.id, stamped);
+      loadedTextRef.current = { id: editing.id, text: editorText };
+      applyOne(editing.id, stamped);
+      return true;
+    } catch {
+      setEditorError(t("editor.flow.saveFailed"));
+      return false;
     }
+  }
+
+  async function openFromList(id: string) {
+    if (!(await persistOpenBuffer())) return;
     await openRelated(id);
   }
 
@@ -2804,7 +2944,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   /** New note directly in `path` (folder long-press → "New note"). Mirrors
    *  `newNote` but seeds the note's `folder:` with the target folder. */
-  function newNoteInFolder(path: string) {
+  async function newNoteInFolder(path: string) {
+    if (!(await persistOpenBuffer())) return;
     setFolderActions(null);
     setEditorText(buildInitialPlaintext(normalizeFolderPath(path)));
     setEditing({ id: null });
@@ -2815,7 +2956,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   /** New drawing note directly in `path` (folder long-press → "New drawing").
    *  Mirrors `newDrawing` but seeds the drawing note's `folder:` (MYND-515). */
-  function newDrawingInFolder(path: string) {
+  async function newDrawingInFolder(path: string) {
+    if (!(await persistOpenBuffer())) return;
     setFolderActions(null);
     setEditorText(
       new TextDecoder().decode(buildDrawingNoteBytes(undefined, normalizeFolderPath(path))),
@@ -3233,18 +3375,219 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
       const res = await importFile(file);
       insertIntoEditor(emitAttachmentEmbed(res.id, res.filename));
     } catch (e) {
-      const kind = (e as { kind?: string })?.kind;
-      setEditorError(
-        kind === "Oversize"
-          ? t("editor.flow.attachTooLarge")
-          : kind === "UnsupportedType"
-            ? t("editor.flow.attachUnsupported")
-            : t("editor.flow.attachFailed"),
-      );
+      setEditorError(attachFailureMessage(e));
     } finally {
       setAttaching(false);
     }
   }
+
+  /** The three import failures the attachment path already names. Shared by the
+   *  attach button and the photo entry so the newer path cannot answer with a
+   *  vaguer sentence than the one beside it. */
+  function attachFailureMessage(e: unknown): string {
+    const kind = (e as { kind?: string })?.kind;
+    return kind === "Oversize"
+      ? t("editor.flow.attachTooLarge")
+      : kind === "UnsupportedType"
+        ? t("editor.flow.attachUnsupported")
+        : t("editor.flow.attachFailed");
+  }
+
+  /**
+   * Photo to note (myne-md/myne#926): import the photograph, then open the DRAFT
+   * sheet instead of inserting a bare embed.
+   *
+   * The sheet opens on the PICKED FILE, not on the attachment id, because the
+   * import runs OCR and can take seconds: waiting for the id would leave the user
+   * staring at a dimmed toolbar button for exactly the part of the flow that has
+   * something to show. `previewUrl` is a blob URL that dies with the draft.
+   *
+   * The existing attach path is deliberately untouched. A user who wants an
+   * image in a note still gets one in one tap; this entry is the one that also
+   * offers to read the page. Two paths is the accepted cost.
+   */
+  async function attachPhoto(file: File) {
+    if (!HAS_TAURI) {
+      setEditorError(t("editor.flow.attachNeedsApp"));
+      return;
+    }
+    setAttaching(true);
+    setEditorError(null);
+    photoNoteCommittedRef.current = false;
+    photoNoteCancelledRef.current = false;
+    const previewUrl =
+      typeof URL !== "undefined" && typeof URL.createObjectURL === "function"
+        ? URL.createObjectURL(file)
+        : null;
+    // The OCR preference AS THE IMPORT READS IT, frozen into the draft. The
+    // cache entry is written (or skipped) inside this call, so a switch flipped
+    // afterwards cannot change what this photo has, and letting the sheet read
+    // the live pref would make it re-probe a cache nobody wrote.
+    setPhotoNote({
+      id: null,
+      filename: file.name || t("photoNote.untitledFile"),
+      previewUrl,
+      ocrEnabled: prefs.attachment_ocr_enabled !== false,
+      deduplicated: false,
+    });
+    try {
+      const res = await importFile(file);
+      // The user backed out, or the vault locked, while the bytes were being
+      // written. The import cannot be aborted, so it is undone here, and ONLY
+      // when it created something: `deduplicated` means the vault already held
+      // this exact image and deleting it would destroy somebody's attachment.
+      if (photoNoteCancelledRef.current || !editorMountedRef.current) {
+        if (!res.deduplicated) {
+          void attachmentDelete(res.id).catch(() => {
+            // Nothing to tell on a dead component, and everything to tell on a
+            // live one: this is the same refusal the cancel path reports.
+            pendingPhotoDiscards.add(res.id);
+            if (editorMountedRef.current) setEditorError(t("photoNote.discardFailed"));
+          });
+        }
+        releasePhotoPreview(previewUrl);
+        return;
+      }
+      setPhotoNote((draft) =>
+        draft === null
+          ? null
+          : {
+              ...draft,
+              id: res.id,
+              filename: res.filename,
+              deduplicated: res.deduplicated,
+            },
+      );
+    } catch (e) {
+      setPhotoNote(null);
+      releasePhotoPreview(previewUrl);
+      setEditorError(attachFailureMessage(e));
+    } finally {
+      setAttaching(false);
+    }
+  }
+
+  /**
+   * Land the reviewed draft.
+   *
+   * `note` inserts the block through the editor's ordinary insert path, so it is
+   * one undoable change and takes the normal note-save route (MY01). `new`
+   * creates a titled note through the same helper the saved-transcript path
+   * uses, honours the user's new-note location, then opens it with `openFromList`
+   * rather than `openNote`: mobile has no autosave, and switching buffers
+   * without flushing first silently discards whatever is in the editor.
+   */
+  async function commitPhotoNote(text: string, destination: PhotoNoteDestination) {
+    const draft = photoNote;
+    if (draft === null || draft.id === null) return;
+    const block = buildPhotoNoteBlock(
+      emitAttachmentEmbed(draft.id, draft.filename),
+      text,
+    );
+    // Set BEFORE the write it guards: an unmount inside the create would
+    // otherwise run the cleanup with "not committed" and delete the attachment
+    // the new note was just created to reference. The catch puts it back,
+    // because a create that failed landed nothing.
+    photoNoteCommittedRef.current = true;
+    if (destination === "new") {
+      const title = photoNoteTitle(
+        text,
+        t("photoNote.defaultTitle", { date: localDateStamp() }),
+      );
+      // The user's "Default location for new notes" (MYND-462). An explicit
+      // folder argument wins over the pref everywhere else, and there is none
+      // here, so this is exactly the root-level create the pref governs. No
+      // try/catch: `prefs` is already-loaded plain data, and a swallowed throw
+      // here would file the note at the root while looking like a successful
+      // default, which is the defect this whole clause exists to fix.
+      const mode = normalizeNewNoteLocation(prefs.new_note_location);
+      const folder =
+        mode === "specific"
+          ? prefs.new_note_location_folder ?? null
+          : mode === "current"
+            ? readNoteFolder(editorText)
+            : null;
+      let id: string;
+      try {
+        id = await createTitledNote(block, title, folder);
+      } catch {
+        photoNoteCommittedRef.current = false;
+        // The sheet stays open with the user's text: a failed create must not
+        // look like a successful one, and re-tapping the button retries.
+        setEditorError(t("photoNote.saveFailed"));
+        return;
+      }
+      // The note EXISTS from here. Clearing the draft before opening it used to
+      // share one catch with the create, so a failed OPEN told the user the note
+      // was not created and invited a retry that made a second one.
+      setPhotoNote(null);
+      releasePhotoPreview(draft.previewUrl);
+      try {
+        await openFromList(id);
+      } catch {
+        setEditorError(t("photoNote.openFailed"));
+      }
+      return;
+    }
+    setPhotoNote(null);
+    releasePhotoPreview(draft.previewUrl);
+    insertIntoEditor(block);
+  }
+
+  /**
+   * Abandon the draft: nothing is written, and the attachment this flow imported
+   * is deleted through the existing path.
+   *
+   * **Not every draft owns its attachment.** `attachment_import` is
+   * content-addressed and dedups, so picking a photograph the vault already holds
+   * returns the EXISTING entry with `deduplicated: true`. Deleting that would
+   * break every note that embeds it and push a tombstone to every device, which
+   * is the opposite of "cancel writes nothing". So the dedup flag decides, and
+   * the flow says so on failure instead of closing as though the bytes went away.
+   */
+  function cancelPhotoNote() {
+    const draft = photoNote;
+    photoNoteCancelledRef.current = true;
+    photoNoteCommittedRef.current = false;
+    setPhotoNote(null);
+    releasePhotoPreview(draft?.previewUrl ?? null);
+    if (draft === null || !shouldDiscardPhotoDraft(draft, photoNoteCommittedRef.current)) return;
+    const id = draft.id;
+    if (id === null) return; // the predicate already covers it; this narrows for TS
+    void attachmentDelete(id).catch(() => {
+      pendingPhotoDiscards.add(id);
+      setEditorError(t("photoNote.discardFailed"));
+    });
+  }
+
+  // A lock (or any other unmount of this flow) with a draft open drops the
+  // plaintext with the component and drops the blob URL. The uncommitted import
+  // is deleted best-effort: after a lock the delete is refused, and then the
+  // image stays in the library, which is the recoverable arm rather than a write
+  // nobody asked for. A deduplicated import is never deleted, because the vault
+  // already held it.
+  useEffect(() => {
+    editorMountedRef.current = true;
+    // Retry the discards a lock refused. The slot is unlocked now, which is the
+    // one thing that changed since the delete failed.
+    for (const id of [...pendingPhotoDiscards]) {
+      void attachmentDelete(id)
+        .then(() => pendingPhotoDiscards.delete(id))
+        .catch(() => {});
+    }
+    return () => {
+      editorMountedRef.current = false;
+      const draft = photoNoteRef.current;
+      releasePhotoPreview(draft?.previewUrl ?? null);
+      if (draft === null || !shouldDiscardPhotoDraft(draft, photoNoteCommittedRef.current)) return;
+      const id = draft.id;
+      if (id === null) return;
+      // Register FIRST and clear on success: after a lock this delete is refused,
+      // and the id has to survive to be retried on the next unlock.
+      pendingPhotoDiscards.add(id);
+      void attachmentDelete(id).then(() => pendingPhotoDiscards.delete(id)).catch(() => {});
+    };
+  }, []);
 
   // Heading outline of the note body (skips fenced code so `# in code` isn't a
   // heading). Each entry keeps the char offset so tapping jumps the caret there.
@@ -4057,19 +4400,6 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           />
         )}
 
-        {settingsOpen && (
-          <SettingsSheet
-            vaultId={vaultId}
-            initialPanel={settingsPanel}
-            onClose={() => {
-              setSettingsOpen(false);
-              setSettingsPanel(undefined);
-            }}
-            onLock={onLock}
-            onDeleteVaultSuccess={onDeleteVaultSuccess}
-          />
-        )}
-
         {aiOnboardingOpen && (
           <AiOnboardingSheet
             onClose={() => setAiOnboardingOpen(false)}
@@ -4315,6 +4645,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // ── Editor pane (the former editor-view return). Same render-helper pattern
   // as the list pane: called by the compact editor screen and by the regular
   // detail pane; its derivations only run when an editor is actually shown. ───
+  // The note's own measure, per layout.
+  //
+  // Regular keeps the WS-01 column: 620px of text plus 56px gutters a side,
+  // centered in the detail pane. Compact keeps the phone's 18/22.
+  //
+  // The folded band sits between them on purpose: it keeps the tablet's 620px
+  // measure (664 - 2x22) but with the PHONE's gutter, because at 626pt the
+  // tablet's 56pt gutters would spend 112 of the 626 points the band exists to
+  // give back, leaving the note 514 wide, narrower than the same phone's own
+  // editor once folded. 664 is the measure plus two phone gutters, so the cap
+  // and the gutter meet at 700 where `medium` takes over.
+  const proseStyle =
+    isRegular
+      ? { width: "100%", maxWidth: 732, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 56px" }
+      : sizeClass === "compactWide"
+        ? { width: "100%", maxWidth: 664, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 22px" }
+        : { width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" };
+
   const renderEditorPane = () => {
     const headerTitle = deriveTitleSnippet(editorText).title || (editing?.id ? "Untitled" : "New note");
     const isExisting = editing?.id != null;
@@ -4328,7 +4676,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return (
       <>
       <EditorTopBar
-        onBack={sizeClass === "compact" ? () => void saveNote() : undefined}
+        onBack={!isRegular ? openList : undefined}
         onToggleList={isRegular ? () => setPanesRevealed((r) => !r) : undefined}
         onContext={() => setRightPanel(true)}
         onMore={isExisting ? () => setMoreOpen(true) : undefined}
@@ -4346,6 +4694,25 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         onChange={(e) => {
           const f = e.target.files?.[0];
           if (f) void attachFile(f);
+          e.target.value = "";
+        }}
+      />
+
+      {/* Photo to note (myne-md/myne#926). Deliberately WITHOUT `capture`:
+          `capture` removes the library option, and the OS file picker already
+          offers "Take Photo" beside "Photo Library" for an `image/*` input. So
+          one input reaches both sources, and Myne never opens a camera stream
+          (the camera app produces the bytes). That is the security property
+          that made this the right shape. */}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        data-testid="editor.photo-input"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) void attachPhoto(f);
           e.target.value = "";
         }}
       />
@@ -4411,6 +4778,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           // was a horizontal scroll container in its own right, outside
           // `.cm-scroller` (myne-md/myne#630). Wearing the class means the next
           // thing that class learns reaches the app's busiest scroll surface.
+          ref={editorScrollRef}
           className="m-scroll"
           style={{
             background: "var(--bg-1)",
@@ -4424,6 +4792,27 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onReady={(view) => {
               editorViewRef.current = view;
               setEditorView(view);
+              // A fold remounted this view: put the reader back where they were.
+              // `applyCaret` refuses a snapshot from another note, so opening a
+              // different note across the transition inherits nothing.
+              if (!view) return;
+              // The snapshot is NOT consumed here. A development mount happens
+              // twice (StrictMode), and the first view is discarded a tick later:
+              // consuming on the first one restored the caret into a view nobody
+              // saw. It stays armed until the caret moves somewhere else, which
+              // is what `handleCursorChange` below watches for.
+              const pending = pendingCaretRef.current;
+              if (!pending) return;
+              applyCaret(view, pending, liveNoteIdRef.current, editorScrollRef.current);
+              // One frame later the scroller has its real height, and replaying
+              // the same offset is idempotent rather than a second restore.
+              if (typeof requestAnimationFrame === "function") {
+                requestAnimationFrame(() => {
+                  if (editorViewRef.current === view) {
+                    applyCaret(view, pending, liveNoteIdRef.current, editorScrollRef.current);
+                  }
+                });
+              }
             }}
             // Live presence (`collab-presence-ui`, myne-md/myne#849 review): this
             // device's caret/selection is reported so PEERS render its cursor. The
@@ -4483,11 +4872,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             viewMode={rawMode ? "source" : "live"}
             // Regular: the WS-01 prose measure - a 620px column (+ 56px gutters)
             // centered in the detail pane. Compact keeps the phone's 18/22.
-            style={
-              isRegular
-                ? { width: "100%", maxWidth: 732, margin: "0 auto", minHeight: "100%", color: "var(--fg-1)", padding: "34px 56px" }
-                : { width: "100%", minHeight: "100%", color: "var(--fg-1)", padding: "18px 22px" }
-            }
+            style={proseStyle}
           />
         </div>
       )}
@@ -4504,6 +4889,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           rawMode={rawMode}
           onToggleRaw={() => setRawMode((r) => !r)}
           onAttach={() => attachInputRef.current?.click()}
+          onPhotoToNote={() => photoInputRef.current?.click()}
           onLibrary={() => setManageAttachments(true)}
           onRecord={() => setRecordOpen(true)}
           // MYND-555: the user's device-local bar layout. Both default to `[]`
@@ -4608,6 +4994,30 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         />
       )}
 
+      {photoNote && (
+        <PhotoNoteSheet
+          attachmentId={photoNote.id}
+          filename={photoNote.filename}
+          previewUrl={photoNote.previewUrl}
+          // The pref AS THE IMPORT READ IT (`import_mobile.rs` reads the same
+          // value and writes or skips the cache entry), frozen into the draft.
+          // Reading it live would let a switch flipped in Settings re-probe a
+          // cache that was never written and report "no text" about a page
+          // nothing read.
+          ocrEnabled={photoNote.ocrEnabled}
+          onCommit={commitPhotoNote}
+          onCancel={cancelPhotoNote}
+          onOpenOcrSetting={() => {
+            // The draft stays open under the settings sheet rather than being
+            // thrown away: turning the switch on here affects the NEXT import
+            // (this photo's cache was already skipped), and the user can still
+            // add this one without text when they come back.
+            setSettingsPanel("data");
+            setSettingsOpen(true);
+          }}
+        />
+      )}
+
       {manageAttachments && (
         <AttachmentsSheet
           onClose={() => setManageAttachments(false)}
@@ -4678,6 +5088,24 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // that. ─────────────────────────────────────────────────────────────────────
   const renderSharedOverlays = () => (
     <>
+      {/* Settings lives HERE rather than with the list overlays (myne-md/myne#926
+          review): the compact phone branch renders the editor pane and the
+          shared overlays but NOT the list overlays, so a settings sheet mounted
+          from the list branch never opened while a note was on screen. The photo
+          sheet's "reading is off" state offers exactly that route, and it was a
+          dead button on the one client the feature ships on. */}
+      {settingsOpen && (
+        <SettingsSheet
+          vaultId={vaultId}
+          initialPanel={settingsPanel}
+          onClose={() => {
+            setSettingsOpen(false);
+            setSettingsPanel(undefined);
+          }}
+          onLock={onLock}
+          onDeleteVaultSuccess={onDeleteVaultSuccess}
+        />
+      )}
       {/* SF5 share-import confirmation toast (§9.20, SYNC-18) - self-contained,
           listens for the drain result; renders in every layout branch. */}
       {/* MYND-640: tapping the toast opens the library the share landed in.
@@ -4785,14 +5213,28 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     </>
   );
 
+  // A fold remounts the editor, so the caret and the scroll offset are captured
+  // HERE, during the render that already knows the size class changed: by the
+  // time an effect runs, the old CodeMirror view is gone and its offsets with
+  // it. The undo history is not captured and cannot be; see `caretRestore.ts`.
+  if (lastSizeClassRef.current !== sizeClass) {
+    lastSizeClassRef.current = sizeClass;
+    const previousView = editorViewRef.current;
+    pendingCaretRef.current = previousView
+      ? snapshotCaret(previousView, liveNoteIdRef.current, editorScrollRef.current)
+      : null;
+  }
+
   // ── Layout switch ────────────────────────────────────────────────────────────
-  // compact: the existing full-screen list ⇄ editor swap (unchanged phone
-  // behavior, push/pop animation included). medium: list + detail side by side,
-  // the phone's AppHeader + TabBar scoped to the list column. expanded: the
-  // WS-01 three-pane - sidebar + list + detail; the sidebar absorbs the
-  // AppHeader/TabBar destinations, so neither renders. Graph / Files /
-  // Templates span the full content width on regular (a graph squeezed into a
-  // 316px column is useless).
+  // One column (compact and the folded band): the existing full-screen list ⇄
+  // editor swap (unchanged phone behavior, push/pop animation included). The
+  // band differs only in the note's measure; it is not a two-pane layout, so
+  // `isRegular` is false there and nothing below this block applies to it.
+  // medium: list + detail side by side, the phone's AppHeader + TabBar scoped
+  // to the list column. expanded: the WS-01 three-pane - sidebar + list +
+  // detail; the sidebar absorbs the AppHeader/TabBar destinations, so neither
+  // renders. Graph / Files / Templates span the full content width on regular
+  // (a graph squeezed into a 316px column is useless).
   if (sizeClass === "compact") {
     if (view === "list") {
       return (
@@ -4806,6 +5248,40 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return (
       <Screen ref={screenRef}>
         {renderEditorPane()}
+        {renderEditorOverlays()}
+        {renderSharedOverlays()}
+      </Screen>
+    );
+  }
+
+  // The folded band (600 to 700pt on a phone-class screen): ONE column, the note
+  // at its own measure, and the list as an overlay drawer rather than a screen
+  // swap. `view === "list"` still owns the intent, so the note's back chevron and
+  // the swipe-back keep working: they save and raise the list over the note
+  // instead of replacing it. With no note open there is nothing to overlay, so
+  // the list is the screen.
+  if (sizeClass === "compactWide") {
+    const drawerOpen = view === "list" && editing != null;
+    return (
+      <Screen ref={screenRef}>
+        <div
+          // The note keeps its geometry while the drawer is up; it is taken out
+          // of the accessibility and focus order rather than unmounted.
+          inert={drawerOpen || undefined}
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+        >
+          {editing ? renderEditorPane() : renderNotesPane({ header: true, tabBar: true })}
+        </div>
+        {drawerOpen && (
+          <ListDrawer
+            label={t("notes.list.treeLabel")}
+            onClose={() => setView("editor")}
+            returnFocusTo={editorViewRef.current?.contentDOM ?? null}
+          >
+            {renderNotesPane({ header: true, tabBar: false })}
+          </ListDrawer>
+        )}
+        {renderListOverlays()}
         {renderEditorOverlays()}
         {renderSharedOverlays()}
       </Screen>

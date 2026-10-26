@@ -199,7 +199,7 @@ describeE2E("diagnostic log switch (myne-md/myne#860)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
-        await openSettings(s, "about");
+        await openSettings(s, "diagnostics");
 
         // The row renders, which is itself the ACL half: this panel is assembled
         // from a hook that invokes `plugin:diagnostics|diagnostic_log_enabled_get`
@@ -238,7 +238,7 @@ describeE2E("diagnostic log switch (myne-md/myne#860)", () => {
         // and reads the file the setter just wrote. A setter that wrote nothing,
         // or a getter that is not registered, leaves it at `false` here.
         await openSettings(s, "appearance");
-        await openSettings(s, "about");
+        await openSettings(s, "diagnostics");
         await s.waitUntil(
           async () => toggleSettled(s, "true"),
           { label: "a fresh mount reads the flag back as on", timeoutMs: 15_000 },
@@ -252,7 +252,7 @@ describeE2E("diagnostic log switch (myne-md/myne#860)", () => {
           { label: "the log switch reports off", timeoutMs: 15_000 },
         );
         await openSettings(s, "appearance");
-        await openSettings(s, "about");
+        await openSettings(s, "diagnostics");
         await s.waitUntil(
           async () => toggleSettled(s, "false"),
           { label: "a fresh mount reads the flag back as off", timeoutMs: 15_000 },
@@ -278,7 +278,7 @@ describeE2E("diagnostic report files (myne-md/myne#860)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
-        await openSettings(s, "about");
+        await openSettings(s, "diagnostics");
 
         // THE MANIFEST LINE, BY TEXT. `report_manifest` counts the log files it
         // would include and sums their bytes, and the panel renders both. A
@@ -404,7 +404,7 @@ describeE2E("diagnostic crash record (myne-md/myne#860)", () => {
         const s = app.session;
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
-        await openSettings(s, "about");
+        await openSettings(s, "diagnostics");
 
         // `crash_record_state` answers `Some` only when a record exists, and a
         // rejected invoke folds to `null` in the hook, which renders NO row. So

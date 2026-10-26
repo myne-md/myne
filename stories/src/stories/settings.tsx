@@ -14,6 +14,7 @@ import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 
 import { AboutPanel } from "@app/components/settings/AboutPanel";
+import { DiagnosticsPanel } from "@app/components/settings/DiagnosticsPanel";
 import { BarCustomizeSettings } from "@app/components/settings/BarCustomizeSettings";
 import { RecoveryDrillRow } from "@app/components/settings/RecoveryDrillRow";
 import {
@@ -48,6 +49,8 @@ import { HotkeysPanel } from "@app/components/settings/HotkeysPanel";
 import { LanguageSelect } from "@app/components/settings/LanguageSelect";
 import { LineNumbersSettings } from "@app/components/settings/LineNumbersSettings";
 import { MemorySection } from "@app/components/settings/MemorySection";
+import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
+import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
 import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
 import { McpSection } from "@app/components/settings/McpSection";
 import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
@@ -121,6 +124,79 @@ const PREFS_FIXTURE: Fixture = {
   },
 };
 
+
+/** The reviewed vault seed (myne-md/myne#915): AI on, an empty memory and a
+ *  small vault outline, so the scope step has real counts to state. */
+const SEED_FIXTURE: Fixture = {
+  description: "AI on, empty memory, a small vault outline",
+  handlers: {
+    ...PREFS_FIXTURE.handlers,
+    "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, ai_enabled: true }),
+    "plugin:memory|memory_list": () => ({ rows: [], cap: 100 }),
+    "plugin:memory|personality_read": () => ({ directives: [] }),
+    "plugin:local_inference|seed_memory_status": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      seedEntries: 0,
+      seededAt: null,
+      provider: "in-process",
+      remote: false,
+    }),
+    "plugin:local_inference|seed_memory_generate": () => ({
+      candidates: [
+        { text: "Projects: Myne, including the roadmap and the release checklist." },
+        { text: "Prefers short, decision-first answers." },
+        { text: "Folders are organised by area, one folder per active project." },
+      ],
+      notesRead: 0,
+      foldersRead: [],
+    }),
+    "plugin:memory|memory_seed_apply": () => ({ ids: ["a", "b", "c"], replaced: 0, liveCount: 3 }),
+    "plugin:local_inference|seed_memory_payload": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      excludedNotes: 1,
+      titlesOmitted: 0,
+      chars: 412,
+      payload:
+        "VAULT OUTLINE\nLive notes: 24\nFolders: 4\nNotes omitted because their folder is excluded from AI: 1\nTags: work, health\n\n- Projects/ (6 notes)\n  - Roadmap\n  - Release checklist\n- Notes/ (18 notes)\n  - Weekly review\n",
+    }),
+  },
+};
+
+/** The same vault after a reviewed seed: three seed rows and one user row, so
+ *  the `From your vault` group and its Remove all are visible. */
+const SEEDED_FIXTURE: Fixture = {
+  description: "AI on, a seeded memory group and one user row",
+  handlers: {
+    ...SEED_FIXTURE.handlers,
+    "plugin:memory|memory_list": () => ({
+      cap: 100,
+      rows: [
+        { id: "seed1", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_000, version: 1, quarantined: false, origin: "seed" },
+        { id: "seed2", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_001, version: 1, quarantined: false, origin: "seed" },
+        { id: "seed3", created_at: 1_700_000_000_000, updated_at: 1_700_000_100_002, version: 1, quarantined: false, origin: "seed" },
+        { id: "user1", created_at: 1_700_000_200_000, updated_at: 1_700_000_200_000, version: 1, quarantined: false },
+      ],
+    }),
+    "plugin:memory|memory_read": (args: Record<string, unknown>) => {
+      const id = String(args.memoryIdHex ?? "");
+      if (id === "user1") return "A fact the user wrote herself.";
+      return "An entry distilled from the vault.";
+    },
+    "plugin:local_inference|seed_memory_status": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      seedEntries: 3,
+      seededAt: 1_700_000_000_000,
+      provider: "in-process",
+      remote: false,
+    }),
+  },
+};
 
 /** The catalogue with one artefact installed and one not, which is the state it
  *  exists for: a list that answers "is this installed" and "what else can I get"
@@ -272,6 +348,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/diagnosticspanel/default",
+    group: "settings",
+    surface: "DiagnosticsPanel",
+    state: "default",
+    description:
+      "Settings → Diagnostics: the report block that is the exact string Copy puts on the clipboard, the opt-in plaintext log switch, the crash record when one exists, and the two ways the log leaves the device (open its folder, or save a report). Look for the preview being the copy itself rather than a summary of it.",
+    tags: ["settings", "diagnostics", "log", "crash", "report", "support"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <DiagnosticsPanel />
+      </Frame>
+    ),
+  },
+  {
     id: "settings/vaultpanel/default",
     group: "settings",
     surface: "VaultPanel",
@@ -304,8 +395,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "AccountPanel",
     state: "default",
     description:
-      "Settings → Account: the device-local grouping of vaults, the account name, and the paired browser extensions. It is deliberately the account level, not the vault's own label, which lives in the Vault panel.",
-    tags: ["settings", "account", "device-local", "vault-group", "paired-extensions", "name"],
+      "Settings → Account: the person account number, the device-local grouping of vaults, and the paired browser extensions. It is deliberately the account level, not the vault's own label, which lives in the Vault panel.",
+    tags: ["settings", "account", "device-local", "vault-group", "paired-extensions", "account-number"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
@@ -799,6 +890,47 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/seedmemorywizard/scope",
+    group: "settings",
+    surface: "SeedMemoryWizard",
+    state: "scope",
+    description:
+      "The first step of Teach Myne your vault: provider, note/folder/tag counts, the estimated payload size, the excluded-folder count and the real payload behind a toggle. A local provider needs no consent; a remote one cannot continue until the box is ticked.",
+    tags: ["settings", "ai", "memory", "seed", "review", "consent", "wizard"],
+    fixture: SEED_FIXTURE,
+    render: () => (
+      <Frame>
+        <SeedMemoryWizard open onClose={action("onClose")} />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/seedmemorycard/default",
+    group: "settings",
+    surface: "SeedMemoryCard",
+    state: "default",
+    description:
+      "The once-only offer in the chat zero state: AI is on, memory is empty and the vault has enough notes to distil. Two actions, one of which dismisses the offer permanently on this device.",
+    tags: ["settings", "ai", "memory", "seed", "card", "zero-state", "offer"],
+    fixture: SEED_FIXTURE,
+    render: () => {
+      // The card's own device-local gate, set before it mounts. A story that
+      // skipped this would render nothing and assert nothing.
+      try {
+        localStorage.setItem("myne.aiOnboardingSeen", "1");
+        localStorage.removeItem("myne.seedMemorySeen");
+      } catch {
+        // Storage unavailable: the story still renders the zero state without
+        // the offer, which is the honest degraded shape.
+      }
+      return (
+        <Frame>
+          <SeedMemoryCard />
+        </Frame>
+      );
+    },
+  },
+  {
     id: "settings/memorysection/default",
     group: "settings",
     surface: "MemorySection",
@@ -806,10 +938,25 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     description:
       "The agent-memory and personality management surface: the complete list, edit, delete, clear-all-with-confirm and the personality editor, sharing one store and one set of commands with the chat header's discoverable popover. Rendered here with `aiEnabled={false}`, so look for the disabled or empty treatment.",
     tags: ["settings", "ai", "agent", "memory", "personality", "management"],
-    fixture: PREFS_FIXTURE,
+    fixture: SEED_FIXTURE,
     render: () => (
       <Frame>
         <MemorySection onShowToast={action("onShowToast")} aiEnabled={false} />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/memorysection/seeded",
+    group: "settings",
+    surface: "MemorySection",
+    state: "seeded",
+    description:
+      "The same panel after a reviewed seed: the seed entries in their own From your vault group with the seed date and Remove all, the ordinary rows above them, and the user row untouched.",
+    tags: ["settings", "ai", "memory", "seed", "group", "remove-all"],
+    fixture: SEEDED_FIXTURE,
+    render: () => (
+      <Frame>
+        <MemorySection onShowToast={action("onShowToast")} aiEnabled />
       </Frame>
     ),
   },

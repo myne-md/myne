@@ -19,7 +19,14 @@
 //   7. `cli/src/status.rs`'s door-byte decode  ==  cli_bridge/status.rs's;
 //      and the desktop's own `byte_for` encode must agree with its `parse`
 //      decode (the CLI has no encoder — it only reads the marker)
-//   8. the `myne-mcp` shim's copies of 1, 2, 3, 6 and 7 (`mcp/src/transport.rs`
+//   8. the WINDOWS door: `cli/src/windows_pipe.rs`'s PIPE_PREFIX ==
+//      cli_bridge/socket.rs's, and the FNV-1a constants that turn the app-data
+//      dir into a pipe name agree in both. A named pipe has no basename to
+//      agree on, so the derivation itself is the contract: the two sides compute
+//      a hash instead of joining a string, and a drifted constant means the CLI
+//      connects to a pipe nobody created, which surfaces exactly like "the app
+//      is not running".
+//   9. the `myne-mcp` shim's copies of 1, 2, 3, 6 and 7 (`mcp/src/transport.rs`
 //      for the identifier, both basenames and the two framing constants, and
 //      `mcp/src/status.rs` for the door-byte decode). It is a THIRD by-design
 //      copy for the same reason as the CLI's: `myne-mcp` depends on neither
@@ -168,6 +175,37 @@ for (const [name, desktopSource, desktopFile] of [
       `${name} drift: ${desktopFile} has "${desktopValue}", ` +
         `cli/src/paths.rs has "${cliValue}".`,
     );
+  }
+}
+
+// ── 8. The Windows pipe name's derivation ──────────────────────────────────
+// Two files, one function, no shared type (the CLI does not depend on this
+// crate), so the CONSTANTS are the contract rather than a call to compare.
+{
+  const cliPipeFile = "cli/src/windows_pipe.rs";
+  const cliPipe = read(cliPipeFile);
+  const cliPrefix = rustStrConst(cliPipe, cliPipeFile, "PIPE_PREFIX");
+  const deskPrefix = rustStrConst(socketRs, "src-tauri/src/cli_bridge/socket.rs", "PIPE_PREFIX");
+  if (cliPrefix !== null && deskPrefix !== null && cliPrefix !== deskPrefix) {
+    fail(
+      `PIPE_PREFIX drift: src-tauri/src/cli_bridge/socket.rs has "${deskPrefix}", ` +
+        `${cliPipeFile} has "${cliPrefix}". The CLI would look for a pipe nobody creates.`,
+    );
+  }
+  // FNV-1a's two constants, as written in each file. Compared as source text
+  // because that is what a hand-copied function is: the offset basis and the
+  // prime, spelled out twice.
+  for (const [label, pattern] of [
+    ["offset basis", /0xcbf2_9ce4_8422_2325/],
+    ["prime", /0x0000_0100_0000_01b3/],
+  ]) {
+    if (!pattern.test(cliPipe) || !pattern.test(socketRs)) {
+      fail(
+        `FNV-1a ${label} (${pattern}) is missing from ` +
+          `${pattern.test(cliPipe) ? "src-tauri/src/cli_bridge/socket.rs" : cliPipeFile}. ` +
+          `Both sides must carry the same arithmetic or they derive different pipe names.`,
+      );
+    }
   }
 }
 

@@ -1188,6 +1188,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
           ))}
         </Group>
       )}
+
     </div>
   );
 }

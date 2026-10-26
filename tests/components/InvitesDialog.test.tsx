@@ -13,7 +13,7 @@
 // The wizards are stubbed: `AcceptInviteWizard` reaches the accept command, and
 // this file is about which surface the dialog chooses, not about the command.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("react-i18next", () => ({
@@ -29,8 +29,20 @@ vi.mock("../../src/components/sync/InviteWizard", () => ({
   ),
 }));
 
+vi.mock("../../src/lib/personAccount", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../src/lib/personAccount")>();
+  return { ...actual, personDeclineInvite: vi.fn() };
+});
+vi.mock("../../src/components/sync/PersonRegisterDialog", () => ({
+  PersonRegisterDialog: ({ open }: { open: boolean }) =>
+    open ? <div data-testid="stub.register-dialog" /> : null,
+}));
+
 import { InvitesDialog } from "../../src/components/sync/InvitesDialog";
-import type { InviteSummary } from "../../src/lib/personAccount";
+import {
+  personDeclineInvite,
+  type InviteSummary,
+} from "../../src/lib/personAccount";
 
 afterEach(() => cleanup());
 
@@ -69,6 +81,8 @@ describe("InvitesDialog", () => {
   it("says an identity must be registered rather than claiming there are no invites", () => {
     renderDialog({ unavailable: "not-enrolled" });
     expect(screen.getByTestId("invites.not-enrolled")).toBeTruthy();
+    // The remedy, where the question is asked (decisions/ui/0725).
+    expect(screen.getByTestId("invites.register-cta")).toBeTruthy();
     // The false statement this guards: "No invitations yet." for a person the
     // server has never seen.
     expect(screen.queryByTestId("invites.empty")).toBeNull();
@@ -103,6 +117,36 @@ describe("InvitesDialog", () => {
     // the phrase and the owner code, and a second row would invite the two to be
     // confused.
     expect(screen.queryByTestId("invites.row")).toBeNull();
+  });
+
+  it("declines only after the confirmation, and only then calls the command", async () => {
+    // Declining cannot be undone: the server drops the sealed payload, so the
+    // owner has to invite again. The press that matters is the second one, and the
+    // assertion that no request leaves the app before it is the point of the test.
+    const props = renderDialog({ invites: [PENDING_INVITE] });
+    fireEvent.click(screen.getByTestId("invites.decline"));
+    expect(personDeclineInvite).not.toHaveBeenCalled();
+    expect(screen.getByTestId("invites.decline-confirm")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("invites.decline-confirm-cta"));
+    });
+    expect(personDeclineInvite).toHaveBeenCalledWith("aa11");
+    // The list is re-read rather than locally spliced: the row that was just
+    // refused is gone on the server, and the count in the vault switcher is
+    // derived from the same list.
+    expect(props.onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the invitation and reports the failure when the decline is refused", async () => {
+    vi.mocked(personDeclineInvite).mockRejectedValueOnce({ kind: "Transport" });
+    const props = renderDialog({ invites: [PENDING_INVITE] });
+    fireEvent.click(screen.getByTestId("invites.decline"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("invites.decline-confirm-cta"));
+    });
+    expect(screen.getByTestId("invites.decline-error")).toBeTruthy();
+    expect(props.onRetry).not.toHaveBeenCalled();
   });
 
   it("opens the join wizard for a claimed invite", () => {

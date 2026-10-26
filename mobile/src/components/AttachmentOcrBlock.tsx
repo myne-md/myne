@@ -100,6 +100,14 @@ export function AttachmentOcrBlock({ enabled }: { enabled: boolean }) {
       <div style={HINT_STYLE} data-testid="settings.attachmentOcr.scope">
         {t("settings.attachmentOcr.mobileDeviceLocal")}
       </div>
+      {/* The second consumer of what this switch produces (myne-md/myne#926).
+          The shared `helper` above says "so search can find them", which was the
+          only purpose when it was written and is still true; a reader of this
+          panel is now also a user of the draft sheet, and the two claims have to
+          live on the client where the draft exists, because desktop has none. */}
+      <div style={HINT_STYLE} data-testid="settings.attachmentOcr.draft-use">
+        {t("settings.attachmentOcr.draftUse")}
+      </div>
     </div>
   );
 }

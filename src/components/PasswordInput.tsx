@@ -213,6 +213,16 @@ export function PasswordInput({
 // this, `zxcvbnOptions.setOptions(...)` re-fires and a fresh loader
 // promise is built on every consumer mount even though Vite caches
 // the underlying module bytes.
+//
+// **A REJECTED promise is not memoized** (2026-10-24). It used to be, and the
+// consequence was a surface with no way out: the three chunks below are fetched
+// lazily, so a chunk that cannot be loaded (a stale page asking for the hashes of
+// a build that is no longer served — routine after a web deploy — a blocked
+// request, an offline start) rejected once, the rejection was cached for the
+// process lifetime, and every consumer sat on "Checking strength…" with its
+// submit disabled and nothing said about why. Clearing the memo is what makes a
+// later mount try again; `usePasswordStrength` reports the failure so the form can
+// stop pretending to be busy.
 let zxcvbnFnPromise: Promise<ZxcvbnFn> | null = null;
 function loadZxcvbn(): Promise<ZxcvbnFn> {
   if (!zxcvbnFnPromise) {
@@ -228,28 +238,42 @@ function loadZxcvbn(): Promise<ZxcvbnFn> {
         dictionary: { ...common.dictionary, ...en.dictionary },
       });
       return core.zxcvbn as unknown as ZxcvbnFn;
-    })();
+    })().catch((error: unknown) => {
+      zxcvbnFnPromise = null;
+      throw error;
+    });
   }
   return zxcvbnFnPromise;
 }
 
 /**
  * Lazy-load zxcvbn-ts and evaluate the given password's strength.
- * Returns `{ ready, result }` where `ready` flips to `true` once the
- * dynamic-import resolves, and `result` is `null` while loading or
- * when `password` is empty. Idempotent across consumers.
+ * Returns `{ ready, result, unavailable }`: `ready` flips to `true` once the
+ * dynamic-import resolves, `result` is `null` while loading or when `password`
+ * is empty, and `unavailable` is `true` once the import has FAILED, which is a
+ * different state from still-loading and the two must not be rendered the same
+ * way. Idempotent across consumers.
  */
 export function usePasswordStrength(password: string): {
   ready: boolean;
   result: PasswordStrengthResult | null;
+  /** The evaluator could not be loaded. Distinct from `!ready`: one is "not yet",
+   *  the other is "not ever, this time". */
+  unavailable: boolean;
 } {
   const [zxcvbnFn, setZxcvbnFn] = useState<ZxcvbnFn | null>(null);
+  const [unavailable, setUnavailable] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    loadZxcvbn().then((fn) => {
-      if (!cancelled) setZxcvbnFn(() => fn);
-    });
+    loadZxcvbn().then(
+      (fn) => {
+        if (!cancelled) setZxcvbnFn(() => fn);
+      },
+      () => {
+        if (!cancelled) setUnavailable(true);
+      },
+    );
     return () => {
       cancelled = true;
     };
@@ -265,5 +289,5 @@ export function usePasswordStrength(password: string): {
     };
   }, [password, zxcvbnFn]);
 
-  return { ready: zxcvbnFn !== null, result };
+  return { ready: zxcvbnFn !== null, result, unavailable };
 }

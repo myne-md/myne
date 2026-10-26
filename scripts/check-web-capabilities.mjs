@@ -279,6 +279,10 @@ const CAPABILITY_BACKING = {
     "plugin:sync|sync_person_list_invites",
     "plugin:sync|sync_list_vault_invites",
     "plugin:sync|sync_person_accept_invite",
+    // The refusal of an invitation (`decisions/protocol/0732`). Same credential as
+    // the claim above (the device-scoped person token), so it is refused for the
+    // same reason and appears beside it rather than under a class of its own.
+    "plugin:sync|sync_person_decline_invite",
     // The SECOND device's join (myne-md/myne#852 task 7). Same refusal, same
     // reason, one command over from the accept above: it is the accept path with
     // the out-of-band code replaced by the owner identity PINNED in the person's

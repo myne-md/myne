@@ -8,6 +8,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@app/components/primitives/Button";
 import { IconButton } from "@app/components/primitives/IconButton";
 import { Input } from "@app/components/primitives/Input";
+import { Textarea } from "@app/components/primitives/Textarea";
 import { Segmented } from "@app/components/primitives/Segmented";
 import { Select } from "@app/components/primitives/Select";
 import { Switch } from "@app/components/primitives/Switch";
@@ -208,6 +209,26 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
       <Row>
         <div style={{ width: 280 }}>
           <Input mono defaultValue="MY-ABCD-EFGH-JKMN-PQRS-TVWX" disabled aria-label="Account number" />
+        </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/textarea/default",
+    group: "primitives",
+    surface: "Textarea",
+    state: "default",
+    description:
+      "The multi-line field, on the same skin as the single-line `Input`: the shared fill, hairline and radius, with the field's own vertical resize. Used where a value is longer than one line, such as a memory entry under review.",
+    tags: ["primitives", "textarea", "multi-line", "form", "review"],
+    render: () => (
+      <Row>
+        <div style={{ width: 420 }}>
+          <Textarea
+            defaultValue={"Projects: Myne, including the roadmap.\nPrefers short, decision-first answers."}
+            rows={3}
+            aria-label="Memory entry"
+          />
         </div>
       </Row>
     ),

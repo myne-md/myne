@@ -21,7 +21,7 @@ import { invoke } from "../platform/core";
 import { evictLiveNote, isLiveNote, patchLiveNote, readLiveNote } from "./liveNote";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { mutateDeliberateFolders } from "./prefs";
-import { patchDeletedField, patchTitleField } from "../dialect/surgery";
+import { patchDeletedField, patchFolderField, patchTitleField } from "../dialect/surgery";
 import type { NoteCreateError } from "../types/note-create-error";
 import type { NoteReadError } from "../types/note-read-error";
 import type { NoteUpdateError } from "../types/note-update-error";
@@ -298,15 +298,25 @@ export async function noteList(): Promise<string[]> {
  * saved audio transcript, myne-md/myne#886 review), which is one place for the
  * two to drift apart; it lives here beside the note primitives instead.
  *
- * `daily.ts`'s `createNoteFromBody` is deliberately NOT a caller: it also
- * patches the `folder:` field into the body and stamps `updated:`, which is the
- * period-note convention rather than this one.
+ * `daily.ts`'s `createNoteFromBody` is deliberately NOT a caller: it ALSO
+ * stamps `updated:`, which is the period-note convention rather than this one.
+ *
+ * **A `folder` argument files the note, not just registers it.** `noteCreate`'s
+ * own `folder` parameter only records a deliberate folder for the unlock
+ * back-fill; the note's location lives in its `folder:` frontmatter, so passing
+ * the folder here without patching the body would create the note at the vault
+ * root and register a folder it is not in. That is what a photo-to-note capture
+ * would have done for every user with "Default location for new notes" set to
+ * anything but the root (myne-md/myne#926 review), so the patch happens here,
+ * beside the title patch, and a caller that passes `null` is unchanged.
  */
 export async function createTitledNote(
   body: string,
   name: string,
   folder: string | null = null,
 ): Promise<string> {
-  const bytes = patchTitleField(new TextEncoder().encode(body), name);
-  return await noteCreate(new TextDecoder().decode(bytes), folder);
+  let bytes = patchTitleField(new TextEncoder().encode(body), name);
+  const target = normalizeFolderPath(folder);
+  if (target !== null) bytes = patchFolderField(bytes, target);
+  return await noteCreate(new TextDecoder().decode(bytes), target);
 }

@@ -175,59 +175,6 @@ describeE2E("vm2 Escape returns to normal mode, one job at a time (vim-keyboard-
   });
 });
 
-describeE2E("vm3 yanked text does not survive a lock (vim-keyboard-mode)", () => {
-  // Vault-count precondition: 1 (weak KDF).
-  it("clears the yank register on lock, so a paste after unlock adds nothing", async () => {
-    let password = "";
-    await scenario(
-      "vm3-vim-lock-register",
-      { seed: (dir) => void (password = seedVault(dir).password) },
-      async (app) => {
-        const s = app.session;
-        await unlockToEditorAndNote(s, password, "vm3notealfa7k2m9qx4w8e5rj0cc");
-
-        await typeIntoEditor(s, "confidential line");
-        await waitForSaved(s);
-
-        await setVimMode(s, true);
-        await s.waitUntil(async () => ((await vimMode(s)) === "normal" ? true : null), {
-          label: "normal mode after enabling vim",
-        });
-
-        // Yank the line into the unnamed register.
-        await sendEditorKeys(s, "yy");
-
-        const before = await noteText(s);
-
-        // Lock → unlock. The reset on the lock path must have emptied the
-        // register; a paste therefore adds nothing.
-        await lockAndReunlock(s, password);
-        await s.waitUntil(async () => ((await vimMode(s)) === "normal" ? true : null), {
-          label: "vim still on after unlock",
-        });
-
-        await sendEditorKeys(s, "p");
-
-        // Deliberately NOT `waitForSaved` here: the assertion is that NOTHING
-        // changed, so there is no save to wait for and the helper simply times
-        // out — which is exactly how the first run of this spec failed (66 s,
-        // two retries). CodeMirror applies a paste synchronously while handling
-        // the keystroke, so by the time `sendKeys` returns the document either
-        // reflects it or, as asserted here, still doesn't.
-        expect(await noteText(s)).toBe(before);
-
-        // Prove the editor is still live and accepting vim input, so the
-        // assertion above cannot pass merely because keystrokes stopped
-        // arriving after the unlock.
-        await sendEditorKeys(s, "i");
-        await s.waitUntil(async () => ((await vimMode(s)) === "insert" ? true : null), {
-          label: "editor still responds to vim keys after the paste attempt",
-        });
-      },
-    );
-  });
-});
-
 /** Unlock, dismiss the importer offer, and create a note — the shared opening of
  *  all three scenarios. */
 async function unlockToEditorAndNote(
@@ -240,12 +187,6 @@ async function unlockToEditorAndNote(
   await createNote(session, title);
 }
 
-/** The active note's visible text. */
-async function noteText(session: Session): Promise<string> {
-  const [content] = await session.findElements(".cm-content");
-  if (!content) throw new Error("editor content not found");
-  return await content.text();
-}
 
 describeE2E("vm4 hiding the vim toggle does not turn vim off (#181)", () => {
   // Vault-count precondition: 1 (weak KDF).

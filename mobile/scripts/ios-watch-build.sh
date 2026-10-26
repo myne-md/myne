@@ -18,6 +18,18 @@
 # the same certificate as the parent app" otherwise.
 set -euo pipefail
 
+# A SIMULATOR build embeds no watch companion, and cannot: watchOS apps are
+# built for device arm64_32 and installed by a paired phone, not by an iOS
+# simulator. Building one here asked for a provisioning profile for
+# `md.myne.mobile.watchkitapp.ext` and failed the whole app build on any machine
+# without one (myne-md/myne#918 task 6 found it; CI never builds iOS, so nothing
+# had ever run this phase for the simulator). Skip rather than weaken the signing
+# rules for the device path, which is the one that ships.
+if [ "${PLATFORM_NAME:-}" = "iphonesimulator" ]; then
+  echo "ios-watch-build: skipped (simulator build embeds no watch companion)"
+  exit 0
+fi
+
 GEN_DIR="${SRCROOT:-$(cd "$(dirname "$0")/../src-tauri/gen/apple" && pwd)}"
 cd "$GEN_DIR"
 

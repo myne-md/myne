@@ -403,6 +403,25 @@ export interface MockConfig {
    *  `[]`. Lets a transcription test seed an audio attachment for the
    *  Transcribe row to appear on. */
   catalog?: Array<{ id: string; filename: string; content_type: string; size: number }>;
+  /** Canned `plugin:attachments|attachment_read_extracted_text` answers, keyed by
+   *  attachment id (myne-md/myne#926). A string is the MYE1 text the import
+   *  wrote; `null` is "no usable cache entry". An id that is absent reads as
+   *  `null`, which is also the honest default: a spec that has not said what the
+   *  page contained gets a page with nothing on it. */
+  readExtractedText?: Record<string, string | null>;
+  /** Make `attachment_import` report a DEDUP HIT: the vault already held this
+   *  exact image, so the returned id is somebody else's attachment and the flow
+   *  must not delete it. This is the arm a cancel has to respect (myne-md/myne#926
+   *  review), and the default `false` is what made the first version of the
+   *  cancel test blind to it. */
+  importDeduplicated?: boolean;
+  /** Make `note_create` REJECT, so "the sheet stays open with your text" can be
+   *  driven. A create that fails must not look like one that landed. */
+  createNoteFails?: boolean;
+  /** Make `attachment_delete` REJECT, so the failed-discard arm can be driven:
+   *  a cancel that cannot remove the bytes must say so rather than close as if
+   *  it had. */
+  deleteFails?: boolean;
   /** Seed + capture for `plugin:chats|*` (myne-md/myne#675). `rows` seeds the
    *  roster `chats_list` returns (each `{ id, created_at, title, updated_at,
    *  version }`); `payloads` maps conversation id → turn-list payload JSON
@@ -1568,10 +1587,29 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           filename: source.filename ?? "file",
           size: len,
           created_at: 0,
-          deduplicated: false,
+          deduplicated: config.importDeduplicated === true,
         };
       },
       "plugin:attachments|catalog_list": () => config.catalog ?? [],
+      // The MYE1 read-back photo-to-note's draft sheet makes (myne-md/myne#926).
+      // Canned rather than derived from the import because the extractor is a
+      // Rust model this tier has no access to; the question a spec asks here is
+      // what the SHEET does with an answer, not whether PP-OCRv5 read the page
+      // (no scenario in this repository can answer that about a real photo).
+      "plugin:attachments|attachment_read_extracted_text": (args) => {
+        const text = config.readExtractedText?.[String(args.id ?? "")];
+        if (text === undefined || text === null) return null;
+        return { text, source_format: "image", truncated: false };
+      },
+      // Deletions are recorded so a cancel can be asserted to clean up exactly
+      // the import this flow created, which is a data-safety property rather
+      // than a UI detail.
+      "plugin:attachments|attachment_delete": (args) => {
+        if (config.deleteFails === true) throw { kind: "Io" };
+        const w = window as unknown as { __attachmentDeletes?: string[] };
+        (w.__attachmentDeletes ??= []).push(String(args.id ?? ""));
+        return null;
+      },
       // ── AI conversations (myne-md/myne#675) ──
       // STATEFUL roster + payloads: seeded from `config.chats`, mutated by
       // the UI's writes, so list/open/new/rename/delete flows assert against
@@ -1771,6 +1809,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // command returns, the first one keeping the constant the single-create
       // specs already assert on.
       "plugin:notes|note_create": (args) => {
+        if (config.createNoteFails === true) throw { kind: "Io" };
         const w = window as unknown as { __noteCreates?: string[] };
         const text = String(args.plaintext ?? "");
         (w.__noteCreates ??= []).push(text);
@@ -2033,12 +2072,19 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_status": () => config.syncStatus ?? { state: "not_enrolled" },
       "plugin:sync|sync_get_endpoint": () =>
         config.endpoint ?? { endpoint_url: null, cert_pin_hex: null, pin_source: null },
-      "plugin:sync|sync_set_endpoint": (args) =>
-        config.setEndpoint ?? {
+      "plugin:sync|sync_set_endpoint": (args) => {
+        // Recorded for the same reason `sync_person_register`'s argument is: the
+        // register step writes the address BEFORE any secret crosses IPC
+        // (2026-10-24), and "did it send the address, and before the phrase" is a
+        // question only this tier can answer.
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs ??= [];
+        (window as unknown as { __setEndpointArgs?: unknown[] }).__setEndpointArgs!.push(args);
+        return config.setEndpoint ?? {
           fingerprint: null,
           pin_source: String(args.endpointUrl ?? "").startsWith("https://")
             ? "platform_trust_store" : null,
-        },
+        };
+      },
       // MYND-548 device naming. The setter mirrors the real one's contract: a
       // blank name is refused (no write), so an empty submit cannot blank a row.
       "plugin:prefs|set_device_name": (args) => {

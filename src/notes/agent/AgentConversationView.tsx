@@ -108,6 +108,13 @@ export function AgentConversationView({
     (noteUuid: string) => ws.openNewTabInFocused(noteUuid),
     [ws],
   );
+  // The note's NAME, for the run's `Working on:` line (myne-md/myne#913). Read
+  // from the same resolver set the mentions use, so a renamed note reads right
+  // without a second lookup path.
+  const openNoteTitle =
+    noteId === null || noteId === ""
+      ? null
+      : (resolverNotes.find((note) => note.noteUuid === noteId)?.title ?? null);
 
   return (
     <div data-testid="agent.focus" style={WRAP_STYLE}>
@@ -128,6 +135,7 @@ export function AgentConversationView({
         testId="agent.focus-surface"
         surface="agent"
         openNoteId={noteId}
+        openNoteTitle={openNoteTitle}
         // **This view IS the anchored session** (myne-md/myne#848): it was
         // opened from a note, or started on the focused one, so the composer
         // pins its scope and shows no picker. The light panel does NOT pass

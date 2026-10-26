@@ -43,19 +43,25 @@ when:
   # ("Run pipeline" / manual trigger). Without a matching `manual` event the
   # UI submits an empty pipeline (no step matches) and the run is rejected.
   #
-  # `RUN_E2E != "true"` makes the manual trigger carry ONE intent at a time.
-  # `.woodpecker/e2e.yml` claims the manual event with `RUN_E2E == "true"`, so
-  # without this negation an E2E trigger would ALSO run this whole pipeline,
-  # which would put two workflows CONCURRENTLY on the shared host, with the agent's
-  # `WOODPECKER_MAX_WORKFLOWS=2`, and that is the
-  # shared host, which is the documented root cause of the E2E suite's mount
-  # timeouts. A lane whose whole purpose is a clean pre-release signal must not
-  # be racing a full pipeline for the same cores.
+  # `RUN_E2E != "true" && RUN_E2E_AI != "true"` makes the manual trigger carry
+  # ONE intent at a time. `.woodpecker/e2e.yml` claims the manual event with
+  # `RUN_E2E == "true" || RUN_E2E_AI == "true"`, so without these negations an
+  # E2E trigger would ALSO run this whole pipeline, which would put two
+  # workflows CONCURRENTLY on the shared host with the agent's
+  # `WOODPECKER_MAX_WORKFLOWS=2`, and that shared host is the documented root
+  # cause of the E2E suite's mount timeouts. A lane whose whole purpose is a
+  # clean pre-release signal must not be racing a full pipeline for the same
+  # cores.
   #
-  # An unset RUN_E2E evaluates to the empty string, so an ordinary manual
+  # `RUN_E2E_AI` is negated for the same reason as `RUN_E2E`, and it is not
+  # spare symmetry: it is the variable that starts the inference lane WITHOUT
+  # the desktop gate, so leaving it out here would let that run pick up this
+  # pipeline as well.
+  #
+  # An unset variable evaluates to the empty string, so an ordinary manual
   # re-run, the case this entry was added for, is unaffected: `"" != "true"`.
   - event: manual
-    evaluate: 'RUN_E2E != "true"'
+    evaluate: 'RUN_E2E != "true" && RUN_E2E_AI != "true"'
 
 variables:
   # The prebuilt CI base image (myne-md/myne#585). It bakes the eleven Tauri

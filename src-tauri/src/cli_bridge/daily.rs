@@ -113,6 +113,75 @@ pub fn local_now(unix_secs: i64) -> Option<LocalNow> {
     }
 }
 
+/// Read the OS-local calendar date/time for `unix_secs` via
+/// `SystemTimeToTzSpecificLocalTime`.
+///
+/// The Windows counterpart of the `localtime_r` arm above, and the reason the
+/// caller is not `#[cfg(unix)]`-gated: `myne daily` decides WHICH note it opens
+/// from the local calendar date, so a platform without this reads the UTC date
+/// and writes today's note under yesterday's (or tomorrow's) title near
+/// midnight. `SystemTimeToTzSpecificLocalTime` needs no process-global state and
+/// honours the same DST rules the OS displays, which `struct tm` would also get.
+///
+/// `None` when the conversion fails (a timestamp outside `FILETIME`'s range, or
+/// a call the OS rejects), for the same reason the Unix arm returns `None`
+/// rather than a zeroed `struct tm`.
+#[cfg(windows)]
+pub fn local_now(unix_secs: i64) -> Option<LocalNow> {
+    use windows_sys::Win32::Foundation::SYSTEMTIME;
+    use windows_sys::Win32::System::Time::SystemTimeToTzSpecificLocalTime;
+
+    // `SystemTimeToTzSpecificLocalTime` takes the UTC instant as a SYSTEMTIME
+    // and converts it in one call, so the calendar half of the conversion is
+    // done here rather than handed to the OS as a tick count. Howard Hinnant's
+    // `civil_from_days` is the standard integer algorithm for it: no table, no
+    // dependency, and it has no leap-second opinion, which is what the
+    // comparison against `localtime_r` wants too.
+    let days = unix_secs.div_euclid(86_400);
+    let secs_of_day = unix_secs.rem_euclid(86_400);
+    let z = days + 719_468;
+    let era = if z >= 0 { z } else { z - 146_096 } / 146_097;
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+    let y = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = if month <= 2 { y + 1 } else { y };
+    // `SYSTEMTIME` holds the year in a `u16`; anything outside a representable
+    // year is a timestamp this function refuses rather than truncates.
+    if !(1..=65_535).contains(&year) {
+        return None;
+    }
+    let utc = SYSTEMTIME {
+        wYear: year as u16,
+        wMonth: month as u16,
+        // 1970-01-01 was a Thursday, and `wDayOfWeek` counts from Sunday = 0.
+        wDayOfWeek: (days + 4).rem_euclid(7) as u16,
+        wDay: day as u16,
+        wHour: (secs_of_day / 3_600) as u16,
+        wMinute: ((secs_of_day % 3_600) / 60) as u16,
+        wSecond: (secs_of_day % 60) as u16,
+        wMilliseconds: 0,
+    };
+    // SAFETY: `utc` is a live local, `local` is written only by the call, and a
+    // null timezone pointer is documented to mean "use the current settings".
+    let mut local: SYSTEMTIME = unsafe { std::mem::zeroed() };
+    let ok = unsafe { SystemTimeToTzSpecificLocalTime(std::ptr::null(), &utc, &mut local) };
+    if ok == 0 || local.wYear == 0 {
+        return None;
+    }
+    Some(LocalNow {
+        year: local.wYear as i32,
+        month: local.wMonth as u32,
+        day: local.wDay as u32,
+        hour: local.wHour as u32,
+        minute: local.wMinute as u32,
+        weekday: local.wDayOfWeek as u32,
+    })
+}
+
 /// Map a populated `struct tm` onto [`LocalNow`].
 ///
 /// Split out of [`local_now`] so the mapping — the part with the two off-by-one
