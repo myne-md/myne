@@ -195,9 +195,11 @@ describe("AiChatFlow scope", () => {
 
   it("asks when the run needs more, and grants it", async () => {
     agentStart.mockImplementation(
-      // `_lang`, `_hist` and `_settings` are the required arguments
-      // myne-md/myne#618, #617 and #850 added between the grant and the callbacks.
-      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang`, `_hist`, `_settings` and `_attachments` are the required
+      // arguments myne-md/myne#618, #617, #850 and #913 added between the grant
+      // and the callbacks. A mock that binds by position carries every slot, or
+      // `onOpen` receives the attachment list and the run never opens.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, _attachments: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,
@@ -249,9 +251,11 @@ describe("AiChatFlow scope", () => {
 
   it("ends the run when the expansion is declined", async () => {
     agentStart.mockImplementation(
-      // `_lang`, `_hist` and `_settings` are the required arguments
-      // myne-md/myne#618, #617 and #850 added between the grant and the callbacks.
-      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, onOpen: (v: AgentRunView) => void) => {
+      // `_lang`, `_hist`, `_settings` and `_attachments` are the required
+      // arguments myne-md/myne#618, #617, #850 and #913 added between the grant
+      // and the callbacks. A mock that binds by position carries every slot, or
+      // `onOpen` receives the attachment list and the run never opens.
+      (_t: string, _g: unknown, _lang: unknown, _hist: unknown, _settings: unknown, _attachments: unknown, onOpen: (v: AgentRunView) => void) => {
         onOpen(VIEW);
         return Promise.resolve({
           view: VIEW,
