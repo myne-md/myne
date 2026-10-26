@@ -154,6 +154,10 @@ describe("AiChatFlow", () => {
       // for the same reason: an empty list is this client's honest answer, and
       // the assertion is what makes a future argument a decision.
       [],
+      // The attached documents, required since myne-md/myne#913. Empty for the
+      // same reason as the settings: this client has no attach control yet, and
+      // asserting the slot is what makes filling it later a decision.
+      [],
       expect.any(Function),
       expect.any(Function),
     );
@@ -210,6 +214,11 @@ describe("AiChatFlow", () => {
         _language: unknown,
         _history: unknown,
         _settings: unknown,
+        // The attached documents (myne-md/myne#913), the fourth required slot
+        // between the settings and the callbacks. A mock that binds by position
+        // carries every slot, or every callback lands one argument early and the
+        // run looks like it never opened.
+        _attachments: unknown,
         _onOpen: unknown,
         onProgress: (p: RunProgress) => void,
       ) => {
@@ -262,6 +271,7 @@ describe("AiChatFlow", () => {
         _language: unknown,
         _history: unknown,
         _settings: unknown,
+        _attachments: unknown,
         onOpen: (v: AgentRunView) => void,
         onProgress: (p: RunProgress) => void,
       ) => {
