@@ -611,6 +611,25 @@ pub async fn sync_person_unlock<R: Runtime>(
     {
         return Err(SyncDeviceError::Transport);
     }
+    // Record the code this device just derived, so the roster panel and the sync cycle
+    // can verify an owner-signed roster on a later cold start without the phrase. The
+    // device key took over SIGNING at `0731` stage 1; this is what stops the same change
+    // from still demanding the phrase to READ.
+    {
+        let base = host.app_data_dir().ok();
+        if let Some(base) = base {
+            let root = crate::paths::active_vault_root_from_base(
+                &base,
+                state.inner().active_vault_id().await,
+            );
+            let _ = super::state::remember_own_identity_code(
+                &crate::vault_io::StdVaultIo,
+                &root,
+                &view.identity_code,
+            )
+            .await;
+        }
+    }
     if super::person_account::refresh_person_auth_public_material(
         &host,
         &crate::vault_io::StdVaultIo,
@@ -1610,12 +1629,26 @@ pub async fn sync_list_roster<R: Runtime>(
             .await
             .map_err(|_| SyncDeviceError::Transport)?;
         let owner_public = if is_owner {
-            state
-                .inner()
-                .clone_person_identity()
-                .await
-                .ok_or(SyncDeviceError::NotOwner)?
-                .public_half()
+            // An owner session holds the identity directly, so it is the first source. A
+            // COLD start holds nothing, and refusing here is why the panel used to show
+            // "Unlock member identity" after the device key had already taken over
+            // signing: the roster carries the owner's FINGERPRINT, not their public half,
+            // so verifying it needs the half from somewhere. This device derived its own
+            // half the last time the phrase was entered and cached it, which is public
+            // material only.
+            let held = state.inner().clone_person_identity().await;
+            match held {
+                Some(identity) => identity.public_half(),
+                None => {
+                    let code = sync_state
+                        .own_identity_code
+                        .as_deref()
+                        .ok_or(SyncDeviceError::NotOwner)?;
+                    super::invite::decode_person_identity_code(code)
+                        .map_err(|_| SyncDeviceError::BadRequest)?
+                        .public
+                }
+            }
         } else {
             // A member holds the owner's public half only as the pinned out-of-band
             // code recorded at invite accept.

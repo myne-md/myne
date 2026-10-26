@@ -39,12 +39,15 @@ pub struct DeviceSigner {
 /// The signed head context: everything one vault's head path needs, for whichever
 /// signer this device holds.
 pub struct SignedHeadCtx {
-    /// The author's held person keypair. Still required: it produces the `0x02`
-    /// fallback, and `0x03` heads are only authorable once the person has signed this
-    /// device's binding row, which happens with the identity unlocked.
-    pub person: PersonKeyPair,
-    /// The vault-scoped author id `0x02` carries.
-    pub author_id: [u8; HEAD_AUTHOR_ID_LEN],
+    /// The author's held person keypair, when this session has one.
+    ///
+    /// `None` is the state `0731` stage 1 made legitimate: a device key signs the head, so
+    /// the phrase is not needed to author one. It is also what a cold start looks like
+    /// before the identity is unlocked, and refusing to build the context at all would
+    /// stop sync from READING heads too, which needs no signer.
+    pub person: Option<PersonKeyPair>,
+    /// The vault-scoped author id `0x02` carries, derived from the person half above.
+    pub author_id: Option<[u8; HEAD_AUTHOR_ID_LEN]>,
     pub account_number_hash: [u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
     /// The roster's live public halves, which resolve a `0x02` signer.
     pub roster_publics: Vec<PersonPublicHalf>,
@@ -62,11 +65,13 @@ impl SignedHeadCtx {
     /// device-key change).
     #[must_use]
     pub fn new(
-        person: PersonKeyPair,
+        person: Option<PersonKeyPair>,
         account_number_hash: [u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
         roster_publics: Vec<PersonPublicHalf>,
     ) -> Self {
-        let author_id = head_author_id(&person.public_half(), &account_number_hash);
+        let author_id = person
+            .as_ref()
+            .map(|person| head_author_id(&person.public_half(), &account_number_hash));
         Self {
             person,
             author_id,
@@ -104,6 +109,11 @@ impl SignedHeadCtx {
     }
 
     /// The format this device AUTHORS: `0x03` with a device key, else `0x02`.
+    ///
+    /// `0x02` is reported even when no identity is held, because the question is which
+    /// format this authority is FOR rather than whether it can sign this instant; a
+    /// context with neither a device key nor a person half refuses at [`Self::sign`]
+    /// (`VaultHeadError::NoAuthority`) instead of stamping a format it cannot produce.
     #[must_use]
     pub fn authors_format(&self) -> u8 {
         if self.device.is_some() {
@@ -111,6 +121,17 @@ impl SignedHeadCtx {
         } else {
             VAULT_HEAD_FORMAT_V2
         }
+    }
+
+    /// Whether this context can author a head at all: a device key (`0x03`), or a held
+    /// person identity (`0x02`).
+    ///
+    /// Asked by the cycle BEFORE it refuses a B2B cycle, so the refusal names the thing the
+    /// user can fix (unlock the identity) rather than a generic failure that would send
+    /// them looking at the network.
+    #[must_use]
+    pub fn can_author(&self) -> bool {
+        self.device.is_some() || (self.person.is_some() && self.author_id.is_some())
     }
 
     /// Author a signed head in this device's format.
@@ -133,15 +154,25 @@ impl SignedHeadCtx {
             // cycle builds carries `0x01` (the single-user shape) and the authority is
             // what stamps the signed generation, so the authoring path cannot disagree
             // with the verifier about which format this vault uses.
-            None => sign_vault_head(
-                &VaultHead {
-                    head_format_version: VAULT_HEAD_FORMAT_V2,
-                    ..head.clone()
-                },
-                &self.author_id,
-                &self.person,
-                rng,
-            ),
+            None => {
+                // No device key, so the phrase path is the only one left. A context built
+                // without a held identity (a cold start) reaches here, and says so rather
+                // than panicking: the caller treats it as "unlock and retry", which is the
+                // failure class the cycle already reports.
+                let (person, author_id) = match (&self.person, &self.author_id) {
+                    (Some(person), Some(author_id)) => (person, author_id),
+                    _ => return Err(protocol::vault_head::VaultHeadError::NoAuthority),
+                };
+                sign_vault_head(
+                    &VaultHead {
+                        head_format_version: VAULT_HEAD_FORMAT_V2,
+                        ..head.clone()
+                    },
+                    author_id,
+                    person,
+                    rng,
+                )
+            }
         }
     }
 
@@ -291,12 +322,49 @@ mod tests {
         }
     }
 
+    /// `0731` stage 1's whole point, pinned: a device key authors a head with NO person
+    /// half in memory. The phrase is not in the sync path any more, so the code must not
+    /// quietly reintroduce the dependency by requiring a context it cannot build.
+    #[test]
+    fn a_device_key_authors_without_the_person_half() {
+        let account = [0x51u8; 16];
+        let signer = device(0x41, 0x0d);
+        let own = DeviceHeadSigner {
+            device_id: signer.device_id,
+            public: signer.key.public_half(),
+        };
+        let ctx = SignedHeadCtx::new(None, account, Vec::new()).with_device(signer, vec![own]);
+
+        assert!(ctx.can_author(), "a device key is an authority on its own");
+        assert_eq!(ctx.authors_format(), VAULT_HEAD_FORMAT_V3);
+
+        let sealed = ctx.sign(&head(account), &mut Rng(7)).expect("device sign");
+        // Read it back through the same context, which is what the next cycle does.
+        let opened = ctx.open(&sealed.record).expect("device head verifies");
+        assert_eq!(opened.head_format_version, VAULT_HEAD_FORMAT_V3);
+        assert_eq!(opened.seq, 1);
+    }
+
+    /// And the other side of the same coin: with neither authority the context refuses
+    /// rather than stamping a format, so the caller can say "unlock and retry" instead of
+    /// surfacing a signature failure it cannot explain.
+    #[test]
+    fn neither_key_cannot_author() {
+        let account = [0x52u8; 16];
+        let ctx = SignedHeadCtx::new(None, account, Vec::new());
+        assert!(!ctx.can_author());
+        assert_eq!(
+            ctx.sign(&head(account), &mut Rng(8)).unwrap_err(),
+            protocol::vault_head::VaultHeadError::NoAuthority
+        );
+    }
+
     #[test]
     fn signed_and_mac_authorities_do_not_accept_each_others_heads() {
         let account = [0x44u8; 16];
         let root = [0x11u8; 32];
         let person = PersonKeyPair::generate_raw(&[1u8; 64], &[2u8; 32], &[3u8; 32]);
-        let ctx = SignedHeadCtx::new(person.clone(), account, vec![person.public_half()]);
+        let ctx = SignedHeadCtx::new(Some(person.clone()), account, vec![person.public_half()]);
         let signed = HeadAuthority::Signed(&ctx);
         let mac = HeadAuthority::Mac { root_key: &root };
 
@@ -323,8 +391,8 @@ mod tests {
         let person = PersonKeyPair::generate_raw(&[4u8; 64], &[5u8; 32], &[6u8; 32]);
         // The pre-change context authors `0x02`; the device context authors `0x03`.
         let publics = vec![person.public_half()];
-        let person_only = SignedHeadCtx::new(person.clone(), account, publics.clone());
-        let with_device = SignedHeadCtx::new(person, account, publics)
+        let person_only = SignedHeadCtx::new(Some(person.clone()), account, publics.clone());
+        let with_device = SignedHeadCtx::new(Some(person), account, publics)
             .with_device(device(0x21, 0x0a), Vec::new());
 
         let v2 = HeadAuthority::Signed(&person_only)
@@ -360,7 +428,7 @@ mod tests {
         // the accepted set is wider than the authored one.
         let account = [0x12u8; 16];
         let person = PersonKeyPair::generate_raw(&[7u8; 64], &[8u8; 32], &[9u8; 32]);
-        let ctx = SignedHeadCtx::new(person, account, vec![]);
+        let ctx = SignedHeadCtx::new(Some(person), account, vec![]);
         let auth = HeadAuthority::Signed(&ctx);
         assert!(auth.accepts_format(VAULT_HEAD_FORMAT_V2));
         assert!(auth.accepts_format(VAULT_HEAD_FORMAT_V3));
@@ -374,12 +442,13 @@ mod tests {
         // not a signature failure: "nobody bound this device" is a different answer.
         let account = [0x13u8; 16];
         let person = PersonKeyPair::generate_raw(&[0x0a; 64], &[0x0b; 32], &[0x0c; 32]);
-        let authoring = SignedHeadCtx::new(person.clone(), account, vec![person.public_half()])
-            .with_device(device(0x31, 0x0b), Vec::new());
+        let authoring =
+            SignedHeadCtx::new(Some(person.clone()), account, vec![person.public_half()])
+                .with_device(device(0x31, 0x0b), Vec::new());
         let sealed = authoring.sign(&head(account), &mut Rng(5)).expect("sign");
 
         let reader_publics = vec![person.public_half()];
-        let reader = SignedHeadCtx::new(person, account, reader_publics);
+        let reader = SignedHeadCtx::new(Some(person), account, reader_publics);
         // Drop the self-published half: the reader now has no device to resolve.
         assert!(reader.open(&sealed.record).is_err());
     }

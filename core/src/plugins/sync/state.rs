@@ -171,6 +171,24 @@ pub struct SyncState {
     /// shared by hand), so it is stored in the clear like the account hash.
     #[serde(default)]
     pub owner_identity_code: Option<String>,
+    /// The OWNER's identity code as this device recorded it — its OWN code, when this
+    /// device is the owner's.
+    ///
+    /// A member stores the owner's code here at invite accept
+    /// ([`Self::owner_identity_code`]). The owner's own device had nowhere to read its
+    /// own public half from except the person keypair, which is phrase-sealed, so
+    /// verifying the roster (the panel, and every signed head) demanded the phrase on
+    /// every cold start even after the device key took over SIGNING (`0731` stages 1
+    /// and 2). The halves are public material and this device derived them itself the
+    /// last time the phrase was entered, so caching them costs no secrecy: it records
+    /// what this device already knew, and a tampered copy cannot forge a roster that
+    /// verifies against a key it substituted, because the roster's own signature is what
+    /// is checked.
+    ///
+    /// Absent until the first unlock on a device with an owner vault. Its absence is not
+    /// an error: the phrase path still works, and it is refreshed on every unlock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub own_identity_code: Option<String>,
     /// The vault's server NAMESPACE when it is not the credential's own account
     /// (myne-md/myne#911 task 8): the random binding an `NTV7` vault writes at
     /// §9.3 offset 6, lowercase hex.
@@ -548,6 +566,25 @@ pub async fn vault_meta_is_dirty(io: &dyn crate::vault_io::VaultIo, dir: &Path) 
         .unwrap_or(false)
 }
 
+/// Record THIS device's own person identity code into the active vault's sync state.
+///
+/// Called on every successful identity unlock, so the cache is refreshed rather than
+/// trusted from the first time it was written. Best-effort on purpose: a readable sync
+/// state is a convenience here, and failing an unlock because a JSON file would not
+/// rewrite would trade a real capability for it.
+pub async fn remember_own_identity_code(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+    code: &str,
+) -> Result<(), SyncConfigError> {
+    let mut state = read_sync_state(io, dir).await?;
+    if state.own_identity_code.as_deref() == Some(code) {
+        return Ok(());
+    }
+    state.own_identity_code = Some(code.to_string());
+    write_sync_state(io, dir, &state).await
+}
+
 /// Persist the sync state to `<dir>/sync-state.json` (atomic replace).
 pub async fn write_sync_state(
     io: &dyn crate::vault_io::VaultIo,
@@ -759,6 +796,42 @@ mod tests {
                 ));
             }
 
+            // The OWNER's own code is remembered on unlock and REFRESHED on the next
+            // one (`0731` stages 1 and 2 moved signing to the device key, and this is what
+            // stops the panel and the cycle from still asking for the phrase to READ a
+            // roster). Refreshed rather than write-once: a device that re-derived its
+            // identity after a phrase change must not keep verifying against the old half.
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code,
+                None
+            );
+            super::remember_own_identity_code(&io, &dir, "MYNE-PERSON-1:aa")
+                .await
+                .unwrap();
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code
+                    .as_deref(),
+                Some("MYNE-PERSON-1:aa")
+            );
+            super::remember_own_identity_code(&io, &dir, "MYNE-PERSON-1:bb")
+                .await
+                .unwrap();
+            assert_eq!(
+                super::read_sync_state(&io, &dir)
+                    .await
+                    .unwrap()
+                    .own_identity_code
+                    .as_deref(),
+                Some("MYNE-PERSON-1:bb"),
+                "a later unlock must replace the cached code, not keep the first one"
+            );
+
             // Generation 1: a real, enrolled device.
             let enrolled = SyncState {
                 cursor: 4_242,
@@ -938,6 +1011,7 @@ mod tests {
             owner_member_token_hex: Some("ff".repeat(32)),
             owner_member_person_id_hex: Some("12".repeat(16)),
             owner_identity_code: Some("MYNE-PERSON-1:aa".to_string()),
+            own_identity_code: None,
             owner_device: None,
             namespace_hex: None,
             published_at_ms: None,

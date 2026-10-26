@@ -8659,7 +8659,7 @@ mod tests {
         // The member's own identity; deterministic seeds keep the test stable.
         let person = PersonKeyPair::generate_raw(&[0x11; 64], &[0x22; 32], &[0x33; 32]);
         let person_public = person.public_half();
-        let ctx = SignedHeadCtx::new(person, account_number_hash, vec![person_public]);
+        let ctx = SignedHeadCtx::new(Some(person), account_number_hash, vec![person_public]);
 
         // The server serves a signed head so the cycle adopts it rather than
         // authoring a genesis (which would need a push route this test omits).
@@ -16172,7 +16172,7 @@ mod tests {
             // genesis (a push route this test does not need).
             let person = person(0x51, 0x52, 0x53);
             let person_public = person.public_half();
-            let ctx = SignedHeadCtx::new(person, HASH, vec![person_public]);
+            let ctx = SignedHeadCtx::new(Some(person), HASH, vec![person_public]);
             let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
             let head = VaultHead {
                 head_format_version: VAULT_HEAD_FORMAT_V2,
@@ -16643,7 +16643,7 @@ mod tests {
             // genesis (a push route this test does not need).
             let signer = person(0x51, 0x52, 0x53);
             let signer_public = signer.public_half();
-            let ctx = SignedHeadCtx::new(signer, HASH, vec![signer_public]);
+            let ctx = SignedHeadCtx::new(Some(signer), HASH, vec![signer_public]);
             let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
             let head = VaultHead {
                 head_format_version: VAULT_HEAD_FORMAT_V2,

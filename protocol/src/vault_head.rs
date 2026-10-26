@@ -202,6 +202,11 @@ pub enum VaultHeadError {
     /// `MYH1` baseline magic mismatch.
     #[error("vault.head-state magic mismatch (expected MYH1)")]
     StateMagicMismatch,
+    /// This device holds no key that can author a head: no device key (`0x03`) and no
+    /// person identity (`0x02`). Not a corruption, and not something a peer sent: it is
+    /// the client telling its caller that the head it was asked for needs a signer first.
+    #[error("vault head has no signing authority on this device")]
+    NoAuthority,
 }
 
 impl VaultHead {
