@@ -218,6 +218,13 @@ describe("capability descriptor", () => {
       // opens for this client's own devices while the cursor affordance is
       // omitted rather than rendered against a command that refuses.
       "liveCollabAwarenessCursors",
+      // external-mcp-connection (myne-md/myne#923). `myne-mcp` is a sidecar
+      // installed from the desktop bundle and reached over the desktop's local
+      // command socket; a page has neither a shell to install one from nor a
+      // socket to speak to. Absent by platform fact rather than pending, so the
+      // Settings > AI > External access section is omitted and the whole `mcp`
+      // namespace answers `Unsupported` in the dispatcher.
+      "externalMcp",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());
