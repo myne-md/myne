@@ -299,24 +299,27 @@ steps:
   # These two commands are 120 s of `wasm-protocol`'s 222 s, in the first stage,
   # whose second-slowest step is `pnpm-build` at 64 s. Nothing depends on them.
   # So they were 120 s of pure waiting for every other step in the pipeline.
-  # `depends_on: [cargo-test-tauri]` lands them in the stage that holds
-  # `web-build` and `sync-sim`. That is NOT the last stage: `web-build` still
-  # feeds the four-step mobile tail and `web-container-check`, so an over-run
-  # here delays those too, not just the pipeline's end.
+  #
+  # The edge points at `stories-build`, measured rather than guessed (pipeline
+  # 991). It used to point at `cargo-test-tauri`, which put this step and
+  # everything downstream of it — `web-build`, `web-container-check` and the
+  # four-step mobile tail — after `tauri-compile`, a step that holds ONE slot for
+  # 11.6 minutes while the other sits idle for ~10.3 of them. Reading the same
+  # run's stage timings: 8.0-19.5 min is `tauri-compile` alone, and 19.5-32.7 is
+  # the entire web and mobile lane queued behind it. `stories-build` ends exactly
+  # where `tauri-compile` begins, so this edge moves that whole lane into the idle
+  # slot instead of onto the critical path, and it costs nothing: `sync-sim`,
+  # `web-build` and `web-container-check` take 6.1 min of a 10.3-minute window.
   #
   # The placement was chosen when the stage also held the 1118 s `e2e` step,
   # under which 120 s cost nothing at all. `e2e` has since moved to
-  # `.woodpecker/e2e.yml`, so the cover is now whatever `sync-sim` and
-  # `web-build` take: `sync-sim` downloads a Go toolchain, apt-installs the full
-  # GTK dev chain, clones and builds myne-server and runs nextest, so the
-  # exposure is probably still nil. Probably is the operative word. Read the
-  # stage timings on a real pipeline before moving this step again.
+  # `.woodpecker/e2e.yml`, and the cover is now the idle window above.
   #
   # Only the REPRODUCIBILITY half moved. The correctness gates above — the
   # CSPRNG-hook check, the wasm dependency graph, both wasm clippys, the entry
   # crate's tests — stay in the first stage and still fail at minute two. This
-  # one is a publish-time property, and the trade it makes is explicit: it now
-  # surfaces at minute ~15 instead of minute ~4.
+  # one is a publish-time property, and the trade it makes is explicit: it
+  # surfaces at minute ~12 instead of minute ~4.
   # ─── This step's run condition belongs to its CONSUMER, not to itself ────────
   # `web-build` bundles `web/src/worker/worker.ts`, which imports
   # `../../wasm/pkg/myne_web_wasm.js`. That directory is gitignored, so it is
@@ -329,7 +332,7 @@ steps:
   # them — are worth asking about even on a red pipeline. This step carried a
   # BARE `when`, whose implicit `status: success` is pipeline-wide rather than
   # `depends_on`-scoped, and a bare `depends_on` edge that a red
-  # `cargo-test-tauri` also skips. So the consumer ran on red and its producer
+  # `stories-build` also skips. So the consumer ran on red and its producer
   # did not, and `web-build` died with
   # `[UNRESOLVED_IMPORT] Could not resolve '../../wasm/pkg/myne_web_wasm.js'`.
   #
@@ -340,8 +343,7 @@ steps:
   #
   # Both halves have to move together or the hole stays open on the other path.
   # The optional edge still ORDERS — it only stops requiring that the parent
-  # SUCCEEDED — so the serial chain that keeps two heavy workspace builds off
-  # the same host at once is unchanged. The rule this restores is stated at the
+  # SUCCEEDED. The rule this restores is stated at the
   # `code-paths` anchor above: a producer and its consumer share a run
   # condition, and this step was the one place it was not applied.
   wasm-repro:
@@ -350,7 +352,7 @@ steps:
       - path: *code-path-globs
         status: [success, failure]
     depends_on:
-      - name: cargo-test-tauri
+      - name: stories-build
         optional: true
     environment:
       RUSTC_WRAPPER: /cache/bin/sccache
@@ -1001,7 +1003,17 @@ steps:
       # these packages baked in, which is a registry plus a build pipeline plus
       # an image-freshness gate, and belongs to its own change rather than to a
       # line hidden in this step.
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      #
+      # CONDITIONAL, and the condition is the point. `pnpm-build` installed into
+      # the shared workspace `node_modules` minutes before this step runs, and the
+      # workspace volume survives between steps, so this line is a no-op that
+      # costs time and — since the web and mobile lanes stopped queueing behind
+      # this one — RACES an install running beside it in the same tree. Two
+      # installs into one `node_modules` is the exact hazard every `depends_on`
+      # chain in this file was built to avoid, so the guard stays a guard: a
+      # missing tree still installs, which is what keeps a `status: [success,
+      # failure]` dependent alive when `pnpm-build` went red.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # Attribution for the ~12 minutes this step costs. `sccache` reports a 100 %
       # hit rate and `Compilations 0`, so essentially none of that time is
       # compiling: it is cargo walking the resolved graph once per INVOCATION
@@ -1232,7 +1244,9 @@ steps:
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Conditional install, see `tauri-compile`'s note: the tree is already
+      # there and an install beside this step's neighbour would corrupt it.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm web:build
       # Zero-third-party-origin drift gate (MYND-574 tasks 55 + 60). The CSP is
       # the runtime guarantee; this pins the SURFACE — which external origins
@@ -1387,7 +1401,8 @@ steps:
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Conditional install, see `tauri-compile`'s note.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm mobile:build
 
   # npm dependency-license gate — the npm analogue of cargo-deny, and the one
@@ -1410,7 +1425,8 @@ steps:
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Conditional install, see `tauri-compile`'s note.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # THE STORE PATH IS PASSED TWICE ON PURPOSE, and the two must agree
       # (myne-md/myne#515). `pnpm licenses list` builds its answer from the
       # lockfile plus the content-addressable STORE, so it has to be pointed at
@@ -1465,7 +1481,8 @@ steps:
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Conditional install, see `tauri-compile`'s note.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm mobile:test
 
   # Sync UI flow-logic tier (MYND-462 T3) — NOT end-to-end. Playwright drives
@@ -1503,7 +1520,11 @@ steps:
         optional: true
     commands:
       - npm install -g pnpm@11.8.0
-      - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Conditional install, see `tauri-compile`'s note. This is the step where
+      # the condition matters most: it is the lane's last step, so it can still be
+      # running when `cargo-test-tauri` starts its own install for the desktop
+      # suite.
+      - test -d node_modules/.pnpm || pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm mobile:test:flow
 
   # Mobile Rust: clippy + unit tests for `myne-mobile` and its four Tauri
@@ -1614,18 +1635,21 @@ steps:
     when:
       - path: *code-path-globs
         status: [success, failure]
-    # `optional: true`: run AFTER cargo-test-tauri (keeps the heavy steps serial
-    # on the shared host) but REGARDLESS of its result. The edge used to point at
-    # `e2e`, which was the tail of the serial chain and chronically flaky on
-    # develop, so a plain `depends_on` skipped sync-sim whenever the UI suite
-    # went red; the suite has since moved to `.woodpecker/e2e.yml` and
-    # `cargo-test-tauri` is the tail. The reason for keeping the edge optional is
-    # unchanged: the sync engine's cross-device correctness is independent of
-    # whatever runs before it, so gate sync-sim on the SERVER binary + its own
-    # tests and on nothing else. Same pattern notify-failure uses to run on
-    # upstream failure.
+    # `optional: true`: run AFTER `stories-build` but REGARDLESS of its result.
+    # The edge used to point at `cargo-test-tauri`, which is the tail of the
+    # serial desktop chain: that placement queued this step AND everything the
+    # web and mobile lane needs behind the 11.6-minute `tauri-compile`, whose
+    # second worker slot is idle for ~10 of those minutes. `stories-build` ends
+    # where `tauri-compile` starts, so the edge now lands in the idle window
+    # instead (pipeline 991's stage timings are the measurement). The reason the
+    # edge is optional is unchanged: the sync engine's cross-device correctness is
+    # independent of whatever runs before it, so gate sync-sim on the SERVER
+    # binary + its own tests and on nothing else. Same pattern notify-failure uses
+    # to run on upstream failure. It pointed at `e2e` before this, which was
+    # chronically flaky on develop, so a plain `depends_on` skipped sync-sim
+    # whenever the UI suite went red.
     depends_on:
-      - name: cargo-test-tauri
+      - name: stories-build
         optional: true
     environment:
       CI: "true"
