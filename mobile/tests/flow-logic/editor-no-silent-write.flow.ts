@@ -93,8 +93,14 @@ test.describe("editor never writes silently", () => {
     // the assertion, and the mock's patch handler refuses a note nothing opened, so
     // this also proves something opened it first.
     await bootAndOpenNote(page);
-    await page.locator(".cm-content").click();
-    await page.keyboard.type("session-routed edit");
+    // Click the body LINE, not `.cm-content`: the live-preview frontmatter renders
+    // a Properties widget at the content's centre, so a centre-click lands in that
+    // widget's key input and the typed text splits between it and the note. That
+    // is what this spec did, and it failed 5 times in 12 locally and once in CI with
+    // the body holding "routed edit" and "session-" gone into the widget.
+    await page.locator(".cm-content").getByText("alpha body line").click();
+    await page.keyboard.press("End");
+    await page.keyboard.type(" session-routed edit");
     await firePagehide(page);
 
     await expect.poll(() => readSessionPatches(page)).toHaveLength(1);
