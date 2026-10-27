@@ -61,6 +61,10 @@ export const VENDORED_ORIGINS = new Map([
   ["https://ollama.com", "myne AI panel: the local-runtime link the user's own browser opens (never fetched)"],
   ["http://127.0.0.1", "loopback: the local sync-server development target"],
   ["https://your-server.example", "placeholder in Myne's own copy"],
+  [
+    "https://sync.example",
+    "placeholder in Myne's own COPY, not in a vendored library: the sync-server address the identity home's register stories show in a configured-endpoint fixture. `.example` is reserved by RFC 2606, so it can never resolve, and the catalogue makes no network call. Story-only, hence WEB_EXCLUDED.",
+  ],
   ["https://sync.example.com", "placeholder in Myne's own copy"],
   ["https://myne.md", "Myne's own site"],
   ["https://sync.myne.md", "the documented production sync origin, a placeholder in Myne's own copy"],
@@ -98,6 +102,10 @@ export const VENDORED_ORIGINS = new Map([
 const WEB_EXCLUDED = new Set([
   "http://scripts.sil.org",
   "https://scripts.sil.org",
+  // A story fixture's placeholder endpoint. It is in `stories/src/stories/`, so
+  // it cannot reach the served bundle; leaving it in the web set would
+  // pre-approve a genuinely new web origin that happened to match it.
+  "https://sync.example",
   // Offered by the catalogue's Welcome page only; the app's web bundle has no
   // link to either.
   "https://app.example.com",
