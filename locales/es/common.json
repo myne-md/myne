@@ -12,7 +12,7 @@
     "pendingTitle": "Esperando aprobación",
     "sasMatch": "Coinciden, continuar",
     "sasMismatch": "No coinciden",
-    "verifyBody": "Comprueba que este código sea el mismo en ambos dispositivos antes de continuar. Si no lo es, detente: algo va mal con la conexión, no con tu contraseña.",
+    "verifyBody": "Comprueba que este código es el mismo en ambos dispositivos antes de continuar. Si no lo es, detente: algo va mal con la conexión, no con tu contraseña.",
     "verifyChanged": "El código cambió mientras lo mirabas. Compara otra vez las dos pantallas. Si sigue cambiando, detente y no continúes.",
     "verifyTitle": "Compara este código",
     "title": "Inicia sesión en tu bóveda",
@@ -41,6 +41,8 @@
       "permissionLabel": "Cuando termine la ejecución",
       "permissionAsk": "Revisar primero",
       "permissionAuto": "Aplicar automáticamente",
+      "keepConversation": "Mantener esta conversación al cambiar de nota",
+      "keepConversationPinned": "Mantenida para esta sesión",
       "providerRejected": "El proveedor no aceptó esta solicitud, así que la ejecución se detuvo. No se escribió nada. Es un fallo en lo que envió Myne, no en tus notas ni en tu configuración.",
       "unchecked": "No se pudo completar la comprobación de edición, así que el agente no está disponible por ahora. Comprueba que tu modelo o proveedor esté accesible y vuelve a intentarlo.",
       "unsupported": "Este modelo no puede hacer ediciones precisas de forma fiable, así que el agente no está disponible. Elige un modelo más grande o un proveedor.",
@@ -49,6 +51,9 @@
       "unsupportedProvisional": "Ese umbral de aprobado aún no se ha medido en varios modelos, así que puede ser más estricto o más laxo de lo debido.",
       "scopeNone": "ninguna nota abierta, así que todavía no hay nada sobre lo que trabajar",
       "scopeAllVault": "Todas las notas",
+      "scopeQuestion": "Lo que el agente puede leer",
+      "scopeFolders": "Carpetas",
+      "scopeApplies": "Se aplica a tu próximo mensaje. Las notas en la papelera, archivadas y de plantilla siempre se excluyen.",
       "blockedScope": "Todavía no hay nada en lo que pueda trabajar el agente: todas las notas están excluidas de la IA, o la bóveda está vacía.",
       "preparing": "Preparando…",
       "blockedScopeSidebar": "Todavía no hay nada aquí sobre lo que preguntar: la carpeta de esta nota está excluida de la IA.",
@@ -56,6 +61,21 @@
       "scopeExcluded_one": "{{count}} excluida de la IA",
       "scopeExcluded_many": "{{count}} excluidas de la IA",
       "scopeExcluded_other": "{{count}} excluidas de la IA"
+    },
+    "attachments": {
+      "title": "Adjuntar un documento",
+      "attach": "Adjuntar un documento",
+      "empty": "Aún no hay archivos adjuntos en esta bóveda. Añade un archivo a la biblioteca de adjuntos primero.",
+      "failed": "No se pudo leer la biblioteca de adjuntos. Inténtalo de nuevo.",
+      "pasteFailed": "No se pudo añadir el archivo pegado a esta conversación.",
+      "pasting": "Pegando…",
+      "pastedFile": "Archivo pegado",
+      "cap": "Puedes adjuntar hasta {{count}} archivos.",
+      "confirm_one": "Adjuntar {{count}} archivo",
+      "confirm_other": "Adjuntar {{count}} archivos",
+      "remove": "Quitar {{name}}",
+      "noText": "{{name}} no tiene texto que el agente pueda leer. Solo se pueden adjuntar archivos cuyo texto se haya podido extraer.",
+      "confirm_many": "Adjuntar {{count}} archivos"
     },
     "progress": {
       "working": "Trabajando",
@@ -98,6 +118,7 @@
     },
     "review": {
       "title": "Revisar cambios",
+      "statusWaiting": "Esperando tu aprobación",
       "close": "Cerrar",
       "scopeTotal_one": "{{count}} nota en el alcance",
       "scopeTotal_many": "{{count}} notas en el alcance",
@@ -109,6 +130,12 @@
       "changedLines_one": "{{count}} línea",
       "changedLines_many": "{{count}} líneas",
       "changedLines_other": "{{count}} líneas",
+      "rowReplace_one": "Sustituir {{count}} línea",
+      "rowReplace_other": "Sustituir {{count}} líneas",
+      "rowAppend": "Añadir al final de la nota",
+      "rowMove": "Mover a {{folder}}",
+      "showChange": "Mostrar el cambio",
+      "hideChange": "Ocultar el cambio",
       "removalFlag": {
         "trashed": "Mueve esta nota a la papelera",
         "deleted": "Elimina esta nota en todos los dispositivos",
@@ -118,6 +145,7 @@
       },
       "largeDeletion": "Elimina mucho texto",
       "rejectEdit": "Rechazar",
+      "createdBadge": "Creada",
       "restoreEdit": "Mantener",
       "applyRemoval": "Aplicar por separado",
       "rejectAll": "Rechazar todo",
@@ -127,6 +155,12 @@
       "appliedCount_one": "{{count}} cambio aplicado.",
       "appliedCount_many": "{{count}} cambios aplicados.",
       "appliedCount_other": "{{count}} cambios aplicados.",
+      "rejectedCount_one": "{{count}} cambio rechazado.",
+      "rejectedCount_other": "{{count}} cambios rechazados.",
+      "rejectedNewNotes_one": "{{count}} nota nueva rechazada.",
+      "rejectedNewNotes_other": "{{count}} notas nuevas rechazadas.",
+      "rejectedSettings_one": "{{count}} ajuste rechazado.",
+      "rejectedSettings_other": "{{count}} ajustes rechazados.",
       "refused": {
         "anchorNotFound": "No se pudo aplicar: ese texto ya no está en la nota.",
         "anchorAmbiguous": "No se pudo aplicar: ese texto aparece más de una vez.",
@@ -143,9 +177,19 @@
         "appendEmpty": "No se pudo aplicar: no había nada que añadir.",
         "appendWouldWriteFrontmatter": "No se pudo aplicar: ese texto se habría convertido en el bloque de propiedades de la nota.",
         "moveToSameFolder": "No se movió: la nota ya está en esa carpeta.",
+        "unknownFolder": "No movida: esta bóveda no tiene una carpeta con ese nombre, así que no se escribió nada.",
         "moveIntoExcludedFolder": "No se movió: esa carpeta está excluida de la IA."
       },
       "applyFailed": "No se pudieron aplicar los cambios.",
+      "applyFailedCause": {
+        "noSuchRun": "Esa ejecución ya no está abierta, así que no se escribió nada.",
+        "cancelled": "Esa ejecución se detuvo, así que no se escribió nada.",
+        "locked": "La bóveda está bloqueada, así que no se escribió nada.",
+        "aiDisabled": "La IA está desactivada para esta bóveda.",
+        "write": "No terminó de escribirse los cambios.",
+        "read": "Algo necesario para esta ejecución no se pudo leer, así que no se escribió nada.",
+        "restorePoint": "No se pudo tomar la copia de seguridad, así que no se escribió nada."
+      },
       "undo": "Deshacer esta ejecución",
       "undoFailed": "No se pudo deshacer la ejecución.",
       "undoReport": "{{reverted}} notas restauradas. Se dejaron {{kept}} notas que creó la ejecución.",
@@ -191,6 +235,8 @@
         "runStopped": "No se aplicó: se detuvo la ejecución, así que no se intentó ningún cambio.",
         "notProposed": "No se aplicó: esta ejecución nunca propuso ese cambio, así que el host no lo escribirá."
       },
+      "appliedSummary": "Cambios aplicados.",
+      "settingsApplied": "Ajustes aplicados.",
       "undoReportFailed_one": "{{count}} cambio no se pudo revertir.",
       "undoReportFailed_many": "{{count}} cambios no se pudieron revertir.",
       "undoReportFailed_other": "{{count}} cambios no se pudieron revertir.",
@@ -205,7 +251,14 @@
       "settingsChanged_other": "{{count}} ajustes cambiados.",
       "refusedCount_one": "{{count}} cambio no se pudo aplicar",
       "refusedCount_many": "{{count}} cambios no se pudieron aplicar",
-      "refusedCount_other": "{{count}} cambios no se pudieron aplicar"
+      "refusedCount_other": "{{count}} cambios no se pudieron aplicar",
+      "rowReplace_many": "Sustituir {{count}} líneas",
+      "rejectedCount_many": "{{count}} cambios rechazados.",
+      "rejectedNewNotes_many": "{{count}} notas nuevas rechazadas.",
+      "rejectedSettings_many": "{{count}} ajustes rechazados."
+    },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
     },
     "undo": {
       "action": "Deshacer la ejecución",
@@ -330,6 +383,7 @@
       "checking": "Comprobando…",
       "checkUnusedFailedNotice": "No se pudieron comprobar los adjuntos sin usar. Inténtalo de nuevo.",
       "corpusIncompleteNotice": "Termina de sincronizar primero. Este dispositivo aún no tiene todas tus notas, así que no puede saber qué adjuntos están sin usar.",
+      "sharedVaultNotice": "Esta es una bóveda compartida, así que las conversaciones se guardan por persona. Myne no puede saber qué archivos sigue usando otro miembro, así que no ofrecerá ninguno para limpieza.",
       "cleanUnused": "Limpiar sin usar",
       "cleanUnusedTitle": "Eliminar los adjuntos que no se usan en ninguna nota",
       "colCreated": "Creado",
@@ -450,7 +504,7 @@
         "joinFailure": "La copia de seguridad falló inesperadamente. No quedó ningún archivo.",
         "memberTooLarge": "Un archivo de esta bóveda es más grande de lo que permite el formato de copia de seguridad.",
         "vaultNotFound": "No se encontró ninguna bóveda para respaldar.",
-        "verifyFailed": "La copia de seguridad escrita no se verificó, así que se descartó. Inténtalo de nuevo, en otro medio si vuelve a ocurrir.",
+        "verifyFailed": "La copia de seguridad escrita no se verificó, así que se descartó. Inténtalo de nuevo, en otro medio si se repite.",
         "unknown": "La copia de seguridad falló por una razón que Myne no pudo identificar. No confíes en ningún archivo en el destino; inténtalo de nuevo."
       },
       "restore": {
@@ -731,6 +785,9 @@
       },
       "manageTemplates": {
         "label": "Administrar plantillas…"
+      },
+      "manageViews": {
+        "label": "Gestionar vistas…"
       },
       "newNoteFromTemplate": {
         "label": "Nueva nota desde plantilla…"
@@ -1327,12 +1384,18 @@
           "memoryPopoverRetry": "Reintentar",
           "memoryPopoverSettings": "Gestionar en Ajustes",
           "memoryPopoverClose": "Cerrar",
+          "seedCard": {
+            "title": "¿Quieres que Myne conozca tu bóveda?",
+            "body": "Puede leer la forma de tus notas una vez y crear unas cuantas entradas de memoria. Revisas cada línea antes de que se guarde nada.",
+            "action": "Enseñar tu bóveda a Myne",
+            "dismiss": "Ahora no"
+          },
           "copied": "Copiado",
           "copyAnswer": "Copiar la respuesta",
           "copyFailed": "No se pudo copiar",
           "copyYourMessage": "Copiar tu mensaje",
           "emptyTitle": "Pregunta sobre tus notas",
-          "noticeLeaves": "Las palabras que escribes, las notas que lee un turno, los títulos, identificadores y rutas de carpeta de cada nota que la ejecución puede leer (toda la bóveda menos las carpetas que excluyas, a no ser que la restrinjas) y lo que la IA recuerda sobre ti se envían a lo que esté respondiendo. No se envía nada más de este dispositivo.",
+          "noticeLeaves": "Las palabras que escribas, las notas que lea un turno, los títulos, identificadores y rutas de carpeta de todas las notas que la ejecución pueda leer (toda la bóveda menos tus carpetas excluidas, salvo que la acotes), el texto que Myne extrajo de los archivos que adjuntes a un mensaje (hasta cuatro, cada uno recortado a 20 000 caracteres; el archivo en sí se queda aquí) y lo que la IA recuerda de ti se envían a quien responda. Nada más de este dispositivo se envía.",
           "noticeReceiver": "Está respondiendo: {{provider}}, que Myne no gestiona.",
           "noticeReceiverLocal": "Está respondiendo: un programa que se ejecuta en este dispositivo. Nada sale de la máquina, pero ese programa no forma parte de Myne y Myne no puede ver qué hace con esos datos.",
           "noticeRevoke": "Para detenerlo, desactiva la IA en Ajustes o cambia lo que está respondiendo allí. Revocar la clave de un proveedor detiene a ese proveedor de inmediato.",
@@ -1408,10 +1471,13 @@
         "editing": "está editando",
         "empty": "Eres el único aquí",
         "jumpTo": "Ir a {{name}}",
+        "showList_one": "{{count}} aquí ahora. Mostrar la lista",
+        "showList_other": "{{count}} aquí ahora. Mostrar la lista",
         "unknown": "Alguien",
         "title_one": "{{count}} aquí ahora",
         "title_many": "{{count}} aquí ahora",
-        "title_other": "{{count}} aquí ahora"
+        "title_other": "{{count}} aquí ahora",
+        "showList_many": "{{count}} aquí ahora. Mostrar la lista"
       }
     },
     "noteActions": {
@@ -1558,7 +1624,9 @@
     "tagSuggestion": {
       "label": "Etiquetas sugeridas",
       "accept": "Añadir la etiqueta {{tag}} a esta nota",
-      "dismiss": "Descartar la etiqueta sugerida {{tag}}"
+      "dismiss": "Descartar la etiqueta sugerida {{tag}}",
+      "groupExisting": "En tu bóveda",
+      "groupNew": "Nueva"
     },
     "taskField": {
       "addAffordance": "Añadir campo de tarea",
@@ -1691,7 +1759,7 @@
         "convertedToast_many": "{{count}} de wikilinks convertidos",
         "convertedToast_other": "{{count}} wikilinks convertidos",
         "noneToConvert": "No hay wikilinks importados que convertir en esta nota.",
-        "nothingToConvert": "Nada que convertir: ningún wikilink importado se resuelve.",
+        "nothingToConvert": "Nada que convertir: no se resuelve ningún wikilink importado.",
         "rewriteCount_one": "Se reescribirá {{count}} enlace",
         "rewriteCount_many": "Se reescribirán {{count}} de enlaces",
         "rewriteCount_other": "Se reescribirán {{count}} enlaces",
@@ -1710,6 +1778,10 @@
       "loadFailed": "No se pudieron cargar tus notas.",
       "openFailed": "No se pudo abrir esta nota.",
       "saveFailed": "No se pudo guardar esta nota.",
+      "liveResynced": "Esta nota se actualizó en otra parte y se recargó.",
+      "liveResyncedKept": "Esta nota se actualizó en otra parte y se recargó. Tus cambios sin guardar se conservaron como copia aparte.",
+      "liveResyncFailed": "No se pudo actualizar esta nota con los cambios de otra parte. Tu texto no ha cambiado.",
+      "liveCopyFailed": "No se pudieron conservar tus cambios sin guardar como copia aparte, así que esta nota no se actualizó. Tu texto no ha cambiado.",
       "moveFailed": "No se pudo mover esta nota.",
       "openTodayFailed": "No se pudo abrir la nota de hoy.",
       "exportFailed": "No se pudo exportar esta nota.",
@@ -1797,6 +1869,7 @@
     "formatBar": {
       "redo": "Rehacer",
       "attachFile": "Adjuntar archivo nuevo",
+      "photoToNote": "Foto a nota",
       "insertFromLibrary": "Insertar desde la biblioteca",
       "recordVoiceNote": "Grabar nota de voz",
       "showLivePreview": "Mostrar vista previa en vivo",
@@ -2099,7 +2172,9 @@
       "copyLink": "Copiar enlace",
       "open": "Abrir",
       "openInNewTab": "Abrir en una pestaña nueva",
-      "revealInFolder": "Mostrar en la carpeta"
+      "revealInFolder": "Mostrar en la carpeta",
+      "archive": "Archivar nota",
+      "trash": "Mover nota a la papelera"
     },
     "colorLabels": {
       "clay": "Arcilla",
@@ -2195,8 +2270,8 @@
       "tooLong": "Esa ruta de carpeta es demasiado larga.",
       "moveIntoSelf": "Una carpeta no se puede mover dentro de sí misma.",
       "moveCollision": "Ahí ya hay una carpeta con ese nombre.",
-      "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que la carpeta no se ha tocado. Inténtalo de nuevo cuando termine.",
-      "renameFailed": "No se pudo cambiar el nombre de la carpeta, así que sigue igual.",
+      "unsettledSave": "Una nota abierta no ha terminado de guardarse, así que la carpeta se dejó sola. Inténtalo de nuevo cuando haya terminado.",
+      "renameFailed": "No se pudo renombrar la carpeta, así que no ha cambiado.",
       "deliberateWriteFailed": "Se cambió el nombre de la carpeta, pero no se pudo guardar uno de sus ajustes. Cada vez que desbloquees, volverá a aparecer una carpeta vacía con el nombre anterior; puedes eliminarla sin riesgo y no cambia nada más. Volver a cambiar el nombre de la carpeta no la quitará.",
       "folderListFull": "Myne solo puede recordar un número limitado de carpetas, y esa lista está llena. Esta carpeta sigue funcionando, pero desaparecerá cuando salga su última nota. Si eliminas una carpeta que ya no necesitas, harás sitio.",
       "folderNotRemembered": "La carpeta se creó, pero Myne no pudo registrarla. Desaparecerá cuando salga su última nota, y en el próximo desbloqueo ya no estará si sigue vacía. Puedes volver a crearla sin riesgo."
@@ -2219,7 +2294,7 @@
         "dragHandleTitle": "Arrastra para reordenar",
         "editFilterButton": "Editar filtro…",
         "editFilterTitle": "Editar el filtro del grupo de color",
-        "emptyBody": "Los grupos de color te permiten colorear los nodos del grafo por etiqueta o carpeta: las notas de trabajo de un color y las personales de otro. Añade tu primera regla.",
+        "emptyBody": "Los grupos de color te permiten colorear los nodos del grafo por etiqueta o carpeta: las notas de trabajo de un color, las personales de otro. Añade tu primera regla.",
         "emptyTitle": "Aún no hay grupos de color",
         "enableToggleAriaLabel": "Activar regla",
         "filterAllNotes": "Coincide con todas las notas",
@@ -2361,7 +2436,7 @@
         "unfollowedLinkOutside": "Es un acceso directo a una carpeta que está fuera de la que elegiste, así que Myne no lo siguió. Mueve o copia esa carpeta dentro de tu bóveda e impórtala de nuevo.",
         "unfollowedLinkLoop": "Este acceso directo apunta de vuelta a una carpeta en la que Myne ya estaba, así que seguirlo daría vueltas sin fin. No se omitió nada de su contenido.",
         "unfollowedLinkBroken": "Este acceso directo no lleva a ninguna parte. Aquello a lo que apuntaba se ha movido o eliminado.",
-        "unreadableDetail": "Omitido: {{reason}} El resto de la importación continuó.",
+        "unreadableDetail": "Omitido: {{reason}} El resto de la importación siguió adelante.",
         "stoppedAt": "Se importaron {{imported}} de {{total}} notas antes de que esto se detuviera. Están en tu bóveda y puedes conservarlas sin riesgo.",
         "reasonNotUtf8": "Myne no pudo leer este archivo como texto. Probablemente esté guardado en una codificación antigua, o no sea un archivo de texto en absoluto.",
         "reasonPathRejected": "Myne no pudo acceder a este archivo dentro de la carpeta que elegiste.",
@@ -2636,13 +2711,13 @@
       "conflictTitle": "Esta nota cambió en otro dispositivo: se conservan ambas versiones",
       "editing": "Editando",
       "editingEllipsis": "Editando…",
-      "editingTitle": "Editando: el guardado automático está activo",
+      "editingTitle": "Editando: el autoguardado está armado",
       "justNow": "ahora mismo",
       "retry": "Reintentar",
       "saved": "Guardado",
       "savedRelative": "Guardado {{rel}}",
       "saveFailed": "Error al guardar",
-      "saveFailedTitle": "Error al guardar: haz clic en Reintentar",
+      "saveFailedTitle": "Guardado fallido: haz clic en Reintentar",
       "storageFull": "Almacenamiento lleno",
       "storageFullTitle": "No queda espacio para guardar esta nota. Libera espacio (o quita algunos adjuntos) y vuelve a intentarlo. Hasta que se guarde, esta edición solo está en esta ventana. Tampoco está en el servidor.",
       "saving": "Guardando",
@@ -2695,7 +2770,7 @@
       "openNotes": "Notas abiertas",
       "pin": "Fijar",
       "pinned": "Fijada",
-      "pinnedTitle": "Fijada: deja de fijarla para cerrar",
+      "pinnedTitle": "Fijada: desfija para cerrar",
       "unpin": "Dejar de fijar",
       "untitled": "Sin título",
       "closeTabMenuItem": "Cerrar pestaña",
@@ -2759,8 +2834,60 @@
       "thisNote": "esta nota",
       "untitled": "Sin título"
     },
-    "unsettledSave": "Una nota abierta aún no ha terminado de guardarse, así que no se ha cambiado nada. Inténtalo de nuevo cuando termine.",
+    "unsettledSave": "Una nota abierta no ha terminado de guardarse, así que no se cambió nada. Inténtalo de nuevo cuando haya terminado.",
     "views": {
+      "bulk": {
+        "apply": "Establecer en {{count}}",
+        "field": "Campo",
+        "notRestorableLine": "{{title}} se escribió pero no tiene instantánea de esta acción, así que no se puede restaurar desde aquí.",
+        "nothingToRestore": "Estas notas conservan su propio historial de cambios, así que esta acción no tiene punto de restauración. Los valores que escribió siguen ahí.",
+        "refusedCannotDecrypt": "no se pudo descifrar",
+        "refusedFieldChanged": "ese campo cambió en otra parte desde que se leyó esta vista",
+        "refusedFieldNotDeclared": "la vista no declara ese campo",
+        "refusedFieldReserved": "ese campo lo gestiona Myne",
+        "refusedInvalidField": "ese nombre de campo no se puede escribir",
+        "refusedInvalidNoteId": "el id de la nota no era válido",
+        "refusedIo": "no se pudo escribir la nota",
+        "refusedJoinFailure": "la escritura no terminó",
+        "refusedLine": "{{title}}: {{reason}}.",
+        "refusedLiveSessionOpen": "una sesión de edición en vivo tiene esa nota abierta",
+        "refusedNotApproved": "este dispositivo no ha aprobado esta vista",
+        "refusedNoteNotFound": "esa nota ya no existe",
+        "refusedPrefsUnreadable": "no se pudieron leer las aprobaciones de este dispositivo",
+        "refusedVaultLocked": "la bóveda está bloqueada",
+        "refusedValueTooLarge": "el valor es demasiado grande para una sola nota",
+        "restore": "Restaurar esta acción",
+        "restoreFailedLine": "{{title}} no se pudo restaurar.",
+        "restored": "Restauradas {{count}}.",
+        "selectAll": "Seleccionar todas las notas de esta vista",
+        "selectRow": "Seleccionar {{title}}",
+        "skippedListValues": "{{count}} notas seleccionadas tienen una lista en ese campo y no se incluyeron.",
+        "value": "Valor a establecer",
+        "valuePlaceholder": "Nuevo valor",
+        "written": "Escritas {{count}}."
+      },
+      "board": {
+        "emptyLane": "Sin tarjetas",
+        "dropRefused": "{{reason}}. La tarjeta vuelve a {{lane}}.",
+        "addCardTo": "Añadir una tarjeta a {{lane}}",
+        "addCardRefused": "La tarjeta se creó, pero no se pudo colocar: {{reason}}.",
+        "addCardFailed": "No se creó ninguna tarjeta: no se pudo leer la plantilla.",
+        "moveSelected": "Mover {{count}}",
+        "moveTo": "Mover a columna",
+        "selectAll": "Seleccionar todas las tarjetas",
+        "selectCard": "Seleccionar {{title}}",
+        "renameLane": "Renombrar columna {{lane}}",
+        "newLaneName": "Nombre de la nueva columna",
+        "saveLaneName": "Guardar nombre de columna",
+        "cancelLaneRename": "Cancelar",
+        "lanesNotSaved": "Las tarjetas se movieron, pero no se pudo guardar el orden de las columnas.",
+        "laneOrderRestored": "El orden de las columnas se ha restaurado.",
+        "laneOrderRestoreFailed": "No se pudo restaurar el orden de las columnas.",
+        "cancel": "Cancelar",
+        "archiveFailed": "No se pudo archivar la nota.",
+        "trashFailed": "No se pudo mover la nota a la papelera.",
+        "noGroupBy": "Este tablero no tiene propiedad de columna. Elige una propiedad para agrupar en los ajustes de la vista."
+      },
       "cards": {
         "changeCover": "Cambiar portada",
         "changeCoverImage": "Cambiar imagen de portada",
@@ -2774,6 +2901,55 @@
       "list": {
         "empty": "Ninguna nota coincide con esta vista",
         "noValue": "Sin valor"
+      },
+      "import": {
+        "approveAction": "Aprobar v{{version}}",
+        "approveFailed": "No se pudo guardar esa aprobación.",
+        "approveFailedBody": "La vista está aquí y sigue necesitando aprobación. Inténtalo de nuevo, o apruébala desde el gestor de vistas.",
+        "armIdentical": "Ya tienes exactamente esta versión (v{{version}}). No hay nada que hacer.",
+        "armIdenticalHeading": "{{name}} ya está actualizada",
+        "armNew": "Esto añade una vista nueva, {{name}} (v{{version}}).",
+        "armOlder": "El archivo es v{{incoming}} y esta bóveda tiene v{{stored}}. Un archivo más antiguo no puede sustituir una vista más nueva.",
+        "armRefusedHeading": "{{name}} no se importó",
+        "armSameVersionDifferent": "El archivo dice v{{version}}, la misma versión que tiene esta bóveda, pero su contenido difiere. Es o bien un autor distinto reutilizando el id o bien un archivo cambiado después de firmarlo, así que se rechaza.",
+        "armUpdate": "Esto sustituye a {{name}}: esta bóveda tiene v{{stored}}, el archivo es v{{incoming}}.",
+        "close": "Cerrar",
+        "filterName": "Manifiesto de vista",
+        "idleBody": "Un archivo de vista es una vista guardada que alguien exportó. Myne la comprueba primero y te muestra lo que selecciona y lee antes de guardar nada.",
+        "importAction": "Importar vista",
+        "pick": "Elegir un archivo…",
+        "pickAgain": "Elegir otro archivo…",
+        "reading": "Leyendo…",
+        "reasonMalformed": "No es un objeto JSON bien formado.",
+        "reasonMissingField": "Falta un campo obligatorio.",
+        "reasonReservedField": "Permitiría que la vista cambiara {{field}}, que es uno de los marcadores que Myne usa para apartar una nota. Ninguna vista puede establecerlo.",
+        "reasonTooLarge": "Es más grande de lo que puede ser una definición de vista.",
+        "reasonUnreadable": "No se pudo leer el archivo.",
+        "reasonUnknownKey": "Establece una clave que esta versión de Myne no conoce: {{key}}.",
+        "reasonUnrepresentable": "Usa un valor que esta versión de Myne no puede mostrar.",
+        "reasonVersionRequired": "No lleva versión, así que no se puede comparar con la vista que tiene esta bóveda.",
+        "reasonWrongType": "Un campo tiene un tipo de valor incorrecto.",
+        "refusedHeading": "Ese archivo no es una vista que esta versión de Myne pueda importar.",
+        "refusedNothingStored": "No se guardó nada y no cambió nada en esta bóveda.",
+        "replaceAction": "Sustituir vista",
+        "storedBody": "Está guardada en v{{version}} y no se abre hasta que la apruebes en este dispositivo.",
+        "storedHeading": "{{name}} está aquí",
+        "title": "Importar una vista"
+      },
+      "manager": {
+        "approve": "Aprobar",
+        "approvedState": "Aprobada en este dispositivo",
+        "close": "Cerrar",
+        "deleteFailed": "No se pudo eliminar esa vista.",
+        "deleteLabel": "Eliminar {{name}}",
+        "emptyBody": "Una vista que guardes desde la lista de notas, o una que alguien te envíe, aparece aquí.",
+        "emptyTitle": "Aún no hay vistas",
+        "listLabel": "Vistas guardadas",
+        "openLabel": "Abrir {{name}}",
+        "pendingBody": "Esta vista vino de otro dispositivo o de un archivo. Su definición está aquí, pero no lee nada hasta que la apruebes en este dispositivo.",
+        "pendingState": "Necesita aprobación",
+        "pendingTitle": "{{name}} necesita aprobación",
+        "title": "Vistas"
       },
       "menu": {
         "deleteView": "Eliminar vista",
@@ -2808,7 +2984,7 @@
       "columnsEmpty": "No se encontraron propiedades",
       "columnsHint": "Propiedades del frontmatter que se muestran como columnas (tabla) o como una línea de detalle (lista / tarjetas).",
       "columnsPlaceholder": "Añadir columnas…",
-      "coverImageHint": "La propiedad del frontmatter cuyo valor es una imagen, que se muestra como portada de cada tarjeta. Déjala vacía para no tener portada.",
+      "coverImageHint": "La propiedad de frontmatter cuyo valor es una imagen, mostrada como portada de cada tarjeta. Déjalo vacío para sin portada.",
       "coverImagePlaceholder": "p. ej. cover",
       "coverImageProperty": "Propiedad de la imagen de portada",
       "groupBy": "Agrupar por",
@@ -2821,9 +2997,46 @@
       "sortDesc": "Descendente",
       "sortDirection": "Dirección de ordenación",
       "viewType": "Tipo de vista",
+      "export": "Exportar vista guardada…",
+      "exportFailed": "No se pudo exportar esa vista.",
+      "exportFilterName": "Manifiesto de vista",
+      "exportHint": "Escribe la definición guardada como un archivo .myneview que otra persona pueda importar. No se incluyen los cambios que no hayas guardado.",
+      "exported": "Exportado a {{filename}}",
+      "version": "Versión",
+      "versionHint": "Avanza cuando cambias esta vista. No hay nada que editar.",
+      "versionNone": "Aún sin versionar",
+      "versionValue": "v{{version}}",
+      "writeFields": "Campos que esta vista puede cambiar",
+      "writeFieldsHint": "Los únicos campos de frontmatter que esta vista puede escribir. Vacío significa que no puede cambiar nada. Archivado, eliminado y en papelera nunca se ofrecen: son cómo la app oculta una nota, así que ninguna vista puede establecerlos.",
+      "writeFieldsPlaceholder": "Añadir un campo escribible…",
+      "viewTypeBoard": "Tablero",
       "viewTypeCards": "Tarjetas",
       "viewTypeList": "Lista",
       "viewTypeTable": "Tabla"
+    },
+    "viewConsent": {
+      "allOf": "Se cumplen todas:",
+      "anyOf": "Basta con que se cumpla una:",
+      "dataNotCode": "Una vista solo describe qué mostrar. No puede ejecutar código.",
+      "everyNote": "Todas las notas de esta bóveda.",
+      "inFolder": "Notas en {{folder}}",
+      "matching": "Notas que coinciden con “{{query}}”",
+      "noneOf": "Ninguna de estas:",
+      "opAtLeast": "es al menos",
+      "opAtMost": "es como mucho",
+      "opContains": "contiene",
+      "opIs": "es",
+      "opIsNot": "no es",
+      "opLessThan": "es menor que",
+      "opMoreThan": "es mayor que",
+      "propertyCondition": "Notas donde {{key}} {{operator}} “{{value}}”",
+      "readsHeading": "Propiedades que lee",
+      "selectionHeading": "Notas que muestra",
+      "tagged": "Notas etiquetadas con #{{tag}}",
+      "templateHeading": "Plantilla",
+      "templateLine": "Las notas creadas desde esta vista parten de la plantilla {{template}}.",
+      "writesHeading": "Campos que puede cambiar",
+      "writesNote": "Myne comprueba cada cambio contra esta lista antes de escribir uno, y rechaza un cambio a un campo que se haya editado en otra parte desde la última lectura de la vista."
     },
     "welcome": {
       "body": "Te damos la bienvenida a Myne, tu espacio privado para pensar y escribir.\n\nTodo lo que guardas aquí está cifrado y permanece en tu dispositivo. Tu **contraseña** y tu **frase de recuperación** son las únicas claves para acceder a ello, así que guárdalas en un lugar seguro. Si llegaras a perder ambas, nadie podrá recuperar tus notas, ni siquiera nosotros.\n\n**Puedes enlazar notas entre sí.** Escribe `[[` y Myne te ofrece las notas que ya tienes; elige una y se convierte en un enlace. La nota a la que enlazaste muestra de dónde vino el enlace, en su propio panel de vínculos entrantes, así que un conjunto de notas es algo que puedes seguir en cualquiera de las dos direcciones.\n\nEsto es solo una nota normal, así que hazla tuya. Edítala, cámbiale el nombre o elimínala cuando quieras, y añade nuevas notas a medida que tus ideas crezcan.\n\nPara saber más sobre Myne, visita https://myne.md\n",
@@ -2831,6 +3044,10 @@
     },
     "workspace": {
       "defaultSlotName": "Predeterminado"
+    },
+    "autoTag": {
+      "applied": "Etiquetas añadidas: {{tags}}",
+      "undo": "Deshacer"
     },
     "export": {
       "html": "HTML",
@@ -2840,9 +3057,37 @@
       "txt": "Texto sin formato"
     }
   },
+  "photoNote": {
+    "cancel": "Cancelar",
+    "commitNew": "Crear nota",
+    "commitNote": "Añadir a esta nota",
+    "defaultTitle": "Nota de foto {{date}}",
+    "destinationLabel": "Dónde poner la foto y su texto",
+    "imageOnly": "Añadir la foto sin texto",
+    "locked": "La bóveda se bloqueó mientras esta foto estaba abierta. Se queda en tus adjuntos; desbloquea e inténtalo de nuevo.",
+    "machineText": "Este texto lo leyó una máquina, así que revísalo antes de conservarlo.",
+    "newNote": "Nota nueva",
+    "noText": "No se leyó texto de esta página. Aún puedes añadir la foto.",
+    "ocrOff": "Leer texto de imágenes está desactivado en este dispositivo, así que esta foto no tiene texto. Activarlo se aplica a la próxima foto que tomes.",
+    "ocrOffAction": "Abrir el ajuste",
+    "readFailed": "No se pudo leer el texto esta vez. Aún puedes añadir la foto.",
+    "reading": "Leyendo el texto…",
+    "textLabel": "Texto de la foto",
+    "textPlaceholder": "El texto que la app leyó aparecerá aquí. Puedes escribirlo tú mismo.",
+    "thisNote": "Esta nota",
+    "saveFailed": "No se pudo crear la nota. Tu texto sigue aquí.",
+    "importing": "Guardando la foto…",
+    "addReading": "Añadir la lectura",
+    "truncated": "La lectura se detiene en un límite de longitud, así que puede faltar el final de la página.",
+    "discardFailed": "No se pudo quitar la foto. Sigue en tus adjuntos.",
+    "readingArrived": "La lectura llegó mientras escribías. Se queda abajo, esperándote.",
+    "untitledFile": "Foto",
+    "openFailed": "La nota se creó, pero no se pudo abrir."
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Comprobando la seguridad…",
+      "strengthUnavailable": "No se pudo cargar la comprobación de fortaleza, así que solo se comprueba la longitud mínima.",
       "confirmLabel": "Confirma la contraseña maestra",
       "defaultEmptyCaption": "Elige algo que puedas recordar. No se puede restablecer.",
       "mismatch": "Las contraseñas no coinciden.",
@@ -3106,49 +3351,72 @@
     "vault": {
       "changePasswordButton": "Cambiar contraseña",
       "changePasswordError": {
-        "invalidCredentialOrVault": "La contraseña actual es incorrecta o el archivo de la bóveda está dañado.",
-        "ioError": "Error de disco; inténtalo de nuevo.",
-        "joinFailure": "Algo salió mal; inténtalo de nuevo.",
+        "invalidCredentialOrVault": "Contraseña actual incorrecta o archivo de bóveda dañado.",
+        "ioError": "Error de disco, inténtalo de nuevo.",
+        "joinFailure": "Algo salió mal, inténtalo de nuevo.",
         "samePasswordRejected": "La nueva contraseña coincide con la actual.",
-        "serverAckPending": "Tu nueva contraseña funciona en este dispositivo, pero Myne no pudo conectar con el servidor para guardarla. Hasta que lo consiga, tus otros dispositivos siguen esperando la contraseña antigua, y si la copia de este navegador se borra antes, el cambio se pierde. Se reintentará automáticamente.",
+        "serverAckPending": "Tu nueva contraseña funciona en este dispositivo, pero Myne no pudo contactar con el servidor para guardarla. Hasta que lo haga, tus otros dispositivos siguen esperando la contraseña antigua, y si se borra la copia de este navegador antes, el cambio se pierde. Reintentará automáticamente.",
         "weakNewPassword": "La nueva contraseña debe tener al menos 12 caracteres.",
-        "unexpected": "Ese cambio de contraseña no se realizó. Inténtalo de nuevo.",
+        "unexpected": "Ese cambio de contraseña no se completó. Inténtalo de nuevo.",
         "vaultNotUnlocked": "Desbloquea esta bóveda antes de cambiar su contraseña."
       },
       "changePasswordHeading": "Cambiar contraseña",
-      "changePasswordHelper": "Cambia tu contraseña maestra manteniendo la misma bóveda. La frase de recuperación no cambia.",
+      "changePasswordHelper": "Rota tu contraseña maestra manteniendo la misma bóveda. La frase de recuperación sigue igual.",
       "dangerZoneHeading": "Zona de peligro",
-      "dangerZoneHelper": "Elimina de forma permanente esta bóveda y todas las notas. No se puede deshacer. La frase de recuperación no restaurará la bóveda.",
+      "dangerZoneHelper": "Elimina permanentemente esta bóveda y todas las notas. No se puede deshacer. La frase de recuperación no restaurará la bóveda.",
       "localEraseHeading": "Este navegador",
-      "localEraseHelper": "Borra de este navegador la copia que Myne tiene de tu bóveda. Tu cuenta y todo lo que ya se sincronizó permanecen en el servidor.",
+      "localEraseHelper": "Borra la copia de tu bóveda que Myne tiene en este navegador. Tu cuenta y todo lo ya sincronizado permanecen en el servidor.",
       "localEraseButton": "Cerrar sesión y borrar la copia de este navegador…",
       "deleteVaultButton": "Eliminar bóveda…",
-      "vaultLabelEyebrow": "ETIQUETA DE LA BÓVEDA",
-      "vaultLabelHelper": "Un nombre para esta bóveda, que se muestra en el selector dentro de la app y en el selector de bóvedas del inicio, antes de desbloquear. Se almacena cifrado dentro de la bóveda; nunca sale de tu dispositivo en texto claro.",
-      "vaultLabelPlaceholder": "Añade una etiqueta…",
-      "vaultLabelRenameNotice": "Hasta que desbloquees esta bóveda en tus otros dispositivos, sus pantallas de bloqueo seguirán mostrando lo último que guardaron: un nombre anterior, o un nombre genérico si nunca guardaron ninguno.",
+      "vaultLabelEyebrow": "ETIQUETA DE BÓVEDA",
+      "vaultLabelHelper": "Un nombre para esta bóveda, mostrado en el selector integrado y en el selector de bóvedas de inicio antes de desbloquear. Se guarda cifrado dentro de la bóveda; no sale nunca de tu dispositivo en texto plano.",
+      "vaultLabelPlaceholder": "Añadir una etiqueta…",
+      "vaultLabelRenameNotice": "Hasta que desbloquees esta bóveda en tus otros dispositivos, sus pantallas de bloqueo seguirán mostrando lo que guardaron por última vez: un nombre anterior, o un marcador de posición si nunca guardaron ninguno.",
       "vaultLabelSave": "Guardar",
       "vaultIconLabel": "ICONO",
-      "vaultIconDefault": "Predeterminado (logotipo)",
+      "vaultIconDefault": "Por defecto (logotipo)",
       "renamedToast": "Bóveda renombrada",
-      "renameError": "No se pudo cambiar el nombre de la bóveda",
+      "renameError": "No se pudo renombrar la bóveda",
       "newPasswordMismatch": "Las nuevas contraseñas no coinciden.",
       "samePassword": "La nueva contraseña es la misma que la actual.",
       "passwordChangedToast": "Contraseña cambiada",
       "vaultUnreadable": "El archivo de la bóveda no se puede leer. Restaura desde una copia de seguridad.",
       "genericChangeError": "Algo salió mal. Inténtalo de nuevo.",
-      "renameHelper": "Se muestra en el selector de bóvedas. Se almacena cifrado dentro de esta bóveda; déjalo en blanco para borrarlo.",
+      "renameHelper": "Se muestra en el selector de bóvedas. Se guarda cifrado dentro de esta bóveda; déjalo en blanco para borrarlo.",
       "newPasswordPlaceholder": "Al menos 12 caracteres",
-      "reenterNewPassword": "Vuelve a introducir la nueva contraseña",
+      "reenterNewPassword": "Vuelve a escribir la nueva contraseña",
       "changePasswordFootnote": "Esto invalida el desbloqueo rápido. Tu frase de recuperación no cambia.",
       "changing": "Cambiando…",
-      "memberVaultNotice": "Esta es una bóveda compartida. No tiene contraseña de bóveda. Usa Desbloqueo de bóveda compartida en Privacidad para añadir una contraseña o un PIN.",
+      "memberVaultNotice": "Esta es una bóveda compartida. No tiene contraseña de bóveda. Usa Desbloqueo de bóveda compartida en Privacidad para añadir una contraseña o PIN.",
       "topics": {
         "vault": "Bóveda",
         "danger": "Zona de peligro"
       },
       "sections": {
         "identity": "Identidad de la bóveda"
+      },
+      "format": {
+        "heading": "Formato de la bóveda",
+        "intro": "Esta bóveda sigue usando su propia frase de recuperación. Actualizarla la mueve a tu frase de identidad, así que una sola frase recupera todas las bóvedas que posees.",
+        "cta": "Actualizar a recuperación de una frase",
+        "confirm": "Retirar mi frase de bóveda y actualizar",
+        "cancel": "Conservar mi frase de bóveda por ahora",
+        "running": "Actualizando…",
+        "warningPhrase": "Tu frase de recuperación de bóveda guardada dejará de abrir esta bóveda. Tu contraseña de bóveda sigue funcionando, y tu frase de identidad pasa a ser la forma de volver a entrar.",
+        "warningDevices": "Todos los dispositivos que uses deben actualizarse primero. Una versión anterior no puede abrir esta bóveda una vez que la actualización se sincronice.",
+        "done": "Esta bóveda usa ahora tu frase de identidad (actualizada desde {{from}}).",
+        "error": {
+          "migrationRequired": "Esta bóveda sigue en el formato antiguo v0.1. Termina primero la actualización de la bóveda en los ajustes de Sincronización.",
+          "personRequired": "Este dispositivo no tiene identidad aún. Crea tu identidad primero y vuelve.",
+          "identityLocked": "Tu identidad está bloqueada. Desbloquéala con tu frase de identidad y luego actualiza.",
+          "personMismatch": "Esta bóveda pertenece a una identidad distinta de la de este dispositivo.",
+          "notOwner": "Esta es una bóveda compartida. Solo su propietario puede cambiar su formato.",
+          "notUnlocked": "Abre la bóveda antes de actualizar su formato.",
+          "inProgress": "Otra operación de seguridad está en curso. Inténtalo de nuevo en un momento.",
+          "alreadyUpgraded": "Esta bóveda ya usa tu frase de identidad.",
+          "generic": "La actualización no terminó. No cambió nada.",
+          "sharedVault": "Esta bóveda se comparte con otra persona. La recuperación de una frase es para una bóveda que solo tú posees, porque el manejo de miembros compartidos aún no la admite."
+        }
       }
     },
     "appearance": {
@@ -3208,9 +3476,9 @@
     },
     "attachmentCompression": {
       "label": "Comprimir las imágenes al importarlas",
-      "helper": "Reduce las imágenes pegadas o soltadas antes de cifrarlas y guardarlas, para que tu bóveda, las copias de seguridad y la sincronización ocupen menos. Es irreversible: el archivo original no se conserva.",
+      "helper": "Reduce las imágenes pegadas o arrastradas antes de cifrarlas y guardarlas, para que tu bóveda, las copias de seguridad y la sincronización ocupen menos. Es irreversible: no se conserva el archivo original.",
       "helperScopeEveryDevice": "Se aplica a toda la bóveda, en todos los dispositivos.",
-      "helperScopeNotHere": "Se aplica a toda la bóveda, pero no en este navegador: las imágenes que se añadan aquí se guardan exactamente tal como se dan.",
+      "helperScopeNotHere": "Se aplica a toda la bóveda, pero no en este navegador: las imágenes añadidas aquí se guardan tal cual.",
       "errorSaveSetting": "No se pudo guardar este ajuste."
     },
     "transcription": {
@@ -3225,6 +3493,7 @@
       "processing_one": "Leyendo 1 adjunto…",
       "processing_many": "Leyendo {{count}} de adjuntos…",
       "processing_other": "Leyendo {{count}} adjuntos…",
+      "draftUse": "El texto que lee también se ofrece como borrador que puedes añadir a una nota. Una nota se sincroniza cifrada como cualquier otra.",
       "mobileDeviceLocal": "Este es por dispositivo: decide lo que indexa este teléfono, así que tus otros dispositivos conservan su propia opción."
     },
     "autoBackup": {
@@ -3250,6 +3519,7 @@
     "changePassword": {
       "cancel": "Cancelar",
       "checkingStrength": "Comprobando la seguridad…",
+      "strengthUnavailable": "No se pudo cargar la comprobación de fortaleza, así que solo se comprueba la longitud mínima.",
       "confirmLabel": "Confirma la nueva contraseña",
       "currentLabel": "Contraseña actual",
       "mismatch": "Las contraseñas no coinciden.",
@@ -3306,7 +3576,7 @@
       "excludedHelper": "Una ruta de carpeta por línea. Las notas de estas carpetas quedan fuera de todos los resultados del terminal y no se pueden escribir ahí desde el terminal. Siguen estando disponibles por completo en la aplicación. Puedes configurarlo antes de activar el acceso desde el terminal.",
       "excludedPlaceholder": "Privado/\nDiario/",
       "rateLimitLabel": "Dejar que el terminal funcione a máxima velocidad",
-      "rateLimitHelper": "De forma predeterminada, Myne responde como máximo a 120 comandos de terminal por minuto. Es un límite de ritmo para un script desbocado, no una comprobación de permisos: nada decide qué programa puede preguntar. Actívalo para trabajos masivos, como pasar todas tus notas por otra herramienta.",
+      "rateLimitHelper": "Myne responde a lo sumo 120 comandos de terminal por minuto por defecto. Es un límite de ritmo para un script desbocado, no una comprobación de permisos: nada decide qué programa puede preguntar. Actívalo para trabajo masivo, como pasar todas las notas por otra herramienta.",
       "inlineOn": "Cualquier programa que se ejecute con tu cuenta puede leer, buscar y crear notas a través de él."
     },
     "clipperInstall": {
@@ -3390,8 +3660,11 @@
       "continue": "Continuar",
       "copyPrimary": "Esto elimina de forma permanente esta bóveda y todas las notas que contiene. La acción no se puede deshacer, y tu frase de recuperación no restaurará los datos.",
       "copySecondary": "Las claves de la bóveda se borran de la memoria antes de desvincular los archivos; cualquier texto cifrado huérfano que quede en el disco seguirá siendo un residuo irrecuperable protegido por Argon2id.",
+      "keychainNote": "Cuando termine la eliminación, Myne también pide a tu llavero del sistema que borre la clave de desbloqueo biométrico que guardó para esta bóveda, en las plataformas donde guarde una.",
       "eyebrow": "IRREVERSIBLE",
+      "memberEyebrow": "SOLO ESTE DISPOSITIVO",
       "heading": "Eliminar bóveda",
+      "memberHeading": "¿Quitar esta bóveda de este dispositivo?",
       "ioFailBody": "No se pudo acceder a los archivos de la bóveda para eliminarlos. Las claves de la bóveda ya se borraron de la memoria; cualquier dato de la bóveda que quede en el disco es un residuo irrecuperable protegido por Argon2id.",
       "ioFailTitle": "Error de disco durante la eliminación",
       "localEraseHeading": "Cerrar sesión y borrar la copia de este navegador",
@@ -3403,7 +3676,9 @@
       "partialFailBody_other": "No se pudieron eliminar {{count}} archivos del disco. Las claves de la bóveda ya se borraron de la memoria, así que cualquier texto cifrado huérfano que quede es un residuo irrecuperable protegido por Argon2id.",
       "partialFailTitle": "La eliminación de la bóveda falló parcialmente",
       "submit": "Eliminar bóveda",
+      "memberSubmit": "Quitar de este dispositivo",
       "submitInFlight": "Eliminando bóveda…",
+      "memberSubmitInFlight": "Quitando…",
       "typeToConfirmLabel": "Escribe DELETE para confirmar",
       "vaultPath": "Ruta de la bóveda: {{path}}",
       "deleteError": "No se pudo eliminar la bóveda por completo. Inténtalo de nuevo.",
@@ -3536,7 +3811,7 @@
       "pendingHint": "Próximamente"
     },
     "ai": {
-      "autoTagHelper": "Cuando dejas de escribir un momento, un modelo pequeño de tu dispositivo lee la nota y sugiere etiquetas en su parte superior. No se añade nada hasta que aceptas una sugerencia.",
+      "autoTagHelper": "Cuando dejas de escribir, un modelo pequeño en tu dispositivo lee la nota y sugiere etiquetas arriba de ella. No se añade nada hasta que aceptas una sugerencia, salvo que actives la fila de abajo.",
       "autoTagLabel": "Sugerir etiquetas automáticamente",
       "autoTagUnavailable": "Todavía no hay ningún modelo de etiquetas instalado. Descárgalo una vez desde Ajustes → IA, y el interruptor se activará solo en cuanto esté instalado.",
       "consent": {
@@ -3564,24 +3839,24 @@
       "endpointModelLabel": "Modelo que usar ahí",
       "endpointModelPlaceholder": "el nombre del modelo tal como lo indica el entorno de ejecución",
       "endpointRejected": {
-        "malformed": "Esa no es una dirección que Myne pueda usar. Necesita un esquema y un puerto explícito; por ejemplo http://127.0.0.1:11434.",
+        "malformed": "Esa no es una dirección que Myne pueda usar. Necesita un esquema y un puerto explícito, por ejemplo http://127.0.0.1:11434.",
         "notLoopback": "Esta dirección debe estar en este ordenador: localhost, 127.0.0.1 o ::1. Para usar un proveedor que se ejecuta en otro sitio, indícalo en Proveedor.",
         "unsupportedScheme": "Solo se aceptan direcciones http y https."
       },
       "endpointSaveFailed": "No se pudo guardar la dirección. Comprueba que Myne pueda escribir sus ajustes.",
       "endpointThirdParty": "{{name}} es un programa aparte, con su propio comportamiento de red, y Myne no lo controla. Tus notas se envían a ese programa mientras se ejecuta en este ordenador.",
       "providerError": {
-        "barred": "Este tipo de solicitud nunca va a un proveedor: se ejecuta en este dispositivo o no se ejecuta.",
+        "barred": "Este tipo de petición nunca va a un proveedor: se ejecuta en este dispositivo o no se ejecuta.",
         "failed": "No ha funcionado. No se ha guardado nada ni se ha vuelto a enviar nada.",
         "localModelMissing": "El modelo local registrado en los ajustes ya no está en este dispositivo. No se envió nada a ninguna parte. Vuelve a elegir un modelo, o indica un proveedor, en Ajustes → Desarrollador → IA.",
         "noCredential": "No hay ninguna clave de API configurada para este proveedor. Añade una en Ajustes → Desarrollador → IA.",
         "notReady": "Todavía no hay nada listo para responder. No se envió nada a ninguna parte. Elige un modelo, o indica un proveedor, en Ajustes → Desarrollador → IA.",
         "requestRejected": "El proveedor no aceptó esta solicitud. No se guardó nada. Es un fallo en lo que envió Myne, no en tu configuración ni en tus notas.",
         "policyRefused": "El proveedor rechazó esta solicitud por sus propias normas: una restricción de la cuenta, una política del espacio de trabajo o un modelo que tu plan no incluye. Esto hay que resolverlo con el proveedor, no en Myne.",
-        "quotaExhausted": "El proveedor rechazó la solicitud: te has quedado sin crédito o has superado un límite de ritmo. Esto hay que resolverlo con el proveedor, no en Myne.",
+        "quotaExhausted": "El proveedor rechazó la petición: te has quedado sin crédito o has superado un límite de tasa. Esto hay que arreglarlo con el proveedor, no en Myne.",
         "refused": "El proveedor rechazó la conexión. Puede que esté caído o que esté bloqueando esta red.",
         "timeout": "El proveedor no respondió a tiempo. No ha quedado nada en marcha.",
-        "unauthorized": "El proveedor rechazó tu clave de API. Sustitúyela: puede que sea incorrecta, que esté revocada o que sea de otra cuenta.",
+        "unauthorized": "El proveedor rechazó tu clave de API. Sustitúyela: puede ser incorrecta, estar revocada o ser de otra cuenta.",
         "unreachable": "No se pudo conectar con el proveedor. Comprueba tu conexión de red.",
         "featureOff": "La IA está desactivada en este dispositivo. No se envió nada. Actívala en Ajustes, en IA.",
         "consentMissing": "No has aceptado enviar notas a este proveedor desde este dispositivo. No se envió nada. Vuelve a elegir el proveedor en Ajustes, en IA, y lee qué se enviará.",
@@ -3592,7 +3867,7 @@
       "modelFilter": {
         "gguf": "Modelo GGUF"
       },
-      "modelGenerationLabel": "Modelo de texto: chat, resúmenes, escritura",
+      "modelGenerationLabel": "Modelo de texto: chat, resúmenes, redacción",
       "modelNone": "Ningún archivo seleccionado",
       "modelSaveFailed": "No se pudo guardar la ruta del modelo (debe estar fuera de tu bóveda).",
       "modelTranscriptionLabel": "Modelo de voz a texto (transcripción)",
@@ -3603,7 +3878,7 @@
       "providerKeyNone": "No hay ninguna clave guardada, así que todavía no se puede enviar nada.",
       "providerKeyRevoke": "Quitar esta clave",
       "providerKeyReplace": "pega una clave nueva para sustituir la guardada",
-      "providerKeyStored": "Hay una clave guardada. Myne nunca te la vuelve a mostrar: pega una nueva para sustituirla.",
+      "providerKeyStored": "Hay una clave guardada. Myne nunca te la muestra de vuelta. Pega una nueva para sustituirla.",
       "providerActive": "Respondiendo ahora: {{name}}",
       "providerLabel": "Proveedor remoto",
       "providerModelCount_one": "{{count}} modelo disponible.",
@@ -3689,8 +3964,73 @@
         "preferences": "Preferencias",
         "memory": "Memoria",
         "excluded": "Lo que la IA puede leer",
-        "history": "Historial de chats"
-      }
+        "history": "Historial de chats",
+        "externalAccess": "Acceso externo"
+      },
+      "externalAccess": {
+        "label": "Acceso externo",
+        "helperOff": "Desactivado. Ninguna herramienta de IA puede alcanzar esta bóveda a través de `myne-mcp`.",
+        "helperOn": "Activado mientras esta bóveda esté desbloqueada. Las herramientas aprobadas pueden leer las carpetas que se les concedieron, y Myne no puede ver qué hacen con lo que leen.",
+        "explanationShared": "Es el mismo interruptor que Ajustes, CLI, Acceso de terminal. Una sola puerta, dos formas de entrar: `myne` lo conduces tú, y `myne-mcp` lo conduce la herramienta de IA que configures.",
+        "explanationLabel": "El nombre de una conexión es una etiqueta, no una contraseña. Myne no puede distinguir un programa de otro ejecutándose con tu cuenta, y no comprueba nada más allá de que la puerta esté abierta.",
+        "explanationDevice": "Las aprobaciones se guardan en este dispositivo. Un segundo ordenador o teléfono empieza sin ninguna y tiene que pedirlas de nuevo.",
+        "outsideMyne": "Lo que una herramienta conectada hace con lo que lee está fuera de Myne: se ejecuta en esta máquina, tiene su propio acceso a la red, y Myne no puede ver adónde envía nada.",
+        "empty": "Aún no hay ninguna conexión aprobada en este dispositivo. Aprobar una es lo que permite que una herramienta concreta lea un conjunto de carpetas que nombres.",
+        "readFailed": "No se pudo leer la lista de conexiones ahora mismo. Myne no te ha dicho que no haya ninguna aprobada.",
+        "retry": "Inténtalo de nuevo",
+        "readSummary": "Puede leer {{count}} notas en {{folders}} carpetas.",
+        "readSummary_one": "Puede leer {{count}} nota en {{folders}} carpetas.",
+        "readSummary_other": "Puede leer {{count}} notas en {{folders}} carpetas.",
+        "readNothing": "Puede leer nada: no se comparte ninguna carpeta con ella.",
+        "writeNone": "No puede escribir nada. Esta compilación concede solo lecturas.",
+        "missing_one": "{{count}} carpeta aprobada ya no existe. Una carpeta renombrada o eliminada deja la concesión apuntando a nada.",
+        "missing_other": "{{count}} carpetas aprobadas ya no existen. Una carpeta renombrada o eliminada deja la concesión apuntando a nada.",
+        "whenLine": "Aprobada {{approved}}. Último uso {{used}}.",
+        "whenLineNever": "Aprobada {{approved}}. Sin uso desde entonces.",
+        "revoke": "Revocar",
+        "revokeFailed": "No se pudo revocar esa conexión. Puede que siga pudiendo leer lo que se le concedió.",
+        "snippetToggle": "Fragmento de configuración",
+        "snippetHelper": "Pega esto en la configuración MCP de tu herramienta de IA. El nombre debe coincidir con la conexión de arriba, porque ese nombre es la clave de la aprobación.",
+        "rootFolder": "Raíz de la bóveda",
+        "addConnection": "Aprobar una conexión",
+        "dialogTitleNew": "Aprobar una conexión",
+        "dialogTitle": "Aprobar {{name}} de nuevo",
+        "nameLabel": "Nombre de la conexión",
+        "namePlaceholder": "claude-desktop",
+        "nameHelper": "El nombre que envía tu cliente. Es una etiqueta, no una contraseña: cualquier programa de esta máquina puede usar cualquier nombre que quiera, así que esto decide qué se comparte con quién, no quién pregunta.",
+        "nameReserved": "Ese nombre está reservado: un cliente configurado sin nombre llega como `unnamed-client`, así que aprobarlo aprobaría a todos los clientes sin configurar.",
+        "nameEmpty": "Una conexión necesita un nombre, porque es la clave sobre la que se basa la concesión.",
+        "firstGrantHelper": "Aún no se comparte nada con esta conexión.",
+        "reextendHelper": "Esta conexión ya tiene una concesión. Aprobar de nuevo congela un conjunto nuevo a partir de lo que elijas ahora, y conserva lo que aún pueda leer.",
+        "countsPending": "Calculando lo que cubre…",
+        "countsNotes": "Comparte {{count}} notas en {{folders}} carpetas.",
+        "countsNotes_one": "Comparte {{count}} nota en {{folders}} carpetas.",
+        "countsNotes_other": "Comparte {{count}} notas en {{folders}} carpetas.",
+        "countsExcluded_one": "{{count}} carpeta excluida.",
+        "countsExcluded_other": "{{count}} carpetas excluidas.",
+        "excludeLabel": "Dejar fuera",
+        "excludePlaceholder": "Nada excluido",
+        "excludeSearch": "Buscar una carpeta",
+        "excludeEmpty": "Ninguna carpeta coincide.",
+        "excludeHelper": "Una carpeta que dejas fuera no se comparte, y tampoco nada de su interior. Eliges entre todas las carpetas de esta bóveda, así que este es el único sitio donde toda la bóveda está sobre la mesa.",
+        "frozenNotice": "Este conjunto se congela al aprobar. Una carpeta que crees después empieza fuera de él, y Acceso externo te mostrará cuántas hay y te ofrecerá añadirlas.",
+        "approve": "Aprobar",
+        "grantRefused": "Esta concesión no cabría en el presupuesto de ajustes de la bóveda. No cambió nada. Revoca una conexión que ya no uses y vuelve a intentarlo.",
+        "grantFailed": "No se pudo guardar la aprobación. No cambió nada.",
+        "delta_one": "{{count}} carpeta creada desde que aprobaste esto no está compartida.",
+        "delta_other": "{{count}} carpetas creadas desde que aprobaste esto no están compartidas.",
+        "deltaAdd": "Añadir {{count}} carpeta",
+        "deltaAdd_one": "Añadir {{count}} carpeta",
+        "deltaAdd_other": "Añadir {{count}} carpetas",
+        "readSummary_many": "Puede leer {{count}} notas en {{folders}} carpetas.",
+        "missing_many": "{{count}} carpetas aprobadas ya no existen. Una carpeta renombrada o eliminada deja la concesión apuntando a nada.",
+        "countsNotes_many": "Comparte {{count}} notas en {{folders}} carpetas.",
+        "countsExcluded_many": "{{count}} carpetas excluidas.",
+        "delta_many": "{{count}} carpetas creadas desde que aprobaste esto no están compartidas.",
+        "deltaAdd_many": "Añadir {{count}} carpetas"
+      },
+      "autoApplyLabel": "Aplicar automáticamente las etiquetas sugeridas",
+      "autoApplyHelper": "Escribe las etiquetas en la nota sin preguntar, una vez por nota en cada sesión, solo después de que la edites. Solo en este dispositivo. Deshacer queda bajo la nota después de escribirlas."
     },
     "network": {
       "disabledCue": "La sincronización ya no se enruta a través de Tor. Las conexiones nuevas van directamente al servidor de sincronización.",
@@ -3746,7 +4086,7 @@
       "hideVaultNamesErrorRead": "No se pudo leer el ajuste actual. Cambia el interruptor para volver a establecerlo.",
       "hideVaultNamesErrorSave": "No se pudo guardar el ajuste, así que sigue como estaba. Si lo estabas activando, puede que ya se hayan destruido algunos nombres guardados; actívalo de nuevo para terminar.",
       "hideVaultNamesErrorErase": "No se pudo destruir uno de los nombres guardados, así que el ajuste se dejó desactivado en lugar de dar por hecho un borrado que no ocurrió. Inténtalo de nuevo.",
-      "screenCaptureHelperOff": "La protección siempre se aplica antes de desbloquear. Tras desbloquear, sigue esta preferencia.",
+      "screenCaptureHelperOff": "Desactivado en este dispositivo, antes de desbloquear y después. Vuelve a activarlo aquí o desde la pantalla de bloqueo con el teclado.",
       "screenCaptureHelperOn": "Eficaz en Windows 10 (actualización de mayo de 2020) y posteriores. macOS y Linux no tienen ninguna API del sistema para esto, así que no puede bloquear la captura allí.",
       "screenCaptureLabel": "Protección contra capturas de pantalla",
       "screenCaptureSubtitle": "Bloquea capturas de pantalla y grabación de pantalla",
@@ -3821,7 +4161,7 @@
       "pinOnEmphasis": "activado",
       "pinOnRest": ". Después de que la bóveda se bloquee automáticamente, puedes volver a entrar con tu PIN en lugar de la contraseña completa (solo durante esta sesión de la aplicación). Un inicio en frío siempre requiere la contraseña completa.",
       "turnOffPin": "Desactivar PIN",
-      "pinSetupHelper": "Establece un PIN de 6 o más dígitos para volver a desbloquear rápidamente tras el bloqueo automático. El PIN envuelve una clave local del dispositivo: nunca sale de este dispositivo y nunca toca tu frase de recuperación.",
+      "pinSetupHelper": "Establece un PIN de 6+ dígitos para volver a desbloquear rápidamente tras el bloqueo automático. El PIN envuelve una clave local del dispositivo: no sale nunca de este dispositivo y no toca tu frase de recuperación.",
       "pinReplacesBiometric": " Establecer un PIN reemplaza el desbloqueo con {{method}}.",
       "pinPlaceholder6": "Al menos 6 dígitos",
       "confirmPin": "Confirmar PIN",
@@ -3851,7 +4191,8 @@
         "sync": "Sincronización",
         "cli": "CLI",
         "vault": "Bóveda",
-        "data": "Datos"
+        "data": "Datos",
+        "diagnostics": "Diagnóstico"
       },
       "passwordUpdatedToast": "Contraseña actualizada",
       "title": "Ajustes"
@@ -3872,7 +4213,7 @@
       "mobileUnavailable": "El corrector ortográfico aún no está disponible en este teléfono: no hay ningún diccionario en este dispositivo, así que el editor de aquí no puede subrayar nada. Actívalo desde tu ordenador."
     },
     "storage": {
-      "backupHelper": "Las copias de seguridad permanecen tan cifradas como tu bóveda, en un único archivo .myne-backup verificado. La restauración funciona con la contraseña o la frase de recuperación de esa bóveda, igual que al desbloquear.",
+      "backupHelper": "Las copias de seguridad permanecen exactamente tan cifradas como tu bóveda, en un único archivo .myne-backup verificado. Restaurar funciona con la contraseña o la frase de recuperación de esa bóveda, igual que desbloquear.",
       "backupLabel": "Copia de seguridad",
       "backUpVault": "Respaldar bóveda…",
       "exportAction": "Exportar…",
@@ -3998,6 +4339,7 @@
       "empty": "Ningún ajuste coincide con “{{query}}”",
       "resultsLabel": "Resultados de búsqueda",
       "keywords": {
+        "accountNumber": "número de cuenta identidad persona soporte relevo copiar",
         "aiAutoTag": "etiquetas automáticas etiquetar sugerir sugerencias auto tag ia ai",
         "aiEndpoint": "ollama endpoint dirección entorno de ejecución local runtime modelo servidor puerto loopback",
         "aiProvider": "proveedor remoto nube cloud openrouter ollama clave de api api key credencial consentimiento enviar notas",
@@ -4077,6 +4419,9 @@
         "recoveryDrill": "frase de recuperación comprobar verificar simulacro prueba 24 palabras semilla copia de seguridad contraseña perdida",
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de herramientas",
         "syncDeviceBindings": "dispositivos reclamados por miembros atribución quién firmó a qué dispositivo pertenece",
+        "vaultFormat": "formato de bóveda actualización recuperación de una frase retirar bóveda frase de recuperación migrar identidad",
+        "publishVault": "publicar bóveda publicada servidor solo dispositivo sincronización",
+        "externalAccess": "acceso externo MCP myne-mcp Claude Desktop conexión aprobar alcance revocar",
         "diagnosticLog": "registro de diagnóstico registro depuración solución de problemas informe de fallo informe de error soporte"
       },
       "emptyBody": "Prueba con una palabra más corta, o con el nombre de un panel."
@@ -4145,23 +4490,109 @@
       "personalitySaveFailed": "No se pudieron guardar las preferencias de voz.",
       "loadFailed": "No se pudieron cargar los recuerdos ni las preferencias de voz. No cambió nada.",
       "retryLabel": "Reintentar",
+      "seed": {
+        "rowTitle": "Enseñar tu bóveda a Myne",
+        "rowHelper": "Construye memoria desde tus notas una vez, con revisión de cada línea antes de guardar.",
+        "rowSeeded": "Creada el {{date}} · {{count}} entradas",
+        "start": "Enseñar tu bóveda a Myne",
+        "rebuild": "Reconstruir",
+        "rebuildConfirm": "¿Sustituir la inicialización de {{date}} ({{count}} entradas)?",
+        "title": "Enseñar tu bóveda a Myne",
+        "candidatesTitle": "Revisa lo que Myne aprendió",
+        "doneTitle": "Guardado",
+        "close": "Cerrar",
+        "loading": "Leyendo tu bóveda…",
+        "scopeIntro": "Myne lee primero la forma de tu bóveda: títulos de notas, carpetas y etiquetas. Pide texto de las notas solo si lo necesita, y nunca de los adjuntos.",
+        "provider": "Proveedor: {{provider}}",
+        "providerRemote": "remoto",
+        "providerLocal": "en este dispositivo",
+        "counts": "{{notes}} notas · {{folders}} carpetas · {{tags}} etiquetas",
+        "estimatedChars": "Unas {{chars}} caracteres",
+        "excluded": "{{count}} notas excluidas porque su carpeta está excluida de la IA",
+        "omitted": "{{count}} títulos omitidos para ajustarse al contexto del modelo",
+        "showPayload": "Mostrar exactamente lo que se enviará",
+        "hidePayload": "Ocultar el contenido",
+        "consentLabel": "Enviar este esquema a {{provider}} (unas {{chars}} caracteres). Entiendo que el proveedor lo recibe.",
+        "localNote": "Nada sale de este dispositivo. El modelo se ejecuta aquí.",
+        "continue": "Continuar",
+        "cancel": "Cancelar",
+        "generatingHelper": "Esto puede tardar unos minutos en un modelo local. Puedes cancelar en cualquier momento y no se guardará nada.",
+        "cancelRun": "Cancelar esta ejecución",
+        "candidatesIntro": "{{count}} entradas. Desmarca lo que no quieras y edita el texto antes de guardarlo.",
+        "candidateLabel": "Entrada de memoria {{index}}",
+        "charCount": "{{count}} / 2000 caracteres",
+        "back": "Atrás",
+        "apply": "Guardar {{count}} entradas",
+        "applying": "Guardando…",
+        "applied": "Guardadas {{count}} entradas en la memoria.",
+        "appliedHelper": "Encuéntralas en «Desde tu bóveda» en esta sección. El asistente las lee a partir de ahora.",
+        "finish": "Hecho",
+        "appliedToast": "Memoria construida desde tu bóveda.",
+        "refusals": {
+          "empty": "Esta entrada está vacía.",
+          "textTooLong": "Esta entrada supera el límite de 2000 caracteres.",
+          "scanRejected": "Esta entrada parece una instrucción al asistente, no un dato. Edítala e inténtalo de nuevo."
+        },
+        "errors": {
+          "aiDisabled": "La IA está desactivada en este dispositivo.",
+          "locked": "Desbloquea la bóveda e inténtalo de nuevo.",
+          "busy": "Ya hay una inicialización en curso.",
+          "consent": "Confirma primero que el proveedor puede recibir el esquema.",
+          "unreadable": "No se pudo leer el índice de tu bóveda.",
+          "malformed": "El modelo no respondió en el formato que necesita esta ejecución. Inténtalo de nuevo.",
+          "cancelled": "La ejecución se canceló. No se guardó nada.",
+          "noBodies": "El modelo pidió texto de las notas, pero no se pudo leer ninguno.",
+          "engine": "La llamada al modelo falló. Comprueba el proveedor e inténtalo de nuevo.",
+          "unknown": "Algo salió mal al construir la memoria. Inténtalo de nuevo.",
+          "candidateRefused": "Se rechazó una entrada. Está marcada abajo; edítala y vuelve a guardar.",
+          "cap": "Tu memoria está llena.",
+          "capDetail": "Quedan {{remaining}} huecos pero se seleccionaron {{requested}} entradas. Quita algunas entradas en este panel, o desmarca algunos candidatos."
+        },
+        "phases": {
+          "projecting": "Leyendo la forma de tu bóveda…",
+          "asking": "Pidiendo al modelo los temas…",
+          "reading": "Leyendo las notas que pidió el modelo…",
+          "finalizing": "Escribiendo las entradas…",
+          "working": "Trabajando…"
+        },
+        "groupTitle": "Desde tu bóveda",
+        "groupMeta": "Inicializada {{date}} · {{count}} entradas",
+        "removeAll": "Quitar todo",
+        "removeConfirm": "¿Quitar todas las entradas de esta inicialización?",
+        "removedToast": "Entradas de tu bóveda eliminadas.",
+        "rowStale": "La bóveda cambió desde esta inicialización"
+      },
       "emptyTitle": "Todavía no se recuerda nada",
       "count": "{{used}} de {{cap}}",
       "atCap": "La lista está llena, así que no se puede recordar nada nuevo. Elimina una entrada para hacer sitio."
     },
     "account": {
       "vaultsLabel": "Bóvedas de esta cuenta",
-      "vaultsHelper": "Las bóvedas que este dispositivo agrupa bajo el nombre de arriba. La agrupación es una decisión organizativa de cada dispositivo, así que no forma parte del contenido de ninguna bóveda ni viaja con él.",
+      "vaultsHelper": "Las bóvedas que este dispositivo agrupa. La agrupación es una elección organizativa por dispositivo, así que no forma parte del contenido de ninguna bóveda y no viaja con ella.",
+      "vaultsHelperShort": "La agrupación se queda en este dispositivo y no viaja con la bóveda.",
       "vaultsCount_one": "{{count}} bóvedas",
       "vaultsCount_other": "{{count}} bóvedas",
+      "vaultActions": "Acciones de la bóveda",
+      "splitLastConfirm": "Esta es la única bóveda de la cuenta. Moverla fuera borra esta cuenta.",
+      "vaultCorrupted": "No se pudieron leer los metadatos de esta bóveda",
+      "vaultUnreadable": "No leída en este dispositivo",
+      "vaultDeviceOnly": "Solo este dispositivo",
       "currentVault": "Esta bóveda",
       "unknownVault": "Otra bóveda de este dispositivo",
+      "numberLabel": "Número de cuenta",
+      "numberHelper": "El número de tu identidad, no el de una bóveda. Derivado de tu frase de identidad, así que no se puede perder y no necesita guardarse. No es un secreto; úsalo para soporte o para pasar el relevo a un operador del servidor.",
+      "numberUnavailable": "No se pudo leer el número de cuenta en este dispositivo. Reabre Ajustes para intentarlo de nuevo.",
+      "numberEmpty": "No hay ninguna identidad en este dispositivo. Añade o recupera una en Sincronización para obtener un número de cuenta.",
+      "numberCopy": "Copiar",
+      "numberCopied": "Número de cuenta copiado",
+      "numberCopyFailed": "No se pudo copiar el número de cuenta",
+      "copyAccountNumber": "Copiar número de cuenta",
       "standaloneHelper": "Esta bóveda no está agrupada bajo una cuenta en este dispositivo, así que va por su cuenta. La agrupación es por dispositivo: otro dispositivo puede mostrarla dentro de una.",
-      "unresolvedHelper": "Determinando qué bóveda está abierta…",
-      "devicesNote": "Los dispositivos, los miembros de bóvedas compartidas y tu identidad se gestionan en Sincronización.",
-      "groupingHidden": "Los nombres de cuenta no están disponibles mientras los nombres de bóveda estén ocultos. Desactiva esa opción en Privacidad para gestionar esta cuenta.",
-      "groupingUnreadable": "No se pudo leer la agrupación de cuentas de este dispositivo. No se cambió nada.",
-      "groupingError": "No se pudo leer la agrupación de cuentas en este dispositivo. No se cambió nada.",
+      "unresolvedHelper": "Averiguando qué bóveda está abierta…",
+      "devicesNote": "Los dispositivos, los miembros de las bóvedas compartidas y tu identidad se gestionan en Sincronización.",
+      "groupingHidden": "La agrupación de cuentas no está disponible mientras los nombres de las bóvedas estén ocultos. Desactiva esa opción en Privacidad para gestionarla.",
+      "groupingUnreadable": "No se pudo leer la agrupación de cuentas de este dispositivo. No cambió nada.",
+      "groupingError": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
       "sections": {
         "extensions": "Extensiones del navegador",
         "grouping": "Esta cuenta"
@@ -4233,7 +4664,7 @@
     },
     "materialising": "Descargando tus notas: {{done}} de {{total}}. Puedes empezar a trabajar; el resto aparecerá a medida que vayan llegando.",
     "credentialAmbiguous": "Puede que tu contraseña haya cambiado en este dispositivo y en otro, y Myne no puede saber cuál es más reciente, así que no ha cambiado nada. Inicia sesión en un dispositivo que ya tenga acceso para resolverlo.",
-    "vaultRekeyed": "Esta bóveda se actualizó al nuevo formato en otro dispositivo. Vuelve a desbloquearla para continuar: no se ha perdido nada.",
+    "vaultRekeyed": "Esta bóveda se actualizó al nuevo formato en otro dispositivo. Desbloquea de nuevo para continuar. No se perdió nada.",
     "attachments": {
       "aria": {
         "downloading": "Descargando {{name}}",
@@ -4282,7 +4713,7 @@
       "invalidAccount": "Eso no parece un número de cuenta válido.",
       "notConfigured": "Configura primero un servidor de sincronización y luego genera un QR.",
       "scanWithApp": "Escanéalo con la app de iOS",
-      "title": "Añadir un dispositivo con un QR"
+      "title": "Iniciar sesión en otro dispositivo"
     },
     "devices": {
       "approve": "Aprobar",
@@ -4291,7 +4722,7 @@
       "awaitingApproval_other": "{{count}} dispositivos a la espera de aprobación",
       "loading": "Cargando…",
       "noDevices": "Aún no hay otros dispositivos",
-      "notEnrolled": "Este dispositivo aún no está conectado. Si acabas de añadirlo, espera a que otro dispositivo lo apruebe; si no, añádelo con el formulario «Añadir un dispositivo» de arriba.",
+      "notEnrolled": "Este dispositivo aún no ha iniciado sesión. Si lo acabas de añadir, espera a la aprobación de un dispositivo que ya esté en tu cuenta; de lo contrario, inícialo sesión con «Iniciar sesión en este dispositivo».",
       "platform": {
         "android": "Teléfono Android",
         "androidTablet": "Tablet Android",
@@ -4399,8 +4830,27 @@
       "verifyTitle": "Verifica este dispositivo",
       "waitingHint": "Mantén esta ventana abierta. Una vez aprobado, aquí aparecerá un código de verificación para compararlo con tu otro dispositivo.",
       "waitingTitle": "Esperando aprobación",
+      "personListFailed": "Estás en esta cuenta, pero listar sus bóvedas no terminó, así que no se muestra ninguna. Reinténtalo, o reabre esta pantalla más tarde.",
+      "personListRetry": "Listar las bóvedas de nuevo",
       "sasAbortFailed": "No se pudo desconectar este dispositivo. Sigue registrado en ese servidor, así que trátalo como no fiable: abre Ajustes → Sincronización y elimínalo allí. Tus notas no se eliminaron.",
       "backToWaiting": "Volver a la espera",
+      "codeBody": "Pega el código que muestra el otro dispositivo. Un código de una identidad añade este dispositivo a toda esa cuenta.",
+      "codeContinue": "Continuar",
+      "codeExpired": "Ese código ha caducado. Pide al otro dispositivo que muestre uno nuevo.",
+      "codeInvalid": "Ese no es un código de unión de Myne.",
+      "codeLabel": "Código de unión",
+      "codeMemberUnsupported": "Ese código es para una bóveda compartida. Añade este dispositivo desde la pantalla de identidad, donde la bóveda aparece bajo tus invitaciones.",
+      "codeOpen": "Tengo un código de unión",
+      "codeTitle": "Añadir este dispositivo con un código",
+      "personMismatch": "Ese código es para una identidad distinta de la frase que introdujiste. Comprueba ambas e inténtalo de nuevo.",
+      "personPendingBody": "Uno de tus otros dispositivos tiene que aprobar este. Hasta que lo haga, este dispositivo no puede abrir ninguna de las bóvedas de la cuenta.",
+      "personPendingHint": "Esperando aprobación. Esto termina solo cuando el otro dispositivo aprueba.",
+      "personPendingPhraseAgain": "Este dispositivo se reinició antes de que llegara la aprobación, así que la frase se necesita una vez más.",
+      "personPendingPhraseCta": "Volver a escribir la frase",
+      "personPendingTitle": "Esperando aprobación",
+      "personPhraseBody": "El código nombró la identidad; las 24 palabras la prueban. Este dispositivo pedirá la contraseña propia de cada bóveda cuando la abras.",
+      "personPhraseSubmit": "Añadir este dispositivo",
+      "personPhraseTitle": "Escribe tu frase de identidad",
       "errorPhrase": "No se pudo añadir este dispositivo. Comprueba la URL del servidor, el número de cuenta y la frase de recuperación, y que se pueda acceder al servidor.",
       "modePassword": "Mi contraseña",
       "modePhrase": "Mi frase de recuperación",
@@ -4414,7 +4864,7 @@
     "panel": {
       "addDevice": {
         "helper": "Inicia sesión en un dispositivo nuevo con tu número de cuenta y tu contraseña o frase de recuperación. El dispositivo queda pendiente hasta que un dispositivo existente lo apruebe.",
-        "label": "Añadir un dispositivo"
+        "label": "Iniciar sesión en este dispositivo"
       },
       "awaitingApproval": {
         "label": "A la espera de aprobación"
@@ -4424,7 +4874,8 @@
         "label": "Conflictos"
       },
       "devices": {
-        "label": "Dispositivos"
+        "label": "Dispositivos",
+        "helper": "Una aprobación firma la entrada de un dispositivo a tu cuenta. A partir de ahí ve todas las bóvedas que posees, y cada bóveda sigue abriéndose con su propia contraseña."
       },
       "recovered": {
         "close": "Cerrar",
@@ -4459,6 +4910,7 @@
         "cta": "Añadir una identidad",
         "codeLabel": "Tu código de identidad",
         "lockedHelper": "Este dispositivo contiene una identidad. Está bloqueada para esta sesión; desbloquéala con tu frase de recuperación para firmar la sincronización y las invitaciones.",
+        "unregisteredHelper": "Esta identidad existe solo en este dispositivo. Registrarla la escribe en tu servidor de sincronización, que es lo que permite que una invitación te alcance.",
         "unlockedHelper": "Este dispositivo contiene una identidad, desbloqueada para esta sesión."
       },
       "topics": {
@@ -4469,11 +4921,31 @@
       "sections": {
         "account": "Cuenta",
         "server": "Servidor",
-        "devices": "Dispositivos registrados"
+        "devices": "Dispositivos de tu cuenta"
+      },
+      "publish": {
+        "label": "Publicar en tu servidor",
+        "cta": "Publicar esta bóveda",
+        "republishCta": "Publicar de nuevo",
+        "deviceOnlyHelper": "Esta bóveda existe solo en este dispositivo. Publicarla la vincula a tu identidad para que tus otros dispositivos puedan abrirla.",
+        "publishedHelper": "Publicada {{when}}. Esta bóveda está en tu servidor de sincronización, así que tus otros dispositivos pueden alcanzarla.",
+        "publishedHelperNoDate": "Publicada. Esta bóveda está en tu servidor de sincronización, así que tus otros dispositivos pueden alcanzarla.",
+        "error": {
+          "NotConfigured": "Configura primero un servidor de sincronización, en Sincronización arriba.",
+          "PersonSessionRequired": "Desbloquea primero tu identidad. Publicar necesita la identidad que posee esta bóveda.",
+          "PersonNotRegistered": "Registra primero tu identidad, en el bloque de Identidad de arriba. Este dispositivo tiene la identidad pero nunca la ha registrado en un servidor, así que no hay ninguna cuenta bajo la que publicar.",
+          "NotEnrolled": "Esta bóveda pertenece a una cuenta en la que este dispositivo no está inscrito. Añade primero el dispositivo a esa cuenta.",
+          "NotOwner": "Esta bóveda ya pertenece a otra identidad, así que no se puede publicar aquí.",
+          "Unauthenticated": "El servidor rechazó este dispositivo. Inténtalo de nuevo y vuelve a inscribirlo si sigue ocurriendo.",
+          "Transport": "No se pudo contactar con el servidor. La bóveda no cambió; inténtalo de nuevo.",
+          "TlsFailure": "No se pudo establecer una conexión de confianza. La bóveda no cambió; inténtalo de nuevo.",
+          "BadRequest": "No se pudieron leer los metadatos de esta bóveda. No se envió nada.",
+          "Other": "La publicación falló. La bóveda no cambió; inténtalo de nuevo."
+        }
       }
     },
     "reconcile": {
-      "message": "Este dispositivo estuvo desconectado un tiempo y está poniéndose al día con la sincronización. Tus notas están a salvo."
+      "message": "Este dispositivo estuvo desconectado un tiempo, así que se está poniendo al día con la sincronización. Tus notas están a salvo."
     },
     "recovered": {
       "restoredToast": "Restaurada como una nota nueva."
@@ -4497,6 +4969,7 @@
       "errorTooLarge": "Un archivo es demasiado grande para subirlo",
       "loading": "Estado de sincronización…",
       "notEnrolled": "Sin registrar",
+      "notRegistered": "No registrada",
       "off": "Sincronización desactivada",
       "synced": "Sincronizado",
       "syncing": "Sincronizando…",
@@ -4509,13 +4982,17 @@
       "devices": "Dispositivos",
       "frozen": "Esta cuenta está congelada. No se pueden subir cambios nuevos; tus notas se siguen descargando.",
       "ofTotal": "{{used}} de {{total}}",
-      "storage": "Almacenamiento"
+      "storage": "Almacenamiento",
+      "storageAcrossVaults": "Almacenado, entre tus bóvedas",
+      "vaultCount_one": "{{count}} bóveda",
+      "vaultCount_other": "{{count}} bóvedas",
+      "vaultCount_many": "{{count}} bóvedas"
     },
     "settings": {
       "serverSection": "Servidor",
       "serverNotSet": "Sin establecer",
       "statusLabel": "Estado",
-      "hubHelp": "La sincronización mantiene tus notas actualizadas en todos los dispositivos. Todo se cifra en este dispositivo antes de enviarse: el servidor nunca ve tus notas.",
+      "hubHelp": "La sincronización mantiene tus notas al día entre dispositivos. Todo se cifra en este dispositivo antes de enviarse. El servidor nunca ve tus notas.",
       "connectedTls": "Conectado a través de TLS.",
       "connectedLocal": "Conectado en tu red local.",
       "connectError": "No se pudo conectar con ese servidor. Comprueba la dirección e inténtalo de nuevo.",
@@ -4523,7 +5000,7 @@
       "serverAddressPlaceholder": "https://sync.example.com",
       "enrollNotConfigured": "Configura primero un servidor de sincronización y luego añade este dispositivo.",
       "enrollTransport": "No se pudo conectar con el servidor de sincronización. Comprueba tu conexión e inténtalo de nuevo.",
-      "accountNumberHint": "Revisa bien este número: no parece correcto.",
+      "accountNumberHint": "Revisa bien este número. No parece correcto.",
       "passwordPlaceholder": "La contraseña de tu bóveda",
       "recoveryPhraseHint": "Introduce o pega tus 24 palabras. Al pegar se rellenan las celdas en orden.",
       "verifyBody": "Comprueba que el mismo código aparece en el dispositivo que acabas de aprobar. Si coincide, está en tu cuenta. Si no, elimina el dispositivo.",
@@ -4542,11 +5019,11 @@
       "conflictsNeedReview_one": "{{count}} conflicto necesita revisión",
       "conflictsNeedReview_many": "{{count}} de conflictos necesitan revisión",
       "conflictsNeedReview_other": "{{count}} conflictos necesitan revisión",
-      "catchingUp": "Poniéndose al día con la sincronización: tus notas están a salvo.",
+      "catchingUp": "Poniéndose al día con la sincronización. Tus notas están a salvo.",
       "verifyDevices": "Verificar dispositivos"
     },
     "tor": {
-      "connecting": "Conectando con Tor. La sincronización está en pausa hasta que la conexión esté lista: no se está enviando nada directamente.",
+      "connecting": "Conectando a Tor. La sincronización está en pausa hasta que la conexión esté lista. No se envía nada directamente.",
       "settingsHint": "Ajustes → Red",
       "unavailable": "Tor no está disponible, así que la sincronización está en pausa. No se está enviando nada directamente. Desactiva el enrutamiento por Tor para sincronizar sin él."
     },
@@ -4578,14 +5055,15 @@
       "invitationsFailed": "No se pudieron cargar tus invitaciones.",
       "title": "Miembros de la bóveda",
       "personUnlock": "Desbloquear identidad de miembro",
-      "personReady": "Identidad de miembro desbloqueada.",
+      "personReady": "Tu identidad está desbloqueada para esta sesión.",
       "ownerCodeHint": "Comparte este código con la persona que invitas para que pueda verificar que la bóveda es tuya. Solo contiene información pública.",
-      "personLock": "Bloquear identidad de miembro",
+      "personLock": "Bloquear identidad",
       "personError": "Esa frase no abrió una identidad de miembro.",
       "inviteHint": "Pega el código de identidad del miembro invitado (de su página de identidad).",
-      "inviteCodeLabel": "Código de identidad de miembro",
+      "inviteCodeLabel": "Tu código de identidad",
       "untitledVault": "Bóveda sin título",
       "inviteFailed": "No se pudo crear la invitación.",
+      "inviteNotOnServer": "Esta bóveda aún no está en tu servidor de sincronización. Publícala, registra tu identidad y vuelve a invitar.",
       "removeFailed": "No se pudo quitar al miembro.",
       "youBadge": "Tú",
       "nameUnverified": "Nombre sin verificar",
@@ -4606,6 +5084,7 @@
       "membersHeading": "Miembros",
       "emptyTitle": "Todavía no hay miembros",
       "personUnlockOpen": "Desbloquear",
+      "identityLockedNotice": "Desbloquea tu identidad para esta sesión para gestionar miembros e invitaciones.",
       "unsharedNotice": "Esta bóveda todavía no se comparte. Compartirla es permanente y ocurre la primera vez que invitas a alguien.",
       "shareConfirmTitle": "¿Compartir esta bóveda?",
       "shareConfirmBody": "Invitar a alguien convierte esta bóveda en una bóveda compartida: obtiene una clave de grupo, y las personas que invites abren su contenido con ella. Este cambio es permanente y no hay forma de volver a una bóveda de un solo usuario. Continúa para elegir a quién invitar.",
@@ -4616,11 +5095,12 @@
       "identityForgetConfirm": "Olvidar identidad",
       "identityForgetCancel": "Conservarla",
       "identityForgetWarning": "Esto elimina la identidad solo de este dispositivo. La cuenta del servidor y cualquier bóveda de la que sea propietaria o a la que se haya unido no se tocan, y puedes recuperar la identidad con su frase de 24 palabras en otro dispositivo. Las invitaciones y las acciones del listado en este dispositivo necesitarán desbloquearla de nuevo.",
-      "identityForgetError": "No se pudo olvidar la identidad. Inténtalo de nuevo."
+      "identityForgetError": "No se pudo olvidar la identidad. Inténtalo de nuevo.",
+      "invitationDeclined": "Rechazada"
     },
     "deviceBindings": {
       "title": "Dispositivos y miembros",
-      "heading": "Dispositivos reclamados",
+      "heading": "Dispositivos de los miembros",
       "hint": "Cada dispositivo que se ha reclamado a sí mismo en esta bóveda, junto con el miembro cuya propia firma lo reclama. Una reclamación no es prueba de propiedad: indica qué miembro firmó la declaración, no que el dispositivo sea suyo.",
       "loading": "Cargando dispositivos…",
       "emptyTitle": "Todavía no se ha reclamado ningún dispositivo",
@@ -4656,7 +5136,19 @@
       "stepIdentity": "En tu otro dispositivo, abre Myne y elige «Ya tengo una identidad».",
       "stepJoin": "Esta bóveda compartida estará esperando en tus invitaciones. Ábrela para unirte.",
       "stepPhrase": "Introduce allí tu frase de recuperación de 24 palabras.",
-      "title": "Añade tu propio dispositivo"
+      "title": "Iniciar sesión en tu segundo dispositivo"
+    },
+    "personJoinQr": {
+      "title": "Añadir un dispositivo a tu identidad",
+      "hint": "En el otro dispositivo, elige «Tengo un código de unión» y pega lo que dice este código. Ese dispositivo pedirá tus 24 palabras y luego esperará a que lo apruebes aquí.",
+      "notConfigured": "Un código nombra un servidor, así que configura primero el tuyo en Sincronización arriba y luego crea este código.",
+      "noIdentity": "Este dispositivo no tiene ninguna identidad, así que no hay ninguna cuenta a la que nombre un código. Crea o recupera tu identidad primero.",
+      "error": "No se pudo crear el código. Inténtalo de nuevo.",
+      "image": "Código de unión",
+      "stepCode": "En el otro dispositivo, abre Myne y pega este código donde pida uno.",
+      "stepPhrase": "Escribe allí tus 24 palabras de identidad. No salen de ese dispositivo.",
+      "stepApprove": "Aprueba ese dispositivo aquí, en un dispositivo que ya tenga tu identidad.",
+      "stepVaults": "Las bóvedas de tu cuenta aparecen entonces en el dispositivo nuevo. Abre una con la contraseña propia de esa bóveda."
     }
   },
   "tasks": {
@@ -4828,6 +5320,7 @@
     "continue": "Continuar",
     "decrypting": "Descifrando…",
     "deleteLink": "¿Perdiste tanto la contraseña como la frase de recuperación? Elimina la bóveda y empieza de nuevo",
+    "memberRemoveLink": "Quitar esta bóveda de este dispositivo",
     "errors": {
       "alreadyUnlocked": "La bóveda ya está desbloqueada.",
       "inProgress": "Operación en curso.",
@@ -4891,6 +5384,7 @@
     "failClosedEyebrow": "No se puede abrir la bóveda",
     "restoreHint": "Restaurar desde una copia de seguridad aún no está disponible en el móvil.",
     "memberHint": "Esta bóveda está compartida contigo. Desbloquéala con tu propia frase de recuperación.",
+    "memberSubtitle": "Abrir esta bóveda compartida.",
     "memberPhraseLabel": "Frase de recuperación",
     "memberSubmit": "Desbloquear",
     "memberError": "Esa frase no abrió esta bóveda compartida.",
@@ -4906,7 +5400,20 @@
     "memberBiometricSubmit": "Desbloquear con biometría",
     "titleNamed": "Desbloquear {{vault}}",
     "restoreCta": "Restaurar desde una copia de seguridad",
-    "ioErrorHint": "Inténtalo de nuevo o vuelve a abrir Myne."
+    "ioErrorHint": "Inténtalo de nuevo o vuelve a abrir Myne.",
+    "identityPhraseLink": "Usar tu frase de identidad",
+    "identityPhrase": {
+      "title": "Desbloquear con tu frase de identidad",
+      "body": "Esta bóveda se abre con su contraseña o con tu frase de identidad. Si guardaste una frase de bóveda aparte para ella, esa se retiró y ya no la abre. Abrirla con las 24 palabras que apuntaste para tu identidad también desbloquea tu identidad para esta sesión, así que la sincronización funciona sin una segunda petición.",
+      "label": "Frase de identidad",
+      "hint": "24 palabras, en orden.",
+      "submit": "Desbloquear con frase de identidad",
+      "decrypting": "Abriendo…",
+      "cancel": "Volver a la contraseña",
+      "recoveryInProgress": "Ya hay una recuperación en curso. Vuelve al formulario de contraseña y continúala.",
+      "generic": "Esa frase no abrió esta bóveda."
+    },
+    "personWrapProbeFailed": "Myne no pudo comprobar si esta bóveda también se abre con una frase de identidad. Si la creaste desde tu identidad, prueba primero esa frase."
   },
   "vault": {
     "ioBanner": {
@@ -4959,6 +5466,7 @@
     "provisioning": {
       "heading": "Creando tu cuenta",
       "caption": "Registrando esta bóveda en el servidor de sincronización. Tu frase de recuperación viene a continuación.",
+      "captionNoPhrase": "Registrando esta bóveda en el servidor de sincronización. Tarda un momento.",
       "footerHint": "Esto tarda un momento. Deja esta pestaña abierta hasta que termine, para que pueda limpiar lo que haya dejado si algo sale mal."
     },
     "errors": {
@@ -5009,6 +5517,10 @@
       "permissionDenied": {
         "body": "Asegúrate de que Myne tiene permiso para escribir en tu carpeta de datos de la aplicación.",
         "title": "No se pudo escribir en la carpeta de la bóveda"
+      },
+      "personLocked": {
+        "body": "Desbloquea tu identidad con sus 24 palabras y luego crea la bóveda de nuevo. Tu frase de identidad es la única credencial de recuperación de esta bóveda, así que crearla mientras la identidad está bloqueada la dejaría irrecuperable.",
+        "title": "Desbloquea primero tu identidad"
       },
       "sessionExpired": {
         "body": "Por tu seguridad, la creación de la bóveda caduca a los 10 minutos. Empieza de nuevo.",
@@ -5069,7 +5581,8 @@
       "reveal": "Mostrar frase",
       "saveAsFile": "Guardar como archivo",
       "saveFailed": "No se pudo guardar el archivo. Copia las palabras o anótalas.",
-      "savedToFile": "Guardado. Es un archivo de texto plano, así que guárdalo donde solo tú puedas leerlo."
+      "savedToFile": "Guardado. Es un archivo de texto plano, así que guárdalo donde solo tú puedas leerlo.",
+      "sessionOnlyNotice": "Este navegador no conserva tu frase tras una recarga, así que se te pedirán las 24 palabras de nuevo. Guárdalas en un lugar seguro."
     },
     "ready": {
       "backedUp": "Respaldada",
@@ -5118,6 +5631,7 @@
   },
   "vaultPicker": {
     "createAnother": "Crear otra bóveda",
+    "deviceOnly": "Solo este dispositivo",
     "heading": "Elige una bóveda",
     "joinDevice": "Añadir este dispositivo a una cuenta",
     "loading": "Cargando tus bóvedas…",
@@ -5194,10 +5708,35 @@
   "vaultSwitcher": {
     "chipFallback": "Bóveda",
     "createAnother": "Crear otra bóveda",
+    "deviceOnly": "Solo este dispositivo",
     "joinDevice": "Añadir este dispositivo a una cuenta",
     "switching": "cambiando…",
     "switchVaultLabel": "Cambiar de bóveda",
     "vaultFallback": "Bóveda {{n}}"
+  },
+  "invites": {
+    "title": "Invitaciones",
+    "loading": "Cargando invitaciones…",
+    "empty": "Aún no hay invitaciones.",
+    "pendingHeading": "Esperando por ti",
+    "pendingHint": "El propietario de la bóveda invitó a tu identidad. Aceptar pide su código de identidad y tu frase de recuperación.",
+    "error": "No se pudieron cargar las invitaciones. Comprueba tu conexión y el servidor de sincronización.",
+    "retry": "Inténtalo de nuevo",
+    "noIdentity": "Este dispositivo no tiene ninguna identidad aún, así que ninguna invitación puede dirigirse a él.",
+    "notEnrolled": "Esta identidad aún no está registrada, así que las invitaciones dirigidas a ella no se pueden listar. Registrarla es el acto que permite que lleguen.",
+    "notice_one": "{{count}} invitación en espera",
+    "notice_other": "{{count}} invitaciones en espera",
+    "decline": "Rechazar",
+    "declineTitle": "¿Rechazar esta invitación?",
+    "declineBody": "La invitación se borra en tu servidor, así que ya nunca podrá aceptarse, y el propietario ve que la rechazaste en lugar de que siga esperando. Para recuperarla, el propietario tiene que invitarte de nuevo.",
+    "declineCta": "Rechazar invitación",
+    "declineFailed": "No se pudo rechazar la invitación. Inténtalo de nuevo.",
+    "noticeUnregistered": "Registra esta identidad para ver invitaciones",
+    "noticePending": "Las invitaciones no se pueden listar hasta que este dispositivo esté aprobado",
+    "notice_many": "{{count}} invitaciones en espera"
+  },
+  "firstRun": {
+    "heading": "Crea tu identidad"
   },
   "welcome": {
     "createCta": "Crear bóveda nueva",
@@ -5236,13 +5775,19 @@
     "cleanUpFiles": "Limpiar archivos sobrantes",
     "connect": "Conectar a mi cuenta",
     "tagline": "Notas markdown cifradas. Sin correo electrónico al registrarte.",
+    "startAction": "Crear tu identidad y bóveda",
+    "startBody": "Empieza de nuevo en este dispositivo: una identidad nueva y luego la bóveda que le pertenece.",
     "restoreTitle": "Restaurar desde una copia de seguridad",
     "restoreBody": "Abre un archivo .myne-backup que guardaras antes.",
     "joinTitle": "Añadir este dispositivo a una cuenta",
     "joinBody": "Usa una bóveda que ya tengas en otro dispositivo.",
+    "invitedTitle": "Me invitaron a una bóveda",
+    "invitedBody": "Configura la identidad a la que iba dirigida la invitación. No necesitas una bóveda propia.",
+    "invitedAction": "Me invitaron",
     "restoreAction": "Restaurar",
     "joinAction": "Añadir dispositivo",
-    "version": "Versión {{version}} · pre-alpha"
+    "version": "Versión {{version}} · pre-alpha",
+    "createAction": "Crear"
   },
   "wikiGraph": {
     "emptyTitle": "Aún no hay enlaces",
@@ -5345,7 +5890,7 @@
     "title": "Conecta a tu cuenta",
     "lead": "Introduce los datos de tu cuenta para traer tus notas a este dispositivo. Todo permanece cifrado de extremo a extremo.",
     "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Revisa bien este número: no parece correcto.",
+    "accountHint": "Revisa bien este número. No parece correcto.",
     "approvalHint": "Tus notas aparecerán una vez que apruebes este dispositivo desde un dispositivo que ya tenga tu cuenta.",
     "connectingSubtitle": "Obteniendo tu cuenta y desbloqueando tu bóveda en este dispositivo.",
     "qr": {
@@ -5493,9 +6038,12 @@
   },
   "identityHome": {
     "createVaultCta": "Crear una bóveda",
+    "createVaultLocked": "Desbloquea tu identidad para crear una bóveda. Firma la primera lista de miembros de la bóveda, que es lo que la hace tuya, y este dispositivo la tiene sellada para esta sesión.",
     "invitesError": "No se pudieron cargar las invitaciones. Comprueba tu conexión y el servidor de sincronización.",
     "invitesHeading": "Invitaciones",
     "invitesLoading": "Buscando invitaciones…",
+    "invitesPending": "Este dispositivo está esperando aprobación. Las invitaciones aparecen aquí cuando otro dispositivo tuyo lo aprueba.",
+    "invitesUnregistered": "Esta identidad aún no está registrada en un servidor de sincronización, así que ninguna invitación puede llegarle.",
     "noInvites": "Todavía no hay invitaciones.",
     "subtitle": "Tienes una identidad en este dispositivo, así que la gente puede invitarte a una bóveda. No necesitas crear una para que te inviten.",
     "accept": "Aceptar",
@@ -5532,6 +6080,20 @@
     "forgetCta": "Olvidar esta identidad en este dispositivo",
     "forgetError": "No se pudo olvidar la identidad. Inténtalo de nuevo.",
     "forgetWarning": "Esto elimina la identidad solo de este dispositivo. La cuenta del servidor y cualquier bóveda de la que sea propietaria o a la que se haya unido no se tocan, y puedes recuperar la identidad con su frase de 24 palabras en otro dispositivo. Si no has guardado esa frase, este dispositivo no podrá recuperarla.",
+    "registerCta": "Registrar esta identidad",
+    "registerContinue": "Continuar",
+    "registerSubmit": "Registrar",
+    "registerError": "No se pudo registrar. Comprueba la frase y la dirección del servidor, luego inténtalo de nuevo.",
+    "registerServerLabel": "Dirección del servidor de sincronización",
+    "registerServerPlaceholder": "https://sync.example.com",
+    "registerServerHint": "Su operador podrá ver que esta identidad existe.",
+    "registerInviteCodeLabel": "Código de invitación del servidor",
+    "registerInviteCodeHint": "Solo si tu servidor lo pide.",
+    "registerServerError": "No se pudo contactar con ese servidor. Comprueba la dirección e inténtalo de nuevo. Tus palabras siguen aquí.",
+    "accountNumberHeading": "Número de cuenta",
+    "accountNumberHint": "Derivado de tu frase de identidad, así que no se puede perder y no es un secreto. Úsalo para soporte o para pasar el relevo a un operador del servidor.",
+    "copyAccountNumber": "Copiar número de cuenta",
+    "registerPhraseLabel": "Tu frase de identidad, 24 palabras",
     "stepIndicator": "Paso {{n}} de {{total}} · {{label}}",
     "stepVerifyOwner": "Verificar al propietario",
     "stepRecoveryPhrase": "Frase de recuperación",
@@ -5676,7 +6238,45 @@
       "inviteHint": "Abre esta invitación desde el selector de bóvedas para unirte con tu frase de identidad.",
       "forgetHeading": "Este dispositivo",
       "forget": "Olvidar esta identidad en este dispositivo",
-      "forgetCheckbox": "Entiendo que esta identidad se eliminará de este dispositivo. La cuenta del servidor se conserva y la frase la recupera."
+      "forgetCheckbox": "Entiendo que esta identidad se eliminará de este dispositivo. La cuenta del servidor se conserva y la frase la recupera.",
+      "vaultHeading": "Tus bóvedas",
+      "vaultHint": "Tu identidad puede ser propietaria de tantas bóvedas como quieras. Cada una tiene su propia contraseña.",
+      "registerHeading": "Registro",
+      "registerHint": "Esta identidad aún no está registrada, así que nadie puede invitarte y nada se sincroniza."
+    },
+    "register": {
+      "title": "Registrar esta identidad",
+      "open": "Registrar esta identidad",
+      "cta": "Registrar",
+      "working": "Registrando…",
+      "failed": "No se pudo registrar esta identidad. Se queda en este dispositivo y puedes intentarlo de nuevo."
+    },
+    "personJoin": {
+      "title": "Añadir este teléfono a tu cuenta",
+      "lead": "Escribe las 24 palabras de la cuenta de la que proviene este código. Después un dispositivo que ya exista aprueba este teléfono, así que una frase por sí sola no puede añadir uno.",
+      "phraseLabel": "Frase de identidad",
+      "phraseHint": "24 palabras, en orden.",
+      "cta": "Añadir este teléfono",
+      "working": "Añadiendo este teléfono…",
+      "mismatch": "Esas palabras pertenecen a una identidad distinta de la de este código.",
+      "failed": "No se añadió este teléfono. Comprueba las palabras e inténtalo de nuevo.",
+      "pendingTitle": "Esperando aprobación",
+      "pendingLead": "Este teléfono está añadido y esperando. Apruébalo en un dispositivo que ya tenga tu cuenta, y esta pantalla terminará sola.",
+      "pendingHint": "Nada que hacer aquí hasta que el otro dispositivo apruebe.",
+      "sessionEnded": "La espera terminó cuando se cerró la app. Vuelve a escribir tus 24 palabras para continuar.",
+      "reenter": "Volver a escribir las palabras",
+      "finishingTitle": "Terminando este dispositivo",
+      "finishingLead": "Este teléfono se ha añadido a tu cuenta. Sus bóvedas se están obteniendo ahora; cada una sigue pidiendo su propia contraseña.",
+      "listFailed": "Este teléfono se añadió, pero las bóvedas de tu cuenta no llegaron. Comprueba tu conexión e inténtalo de nuevo.",
+      "listRetry": "Obtener las bóvedas de nuevo"
+    },
+    "unlock": {
+      "title": "Desbloquea tu identidad",
+      "lead": "Tu identidad está sellada en este dispositivo para esta sesión. Sus 24 palabras de recuperación la abren; nada se envía a ninguna parte.",
+      "open": "Desbloquear identidad",
+      "cta": "Desbloquear",
+      "working": "Desbloqueando…",
+      "failed": "Esa frase no abrió esta identidad. Comprueba las 24 palabras e inténtalo de nuevo."
     },
     "recover": {
       "open": "Ya tengo una identidad",

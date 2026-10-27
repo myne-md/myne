@@ -40,6 +40,8 @@
       "permissionLabel": "Uendeshaji ukikamilika",
       "permissionAsk": "Kagua kwanza",
       "permissionAuto": "Tumia kiotomatiki",
+      "keepConversation": "Hifadhi mazungumzo haya nikipotea kwenye madokezo",
+      "keepConversationPinned": "Imehifadhiwa kwa kipindi hiki",
       "providerRejected": "Mtoa huduma amekataa ombi hili, kwa hivyo uendeshaji umesimama. Hakuna kilichoandikwa. Hitilafu hii ipo katika kile Myne ilichotuma, si katika madokezo yako wala mipangilio yako.",
       "unchecked": "Ukaguzi wa uhariri haukuweza kukamilika, kwa hivyo wakala hapatikani kwa sasa. Hakikisha modeli au mtoa huduma wako anapatikana, kisha ujaribu tena.",
       "unsupported": "Modeli hii haiwezi kuhariri kwa usahihi wa kuaminika, kwa hivyo wakala hapatikani. Chagua modeli kubwa zaidi au mtoa huduma.",
@@ -48,12 +50,29 @@
       "unsupportedProvisional": "Kiwango hicho cha kufaulu bado hakijapimwa katika modeli mbalimbali, kwa hivyo kinaweza kuwa kikali au chepesi kuliko inavyostahili.",
       "scopeNone": "hakuna dokezo lililofunguliwa, hivyo bado hakuna cha kufanyia kazi",
       "scopeAllVault": "Madokezo yote",
+      "scopeQuestion": "Wakala anaweza kusoma nini",
+      "scopeFolders": "Folda",
+      "scopeApplies": "Inahusu ujumbe wako ujao. Madokezo yaliyotupwa, yaliyowekwa kwenye kumbukumbu na violezo daima yanatengwa.",
       "blockedScope": "Bado hakuna cha kufanyia kazi: kila dokezo limetengwa na AI, au kasha ni tupu.",
       "preparing": "Inajiandaa…",
       "blockedScopeSidebar": "Bado hakuna cha kuuliza hapa: folda ya dokezo hili imetengwa na AI.",
       "needsScope": "Chagua folda hapa chini, au fungua dokezo, ili wakala awe na cha kufanyia kazi.",
       "scopeExcluded_one": "dokezo {{count}} limetengwa na AI",
       "scopeExcluded_other": "madokezo {{count}} yametengwa na AI"
+    },
+    "attachments": {
+      "title": "Ambatisha hati",
+      "attach": "Ambatisha hati",
+      "empty": "Hakuna viambatisho kwenye kasha hili bado. Ongeza faili kwenye maktaba ya viambatisho kwanza.",
+      "failed": "Maktaba ya viambatisho haikuweza kusomwa. Jaribu tena.",
+      "pasteFailed": "Faili iliyobandikwa haikuweza kuongezwa kwenye mazungumzo haya.",
+      "pasting": "Inabandika…",
+      "pastedFile": "Faili iliyobandikwa",
+      "cap": "Unaweza kuambatisha faili hadi {{count}}.",
+      "confirm_one": "Ambatisha faili {{count}}",
+      "confirm_other": "Ambatisha faili {{count}}",
+      "remove": "Ondoa {{name}}",
+      "noText": "{{name}} haina maandishi wakala anaweza kusoma. Ni faili ambazo maandishi yake yanaweza kuchimbwa tu ndizo zinaweza kuambatishwa."
     },
     "progress": {
       "working": "Inafanya kazi",
@@ -90,6 +109,7 @@
     },
     "review": {
       "title": "Kagua mabadiliko",
+      "statusWaiting": "Inasubiri idhini yako",
       "close": "Funga",
       "scopeTotal_one": "dokezo {{count}} kwenye wigo",
       "scopeTotal_other": "madokezo {{count}} kwenye wigo",
@@ -98,6 +118,12 @@
       "noteHeading_other": "mabadiliko {{count}}",
       "changedLines_one": "mstari {{count}}",
       "changedLines_other": "mistari {{count}}",
+      "rowReplace_one": "Badilisha mstari {{count}}",
+      "rowReplace_other": "Badilisha mistari {{count}}",
+      "rowAppend": "Ongeza mwishoni mwa dokezo",
+      "rowMove": "Sogea kwenye {{folder}}",
+      "showChange": "Onyesha mabadiliko",
+      "hideChange": "Ficha mabadiliko",
       "removalFlag": {
         "trashed": "Inapeleka dokezo hili kwenye tupio",
         "deleted": "Inafuta dokezo hili kwenye kila kifaa",
@@ -107,6 +133,7 @@
       },
       "largeDeletion": "Inaondoa maandishi mengi",
       "rejectEdit": "Kataa",
+      "createdBadge": "Limeundwa",
       "restoreEdit": "Rudisha",
       "applyRemoval": "Tumia peke yake",
       "rejectAll": "Kataa yote",
@@ -114,6 +141,12 @@
       "approveAll_other": "Idhinisha mabadiliko {{count}}",
       "appliedCount_one": "Badiliko {{count}} limetumika.",
       "appliedCount_other": "Mabadiliko {{count}} yametumika.",
+      "rejectedCount_one": "Mabadiliko {{count}} yamekataliwa.",
+      "rejectedCount_other": "Mabadiliko {{count}} yamekataliwa.",
+      "rejectedNewNotes_one": "Dokezo jipya {{count}} limekataliwa.",
+      "rejectedNewNotes_other": "Madokezo mapya {{count}} yamekataliwa.",
+      "rejectedSettings_one": "Mpangilio {{count}} umekataliwa.",
+      "rejectedSettings_other": "Mipangilio {{count}} imekataliwa.",
       "refused": {
         "anchorNotFound": "Hayakuweza kutumika: maandishi hayo hayapo tena kwenye dokezo.",
         "anchorAmbiguous": "Hayakuweza kutumika: maandishi hayo yanajitokeza zaidi ya mara moja.",
@@ -130,9 +163,19 @@
         "appendEmpty": "Hayakuweza kutumika: hakukuwa na kitu cha kuongeza.",
         "appendWouldWriteFrontmatter": "Hayakuweza kutumika: maandishi hayo yangekuwa kizuizi cha sifa za dokezo.",
         "moveToSameFolder": "Hakijasogezwa: dokezo tayari liko kwenye folda hiyo.",
+        "unknownFolder": "Hakijasogezwa: kasha hili haina folda ya jina hilo, kwa hivyo hakuna kilichoandikwa.",
         "moveIntoExcludedFolder": "Hakijasogezwa: folda hiyo imetengwa na AI."
       },
       "applyFailed": "Mabadiliko hayakuweza kutumika.",
+      "applyFailedCause": {
+        "noSuchRun": "Uendeshaji huo haupo tena, kwa hivyo hakuna kilichoandikwa.",
+        "cancelled": "Uendeshaji huo umesimamishwa, kwa hivyo hakuna kilichoandikwa.",
+        "locked": "Kasha limefungwa, kwa hivyo hakuna kilichoandikwa.",
+        "aiDisabled": "AI imezimwa kwenye kasha hili.",
+        "write": "Kuandika mabadiliko hakukukamilika.",
+        "read": "Jambo lililohitajika kwa uendeshaji huu haikuweza kusomwa, kwa hivyo hakuna kilichoandikwa.",
+        "restorePoint": "Nakala ya usalama haikuweza kutengenezwa, kwa hivyo hakuna kilichoandikwa."
+      },
       "undo": "Tendua uendeshaji huu",
       "undoFailed": "Uendeshaji haukuweza kutenduliwa.",
       "undoReport": "Madokezo {{reverted}} yamerejeshwa. Madokezo {{kept}} yaliyotengenezwa na uendeshaji yameachwa yalipo.",
@@ -173,6 +216,8 @@
         "runStopped": "Hakutumika: uendeshaji ulisimamishwa, hivyo hakuna badiliko lililojaribiwa.",
         "notProposed": "Hakutumika: uendeshaji huu haukuwasilisha badiliko hilo, hivyo mwenyeji hataandika."
       },
+      "appliedSummary": "Mabadiliko yametumika.",
+      "settingsApplied": "Mipangilio imetumika.",
       "undoReportFailed_one": "Badiliko {{count}} halikuweza kurudishwa.",
       "undoReportFailed_other": "Mabadiliko {{count}} hayakuweza kurudishwa.",
       "undoReportSettings_one": "Mpangilio {{count}} umerudishwa.",
@@ -183,6 +228,9 @@
       "settingsChanged_other": "Mipangilio {{count}} imebadilishwa.",
       "refusedCount_one": "Badiliko {{count}} halikuweza kutumika",
       "refusedCount_other": "Mabadiliko {{count}} hayakuweza kutumika"
+    },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
     },
     "undo": {
       "action": "Tendua uendeshaji",
@@ -296,6 +344,7 @@
       "actionsTitle": "Vitendo",
       "checkUnusedFailedNotice": "Imeshindwa kukagua viambatisho visivyotumika. Jaribu tena.",
       "corpusIncompleteNotice": "Maliza kusawazisha kwanza. Kifaa hiki bado hakina madokezo yako yote, hivyo hakiwezi kujua ni viambatisho vipi visivyotumika.",
+      "sharedVaultNotice": "Hiki ni kasha shirikishi, kwa hivyo mazungumzo yanahifadhiwa kwa kila mtu. Myne haiwezi kujua ni faili zipi mwanachama mwingine anazotumia bado, kwa hivyo haitatoa yoyote kwa usafishaji.",
       "checking": "Inakagua…",
       "cleanUnused": "Safisha visivyotumika",
       "cleanUnusedTitle": "Futa viambatisho visivyotumika katika dokezo lolote",
@@ -694,6 +743,9 @@
       },
       "manageTemplates": {
         "label": "Dhibiti violezo…"
+      },
+      "manageViews": {
+        "label": "Dhibiti mitazamo…"
       },
       "newNoteFromTemplate": {
         "label": "Dokezo jipya kutoka kwenye kiolezo…"
@@ -1270,12 +1322,18 @@
           "memoryPopoverRetry": "Jaribu tena",
           "memoryPopoverSettings": "Simamia kwenye mipangilio",
           "memoryPopoverClose": "Funga",
+          "seedCard": {
+            "title": "Unataka Myne ijue kasha lako?",
+            "body": "Inaweza kusoma umbo la madokezo yako mara moja na kutengeneza maingizo machache ya kumbukumbu. Unakagua kila mstari kabla ya kuhifadhiwa chochote.",
+            "action": "Mfundishe Myne kasha lako",
+            "dismiss": "Si sasa"
+          },
           "copied": "Imenakiliwa",
           "copyAnswer": "Nakili jibu",
           "copyFailed": "Haikuweza kunakili",
           "copyYourMessage": "Nakili ujumbe wako",
           "emptyTitle": "Uliza kuhusu madokezo yako",
-          "noticeLeaves": "Maneno unayoandika, madokezo ambayo zamu inasoma, vichwa, vitambulisho na njia za folda za kila dokezo ambalo uendeshaji unaweza kusoma (kasha lote ukiondoa folda zako zilizotengwa, isipokuwa ulipunguze), na kile AI inachokumbuka kukuhusu hutumwa kwa anayejibu. Hakuna kingine kwenye kifaa hiki kinachotumwa.",
+          "noticeLeaves": "Maneno unayoandika, madokezo ambayo mzunguko unasoma, vichwa, vitambulisho na njia za folda za kila dokezo ambalo uendeshaji unaweza kusoma (kasha lote isipokuwa folda ulizotenga, isipokuwa unapunguza), maandishi ambayo Myne ilichimba kutoka kwenye faili unazozibandika kwenye ujumbe (hadhi nne, kila moja iliyokatwa hadi herufi 20,000; faili yenyewe inabaki hapa), na kile AI inachokumbuka kukuhusu vinatumwa kwa chochote kinachojibu. Hakuna kingine kwenye kifaa hiki kinachotumwa.",
           "noticeReceiver": "Anajibu: {{provider}}, ambaye Myne haiendeshi.",
           "noticeReceiverLocal": "Anajibu: programu inayoendeshwa kwenye kifaa hiki. Hakuna kinachotoka kwenye mashine, lakini programu hiyo si sehemu ya Myne na Myne haiwezi kuona inachofanya nazo.",
           "noticeRevoke": "Ili kuisimamisha, zima AI katika Mipangilio, au badilisha anayejibu hapo. Kubatilisha ufunguo wa mtoa huduma humsimamisha mtoa huduma huyo mara moja.",
@@ -1351,6 +1409,8 @@
         "editing": "anahariri",
         "empty": "Wewe pekee uliyeko hapa",
         "jumpTo": "Nenda kwa {{name}}",
+        "showList_one": "{{count}} yuko hapa sasa. Onyesha orodha",
+        "showList_other": "{{count}} wako hapa sasa. Onyesha orodha",
         "unknown": "Mtu fulani",
         "title_one": "Watu {{count}} wapo hapa sasa",
         "title_other": "Watu {{count}} wapo hapa sasa"
@@ -1500,7 +1560,9 @@
     "tagSuggestion": {
       "label": "Lebo zilizopendekezwa",
       "accept": "Ongeza lebo {{tag}} kwenye dokezo hili",
-      "dismiss": "Ondoa lebo iliyopendekezwa {{tag}}"
+      "dismiss": "Ondoa lebo iliyopendekezwa {{tag}}",
+      "groupExisting": "Kwenye kasha lako",
+      "groupNew": "Mpya"
     },
     "taskField": {
       "addAffordance": "Ongeza sehemu ya kazi",
@@ -1649,6 +1711,10 @@
       "loadFailed": "Imeshindwa kupakia madokezo yako.",
       "openFailed": "Imeshindwa kufungua dokezo hili.",
       "saveFailed": "Imeshindwa kuhifadhi dokezo hili.",
+      "liveResynced": "Dokezo hili limesasishwa kwingineko na kupakiwa upya.",
+      "liveResyncedKept": "Dokezo hili limesasishwa kwingineko na kupakiwa upya. Mabadiliko yako yasiyohifadhiwa yamehifadhiwa kama nakala tofauti.",
+      "liveResyncFailed": "Haikuweza kusasisha dokezo hili kwa mabadiliko kutoka kwingineko. Maandishi yako hayajabadilika.",
+      "liveCopyFailed": "Haikuweza kuhifadhi mabadiliko yako yasiyohifadhiwa kama nakala tofauti, kwa hivyo dokezo hili halijasasishwa. Maandishi yako hayajabadilika.",
       "moveFailed": "Imeshindwa kuhamisha dokezo hili.",
       "openTodayFailed": "Imeshindwa kufungua dokezo la leo.",
       "exportFailed": "Imeshindwa kuhamisha dokezo hili.",
@@ -1732,6 +1798,7 @@
     "formatBar": {
       "redo": "Rudia",
       "attachFile": "Ambatisha faili jipya",
+      "photoToNote": "Picha kuwa dokezo",
       "insertFromLibrary": "Weka kutoka kwenye maktaba",
       "recordVoiceNote": "Rekodi dokezo la sauti",
       "showLivePreview": "Onyesha hakikisho la papo hapo",
@@ -2019,7 +2086,9 @@
       "copyLink": "Nakili kiungo",
       "open": "Fungua",
       "openInNewTab": "Fungua kwenye kichupo kipya",
-      "revealInFolder": "Onyesha kwenye folda"
+      "revealInFolder": "Onyesha kwenye folda",
+      "archive": "Weka dokezo kwenye kumbukumbu",
+      "trash": "Hamisha dokezo kwenye tupio"
     },
     "colorLabels": {
       "clay": "Udongo",
@@ -2115,7 +2184,7 @@
       "moveIntoSelf": "Folda haiwezi kuhamishwa ndani yake yenyewe.",
       "moveCollision": "Tayari kuna folda yenye jina hilo pale.",
       "unsettledSave": "Dokezo lililofunguliwa bado halijamaliza kuhifadhiwa, hivyo folda haikuguswa. Jaribu tena litakapomaliza.",
-      "renameFailed": "Imeshindwa kubadilisha jina la folda, hivyo haijabadilika.",
+      "renameFailed": "Haikuweza kubadilisha jina la folda, kwa hivyo imebaki vilevile.",
       "deliberateWriteFailed": "Jina la folda limebadilishwa, lakini mojawapo ya mipangilio yake haikuweza kuhifadhiwa. Folda tupu itaonekana tena kwa jina la zamani kila unapofungua kasha; kuifuta ni salama na hakubadilishi kitu kingine chochote. Kubadilisha jina la folda tena hakutaiondoa.",
       "folderListFull": "Myne inaweza kukumbuka idadi finyu ya folda, na orodha hiyo imejaa. Folda hii bado inafanya kazi, lakini itatoweka pale dokezo lake la mwisho litakapoondoka humo. Kufuta folda usiyoihitaji tena hutengeneza nafasi.",
       "folderNotRemembered": "Folda imeundwa, lakini Myne haikuweza kuihifadhi kwenye orodha yake. Itatoweka pale dokezo lake la mwisho litakapoondoka humo, na itakuwa imekwisha utakapofungua kasha tena ikiwa bado ni tupu. Ni salama kuiunda tena."
@@ -2383,7 +2452,7 @@
     "list": {
       "addToFavorites": "Ongeza kwenye vipendwa",
       "archiveBulkError": "Imeshindwa kuweka madokezo kwenye kumbukumbu.",
-      "renameFailed": "Imeshindwa kuhifadhi jina hilo, hivyo dokezo limebaki na jina lake la zamani.",
+      "renameFailed": "Haikuweza kuhifadhi jina hilo, kwa hivyo dokezo lilibaki na jina lake la zamani.",
       "archiveFolder": "Weka folda kwenye kumbukumbu",
       "archiveNote": "Weka kwenye kumbukumbu",
       "archiveSingleError": "Imeshindwa kuweka dokezo kwenye kumbukumbu.",
@@ -2656,6 +2725,58 @@
     },
     "unsettledSave": "Dokezo lililofunguliwa halijamaliza kuhifadhiwa, hivyo hakuna kilichobadilika. Jaribu tena litakapomaliza.",
     "views": {
+      "bulk": {
+        "apply": "Weka kwenye {{count}}",
+        "field": "Sehemu",
+        "notRestorableLine": "{{title}} iliandikwa lakini haina nakala ya hatua hii, kwa hivyo haiwezi kurejeshwa kutoka hapa.",
+        "nothingToRestore": "Madokezo haya yanahifadhi historia yake ya mabadiliko, kwa hivyo hatua hii haina sehemu ya kurejesha. Thamani ziliandikwa zipo bado.",
+        "refusedCannotDecrypt": "haikuweza kufunguliwa",
+        "refusedFieldChanged": "sehemu hiyo ilibadilishwa kwingineko tangu mtazamo huu uliposomwa",
+        "refusedFieldNotDeclared": "mtazamo huu hautangazi sehemu hiyo",
+        "refusedFieldReserved": "sehemu hiyo inasimamiwa na Myne",
+        "refusedInvalidField": "jina la sehemu hiyo haliwezi kuandikwa",
+        "refusedInvalidNoteId": "kitambulisho cha dokezo hakikuwa sahihi",
+        "refusedIo": "dokezo haikuweza kuandikwa",
+        "refusedJoinFailure": "kuandika hakukukamilika",
+        "refusedLine": "{{title}}: {{reason}}.",
+        "refusedLiveSessionOpen": "kipindi cha uhariri hai kina dokezo hilo wazi",
+        "refusedNotApproved": "kifaa hiki hakijaidhinisha mtazamo huu",
+        "refusedNoteNotFound": "dokezo hilo halipo tena",
+        "refusedPrefsUnreadable": "idhini za kifaa hiki hazikuweza kusomwa",
+        "refusedVaultLocked": "kasha limefungwa",
+        "refusedValueTooLarge": "thamani ni kubwa mno kwa dokezo moja",
+        "restore": "Rejesha hatua hii",
+        "restoreFailedLine": "{{title}} haikuweza kurejeshwa.",
+        "restored": "Zimerejeshwa {{count}}.",
+        "selectAll": "Chagua kila dokezo kwenye mtazamo huu",
+        "selectRow": "Chagua {{title}}",
+        "skippedListValues": "Madokezo {{count}} yaliyochaguliwa yanashikilia orodha kwenye sehemu hiyo na hayakujumuishwa.",
+        "value": "Thamani ya kuweka",
+        "valuePlaceholder": "Thamani mpya",
+        "written": "Ziliandikwa {{count}}."
+      },
+      "board": {
+        "emptyLane": "Hakuna kadi",
+        "dropRefused": "{{reason}}. Kadi imerejea kwenye {{lane}}.",
+        "addCardTo": "Ongeza kadi kwenye {{lane}}",
+        "addCardRefused": "Kadi iliundwa, lakini haikuweza kuwekwa: {{reason}}.",
+        "addCardFailed": "Hakuna kadi iliyoundwa: kiolezo haikuweza kusomwa.",
+        "moveSelected": "Sogea {{count}}",
+        "moveTo": "Sogea kwenye lane",
+        "selectAll": "Chagua kila kadi",
+        "selectCard": "Chagua {{title}}",
+        "renameLane": "Badilisha jina la lane {{lane}}",
+        "newLaneName": "Jina jipya la lane",
+        "saveLaneName": "Hifadhi jina la lane",
+        "cancelLaneRename": "Ghairi",
+        "lanesNotSaved": "Kadi zimesogea, lakini mfuatano wa lane haikuweza kuhifadhiwa.",
+        "laneOrderRestored": "Mfuatano wa lane umerudi.",
+        "laneOrderRestoreFailed": "Mfuatano wa lane haikuweza kurejeshwa.",
+        "cancel": "Ghairi",
+        "archiveFailed": "Dokezo haikuweza kuwekwa kwenye kumbukumbu.",
+        "trashFailed": "Dokezo haikuweza kuhamishwa kwenye tupio.",
+        "noGroupBy": "Bodi hii haina sifa ya lane. Chagua sifa ya kugawanya kwenye mipangilio ya mtazamo."
+      },
       "cards": {
         "changeCover": "Badilisha jalada",
         "changeCoverImage": "Badilisha picha ya jalada",
@@ -2669,6 +2790,55 @@
       "list": {
         "empty": "Hakuna dokezo linalolingana na mwonekano huu",
         "noValue": "Hakuna thamani"
+      },
+      "import": {
+        "approveAction": "Idhinisha v{{version}}",
+        "approveFailed": "Idhini hiyo haikuweza kuhifadhiwa.",
+        "approveFailedBody": "Mtazamo upo hapa na bado unahitaji idhini. Jaribu tena, au uidhinishi kutoka kwenye kidhibiti cha mitazamo.",
+        "armIdentical": "Tayari una toleo hili hasa (v{{version}}). Hakuna cha kufanya.",
+        "armIdenticalHeading": "{{name}} imesasishwa tayari",
+        "armNew": "Hii inaongeza mtazamo mpya, {{name}} (v{{version}}).",
+        "armOlder": "Faili ni v{{incoming}} na kasha hili lina v{{stored}}. Faili ya zamani haiwezi kuchukua nafasi ya mtazamo mpya.",
+        "armRefusedHeading": "{{name}} haikuagizwa",
+        "armSameVersionDifferent": "Faili inasema v{{version}}, toleo lile lile ambalo kasha hili lina, lakini yaliyomo yanatofautiana. Hiyo ni ama mwandishi tofauti anayetumia id hiyo, au faili iliyobadilishwa baada ya kuidhinishwa, kwa hivyo inakataliwa.",
+        "armUpdate": "Hii inachukua nafasi ya {{name}}: kasha hili lina v{{stored}}, faili ni v{{incoming}}.",
+        "close": "Funga",
+        "filterName": "Manifest ya mtazamo",
+        "idleBody": "Faili ya mtazamo ni mtazamo mmoja uliohifadhiwa ambao mtu amehamisha. Myne inaukagua kwanza na kukuonyesha kinachochaguliwa na kusomwa kabla ya kuhifadhiwa chochote.",
+        "importAction": "Agiza mtazamo",
+        "pick": "Chagua faili…",
+        "pickAgain": "Chagua faili nyingine…",
+        "reading": "Inasoma…",
+        "reasonMalformed": "Si kitu halali cha JSON.",
+        "reasonMissingField": "Sehemu inayohitajika inakosekana.",
+        "reasonReservedField": "Ingeruhusu mtazamo kubadilisha {{field}}, ambayo ni mojawapo ya alama Myne inazotumia kutoa dokezo kwenye njia. Hakuna mtazamo unaweza kuweka hiyo.",
+        "reasonTooLarge": "Ni kubwa zaidi kuliko ufafanuzi wa mtazamo unavyoruhusiwa kuwa.",
+        "reasonUnreadable": "Faili haikuweza kusomwa.",
+        "reasonUnknownKey": "Inaweka ufunguo ambao toleo hili la Myne haujui: {{key}}.",
+        "reasonUnrepresentable": "Inatumia thamani ambayo toleo hili la Myne haliwezi kuonyesha.",
+        "reasonVersionRequired": "Haina toleo, kwa hivyo haiwezi kulinganishwa na mtazamo ambao kasha hili lina.",
+        "reasonWrongType": "Sehemu ina aina isiyo sahihi ya thamani.",
+        "refusedHeading": "Faili hiyo si mtazamo ambao toleo hili la Myne linaweza kuagiza.",
+        "refusedNothingStored": "Hakuna kilichohifadhiwa, na hakuna kilichobadilika kwenye kasha hili.",
+        "replaceAction": "Chukua nafasi ya mtazamo",
+        "storedBody": "Imehifadhiwa kwenye v{{version}} na haitafunguka hadi uidhinishwe kwenye kifaa hiki.",
+        "storedHeading": "{{name}} ipo hapa",
+        "title": "Agiza mtazamo"
+      },
+      "manager": {
+        "approve": "Idhinisha",
+        "approvedState": "Imeidhinishwa kwenye kifaa hiki",
+        "close": "Funga",
+        "deleteFailed": "Mtazamo huo haikuweza kufutwa.",
+        "deleteLabel": "Futa {{name}}",
+        "emptyBody": "Mtazamo unaouhifadhi kutoka kwenye orodha ya madokezo, au mtu anayekutumia, unaonekana hapa.",
+        "emptyTitle": "Hakuna mitazamo bado",
+        "listLabel": "Mitazamo iliyohifadhiwa",
+        "openLabel": "Fungua {{name}}",
+        "pendingBody": "Mtazamo huu ulitoka kwenye kifaa kingine au faili. Ufafanuzi wake upo hapa, lakini haasomi chochote hadi uidhinishwe kwenye kifaa hiki.",
+        "pendingState": "Inahitaji idhini",
+        "pendingTitle": "{{name}} inahitaji idhini",
+        "title": "Mitazamo"
       },
       "menu": {
         "deleteView": "Futa mwonekano",
@@ -2716,9 +2886,46 @@
       "sortDesc": "Kushuka",
       "sortDirection": "Mwelekeo wa upangaji",
       "viewType": "Aina ya mwonekano",
+      "export": "Hamisha mtazamo uliohifadhiwa…",
+      "exportFailed": "Mtazamo huo haikuweza kuhuishwa.",
+      "exportFilterName": "Manifest ya mtazamo",
+      "exportHint": "Andika ufafanuzi uliohifadhiwa kama faili .myneview ambayo mtu mwingine anaweza kuingiza. Mabadiliko ambayo bado hujahifadhiwa hayajumuishwi.",
+      "exported": "Imehuishwa kwenye {{filename}}",
+      "version": "Toleo",
+      "versionHint": "Inasonga mbele unapobadilisha mtazamo huu. Hakuna cha kuhariri.",
+      "versionNone": "Haijachukua toleo bado",
+      "versionValue": "v{{version}}",
+      "writeFields": "Sehemu ambazo mtazamo huu unaweza kubadilisha",
+      "writeFieldsHint": "Sehemu za frontmatter pekee ambazo mtazamo huu unaweza kuandika. Tupu inamaanisha hauwezi kubadilisha chochote. Archived, deleted na trashed kamwe hazitolewi: ndizo jinsi app inavyoficha dokezo, kwa hivyo hakuna mtazamo unaweza kuziweka.",
+      "writeFieldsPlaceholder": "Ongeza sehemu inayoweza kuandikwa…",
+      "viewTypeBoard": "Bodi",
       "viewTypeCards": "Kadi",
       "viewTypeList": "Orodha",
       "viewTypeTable": "Jedwali"
+    },
+    "viewConsent": {
+      "allOf": "Haya yote yanatumika:",
+      "anyOf": "Moja yoyote inatosha:",
+      "dataNotCode": "Mtazamo unaeleza tu kinachopaswa kuonyeshwa. Hauwezi kuendesha msimbo.",
+      "everyNote": "Kila dokezo kwenye kasha hili.",
+      "inFolder": "Madokezo kwenye {{folder}}",
+      "matching": "Madokezo yanayofanana na “{{query}}”",
+      "noneOf": "Si yoyote ya haya:",
+      "opAtLeast": "ni angalau",
+      "opAtMost": "ni zaidi ya",
+      "opContains": "inajumuisha",
+      "opIs": "ni",
+      "opIsNot": "si",
+      "opLessThan": "ni chini ya",
+      "opMoreThan": "ni zaidi ya",
+      "propertyCondition": "Madokezo ambapo {{key}} {{operator}} “{{value}}”",
+      "readsHeading": "Sifa zinazosomwa",
+      "selectionHeading": "Madokezo yanayoonyeshwa",
+      "tagged": "Madokezo yaliyotagiwa #{{tag}}",
+      "templateHeading": "Kiolezo",
+      "templateLine": "Madokezo yaliyoundwa kutoka mtazamo huu yanaanza na kiolezo {{template}}.",
+      "writesHeading": "Sehemu zinazoweza kubadilishwa",
+      "writesNote": "Myne inakagua kila mabadiliko dhidi ya orodha hii kabla ya kuandika moja, na inakataa mabadiliko kwenye sehemu iliyohaririwa kwingineko tangu mtazamo huu uliposomwa."
     },
     "welcome": {
       "body": "Karibu Myne, nafasi yako ya faragha ya kufikiri na kuandika.\n\nKila kitu unachohifadhi hapa kimesimbwa kwa njia fiche na kinabaki kwenye kifaa chako. **Nenosiri** lako na **kifungu chako cha urejeshaji** ndivyo vifunguo pekee vya kufikia, hivyo vihifadhi mahali salama. Vikipotea vyote viwili, hakuna anayeweza kurudisha madokezo yako, hata sisi.\n\n**Unaweza kuunganisha madokezo.** Andika `[[` na Myne itakupendekeza madokezo uliyo nayo; chagua moja nayo iwe kiungo. Dokezo ulilounganisha KWENDA kwalo linaonyesha kiungo kilitokea wapi, kwenye paneli yake ya viungo rejeshi, hivyo seti ya madokezo ni kitu unachoweza kufuata kwa pande zote mbili.\n\nHili ni dokezo la kawaida tu, hivyo lifanye lako. Lihariri, libadilishe jina, au lifute wakati wowote, na uongeze madokezo mapya kadiri mawazo yako yanavyokua.\n\nIli kujifunza zaidi kuhusu Myne, tembelea https://myne.md\n",
@@ -2726,6 +2933,10 @@
     },
     "workspace": {
       "defaultSlotName": "Chaguomsingi"
+    },
+    "autoTag": {
+      "applied": "Tagi zimeongezwa: {{tags}}",
+      "undo": "Tendua"
     },
     "export": {
       "html": "HTML",
@@ -2735,9 +2946,37 @@
       "txt": "Maandishi sahili"
     }
   },
+  "photoNote": {
+    "cancel": "Ghairi",
+    "commitNew": "Tengeneza dokezo",
+    "commitNote": "Ongeza kwenye dokezo hili",
+    "defaultTitle": "Dokezo la picha {{date}}",
+    "destinationLabel": "Kuweka picha na maandishi yake",
+    "imageOnly": "Ongeza picha bila maandishi",
+    "locked": "Kasha lilifungwa wakati picha hii ilikuwa wazi. Inabaki kwenye viambatisho vyako; fungua kasha kisha ujaribu tena.",
+    "machineText": "Maandishi haya yalisomwa na mashine, kwa hivyo yakague kabla ya kuyahifadhi.",
+    "newNote": "Dokezo jipya",
+    "noText": "Hakuna maandishi yaliyosomwa kutoka ukurasa huu. Bado unaweza kuongeza picha.",
+    "ocrOff": "Kusoma maandishi kutoka picha kumezimwa kwenye kifaa hiki, kwa hivyo picha hii haina maandishi. Kuwasha kunatumika kwenye picha inayofuata unayopiga.",
+    "ocrOffAction": "Fungua mpangilio",
+    "readFailed": "Maandishi hayakuweza kusomwa wakati huu. Bado unaweza kuongeza picha.",
+    "reading": "Inasoma maandishi…",
+    "textLabel": "Maandishi kutoka picha",
+    "textPlaceholder": "Maandishi ambayo app ilisoma yataonekana hapa. Unaweza kuyaandika mwenyewe.",
+    "thisNote": "Dokezo hili",
+    "saveFailed": "Dokezo haikuweza kutengenezwa. Maandishi yako yako bado hapa.",
+    "importing": "Inahifadhi picha…",
+    "addReading": "Ongeza usomaji",
+    "truncated": "Usomaji unakoma kwenye kikomo cha urefu, kwa hivyo mwisho wa ukurasa unaweza kukosekana.",
+    "discardFailed": "Picha haikuweza kuondolewa. Bado ipo kwenye viambatisho vyako.",
+    "readingArrived": "Usomaji ulifika ulipokuwa unaandika. Umehifadhiwa chini, unakusubiri.",
+    "untitledFile": "Picha",
+    "openFailed": "Dokezo liliundwa, lakini haikuweza kufunguliwa."
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Inakagua nguvu…",
+      "strengthUnavailable": "Ukaguzi wa nguvu haikuweza kupakiwa, kwa hivyo urefu wa chini tu unakaguliwa.",
       "confirmLabel": "Thibitisha nenosiri kuu",
       "defaultEmptyCaption": "Chagua kitu unachoweza kukumbuka. Hakiwezi kuwekwa upya.",
       "mismatch": "Manenosiri hayafanani.",
@@ -2994,39 +3233,39 @@
     "vault": {
       "changePasswordButton": "Badilisha nenosiri",
       "changePasswordError": {
-        "invalidCredentialOrVault": "Nenosiri la sasa si sahihi au faili la kasha limeharibika.",
-        "ioError": "Hitilafu ya diski, tafadhali jaribu tena.",
-        "joinFailure": "Kuna kitu kimeenda vibaya, tafadhali jaribu tena.",
+        "invalidCredentialOrVault": "Nenosiri la sasa si sahihi au faili ya kasha imeharibika.",
+        "ioError": "Hitilafu ya diski, jaribu tena.",
+        "joinFailure": "Kitu kimetokea vibaya, jaribu tena.",
         "samePasswordRejected": "Nenosiri jipya linafanana na la sasa.",
         "serverAckPending": "Nenosiri lako jipya linafanya kazi kwenye kifaa hiki, lakini Myne haikuweza kufikia seva ili kulihifadhi. Hadi itakapofanya hivyo, vifaa vyako vingine bado vinatarajia nenosiri la zamani, na kama nakala ya kivinjari hiki itafutwa kabla ya hapo, mabadiliko yatapotea. Litaribu kiotomatiki.",
-        "weakNewPassword": "Nenosiri jipya lazima liwe na angalau herufi 12.",
+        "weakNewPassword": "Nenosiri jipya lazima liwe na herufi angalau 12.",
         "unexpected": "Mabadiliko hayo ya nenosiri hayakufaulu. Tafadhali jaribu tena.",
         "vaultNotUnlocked": "Fungua kasha hili kabla ya kubadilisha nenosiri lake."
       },
       "changePasswordHeading": "Badilisha nenosiri",
       "changePasswordHelper": "Badilisha nenosiri lako kuu huku ukibakiza kasha lile lile. Kifungu cha urejeshaji kinabaki kile kile.",
-      "dangerZoneHeading": "Eneo la hatari",
-      "dangerZoneHelper": "Futa kasha hili na madokezo yote kwa kudumu. Haiwezi kutenduliwa. Kifungu cha urejeshaji hakitarejesha kasha.",
+      "dangerZoneHeading": "Eneo hatari",
+      "dangerZoneHelper": "Futa kasha hili na madokezo yote kabisa. Haiwezi kutenduliwa. Kifungu cha kurejesha hakitatekeleza kasha hili tena.",
       "localEraseHeading": "Kivinjari hiki",
       "localEraseHelper": "Futa nakala ya Myne ya kasha lako kwenye kivinjari hiki. Akaunti yako na kila kitu kilichokwisha kusawazishwa hubaki kwenye seva.",
-      "localEraseButton": "Toka na ufute nakala ya kivinjari hiki…",
+      "localEraseButton": "Toka na futa nakala ya kivinjari hiki…",
       "deleteVaultButton": "Futa kasha…",
       "vaultLabelEyebrow": "LEBO YA KASHA",
       "vaultLabelHelper": "Jina la kasha hili, huonyeshwa kwenye kichagua cha ndani ya programu na kwenye kichagua cha kasha cha kuanza kabla ya kufungua. Huhifadhiwa kimesimbwa ndani ya kasha; hakitoki kamwe kwenye kifaa chako kama maandishi wazi.",
       "vaultLabelPlaceholder": "Ongeza lebo…",
       "vaultLabelRenameNotice": "Hadi utakapofungua kasha hili kwenye vifaa vyako vingine, skrini zao za kufunga zitaendelea kuonyesha kile walichohifadhi mwisho: jina la awali, au kishika nafasi kama hawakuhifadhi moja.",
       "vaultLabelSave": "Hifadhi",
-      "vaultIconLabel": "AIKONI",
+      "vaultIconLabel": "IKONI",
       "vaultIconDefault": "Chaguomsingi (wordmark)",
-      "renamedToast": "Jina la kasha limebadilishwa",
+      "renamedToast": "Kasha limebadilishwa jina",
       "renameError": "Haikuweza kubadilisha jina la kasha",
       "newPasswordMismatch": "Manenosiri mapya hayafanani.",
-      "samePassword": "Nenosiri jipya ni lile lile la sasa.",
+      "samePassword": "Nenosiri jipya ni sawa na nenosiri la sasa.",
       "passwordChangedToast": "Nenosiri limebadilishwa",
-      "vaultUnreadable": "Faili la kasha halisomeki. Rejesha kutoka kwenye hifadhi rudufu.",
-      "genericChangeError": "Kuna kitu kimeenda vibaya. Tafadhali jaribu tena.",
+      "vaultUnreadable": "Faili ya kasha haisomwi. Rejesha kutoka kwenye nakala rudufu.",
+      "genericChangeError": "Kitu kimetokea vibaya. Jaribu tena.",
       "renameHelper": "Huonyeshwa kwenye kichagua cha kasha. Huhifadhiwa kimesimbwa ndani ya kasha hili; acha wazi ili kuifuta.",
-      "newPasswordPlaceholder": "Angalau herufi 12",
+      "newPasswordPlaceholder": "Herufi angalau 12",
       "reenterNewPassword": "Weka tena nenosiri jipya",
       "changePasswordFootnote": "Hii hubatilisha ufunguzi wa haraka. Kifungu chako cha urejeshaji hakibadiliki.",
       "changing": "Inabadilisha…",
@@ -3037,6 +3276,29 @@
       },
       "sections": {
         "identity": "Utambulisho wa kasha"
+      },
+      "format": {
+        "heading": "Muundo wa kasha",
+        "intro": "Kasha hili bado linatumia kifungu chake cha kurejesha. Kuupgradu kunahamisha kwenye kifungu chako cha utambulisho, kwa hivyo kifungu kimoja kinarejesha kila kasha unachomiliki.",
+        "cta": "Upgradu kwenye kurejesha kifungu kimoja",
+        "confirm": "Staafu kifungu changu cha kasha na upgradu",
+        "cancel": "Hifadhi kifungu changu cha kasha kwa sasa",
+        "running": "Inaupgradu…",
+        "warningPhrase": "Kifungu chako kilichohifadhiwa cha kurejesha kasha kitakoma kufungua kasha hili. Nenosiri lako la kasha bado linafanya kazi, na kifungu chako cha utambulisho kinakuwa njia ya kurudi.",
+        "warningDevices": "Kila kifaa unachotumia lazima kisasishe kwanza. Toleo la zamani haliwezi kufungua kasha hili upgradu ukisawazishwa.",
+        "done": "Kasha hili sasa linatumia kifungu chako cha utambulisho (limeupgradwa kutoka {{from}}).",
+        "error": {
+          "migrationRequired": "Kasha hili bado liko kwenye muundo wa zamani wa v0.1. Maliza upgradu wa kasha kwenye Mipangilio ya Sync kwanza.",
+          "personRequired": "Kifaa hiki hakina utambulisho bado. Tengeneza utambulisho wako kwanza, kisha urudi.",
+          "identityLocked": "Utambulisho wako umefungwa. Ufungue kwa kifungu chako cha utambulisho, kisha upgradu.",
+          "personMismatch": "Kasha hili linahusiana na utambulisho tofauti na ulioko kwenye kifaa hiki.",
+          "notOwner": "Hiki ni kasha shirikishi. Ni mmiliki wake tu anayeweza kubadilisha muundo wake.",
+          "notUnlocked": "Fungua kasha kabla ya kuupgradu muundo wake.",
+          "inProgress": "Operesheni nyingine ya usalama inaendelea. Jaribu tena baada ya muda.",
+          "alreadyUpgraded": "Kasha hili tayari linatumia kifungu chako cha utambulisho.",
+          "generic": "Upgradu haukukamilika. Hakuna kilichobadilika.",
+          "sharedVault": "Kasha hili linashirikiwa na mtu mwingine. Kurejesha kifungu kimoja ni kwa kasha ambalo wewe pekee unamiliki, kwa sababu usimamizi wa wanachama wanaoshiriki haukuikubali bado."
+        }
       }
     },
     "appearance": {
@@ -3112,6 +3374,7 @@
       "errorSaveSetting": "Imeshindwa kuhifadhi mpangilio huu.",
       "processing_one": "Inasoma kiambatisho 1…",
       "processing_other": "Inasoma viambatisho {{count}}…",
+      "draftUse": "Maandishi ambayo inasoma pia yanatolewa kama rasimu unaweza kuiongeza kwenye dokezo. Dokezo linasawazishwa kwa usimbaji fiche kama lingine lolote.",
       "mobileDeviceLocal": "Hii ni ya kila kifaa: huamua kile ambacho simu hii hufahirisi, hivyo vifaa vyako vingine vinabaki na chaguo lao."
     },
     "autoBackup": {
@@ -3137,6 +3400,7 @@
     "changePassword": {
       "cancel": "Ghairi",
       "checkingStrength": "Inakagua uimara…",
+      "strengthUnavailable": "Ukaguzi wa nguvu haikuweza kupakiwa, kwa hivyo urefu wa chini tu unakaguliwa.",
       "confirmLabel": "Thibitisha nenosiri jipya",
       "currentLabel": "Nenosiri la sasa",
       "mismatch": "Manenosiri hayalingani.",
@@ -3257,8 +3521,8 @@
       "periodFolderAriaLabel": "Folda ya madokezo ya {{period}}",
       "periodFormatAriaLabel": "Muundo wa kichwa wa madokezo ya {{period}}",
       "periodTemplateAriaLabel": "Kiolezo cha madokezo ya {{period}}",
-      "sectionPeriodic": "Madokezo ya mara kwa mara",
-      "periodSwitcherAriaLabel": "Aina ya dokezo la mara kwa mara",
+      "sectionPeriodic": "Madokezo ya kipindi",
+      "periodSwitcherAriaLabel": "Aina ya dokezo la kipindi",
       "blockLabel": "Madokezo ya mara kwa mara",
       "mobilePeriodAriaLabel": "Kipindi cha dokezo",
       "mobileSaveGlyph": "✓",
@@ -3271,8 +3535,11 @@
       "continue": "Endelea",
       "copyPrimary": "Hii inafuta kasha hili na kila dokezo lililo ndani yake kwa kudumu. Kitendo hiki hakiwezi kutenduliwa, na kifungu chako cha urejeshaji hakitarejesha data.",
       "copySecondary": "Funguo za kasha huondolewa kabisa kwenye kumbukumbu kabla mafaili hayajafutwa; maandishi yoyote yaliyosimbwa yatakayobaki kwenye diski hubaki takataka iliyofungwa kwa Argon2id isiyorejesheka.",
+      "keychainNote": "Ufutaji ukikamilika, Myne pia inaomba mfumo wako wa kifunguo kufuta ufunguo wa kufungua kwa kibiometri uliohifadhiwa kwa kasha hili, kwenye majukwaa ambayo inahifadhi moja.",
       "eyebrow": "HAKIWEZI KUTENDULIWA",
+      "memberEyebrow": "KIFAA HIKI PEKEE",
       "heading": "Futa kasha",
+      "memberHeading": "Ondoa kasha hili kwenye kifaa hiki?",
       "ioFailBody": "Imeshindwa kufikia mafaili ya kasha kwa ajili ya kufuta. Funguo za kasha tayari zimeondolewa kwenye kumbukumbu; data yoyote ya kasha itakayobaki kwenye diski ni takataka iliyofungwa kwa Argon2id isiyorejesheka.",
       "ioFailTitle": "Hitilafu ya diski wakati wa kufuta",
       "localEraseHeading": "Toka na ufute nakala ya kivinjari hiki",
@@ -3283,7 +3550,9 @@
       "partialFailBody_other": "Mafaili {{count}} hayakuweza kufutwa kwenye diski. Funguo za kasha tayari zimeondolewa kwenye kumbukumbu, hivyo maandishi yoyote yaliyosimbwa yatakayobaki ni takataka iliyofungwa kwa Argon2id isiyorejesheka.",
       "partialFailTitle": "Ufutaji wa kasha umeshindikana kwa sehemu",
       "submit": "Futa kasha",
+      "memberSubmit": "Ondoa kwenye kifaa hiki",
       "submitInFlight": "Inafuta kasha…",
+      "memberSubmitInFlight": "Inaondoa…",
       "typeToConfirmLabel": "Andika DELETE ili kuthibitisha",
       "vaultPath": "Njia ya kasha: {{path}}",
       "deleteError": "Imeshindwa kufuta kasha kikamilifu. Tafadhali jaribu tena.",
@@ -3416,7 +3685,7 @@
       "pendingHint": "Inakuja hivi karibuni"
     },
     "ai": {
-      "autoTagHelper": "Unaposimama kuandika, modeli ndogo iliyo kwenye kifaa chako husoma dokezo na kupendekeza lebo juu yake. Hakuna kinachoongezwa hadi ukubali pendekezo.",
+      "autoTagHelper": "Unapopumzika kuandika, modeli ndogo kwenye kifaa chako inasoma dokezo na kupendekeza tagi juu yake. Hakuna linaloongezwa hadi ukubali pendekezo, isipokuwa unawasha safu hapo chini.",
       "autoTagLabel": "Pendekeza lebo kiotomatiki",
       "autoTagUnavailable": "Bado hakuna modeli ya lebo iliyowekwa. Ipakue mara moja kutoka Mipangilio, AI, na swichi hujiwasha yenyewe mara tu inapowekwa.",
       "consent": {
@@ -3567,8 +3836,67 @@
         "preferences": "Mapendeleo",
         "memory": "Kumbukumbu",
         "excluded": "Kile ambacho AI inaweza kusoma",
-        "history": "Historia ya mazungumzo"
-      }
+        "history": "Historia ya mazungumzo",
+        "externalAccess": "Ufikiaji wa nje"
+      },
+      "externalAccess": {
+        "label": "Ufikiaji wa nje",
+        "helperOff": "Zima. Hakuna zana ya AI inayoweza kufikia kasha hili kupitia `myne-mcp`.",
+        "helperOn": "Imewashwa kasha likiwa wazi. Zana zilizoidhinishwa zinaweza kusoma folda zilizogawiwa kwazo, na Myne haiwezi kuona zinafanya nini na zilizosoma.",
+        "explanationShared": "Hili ni swichi moja na Mipangilio, CLI, Ufikiaji wa Terminal. Mlango mmoja, njia mbili za kuingia: `myne` inaendeshwa na wewe, na `myne-mcp` inaendeshwa na zana yoyote ya AI unayoiweka.",
+        "explanationLabel": "Jina la muunganisho ni lebo, si nenosiri. Myne haiwezi kutofautisha programu moja na nyingine zinazoendeshwa chini ya akaunti yako, na haukagui chochote zaidi ya kuwa mlango umefunguliwa.",
+        "explanationDevice": "Idhini zinahifadhiwa kwenye kifaa hiki. Kompyuta au simu nyingine inaanza bila zozote na inahitaji kuulizwa tena.",
+        "outsideMyne": "Zana iliyounganishwa inayofanya nini na zilizosoma ipo nje ya Myne: inaendeshwa kwenye mashine hii, ina ufikiaji wake wa mtandao, na Myne haiwezi kuona inapotuma kitu.",
+        "empty": "Hakuna muunganisho ulioidhinishwa kwenye kifaa hiki bado. Kuidhinisha moja ndio inayoruhusu zana maalum kusoma seti ya folda unazotaja.",
+        "readFailed": "Haikuweza kusoma orodha ya miunganisho sasa hivi. Myne haijakuambia kuwa hakuna iliyoidhinishwa.",
+        "retry": "Jaribu tena",
+        "readSummary": "Inaweza kusoma madokezo {{count}} kwenye folda {{folders}}.",
+        "readSummary_one": "Inaweza kusoma dokezo {{count}} kwenye folda {{folders}}.",
+        "readSummary_other": "Inaweza kusoma madokezo {{count}} kwenye folda {{folders}}.",
+        "readNothing": "Haiwezi kusoma chochote: hakuna folda iliyoshirikiwa kwake.",
+        "writeNone": "Haiwezi kuandika chochote. Jengo hili linatoa usomaji pekee.",
+        "missing_one": "Folda {{count}} iliyoidhinishwa haipo tena. Folda iliyobadilishwa jina au kufutwa inaacha idhini kuashiria kitu tupu.",
+        "missing_other": "Folda {{count}} zilizoidhinishwa hazipo tena. Folda iliyobadilishwa jina au kufutwa inaacha idhini kuashiria kitu tupu.",
+        "whenLine": "Imeidhinishwa {{approved}}. Imetumika mwisho {{used}}.",
+        "whenLineNever": "Imeidhinishwa {{approved}}. Haijatumika tangu.",
+        "revoke": "Futa idhini",
+        "revokeFailed": "Haikuweza kufuta idhini ya muunganisho huo. Bado inaweza kusoma zilizogawiwa kwake.",
+        "snippetToggle": "Kipande cha usanidi",
+        "snippetHelper": "Bandika hii kwenye usanidi wa MCP wa zana yako ya AI. Jina lazima lifanane na muunganisho hapo juu, kwa sababu jina ndiyo idhini inayounganishwa kwake.",
+        "rootFolder": "Mzizi wa kasha",
+        "addConnection": "Idhinisha muunganisho",
+        "dialogTitleNew": "Idhinisha muunganisho",
+        "dialogTitle": "Idhinisha {{name}} tena",
+        "nameLabel": "Jina la muunganisho",
+        "namePlaceholder": "claude-desktop",
+        "nameHelper": "Jina ambalo mteja wako anatuma. Ni lebo, si nenosiri: programu yoyote kwenye mashine hii inaweza kutumia jina lolote inalopenda, kwa hivyo hili linaamua kinachoshirikiwa na nani, si nani anayeuliza.",
+        "nameReserved": "Jina hilo limehifadhiwa: mteja aliyesanidiwa bila jina atafika kama `unnamed-client`, kwa hivyo kuidhinisha kunamaanisha kuaidhinisha kila mteja asiyesanidiwa.",
+        "nameEmpty": "Muunganisho unahitaji jina, kwa sababu ndiyo idhini inayounganishwa kwake.",
+        "firstGrantHelper": "Hakuna kinachoshirikiwa na muunganisho huu bado.",
+        "reextendHelper": "Muunganisho huu tayari una idhini. Kuidhinisha tena kunafungia seti mpya kutoka unachochagua sasa, na kuendelea na kinachoweza kusomwa bado.",
+        "countsPending": "Inakokotoa kinachohusika…",
+        "countsNotes": "Inashiriki madokezo {{count}} kwenye folda {{folders}}.",
+        "countsNotes_one": "Inashiriki dokezo {{count}} kwenye folda {{folders}}.",
+        "countsNotes_other": "Inashiriki madokezo {{count}} kwenye folda {{folders}}.",
+        "countsExcluded_one": "Folda {{count}} imetengwa.",
+        "countsExcluded_other": "Folda {{count}} zimetengwa.",
+        "excludeLabel": "Acha nje",
+        "excludePlaceholder": "Hakuna alichotengwa",
+        "excludeSearch": "Tafuta folda",
+        "excludeEmpty": "Hakuna folda inayofanana.",
+        "excludeHelper": "Folda unayoiacha nje haishirikiwi, wala chochote kilicho ndani yake. Unachagua kutoka kila folda kwenye kasha hili, kwa hivyo hapa ndipo kasha lote lipo kwenye meza.",
+        "frozenNotice": "Seti hii inafungwa unapoidhinisha. Folda unayounda baadaye inaanza nje yake, na Ufikiaji wa Nje utakuonyesha ni ngapi na kutoa ongezeko.",
+        "approve": "Idhinisha",
+        "grantRefused": "Idhini hii haikuweza kuingia kwenye bajeti ya mipangilio ya kasha. Hakuna kilichobadilika. Futa muunganisho usiotumia tena, kisha ujaribu tena.",
+        "grantFailed": "Haikuweza kuhifadhi idhini. Hakuna kilichobadilika.",
+        "delta_one": "Folda {{count}} iliyoundwa tangu uliidhinishi hii haijashirikiwa.",
+        "delta_other": "Folda {{count}} zilizoundwa tangu uliidhinishi hii hazijashirikiwa.",
+        "deltaAdd": "Ongeza folda {{count}}",
+        "deltaAdd_one": "Ongeza folda {{count}}",
+        "deltaAdd_other": "Ongeza folda {{count}}"
+      },
+      "autoApplyLabel": "Tumia tagi zilizopendekezwa kiotomatiki",
+      "autoApplyHelper": "Inaandika tagi kwenye dokezo bila kuuliza, mara moja kwa kila dokezo kwa kipindi, tu baada ya kukiandika. Kwenye kifaa hiki tu. Kutendua kupo chini ya dokezo baada ya kuandika."
     },
     "network": {
       "disabledCue": "Usawazishaji hausafirishwi tena kupitia Tor. Miunganisho mipya huenda moja kwa moja kwenye seva ya usawazishaji.",
@@ -3624,8 +3952,8 @@
       "hideVaultNamesErrorRead": "Imeshindwa kusoma mpangilio wa sasa. Geuza swichi ili kuuweka tena.",
       "hideVaultNamesErrorSave": "Imeshindwa kuhifadhi mpangilio, hivyo haujabadilika. Kama ulikuwa unauwasha, baadhi ya majina yaliyohifadhiwa huenda tayari yameharibiwa; uwashe tena ili kumaliza.",
       "hideVaultNamesErrorErase": "Jina moja lililohifadhiwa halikuweza kuharibiwa, hivyo mpangilio uliachwa umezimwa badala ya kudai ufutaji ambao haukutokea. Jaribu tena.",
-      "screenCaptureHelperOff": "Ulinzi hutumika daima kabla ya kufungua. Baada ya kufungua, hufuata mapendeleo haya.",
-      "screenCaptureHelperOn": "Inafanya kazi kwenye Windows 10 (May 2020 Update) na baadaye. macOS na Linux hazina API ya mfumo kwa hili, hivyo huko haiwezi kuzuia kunasa skrini.",
+      "screenCaptureHelperOff": "Zima kwenye kifaa hiki, kabla ya kufungua na baada. Washa tena hapa, au kutoka skrini ya kufunga kwa kibodi.",
+      "screenCaptureHelperOn": "Inafanya kazi kwenye Windows 10 (May 2020 Update) na baadaye. macOS na Linux hazina API ya mfumo kwa hili, kwa hivyo haiwezi kuzuia kunasa kwenye hizo.",
       "screenCaptureLabel": "Ulinzi dhidi ya kunasa skrini",
       "screenCaptureSubtitle": "Zuia picha za skrini na kurekodi skrini",
       "screenshotBlocked": "Ulinzi wa skrini umewashwa: picha za skrini za Myne hutoka tupu.",
@@ -3727,7 +4055,8 @@
         "sync": "Usawazishaji",
         "cli": "CLI",
         "vault": "Kasha",
-        "data": "Data"
+        "data": "Data",
+        "diagnostics": "Uchunguzi"
       },
       "passwordUpdatedToast": "Nenosiri limesasishwa",
       "title": "Mipangilio"
@@ -3872,6 +4201,7 @@
       "empty": "Hakuna mpangilio unaolingana na “{{query}}”",
       "resultsLabel": "Matokeo ya utafutaji",
       "keywords": {
+        "accountNumber": "nambari ya akaunti utambulisho msaada mkabidhi nakili",
         "aiAutoTag": "lebo kiotomatiki lebo pendekeza mapendekezo alama ai",
         "aiEndpoint": "ollama endpoint anwani kiendeshi cha ndani modeli seva mlango loopback",
         "aiProvider": "mtoa huduma wa mbali wingu openrouter ollama cloud api ufunguo kitambulisho idhini tuma madokezo",
@@ -3943,7 +4273,7 @@
         "ribbon": "utepe wa kushoto bandika amri mipangilio mpangilio ondoa baru ya zana mishale mafupi",
         "folderNotes": "folda notisi faharasa folder_index ukurasa lengo mbili-bofya kiungo kwa folda miradi zima",
         "syncMembers": "wanachama, shiriki, karibisha, timu, ushirikiano, hazina",
-        "accountVaults": "akaunti makasha yaliyopangwa makasha yapi ni ya kundi orodha",
+        "accountVaults": "akaunti makasha yaliyogawanywa ni makasha gani yanahusiana na orodha",
         "aiMeetingPrompt": "mkutano muhtasari kidokezo maelekezo maalum unukuzi hoja za kufanyia kazi maamuzi",
         "update": "sasisha sasisho kagua masasisho toleo jipya toleo pakua",
         "plainFile": "faili wazi kihariri markdown diski ya ndani nje ya kasha maandishi wazi fungua mahali yalipo",
@@ -3951,6 +4281,9 @@
         "recoveryDrill": "kifungu cha urejeshaji kagua thibitisha zoezi jaribio maneno 24 mbegu hifadhi rudufu nenosiri lililopotea",
         "bar": "upau wa chini upau wa hali viashiria boreka panga upya ficha onyesha upau wa zana",
         "syncDeviceBindings": "vifaa vinavyodaiwa na wanachama uhusiano nani alisaini kifaa kipi ni cha nani",
+        "vaultFormat": "muundo wa kasha upgradu kurejesha kifungu kimoja staafu kasha kifungu cha kurejesha hamisha utambulisho",
+        "publishVault": "chapisha kasha lililochapishwa seva kifaa pekee usawazishaji",
+        "externalAccess": "ufikiaji wa nje MCP myne-mcp Claude Desktop muunganisho idhinisha wigo futa",
         "diagnosticLog": "kumbukumbu za uchunguzi uwekaji kumbukumbu utatuzi wa hitilafu utatuzi wa matatizo ripoti ya kuanguka ripoti ya hitilafu msaada"
       },
       "emptyBody": "Jaribu neno fupi, au jina la paneli."
@@ -4019,23 +4352,109 @@
       "personalitySaveFailed": "Mipangilio ya sauti haiwezi kuhifadhiwa.",
       "loadFailed": "Kumbukumbu au mipangilio ya sauti haiwezi kupakiwa. Hakuna kilichobadilika.",
       "retryLabel": "Jaribu tena",
+      "seed": {
+        "rowTitle": "Mfundishe Myne kasha lako",
+        "rowHelper": "Tengeneza kumbukumbu kutoka kwenye madokezo yako mara moja, ukipitia kila mstari kabla ya kuhifadhiwa.",
+        "rowSeeded": "Iliundwa {{date}} · maingizo {{count}}",
+        "start": "Mfundishe Myne kasha lako",
+        "rebuild": "Tengeneza upya",
+        "rebuildConfirm": "Badilisha upanuzi kutoka {{date}} (maingizo {{count}})?",
+        "title": "Mfundishe Myne kasha lako",
+        "candidatesTitle": "Kagua Myne ilichojifunza",
+        "doneTitle": "Imehifadhiwa",
+        "close": "Funga",
+        "loading": "Inasoma kasha lako…",
+        "scopeIntro": "Myne inasoma umbo la kasha lako kwanza: vichwa vya madokezo, folda na tagi. Inaomba maandishi ya dokezo tu ikiwa inahitaji, na kamwe viambatisho.",
+        "provider": "Mtoa huduma: {{provider}}",
+        "providerRemote": "mbali",
+        "providerLocal": "kwenye kifaa hiki",
+        "counts": "Madokezo {{notes}} · folda {{folders}} · tagi {{tags}}",
+        "estimatedChars": "Herufi takriban {{chars}}",
+        "excluded": "Madokezo {{count}} yameachwa kwa sababu folda yake imetengwa na AI",
+        "omitted": "Vichwa {{count}} viliondolewa ili kutoshea muktadha wa modeli",
+        "showPayload": "Onyesha hasa kinachotumwa",
+        "hidePayload": "Ficha mzigo",
+        "consentLabel": "Tuma muhtasari huu kwa {{provider}} (herufi takriban {{chars}}). Ninaelewa mtoa huduma anapokea.",
+        "localNote": "Hakuna kinachotoka kwenye kifaa hiki. Modeli inaendeshwa hapa.",
+        "continue": "Endelea",
+        "cancel": "Ghairi",
+        "generatingHelper": "Hii inaweza kuchukua dakika kadhaa kwenye modeli ya kwenye kifaa. Unaweza kughairi wakati wowote na hakuna kilichohifadhiwa.",
+        "cancelRun": "Ghairi uendeshaji huu",
+        "candidatesIntro": "Maingizo {{count}}. Ondoa tiki chochote usichotaki, na hariri muundo kabla ya kuhifadhiwa.",
+        "candidateLabel": "Ingizo la kumbukumbu {{index}}",
+        "charCount": "Herufi {{count}} / 2000",
+        "back": "Rudi",
+        "apply": "Hifadhi maingizo {{count}}",
+        "applying": "Inahifadhi…",
+        "applied": "Maingizo {{count}} yamehifadhiwa kwenye kumbukumbu.",
+        "appliedHelper": "Yapatikane chini ya Kutoka kwenye kasha lako katika sehemu hii. Msaidizi anayasoma tangu sasa.",
+        "finish": "Maliza",
+        "appliedToast": "Kumbukumbu imetengenezwa kutoka kwenye kasha lako.",
+        "refusals": {
+          "empty": "Ingizo hili ni tupu.",
+          "textTooLong": "Ingizo hili limezidi kikomo cha herufi 2000.",
+          "scanRejected": "Ingizo hili linasoma kama maagizo kwa msaidizi, si ukweli. Lihariri kisha ujaribu tena."
+        },
+        "errors": {
+          "aiDisabled": "AI imezimwa kwenye kifaa hiki.",
+          "locked": "Fungua kasha kisha ujaribu tena.",
+          "busy": "Upanuzi unaendelea tayari.",
+          "consent": "Thibitisha kuwa mtoa huduma anaweza kupokea muhtasari kwanza.",
+          "unreadable": "Faharasa ya kasha lako haikuweza kusomwa.",
+          "malformed": "Modeli haikujibu kwa muundo unaohitajika na uendeshaji huu. Jaribu tena.",
+          "cancelled": "Uendeshaji umeghairiwa. Hakuna kilichohifadhiwa.",
+          "noBodies": "Modeli iliomba maandishi ya dokezo, lakini hakuna yaliyoweza kusomwa.",
+          "engine": "Wito wa modeli umeshindwa. Kagua mtoa huduma kisha ujaribu tena.",
+          "unknown": "Kitu kimetokea vibaya wakati wa kutengeneza kumbukumbu. Jaribu tena.",
+          "candidateRefused": "Ingizo moja limekataliwa. Limeashiria chini; lihariri kisha uhifadhi tena.",
+          "cap": "Kumbukumbu yako imejaa.",
+          "capDetail": "Nafasi {{remaining}} zimebaki lakini maingizo {{requested}} yamechaguliwa. Ondoa maingizo katika paneli hii, au ondoa tiki kwenye baadhi ya wagombea."
+        },
+        "phases": {
+          "projecting": "Inasoma umbo la kasha lako…",
+          "asking": "Inauliza modeli kuhusu mada…",
+          "reading": "Inasoma madokezo ambayo modeli iliomba…",
+          "finalizing": "Inaandika maingizo…",
+          "working": "Inafanya kazi…"
+        },
+        "groupTitle": "Kutoka kwenye kasha lako",
+        "groupMeta": "Imeupanziwa {{date}} · maingizo {{count}}",
+        "removeAll": "Ondoa yote",
+        "removeConfirm": "Ondoa maingizo yote kutoka upanuzi huu?",
+        "removedToast": "Maingizo kutoka kwenye kasha lako yameondolewa.",
+        "rowStale": "Kasha limebadilika tangu upanuzi huu"
+      },
       "emptyTitle": "Hakuna kinachokumbukwa bado",
       "count": "{{used}} kati ya {{cap}}",
       "atCap": "Orodha imejaa, hivyo hakuna kipya kinachoweza kukumbukwa. Futa kijikumbusho ili kupata nafasi."
     },
     "account": {
-      "vaultsLabel": "Makasha katika akaunti hii",
-      "vaultsHelper": "Makasha ambayo kifaa hiki kinapanga chini ya jina lililo juu. Kupanga ni chaguo la mpangilio la kila kifaa, hivyo si sehemu ya maudhui ya kasha lolote na havisafiri navyo.",
+      "vaultsLabel": "Makasha kwenye akaunti hii",
+      "vaultsHelper": "Makasha ambayo kifaa hiki kinagawanya pamoja. Ugawaji ni chaguo la kuandaa kwa kila kifaa, kwa hivyo si sehemu ya yaliyomo kwenye kasha lolote na haufuati.",
+      "vaultsHelperShort": "Ugawaji unabaki kwenye kifaa hiki na haufuati kasha.",
       "vaultsCount_one": "Makasha {{count}}",
       "vaultsCount_other": "Makasha {{count}}",
+      "vaultActions": "Vitendo vya kasha",
+      "splitLastConfirm": "Hiki ndicho kasha pekee kwenye akaunti. Kukihamisha kunafuta akaunti hii.",
+      "vaultCorrupted": "Metadata ya kasha hiki haikuweza kusomwa",
+      "vaultUnreadable": "Haisomwi kwenye kifaa hiki",
+      "vaultDeviceOnly": "Kifaa pekee",
       "currentVault": "Kasha hili",
-      "unknownVault": "Kasha jingine kwenye kifaa hiki",
-      "standaloneHelper": "Kasha hili halijapangwa chini ya akaunti kwenye kifaa hiki, hivyo linajitegemea. Kupanga ni kwa kila kifaa: kifaa kingine kinaweza kukionyesha ndani ya moja.",
-      "unresolvedHelper": "Inabaini ni kasha lipi lililofunguliwa…",
-      "devicesNote": "Vifaa, wanachama wa kasha linaloshirikiwa na utambulisho wako huthibitishwa katika Usawazishaji.",
-      "groupingHidden": "Majina ya akaunti hayapatikani wakati majina ya makasha yamefichwa. Zima chaguo hilo katika Faragha ili kudhibiti akaunti hii.",
-      "groupingUnreadable": "Upangaji wa akaunti wa kifaa hiki haukuweza kusomwa. Hakuna kilichobadilika.",
-      "groupingError": "Imeshindwa kusoma upangaji wa akaunti kwenye kifaa hiki. Hakuna kilichobadilika.",
+      "unknownVault": "Kasha lingine kwenye kifaa hiki",
+      "numberLabel": "Nambari ya akaunti",
+      "numberHelper": "Nambari ya utambulisho wako, si ya kasha. Inatokana na kifungu chako cha utambulisho, kwa hivyo haiwezi kupotea na hahitaji kuhifadhiwa. Si siri; itumie kwa msaada au kwa mkabidhi wa msimamizi wa seva.",
+      "numberUnavailable": "Haikuweza kusoma nambari ya akaunti kwenye kifaa hiki. Fungua Mipangilio tena ili kujaribu.",
+      "numberEmpty": "Hakuna utambulisho kwenye kifaa hiki. Ongeza au urejeshe moja kwenye Sync ili upate nambari ya akaunti.",
+      "numberCopy": "Nakili",
+      "numberCopied": "Nambari ya akaunti imenakiliwa",
+      "numberCopyFailed": "Haikuweza kunakili nambari ya akaunti",
+      "copyAccountNumber": "Nakili nambari ya akaunti",
+      "standaloneHelper": "Kasha hili halijagawiwa chini ya akaunti kwenye kifaa hiki, kwa hivyo kinasimama kwa kujitegemea. Ugawaji ni kwa kila kifaa: kifaa kingine kinaweza kulionyesha ndani ya moja.",
+      "unresolvedHelper": "Inakokotoa kasha lililofunguliwa…",
+      "devicesNote": "Vifaa, wanachama wa kasha shirikishi na utambulisho wako vinasimamiwa kwenye Sync.",
+      "groupingHidden": "Ugawaji wa akaunti haupatikani wakati majina ya makasha yanafichwa. Zima chaguo hilo kwenye Faragha ili kuusimamia.",
+      "groupingUnreadable": "Ugawaji wa akaunti wa kifaa hiki haikuweza kusomwa. Hakuna kilichobadilika.",
+      "groupingError": "Haikuweza kusoma ugawaji wa akaunti kwenye kifaa hiki. Hakuna kilichobadilika.",
       "sections": {
         "extensions": "Viendelezi vya kivinjari",
         "grouping": "Akaunti hii"
@@ -4152,7 +4571,7 @@
       "invalidAccount": "Hiyo haionekani kama nambari halali ya akaunti.",
       "notConfigured": "Weka seva ya usawazishaji kwanza, kisha utengeneze QR.",
       "scanWithApp": "Skani kwa programu ya iOS",
-      "title": "Ongeza kifaa kwa QR"
+      "title": "Ingia kwenye kifaa kingine"
     },
     "devices": {
       "approve": "Idhinisha",
@@ -4160,7 +4579,7 @@
       "awaitingApproval_other": "Vifaa {{count}} vinasubiri idhini",
       "loading": "Inapakia…",
       "noDevices": "Bado hakuna vifaa vingine",
-      "notEnrolled": "Kifaa hiki bado hakijaunganishwa. Kama umekiongeza sasa hivi, subiri idhini kutoka kwenye kifaa kingine; vinginevyo kiongeze kwa fomu ya “Ongeza kifaa” iliyo hapo juu.",
+      "notEnrolled": "Kifaa hiki hakijasajiliwa bado. Ikiwa uliongeza hivi karibuni, subiri idhini kutoka kwenye kifaa ambacho tayari kiko kwenye akaunti yako; vinginevyo kisajili kwa “Sajili kifaa hiki”.",
       "platform": {
         "android": "Simu ya Android",
         "androidTablet": "Kompyuta kibao ya Android",
@@ -4268,8 +4687,27 @@
       "verifyTitle": "Thibitisha kifaa hiki",
       "waitingHint": "Acha dirisha hili wazi. Likishaidhinishwa, msimbo wa uthibitisho utaonekana hapa ili ulinganishe na kifaa chako kingine.",
       "waitingTitle": "Inasubiri idhini",
+      "personListFailed": "Uko kwenye akaunti hii, lakini kuorodhesha makasha yake hakukukamilika, kwa hivyo hakuna linaloonyeshwa bado. Jaribu tena, au fungua skrini hii baadaye.",
+      "personListRetry": "Orodhesha makasha tena",
       "sasAbortFailed": "Imeshindwa kukiondoa kifaa hiki kwenye muunganisho. Bado kimesajiliwa kwenye seva hiyo, hivyo kichukulie kama kisichoaminika: fungua Mipangilio → Usawazishaji na ukiondoe hapo. Madokezo yako hayakufutwa.",
       "backToWaiting": "Rudi kwenye kusubiri",
+      "codeBody": "Bandika msimbo unaonyeshwa na kifaa kingine. Msimbo kutoka utambulisho unaongeza kifaa hiki kwenye akaunti nzima.",
+      "codeContinue": "Endelea",
+      "codeExpired": "Msimbo huu umeisha muda. Uliza kifaa kingine kuonyesha mpya.",
+      "codeInvalid": "Huu si msimbo wa kujiunga wa Myne.",
+      "codeLabel": "Msimbo wa kujiunga",
+      "codeMemberUnsupported": "Msimbo huo ni wa kasha shirikishi. Ongeza kifaa hiki kutoka skrini ya utambulisho, ambapo kasha linaonekana chini ya mialiko yako.",
+      "codeOpen": "Nina msimbo wa kujiunga",
+      "codeTitle": "Ongeza kifaa hiki kwa msimbo",
+      "personMismatch": "Msimbo huo ni wa utambulisho tofauti na kifungu ulichoingiza. Kagua vyote viwili kisha ujaribu tena.",
+      "personPendingBody": "Kifaa kingine chako lazima kidhinishi hiki. Hadithi, kifaa hiki hakiwezi kufungua kasha lolote la akaunti.",
+      "personPendingHint": "Inasubiri idhini. Inakamilika yenyewe kifaa kingine kikidhinisha.",
+      "personPendingPhraseAgain": "Kifaa hiki kilianzishwa upya kabla idhini haijafika, kwa hivyo kifungu kinahitajika tena.",
+      "personPendingPhraseCta": "Weka kifungu tena",
+      "personPendingTitle": "Inasubiri idhini",
+      "personPhraseBody": "Msimbo ulitaja utambulisho; maneno 24 yanathibitisha. Kifaa hiki kitahitaji nenosiri la kila kasha unapofungua.",
+      "personPhraseSubmit": "Ongeza kifaa hiki",
+      "personPhraseTitle": "Weka kifungu chako cha utambulisho",
       "errorPhrase": "Imeshindwa kuongeza kifaa hiki. Kagua URL ya seva, nambari ya akaunti, na kifungu cha urejeshaji, na uhakikishe seva inafikika.",
       "modePassword": "Nenosiri langu",
       "modePhrase": "Kifungu changu cha urejeshaji",
@@ -4283,7 +4721,7 @@
     "panel": {
       "addDevice": {
         "helper": "Ingia kwenye kifaa kipya kwa nambari yako ya akaunti na nenosiri au kifungu cha urejeshaji. Kifaa hubaki kikisubiri hadi kifaa kilichopo kikiidhinishe.",
-        "label": "Ongeza kifaa"
+        "label": "Sajili kifaa hiki"
       },
       "awaitingApproval": {
         "label": "Inasubiri idhini"
@@ -4293,7 +4731,8 @@
         "label": "Migongano"
       },
       "devices": {
-        "label": "Vifaa"
+        "label": "Vifaa",
+        "helper": "Idhini moja inatisaini kifaa kwenye akaunti yako. Kisha kinaona kila kasha unachomiliki, na kila kasha bado linafunguliwa kwa nenosiri lake."
       },
       "recovered": {
         "close": "Funga",
@@ -4328,6 +4767,7 @@
         "cta": "Ongeza utambulisho",
         "codeLabel": "Msimbo wako wa utambulisho",
         "lockedHelper": "Kifaa hiki kina utambulisho. Umefungwa kwa kipindi hiki; ufungue kwa kifungu chako cha urejeshaji ili kusaini usawazishaji na mialiko.",
+        "unregisteredHelper": "Utambulisho huu upo kwenye kifaa hiki tu. Usajili unauandika kwenye seva yako ya usawazishaji, ndiyo inayowezesha mwaliko kufika kwako.",
         "unlockedHelper": "Kifaa hiki kina utambulisho, uliofunguliwa kwa kipindi hiki."
       },
       "topics": {
@@ -4338,7 +4778,27 @@
       "sections": {
         "account": "Akaunti",
         "server": "Seva",
-        "devices": "Vifaa vilivyosajiliwa"
+        "devices": "Vifaa kwenye akaunti yako"
+      },
+      "publish": {
+        "label": "Chapisha kwenye seva yako",
+        "cta": "Chapisha kasha hili",
+        "republishCta": "Chapisha tena",
+        "deviceOnlyHelper": "Kasha hili lipo kwenye kifaa hiki tu. Kuchapisha kunaliunganisha na utambulisho wako ili vifaa vyako vingine viweze kulifungua.",
+        "publishedHelper": "Imechapishwa {{when}}. Kasha hili liko kwenye seva yako ya usawazishaji, kwa hivyo vifaa vyako vingine vinaweza kulifikia.",
+        "publishedHelperNoDate": "Imechapishwa. Kasha hili liko kwenye seva yako ya usawazishaji, kwa hivyo vifaa vyako vingine vinaweza kulifikia.",
+        "error": {
+          "NotConfigured": "Weka seva ya usawazishaji kwanza, kwenye Sync hapo juu.",
+          "PersonSessionRequired": "Fungua utambulisho wako kwanza. Kuchapisha kunahitaji utambulisho unayomiliki kasha hili.",
+          "PersonNotRegistered": "Sajili utambulisho wako kwanza, katika sehemu ya Utambulisho hapo juu. Kifaa hiki kinashikilia utambulisho lakini haujawahi kusajiliwa kwenye seva, kwa hivyo hakuna akaunti ya kuchapisha chini yake.",
+          "NotEnrolled": "Kasha hili linahusiana na akaunti ambayo kifaa hiki hakijaandikishwa. Ongeza kifaa kwenye akaunti hiyo kwanza.",
+          "NotOwner": "Kasha hili tayari linahusiana na utambulisho mwingine, kwa hivyo haliwezi kuchapishwa hapa.",
+          "Unauthenticated": "Seva ilikataa kifaa hiki. Jaribu tena, na uandikishe upya ikizidi kutokea.",
+          "Transport": "Haikuweza kufikia seva. Kasha halijabadilika; jaribu tena.",
+          "TlsFailure": "Haikuweza kuanzisha muunganisho wa kuaminika. Kasha halijabadilika; jaribu tena.",
+          "BadRequest": "Metadata ya kasha hiki haikuweza kusomwa. Hakuna kilichotumwa.",
+          "Other": "Kuchapisha kumeshindwa. Kasha halijabadilika; jaribu tena."
+        }
       }
     },
     "reconcile": {
@@ -4365,6 +4825,7 @@
       "errorTooLarge": "Kuna faili kubwa mno kupakiwa",
       "loading": "Hali ya usawazishaji…",
       "notEnrolled": "Hakijasajiliwa",
+      "notRegistered": "Haijasajiliwa",
       "off": "Usawazishaji umezimwa",
       "synced": "Imesawazishwa",
       "syncing": "Inasawazisha…",
@@ -4377,7 +4838,10 @@
       "devices": "Vifaa",
       "frozen": "Akaunti hii imegandishwa. Mabadiliko mapya hayawezi kupakiwa; madokezo yako bado yanapakuliwa.",
       "ofTotal": "{{used}} kati ya {{total}}",
-      "storage": "Hifadhi"
+      "storage": "Hifadhi",
+      "storageAcrossVaults": "Imehifadhiwa, kwenye makasha yako",
+      "vaultCount_one": "Kasha {{count}}",
+      "vaultCount_other": "Makasha {{count}}"
     },
     "settings": {
       "serverSection": "Seva",
@@ -4445,14 +4909,15 @@
       "invitationsFailed": "Mkaribisho wako haukuweza kupakiwa.",
       "title": "Wanachama wa hazina",
       "personUnlock": "Fungua utambulisho wa mwanachama",
-      "personReady": "Utambulisho wa mwanachama umefunguliwa.",
+      "personReady": "Utambulisho wako umefunguliwa kwa kipindi hiki.",
       "ownerCodeHint": "Shiriki msimbo huu na mtu unayemkaribisha ili aweze kuthibitisha kuwa hazina ni yako. Una taarifa za umma pekee.",
-      "personLock": "Funga utambulisho wa mwanachama",
+      "personLock": "Funga utambulisho",
       "personError": "Sentensi hii haikufungua utambulisho wa mwanachama.",
       "inviteHint": "Bandika msimbo wa utambulisho wa mwanachama aliyekaribishwa (kwenye ukurasa wake wa utambulisho).",
-      "inviteCodeLabel": "Msimbo wa utambulisho wa mwanachama",
+      "inviteCodeLabel": "Msimbo wako wa utambulisho",
       "untitledVault": "Hazina isiyo na jina",
       "inviteFailed": "Mkaribisho haukuweza kutengenezwa.",
+      "inviteNotOnServer": "Kasha hili haliko kwenye seva yako ya usawazishaji bado. Kilichapishe, na usajili utambulisho wako, kisha ualike tena.",
       "removeFailed": "Mwanachama hakuweza kuondolewa.",
       "youBadge": "Wewe",
       "nameUnverified": "Jina halijathibitishwa",
@@ -4473,6 +4938,7 @@
       "membersHeading": "Wanachama",
       "emptyTitle": "Hakuna wanachama bado",
       "personUnlockOpen": "Fungua",
+      "identityLockedNotice": "Fungua utambulisho wako kwa kipindi hiki ili kusimamia wanachama na mialiko.",
       "unsharedNotice": "Kasha hili bado halijashirikiwa. Kulishiriki ni la kudumu na hutokea mara ya kwanza unapomkaribisha mtu.",
       "shareConfirmTitle": "Shiriki kasha hili?",
       "shareConfirmBody": "Kumkaribisha mtu huligeuza kasha hili kuwa linaloshirikiwa: linapata ufunguo wa kikundi, na watu unaowakaribisha hufungua maudhui yake kwa ufunguo huo. Mabadiliko haya ni ya kudumu na hakuna njia ya kurudi kwenye kasha la mtumiaji mmoja. Endelea ili kuchagua nani wa kumkaribisha.",
@@ -4483,11 +4949,12 @@
       "identityForgetConfirm": "Sahau utambulisho",
       "identityForgetCancel": "Ihifadhi",
       "identityForgetWarning": "Hii huondoa utambulisho kwenye kifaa hiki pekee. Akaunti ya seva na kasha lolote analomiliki au alilojiunga nalo hayaathiriki, na unaweza kurejesha utambulisho kwa kifungu chake cha maneno 24 kwenye kifaa kingine. Mialiko na vitendo vya orodha ya wanachama kwenye kifaa hiki vitahitaji ufunguliwe tena.",
-      "identityForgetError": "Imeshindwa kusahau utambulisho. Jaribu tena."
+      "identityForgetError": "Imeshindwa kusahau utambulisho. Jaribu tena.",
+      "invitationDeclined": "Imekataliwa"
     },
     "deviceBindings": {
       "title": "Vifaa na wanachama",
-      "heading": "Vifaa vinavyodaiwa",
+      "heading": "Vifaa vya mwanachama",
       "hint": "Kila kifaa kilichojidai chenyewe kwenye kasha hili, pamoja na mwanachama ambaye saini yake mwenyewe kinadaiwa. Kudai si uthibitisho wa umiliki: husema ni mwanachama gani alisaini taarifa, si kwamba kifaa ni chake.",
       "loading": "Inapakia vifaa…",
       "emptyTitle": "Hakuna vifaa vilivyodaiwa bado",
@@ -4523,7 +4990,19 @@
       "stepIdentity": "Kwenye kifaa chako kingine, fungua Myne na uchague “Tayari nina utambulisho”.",
       "stepJoin": "Kasha hili linaloshirikiwa litakuwa linasubiri kwenye mialiko yako. Lifungue ili ujiunge.",
       "stepPhrase": "Weka maneno 24 ya kifungu chako cha urejeshaji hapo.",
-      "title": "Ongeza kifaa chako mwenyewe"
+      "title": "Ingia kwenye kifaa chako cha pili"
+    },
+    "personJoinQr": {
+      "title": "Ongeza kifaa kwenye utambulisho wako",
+      "hint": "Kwenye kifaa kingine, chagua “Nina msimbo wa kujiunga” kisha ubandike kile msimbo huu unasema. Kifaa hicho kitahitaji maneno yako 24, kisha kisubiri uidhinishaji hapa.",
+      "notConfigured": "Msimbo unataja seva, kwa hivyo weka yako kwanza kwenye Sync hapo juu, kisha tengeneza msimbo huu.",
+      "noIdentity": "Kifaa hiki hakina utambulisho, kwa hivyo hakuna akaunti ambayo msimbo unaweza kuitaja. Tengeneza au urejeshe utambulisho wako kwanza.",
+      "error": "Haikuweza kutengeneza msimbo. Jaribu tena.",
+      "image": "Msimbo wa kujiunga",
+      "stepCode": "Kwenye kifaa kingine, fungua Myne kisha ubandike msimbo huu pale inapouliza msimbo.",
+      "stepPhrase": "Weka kifungu chako cha maneno 24 hapo. Hakiachi kifaa hicho.",
+      "stepApprove": "Idhinisha kifaa hicho hapa, kwenye kifaa ambacho tayari kina utambulisho wako.",
+      "stepVaults": "Makasha ya akaunti yako kisha yanaonekana kwenye kifaa kipya. Fungua moja kwa nenosiri la kasha hilo."
     }
   },
   "tasks": {
@@ -4693,6 +5172,7 @@
     "continue": "Endelea",
     "decrypting": "Inasimbua…",
     "deleteLink": "Umepoteza nenosiri na kifungu cha urejeshaji? Futa kasha uanze upya",
+    "memberRemoveLink": "Ondoa kasha hili kwenye kifaa hiki",
     "errors": {
       "alreadyUnlocked": "Kasha tayari limefunguliwa.",
       "inProgress": "Kuna shughuli inayoendelea.",
@@ -4755,6 +5235,7 @@
     "failClosedEyebrow": "Haiwezi kufungua kasha",
     "restoreHint": "Kurejesha kutoka kwenye hifadhi rudufu hakupatikani kwenye simu bado.",
     "memberHint": "Hazina hii imeshirikiwa nawe. Ifungue kwa sentensi yako ya kurejesha.",
+    "memberSubtitle": "Fungua kasha hili shirikishi.",
     "memberPhraseLabel": "Sentensi ya kurejesha",
     "memberSubmit": "Fungua",
     "memberError": "Sentensi hii haikufungua hazina iliyoshirikiwa.",
@@ -4770,7 +5251,20 @@
     "memberBiometricSubmit": "Fungua kwa bayometriki",
     "titleNamed": "Fungua {{vault}}",
     "restoreCta": "Rejesha kutoka kwenye hifadhi rudufu",
-    "ioErrorHint": "Jaribu tena, au fungua Myne upya."
+    "ioErrorHint": "Jaribu tena, au fungua Myne upya.",
+    "identityPhraseLink": "Tumia kifungu chako cha utambulisho",
+    "identityPhrase": {
+      "title": "Fungua kwa kifungu chako cha utambulisho",
+      "body": "Kasha hili linafunguliwa kwa nenosiri lake au kwa kifungu chako cha utambulisho. Ikiwa ulihifadhi kifungu cha kasha tofauti kwake, kile kimestaafu na hakiwezi kulifungua tena. Kulifungua kwa maneno 24 uliyoandika kwa utambulisho wako kunafungua pia utambulisho wako kwa kipindi hiki, kwa hivyo usawazishaji unaendelea bila kuulizwa tena.",
+      "label": "Kifungu cha utambulisho",
+      "hint": "Maneno 24, kwa utaratibu.",
+      "submit": "Fungua kwa kifungu cha utambulisho",
+      "decrypting": "Inafungua…",
+      "cancel": "Rudi kwenye nenosiri",
+      "recoveryInProgress": "Urejeshi unaendelea tayari. Rudi kwenye fomu ya nenosiri na uendelee.",
+      "generic": "Kifungu hicho hakikufungua kasha hili."
+    },
+    "personWrapProbeFailed": "Myne haikuweza kukagua kama kasha hili pia linafunguliwa kwa kifungu cha utambulisho. Ikiwa ulilitengeneza kutoka utambulisho wako, jaribu kifungu hicho kwanza."
   },
   "vault": {
     "ioBanner": {
@@ -4823,6 +5317,7 @@
     "provisioning": {
       "heading": "Inaunda akaunti yako",
       "caption": "Inasajili kasha hili kwenye seva ya usawazishaji. Kifungu chako cha urejeshaji kinafuata.",
+      "captionNoPhrase": "Inasajili kasha hili kwenye seva ya usawazishaji. Inachukua muda.",
       "footerHint": "Hii huchukua muda kidogo. Acha kichupo hiki wazi hadi imalize, ili iweze kujisafisha yenyewe kama kitu kitaenda vibaya."
     },
     "errors": {
@@ -4873,6 +5368,10 @@
       "permissionDenied": {
         "body": "Hakikisha Myne ina ruhusa ya kuandika kwenye folda yako ya data ya programu.",
         "title": "Imeshindwa kuandika kwenye folda ya kasha"
+      },
+      "personLocked": {
+        "body": "Fungua utambulisho wako kwa maneno yake 24, kisha tengeneza kasha tena. Kifungu chako cha utambulisho ndiyo nyaraka pekee ya kurejesha kwa kasha hili, kwa hivyo kuliunda utambulisho ulipofungwa kungeacha kisichorejeshwa.",
+        "title": "Fungua utambulisho wako kwanza"
       },
       "sessionExpired": {
         "body": "Kwa usalama wako, uundaji wa kasha huisha muda baada ya dakika 10. Anza upya.",
@@ -4933,7 +5432,8 @@
       "reveal": "Onyesha kifungu",
       "saveAsFile": "Hifadhi kama faili",
       "saveFailed": "Haikuweza kuhifadhi faili. Nakili maneno badala yake, au yaandike chini.",
-      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi, hivyo liweke mahali ambapo wewe peke yako unaweza kulisoma."
+      "savedToFile": "Imehifadhiwa. Ni faili la maandishi wazi, hivyo liweke mahali ambapo wewe peke yako unaweza kulisoma.",
+      "sessionOnlyNotice": "Kivinjari hiki hakihifadhi kifungu chako baada ya kupakiwa upya, kwa hivyo utaulizwa maneno 24 tena. Waweke mahali salama."
     },
     "ready": {
       "backedUp": "Imehifadhiwa rudufu",
@@ -4982,6 +5482,7 @@
   },
   "vaultPicker": {
     "createAnother": "Unda kasha jingine",
+    "deviceOnly": "Kifaa pekee",
     "heading": "Chagua kasha",
     "joinDevice": "Ongeza kifaa hiki kwenye akaunti",
     "loading": "Inapakia makasha yako…",
@@ -5057,10 +5558,34 @@
   "vaultSwitcher": {
     "chipFallback": "Kasha",
     "createAnother": "Unda kasha jingine",
+    "deviceOnly": "Kifaa pekee",
     "joinDevice": "Ongeza kifaa hiki kwenye akaunti",
     "switching": "inabadilisha…",
     "switchVaultLabel": "Badilisha kasha",
     "vaultFallback": "Kasha {{n}}"
+  },
+  "invites": {
+    "title": "Mialiko",
+    "loading": "Inapakia mialiko…",
+    "empty": "Hakuna mialiko bado.",
+    "pendingHeading": "Inakusubiri",
+    "pendingHint": "Mmiliki wa kasha amemualika utambulisho wako. Kukubali kunahitaji msimbo wake wa utambulisho na kifungu chako cha kurejesha.",
+    "error": "Haikuweza kupakia mialiko. Kagua muunganisho wako na seva ya usawazishaji.",
+    "retry": "Jaribu tena",
+    "noIdentity": "Kifaa hiki hakina utambulisho bado, kwa hivyo hakuna mwaliko unaweza kuandikiwa.",
+    "notEnrolled": "Utambulisho huu haujasajiliwa bado, kwa hivyo mialiko inayoandikiwa kwake haiwezi kuorodheshwa. Usajili ndio unayowezesha kufika.",
+    "notice_one": "Mwaliko {{count}} unasubiri",
+    "notice_other": "Mialiko {{count}} inasubiri",
+    "decline": "Kataa",
+    "declineTitle": "Kataa mwaliko huu?",
+    "declineBody": "Mwaliko unafutwa kwenye seva yako, kwa hivyo hauwezi kamwe kukubaliwa, na mmiliki anaona kuwa ulikataa badala ya kuwa bado anasubiri. Kuupata tena kunamaanisha mmiliki akukualike tena.",
+    "declineCta": "Kataa mwaliko",
+    "declineFailed": "Mwaliko haikuweza kukataliwa. Jaribu tena.",
+    "noticeUnregistered": "Sajili utambulisho huu ili kuona mialiko",
+    "noticePending": "Mialiko haiwezi kuorodheshwa hadi kifaa hiki kidhinishwe"
+  },
+  "firstRun": {
+    "heading": "Tengeneza utambulisho wako"
   },
   "welcome": {
     "createCta": "Unda kasha jipya",
@@ -5094,13 +5619,19 @@
     "cleanUpFiles": "Safisha mafaili yaliyobaki",
     "connect": "Unganisha kwenye akaunti yangu",
     "tagline": "Madokezo ya markdown yaliyosimbwa. Hakuna barua pepe wakati wa kujisajili.",
+    "startAction": "Tengeneza utambulisho wako na kasha",
+    "startBody": "Anza upya kwenye kifaa hiki: utambulisho mpya, kisha kasha linalohusiana nalo.",
     "restoreTitle": "Rejesha kutoka hifadhi rudufu",
     "restoreBody": "Fungua faili la .myne-backup ulilohifadhi awali.",
     "joinTitle": "Ongeza kifaa hiki kwenye akaunti",
     "joinBody": "Tumia kasha ulilo nalo tayari kwenye kifaa kingine.",
+    "invitedTitle": "Nilialikwa kwenye kasha",
+    "invitedBody": "Weka utambulisho ambao mwaliko uliandikiwa. Huhitaji kasha lako mwenyewe.",
+    "invitedAction": "Nilialikwa",
     "restoreAction": "Rejesha",
     "joinAction": "Ongeza kifaa",
-    "version": "Toleo {{version}} · pre-alpha"
+    "version": "Toleo {{version}} · pre-alpha",
+    "createAction": "Tengeneza"
   },
   "wikiGraph": {
     "emptyTitle": "Hakuna viungo bado",
@@ -5344,9 +5875,12 @@
   },
   "identityHome": {
     "createVaultCta": "Tengeneza hazina",
+    "createVaultLocked": "Fungua utambulisho wako ili kutengeneza kasha. Inatisaini orodha ya kwanza ya wanachama wa kasha, ndiyo inayofanya kasha kuwa lako, na kifaa hiki kinaifungia kwa kipindi hiki.",
     "invitesError": "Mkaribisho haukuweza kupakiwa. Angalia muunganisho na seva ya kusawazisha.",
     "invitesHeading": "Mkaribisho",
     "invitesLoading": "Inakagua karibisho…",
+    "invitesPending": "Kifaa hiki kinasubiri idhini. Mialiko itaonekana hapa kifaa kingine chako kikidhinisha.",
+    "invitesUnregistered": "Utambulisho huu haujasajiliwa kwenye seva ya usawazishaji bado, kwa hivyo hakuna mwaliko unaweza kuufikia.",
     "noInvites": "Hakuna mkaribisho bado.",
     "subtitle": "Una utambulisho kwenye kifaa, hivyo unaweza kukaribishwa kwenye hazina. Hautahitaji kuitengeneza ili kukaribishwa.",
     "accept": "Pokea",
@@ -5383,6 +5917,20 @@
     "forgetCta": "Sahau utambulisho huu kwenye kifaa hiki",
     "forgetError": "Imeshindwa kusahau utambulisho. Jaribu tena.",
     "forgetWarning": "Hii huondoa utambulisho kwenye kifaa hiki pekee. Akaunti ya seva na kasha lolote analomiliki au alilojiunga nalo hayaathiriki, na unaweza kurejesha utambulisho kwa kifungu chake cha maneno 24 kwenye kifaa kingine. Ikiwa hukuhifadhi kifungu hicho, kifaa hiki hakiwezi kukirejesha.",
+    "registerCta": "Sajili utambulisho huu",
+    "registerContinue": "Endelea",
+    "registerSubmit": "Sajili",
+    "registerError": "Haikuweza kusajili. Kagua kifungu na anwani ya seva, kisha ujaribu tena.",
+    "registerServerLabel": "Anwani ya seva ya usawazishaji",
+    "registerServerPlaceholder": "https://sync.example.com",
+    "registerServerHint": "Msimamizi wake ataweza kuona kuwa utambulisho huu upo.",
+    "registerInviteCodeLabel": "Msimbo wa mwaliko wa seva",
+    "registerInviteCodeHint": "Ni kama seva yako inaihitaji.",
+    "registerServerError": "Seva hiyo haikuweza kufikiwa. Kagua anwani kisha ujaribu tena. Maneno yako bado yako hapa.",
+    "accountNumberHeading": "Nambari ya akaunti",
+    "accountNumberHint": "Inatokana na kifungu cha utambulisho wako, hivyo haiwezi kupotea, na si siri. Itumie kwa msaada au kwa mkabidhi wa msimamizi wa seva.",
+    "copyAccountNumber": "Nakili nambari ya akaunti",
+    "registerPhraseLabel": "Kifungu chako cha utambulisho, maneno 24",
     "stepIndicator": "Hatua {{n}} kati ya {{total}} · {{label}}",
     "stepVerifyOwner": "Thibitisha mmiliki",
     "stepRecoveryPhrase": "Kifungu cha urejeshaji",
@@ -5527,7 +6075,45 @@
       "inviteHint": "Fungua mkaribisho huu kutoka kichagua kasha ili ujiunge kwa kifungu cha utambulisho wako.",
       "forgetHeading": "Kifaa hiki",
       "forget": "Sahau utambulisho huu kwenye kifaa hiki",
-      "forgetCheckbox": "Naelewa kuwa utambulisho huu utaondolewa kwenye kifaa hiki. Akaunti ya seva inabaki na kifungu hukirejesha."
+      "forgetCheckbox": "Naelewa kuwa utambulisho huu utaondolewa kwenye kifaa hiki. Akaunti ya seva inabaki na kifungu hukirejesha.",
+      "vaultHeading": "Makasha yako",
+      "vaultHint": "Utambulisho wako unaweza kumiliki makasha mengi upendavyo. Kila moja lina nenosiri lake.",
+      "registerHeading": "Usajili",
+      "registerHint": "Utambulisho huu haujasajiliwa bado, kwa hivyo hakuna anayeweza kukualika na hakuna kinachosawazishwa."
+    },
+    "register": {
+      "title": "Sajili utambulisho huu",
+      "open": "Sajili utambulisho huu",
+      "cta": "Sajili",
+      "working": "Inasajili…",
+      "failed": "Haikuweza kusajili utambulisho huu. Inabaki kwenye kifaa hiki na unaweza kujaribu tena."
+    },
+    "personJoin": {
+      "title": "Ongeza simu hii kwenye akaunti yako",
+      "lead": "Andika maneno 24 ya akaunti ambayo msimbo huu ulitoka. Kifaa kilichopo tayari kinaidhinisha simu hii, kwa hivyo kifungu peke yake hakiwezi kuongeza kifaa.",
+      "phraseLabel": "Kifungu cha utambulisho",
+      "phraseHint": "Maneno 24, kwa utaratibu.",
+      "cta": "Ongeza simu hii",
+      "working": "Inaongeza simu hii…",
+      "mismatch": "Maneno hayo yanahusiana na utambulisho tofauti na msimbo huu.",
+      "failed": "Haijaongeza simu hii. Kagua maneno kisha ujaribu tena.",
+      "pendingTitle": "Inasubiri idhini",
+      "pendingLead": "Simu hii imeongezwa na inasubiri. Idhinisha kwenye kifaa ambacho tayari kina akaunti yako, na skrini hii itakamilika yenyewe.",
+      "pendingHint": "Hakuna cha kufanya hapa hadi kifaa kingine kidhinishwe.",
+      "sessionEnded": "Kusubiri kulimalizika app ilipofungwa. Weka maneno yako 24 tena kuendelea.",
+      "reenter": "Weka maneno yako tena",
+      "finishingTitle": "Inakamilisha kifaa hiki",
+      "finishingLead": "Simu hii imeongezwa kwenye akaunti yako. Makasha yake yanachukuliwa sasa; kila moja bado linahitaji nenosiri lake.",
+      "listFailed": "Simu hii imeongezwa, lakini makasha ya akaunti yako hayakufika. Kagua muunganisho wako kisha ujaribu tena.",
+      "listRetry": "Chukua makasha tena"
+    },
+    "unlock": {
+      "title": "Fungua utambulisho wako",
+      "lead": "Utambulisho wako umefungwa kwenye kifaa hiki kwa kipindi hiki. Kifungu chake cha maneno 24 kinakifungua; hakuna kinachotumwa popote.",
+      "open": "Fungua utambulisho",
+      "cta": "Fungua",
+      "working": "Inafungua…",
+      "failed": "Kifungu hicho hakikufungua utambulisho huu. Kagua maneno 24 kisha ujaribu tena."
     },
     "recover": {
       "open": "Tayari nina utambulisho",
