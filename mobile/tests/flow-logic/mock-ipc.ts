@@ -136,6 +136,10 @@ export interface MockConfig {
   /** `sync_person_register` refusal (myne-md/myne#911 task 12). Absent = the
    *  registration lands and the device becomes `enrolled`. */
   personRegisterError?: { kind: string };
+  /** `sync_person_unlock` refusal (decisions/ui/0729): `BadRequest` for a phrase
+   *  that does not open the sealed frame. Absent = the unlock opens the identity
+   *  and the home stops withholding its create-vault action. */
+  personUnlockError?: { kind: string };
   /** `sync_person_join_device` refusal (task 12): `PersonMismatch` for a phrase
    *  that belongs to another person, `TlsFailure` for an endpoint that does not
    *  verify. Absent = the join lands, pending unless `personJoinApproved`. */
@@ -738,6 +742,16 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
      *  constant would make the identity home's create-vault and register blocks
      *  unreachable no matter what the flow did. */
     let personState: "reserved" | "pending" | "enrolled" | null = null;
+    /** Whether the identity's session is OPEN in RAM, or `null` while the spec
+     *  has not said either way (myne-md/myne#911 task 12). Set by
+     *  `sync_person_setup` (both the create and the recover arm) and by
+     *  `sync_person_unlock`, and read by `sync_person_status`, because that is
+     *  the real sequence: both commands install the person session before they
+     *  return, so the probe answers `true` and the identity home offers its
+     *  create-vault action. A mock that answered a constant `false` made the
+     *  home render its SEALED shape after a ceremony that had just unlocked the
+     *  identity, which broke every onboarding flow that walks that ceremony. */
+    let personUnlocked: boolean | null = null;
     // Vaults deleted during this session, by id. The delete escape routes by
     // re-probing rather than by navigating, so the roster is the only thing
     // that can carry the outcome — see the vault-delete handler.
@@ -2127,7 +2141,24 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           // spec that configures a status is describing where the device STARTS,
           // and the two commands below describe what it became.
           state: personState ?? config.personStatus?.state ?? null,
+          identity_unlocked:
+            personUnlocked ?? config.personStatus?.identity_unlocked ?? false,
         }),
+      "plugin:sync|sync_person_unlock": (args) => {
+        // The sealed identity's own door (decisions/ui/0729): the phrase is the
+        // proof of possession and the only input. It installs the session, so it
+        // flips the same flag the create does rather than being a second notion
+        // of "unlocked".
+        (window as unknown as { __personUnlockArgs?: unknown }).__personUnlockArgs = args;
+        if (config.personUnlockError) throw config.personUnlockError;
+        personUnlocked = true;
+        personState = personState ?? "reserved";
+        return {
+          fingerprint_hex: "ab".repeat(32),
+          person_id_hex: "cd".repeat(16),
+          identity_code: config.personSetupResult?.identity_code ?? "MYNE-PERSON-1:" + "cd".repeat(16),
+        };
+      },
       "plugin:sync|sync_person_list_invites": () => config.personInvites ?? [],
       "plugin:sync|sync_person_setup": (args) => {
         // The identity-only setup, and the ONE command behind both of the gate's
@@ -2144,6 +2175,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         // register block exists for. Recording it here is what lets a spec drive
         // the offline first run end to end.
         personState = "reserved";
+        // Both arms install the session in RAM before returning
+        // (`person_create_identity_from_host` and
+        // `person_recover_identity_from_host` each end in
+        // `install_person_session_if_generation`), which is what makes the home
+        // this lands on the UNSEALED one.
+        personUnlocked = true;
         return config.personSetupResult;
       },
       "plugin:sync|sync_person_register": (args) => {
