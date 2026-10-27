@@ -1047,16 +1047,34 @@ steps:
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
       # pnpm-build step (shared workspace) instead of rebuilding it here (Q3);
       # `test -d dist || pnpm build` still rebuilds if dist/ is somehow absent.
-      # The override keeps the sidecar half of `beforeBuildCommand`
-      # (cli-thin-client task 11) and only swaps the frontend half: staging the
-      # sidecars is what `bundle.externalBin` consumes, and running it here is
-      # also the only CI exercise `scripts/build-{cli,tor}-sidecar.mjs` get.
+      # The override used to carry the sidecar half of `beforeBuildCommand`
+      # (cli-thin-client task 11) and no longer does: staging moved to the two
+      # commands above this build, so the cargo INVOCATION count is visible in the
+      # step instead of hidden inside `pnpm sidecar:release`. Staging is what
+      # `bundle.externalBin` consumes, and it is still the only CI exercise
+      # `scripts/build-{cli,mcp,tor,clipper-host}-sidecar.mjs` get.
+      #
+      # WHY THEY ARE SPLIT. `pnpm sidecar:release` is four `cargo build --release`
+      # runs, one per package, and `sccache` reports `Compilations 0` for the whole
+      # step: every one of them is a graph walk that produces no new artefact
+      # (`Non-cacheable` is linking, 414 `crate-type` calls). The three thin
+      # sidecars declare no features and no interdependence, so ONE
+      # `cargo build --release --bins -p …` builds all three in a single walk and
+      # the per-package scripts then only stage, which is exactly what their
+      # `--no-build` flag exists for. `myne-clipper-host` keeps its own build: it
+      # is `myne-desktop`'s `myne-clipper-host` bin, and its features come from
+      # the environment (`build-clipper-host.mjs`), so folding it in would apply
+      # them to the three crates that declare none, which cargo refuses outright.
       # BOTH sidecars, not just `myne`: `build.rs` resolves every
       # `bundle.externalBin` entry as a resource path and PANICS on a missing
       # one ("resource path `binaries/myne-tor-…` doesn't exist"), so dropping
       # the arti half here fails the build outright rather than shipping a
       # bundle without a Tor client. It costs one release build of `arti` on a
       # cold cache; sccache pays it once.
+      - cargo build --release --bins -p myne-cli -p myne-mcp -p myne-tor-sidecar
+      - echo "[t] sidecars-compiled $(date +%s)"
+      - node scripts/build-cli-sidecar.mjs --profile release --no-build && node scripts/build-mcp-sidecar.mjs --profile release --no-build && node scripts/build-tor-sidecar.mjs --profile release --no-build && node scripts/build-clipper-host.mjs --profile release
+      - echo "[t] sidecars-staged $(date +%s)"
       # `--features voice-capture-stub` (myne#389 item D): the voice E2E
       # scenarios need a capture source that is not a microphone the runner does
       # not have. The suite no longer runs from this file, since
@@ -1076,8 +1094,8 @@ steps:
       # `.woodpecker/e2e.yml` sets that variable and builds with this feature.
       # Also additive and dependency-free; `cargo-test-tauri` still compiles the
       # production arm.
-      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
-      - echo "[t] sidecars+tauri-build $(date +%s)"
+      - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"test -d dist || pnpm build"}}' -- --features voice-capture-stub,local-inference-stub
+      - echo "[t] tauri-build $(date +%s)"
       # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
       # other clippy invocation in this file misses it — the slim step is
       # `-p protocol`, the wasm steps are cross-target, and the line below is
