@@ -40,6 +40,8 @@
       "permissionLabel": "När körningen är klar",
       "permissionAsk": "Granska först",
       "permissionAuto": "Tillämpa automatiskt",
+      "keepConversation": "Behåll den här konversationen när jag byter anteckning",
+      "keepConversationPinned": "Behållen för den här sessionen",
       "providerRejected": "Leverantören accepterade inte den här begäran, så körningen stoppades. Inget skrevs. Det är ett fel i det som Myne skickade, inte i dina anteckningar eller din konfiguration.",
       "unchecked": "Redigeringskontrollen kunde inte slutföras, så agenten är otillgänglig just nu. Kontrollera att din modell eller leverantör går att nå och försök sedan igen.",
       "unsupported": "Den här modellen kan inte göra exakta ändringar tillförlitligt, så agenten är otillgänglig. Välj en större modell eller en leverantör.",
@@ -48,12 +50,29 @@
       "unsupportedProvisional": "Den godkäntgränsen har ännu inte mätts över flera modeller, så den kan vara strängare eller mildare än den borde vara.",
       "scopeNone": "ingen anteckning öppen, så det finns inget att arbeta med än",
       "scopeAllVault": "Alla anteckningar",
+      "scopeQuestion": "Vad agenten kan läsa",
+      "scopeFolders": "Mappar",
+      "scopeApplies": "Gäller ditt nästa meddelande. Borttagna, arkiverade och mall-anteckningar lämnas alltid utanför.",
       "blockedScope": "Inget för agenten att arbeta med ännu: varje anteckning är undantagen från AI, eller så är valvet tomt.",
       "preparing": "Förbereder…",
       "blockedScopeSidebar": "Inget att fråga om här ännu: den här anteckningens mapp är undantagen från AI.",
       "needsScope": "Välj en mapp nedan, eller öppna en anteckning, så att agenten har något att arbeta med.",
       "scopeExcluded_one": "{{count}} undantagen från AI",
       "scopeExcluded_other": "{{count}} undantagna från AI"
+    },
+    "attachments": {
+      "title": "Bifoga ett dokument",
+      "attach": "Bifoga ett dokument",
+      "empty": "Inga bilagor i det här valvet ännu. Lägg till en fil i bilagebiblioteket först.",
+      "failed": "Bilagebiblioteket kunde inte läsas. Försök igen.",
+      "pasteFailed": "Den inklistrade filen kunde inte läggas till i den här konversationen.",
+      "pasting": "Klistrar in…",
+      "pastedFile": "Inklistrad fil",
+      "cap": "Du kan bifoga upp till {{count}} filer.",
+      "confirm_one": "Bifoga {{count}} fil",
+      "confirm_other": "Bifoga {{count}} filer",
+      "remove": "Ta bort {{name}}",
+      "noText": "{{name}} har ingen text som agenten kan läsa. Endast filer vars text kunde extraheras kan bifogas."
     },
     "progress": {
       "working": "Arbetar",
@@ -90,6 +109,7 @@
     },
     "review": {
       "title": "Granska ändringar",
+      "statusWaiting": "Väntar på ditt godkännande",
       "close": "Stäng",
       "scopeTotal_one": "{{count}} anteckning i omfattningen",
       "scopeTotal_other": "{{count}} anteckningar i omfattningen",
@@ -98,6 +118,12 @@
       "noteHeading_other": "{{count}} ändringar",
       "changedLines_one": "{{count}} rad",
       "changedLines_other": "{{count}} rader",
+      "rowReplace_one": "Ersätt {{count}} rad",
+      "rowReplace_other": "Ersätt {{count}} rader",
+      "rowAppend": "Lägg till i slutet av anteckningen",
+      "rowMove": "Flytta till {{folder}}",
+      "showChange": "Visa ändringen",
+      "hideChange": "Dölj ändringen",
       "removalFlag": {
         "trashed": "Flyttar den här anteckningen till papperskorgen",
         "deleted": "Tar bort den här anteckningen på alla enheter",
@@ -107,6 +133,7 @@
       },
       "largeDeletion": "Tar bort mycket text",
       "rejectEdit": "Avvisa",
+      "createdBadge": "Skapad",
       "restoreEdit": "Behåll",
       "applyRemoval": "Tillämpa separat",
       "rejectAll": "Avvisa alla",
@@ -114,6 +141,12 @@
       "approveAll_other": "Godkänn {{count}} ändringar",
       "appliedCount_one": "{{count}} ändring tillämpad.",
       "appliedCount_other": "{{count}} ändringar tillämpade.",
+      "rejectedCount_one": "{{count}} ändring avvisad.",
+      "rejectedCount_other": "{{count}} ändringar avvisade.",
+      "rejectedNewNotes_one": "{{count}} ny anteckning avvisad.",
+      "rejectedNewNotes_other": "{{count}} nya anteckningar avvisade.",
+      "rejectedSettings_one": "{{count}} inställning avvisad.",
+      "rejectedSettings_other": "{{count}} inställningar avvisade.",
       "refused": {
         "anchorNotFound": "Kunde inte tillämpas: den texten finns inte längre i anteckningen.",
         "anchorAmbiguous": "Kunde inte tillämpas: den texten förekommer mer än en gång.",
@@ -130,9 +163,19 @@
         "appendEmpty": "Kunde inte tillämpas: det fanns inget att lägga till.",
         "appendWouldWriteFrontmatter": "Kunde inte tillämpas: den texten skulle ha blivit anteckningens egenskapsblock.",
         "moveToSameFolder": "Flyttades inte: anteckningen ligger redan i den mappen.",
+        "unknownFolder": "Flyttades inte: det här valvet har ingen mapp med det namnet, så inget skrevs.",
         "moveIntoExcludedFolder": "Flyttades inte: den mappen är undantagen från AI."
       },
       "applyFailed": "Ändringarna kunde inte tillämpas.",
+      "applyFailedCause": {
+        "noSuchRun": "Den körningen är inte längre öppen, så inget skrevs.",
+        "cancelled": "Den körningen stoppades, så inget skrevs.",
+        "locked": "Valvet är låst, så inget skrevs.",
+        "aiDisabled": "AI är avstängt för det här valvet.",
+        "write": "Det gick inte att skriva klart ändringarna.",
+        "read": "Något som behövdes för den här körningen kunde inte läsas, så inget skrevs.",
+        "restorePoint": "Säkerhetskopian kunde inte tas, så inget skrevs."
+      },
       "undo": "Ångra den här körningen",
       "undoFailed": "Körningen kunde inte ångras.",
       "undoReport": "{{reverted}} anteckningar återställdes. {{kept}} anteckningar som körningen skapade lämnades kvar.",
@@ -173,6 +216,8 @@
         "runStopped": "Tillämpades inte: körningen stoppades, så ingen ändring försöktes.",
         "notProposed": "Tillämpades inte: den här körningen föreslog aldrig den ändringen, så värden skriver den inte."
       },
+      "appliedSummary": "Ändringar tillämpade.",
+      "settingsApplied": "Inställningar tillämpade.",
       "undoReportFailed_one": "{{count}} ändring kunde inte återställas.",
       "undoReportFailed_other": "{{count}} ändringar kunde inte återställas.",
       "undoReportSettings_one": "{{count}} inställning återställd.",
@@ -183,6 +228,9 @@
       "settingsChanged_other": "{{count}} inställningar ändrade.",
       "refusedCount_one": "{{count}} ändring kunde inte tillämpas",
       "refusedCount_other": "{{count}} ändringar kunde inte tillämpas"
+    },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
     },
     "undo": {
       "action": "Ångra körningen",
@@ -297,6 +345,7 @@
       "checking": "Kontrollerar…",
       "checkUnusedFailedNotice": "Kunde inte kontrollera oanvända bilagor. Försök igen.",
       "corpusIncompleteNotice": "Slutför synkroniseringen först. Den här enheten har inte alla dina anteckningar ännu och kan därför inte avgöra vilka bilagor som är oanvända.",
+      "sharedVaultNotice": "Det här är ett delat valv, så konversationer sparas per person. Myne kan inte avgöra vilka filer en annan medlem fortfarande använder, så inga erbjuds för rensning.",
       "cleanUnused": "Rensa oanvända",
       "cleanUnusedTitle": "Ta bort bilagor som inte används i någon anteckning",
       "colCreated": "Skapad",
@@ -694,6 +743,9 @@
       },
       "manageTemplates": {
         "label": "Hantera mallar…"
+      },
+      "manageViews": {
+        "label": "Hantera vyer…"
       },
       "newNoteFromTemplate": {
         "label": "Ny anteckning från mall…"
@@ -1270,12 +1322,18 @@
           "memoryPopoverRetry": "Försök igen",
           "memoryPopoverSettings": "Hantera i Inställningar",
           "memoryPopoverClose": "Stäng",
+          "seedCard": {
+            "title": "Vill du att Myne ska känna till ditt valv?",
+            "body": "Den kan läsa formen på dina anteckningar en gång och bygga några minnesposter. Du granskar varje rad innan något sparas.",
+            "action": "Lär Myne ditt valv",
+            "dismiss": "Inte nu"
+          },
           "copied": "Kopierat",
           "copyAnswer": "Kopiera svaret",
           "copyFailed": "Det gick inte att kopiera",
           "copyYourMessage": "Kopiera ditt meddelande",
           "emptyTitle": "Fråga om dina anteckningar",
-          "noticeLeaves": "Orden du skriver, de anteckningar ett steg läser, rubrikerna, identifierarna och mappsökvägarna för varje anteckning körningen kan läsa (hela valvet minus dina undantagna mappar, om du inte begränsar det), och det AI:n minns om dig skickas till det som svarar. Inget annat på den här enheten skickas.",
+          "noticeLeaves": "Orden du skriver, anteckningarna en omgång läser, titlarna, identifierarna och mappsökvägarna för varje anteckning omgången kan läsa (hela valvet minus dina undantagna mappar, om du inte smalnar av det), texten Myne extraherade från filer du bifogar ett meddelande (upp till fyra, var och en avkortad vid 20 000 tecken; filen stannar här), och vad AI:n minns om dig skickas till den som svarar. Inget annat på den här enheten skickas.",
           "noticeReceiver": "Det som svarar: {{provider}}, som Myne inte driver.",
           "noticeReceiverLocal": "Det som svarar: ett program som körs på den här enheten. Inget lämnar datorn, men programmet är inte en del av Myne och Myne kan inte se vad det gör med dem.",
           "noticeRevoke": "För att stoppa det, slå av AI i Inställningar, eller ändra vad som svarar där. Att återkalla en leverantörsnyckel stoppar den leverantören omedelbart.",
@@ -1351,6 +1409,8 @@
         "editing": "redigerar",
         "empty": "Du är ensam här",
         "jumpTo": "Hoppa till {{name}}",
+        "showList_one": "{{count}} här nu. Visa listan",
+        "showList_other": "{{count}} här nu. Visa listan",
         "unknown": "Någon",
         "title_one": "{{count}} här nu",
         "title_other": "{{count}} här nu"
@@ -1500,7 +1560,9 @@
     "tagSuggestion": {
       "label": "Föreslagna taggar",
       "accept": "Lägg till taggen {{tag}} i den här anteckningen",
-      "dismiss": "Avfärda den föreslagna taggen {{tag}}"
+      "dismiss": "Avfärda den föreslagna taggen {{tag}}",
+      "groupExisting": "I ditt valv",
+      "groupNew": "Ny"
     },
     "taskField": {
       "addAffordance": "Lägg till uppgiftsfält",
@@ -1649,6 +1711,10 @@
       "loadFailed": "Det gick inte att läsa in dina anteckningar.",
       "openFailed": "Det gick inte att öppna anteckningen.",
       "saveFailed": "Det gick inte att spara anteckningen.",
+      "liveResynced": "Anteckningen uppdaterades annorstädes och lästes in igen.",
+      "liveResyncedKept": "Anteckningen uppdaterades annorstädes och lästes in igen. Dina osparade ändringar behölls som en separat kopia.",
+      "liveResyncFailed": "Kunde inte uppdatera anteckningen med ändringar från annat håll. Din text är oförändrad.",
+      "liveCopyFailed": "Kunde inte behålla dina osparade ändringar som en separat kopia, så anteckningen uppdaterades inte. Din text är oförändrad.",
       "moveFailed": "Det gick inte att flytta anteckningen.",
       "openTodayFailed": "Det gick inte att öppna dagens anteckning.",
       "exportFailed": "Det gick inte att exportera anteckningen.",
@@ -1732,6 +1798,7 @@
     "formatBar": {
       "redo": "Gör om",
       "attachFile": "Bifoga ny fil",
+      "photoToNote": "Foto till anteckning",
       "insertFromLibrary": "Infoga från bibliotek",
       "recordVoiceNote": "Spela in röstanteckning",
       "showLivePreview": "Visa liveförhandsvisning",
@@ -1888,7 +1955,7 @@
         "includeAttachments_one": "Inkludera {{count}} bilaga",
         "includeAttachments_other": "Inkludera {{count}} bilagor",
         "title": "Exportera som Markdown",
-        "copyLabel": "Kopiera anteckningstexten till urklipp",
+        "copyLabel": "Kopiera anteckningstext till urklipp",
         "copied": "Anteckningstexten kopierad",
         "copyFailed": "Kunde inte kopiera anteckningstexten"
       }
@@ -2019,7 +2086,9 @@
       "copyLink": "Kopiera länk",
       "open": "Öppna",
       "openInNewTab": "Öppna i ny flik",
-      "revealInFolder": "Visa i mapp"
+      "revealInFolder": "Visa i mapp",
+      "archive": "Arkivera anteckning",
+      "trash": "Flytta anteckning till papperskorgen"
     },
     "colorLabels": {
       "clay": "Lera",
@@ -2656,6 +2725,58 @@
     },
     "unsettledSave": "En öppen anteckning har inte sparats klart, så ingenting ändrades. Försök igen när den har gjort det.",
     "views": {
+      "bulk": {
+        "apply": "Sätt på {{count}}",
+        "field": "Fält",
+        "notRestorableLine": "{{title}} skrevs men har ingen ögonblicksbild från den här åtgärden, så den kan inte återställas härifrån.",
+        "nothingToRestore": "Dessa anteckningar har sin egen ändringshistorik, så den här åtgärden har ingen återställningspunkt. De värden den skrev är kvar.",
+        "refusedCannotDecrypt": "den kunde inte dekrypteras",
+        "refusedFieldChanged": "det fältet ändrades någon annanstans sedan vyn lästes",
+        "refusedFieldNotDeclared": "vyn deklarerar inte det fältet",
+        "refusedFieldReserved": "det fältet är ett Myne hanterar",
+        "refusedInvalidField": "det fältnamnet kan inte skrivas",
+        "refusedInvalidNoteId": "antecknings-id:t var inte giltigt",
+        "refusedIo": "anteckningen kunde inte skrivas",
+        "refusedJoinFailure": "skrivningen slutfördes inte",
+        "refusedLine": "{{title}}: {{reason}}.",
+        "refusedLiveSessionOpen": "en live-redigeringssession har den anteckningen öppen",
+        "refusedNotApproved": "den här enheten har inte godkänt den här vyn",
+        "refusedNoteNotFound": "den anteckningen är borta",
+        "refusedPrefsUnreadable": "den här enhetens godkännanden kunde inte läsas",
+        "refusedVaultLocked": "valvet är låst",
+        "refusedValueTooLarge": "värdet är för stort för en anteckning",
+        "restore": "Återställ den här åtgärden",
+        "restoreFailedLine": "{{title}} kunde inte återställas.",
+        "restored": "Återställde {{count}}.",
+        "selectAll": "Markera varje anteckning i den här vyn",
+        "selectRow": "Markera {{title}}",
+        "skippedListValues": "{{count}} valda anteckningar har en lista i det fältet och inkluderades inte.",
+        "value": "Värde att sätta",
+        "valuePlaceholder": "Nytt värde",
+        "written": "Skrev {{count}}."
+      },
+      "board": {
+        "emptyLane": "Inga kort",
+        "dropRefused": "{{reason}}. Kortet är tillbaka i {{lane}}.",
+        "addCardTo": "Lägg till ett kort i {{lane}}",
+        "addCardRefused": "Kortet skapades, men det kunde inte placeras: {{reason}}.",
+        "addCardFailed": "Inget kort skapades: mallen kunde inte läsas.",
+        "moveSelected": "Flytta {{count}}",
+        "moveTo": "Flytta till kolumn",
+        "selectAll": "Markera varje kort",
+        "selectCard": "Markera {{title}}",
+        "renameLane": "Byt namn på kolumn {{lane}}",
+        "newLaneName": "Nytt kolumnnamn",
+        "saveLaneName": "Spara kolumnnamn",
+        "cancelLaneRename": "Avbryt",
+        "lanesNotSaved": "Korten flyttades, men kolumnordningen kunde inte sparas.",
+        "laneOrderRestored": "Kolumnordningen är tillbaka.",
+        "laneOrderRestoreFailed": "Kolumnordningen kunde inte återställas.",
+        "cancel": "Avbryt",
+        "archiveFailed": "Anteckningen kunde inte arkiveras.",
+        "trashFailed": "Anteckningen kunde inte flyttas till papperskorgen.",
+        "noGroupBy": "Den här tavlan har ingen kolumnegenskap. Välj en egenskap att gruppera efter i vyinställningarna."
+      },
       "cards": {
         "changeCover": "Byt omslag",
         "changeCoverImage": "Byt omslagsbild",
@@ -2669,6 +2790,55 @@
       "list": {
         "empty": "Inga anteckningar matchar den här vyn",
         "noValue": "Inget värde"
+      },
+      "import": {
+        "approveAction": "Godkänn v{{version}}",
+        "approveFailed": "Det godkännandet kunde inte sparas.",
+        "approveFailedBody": "Vyn är här och behöver fortfarande godkännande. Försök igen, eller godkänn den från Vyhanteraren.",
+        "armIdentical": "Du har redan exakt den här versionen (v{{version}}). Det finns inget att göra.",
+        "armIdenticalHeading": "{{name}} är redan uppdaterad",
+        "armNew": "Det här lägger till en ny vy, {{name}} (v{{version}}).",
+        "armOlder": "Filen är v{{incoming}} och det här valvet har v{{stored}}. En äldre fil kan inte ersätta en nyare vy.",
+        "armRefusedHeading": "{{name}} importerades inte",
+        "armSameVersionDifferent": "Filen säger v{{version}}, samma version som det här valvet har, men dess innehåll skiljer sig. Det är antingen en annan författare som återanvänder id:t eller en fil som ändrades efter att den signerades, så den avvisas.",
+        "armUpdate": "Det här ersätter {{name}}: det här valvet har v{{stored}}, filen är v{{incoming}}.",
+        "close": "Stäng",
+        "filterName": "Vymanifest",
+        "idleBody": "En vyfil är en sparad vy någon exporterade. Myne kontrollerar den först och visar vad den väljer och läser innan något lagras.",
+        "importAction": "Importera vy",
+        "pick": "Välj en fil…",
+        "pickAgain": "Välj en annan fil…",
+        "reading": "Läser…",
+        "reasonMalformed": "Det är inte ett välformaterat JSON-objekt.",
+        "reasonMissingField": "Ett obligatoriskt fält saknas.",
+        "reasonReservedField": "Den skulle låta vyn ändra {{field}}, som är en av markörerna Myne använder för att ta en anteckning ur vägen. Ingen vy får sätta den.",
+        "reasonTooLarge": "Den är större än en vydefinition får vara.",
+        "reasonUnreadable": "Filen kunde inte läsas.",
+        "reasonUnknownKey": "Den sätter en nyckel den här versionen av Myne inte känner till: {{key}}.",
+        "reasonUnrepresentable": "Den använder ett värde den här versionen av Myne inte kan visa.",
+        "reasonVersionRequired": "Den har ingen version, så den kan inte jämföras med vyn det här valvet har.",
+        "reasonWrongType": "Ett fält har fel sorts värde.",
+        "refusedHeading": "Den filen är inte en vy den här versionen av Myne kan importera.",
+        "refusedNothingStored": "Inget lagrades, och inget i det här valvet ändrades.",
+        "replaceAction": "Ersätt vy",
+        "storedBody": "Den lagras på v{{version}} och öppnas inte förrän du godkänner den på den här enheten.",
+        "storedHeading": "{{name}} är här",
+        "title": "Importera en vy"
+      },
+      "manager": {
+        "approve": "Godkänn",
+        "approvedState": "Godkänd på den här enheten",
+        "close": "Stäng",
+        "deleteFailed": "Den vyn kunde inte tas bort.",
+        "deleteLabel": "Ta bort {{name}}",
+        "emptyBody": "En vy du sparar från anteckningslistan, eller en någon skickar dig, visas här.",
+        "emptyTitle": "Inga vyer ännu",
+        "listLabel": "Sparade vyer",
+        "openLabel": "Öppna {{name}}",
+        "pendingBody": "Den här vyn kom från en annan enhet eller från en fil. Dess definition finns här, men den läser inget förrän du godkänner den på den här enheten.",
+        "pendingState": "Behöver godkännande",
+        "pendingTitle": "{{name}} behöver godkännande",
+        "title": "Vyer"
       },
       "menu": {
         "deleteView": "Ta bort vy",
@@ -2716,9 +2886,46 @@
       "sortDesc": "Fallande",
       "sortDirection": "Sorteringsriktning",
       "viewType": "Vytyp",
+      "export": "Exportera sparad vy…",
+      "exportFailed": "Den vyn kunde inte exporteras.",
+      "exportFilterName": "Vymanifest",
+      "exportHint": "Skriv den sparade definitionen som en .myneview-fil som någon annan kan importera. Ändringar du inte har sparat ingår inte.",
+      "exported": "Exporterad till {{filename}}",
+      "version": "Version",
+      "versionHint": "Går framåt när du ändrar den här vyn. Inget att redigera.",
+      "versionNone": "Inte versionshanterad ännu",
+      "versionValue": "v{{version}}",
+      "writeFields": "Fält den här vyn kan ändra",
+      "writeFieldsHint": "De enda frontmatter-fälten den här vyn får skriva. Tomt betyder att den inte kan ändra något. Arkiverad, borttagen och i papperskorgen erbjuds aldrig: det är så appen döljer en anteckning, så ingen vy får sätta dem.",
+      "writeFieldsPlaceholder": "Lägg till ett skrivbart fält…",
+      "viewTypeBoard": "Tavla",
       "viewTypeCards": "Kort",
       "viewTypeList": "Lista",
       "viewTypeTable": "Tabell"
+    },
+    "viewConsent": {
+      "allOf": "Alla dessa gäller:",
+      "anyOf": "Vilken som helst av dessa räcker:",
+      "dataNotCode": "En vy beskriver bara vad som ska visas. Den kan inte köra kod.",
+      "everyNote": "Varje anteckning i det här valvet.",
+      "inFolder": "Anteckningar i {{folder}}",
+      "matching": "Anteckningar som matchar “{{query}}”",
+      "noneOf": "Ingen av dessa:",
+      "opAtLeast": "är minst",
+      "opAtMost": "är högst",
+      "opContains": "innehåller",
+      "opIs": "är",
+      "opIsNot": "är inte",
+      "opLessThan": "är mindre än",
+      "opMoreThan": "är mer än",
+      "propertyCondition": "Anteckningar där {{key}} {{operator}} “{{value}}”",
+      "readsHeading": "Egenskaper den läser",
+      "selectionHeading": "Anteckningar den visar",
+      "tagged": "Anteckningar taggade #{{tag}}",
+      "templateHeading": "Mall",
+      "templateLine": "Anteckningar som skapas från den här vyn utgår från mallen {{template}}.",
+      "writesHeading": "Fält den kan ändra",
+      "writesNote": "Myne kontrollerar varje ändring mot den här listan innan den skriver en, och avvisar en ändring av ett fält som redigerats någon annanstans sedan vyn senast läste det."
     },
     "welcome": {
       "body": "Välkommen till Myne, ditt privata utrymme för att tänka och skriva.\n\nAllt du sparar här är krypterat och stannar på din enhet. Ditt **lösenord** och din **återställningsfras** är de enda nycklarna till det, så förvara dem på ett säkert ställe. Om båda någonsin går förlorade kan ingen få tillbaka dina anteckningar, inte ens vi.\n\n**Du kan länka anteckningar till varandra.** Skriv `[[` och Myne föreslår de anteckningar du redan har; välj en och den blir en länk. Anteckningen du länkade TILL visar var länken kom ifrån, i sin egen panel för bakåtlänkar, så en uppsättning anteckningar är något du kan följa i båda riktningarna.\n\nDet här är bara en vanlig anteckning, så gör den till din egen. Redigera den, byt namn på den eller ta bort den när du vill, och lägg till nya anteckningar i takt med att dina idéer växer.\n\nFör att lära dig mer om Myne, besök https://myne.md\n",
@@ -2726,6 +2933,10 @@
     },
     "workspace": {
       "defaultSlotName": "Standard"
+    },
+    "autoTag": {
+      "applied": "Taggar tillagda: {{tags}}",
+      "undo": "Ångra"
     },
     "export": {
       "html": "HTML",
@@ -2735,9 +2946,37 @@
       "txt": "Oformaterad text"
     }
   },
+  "photoNote": {
+    "cancel": "Avbryt",
+    "commitNew": "Skapa anteckning",
+    "commitNote": "Lägg till i den här anteckningen",
+    "defaultTitle": "Fotoanteckning {{date}}",
+    "destinationLabel": "Var fotot och dess text ska hamna",
+    "imageOnly": "Lägg till fotot utan text",
+    "locked": "Valvet låstes medan fotot var öppet. Det är kvar i dina bilagor; lås upp och försök igen.",
+    "machineText": "Den här texten lästes av en maskin, så kontrollera den innan du behåller den.",
+    "newNote": "Ny anteckning",
+    "noText": "Ingen text lästes från den här sidan. Du kan ändå lägga till fotot.",
+    "ocrOff": "Läsning av text från bilder är avstängd på den här enheten, så det här fotot har ingen text. Att slå på det gäller nästa foto du tar.",
+    "ocrOffAction": "Öppna inställningen",
+    "readFailed": "Texten kunde inte läsas den här gången. Du kan ändå lägga till fotot.",
+    "reading": "Läser texten…",
+    "textLabel": "Text från fotot",
+    "textPlaceholder": "Texten appen läste visas här. Du kan skriva den själv.",
+    "thisNote": "Den här anteckningen",
+    "saveFailed": "Anteckningen kunde inte skapas. Din text är kvar här.",
+    "importing": "Sparar fotot…",
+    "addReading": "Lägg till läsningen",
+    "truncated": "Läsningen stoppar vid en längdgräns, så slutet av sidan kan saknas.",
+    "discardFailed": "Fotot kunde inte tas bort. Det är kvar i dina bilagor.",
+    "readingArrived": "Läsningen kom medan du skrev. Den är kvar nedan och väntar på dig.",
+    "untitledFile": "Foto",
+    "openFailed": "Anteckningen skapades, men den kunde inte öppnas."
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Kontrollerar styrka…",
+      "strengthUnavailable": "Styrkekontrollen kunde inte laddas, så endast minimilängden kontrolleras.",
       "confirmLabel": "Bekräfta huvudlösenord",
       "defaultEmptyCaption": "Välj något du kan komma ihåg. Det kan inte återställas.",
       "mismatch": "Lösenorden matchar inte.",
@@ -2997,11 +3236,11 @@
         "invalidCredentialOrVault": "Fel nuvarande lösenord eller så är valvfilen skadad.",
         "ioError": "Diskfel, försök igen.",
         "joinFailure": "Något gick fel, försök igen.",
-        "samePasswordRejected": "Det nya lösenordet är samma som det nuvarande.",
+        "samePasswordRejected": "Nytt lösenord matchar det nuvarande.",
         "serverAckPending": "Ditt nya lösenord fungerar på den här enheten, men Myne kunde inte nå servern för att spara det. Tills det lyckas förväntar sig dina andra enheter fortfarande det gamla lösenordet, och om den här webbläsarens kopia rensas innan dess går ändringen förlorad. Myne försöker igen automatiskt.",
-        "weakNewPassword": "Det nya lösenordet måste vara minst 12 tecken.",
-        "unexpected": "Lösenordsändringen gick inte igenom. Försök igen.",
-        "vaultNotUnlocked": "Lås upp det här valvet innan du ändrar dess lösenord."
+        "weakNewPassword": "Nytt lösenord måste vara minst 12 tecken.",
+        "unexpected": "Lösenordsbytet gick inte igenom. Försök igen.",
+        "vaultNotUnlocked": "Lås upp det här valvet innan du byter lösenord."
       },
       "changePasswordHeading": "Byt lösenord",
       "changePasswordHelper": "Byt ut ditt huvudlösenord men behåll samma valv. Återställningsfrasen är oförändrad.",
@@ -3018,18 +3257,18 @@
       "vaultLabelSave": "Spara",
       "vaultIconLabel": "IKON",
       "vaultIconDefault": "Standard (ordmärke)",
-      "renamedToast": "Valvet har bytt namn",
+      "renamedToast": "Valv omdöpt",
       "renameError": "Kunde inte byta namn på valvet",
-      "newPasswordMismatch": "De nya lösenorden stämmer inte överens.",
-      "samePassword": "Det nya lösenordet är samma som det nuvarande lösenordet.",
-      "passwordChangedToast": "Lösenordet har ändrats",
+      "newPasswordMismatch": "Nya lösenord matchar inte.",
+      "samePassword": "Nytt lösenord är samma som det nuvarande.",
+      "passwordChangedToast": "Lösenord bytt",
       "vaultUnreadable": "Valvfilen kan inte läsas. Återställ från en säkerhetskopia.",
       "genericChangeError": "Något gick fel. Försök igen.",
-      "renameHelper": "Visas i valvväxlaren. Lagras krypterat inuti det här valvet; lämna tomt för att rensa.",
+      "renameHelper": "Visas i valvväljaren. Lagras krypterat i det här valvet; lämna tomt för att rensa.",
       "newPasswordPlaceholder": "Minst 12 tecken",
       "reenterNewPassword": "Ange det nya lösenordet igen",
       "changePasswordFootnote": "Detta ogiltigförklarar snabbupplåsningen. Din återställningsfras är oförändrad.",
-      "changing": "Ändrar…",
+      "changing": "Byter…",
       "memberVaultNotice": "Det här är ett delat valv. Det har inget vallösenord. Använd Upplåsning av delat valv under Integritet för att lägga till ett lösenord eller en PIN-kod.",
       "topics": {
         "vault": "Valv",
@@ -3037,6 +3276,29 @@
       },
       "sections": {
         "identity": "Valvets identitet"
+      },
+      "format": {
+        "heading": "Valvformat",
+        "intro": "Det här valvet använder fortfarande sin egen återställningsfras. Uppgradering flyttar det till din identitetsfras, så en fras återställer alla valv du äger.",
+        "cta": "Uppgradera till en-fras återställning",
+        "confirm": "Pensionera min valvfras och uppgradera",
+        "cancel": "Behåll min valvfras för nu",
+        "running": "Uppgraderar…",
+        "warningPhrase": "Din sparade valvåterställningsfras slutar öppna det här valvet. Ditt valvlösenord fungerar fortfarande, och din identitetsfras blir vägen tillbaka in.",
+        "warningDevices": "Varje enhet du använder måste uppdateras först. En äldre version kan inte öppna det här valvet när uppgraderingen har synkroniserats.",
+        "done": "Det här valvet använder nu din identitetsfras (uppgraderat från {{from}}).",
+        "error": {
+          "migrationRequired": "Det här valvet är fortfarande i det gamla v0.1-formatet. Slutför valvuppgraderingen i Synkinställningar först.",
+          "personRequired": "Den här enheten har ingen identitet ännu. Skapa din identitet först och kom sedan tillbaka.",
+          "identityLocked": "Din identitet är låst. Lås upp den med din identitetsfras och uppgradera sedan.",
+          "personMismatch": "Det här valvet tillhör en annan identitet än den på den här enheten.",
+          "notOwner": "Det här är ett delat valv. Endast dess ägare kan ändra dess format.",
+          "notUnlocked": "Öppna valvet innan du uppgraderar dess format.",
+          "inProgress": "En annan säkerhetsåtgärd pågår. Försök igen om en stund.",
+          "alreadyUpgraded": "Det här valvet använder redan din identitetsfras.",
+          "generic": "Uppgraderingen slutfördes inte. Inget ändrades.",
+          "sharedVault": "Det här valvet delas med någon annan. En-fras återställning är för ett valv du äger ensam, eftersom delad medlemshantering inte stöder det ännu."
+        }
       }
     },
     "appearance": {
@@ -3112,6 +3374,7 @@
       "errorSaveSetting": "Kunde inte spara den här inställningen.",
       "processing_one": "Läser 1 bilaga…",
       "processing_other": "Läser {{count}} bilagor…",
+      "draftUse": "Texten den läser erbjuds också som ett utkast du kan lägga till i en anteckning. En anteckning synkroniseras krypterad som alla andra.",
       "mobileDeviceLocal": "Den här gäller per enhet: den avgör vad den här telefonen indexerar, så dina andra enheter behåller sitt eget val."
     },
     "autoBackup": {
@@ -3137,6 +3400,7 @@
     "changePassword": {
       "cancel": "Avbryt",
       "checkingStrength": "Kontrollerar styrka…",
+      "strengthUnavailable": "Styrkekontrollen kunde inte laddas, så endast minimilängden kontrolleras.",
       "confirmLabel": "Bekräfta nytt lösenord",
       "currentLabel": "Nuvarande lösenord",
       "mismatch": "Lösenorden matchar inte.",
@@ -3271,8 +3535,11 @@
       "continue": "Fortsätt",
       "copyPrimary": "Detta tar bort det här valvet och alla anteckningar i det permanent. Åtgärden kan inte ångras, och din återställningsfras kommer inte att återställa datan.",
       "copySecondary": "Valvnycklarna nollställs ur minnet innan filerna länkas bort; eventuell föräldralös chiffertext som blir kvar på disken förblir oåterställbart Argon2id-inslaget skräp.",
+      "keychainNote": "När borttagningen är klar ber Myne även ditt systems nyckelring att ta bort den biometriska upplåsningsnyckel den lagrade för det här valvet, på de plattformar där den lagrar en.",
       "eyebrow": "OÅTERKALLELIGT",
+      "memberEyebrow": "ENDAST DEN HÄR ENHETEN",
       "heading": "Ta bort valv",
+      "memberHeading": "Ta bort det här valvet från den här enheten?",
       "ioFailBody": "Kunde inte komma åt valvfilerna för borttagning. Valvnycklarna är redan nollställda ur minnet; eventuell valvdata som blir kvar på disken är oåterställbart Argon2id-inslaget skräp.",
       "ioFailTitle": "Diskfel under borttagning",
       "localEraseHeading": "Logga ut och radera den här webbläsarens kopia",
@@ -3283,7 +3550,9 @@
       "partialFailBody_other": "{{count}} filer kunde inte tas bort från disken. Valvnycklarna är redan nollställda ur minnet, så eventuell föräldralös chiffertext som blir kvar är oåterställbart Argon2id-inslaget skräp.",
       "partialFailTitle": "Borttagningen av valvet misslyckades delvis",
       "submit": "Ta bort valv",
+      "memberSubmit": "Ta bort från den här enheten",
       "submitInFlight": "Tar bort valv…",
+      "memberSubmitInFlight": "Tar bort…",
       "typeToConfirmLabel": "Skriv DELETE för att bekräfta",
       "vaultPath": "Valvsökväg: {{path}}",
       "deleteError": "Det gick inte att ta bort valvet helt. Försök igen.",
@@ -3416,7 +3685,7 @@
       "pendingHint": "Kommer snart"
     },
     "ai": {
-      "autoTagHelper": "När du pausar med skrivandet läser en liten modell på din enhet anteckningen och föreslår taggar överst i den. Ingenting läggs till förrän du accepterar ett förslag.",
+      "autoTagHelper": "När du pausar skrivandet läser en liten modell på din enhet anteckningen och föreslår taggar högst upp i den. Inget läggs till förrän du accepterar ett förslag, om du inte slår på raden nedan.",
       "autoTagLabel": "Föreslå taggar automatiskt",
       "autoTagUnavailable": "Ingen taggmodell är installerad ännu. Ladda ner den en gång från Inställningar, AI, så slås reglaget på av sig självt när den är installerad.",
       "consent": {
@@ -3567,8 +3836,67 @@
         "preferences": "Preferenser",
         "memory": "Minne",
         "excluded": "Vad AI kan läsa",
-        "history": "Chatthistorik"
-      }
+        "history": "Chatthistorik",
+        "externalAccess": "Extern åtkomst"
+      },
+      "externalAccess": {
+        "label": "Extern åtkomst",
+        "helperOff": "Av. Inget AI-verktyg når det här valvet genom `myne-mcp`.",
+        "helperOn": "På medan det här valvet är upplåst. Godkända verktyg kan läsa de mappar de beviljats, och Myne ser inte vad de gör med det de läser.",
+        "explanationShared": "Det här är samma strömbrytare som Inställningar, CLI, Terminalåtkomst. En dörr, två vägar in: `myne` drivs av dig, och `myne-mcp` drivs av vilket AI-verktyg du än konfigurerar.",
+        "explanationLabel": "En anslutnings namn är en etikett, inte ett lösenord. Myne kan inte skilja ett program från ett annat som körs under ditt konto, och kontrollerar inget utöver att dörren är öppen.",
+        "explanationDevice": "Godkännanden lagras på den här enheten. En andra dator eller telefon börjar utan några och måste frågas igen.",
+        "outsideMyne": "Vad ett anslutet verktyg gör med det det läser är utanför Myne: det körs på den här datorn, har sin egen nätverksåtkomst, och Myne ser inte vart det skickar något.",
+        "empty": "Ingen anslutning är godkänd på den här enheten ännu. Att godkänna en är det som låter ett visst verktyg läsa en uppsättning mappar du namnger.",
+        "readFailed": "Kunde inte läsa anslutningslistan just nu. Myne har inte sagt att inget är godkänt.",
+        "retry": "Försök igen",
+        "readSummary": "Får läsa {{count}} anteckningar i {{folders}} mappar.",
+        "readSummary_one": "Får läsa {{count}} anteckning i {{folders}} mappar.",
+        "readSummary_other": "Får läsa {{count}} anteckningar i {{folders}} mappar.",
+        "readNothing": "Får läsa ingenting: ingen mapp delas med den.",
+        "writeNone": "Får skriva ingenting. Den här versionen beviljar endast läsning.",
+        "missing_one": "{{count}} godkänd mapp finns inte längre. En omdöpt eller borttagen mapp lämnar beviljningen pekande på ingenting.",
+        "missing_other": "{{count}} godkända mappar finns inte längre. En omdöpt eller borttagen mapp lämnar beviljningen pekande på ingenting.",
+        "whenLine": "Godkänd {{approved}}. Senast använd {{used}}.",
+        "whenLineNever": "Godkänd {{approved}}. Inte använd sedan.",
+        "revoke": "Återkalla",
+        "revokeFailed": "Kunde inte återkalla den anslutningen. Den kan fortfarande läsa det den beviljades.",
+        "snippetToggle": "Inställningsutdrag",
+        "snippetHelper": "Klistra in det här i ditt AI-verktygs MCP-konfiguration. Namnet måste matcha anslutningen ovan, eftersom det namnet är vad godkännandet nycklas på.",
+        "rootFolder": "Valvets rot",
+        "addConnection": "Godkänn en anslutning",
+        "dialogTitleNew": "Godkänn en anslutning",
+        "dialogTitle": "Godkänn {{name}} igen",
+        "nameLabel": "Anslutningsnamn",
+        "namePlaceholder": "claude-desktop",
+        "nameHelper": "Namnet din klient skickar. Det är en etikett, inte ett lösenord: alla program på den här datorn kan använda vilket namn de vill, så det här avgör vad som delas med vem, inte vem som frågar.",
+        "nameReserved": "Det namnet är reserverat: en klient som är konfigurerad utan namn anländer som `unnamed-client`, så att godkänna den skulle godkänna varje okonfigurerad klient.",
+        "nameEmpty": "En anslutning behöver ett namn, eftersom det är vad beviljningen nycklas på.",
+        "firstGrantHelper": "Inget delas med den här anslutningen ännu.",
+        "reextendHelper": "Den här anslutningen har redan en beviljning. Att godkänna igen fryser en ny uppsättning från det du väljer nu, och behåller det den fortfarande kan läsa.",
+        "countsPending": "Räknar ut vad det omfattar…",
+        "countsNotes": "Delar {{count}} anteckningar i {{folders}} mappar.",
+        "countsNotes_one": "Delar {{count}} anteckning i {{folders}} mappar.",
+        "countsNotes_other": "Delar {{count}} anteckningar i {{folders}} mappar.",
+        "countsExcluded_one": "{{count}} mapp undantagen.",
+        "countsExcluded_other": "{{count}} mappar undantagna.",
+        "excludeLabel": "Lämna utanför",
+        "excludePlaceholder": "Inget lämnat utanför",
+        "excludeSearch": "Hitta en mapp",
+        "excludeEmpty": "Ingen mapp matchar.",
+        "excludeHelper": "En mapp du lämnar utanför delas inte, och inte heller något inuti den. Du väljer bland alla mappar i det här valvet, så det här är det enda stället där hela valvet ligger på bordet.",
+        "frozenNotice": "Den här uppsättningen fryses när du godkänner. En mapp du skapar efteråt börjar utanför den, och Extern åtkomst visar hur många det är och erbjuder att lägga till dem.",
+        "approve": "Godkänn",
+        "grantRefused": "Den här beviljningen ryms inte i valvets inställningsbudget. Inget ändrades. Återkalla en anslutning du inte längre använder och försök sedan igen.",
+        "grantFailed": "Kunde inte spara godkännandet. Inget ändrades.",
+        "delta_one": "{{count}} mapp skapad sedan du godkände den här delas inte.",
+        "delta_other": "{{count}} mappar skapade sedan du godkände den här delas inte.",
+        "deltaAdd": "Lägg till {{count}} mapp",
+        "deltaAdd_one": "Lägg till {{count}} mapp",
+        "deltaAdd_other": "Lägg till {{count}} mappar"
+      },
+      "autoApplyLabel": "Tillämpa föreslagna taggar automatiskt",
+      "autoApplyHelper": "Skriver taggarna i anteckningen utan att fråga, en gång per anteckning och session, bara efter att du har redigerat den. Endast på den här enheten. Ångra finns under anteckningen efter att den skrivit."
     },
     "network": {
       "disabledCue": "Synkroniseringen går inte längre via Tor. Nya anslutningar går direkt till synkservern.",
@@ -3624,7 +3952,7 @@
       "hideVaultNamesErrorRead": "Kunde inte läsa den aktuella inställningen. Slå om reglaget för att ställa in den igen.",
       "hideVaultNamesErrorSave": "Kunde inte spara inställningen, så den är oförändrad. Om du höll på att slå på den kan vissa lagrade namn redan ha förstörts; slå på den igen för att slutföra.",
       "hideVaultNamesErrorErase": "Ett lagrat namn kunde inte förstöras, så inställningen lämnades avstängd i stället för att påstå en radering som inte skedde. Försök igen.",
-      "screenCaptureHelperOff": "Skyddet gäller alltid före upplåsning. Efter upplåsning följs den här inställningen.",
+      "screenCaptureHelperOff": "Av på den här enheten, före upplåsning och efter. Slå på den igen här, eller från låsskärmen med tangentbordet.",
       "screenCaptureHelperOn": "Gäller från Windows 10 (May 2020 Update) och senare. macOS och Linux har inget system-API för detta, så det kan inte blockera inspelning där.",
       "screenCaptureLabel": "Skydd mot skärminspelning",
       "screenCaptureSubtitle": "Blockera skärmdumpar och skärminspelning",
@@ -3727,7 +4055,8 @@
         "sync": "Synkronisering",
         "cli": "CLI",
         "vault": "Valv",
-        "data": "Data"
+        "data": "Data",
+        "diagnostics": "Diagnostik"
       },
       "passwordUpdatedToast": "Lösenord uppdaterat",
       "title": "Inställningar"
@@ -3872,6 +4201,7 @@
       "empty": "Inga inställningar matchar “{{query}}”",
       "resultsLabel": "Sökresultat",
       "keywords": {
+        "accountNumber": "kontonummer personidentitet support överlämning kopiera",
         "aiAutoTag": "automatiska taggar tagg föreslå förslag etiketter ai auto tag",
         "aiEndpoint": "ollama slutpunkt adress lokal körmiljö modellserver port loopback endpoint local runtime",
         "aiProvider": "leverantör fjärrleverantör moln openrouter ollama api-nyckel inloggningsuppgift samtycke skicka anteckningar provider remote cloud api key",
@@ -3943,7 +4273,7 @@
         "ribbon": "vänster list skena fäst pin kommando kommandon anpassa ordna lossa verktygsfält genvägar",
         "folderNotes": "mapp anteckning index folder_index landningssida dubbelklick mapplänk projekt av stäng av inaktivera",
         "syncMembers": "medlemmar, dela, bjuda in, team, samarbete, vault",
-        "accountVaults": "konto valv grupperade vilka valv tillhör grupp lista",
+        "accountVaults": "kontovalv grupperade vilka valv tillhör grupp lista",
         "aiMeetingPrompt": "möte sammanfattning instruktion anpassad transkription åtgärdspunkter beslut",
         "update": "uppdatering uppgradera sök efter uppdateringar ny version utgåva ladda ner",
         "plainFile": "vanlig fil redigerare markdown lokal disk utanför valv klartext öppna på plats",
@@ -3951,6 +4281,9 @@
         "recoveryDrill": "återställningsfras kontrollera verifiera övning test 24 ord seed säkerhetskopia förlorat lösenord",
         "bar": "nedre fält statusfält indikatorer anpassa ordna om dölj visa verktygsfält",
         "syncDeviceBindings": "enheter anspråk medlemmar tillskrivning vem som signerade vilken enhet tillhör",
+        "vaultFormat": "valvformat uppgradering en-fras återställning pensionera valvåterställningsfras migrera identitet",
+        "publishVault": "publicera publicerat valv server endast enhet synk",
+        "externalAccess": "extern åtkomst MCP myne-mcp Claude Desktop klientanslutning godkänn omfång återkalla",
         "diagnosticLog": "diagnostiklogg loggning felsökning kraschrapport buggrapport support"
       },
       "emptyBody": "Prova ett kortare ord, eller namnet på en panel."
@@ -4019,21 +4352,107 @@
       "personalitySaveFailed": "Röstpreferenserna kunde inte sparas.",
       "loadFailed": "Kunde inte läsa in minnen eller röstpreferenser. Inget ändrades.",
       "retryLabel": "Försök igen",
+      "seed": {
+        "rowTitle": "Lär Myne ditt valv",
+        "rowHelper": "Bygg minne från dina anteckningar en gång, med granskning av varje rad innan den sparas.",
+        "rowSeeded": "Skapad {{date}} · {{count}} poster",
+        "start": "Lär Myne ditt valv",
+        "rebuild": "Bygg om",
+        "rebuildConfirm": "Ersätta seedningen från {{date}} ({{count}} poster)?",
+        "title": "Lär Myne ditt valv",
+        "candidatesTitle": "Granska vad Myne lärde sig",
+        "doneTitle": "Sparat",
+        "close": "Stäng",
+        "loading": "Läser ditt valv…",
+        "scopeIntro": "Myne läser först formen på ditt valv: anteckningstitlar, mappar och taggar. Den ber om anteckningstext bara om den behöver det, och aldrig bilagor.",
+        "provider": "Leverantör: {{provider}}",
+        "providerRemote": "fjärr",
+        "providerLocal": "på den här enheten",
+        "counts": "{{notes}} anteckningar · {{folders}} mappar · {{tags}} taggar",
+        "estimatedChars": "Cirka {{chars}} tecken",
+        "excluded": "{{count}} anteckningar lämnades utanför eftersom deras mapp är undantagen från AI",
+        "omitted": "{{count}} titlar uteslöts för att få plats i modellens kontext",
+        "showPayload": "Visa exakt vad som skickas",
+        "hidePayload": "Dölj nyttolasten",
+        "consentLabel": "Skicka den här översikten till {{provider}} (cirka {{chars}} tecken). Jag förstår att leverantören tar emot den.",
+        "localNote": "Inget lämnar den här enheten. Modellen körs här.",
+        "continue": "Fortsätt",
+        "cancel": "Avbryt",
+        "generatingHelper": "Det kan ta några minuter på en lokal modell. Du kan avbryta när som helst och inget sparas.",
+        "cancelRun": "Avbryt den här körningen",
+        "candidatesIntro": "{{count}} poster. Avmarkera vad du inte vill, och redigera formuleringen innan den sparas.",
+        "candidateLabel": "Minnepost {{index}}",
+        "charCount": "{{count}} / 2000 tecken",
+        "back": "Tillbaka",
+        "apply": "Spara {{count}} poster",
+        "applying": "Sparar…",
+        "applied": "Sparade {{count}} poster i minnet.",
+        "appliedHelper": "Hitta dem under Från ditt valv i det här avsnittet. Assistenten läser dem från och med nu.",
+        "finish": "Klar",
+        "appliedToast": "Minne byggt från ditt valv.",
+        "refusals": {
+          "empty": "Den här posten är tom.",
+          "textTooLong": "Den här posten överskrider 2000-teckengränsen.",
+          "scanRejected": "Den här posten läser sig som en instruktion till assistenten, inte som ett faktum. Redigera den och försök igen."
+        },
+        "errors": {
+          "aiDisabled": "AI är avstängt på den här enheten.",
+          "locked": "Lås upp valvet och försök igen.",
+          "busy": "En seedning pågår redan.",
+          "consent": "Bekräfta först att leverantören får ta emot översikten.",
+          "unreadable": "Valvets index kunde inte läsas.",
+          "malformed": "Modellen svarade inte i det format den här körningen behöver. Försök igen.",
+          "cancelled": "Körningen avbröts. Inget sparades.",
+          "noBodies": "Modellen bad om anteckningstext, men ingen av den kunde läsas.",
+          "engine": "Modellanropet misslyckades. Kontrollera leverantören och försök igen.",
+          "unknown": "Något gick fel när minnet byggdes. Försök igen.",
+          "candidateRefused": "En post avvisades. Den är markerad nedan; redigera den och spara igen.",
+          "cap": "Ditt minne är fullt.",
+          "capDetail": "{{remaining}} platser återstår men {{requested}} poster valdes. Ta bort några poster i den här panelen, eller avmarkera några kandidater."
+        },
+        "phases": {
+          "projecting": "Läser ditt valvs form…",
+          "asking": "Frågar modellen om teman…",
+          "reading": "Läser anteckningarna modellen bad om…",
+          "finalizing": "Skriver posterna…",
+          "working": "Arbetar…"
+        },
+        "groupTitle": "Från ditt valv",
+        "groupMeta": "Seedad {{date}} · {{count}} poster",
+        "removeAll": "Ta bort alla",
+        "removeConfirm": "Ta bort alla poster från den här seedningen?",
+        "removedToast": "Poster från ditt valv borttagna.",
+        "rowStale": "Valvet har ändrats sedan den här seedningen"
+      },
       "emptyTitle": "Inget sparat i minnet än",
       "count": "{{used}} av {{cap}}",
       "atCap": "Listan är full, så inget nytt kan kommas ihåg. Ta bort en post för att göra plats."
     },
     "account": {
       "vaultsLabel": "Valv i det här kontot",
-      "vaultsHelper": "Valven som den här enheten grupperar under namnet ovan. Gruppering är ett organisatoriskt val per enhet, så det är inte en del av något valvs innehåll och följer inte med det.",
+      "vaultsHelper": "Valven den här enheten grupperar tillsammans. Gruppering är ett per-enhet organisatoriskt val, så det är inte en del av något valvs innehåll och följer inte med det.",
+      "vaultsHelperShort": "Gruppering stannar på den här enheten och följer inte med ett valv.",
       "vaultsCount_one": "{{count}} valv",
       "vaultsCount_other": "{{count}} valv",
+      "vaultActions": "Valvåtgärder",
+      "splitLastConfirm": "Det här är det enda valvet i kontot. Att flytta ut det tar bort kontot.",
+      "vaultCorrupted": "Det här valvets metadata kunde inte läsas",
+      "vaultUnreadable": "Inte läst på den här enheten",
+      "vaultDeviceOnly": "Endast enhet",
       "currentVault": "Det här valvet",
       "unknownVault": "Ett annat valv på den här enheten",
+      "numberLabel": "Kontonummer",
+      "numberHelper": "Din identitets nummer, inte ett valvs. Härlett från din identitetsfras, så det kan inte förloras och behöver inte sparas. Det är ingen hemlighet; använd det för support eller för en överlämning till serveroperatören.",
+      "numberUnavailable": "Kunde inte läsa kontonumret på den här enheten. Öppna Inställningar igen för att försöka.",
+      "numberEmpty": "Ingen identitet på den här enheten. Lägg till eller återställ en i Synk för att få ett kontonummer.",
+      "numberCopy": "Kopiera",
+      "numberCopied": "Kontonummer kopierat",
+      "numberCopyFailed": "Kunde inte kopiera kontonumret",
+      "copyAccountNumber": "Kopiera kontonummer",
       "standaloneHelper": "Det här valvet är inte grupperat under ett konto på den här enheten, så det står för sig självt. Gruppering gäller per enhet: en annan enhet kan visa det inuti en grupp.",
       "unresolvedHelper": "Tar reda på vilket valv som är öppet…",
       "devicesNote": "Enheter, medlemmar i delade valv och din identitet hanteras under Synkronisering.",
-      "groupingHidden": "Kontonamn är otillgängliga medan valvnamn är dolda. Stäng av det alternativet under Integritet för att hantera det här kontot.",
+      "groupingHidden": "Kontogruppering är inte tillgänglig medan valvnamn är dolda. Stäng av det alternativet i Integritet för att hantera den.",
       "groupingUnreadable": "Den här enhetens kontogruppering kunde inte läsas. Ingenting ändrades.",
       "groupingError": "Kunde inte läsa kontogrupperingen på den här enheten. Ingenting ändrades.",
       "sections": {
@@ -4152,7 +4571,7 @@
       "invalidAccount": "Det ser inte ut som ett giltigt kontonummer.",
       "notConfigured": "Konfigurera en synkserver först och skapa sedan en QR-kod.",
       "scanWithApp": "Skanna med iOS-appen",
-      "title": "Lägg till en enhet med en QR-kod"
+      "title": "Logga in en annan enhet"
     },
     "devices": {
       "approve": "Godkänn",
@@ -4160,7 +4579,7 @@
       "awaitingApproval_other": "{{count}} enheter väntar på godkännande",
       "loading": "Läser in…",
       "noDevices": "Inga andra enheter ännu",
-      "notEnrolled": "Den här enheten är inte ansluten ännu. Om du precis lade till den, vänta på godkännande från en annan enhet. Annars lägger du till den med formuläret ”Lägg till en enhet” ovan.",
+      "notEnrolled": "Den här enheten är inte inloggad ännu. Om du just lade till den, vänta på godkännande från en enhet som redan är på ditt konto; annars logga in den med “Logga in den här enheten”.",
       "platform": {
         "android": "Android-telefon",
         "androidTablet": "Android-surfplatta",
@@ -4268,8 +4687,27 @@
       "verifyTitle": "Verifiera den här enheten",
       "waitingHint": "Håll det här fönstret öppet. När det har godkänts visas en verifieringskod här att jämföra med din andra enhet.",
       "waitingTitle": "Väntar på godkännande",
+      "personListFailed": "Du är på det här kontot, men listningen av dess valv slutfördes inte, så inga visas ännu. Försök igen, eller öppna den här skärmen senare.",
+      "personListRetry": "Lista valven igen",
       "sasAbortFailed": "Det gick inte att koppla från den här enheten. Den är fortfarande registrerad hos den servern, så behandla den som opålitlig: öppna Inställningar → Synkronisering och ta bort den där. Dina anteckningar togs inte bort.",
       "backToWaiting": "Tillbaka till vänteläget",
+      "codeBody": "Klistra in koden den andra enheten visar. En kod från en identitet lägger till den här enheten i hela det kontot.",
+      "codeContinue": "Fortsätt",
+      "codeExpired": "Den koden har gått ut. Be den andra enheten visa en ny.",
+      "codeInvalid": "Det är ingen Myne-anslutningskod.",
+      "codeLabel": "Anslutningskod",
+      "codeMemberUnsupported": "Den koden gäller ett delat valv. Lägg till den här enheten från identitetsskärmen i stället, där valvet visas under dina inbjudningar.",
+      "codeOpen": "Jag har en anslutningskod",
+      "codeTitle": "Lägg till den här enheten med en kod",
+      "personMismatch": "Den koden gäller en annan identitet än frasen du angav. Kontrollera båda och försök igen.",
+      "personPendingBody": "En av dina andra enheter måste godkänna den här. Tills dess kan den här enheten inte öppna något av kontots valv.",
+      "personPendingHint": "Väntar på godkännande. Detta avslutas av sig själv när den andra enheten godkänner.",
+      "personPendingPhraseAgain": "Den här enheten startades om innan godkännandet kom fram, så frasen behövs en gång till.",
+      "personPendingPhraseCta": "Ange frasen igen",
+      "personPendingTitle": "Väntar på godkännande",
+      "personPhraseBody": "Koden namngav identiteten; de 24 orden bevisar det. Den här enheten frågar efter varje valvs eget lösenord när du öppnar det.",
+      "personPhraseSubmit": "Lägg till den här enheten",
+      "personPhraseTitle": "Ange din identitetsfras",
       "errorPhrase": "Det gick inte att lägga till den här enheten. Kontrollera server-URL:en, kontonumret och återställningsfrasen, och att servern går att nå.",
       "modePassword": "Mitt lösenord",
       "modePhrase": "Min återställningsfras",
@@ -4283,7 +4721,7 @@
     "panel": {
       "addDevice": {
         "helper": "Logga in på en ny enhet med ditt kontonummer och lösenord eller din återställningsfras. En enhet förblir väntande tills en befintlig enhet godkänner den.",
-        "label": "Lägg till en enhet"
+        "label": "Logga in den här enheten"
       },
       "awaitingApproval": {
         "label": "Väntar på godkännande"
@@ -4293,7 +4731,8 @@
         "label": "Konflikter"
       },
       "devices": {
-        "label": "Enheter"
+        "label": "Enheter",
+        "helper": "Ett godkännande signerar in en enhet i ditt konto. Den ser sedan alla valv du äger, och varje valv öppnas fortfarande med sitt eget lösenord."
       },
       "recovered": {
         "close": "Stäng",
@@ -4328,6 +4767,7 @@
         "cta": "Lägg till en identitet",
         "codeLabel": "Din identitetskod",
         "lockedHelper": "Den här enheten har en identitet. Den är låst för den här sessionen; lås upp den med din återställningsfras för att signera synkronisering och inbjudningar.",
+        "unregisteredHelper": "Den här identiteten finns bara på den här enheten. Registrering skriver den till din synkserver, vilket är det som låter en inbjudan nå dig.",
         "unlockedHelper": "Den här enheten har en identitet, upplåst för den här sessionen."
       },
       "topics": {
@@ -4338,7 +4778,27 @@
       "sections": {
         "account": "Konto",
         "server": "Server",
-        "devices": "Registrerade enheter"
+        "devices": "Enheter på ditt konto"
+      },
+      "publish": {
+        "label": "Publicera till din server",
+        "cta": "Publicera det här valvet",
+        "republishCta": "Publicera igen",
+        "deviceOnlyHelper": "Det här valvet finns bara på den här enheten. Publicering binder det till din identitet så att dina andra enheter kan öppna det.",
+        "publishedHelper": "Publicerat {{when}}. Det här valvet är på din synkserver, så dina andra enheter kan nå det.",
+        "publishedHelperNoDate": "Publicerat. Det här valvet är på din synkserver, så dina andra enheter kan nå det.",
+        "error": {
+          "NotConfigured": "Ange en synkserver först, i Synk ovan.",
+          "PersonSessionRequired": "Lås upp din identitet först. Publicering kräver identiteten som äger det här valvet.",
+          "PersonNotRegistered": "Registrera din identitet först, i Identitetsblocket ovan. Den här enheten har identiteten men har aldrig registrerat den hos en server, så det finns inget konto att publicera under.",
+          "NotEnrolled": "Det här valvet tillhör ett konto den här enheten inte är inskriven på. Lägg till enheten i det kontot först.",
+          "NotOwner": "Det här valvet tillhör redan en annan identitet, så det kan inte publiceras här.",
+          "Unauthenticated": "Servern avvisade den här enheten. Försök igen, och registrera om den fortsätter.",
+          "Transport": "Kunde inte nå servern. Valvet är oförändrat; försök igen.",
+          "TlsFailure": "Kunde inte upprätta en betrodd anslutning. Valvet är oförändrat; försök igen.",
+          "BadRequest": "Det här valvets metadata kunde inte läsas. Inget skickades.",
+          "Other": "Publicering misslyckades. Valvet är oförändrat; försök igen."
+        }
       }
     },
     "reconcile": {
@@ -4365,6 +4825,7 @@
       "errorTooLarge": "En fil är för stor för att laddas upp",
       "loading": "Synkstatus…",
       "notEnrolled": "Inte registrerad",
+      "notRegistered": "Inte registrerad",
       "off": "Synk av",
       "synced": "Synkroniserad",
       "syncing": "Synkroniserar…",
@@ -4377,7 +4838,10 @@
       "devices": "Enheter",
       "frozen": "Det här kontot är fryst. Nya ändringar kan inte laddas upp; dina anteckningar hämtas fortfarande.",
       "ofTotal": "{{used}} av {{total}}",
-      "storage": "Lagring"
+      "storage": "Lagring",
+      "storageAcrossVaults": "Lagrat, över dina valv",
+      "vaultCount_one": "{{count}} valv",
+      "vaultCount_other": "{{count}} valv"
     },
     "settings": {
       "serverSection": "Server",
@@ -4445,14 +4909,15 @@
       "invitationsFailed": "Kunde inte läsa in dina inbjudningar.",
       "title": "Vault-medlemmar",
       "personUnlock": "Lås upp medlemsidentitet",
-      "personReady": "Medlemsidentitet upplåst.",
+      "personReady": "Din identitet är upplåst för den här sessionen.",
       "ownerCodeHint": "Dela denna kod med personen du bjuder in, så att de kan verifiera att vaulten är din. Den innehåller bara offentlig information.",
-      "personLock": "Lås medlemsidentitet",
+      "personLock": "Lås identitet",
       "personError": "Den frasen öppnade ingen medlemsidentitet.",
       "inviteHint": "Klistra in den inbjudna medlemmets identitetskod (från deras identitetshem).",
-      "inviteCodeLabel": "Medlemsidentitetskod",
+      "inviteCodeLabel": "Din identitetskod",
       "untitledVault": "Namnlös vault",
       "inviteFailed": "Inbjudan kunde inte skapas.",
+      "inviteNotOnServer": "Det här valvet är inte på din synkserver ännu. Publicera det och registrera din identitet, bjud sedan in igen.",
       "removeFailed": "Medlemmen kunde inte tas bort.",
       "youBadge": "Du",
       "nameUnverified": "Namn ej verifierat",
@@ -4473,6 +4938,7 @@
       "membersHeading": "Medlemmar",
       "emptyTitle": "Inga medlemmar än",
       "personUnlockOpen": "Lås upp",
+      "identityLockedNotice": "Lås upp din identitet för den här sessionen för att hantera medlemmar och inbjudningar.",
       "unsharedNotice": "Det här valvet är inte delat än. Att dela det är permanent och sker första gången du bjuder in någon.",
       "shareConfirmTitle": "Dela det här valvet?",
       "shareConfirmBody": "Att bjuda in någon gör det här valvet till ett delat valv: det får en gruppnyckel, och personer du bjuder in öppnar dess innehåll med den. Den här ändringen är permanent och det finns ingen väg tillbaka till ett valv för en enda användare. Fortsätt för att välja vem du vill bjuda in.",
@@ -4483,11 +4949,12 @@
       "identityForgetConfirm": "Glöm identiteten",
       "identityForgetCancel": "Behåll den",
       "identityForgetWarning": "Detta tar bort identiteten endast från den här enheten. Serverkontot och alla valv den äger eller har gått med i är orörda, och du kan återställa identiteten med dess fras på 24 ord på en annan enhet. Inbjudningar och medlemsåtgärder på den här enheten kräver att den låses upp igen.",
-      "identityForgetError": "Det gick inte att glömma identiteten. Försök igen."
+      "identityForgetError": "Det gick inte att glömma identiteten. Försök igen.",
+      "invitationDeclined": "Avvisad"
     },
     "deviceBindings": {
       "title": "Enheter och medlemmar",
-      "heading": "Enheter med anspråk",
+      "heading": "Medlemmarnas enheter",
       "hint": "Varje enhet som har gjort anspråk på sig själv i det här valvet, tillsammans med den medlem vars egen signatur gör anspråket. Ett anspråk är inte ett bevis på ägande: det säger vilken medlem som signerade uttalandet, inte att enheten tillhör dem.",
       "loading": "Läser in enheter…",
       "emptyTitle": "Inga enhetsanspråk än",
@@ -4523,7 +4990,19 @@
       "stepIdentity": "Öppna Myne på din andra enhet och välj “Jag har redan en identitet”.",
       "stepJoin": "Det här delade valvet väntar bland dina inbjudningar. Öppna det för att gå med.",
       "stepPhrase": "Ange din återställningsfras på 24 ord där.",
-      "title": "Lägg till din egen enhet"
+      "title": "Logga in din andra enhet"
+    },
+    "personJoinQr": {
+      "title": "Lägg till en enhet i din identitet",
+      "hint": "På den andra enheten väljer du “Jag har en anslutningskod” och klistrar in vad den här koden säger. Den enheten frågar efter dina 24 ord och väntar sedan på att du godkänner den här.",
+      "notConfigured": "En kod namnger en server, så ange din först i Synk ovan och skapa sedan den här koden.",
+      "noIdentity": "Den här enheten har ingen identitet, så det finns inget konto för en kod att namnge. Skapa eller återställ din identitet först.",
+      "error": "Kunde inte skapa koden. Försök igen.",
+      "image": "Anslutningskod",
+      "stepCode": "På den andra enheten öppnar du Myne och klistrar in den här koden där den frågar efter en.",
+      "stepPhrase": "Ange din 24-ords identitetsfras där. Den lämnar aldrig den enheten.",
+      "stepApprove": "Godkänn den enheten här, på en enhet som redan har din identitet.",
+      "stepVaults": "Ditt kontos valv visas sedan på den nya enheten. Öppna ett med det valvets eget lösenord."
     }
   },
   "tasks": {
@@ -4693,6 +5172,7 @@
     "continue": "Fortsätt",
     "decrypting": "Dekrypterar…",
     "deleteLink": "Förlorat både lösenord och återställningsfras? Ta bort valvet och börja om",
+    "memberRemoveLink": "Ta bort det här valvet från den här enheten",
     "errors": {
       "alreadyUnlocked": "Valvet är redan upplåst.",
       "inProgress": "Åtgärd pågår.",
@@ -4755,6 +5235,7 @@
     "failClosedEyebrow": "Det går inte att öppna valvet",
     "restoreHint": "Att återställa från en säkerhetskopia är ännu inte tillgängligt på mobilen.",
     "memberHint": "Dessa vault delas med dig. Lås upp den med din egen återställningsfras.",
+    "memberSubtitle": "Öppna det här delade valvet.",
     "memberPhraseLabel": "Återställningsfras",
     "memberSubmit": "Lås upp",
     "memberError": "Den frasen öppnade inte denna delade vault.",
@@ -4770,7 +5251,20 @@
     "memberBiometricSubmit": "Lås upp med biometri",
     "titleNamed": "Lås upp {{vault}}",
     "restoreCta": "Återställ från en säkerhetskopia",
-    "ioErrorHint": "Försök igen eller öppna Myne på nytt."
+    "ioErrorHint": "Försök igen eller öppna Myne på nytt.",
+    "identityPhraseLink": "Använd din identitetsfras",
+    "identityPhrase": {
+      "title": "Lås upp med din identitetsfras",
+      "body": "Det här valvet öppnas med sitt lösenord eller med din identitetsfras. Om du sparade en separat valvfras för det har den pensionerats och öppnar det inte längre. Att öppna det med de 24 orden du skrev ner för din identitet låser även upp din identitet för den här sessionen, så synkronisering körs utan en andra uppmaning.",
+      "label": "Identitetsfras",
+      "hint": "24 ord, i ordning.",
+      "submit": "Lås upp med identitetsfras",
+      "decrypting": "Öppnar…",
+      "cancel": "Tillbaka till lösenord",
+      "recoveryInProgress": "En återställning pågår redan. Återgå till lösenordsformuläret och fortsätt den.",
+      "generic": "Den frasen öppnade inte det här valvet."
+    },
+    "personWrapProbeFailed": "Myne kunde inte kontrollera om det här valvet också öppnas med en identitetsfras. Om du skapade det från din identitet, försök den frasen först."
   },
   "vault": {
     "ioBanner": {
@@ -4823,6 +5317,7 @@
     "provisioning": {
       "heading": "Skapar ditt konto",
       "caption": "Registrerar det här valvet hos synkservern. Din återställningsfras kommer härnäst.",
+      "captionNoPhrase": "Registrerar det här valvet hos synkservern. Det tar en stund.",
       "footerHint": "Det här tar en stund. Låt den här fliken vara öppen tills det är klart, så att den kan städa upp efter sig om något går fel."
     },
     "errors": {
@@ -4873,6 +5368,10 @@
       "permissionDenied": {
         "body": "Se till att Myne har behörighet att skriva till din applikationsdatamapp.",
         "title": "Kunde inte skriva till valvmappen"
+      },
+      "personLocked": {
+        "body": "Lås upp din identitet med dess 24 ord och skapa valvet igen. Din identitetsfras är den enda återställningsuppgiften för det här valvet, så att skapa det medan identiteten är låst skulle lämna det oåterställbart.",
+        "title": "Lås upp din identitet först"
       },
       "sessionExpired": {
         "body": "För din säkerhet avbryts valvskapandet efter 10 minuter. Börja om.",
@@ -4933,7 +5432,8 @@
       "reveal": "Visa fras",
       "saveAsFile": "Spara som fil",
       "saveFailed": "Kunde inte spara filen. Kopiera orden i stället, eller skriv ner dem.",
-      "savedToFile": "Sparat. Det är en fil med oformaterad text, så förvara den någonstans där bara du kan läsa den."
+      "savedToFile": "Sparat. Det är en fil med oformaterad text, så förvara den någonstans där bara du kan läsa den.",
+      "sessionOnlyNotice": "Den här webbläsaren behåller inte din fras efter en omladdning, så du blir tillfrågad om de 24 orden igen. Förvara dem på ett säkert ställe."
     },
     "ready": {
       "backedUp": "Säkerhetskopierad",
@@ -4982,6 +5482,7 @@
   },
   "vaultPicker": {
     "createAnother": "Skapa ett till valv",
+    "deviceOnly": "Endast enhet",
     "heading": "Välj ett valv",
     "joinDevice": "Lägg till den här enheten på ett konto",
     "loading": "Läser in dina valv…",
@@ -5057,10 +5558,34 @@
   "vaultSwitcher": {
     "chipFallback": "Valv",
     "createAnother": "Skapa ett till valv",
+    "deviceOnly": "Endast enhet",
     "joinDevice": "Lägg till den här enheten på ett konto",
     "switching": "byter…",
     "switchVaultLabel": "Byt valv",
     "vaultFallback": "Valv {{n}}"
+  },
+  "invites": {
+    "title": "Inbjudningar",
+    "loading": "Läser in inbjudningar…",
+    "empty": "Inga inbjudningar ännu.",
+    "pendingHeading": "Väntar på dig",
+    "pendingHint": "Valvägaren bjöd in din identitet. Att acceptera frågar efter deras identitetskod och din återställningsfras.",
+    "error": "Kunde inte läsa in inbjudningar. Kontrollera din anslutning och synkserver.",
+    "retry": "Försök igen",
+    "noIdentity": "Den här enheten har ingen identitet ännu, så ingen inbjudan kan adresseras till den.",
+    "notEnrolled": "Den här identiteten är inte registrerad ännu, så inbjudningar adresserade till den kan inte listas. Att registrera den är det som låter dem komma fram.",
+    "notice_one": "{{count}} inbjudan väntar",
+    "notice_other": "{{count}} inbjudningar väntar",
+    "decline": "Avvisa",
+    "declineTitle": "Avvisa den här inbjudan?",
+    "declineBody": "Inbjudan tas bort på din server, så den kan aldrig accepteras, och ägaren ser att du avvisade den i stället för att de fortfarande väntar. Att få tillbaka den kräver att ägaren bjuder in dig igen.",
+    "declineCta": "Avvisa inbjudan",
+    "declineFailed": "Inbjudan kunde inte avvisas. Försök igen.",
+    "noticeUnregistered": "Registrera den här identiteten för att se inbjudningar",
+    "noticePending": "Inbjudningar kan inte listas förrän den här enheten är godkänd"
+  },
+  "firstRun": {
+    "heading": "Skapa din identitet"
   },
   "welcome": {
     "createCta": "Skapa nytt valv",
@@ -5094,13 +5619,19 @@
     "cleanUpFiles": "Rensa kvarvarande filer",
     "connect": "Anslut till mitt konto",
     "tagline": "Krypterade markdown-anteckningar. Ingen e-post vid registrering.",
+    "startAction": "Skapa din identitet och ditt valv",
+    "startBody": "Börja nytt på den här enheten: en ny identitet, sedan valvet som hör till den.",
     "restoreTitle": "Återställ från säkerhetskopia",
     "restoreBody": "Öppna en .myne-backup-fil du sparade tidigare.",
     "joinTitle": "Lägg till den här enheten i ett konto",
     "joinBody": "Använd ett valv du redan har på en annan enhet.",
+    "invitedTitle": "Jag blev inbjuden till ett valv",
+    "invitedBody": "Ställ in identiteten inbjudan adresserades till. Du behöver inget eget valv.",
+    "invitedAction": "Jag blev inbjuden",
     "restoreAction": "Återställ",
     "joinAction": "Lägg till enhet",
-    "version": "Version {{version}} · pre-alpha"
+    "version": "Version {{version}} · pre-alpha",
+    "createAction": "Skapa"
   },
   "wikiGraph": {
     "emptyTitle": "Inga länkar ännu",
@@ -5344,9 +5875,12 @@
   },
   "identityHome": {
     "createVaultCta": "Skapa en vault",
+    "createVaultLocked": "Lås upp din identitet för att skapa ett valv. Den signerar valvets första medlemslista, vilket gör valvet till ditt, och den här enheten har den förseglad för den här sessionen.",
     "invitesError": "Kunde inte läsa in inbjudningar. Kontrollera din anslutning och synkroniseringsserver.",
     "invitesHeading": "Inbjudningar",
     "invitesLoading": "Kontrollerar efter inbjudningar…",
+    "invitesPending": "Den här enheten väntar på godkännande. Inbjudningar visas här när en annan av dina enheter godkänner den.",
+    "invitesUnregistered": "Den här identiteten är inte registrerad hos en synkserver ännu, så ingen inbjudan når den.",
     "noInvites": "Inga inbjudningar ännu.",
     "subtitle": "Du har en identitet på denna enhet, så folk kan bjuda in dig till en vault. Du behöver inte skapa en för att bli inbjuden.",
     "accept": "Acceptera",
@@ -5383,6 +5917,20 @@
     "forgetCta": "Glöm den här identiteten på den här enheten",
     "forgetError": "Det gick inte att glömma identiteten. Försök igen.",
     "forgetWarning": "Detta tar bort identiteten endast från den här enheten. Serverkontot och alla valv den äger eller har gått med i är orörda, och du kan återställa identiteten med dess fras på 24 ord på en annan enhet. Om du inte har sparat den frasen kan den här enheten inte återställa den.",
+    "registerCta": "Registrera den här identiteten",
+    "registerContinue": "Fortsätt",
+    "registerSubmit": "Registrera",
+    "registerError": "Kunde inte registrera. Kontrollera frasen och serveradressen, försök sedan igen.",
+    "registerServerLabel": "Synkserveradress",
+    "registerServerPlaceholder": "https://sync.example.com",
+    "registerServerHint": "Dess operatör kommer att kunna se att den här identiteten finns.",
+    "registerInviteCodeLabel": "Serverinbjudningskod",
+    "registerInviteCodeHint": "Endast om din server frågar efter en.",
+    "registerServerError": "Den servern kunde inte nås. Kontrollera adressen och försök igen. Dina ord är kvar här.",
+    "accountNumberHeading": "Kontonummer",
+    "accountNumberHint": "Härledd från din identitetsfras, så den kan inte förloras och är ingen hemlighet. Använd den för support eller för en överlämning till serveroperatören.",
+    "copyAccountNumber": "Kopiera kontonummer",
+    "registerPhraseLabel": "Din identitetsfras, 24 ord",
     "stepIndicator": "Steg {{n}} av {{total}} · {{label}}",
     "stepVerifyOwner": "Verifiera ägaren",
     "stepRecoveryPhrase": "Återställningsfras",
@@ -5527,7 +6075,45 @@
       "inviteHint": "Öppna den här inbjudan från valvväljaren för att gå med med din identitetsfras.",
       "forgetHeading": "Den här enheten",
       "forget": "Glöm den här identiteten på den här enheten",
-      "forgetCheckbox": "Jag förstår att den här identiteten tas bort från den här enheten. Serverkontot finns kvar och frasen återställer det."
+      "forgetCheckbox": "Jag förstår att den här identiteten tas bort från den här enheten. Serverkontot finns kvar och frasen återställer det.",
+      "vaultHeading": "Dina valv",
+      "vaultHint": "Din identitet kan äga hur många valv som helst. Varje har sitt eget lösenord.",
+      "registerHeading": "Registrering",
+      "registerHint": "Den här identiteten är inte registrerad ännu, så ingen kan bjuda in dig och inget synkroniseras."
+    },
+    "register": {
+      "title": "Registrera den här identiteten",
+      "open": "Registrera den här identiteten",
+      "cta": "Registrera",
+      "working": "Registrerar…",
+      "failed": "Kunde inte registrera den här identiteten. Den stannar på den här enheten och du kan försöka igen."
+    },
+    "personJoin": {
+      "title": "Lägg till den här telefonen i ditt konto",
+      "lead": "Skriv in de 24 orden från det konto koden kom ifrån. En befintlig enhet godkänner sedan den här telefonen, så en fras ensam kan inte lägga till en.",
+      "phraseLabel": "Identitetsfras",
+      "phraseHint": "24 ord, i ordning.",
+      "cta": "Lägg till den här telefonen",
+      "working": "Lägger till den här telefonen…",
+      "mismatch": "Dessa ord tillhör en annan identitet än den här koden.",
+      "failed": "Den telefonen lades inte till. Kontrollera orden och försök igen.",
+      "pendingTitle": "Väntar på godkännande",
+      "pendingLead": "Den här telefonen är tillagd och väntar. Godkänn den på en enhet som redan har ditt konto, så avslutas den här skärmen av sig själv.",
+      "pendingHint": "Inget att göra här förrän den andra enheten godkänner.",
+      "sessionEnded": "Väntan avslutades när appen stängdes. Ange dina 24 ord igen för att fortsätta.",
+      "reenter": "Ange dina ord igen",
+      "finishingTitle": "Slutför den här enheten",
+      "finishingLead": "Den här telefonen är tillagd i ditt konto. Dess valv hämtas nu; varje ber fortfarande om sitt eget lösenord.",
+      "listFailed": "Den här telefonen lades till, men ditt kontos valv kom inte fram. Kontrollera anslutningen och försök igen.",
+      "listRetry": "Hämta valven igen"
+    },
+    "unlock": {
+      "title": "Lås upp din identitet",
+      "lead": "Din identitet är förseglad på den här enheten för den här sessionen. Dess 24-ords återställningsfras öppnar den; inget skickas någonstans.",
+      "open": "Lås upp identitet",
+      "cta": "Lås upp",
+      "working": "Låser upp…",
+      "failed": "Den frasen öppnade inte den här identiteten. Kontrollera de 24 orden och försök igen."
     },
     "recover": {
       "open": "Jag har redan en identitet",

@@ -41,6 +41,8 @@
       "permissionLabel": "À la fin de l'exécution",
       "permissionAsk": "Examiner d'abord",
       "permissionAuto": "Appliquer automatiquement",
+      "keepConversation": "Garder cette conversation quand je change de note",
+      "keepConversationPinned": "Gardée pour cette session",
       "providerRejected": "Le fournisseur a rejeté cette requête, l'exécution s'est donc arrêtée. Rien n'a été écrit. Le défaut vient de ce que Myne a envoyé, pas de vos notes ni de votre configuration.",
       "unchecked": "La vérification des modifications n'a pas pu aboutir, l'agent est donc indisponible pour l'instant. Vérifiez que votre modèle ou votre fournisseur est joignable, puis réessayez.",
       "unsupported": "Ce modèle ne peut pas effectuer de modifications précises de façon fiable, l'agent est donc indisponible. Choisissez un modèle plus grand ou un fournisseur.",
@@ -49,6 +51,9 @@
       "unsupportedProvisional": "Ce seuil de réussite n'a pas encore été mesuré sur l'ensemble des modèles ; il peut donc être plus strict ou plus permissif qu'il ne devrait.",
       "scopeNone": "aucune note ouverte, il n'y a donc rien sur quoi travailler pour l'instant",
       "scopeAllVault": "Toutes les notes",
+      "scopeQuestion": "Ce que l'agent peut lire",
+      "scopeFolders": "Dossiers",
+      "scopeApplies": "S'applique à votre prochain message. Les notes à la corbeille, archivées et les modèles sont toujours exclus.",
       "blockedScope": "Rien sur quoi l'agent puisse travailler pour l'instant : toutes les notes sont exclues de l'IA, ou le coffre est vide.",
       "preparing": "Préparation…",
       "blockedScopeSidebar": "Rien à demander pour l'instant : le dossier de cette note est exclu de l'IA.",
@@ -56,6 +61,21 @@
       "scopeExcluded_one": "{{count}} exclue de l'IA",
       "scopeExcluded_many": "{{count}} exclues de l'IA",
       "scopeExcluded_other": "{{count}} exclues de l'IA"
+    },
+    "attachments": {
+      "title": "Joindre un document",
+      "attach": "Joindre un document",
+      "empty": "Aucune pièce jointe dans ce coffre pour l'instant. Ajoutez d'abord un fichier à la bibliothèque de pièces jointes.",
+      "failed": "La bibliothèque de pièces jointes n'a pas pu être lue. Réessayez.",
+      "pasteFailed": "Le fichier collé n'a pas pu être ajouté à cette conversation.",
+      "pasting": "Collage…",
+      "pastedFile": "Fichier collé",
+      "cap": "Vous pouvez joindre jusqu'à {{count}} fichiers.",
+      "confirm_one": "Joindre {{count}} fichier",
+      "confirm_other": "Joindre {{count}} fichiers",
+      "remove": "Retirer {{name}}",
+      "noText": "{{name}} n'a pas de texte que l'agent puisse lire. Seuls les fichiers dont le texte a pu être extrait peuvent être joints.",
+      "confirm_many": "Joindre {{count}} fichiers"
     },
     "progress": {
       "working": "En cours",
@@ -98,6 +118,7 @@
     },
     "review": {
       "title": "Examiner les modifications",
+      "statusWaiting": "En attente de votre approbation",
       "close": "Fermer",
       "scopeTotal_one": "{{count}} note dans la portée",
       "scopeTotal_many": "{{count}} de notes dans la portée",
@@ -109,6 +130,12 @@
       "changedLines_one": "{{count}} ligne",
       "changedLines_many": "{{count}} de lignes",
       "changedLines_other": "{{count}} lignes",
+      "rowReplace_one": "Remplacer {{count}} ligne",
+      "rowReplace_other": "Remplacer {{count}} lignes",
+      "rowAppend": "Ajouter à la fin de la note",
+      "rowMove": "Déplacer vers {{folder}}",
+      "showChange": "Afficher la modification",
+      "hideChange": "Masquer la modification",
       "removalFlag": {
         "trashed": "Déplace cette note vers la corbeille",
         "deleted": "Supprime cette note sur tous les appareils",
@@ -118,6 +145,7 @@
       },
       "largeDeletion": "Supprime une grande partie du texte",
       "rejectEdit": "Refuser",
+      "createdBadge": "Créée",
       "restoreEdit": "Conserver",
       "applyRemoval": "Appliquer séparément",
       "rejectAll": "Tout refuser",
@@ -127,6 +155,12 @@
       "appliedCount_one": "{{count}} modification appliquée.",
       "appliedCount_many": "{{count}} de modifications appliquées.",
       "appliedCount_other": "{{count}} modifications appliquées.",
+      "rejectedCount_one": "{{count}} modification rejetée.",
+      "rejectedCount_other": "{{count}} modifications rejetées.",
+      "rejectedNewNotes_one": "{{count}} nouvelle note rejetée.",
+      "rejectedNewNotes_other": "{{count}} nouvelles notes rejetées.",
+      "rejectedSettings_one": "{{count}} réglage rejeté.",
+      "rejectedSettings_other": "{{count}} réglages rejetés.",
       "refused": {
         "anchorNotFound": "Impossible à appliquer : ce texte ne figure plus dans la note.",
         "anchorAmbiguous": "Impossible à appliquer : ce texte apparaît plusieurs fois.",
@@ -143,9 +177,19 @@
         "appendEmpty": "Impossible à appliquer : il n'y avait rien à ajouter.",
         "appendWouldWriteFrontmatter": "Impossible à appliquer : ce texte serait devenu le bloc de propriétés de la note.",
         "moveToSameFolder": "Non déplacée : la note est déjà dans ce dossier.",
+        "unknownFolder": "Non déplacée : ce coffre n'a pas de dossier de ce nom, rien n'a donc été écrit.",
         "moveIntoExcludedFolder": "Non déplacée : ce dossier est exclu de l'IA."
       },
       "applyFailed": "Les modifications n'ont pas pu être appliquées.",
+      "applyFailedCause": {
+        "noSuchRun": "Cette exécution n'est plus ouverte, rien n'a donc été écrit.",
+        "cancelled": "Cette exécution a été arrêtée, rien n'a donc été écrit.",
+        "locked": "Le coffre est verrouillé, rien n'a donc été écrit.",
+        "aiDisabled": "L'IA est désactivée pour ce coffre.",
+        "write": "L'écriture des modifications ne s'est pas terminée.",
+        "read": "Un élément nécessaire à cette exécution n'a pas pu être lu, rien n'a donc été écrit.",
+        "restorePoint": "La copie de sécurité n'a pas pu être prise, rien n'a donc été écrit."
+      },
       "undo": "Annuler cette exécution",
       "undoFailed": "L'exécution n'a pas pu être annulée.",
       "undoReport": "{{reverted}} notes restaurées. {{kept}} notes créées par l'exécution ont été conservées.",
@@ -191,6 +235,8 @@
         "runStopped": "Non appliqué : l'exécution a été arrêtée, aucune modification n'a donc été tentée.",
         "notProposed": "Non appliqué : cette exécution n'a jamais proposé cette modification, l'hôte ne l'écrira donc pas."
       },
+      "appliedSummary": "Modifications appliquées.",
+      "settingsApplied": "Réglages appliqués.",
       "undoReportFailed_one": "{{count}} modification n'a pas pu être rétablie.",
       "undoReportFailed_many": "{{count}} de modifications n'ont pas pu être rétablies.",
       "undoReportFailed_other": "{{count}} modifications n'ont pas pu être rétablies.",
@@ -205,7 +251,14 @@
       "settingsChanged_other": "{{count}} réglages modifiés.",
       "refusedCount_one": "{{count}} modification n'a pas pu être appliquée",
       "refusedCount_many": "{{count}} de modifications n'ont pas pu être appliquées",
-      "refusedCount_other": "{{count}} modifications n'ont pas pu être appliquées"
+      "refusedCount_other": "{{count}} modifications n'ont pas pu être appliquées",
+      "rowReplace_many": "Remplacer {{count}} lignes",
+      "rejectedCount_many": "{{count}} modifications rejetées.",
+      "rejectedNewNotes_many": "{{count}} nouvelles notes rejetées.",
+      "rejectedSettings_many": "{{count}} réglages rejetés."
+    },
+    "proposal": {
+      "lineCounts": "+{{added}} −{{removed}}"
     },
     "undo": {
       "action": "Annuler l'exécution",
@@ -330,6 +383,7 @@
       "checking": "Vérification…",
       "checkUnusedFailedNotice": "Impossible de vérifier les pièces jointes inutilisées. Réessayez.",
       "corpusIncompleteNotice": "Terminez d'abord la synchronisation. Cet appareil n'a pas encore toutes vos notes, il ne peut donc pas savoir quelles pièces jointes sont inutilisées.",
+      "sharedVaultNotice": "Il s'agit d'un coffre partagé, les conversations sont donc conservées par personne. Myne ne peut pas savoir quels fichiers un autre membre utilise encore, il n'en proposera donc aucun pour le nettoyage.",
       "cleanUnused": "Nettoyer les inutilisées",
       "cleanUnusedTitle": "Supprimer les pièces jointes utilisées dans aucune note",
       "colCreated": "Créée",
@@ -731,6 +785,9 @@
       },
       "manageTemplates": {
         "label": "Gérer les modèles…"
+      },
+      "manageViews": {
+        "label": "Gérer les vues…"
       },
       "newNoteFromTemplate": {
         "label": "Nouvelle note à partir d'un modèle…"
@@ -1327,12 +1384,18 @@
           "memoryPopoverRetry": "Réessayer",
           "memoryPopoverSettings": "Gérer dans les Réglages",
           "memoryPopoverClose": "Fermer",
+          "seedCard": {
+            "title": "Voulez-vous que Myne connaisse votre coffre ?",
+            "body": "Il peut lire la forme de vos notes une fois et créer quelques entrées de mémoire. Vous relisez chaque ligne avant que rien ne soit enregistré.",
+            "action": "Apprendre votre coffre à Myne",
+            "dismiss": "Pas maintenant"
+          },
           "copied": "Copié",
           "copyAnswer": "Copier la réponse",
           "copyFailed": "Impossible de copier",
           "copyYourMessage": "Copier votre message",
           "emptyTitle": "Posez une question sur vos notes",
-          "noticeLeaves": "Les mots que vous saisissez, les notes qu'un tour lit, les titres, identifiants et chemins de dossier de chaque note que l'exécution peut lire (tout le coffre moins vos dossiers exclus, sauf si vous le restreignez), ainsi que ce que l'IA retient de vous sont envoyés à ce qui répond. Rien d'autre sur cet appareil n'est envoyé.",
+          "noticeLeaves": "Les mots que vous tapez, les notes qu'un tour lit, les titres, identifiants et chemins de dossiers de toutes les notes que l'exécution peut lire (tout le coffre moins vos dossiers exclus, sauf si vous le réduisez), le texte que Myne a extrait de tout fichier que vous joignez à un message (jusqu'à quatre, chacun coupé à 20 000 caractères ; le fichier lui-même reste ici), et ce dont l'IA se souvient de vous sont envoyés à ce qui répond. Rien d'autre sur cet appareil n'est envoyé.",
           "noticeReceiver": "C'est {{provider}} qui répond, que Myne n'exploite pas.",
           "noticeReceiverLocal": "C'est un programme exécuté sur cet appareil qui répond. Rien ne quitte la machine, mais ce programme ne fait pas partie de Myne et Myne ne peut pas voir ce qu'il en fait.",
           "noticeRevoke": "Pour l'arrêter, désactivez l'IA dans les Paramètres, ou changez ce qui répond à cet endroit. Révoquer la clé d'un fournisseur arrête immédiatement ce fournisseur.",
@@ -1408,15 +1471,18 @@
         "editing": "est en train de modifier",
         "empty": "Vous êtes seul ici",
         "jumpTo": "Aller à {{name}}",
+        "showList_one": "{{count}} ici maintenant. Afficher la liste",
+        "showList_other": "{{count}} ici maintenant. Afficher la liste",
         "unknown": "Quelqu'un",
         "title_one": "{{count}} personne ici maintenant",
         "title_many": "{{count}} de personnes ici maintenant",
-        "title_other": "{{count}} personnes ici maintenant"
+        "title_other": "{{count}} personnes ici maintenant",
+        "showList_many": "{{count}} ici maintenant. Afficher la liste"
       }
     },
     "noteActions": {
       "buttonLabel": "Actions de la note",
-      "convertFailed": "Impossible de changer la nature de cette note, elle est donc inchangée.",
+      "convertFailed": "Impossible de changer ce qu'est cette note, elle est donc inchangée.",
       "rename": "Renommer",
       "move": "Déplacer vers un dossier…",
       "duplicate": "Dupliquer",
@@ -1558,7 +1624,9 @@
     "tagSuggestion": {
       "label": "Étiquettes suggérées",
       "accept": "Ajouter l'étiquette {{tag}} à cette note",
-      "dismiss": "Ignorer l'étiquette suggérée {{tag}}"
+      "dismiss": "Ignorer l'étiquette suggérée {{tag}}",
+      "groupExisting": "Dans votre coffre",
+      "groupNew": "Nouveau"
     },
     "taskField": {
       "addAffordance": "Ajouter un champ de tâche",
@@ -1710,6 +1778,10 @@
       "loadFailed": "Impossible de charger vos notes.",
       "openFailed": "Impossible d'ouvrir cette note.",
       "saveFailed": "Impossible d'enregistrer cette note.",
+      "liveResynced": "Cette note a été mise à jour ailleurs et rechargée.",
+      "liveResyncedKept": "Cette note a été mise à jour ailleurs et rechargée. Vos modifications non enregistrées ont été conservées comme copie séparée.",
+      "liveResyncFailed": "Impossible de mettre à jour cette note avec les modifications venues d'ailleurs. Votre texte est inchangé.",
+      "liveCopyFailed": "Impossible de conserver vos modifications non enregistrées comme copie séparée, cette note n'a donc pas été mise à jour. Votre texte est inchangé.",
       "moveFailed": "Impossible de déplacer cette note.",
       "openTodayFailed": "Impossible d'ouvrir la note du jour.",
       "exportFailed": "Impossible d'exporter cette note.",
@@ -1797,6 +1869,7 @@
     "formatBar": {
       "redo": "Rétablir",
       "attachFile": "Joindre un nouveau fichier",
+      "photoToNote": "Photo vers note",
       "insertFromLibrary": "Insérer depuis la bibliothèque",
       "recordVoiceNote": "Enregistrer une note vocale",
       "showLivePreview": "Afficher l'aperçu en direct",
@@ -2083,9 +2156,9 @@
       "folderDeleteBody_one": "« {{name}} » et sa {{count}} note",
       "folderDeleteBody_many": "« {{name}} » et ses {{count}} de notes",
       "folderDeleteBody_other": "« {{name}} » et ses {{count}} notes",
-      "folderDeleteConfirm_one": "Déplacer {{count}} note vers la corbeille ?",
+      "folderDeleteConfirm_one": "Mettre {{count}} note à la corbeille ?",
       "folderDeleteConfirm_many": "Déplacer {{count}} de notes vers la corbeille ?",
-      "folderDeleteConfirm_other": "Déplacer {{count}} notes vers la corbeille ?",
+      "folderDeleteConfirm_other": "Mettre {{count}} notes à la corbeille ?",
       "folderDeleteConfirmCta": "Déplacer vers la corbeille",
       "folderDeleteError": "Impossible de déplacer les notes de ce dossier vers la corbeille. Réessayez.",
       "folderDeleteTitle": "Déplacer ce dossier vers la corbeille ?",
@@ -2099,7 +2172,9 @@
       "copyLink": "Copier le lien",
       "open": "Ouvrir",
       "openInNewTab": "Ouvrir dans un nouvel onglet",
-      "revealInFolder": "Afficher dans le dossier"
+      "revealInFolder": "Afficher dans le dossier",
+      "archive": "Archiver la note",
+      "trash": "Mettre la note à la corbeille"
     },
     "colorLabels": {
       "clay": "Argile",
@@ -2474,7 +2549,7 @@
     "list": {
       "addToFavorites": "Ajouter aux favoris",
       "archiveBulkError": "Impossible d'archiver les notes.",
-      "renameFailed": "Impossible d'enregistrer ce nom, la note a donc conservé l'ancien.",
+      "renameFailed": "Impossible d'enregistrer ce nom, la note a donc gardé l'ancien.",
       "archiveFolder": "Archiver le dossier",
       "archiveNote": "Archiver",
       "archiveSingleError": "Impossible d'archiver la note.",
@@ -2759,8 +2834,60 @@
       "thisNote": "cette note",
       "untitled": "Sans titre"
     },
-    "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, rien n'a donc été modifié. Réessayez une fois que ce sera fait.",
+    "unsettledSave": "Une note ouverte n'a pas fini d'être enregistrée, rien n'a donc changé. Réessayez une fois qu'elle l'est.",
     "views": {
+      "bulk": {
+        "apply": "Définir sur {{count}}",
+        "field": "Champ",
+        "notRestorableLine": "{{title}} a été écrit mais n'a pas d'instantané pour cette action, il ne peut donc pas être restauré depuis ici.",
+        "nothingToRestore": "Ces notes gardent leur propre historique de modifications, cette action n'a donc pas de point de restauration. Les valeurs qu'elle a écrites sont toujours là.",
+        "refusedCannotDecrypt": "elle n'a pas pu être déchiffrée",
+        "refusedFieldChanged": "ce champ a changé ailleurs depuis la lecture de cette vue",
+        "refusedFieldNotDeclared": "la vue ne déclare pas ce champ",
+        "refusedFieldReserved": "ce champ est géré par Myne",
+        "refusedInvalidField": "ce nom de champ ne peut pas être écrit",
+        "refusedInvalidNoteId": "l'identifiant de la note n'était pas valide",
+        "refusedIo": "la note n'a pas pu être écrite",
+        "refusedJoinFailure": "l'écriture ne s'est pas terminée",
+        "refusedLine": "{{title}} : {{reason}}.",
+        "refusedLiveSessionOpen": "une session d'édition en direct a cette note ouverte",
+        "refusedNotApproved": "cet appareil n'a pas approuvé cette vue",
+        "refusedNoteNotFound": "cette note n'existe plus",
+        "refusedPrefsUnreadable": "les approbations de cet appareil n'ont pas pu être lues",
+        "refusedVaultLocked": "le coffre est verrouillé",
+        "refusedValueTooLarge": "la valeur est trop grande pour une note",
+        "restore": "Restaurer cette action",
+        "restoreFailedLine": "{{title}} n'a pas pu être restauré.",
+        "restored": "{{count}} restauré(s).",
+        "selectAll": "Sélectionner toutes les notes de cette vue",
+        "selectRow": "Sélectionner {{title}}",
+        "skippedListValues": "{{count}} notes sélectionnées contiennent une liste dans ce champ et n'ont pas été incluses.",
+        "value": "Valeur à définir",
+        "valuePlaceholder": "Nouvelle valeur",
+        "written": "{{count}} écrit(s)."
+      },
+      "board": {
+        "emptyLane": "Aucune carte",
+        "dropRefused": "{{reason}}. La carte est revenue dans {{lane}}.",
+        "addCardTo": "Ajouter une carte à {{lane}}",
+        "addCardRefused": "La carte a été créée, mais elle n'a pas pu être placée : {{reason}}.",
+        "addCardFailed": "Aucune carte n'a été créée : le modèle n'a pas pu être lu.",
+        "moveSelected": "Déplacer {{count}}",
+        "moveTo": "Déplacer vers la voie",
+        "selectAll": "Sélectionner toutes les cartes",
+        "selectCard": "Sélectionner {{title}}",
+        "renameLane": "Renommer la voie {{lane}}",
+        "newLaneName": "Nom de la nouvelle voie",
+        "saveLaneName": "Enregistrer le nom de la voie",
+        "cancelLaneRename": "Annuler",
+        "lanesNotSaved": "Les cartes ont bougé, mais l'ordre des voies n'a pas pu être enregistré.",
+        "laneOrderRestored": "L'ordre des voies est revenu.",
+        "laneOrderRestoreFailed": "L'ordre des voies n'a pas pu être restauré.",
+        "cancel": "Annuler",
+        "archiveFailed": "La note n'a pas pu être archivée.",
+        "trashFailed": "La note n'a pas pu être mise à la corbeille.",
+        "noGroupBy": "Ce tableau n'a pas de propriété de voie. Choisissez une propriété de regroupement dans les réglages de vue."
+      },
       "cards": {
         "changeCover": "Changer la couverture",
         "changeCoverImage": "Changer l'image de couverture",
@@ -2774,6 +2901,55 @@
       "list": {
         "empty": "Aucune note ne correspond à cette vue",
         "noValue": "Aucune valeur"
+      },
+      "import": {
+        "approveAction": "Approuver v{{version}}",
+        "approveFailed": "Cette approbation n'a pas pu être enregistrée.",
+        "approveFailedBody": "La vue est ici et attend encore une approbation. Réessayez, ou approuvez-la depuis le gestionnaire de vues.",
+        "armIdentical": "Vous avez déjà exactement cette version (v{{version}}). Il n'y a rien à faire.",
+        "armIdenticalHeading": "{{name}} est déjà à jour",
+        "armNew": "Cela ajoute une nouvelle vue, {{name}} (v{{version}}).",
+        "armOlder": "Le fichier est en v{{incoming}} et ce coffre a v{{stored}}. Un fichier plus ancien ne peut pas remplacer une vue plus récente.",
+        "armRefusedHeading": "{{name}} n'a pas été importé",
+        "armSameVersionDifferent": "Le fichier indique v{{version}}, la même version que ce coffre, mais son contenu diffère. C'est soit un autre auteur qui réutilise l'identifiant, soit un fichier modifié après son approbation, donc il est refusé.",
+        "armUpdate": "Cela remplace {{name}} : ce coffre a v{{stored}}, le fichier est en v{{incoming}}.",
+        "close": "Fermer",
+        "filterName": "Manifeste de vue",
+        "idleBody": "Un fichier de vue est une vue enregistrée que quelqu'un a exportée. Myne la vérifie d'abord et vous montre ce qu'elle sélectionne et lit avant que quoi que ce soit ne soit stocké.",
+        "importAction": "Importer la vue",
+        "pick": "Choisir un fichier…",
+        "pickAgain": "Choisir un autre fichier…",
+        "reading": "Lecture…",
+        "reasonMalformed": "Ce n'est pas un objet JSON bien formé.",
+        "reasonMissingField": "Un champ obligatoire manque.",
+        "reasonReservedField": "Elle permettrait à la vue de modifier {{field}}, qui est l'un des marqueurs que Myne utilise pour mettre une note de côté. Aucune vue ne peut définir cela.",
+        "reasonTooLarge": "Elle est plus grande qu'une définition de vue n'est autorisée à l'être.",
+        "reasonUnreadable": "Le fichier n'a pas pu être lu.",
+        "reasonUnknownKey": "Elle définit une clé que cette version de Myne ne connaît pas : {{key}}.",
+        "reasonUnrepresentable": "Elle utilise une valeur que cette version de Myne ne peut pas afficher.",
+        "reasonVersionRequired": "Elle ne porte aucune version, elle ne peut donc pas être comparée avec la vue que ce coffre possède.",
+        "reasonWrongType": "Un champ a le mauvais type de valeur.",
+        "refusedHeading": "Ce fichier n'est pas une vue que cette version de Myne peut importer.",
+        "refusedNothingStored": "Rien n'a été stocké, et rien dans ce coffre n'a changé.",
+        "replaceAction": "Remplacer la vue",
+        "storedBody": "Elle est stockée en v{{version}} et ne s'ouvre pas tant que vous ne l'approuvez pas sur cet appareil.",
+        "storedHeading": "{{name}} est ici",
+        "title": "Importer une vue"
+      },
+      "manager": {
+        "approve": "Approuver",
+        "approvedState": "Approuvée sur cet appareil",
+        "close": "Fermer",
+        "deleteFailed": "Cette vue n'a pas pu être supprimée.",
+        "deleteLabel": "Supprimer {{name}}",
+        "emptyBody": "Une vue que vous enregistrez depuis la liste de notes, ou qu'une personne vous envoie, apparaît ici.",
+        "emptyTitle": "Aucune vue pour l'instant",
+        "listLabel": "Vues enregistrées",
+        "openLabel": "Ouvrir {{name}}",
+        "pendingBody": "Cette vue vient d'un autre appareil ou d'un fichier. Sa définition est ici, mais elle ne lit rien tant que vous ne l'approuvez pas sur cet appareil.",
+        "pendingState": "En attente d'approbation",
+        "pendingTitle": "{{name}} attend une approbation",
+        "title": "Vues"
       },
       "menu": {
         "deleteView": "Supprimer la vue",
@@ -2821,9 +2997,46 @@
       "sortDesc": "Décroissant",
       "sortDirection": "Sens du tri",
       "viewType": "Type de vue",
+      "export": "Exporter la vue enregistrée…",
+      "exportFailed": "Cette vue n'a pas pu être exportée.",
+      "exportFilterName": "Manifeste de vue",
+      "exportHint": "Écrit la définition enregistrée dans un fichier .myneview qu'une autre personne peut importer. Les modifications non enregistrées ne sont pas incluses.",
+      "exported": "Exporté vers {{filename}}",
+      "version": "Version",
+      "versionHint": "Avance quand vous modifiez cette vue. Rien à éditer.",
+      "versionNone": "Pas encore versionnée",
+      "versionValue": "v{{version}}",
+      "writeFields": "Champs que cette vue peut modifier",
+      "writeFieldsHint": "Les seuls champs de frontmatter que cette vue peut écrire. Vide signifie qu'elle ne peut rien modifier. Archivé, supprimé et à la corbeille ne sont jamais proposés : ce sont les façons dont l'application masque une note, aucune vue ne peut les définir.",
+      "writeFieldsPlaceholder": "Ajouter un champ modifiable…",
+      "viewTypeBoard": "Tableau",
       "viewTypeCards": "Cartes",
       "viewTypeList": "Liste",
       "viewTypeTable": "Tableau"
+    },
+    "viewConsent": {
+      "allOf": "Toutes ces conditions s'appliquent :",
+      "anyOf": "Une seule de ces conditions suffit :",
+      "dataNotCode": "Une vue ne fait que décrire ce qu'il faut afficher. Elle ne peut pas exécuter de code.",
+      "everyNote": "Toutes les notes de ce coffre.",
+      "inFolder": "Notes dans {{folder}}",
+      "matching": "Notes correspondant à « {{query}} »",
+      "noneOf": "Aucune de ces conditions :",
+      "opAtLeast": "est au moins",
+      "opAtMost": "est au plus",
+      "opContains": "contient",
+      "opIs": "est",
+      "opIsNot": "n'est pas",
+      "opLessThan": "est inférieur à",
+      "opMoreThan": "est supérieur à",
+      "propertyCondition": "Notes où {{key}} {{operator}} « {{value}} »",
+      "readsHeading": "Propriétés qu'elle lit",
+      "selectionHeading": "Notes qu'elle affiche",
+      "tagged": "Notes étiquetées #{{tag}}",
+      "templateHeading": "Modèle",
+      "templateLine": "Les notes créées depuis cette vue partent du modèle {{template}}.",
+      "writesHeading": "Champs qu'elle peut modifier",
+      "writesNote": "Myne vérifie chaque modification contre cette liste avant d'en écrire une, et refuse une modification d'un champ qui a été modifié ailleurs depuis la dernière lecture de la vue."
     },
     "welcome": {
       "body": "Bienvenue dans Myne, votre espace privé pour réfléchir et écrire.\n\nTout ce que vous enregistrez ici est chiffré et reste sur votre appareil. Votre **mot de passe** et votre **phrase de récupération** en sont les seules clés, alors gardez-les en lieu sûr. Si les deux venaient à être perdus, personne ne pourrait récupérer vos notes, pas même nous.\n\n**Vous pouvez lier des notes entre elles.** Tapez `[[` et Myne vous propose les notes que vous avez déjà ; choisissez-en une et elle devient un lien. La note vers laquelle vous avez créé un lien indique d'où vient ce lien, dans son propre panneau de liens entrants, si bien qu'un ensemble de notes peut se parcourir dans les deux sens.\n\nCeci n'est qu'une note ordinaire, alors faites-en ce que vous voulez. Modifiez-la, renommez-la ou supprimez-la quand bon vous semble, et ajoutez de nouvelles notes au fil de vos idées.\n\nPour en savoir plus sur Myne, rendez-vous sur https://myne.md\n",
@@ -2831,6 +3044,10 @@
     },
     "workspace": {
       "defaultSlotName": "Par défaut"
+    },
+    "autoTag": {
+      "applied": "Étiquettes ajoutées : {{tags}}",
+      "undo": "Annuler"
     },
     "export": {
       "html": "HTML",
@@ -2840,9 +3057,37 @@
       "txt": "Texte brut"
     }
   },
+  "photoNote": {
+    "cancel": "Annuler",
+    "commitNew": "Créer la note",
+    "commitNote": "Ajouter à cette note",
+    "defaultTitle": "Note photo {{date}}",
+    "destinationLabel": "Où mettre la photo et son texte",
+    "imageOnly": "Ajouter la photo sans texte",
+    "locked": "Le coffre s'est verrouillé pendant que cette photo était ouverte. Elle reste dans vos pièces jointes ; déverrouillez et réessayez.",
+    "machineText": "Ce texte a été lu par une machine, vérifiez-le donc avant de le garder.",
+    "newNote": "Nouvelle note",
+    "noText": "Aucun texte n'a été lu sur cette page. Vous pouvez quand même ajouter la photo.",
+    "ocrOff": "La lecture du texte dans les images est désactivée sur cet appareil, cette photo n'a donc pas de texte. L'activer s'applique à la prochaine photo que vous prenez.",
+    "ocrOffAction": "Ouvrir le réglage",
+    "readFailed": "Le texte n'a pas pu être lu cette fois. Vous pouvez quand même ajouter la photo.",
+    "reading": "Lecture du texte…",
+    "textLabel": "Texte de la photo",
+    "textPlaceholder": "Le texte lu par l'application apparaîtra ici. Vous pouvez le taper vous-même.",
+    "thisNote": "Cette note",
+    "saveFailed": "La note n'a pas pu être créée. Votre texte est toujours là.",
+    "importing": "Enregistrement de la photo…",
+    "addReading": "Ajouter la lecture",
+    "truncated": "La lecture s'arrête à une limite de longueur, la fin de la page peut donc manquer.",
+    "discardFailed": "La photo n'a pas pu être retirée. Elle est toujours dans vos pièces jointes.",
+    "readingArrived": "La lecture est arrivée pendant que vous tapiez. Elle est conservée ci-dessous, en attente de vous.",
+    "untitledFile": "Photo",
+    "openFailed": "La note a été créée, mais elle n'a pas pu être ouverte."
+  },
   "password": {
     "createForm": {
       "checkingStrength": "Vérification de la robustesse…",
+      "strengthUnavailable": "La vérification de la force n'a pas pu se charger, seules la longueur minimale est donc vérifiée.",
       "confirmLabel": "Confirmer le mot de passe maître",
       "defaultEmptyCaption": "Choisissez quelque chose dont vous vous souviendrez. Il ne peut pas être réinitialisé.",
       "mismatch": "Les mots de passe ne correspondent pas.",
@@ -2906,7 +3151,7 @@
     "restoreVaultHeader": "Restaurer un coffre-fort",
     "accountTitle": "Saisissez votre numéro de compte",
     "accountLead": "Vous le trouverez là où vous avez enregistré votre phrase de récupération. Il identifie le coffre-fort à restaurer.",
-    "accountInvalid": "Numéro de compte invalide — veuillez vérifier et le saisir à nouveau.",
+    "accountInvalid": "Numéro de compte invalide — vérifiez et ressaisissez.",
     "accountOptionalHint": "Vous ne l'avez pas ? Laissez ce champ vide et continuez. Votre phrase de récupération de 24 mots suffit.",
     "paste": "Coller",
     "phraseGridHint": "Saisissez chaque mot, ou collez les 24 en une fois pour remplir la grille.",
@@ -3106,49 +3351,72 @@
     "vault": {
       "changePasswordButton": "Changer le mot de passe",
       "changePasswordError": {
-        "invalidCredentialOrVault": "Mot de passe actuel incorrect ou fichier du coffre-fort corrompu.",
-        "ioError": "Erreur de disque, veuillez réessayer.",
-        "joinFailure": "Une erreur s'est produite, veuillez réessayer.",
-        "samePasswordRejected": "Le nouveau mot de passe est identique à l'actuel.",
-        "serverAckPending": "Votre nouveau mot de passe fonctionne sur cet appareil, mais Myne n'a pas pu joindre le serveur pour l'enregistrer. Tant que ce n'est pas fait, vos autres appareils attendent toujours l'ancien mot de passe, et si la copie de ce navigateur est effacée d'ici là, la modification est perdue. Myne réessaiera automatiquement.",
-        "weakNewPassword": "Le nouveau mot de passe doit comporter au moins 12 caractères.",
-        "unexpected": "Ce changement de mot de passe n'a pas abouti. Veuillez réessayer.",
-        "vaultNotUnlocked": "Déverrouillez ce coffre avant de modifier son mot de passe."
+        "invalidCredentialOrVault": "Mauvais mot de passe actuel ou fichier de coffre corrompu.",
+        "ioError": "Erreur disque, réessayez.",
+        "joinFailure": "Quelque chose s'est mal passé, réessayez.",
+        "samePasswordRejected": "Le nouveau mot de passe correspond au mot de passe actuel.",
+        "serverAckPending": "Votre nouveau mot de passe fonctionne sur cet appareil, mais Myne n'a pas pu joindre le serveur pour l'enregistrer. Jusqu'à ce qu'il le fasse, vos autres appareils attendent encore l'ancien mot de passe, et si la copie de ce navigateur est effacée avant, la modification est perdue. Il réessaiera automatiquement.",
+        "weakNewPassword": "Le nouveau mot de passe doit faire au moins 12 caractères.",
+        "unexpected": "Ce changement de mot de passe n'est pas passé. Réessayez.",
+        "vaultNotUnlocked": "Déverrouillez ce coffre avant de changer son mot de passe."
       },
       "changePasswordHeading": "Changer le mot de passe",
       "changePasswordHelper": "Faites tourner votre mot de passe maître tout en conservant le même coffre-fort. La phrase de récupération reste la même.",
       "dangerZoneHeading": "Zone de danger",
       "dangerZoneHelper": "Supprimer définitivement ce coffre-fort et toutes ses notes. Action irréversible. La phrase de récupération ne restaurera pas le coffre-fort.",
       "localEraseHeading": "Ce navigateur",
-      "localEraseHelper": "Effacer de ce navigateur la copie de votre coffre-fort conservée par Myne. Votre compte et tout ce qui est déjà synchronisé restent sur le serveur.",
+      "localEraseHelper": "Effacer la copie de Myne de votre coffre de ce navigateur. Votre compte et tout ce qui est déjà synchronisé restent sur le serveur.",
       "localEraseButton": "Se déconnecter et effacer la copie de ce navigateur…",
-      "deleteVaultButton": "Supprimer le coffre-fort…",
-      "vaultLabelEyebrow": "ÉTIQUETTE DU COFFRE-FORT",
-      "vaultLabelHelper": "Un nom pour ce coffre-fort, affiché dans le sélecteur de l'application et dans le sélecteur de coffre-fort au démarrage, avant le déverrouillage. Stocké chiffré à l'intérieur du coffre-fort ; ne quitte jamais votre appareil en clair.",
+      "deleteVaultButton": "Supprimer le coffre…",
+      "vaultLabelEyebrow": "ÉTIQUETTE DU COFFRE",
+      "vaultLabelHelper": "Un nom pour ce coffre, affiché dans le sélecteur intégré et sur le sélecteur de coffre au démarrage avant le déverrouillage. Stocké chiffré dans le coffre ; ne quitte jamais votre appareil en clair.",
       "vaultLabelPlaceholder": "Ajouter une étiquette…",
-      "vaultLabelRenameNotice": "Tant que vous n'avez pas déverrouillé ce coffre-fort sur vos autres appareils, leurs écrans de verrouillage continuent d'afficher ce qu'ils ont enregistré en dernier : un ancien nom, ou un nom générique s'ils n'en ont jamais enregistré.",
+      "vaultLabelRenameNotice": "Jusqu'à ce que vous déverrouilliez ce coffre sur vos autres appareils, leurs écrans de verrouillage continuent d'afficher ce qu'ils ont stocké en dernier : un nom antérieur, ou un espace réservé s'ils n'en ont jamais stocké un.",
       "vaultLabelSave": "Enregistrer",
       "vaultIconLabel": "ICÔNE",
       "vaultIconDefault": "Par défaut (logotype)",
-      "renamedToast": "Coffre-fort renommé",
-      "renameError": "Impossible de renommer le coffre-fort",
+      "renamedToast": "Coffre renommé",
+      "renameError": "Impossible de renommer le coffre",
       "newPasswordMismatch": "Les nouveaux mots de passe ne correspondent pas.",
-      "samePassword": "Le nouveau mot de passe est identique au mot de passe actuel.",
-      "passwordChangedToast": "Mot de passe modifié",
-      "vaultUnreadable": "Le fichier du coffre-fort est illisible. Restaurez depuis une sauvegarde.",
-      "genericChangeError": "Une erreur s'est produite. Veuillez réessayer.",
-      "renameHelper": "Affiché dans le sélecteur de coffres-forts. Stocké chiffré à l'intérieur de ce coffre-fort ; laissez vide pour l'effacer.",
+      "samePassword": "Le nouveau mot de passe est le même que le mot de passe actuel.",
+      "passwordChangedToast": "Mot de passe changé",
+      "vaultUnreadable": "Fichier de coffre illisible. Restaurez depuis une sauvegarde.",
+      "genericChangeError": "Quelque chose s'est mal passé. Réessayez.",
+      "renameHelper": "Affiché dans le sélecteur de coffre. Stocké chiffré dans ce coffre ; laissez vide pour l'effacer.",
       "newPasswordPlaceholder": "Au moins 12 caractères",
-      "reenterNewPassword": "Saisissez à nouveau le nouveau mot de passe",
-      "changePasswordFootnote": "Cela invalide le déverrouillage rapide. Votre phrase de récupération reste inchangée.",
+      "reenterNewPassword": "Ressaisir le nouveau mot de passe",
+      "changePasswordFootnote": "Cela invalide le déverrouillage rapide. Votre phrase de récupération est inchangée.",
       "changing": "Modification…",
-      "memberVaultNotice": "Il s'agit d'un coffre partagé. Il n'a pas de mot de passe de coffre. Utilisez Déverrouillage du coffre partagé dans Confidentialité pour ajouter un mot de passe ou un code PIN.",
+      "memberVaultNotice": "Il s'agit d'un coffre partagé. Il n'a pas de mot de passe de coffre. Utilisez le déverrouillage de coffre partagé dans Confidentialité pour ajouter un mot de passe ou un PIN.",
       "topics": {
         "vault": "Coffre-fort",
         "danger": "Zone de danger"
       },
       "sections": {
         "identity": "Identité du coffre-fort"
+      },
+      "format": {
+        "heading": "Format du coffre",
+        "intro": "Ce coffre utilise encore sa propre phrase de récupération. La mise à niveau le fait passer à votre phrase d'identité, pour qu'une seule phrase récupère tous les coffres que vous possédez.",
+        "cta": "Passer à la récupération en une phrase",
+        "confirm": "Retirer ma phrase de coffre et mettre à niveau",
+        "cancel": "Garder ma phrase de coffre pour l'instant",
+        "running": "Mise à niveau…",
+        "warningPhrase": "Votre phrase de récupération du coffre enregistrée ne pourra plus ouvrir ce coffre. Votre mot de passe de coffre fonctionne toujours, et votre phrase d'identité devient le moyen de revenir.",
+        "warningDevices": "Tous les appareils que vous utilisez doivent d'abord être mis à jour. Une ancienne version ne peut plus ouvrir ce coffre une fois la mise à niveau synchronisée.",
+        "done": "Ce coffre utilise maintenant votre phrase d'identité (mis à niveau depuis {{from}}).",
+        "error": {
+          "migrationRequired": "Ce coffre est encore dans l'ancien format v0.1. Terminez d'abord la mise à niveau du coffre dans les réglages de synchronisation.",
+          "personRequired": "Cet appareil n'a pas encore d'identité. Créez d'abord votre identité, puis revenez.",
+          "identityLocked": "Votre identité est verrouillée. Déverrouillez-la avec votre phrase d'identité, puis mettez à niveau.",
+          "personMismatch": "Ce coffre appartient à une autre identité que celle de cet appareil.",
+          "notOwner": "Il s'agit d'un coffre partagé. Seul son propriétaire peut changer son format.",
+          "notUnlocked": "Ouvrez le coffre avant de mettre à niveau son format.",
+          "inProgress": "Une autre opération de sécurité est en cours. Réessayez dans un moment.",
+          "alreadyUpgraded": "Ce coffre utilise déjà votre phrase d'identité.",
+          "generic": "La mise à niveau ne s'est pas terminée. Rien n'a changé.",
+          "sharedVault": "Ce coffre est partagé avec quelqu'un d'autre. La récupération en une phrase est pour un coffre que vous seul possédez, car la gestion des membres partagés ne la prend pas encore en charge."
+        }
       }
     },
     "appearance": {
@@ -3225,6 +3493,7 @@
       "processing_one": "Lecture d'une pièce jointe…",
       "processing_many": "Lecture de {{count}} de pièces jointes…",
       "processing_other": "Lecture de {{count}} pièces jointes…",
+      "draftUse": "Le texte lu est aussi proposé comme brouillon que vous pouvez ajouter à une note. Une note se synchronise chiffrée comme n'importe quelle autre.",
       "mobileDeviceLocal": "Ce réglage est propre à chaque appareil : il détermine ce que ce téléphone indexe, vos autres appareils conservent donc leur propre choix."
     },
     "autoBackup": {
@@ -3250,6 +3519,7 @@
     "changePassword": {
       "cancel": "Annuler",
       "checkingStrength": "Vérification de la robustesse…",
+      "strengthUnavailable": "La vérification de la force n'a pas pu se charger, seules la longueur minimale est donc vérifiée.",
       "confirmLabel": "Confirmer le nouveau mot de passe",
       "currentLabel": "Mot de passe actuel",
       "mismatch": "Les mots de passe ne correspondent pas.",
@@ -3390,8 +3660,11 @@
       "continue": "Continuer",
       "copyPrimary": "Cela supprime définitivement ce coffre-fort et chaque note qu'il contient. L'action est irréversible, et votre phrase de récupération ne permettra pas de restaurer les données.",
       "copySecondary": "Les clés du coffre-fort sont effacées de la mémoire avant que les fichiers ne soient supprimés ; tout texte chiffré orphelin qui resterait sur le disque demeure des données illisibles protégées par Argon2id et irrécupérables.",
+      "keychainNote": "À la fin de la suppression, Myne demande aussi à votre trousseau système de supprimer la clé de déverrouillage biométrique qu'il a stockée pour ce coffre, sur les plateformes où il en stocke une.",
       "eyebrow": "IRRÉVERSIBLE",
+      "memberEyebrow": "CET APPAREIL UNIQUEMENT",
       "heading": "Supprimer le coffre-fort",
+      "memberHeading": "Retirer ce coffre de cet appareil ?",
       "ioFailBody": "Impossible d'accéder aux fichiers du coffre-fort pour la suppression. Les clés du coffre-fort sont déjà effacées de la mémoire ; toute donnée restant sur le disque est illisible, protégée par Argon2id et irrécupérable.",
       "ioFailTitle": "Erreur de disque lors de la suppression",
       "localEraseHeading": "Se déconnecter et effacer la copie de ce navigateur",
@@ -3403,7 +3676,9 @@
       "partialFailBody_other": "{{count}} fichiers n'ont pas pu être supprimés du disque. Les clés du coffre-fort sont déjà effacées de la mémoire ; tout texte chiffré orphelin restant est illisible, protégé par Argon2id et irrécupérable.",
       "partialFailTitle": "Suppression du coffre-fort partiellement échouée",
       "submit": "Supprimer le coffre-fort",
+      "memberSubmit": "Retirer de cet appareil",
       "submitInFlight": "Suppression du coffre-fort…",
+      "memberSubmitInFlight": "Retrait…",
       "typeToConfirmLabel": "Tapez DELETE pour confirmer",
       "vaultPath": "Chemin du coffre-fort : {{path}}",
       "deleteError": "Impossible de supprimer entièrement le coffre-fort. Veuillez réessayer.",
@@ -3536,7 +3811,7 @@
       "pendingHint": "Bientôt disponible"
     },
     "ai": {
-      "autoTagHelper": "Lorsque vous cessez de taper, un petit modèle sur votre appareil lit la note et suggère des étiquettes en haut de celle-ci. Rien n'est ajouté tant que vous n'acceptez pas une suggestion.",
+      "autoTagHelper": "Quand vous arrêtez de taper, un petit modèle sur votre appareil lit la note et propose des étiquettes en haut de celle-ci. Rien n'est ajouté tant que vous n'acceptez pas une suggestion, sauf si vous activez la ligne ci-dessous.",
       "autoTagLabel": "Suggérer des étiquettes automatiquement",
       "autoTagUnavailable": "Aucun modèle d'étiquetage n'est encore installé. Téléchargez-le une fois depuis Paramètres, IA, et l'option s'active d'elle-même une fois qu'il est installé.",
       "consent": {
@@ -3689,8 +3964,73 @@
         "preferences": "Préférences",
         "memory": "Mémoire",
         "excluded": "Ce que l'IA peut lire",
-        "history": "Historique des conversations"
-      }
+        "history": "Historique des conversations",
+        "externalAccess": "Accès externe"
+      },
+      "externalAccess": {
+        "label": "Accès externe",
+        "helperOff": "Désactivé. Aucun outil d'IA ne peut atteindre ce coffre via `myne-mcp`.",
+        "helperOn": "Activé tant que ce coffre est déverrouillé. Les outils approuvés peuvent lire les dossiers qui leur ont été accordés, et Myne ne peut pas voir ce qu'ils font de ce qu'ils lisent.",
+        "explanationShared": "C'est le même interrupteur que Réglages, CLI, accès Terminal. Une porte, deux entrées : `myne` est piloté par vous, et `myne-mcp` par l'outil d'IA que vous configurez.",
+        "explanationLabel": "Le nom d'une connexion est une étiquette, pas un mot de passe. Myne ne peut pas distinguer un programme d'un autre s'exécutant sous votre compte, et ne vérifie rien au-delà de la porte ouverte.",
+        "explanationDevice": "Les approbations sont stockées sur cet appareil. Un deuxième ordinateur ou téléphone part de zéro et doit être redemandé.",
+        "outsideMyne": "Ce qu'un outil connecté fait de ce qu'il lit est hors de Myne : il s'exécute sur cette machine, a son propre accès réseau, et Myne ne peut pas voir où il envoie quoi que ce soit.",
+        "empty": "Aucune connexion n'est approuvée sur cet appareil pour l'instant. En approuver une est ce qui permet à un outil précis de lire un ensemble de dossiers que vous nommez.",
+        "readFailed": "Impossible de lire la liste des connexions pour l'instant. Myne ne vous a pas dit qu'aucune n'est approuvée.",
+        "retry": "Réessayer",
+        "readSummary": "Peut lire {{count}} notes dans {{folders}} dossiers.",
+        "readSummary_one": "Peut lire {{count}} note dans {{folders}} dossiers.",
+        "readSummary_other": "Peut lire {{count}} notes dans {{folders}} dossiers.",
+        "readNothing": "Peut ne rien lire : aucun dossier n'est partagé avec lui.",
+        "writeNone": "Peut ne rien écrire. Cette version n'accorde que la lecture.",
+        "missing_one": "{{count}} dossier approuvé n'existe plus. Un dossier renommé ou supprimé laisse l'autorisation pointer vers rien.",
+        "missing_other": "{{count}} dossiers approuvés n'existent plus. Un dossier renommé ou supprimé laisse l'autorisation pointer vers rien.",
+        "whenLine": "Approuvée le {{approved}}. Dernière utilisation le {{used}}.",
+        "whenLineNever": "Approuvée le {{approved}}. Pas utilisée depuis.",
+        "revoke": "Révoquer",
+        "revokeFailed": "Impossible de révoquer cette connexion. Elle peut encore lire ce qui lui a été accordé.",
+        "snippetToggle": "Extrait de configuration",
+        "snippetHelper": "Collez ceci dans la configuration MCP de votre outil d'IA. Le nom doit correspondre à la connexion ci-dessus, car c'est sur ce nom que l'autorisation est indexée.",
+        "rootFolder": "Racine du coffre",
+        "addConnection": "Approuver une connexion",
+        "dialogTitleNew": "Approuver une connexion",
+        "dialogTitle": "Approuver {{name}} à nouveau",
+        "nameLabel": "Nom de la connexion",
+        "namePlaceholder": "claude-desktop",
+        "nameHelper": "Le nom que votre client envoie. C'est une étiquette, pas un mot de passe : n'importe quel programme sur cette machine peut utiliser n'importe quel nom, cela décide donc de ce qui est partagé avec qui, pas de qui demande.",
+        "nameReserved": "Ce nom est réservé : un client configuré sans nom arrive comme `unnamed-client`, approuver ce nom approuverait donc tous les clients non configurés.",
+        "nameEmpty": "Une connexion a besoin d'un nom, car c'est sur lui que l'autorisation est indexée.",
+        "firstGrantHelper": "Rien n'est partagé avec cette connexion pour l'instant.",
+        "reextendHelper": "Cette connexion a déjà une autorisation. Réapprouver fige un nouvel ensemble à partir de ce que vous choisissez maintenant, et conserve ce qu'elle peut encore lire.",
+        "countsPending": "Calcul de ce que cela couvre…",
+        "countsNotes": "Partage {{count}} notes dans {{folders}} dossiers.",
+        "countsNotes_one": "Partage {{count}} note dans {{folders}} dossiers.",
+        "countsNotes_other": "Partage {{count}} notes dans {{folders}} dossiers.",
+        "countsExcluded_one": "{{count}} dossier exclu.",
+        "countsExcluded_other": "{{count}} dossiers exclus.",
+        "excludeLabel": "Laisser de côté",
+        "excludePlaceholder": "Rien laissé de côté",
+        "excludeSearch": "Trouver un dossier",
+        "excludeEmpty": "Aucun dossier ne correspond.",
+        "excludeHelper": "Un dossier que vous laissez de côté n'est pas partagé, ni rien à l'intérieur. Vous choisissez parmi tous les dossiers du coffre, c'est donc le seul endroit où tout le coffre est sur la table.",
+        "frozenNotice": "Cet ensemble est figé à l'approbation. Un dossier créé ensuite commence en dehors, et Accès externe vous montrera combien il y en a et proposera de les ajouter.",
+        "approve": "Approuver",
+        "grantRefused": "Cette autorisation ne tiendrait pas dans le budget de réglages du coffre. Rien n'a changé. Révoquez une connexion que vous n'utilisez plus, puis réessayez.",
+        "grantFailed": "Impossible d'enregistrer l'approbation. Rien n'a changé.",
+        "delta_one": "{{count}} dossier créé depuis votre approbation n'est pas partagé.",
+        "delta_other": "{{count}} dossiers créés depuis votre approbation ne sont pas partagés.",
+        "deltaAdd": "Ajouter {{count}} dossier",
+        "deltaAdd_one": "Ajouter {{count}} dossier",
+        "deltaAdd_other": "Ajouter {{count}} dossiers",
+        "readSummary_many": "Peut lire {{count}} notes dans {{folders}} dossiers.",
+        "missing_many": "{{count}} dossiers approuvés n'existent plus. Un dossier renommé ou supprimé laisse l'autorisation pointer vers rien.",
+        "countsNotes_many": "Partage {{count}} notes dans {{folders}} dossiers.",
+        "countsExcluded_many": "{{count}} dossiers exclus.",
+        "delta_many": "{{count}} dossiers créés depuis votre approbation ne sont pas partagés.",
+        "deltaAdd_many": "Ajouter {{count}} dossiers"
+      },
+      "autoApplyLabel": "Appliquer automatiquement les étiquettes suggérées",
+      "autoApplyHelper": "Écrit les étiquettes dans la note sans demander, une fois par note et par session, seulement après que vous l'avez modifiée. Sur cet appareil uniquement. Annuler se trouve sous la note après écriture."
     },
     "network": {
       "disabledCue": "La synchronisation ne passe plus par Tor. Les nouvelles connexions vont directement au serveur de synchronisation.",
@@ -3746,7 +4086,7 @@
       "hideVaultNamesErrorRead": "Impossible de lire le réglage actuel. Basculez l'interrupteur pour le redéfinir.",
       "hideVaultNamesErrorSave": "Impossible d'enregistrer le réglage : il reste donc inchangé. Si vous étiez en train de l'activer, certains noms enregistrés ont peut-être déjà été détruits ; activez-le de nouveau pour terminer.",
       "hideVaultNamesErrorErase": "Un nom enregistré n'a pas pu être détruit : le réglage a donc été laissé désactivé plutôt que d'annoncer un effacement qui n'a pas eu lieu. Réessayez.",
-      "screenCaptureHelperOff": "La protection s'applique toujours avant le déverrouillage. Après le déverrouillage, elle suit cette préférence.",
+      "screenCaptureHelperOff": "Désactivé sur cet appareil, avant le déverrouillage et après. Réactivez-le ici, ou depuis l'écran de verrouillage avec le clavier.",
       "screenCaptureHelperOn": "Effective sur Windows 10 (mise à jour de mai 2020) et versions ultérieures. macOS et Linux n'offrent aucune API système pour cela, la capture n'y est donc pas bloquée.",
       "screenCaptureLabel": "Protection contre la capture d'écran",
       "screenCaptureSubtitle": "Bloquer les captures et l'enregistrement d'écran",
@@ -3851,7 +4191,8 @@
         "sync": "Synchronisation",
         "cli": "CLI",
         "vault": "Coffre",
-        "data": "Données"
+        "data": "Données",
+        "diagnostics": "Diagnostic"
       },
       "passwordUpdatedToast": "Mot de passe mis à jour",
       "title": "Paramètres"
@@ -3998,6 +4339,7 @@
       "empty": "Aucun paramètre ne correspond à « {{query}} »",
       "resultsLabel": "Résultats de la recherche",
       "keywords": {
+        "accountNumber": "numéro de compte identité personne support remise copie",
         "aiAutoTag": "étiquettes automatiques suggérer suggestions libellés ia auto tag tags",
         "aiEndpoint": "ollama adresse moteur de modèles local serveur port boucle locale endpoint runtime loopback",
         "aiProvider": "fournisseur distant cloud openrouter ollama clé api identifiant consentement envoyer notes provider remote",
@@ -4077,6 +4419,9 @@
         "recoveryDrill": "phrase de récupération vérifier contrôle exercice test 24 mots graine sauvegarde mot de passe perdu",
         "bar": "barre inférieure barre d'état indicateurs personnaliser réorganiser masquer afficher barre d'outils",
         "syncDeviceBindings": "appareils revendiqués par les membres attribution qui a signé quel appareil appartient",
+        "vaultFormat": "format de coffre mise à niveau récupération en une phrase retraite coffre phrase de récupération migrer identité",
+        "publishVault": "publier coffre publié serveur appareil uniquement synchroniser",
+        "externalAccess": "accès externe MCP myne-mcp Claude Desktop connexion approuver périmètre révoquer",
         "diagnosticLog": "journal de diagnostic journalisation débogage dépannage rapport de plantage rapport de bug assistance"
       },
       "emptyBody": "Essayez un mot plus court, ou le nom d'un panneau."
@@ -4145,23 +4490,109 @@
       "personalitySaveFailed": "Impossible d'enregistrer les préférences de voix.",
       "loadFailed": "Impossible de charger les souvenirs ou les préférences de voix. Rien n'a changé.",
       "retryLabel": "Réessayer",
+      "seed": {
+        "rowTitle": "Apprendre votre coffre à Myne",
+        "rowHelper": "Construire la mémoire à partir de vos notes une fois, avec une relecture de chaque ligne avant l'enregistrement.",
+        "rowSeeded": "Créée le {{date}} · {{count}} entrées",
+        "start": "Apprendre votre coffre à Myne",
+        "rebuild": "Reconstruire",
+        "rebuildConfirm": "Remplacer l'initialisation du {{date}} ({{count}} entrées) ?",
+        "title": "Apprendre votre coffre à Myne",
+        "candidatesTitle": "Relire ce que Myne a appris",
+        "doneTitle": "Enregistré",
+        "close": "Fermer",
+        "loading": "Lecture de votre coffre…",
+        "scopeIntro": "Myne lit d'abord la forme de votre coffre : titres des notes, dossiers et étiquettes. Il ne demande le texte des notes que s'il en a besoin, et jamais pour les pièces jointes.",
+        "provider": "Fournisseur : {{provider}}",
+        "providerRemote": "à distance",
+        "providerLocal": "sur cet appareil",
+        "counts": "{{notes}} notes · {{folders}} dossiers · {{tags}} étiquettes",
+        "estimatedChars": "Environ {{chars}} caractères",
+        "excluded": "{{count}} notes laissées de côté car leur dossier est exclu de l'IA",
+        "omitted": "{{count}} titres omis pour tenir dans le contexte du modèle",
+        "showPayload": "Afficher exactement ce qui sera envoyé",
+        "hidePayload": "Masquer le contenu",
+        "consentLabel": "Envoyer ce plan à {{provider}} (environ {{chars}} caractères). Je comprends que le fournisseur le reçoit.",
+        "localNote": "Rien ne quitte cet appareil. Le modèle s'exécute ici.",
+        "continue": "Continuer",
+        "cancel": "Annuler",
+        "generatingHelper": "Cela peut prendre quelques minutes sur un modèle local. Vous pouvez annuler à tout moment et rien ne sera enregistré.",
+        "cancelRun": "Annuler cette exécution",
+        "candidatesIntro": "{{count}} entrées. Décochez ce que vous ne voulez pas, et modifiez la formulation avant l'enregistrement.",
+        "candidateLabel": "Entrée de mémoire {{index}}",
+        "charCount": "{{count}} / 2000 caractères",
+        "back": "Retour",
+        "apply": "Enregistrer {{count}} entrées",
+        "applying": "Enregistrement…",
+        "applied": "{{count}} entrées enregistrées en mémoire.",
+        "appliedHelper": "Trouvez-les sous Depuis votre coffre dans cette section. L'assistant les lit à partir de maintenant.",
+        "finish": "Terminé",
+        "appliedToast": "Mémoire construite à partir de votre coffre.",
+        "refusals": {
+          "empty": "Cette entrée est vide.",
+          "textTooLong": "Cette entrée dépasse la limite de 2000 caractères.",
+          "scanRejected": "Cette entrée ressemble à une instruction pour l'assistant, pas à un fait. Modifiez-la et réessayez."
+        },
+        "errors": {
+          "aiDisabled": "L'IA est désactivée sur cet appareil.",
+          "locked": "Déverrouillez le coffre et réessayez.",
+          "busy": "Une initialisation est déjà en cours.",
+          "consent": "Confirmez d'abord que le fournisseur peut recevoir le plan.",
+          "unreadable": "L'index de votre coffre n'a pas pu être lu.",
+          "malformed": "Le modèle n'a pas répondu dans le format dont cette exécution a besoin. Réessayez.",
+          "cancelled": "L'exécution a été annulée. Rien n'a été enregistré.",
+          "noBodies": "Le modèle a demandé le texte des notes, mais aucune n'a pu être lue.",
+          "engine": "L'appel au modèle a échoué. Vérifiez le fournisseur et réessayez.",
+          "unknown": "Quelque chose a mal tourné lors de la construction de la mémoire. Réessayez.",
+          "candidateRefused": "Une entrée a été refusée. Elle est marquée ci-dessous ; modifiez-la et enregistrez à nouveau.",
+          "cap": "Votre mémoire est pleine.",
+          "capDetail": "{{remaining}} emplacements restent mais {{requested}} entrées ont été sélectionnées. Retirez des entrées dans ce panneau, ou décochez des candidats."
+        },
+        "phases": {
+          "projecting": "Lecture de la forme de votre coffre…",
+          "asking": "Demande des thèmes au modèle…",
+          "reading": "Lecture des notes que le modèle a demandées…",
+          "finalizing": "Écriture des entrées…",
+          "working": "En cours…"
+        },
+        "groupTitle": "Depuis votre coffre",
+        "groupMeta": "Initialisé le {{date}} · {{count}} entrées",
+        "removeAll": "Tout retirer",
+        "removeConfirm": "Retirer toutes les entrées de cette initialisation ?",
+        "removedToast": "Entrées depuis votre coffre retirées.",
+        "rowStale": "Le coffre a changé depuis cette initialisation"
+      },
       "emptyTitle": "Rien de mémorisé pour l'instant",
       "count": "{{used}} sur {{cap}}",
       "atCap": "La liste est pleine, rien de nouveau ne peut donc être mémorisé. Supprimez une entrée pour faire de la place."
     },
     "account": {
       "vaultsLabel": "Coffres de ce compte",
-      "vaultsHelper": "Les coffres que cet appareil regroupe sous le nom ci-dessus. Le regroupement est un choix d'organisation propre à chaque appareil, il ne fait donc partie du contenu d'aucun coffre et ne voyage pas avec lui.",
+      "vaultsHelper": "Les coffres que cet appareil regroupe. Le regroupement est un choix organisationnel par appareil, il ne fait donc pas partie du contenu d'un coffre et ne voyage pas avec lui.",
+      "vaultsHelperShort": "Le regroupement reste sur cet appareil et ne voyage pas avec un coffre.",
       "vaultsCount_one": "{{count}} coffres",
       "vaultsCount_other": "{{count}} coffres",
+      "vaultActions": "Actions sur le coffre",
+      "splitLastConfirm": "C'est le seul coffre du compte. Le sortir supprime ce compte.",
+      "vaultCorrupted": "Les métadonnées de ce coffre n'ont pas pu être lues",
+      "vaultUnreadable": "Non lu sur cet appareil",
+      "vaultDeviceOnly": "Appareil uniquement",
       "currentVault": "Ce coffre",
-      "unknownVault": "Un autre coffre sur cet appareil",
-      "standaloneHelper": "Ce coffre n'est regroupé sous aucun compte sur cet appareil, il est donc autonome. Le regroupement est propre à chaque appareil : un autre appareil peut l'afficher dans un compte.",
+      "unknownVault": "Un autre coffre de cet appareil",
+      "numberLabel": "Numéro de compte",
+      "numberHelper": "Le numéro de votre identité, pas celui d'un coffre. Dérivé de votre phrase d'identité, il ne peut pas être perdu et n'a pas besoin d'être enregistré. Ce n'est pas un secret ; utilisez-le pour le support ou pour une remise à un opérateur de serveur.",
+      "numberUnavailable": "Impossible de lire le numéro de compte sur cet appareil. Rouvrez les Réglages pour réessayer.",
+      "numberEmpty": "Aucune identité sur cet appareil. Ajoutez-en une ou récupérez-en une dans Synchronisation pour obtenir un numéro de compte.",
+      "numberCopy": "Copier",
+      "numberCopied": "Numéro de compte copié",
+      "numberCopyFailed": "Impossible de copier le numéro de compte",
+      "copyAccountNumber": "Copier le numéro de compte",
+      "standaloneHelper": "Ce coffre n'est pas regroupé sous un compte sur cet appareil, il est donc autonome. Le regroupement est par appareil : un autre appareil peut l'afficher dans un.",
       "unresolvedHelper": "Détermination du coffre ouvert…",
       "devicesNote": "Les appareils, les membres des coffres partagés et votre identité se gèrent dans Synchronisation.",
-      "groupingHidden": "Les noms de compte sont indisponibles tant que les noms de coffres sont masqués. Désactivez cette option dans Confidentialité pour gérer ce compte.",
-      "groupingUnreadable": "Le regroupement des comptes de cet appareil n'a pas pu être lu. Rien n'a été modifié.",
-      "groupingError": "Impossible de lire le regroupement des comptes sur cet appareil. Rien n'a été modifié.",
+      "groupingHidden": "Le regroupement de comptes est indisponible tant que les noms de coffre sont masqués. Désactivez cette option dans Confidentialité pour le gérer.",
+      "groupingUnreadable": "Le regroupement de comptes de cet appareil n'a pas pu être lu. Rien n'a changé.",
+      "groupingError": "Impossible de lire le regroupement de comptes sur cet appareil. Rien n'a changé.",
       "sections": {
         "extensions": "Extensions de navigateur",
         "grouping": "Ce compte"
@@ -4282,7 +4713,7 @@
       "invalidAccount": "Cela ne ressemble pas à un numéro de compte valide.",
       "notConfigured": "Configurez d'abord un serveur de synchronisation, puis générez un QR.",
       "scanWithApp": "Scanner avec l'application iOS",
-      "title": "Ajouter un appareil avec un QR"
+      "title": "Connecter un autre appareil"
     },
     "devices": {
       "approve": "Approuver",
@@ -4291,7 +4722,7 @@
       "awaitingApproval_other": "{{count}} appareils en attente d'approbation",
       "loading": "Chargement…",
       "noDevices": "Aucun autre appareil pour l'instant",
-      "notEnrolled": "Cet appareil n'est pas encore connecté. Si vous venez de l'ajouter, attendez son approbation depuis un autre appareil ; sinon, ajoutez-le à l'aide du formulaire « Ajouter un appareil » ci-dessus.",
+      "notEnrolled": "Cet appareil n'est pas encore connecté. Si vous venez de l'ajouter, attendez l'approbation d'un appareil déjà sur votre compte ; sinon connectez-le avec « Connecter cet appareil ».",
       "platform": {
         "android": "Téléphone Android",
         "androidTablet": "Tablette Android",
@@ -4399,8 +4830,27 @@
       "verifyTitle": "Vérifier cet appareil",
       "waitingHint": "Gardez cette fenêtre ouverte. Une fois approuvé, un code de vérification apparaît ici pour le comparer avec votre autre appareil.",
       "waitingTitle": "En attente d'approbation",
+      "personListFailed": "Vous êtes sur ce compte, mais la liste de ses coffres ne s'est pas terminée, aucun n'est donc affiché pour l'instant. Réessayez, ou rouvrez cet écran plus tard.",
+      "personListRetry": "Lister les coffres à nouveau",
       "sasAbortFailed": "Impossible de déconnecter cet appareil. Il reste enregistré auprès de ce serveur : considérez-le comme non fiable et ouvrez Paramètres → Synchronisation pour l'y retirer. Vos notes n'ont pas été supprimées.",
       "backToWaiting": "Revenir à l'attente",
+      "codeBody": "Collez le code que l'autre appareil affiche. Un code d'identité ajoute cet appareil à tout le compte.",
+      "codeContinue": "Continuer",
+      "codeExpired": "Ce code a expiré. Demandez à l'autre appareil d'en afficher un nouveau.",
+      "codeInvalid": "Ce n'est pas un code de jonction Myne.",
+      "codeLabel": "Code de jonction",
+      "codeMemberUnsupported": "Ce code est pour un coffre partagé. Ajoutez cet appareil depuis l'écran d'identité à la place, où le coffre apparaît sous vos invitations.",
+      "codeOpen": "J'ai un code de jonction",
+      "codeTitle": "Ajouter cet appareil avec un code",
+      "personMismatch": "Ce code est pour une autre identité que la phrase que vous avez saisie. Vérifiez les deux et réessayez.",
+      "personPendingBody": "Un de vos autres appareils doit approuver celui-ci. Jusqu'à ce qu'il le fasse, cet appareil ne peut ouvrir aucun des coffres du compte.",
+      "personPendingHint": "En attente d'approbation. Cela se termine tout seul une fois que l'autre appareil approuve.",
+      "personPendingPhraseAgain": "Cet appareil a redémarré avant l'arrivée de l'approbation, la phrase est donc nécessaire une fois de plus.",
+      "personPendingPhraseCta": "Saisir la phrase à nouveau",
+      "personPendingTitle": "En attente d'approbation",
+      "personPhraseBody": "Le code a nommé l'identité ; les 24 mots la prouvent. Cet appareil demandera le propre mot de passe de chaque coffre quand vous l'ouvrirez.",
+      "personPhraseSubmit": "Ajouter cet appareil",
+      "personPhraseTitle": "Saisir votre phrase d'identité",
       "errorPhrase": "Impossible d'ajouter cet appareil. Vérifiez l'URL du serveur, le numéro de compte et la phrase de récupération, et que le serveur est joignable.",
       "modePassword": "Mon mot de passe",
       "modePhrase": "Ma phrase de récupération",
@@ -4414,7 +4864,7 @@
     "panel": {
       "addDevice": {
         "helper": "Connectez-vous sur un nouvel appareil avec votre numéro de compte et votre mot de passe ou votre phrase de récupération. Un appareil reste en attente jusqu'à ce qu'un appareil existant l'approuve.",
-        "label": "Ajouter un appareil"
+        "label": "Connecter cet appareil"
       },
       "awaitingApproval": {
         "label": "En attente d'approbation"
@@ -4424,7 +4874,8 @@
         "label": "Conflits"
       },
       "devices": {
-        "label": "Appareils"
+        "label": "Appareils",
+        "helper": "Une approbation connecte un appareil à votre compte. Il voit alors tous les coffres que vous possédez, et chaque coffre s'ouvre toujours avec son propre mot de passe."
       },
       "recovered": {
         "close": "Fermer",
@@ -4459,6 +4910,7 @@
         "cta": "Ajouter une identité",
         "codeLabel": "Votre code d'identité",
         "lockedHelper": "Cet appareil détient une identité. Elle est verrouillée pour cette session ; déverrouillez-la avec votre phrase de récupération pour signer la synchronisation et les invitations.",
+        "unregisteredHelper": "Cette identité existe sur cet appareil seulement. L'inscrire l'écrit sur votre serveur de synchronisation, ce qui est ce qui permet à une invitation de vous rejoindre.",
         "unlockedHelper": "Cet appareil détient une identité, déverrouillée pour cette session."
       },
       "topics": {
@@ -4469,7 +4921,27 @@
       "sections": {
         "account": "Compte",
         "server": "Serveur",
-        "devices": "Appareils enregistrés"
+        "devices": "Appareils de votre compte"
+      },
+      "publish": {
+        "label": "Publier sur votre serveur",
+        "cta": "Publier ce coffre",
+        "republishCta": "Publier à nouveau",
+        "deviceOnlyHelper": "Ce coffre n'existe que sur cet appareil. Le publier le lie à votre identité pour que vos autres appareils puissent l'ouvrir.",
+        "publishedHelper": "Publié le {{when}}. Ce coffre est sur votre serveur de synchronisation, vos autres appareils peuvent donc l'atteindre.",
+        "publishedHelperNoDate": "Publié. Ce coffre est sur votre serveur de synchronisation, vos autres appareils peuvent donc l'atteindre.",
+        "error": {
+          "NotConfigured": "Définissez d'abord un serveur de synchronisation, dans Synchronisation ci-dessus.",
+          "PersonSessionRequired": "Déverrouillez d'abord votre identité. La publication a besoin de l'identité qui possède ce coffre.",
+          "PersonNotRegistered": "Inscrivez d'abord votre identité, dans le bloc Identité ci-dessus. Cet appareil détient l'identité mais ne l'a jamais inscrite sur un serveur, il n'y a donc pas de compte sous lequel publier.",
+          "NotEnrolled": "Ce coffre appartient à un compte auquel cet appareil n'est pas inscrit. Ajoutez d'abord l'appareil à ce compte.",
+          "NotOwner": "Ce coffre appartient déjà à une autre identité, il ne peut donc pas être publié ici.",
+          "Unauthenticated": "Le serveur a refusé cet appareil. Réessayez, et réinscrivez-le si cela continue.",
+          "Transport": "Impossible de joindre le serveur. Le coffre est inchangé ; réessayez.",
+          "TlsFailure": "Impossible d'établir une connexion de confiance. Le coffre est inchangé ; réessayez.",
+          "BadRequest": "Les métadonnées de ce coffre n'ont pas pu être lues. Rien n'a été envoyé.",
+          "Other": "La publication a échoué. Le coffre est inchangé ; réessayez."
+        }
       }
     },
     "reconcile": {
@@ -4497,6 +4969,7 @@
       "errorTooLarge": "Un fichier est trop volumineux pour être envoyé",
       "loading": "État de la synchronisation…",
       "notEnrolled": "Non inscrit",
+      "notRegistered": "Non inscrit",
       "off": "Synchronisation désactivée",
       "synced": "Synchronisé",
       "syncing": "Synchronisation…",
@@ -4509,7 +4982,11 @@
       "devices": "Appareils",
       "frozen": "Ce compte est gelé. Les nouvelles modifications ne peuvent pas être envoyées ; vos notes continuent d'être téléchargées.",
       "ofTotal": "{{used}} sur {{total}}",
-      "storage": "Stockage"
+      "storage": "Stockage",
+      "storageAcrossVaults": "Stocké, sur l'ensemble de vos coffres",
+      "vaultCount_one": "{{count}} coffre",
+      "vaultCount_other": "{{count}} coffres",
+      "vaultCount_many": "{{count}} coffres"
     },
     "settings": {
       "serverSection": "Serveur",
@@ -4578,14 +5055,15 @@
       "invitationsFailed": "Impossible de charger vos invitations.",
       "title": "Membres du coffre",
       "personUnlock": "Déverrouiller l'identité de membre",
-      "personReady": "Identité de membre déverrouillée.",
+      "personReady": "Votre identité est déverrouillée pour cette session.",
       "ownerCodeHint": "Partagez ce code à la personne que vous invitez pour qu'elle puisse vérifier que le coffre vous appartient. Il ne contient que des informations publiques.",
-      "personLock": "Verrouiller l'identité de membre",
+      "personLock": "Verrouiller l'identité",
       "personError": "Cette phrase n'a pas ouvert d'identité de membre.",
       "inviteHint": "Collez le code d'identité du membre invité (depuis sa page d'identité).",
-      "inviteCodeLabel": "Code d'identité de membre",
+      "inviteCodeLabel": "Votre code d'identité",
       "untitledVault": "Coffre sans titre",
       "inviteFailed": "L'invitation n'a pas pu être créée.",
+      "inviteNotOnServer": "Ce coffre n'est pas encore sur votre serveur de synchronisation. Publiez-le, et inscrivez votre identité, puis réinvitez.",
       "removeFailed": "Le membre n'a pas pu être retiré.",
       "youBadge": "Vous",
       "nameUnverified": "Nom non vérifié",
@@ -4606,6 +5084,7 @@
       "membersHeading": "Membres",
       "emptyTitle": "Aucun membre pour l'instant",
       "personUnlockOpen": "Déverrouiller",
+      "identityLockedNotice": "Déverrouillez votre identité pour cette session pour gérer les membres et les invitations.",
       "unsharedNotice": "Ce coffre n'est pas encore partagé. Le partager est définitif et se produit la première fois que vous invitez quelqu'un.",
       "shareConfirmTitle": "Partager ce coffre ?",
       "shareConfirmBody": "Inviter quelqu'un transforme ce coffre en coffre partagé : il obtient une clé de groupe, et les personnes que vous invitez ouvrent son contenu avec elle. Ce changement est définitif et il n'y a aucun retour possible vers un coffre à utilisateur unique. Continuez pour choisir qui inviter.",
@@ -4616,11 +5095,12 @@
       "identityForgetConfirm": "Oublier l'identité",
       "identityForgetCancel": "La conserver",
       "identityForgetWarning": "Cela retire l'identité de cet appareil uniquement. Le compte serveur et tout coffre qu'elle possède ou a rejoint restent intacts, et vous pouvez la récupérer avec sa phrase de 24 mots sur un autre appareil. Les invitations et les actions sur la liste des membres sur cet appareil nécessiteront de la déverrouiller à nouveau.",
-      "identityForgetError": "Impossible d'oublier l'identité. Réessayez."
+      "identityForgetError": "Impossible d'oublier l'identité. Réessayez.",
+      "invitationDeclined": "Refusée"
     },
     "deviceBindings": {
       "title": "Appareils et membres",
-      "heading": "Appareils revendiqués",
+      "heading": "Appareils membres",
       "hint": "Chaque appareil qui s'est revendiqué dans ce coffre, avec le membre dont la propre signature le revendique. Une revendication n'est pas une preuve de propriété : elle indique quel membre a signé la déclaration, pas que l'appareil lui appartient.",
       "loading": "Chargement des appareils…",
       "emptyTitle": "Aucun appareil revendiqué pour l'instant",
@@ -4656,7 +5136,19 @@
       "stepIdentity": "Sur votre autre appareil, ouvrez Myne et choisissez « J'ai déjà une identité ».",
       "stepJoin": "Ce coffre partagé vous attendra dans vos invitations. Ouvrez-le pour le rejoindre.",
       "stepPhrase": "Saisissez-y votre phrase de récupération de 24 mots.",
-      "title": "Ajouter votre propre appareil"
+      "title": "Connecter votre second appareil"
+    },
+    "personJoinQr": {
+      "title": "Ajouter un appareil à votre identité",
+      "hint": "Sur l'autre appareil, choisissez « J'ai un code de jonction » et collez ce que ce code dit. Cet appareil demandera vos 24 mots, puis attendra que vous l'approuviez ici.",
+      "notConfigured": "Un code nomme un serveur, définissez donc le vôtre d'abord dans Synchronisation ci-dessus, puis créez ce code.",
+      "noIdentity": "Cet appareil ne détient aucune identité, il n'y a donc pas de compte qu'un code puisse nommer. Créez ou récupérez d'abord votre identité.",
+      "error": "Impossible de créer le code. Réessayez.",
+      "image": "Code de jonction",
+      "stepCode": "Sur l'autre appareil, ouvrez Myne et collez ce code là où il en demande un.",
+      "stepPhrase": "Saisissez votre phrase d'identité de 24 mots là-bas. Elle ne quitte jamais cet appareil.",
+      "stepApprove": "Approuvez cet appareil ici, sur un appareil qui possède déjà votre identité.",
+      "stepVaults": "Les coffres de votre compte apparaissent alors sur le nouvel appareil. Ouvrez-en un avec le propre mot de passe de ce coffre."
     }
   },
   "tasks": {
@@ -4828,6 +5320,7 @@
     "continue": "Continuer",
     "decrypting": "Déchiffrement…",
     "deleteLink": "Mot de passe et phrase de récupération perdus ? Supprimez le coffre-fort et recommencez",
+    "memberRemoveLink": "Retirer ce coffre de cet appareil",
     "errors": {
       "alreadyUnlocked": "Le coffre-fort est déjà déverrouillé.",
       "inProgress": "Opération en cours.",
@@ -4891,6 +5384,7 @@
     "failClosedEyebrow": "Impossible d'ouvrir le coffre-fort",
     "restoreHint": "La restauration depuis une sauvegarde n'est pas encore disponible sur mobile.",
     "memberHint": "Ce coffre est partagé avec vous. Déverrouillez-le avec votre propre phrase de récupération.",
+    "memberSubtitle": "Ouvrir ce coffre partagé.",
     "memberPhraseLabel": "Phrase de récupération",
     "memberSubmit": "Déverrouiller",
     "memberError": "Cette phrase n'a pas ouvert ce coffre partagé.",
@@ -4906,7 +5400,20 @@
     "memberBiometricSubmit": "Déverrouiller avec la biométrie",
     "titleNamed": "Déverrouiller {{vault}}",
     "restoreCta": "Restaurer depuis une sauvegarde",
-    "ioErrorHint": "Réessayez, ou rouvrez Myne."
+    "ioErrorHint": "Réessayez, ou rouvrez Myne.",
+    "identityPhraseLink": "Utiliser votre phrase d'identité",
+    "identityPhrase": {
+      "title": "Déverrouiller avec votre phrase d'identité",
+      "body": "Ce coffre s'ouvre avec son mot de passe ou avec votre phrase d'identité. Si vous lui avez enregistré une phrase de coffre séparée, celle-ci a été retirée et ne l'ouvre plus. L'ouvrir avec les 24 mots que vous avez notés pour votre identité déverrouille aussi votre identité pour cette session, la synchronisation s'exécute donc sans seconde demande.",
+      "label": "Phrase d'identité",
+      "hint": "24 mots, dans l'ordre.",
+      "submit": "Déverrouiller avec la phrase d'identité",
+      "decrypting": "Ouverture…",
+      "cancel": "Retour au mot de passe",
+      "recoveryInProgress": "Une récupération est déjà en cours. Revenez au formulaire de mot de passe et continuez-la.",
+      "generic": "Cette phrase n'a pas ouvert ce coffre."
+    },
+    "personWrapProbeFailed": "Myne n'a pas pu vérifier si ce coffre s'ouvre aussi avec une phrase d'identité. Si vous l'avez créé depuis votre identité, essayez d'abord cette phrase."
   },
   "vault": {
     "ioBanner": {
@@ -4959,6 +5466,7 @@
     "provisioning": {
       "heading": "Création de votre compte",
       "caption": "Enregistrement de ce coffre-fort auprès du serveur de synchronisation. Votre phrase de récupération vient ensuite.",
+      "captionNoPhrase": "Enregistrement de ce coffre sur le serveur de synchronisation. Cela prend un moment.",
       "footerHint": "Cela prend un instant. Laissez cet onglet ouvert jusqu'à la fin, afin que le nettoyage puisse se faire en cas de problème."
     },
     "errors": {
@@ -5009,6 +5517,10 @@
       "permissionDenied": {
         "body": "Assurez-vous que Myne a l'autorisation d'écrire dans votre dossier de données d'application.",
         "title": "Impossible d'écrire dans le dossier du coffre-fort"
+      },
+      "personLocked": {
+        "body": "Déverrouillez votre identité avec ses 24 mots, puis créez à nouveau le coffre. Votre phrase d'identité est le seul moyen de récupération de ce coffre, créer ce coffre pendant que l'identité est verrouillée le rendrait irrécupérable.",
+        "title": "Déverrouillez d'abord votre identité"
       },
       "sessionExpired": {
         "body": "Pour votre sécurité, la création du coffre-fort expire après 10 minutes. Recommencez.",
@@ -5065,11 +5577,12 @@
       "copy": "Copier",
       "extensionNotice": "Les extensions de navigateur ayant accès à ce site peuvent lire ce qui se trouve sur cette page. Si vous n'êtes pas certain de chacune des extensions de ce profil, utilisez l'application de bureau ou un profil de navigateur sans extension pour cette étape.",
       "copyFailed": "Impossible de copier. Utilisez plutôt « Enregistrer dans un fichier ».",
-      "downloadStarted": "Envoyé dans les téléchargements de votre navigateur. Vérifiez qu'il est bien arrivé : c'est votre navigateur qui décide où va le fichier, et Myne ne peut pas voir s'il est arrivé.",
+      "downloadStarted": "Envoyé aux téléchargements de votre navigateur. Vérifiez qu'il est arrivé : votre navigateur décide où va le fichier, et Myne ne peut pas savoir s'il y est.",
       "reveal": "Révéler la phrase",
       "saveAsFile": "Enregistrer dans un fichier",
       "saveFailed": "Impossible d'enregistrer le fichier. Copiez plutôt les mots, ou notez-les.",
-      "savedToFile": "Enregistré. C'est un fichier en texte brut, conservez-le donc à un endroit que vous seul pouvez lire."
+      "savedToFile": "Enregistré. C'est un fichier texte brut, gardez-le donc dans un endroit que vous seul pouvez lire.",
+      "sessionOnlyNotice": "Ce navigateur ne conserve pas votre phrase après un rechargement, vous serez donc redemandé les 24 mots. Gardez-les en lieu sûr."
     },
     "ready": {
       "backedUp": "Sauvegardé",
@@ -5118,6 +5631,7 @@
   },
   "vaultPicker": {
     "createAnother": "Créer un autre coffre-fort",
+    "deviceOnly": "Appareil uniquement",
     "heading": "Choisir un coffre-fort",
     "joinDevice": "Ajouter cet appareil à un compte",
     "loading": "Chargement de vos coffres-forts…",
@@ -5194,10 +5708,35 @@
   "vaultSwitcher": {
     "chipFallback": "Coffre-fort",
     "createAnother": "Créer un autre coffre-fort",
+    "deviceOnly": "Appareil uniquement",
     "joinDevice": "Ajouter cet appareil à un compte",
     "switching": "changement…",
     "switchVaultLabel": "Changer de coffre-fort",
     "vaultFallback": "Coffre-fort {{n}}"
+  },
+  "invites": {
+    "title": "Invitations",
+    "loading": "Chargement des invitations…",
+    "empty": "Aucune invitation pour l'instant.",
+    "pendingHeading": "En attente de vous",
+    "pendingHint": "Le propriétaire du coffre a invité votre identité. Accepter demande son code d'identité et votre phrase de récupération.",
+    "error": "Impossible de charger les invitations. Vérifiez votre connexion et votre serveur de synchronisation.",
+    "retry": "Réessayer",
+    "noIdentity": "Cet appareil ne détient aucune identité, aucune invitation ne peut donc lui être adressée.",
+    "notEnrolled": "Cette identité n'est pas encore enregistrée, les invitations qui lui sont adressées ne peuvent donc pas être listées. L'inscrire est l'acte qui les laisse arriver.",
+    "notice_one": "{{count}} invitation en attente",
+    "notice_other": "{{count}} invitations en attente",
+    "decline": "Refuser",
+    "declineTitle": "Refuser cette invitation ?",
+    "declineBody": "L'invitation est supprimée sur votre serveur, elle ne peut donc jamais être acceptée, et le propriétaire voit que vous l'avez refusée plutôt qu'il attend encore. La récupérer veut dire que le propriétaire vous réinvite.",
+    "declineCta": "Refuser l'invitation",
+    "declineFailed": "L'invitation n'a pas pu être refusée. Réessayez.",
+    "noticeUnregistered": "Inscrire cette identité pour voir les invitations",
+    "noticePending": "Les invitations ne peuvent être listées tant que cet appareil n'est pas approuvé",
+    "notice_many": "{{count}} invitations en attente"
+  },
+  "firstRun": {
+    "heading": "Créer votre identité"
   },
   "welcome": {
     "createCta": "Créer un nouveau coffre-fort",
@@ -5236,13 +5775,19 @@
     "cleanUpFiles": "Nettoyer les fichiers résiduels",
     "connect": "Me connecter à mon compte",
     "tagline": "Des notes markdown chiffrées. Aucun e-mail à l'inscription.",
+    "startAction": "Créer votre identité et votre coffre",
+    "startBody": "Commencez sur cet appareil : une nouvelle identité, puis le coffre qui lui appartient.",
     "restoreTitle": "Restaurer depuis une sauvegarde",
     "restoreBody": "Ouvrez un fichier .myne-backup que vous avez enregistré précédemment.",
     "joinTitle": "Ajouter cet appareil à un compte",
     "joinBody": "Utilisez un coffre que vous avez déjà sur un autre appareil.",
+    "invitedTitle": "J'ai été invité à un coffre",
+    "invitedBody": "Configurez l'identité à laquelle l'invitation a été adressée. Vous n'avez pas besoin d'un coffre à vous.",
+    "invitedAction": "J'ai été invité",
     "restoreAction": "Restaurer",
     "joinAction": "Ajouter un appareil",
-    "version": "Version {{version}} · pré-alpha"
+    "version": "Version {{version}} · pré-alpha",
+    "createAction": "Créer"
   },
   "wikiGraph": {
     "emptyTitle": "Aucun lien pour l'instant",
@@ -5493,9 +6038,12 @@
   },
   "identityHome": {
     "createVaultCta": "Créer un coffre",
+    "createVaultLocked": "Déverrouillez votre identité pour créer un coffre. Elle signe la première liste de membres du coffre, ce qui en fait le vôtre, et cet appareil l'a scellée pour cette session.",
     "invitesError": "Impossible de charger les invitations. Vérifiez votre connexion et le serveur de synchronisation.",
     "invitesHeading": "Invitations",
     "invitesLoading": "Recherche d'invitations…",
+    "invitesPending": "Cet appareil attend une approbation. Les invitations apparaissent ici une fois qu'un autre de vos appareils l'a approuvé.",
+    "invitesUnregistered": "Cette identité n'est pas encore enregistrée sur un serveur de synchronisation, aucune invitation ne peut donc la rejoindre.",
     "noInvites": "Aucune invitation pour l'instant.",
     "subtitle": "Vous avez une identité sur cet appareil, donc les gens peuvent vous inviter dans un coffre. Vous n'avez pas besoin d'en créer un pour être invité.",
     "accept": "Accepter",
@@ -5532,6 +6080,20 @@
     "forgetCta": "Oublier cette identité sur cet appareil",
     "forgetError": "Impossible d'oublier l'identité. Réessayez.",
     "forgetWarning": "Cela retire l'identité de cet appareil uniquement. Le compte serveur et tout coffre qu'elle possède ou a rejoint restent intacts, et vous pouvez la récupérer avec sa phrase de 24 mots sur un autre appareil. Si vous n'avez pas enregistré cette phrase, cet appareil ne pourra pas la récupérer.",
+    "registerCta": "Inscrire cette identité",
+    "registerContinue": "Continuer",
+    "registerSubmit": "Inscrire",
+    "registerError": "Impossible d'inscrire. Vérifiez la phrase et l'adresse du serveur, puis réessayez.",
+    "registerServerLabel": "Adresse du serveur de synchronisation",
+    "registerServerPlaceholder": "https://sync.example.com",
+    "registerServerHint": "Son opérateur pourra voir que cette identité existe.",
+    "registerInviteCodeLabel": "Code d'invitation du serveur",
+    "registerInviteCodeHint": "Seulement si votre serveur en demande un.",
+    "registerServerError": "Ce serveur n'a pas pu être joint. Vérifiez l'adresse et réessayez. Vos mots sont toujours là.",
+    "accountNumberHeading": "Numéro de compte",
+    "accountNumberHint": "Dérivé de votre phrase d'identité, il ne peut donc pas être perdu et n'est pas un secret. Utilisez-le pour le support ou pour une remise à un opérateur de serveur.",
+    "copyAccountNumber": "Copier le numéro de compte",
+    "registerPhraseLabel": "Votre phrase d'identité, 24 mots",
     "stepIndicator": "Étape {{n}} sur {{total}} · {{label}}",
     "stepVerifyOwner": "Vérifier le propriétaire",
     "stepRecoveryPhrase": "Phrase de récupération",
@@ -5676,7 +6238,45 @@
       "inviteHint": "Ouvrez cette invitation depuis le sélecteur de coffres pour rejoindre avec votre phrase d'identité.",
       "forgetHeading": "Cet appareil",
       "forget": "Oublier cette identité sur cet appareil",
-      "forgetCheckbox": "Je comprends que cette identité sera retirée de cet appareil. Le compte serveur subsiste et la phrase permet de la récupérer."
+      "forgetCheckbox": "Je comprends que cette identité sera retirée de cet appareil. Le compte serveur subsiste et la phrase permet de la récupérer.",
+      "vaultHeading": "Vos coffres",
+      "vaultHint": "Votre identité peut posséder autant de coffres que vous le souhaitez. Chacun a son propre mot de passe.",
+      "registerHeading": "Inscription",
+      "registerHint": "Cette identité n'est pas encore enregistrée, personne ne peut donc vous inviter et rien ne se synchronise."
+    },
+    "register": {
+      "title": "Inscrire cette identité",
+      "open": "Inscrire cette identité",
+      "cta": "Inscrire",
+      "working": "Inscription…",
+      "failed": "Impossible d'inscrire cette identité. Elle reste sur cet appareil et vous pouvez réessayer."
+    },
+    "personJoin": {
+      "title": "Ajouter ce téléphone à votre compte",
+      "lead": "Saisissez les 24 mots du compte dont vient ce code. Un appareil existant approuve ensuite ce téléphone, donc une phrase seule ne peut pas en ajouter un.",
+      "phraseLabel": "Phrase d'identité",
+      "phraseHint": "24 mots, dans l'ordre.",
+      "cta": "Ajouter ce téléphone",
+      "working": "Ajout de ce téléphone…",
+      "mismatch": "Ces mots appartiennent à une autre identité que ce code.",
+      "failed": "Ce téléphone n'a pas pu être ajouté. Vérifiez les mots et réessayez.",
+      "pendingTitle": "En attente d'approbation",
+      "pendingLead": "Ce téléphone est ajouté et en attente. Approuvez-le sur un appareil qui possède déjà votre compte, et cet écran se termine tout seul.",
+      "pendingHint": "Rien à faire ici tant que l'autre appareil n'a pas approuvé.",
+      "sessionEnded": "L'attente s'est terminée à la fermeture de l'application. Saisissez à nouveau vos 24 mots pour continuer.",
+      "reenter": "Saisir les mots à nouveau",
+      "finishingTitle": "Finalisation de cet appareil",
+      "finishingLead": "Ce téléphone est ajouté à votre compte. Ses coffres sont en cours de récupération ; chacun demande encore son propre mot de passe.",
+      "listFailed": "Ce téléphone a été ajouté, mais les coffres de votre compte ne sont pas arrivés. Vérifiez votre connexion et réessayez.",
+      "listRetry": "Récupérer les coffres à nouveau"
+    },
+    "unlock": {
+      "title": "Déverrouiller votre identité",
+      "lead": "Votre identité est scellée sur cet appareil pour cette session. Sa phrase de récupération de 24 mots l'ouvre ; rien n'est envoyé nulle part.",
+      "open": "Déverrouiller l'identité",
+      "cta": "Déverrouiller",
+      "working": "Déverrouillage…",
+      "failed": "Cette phrase n'a pas ouvert cette identité. Vérifiez les 24 mots et réessayez."
     },
     "recover": {
       "open": "J'ai déjà une identité",
