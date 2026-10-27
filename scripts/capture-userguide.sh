@@ -86,7 +86,15 @@ FIX_PERMS='chown -R e2e:e2e /work'
 # the myne-md/myne#520 trap). Every other runner here does this; this one was the
 # only build-capable script that did not, so a frontend-only change produced
 # screenshots of the PREVIOUS frontend with no sign anywhere that it had.
-BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle'
+# `--features …`: the same stub list `scripts/e2e-local.sh` builds with, and for
+# the same reason. Bare defaults pull the real Candle engine into `myne-desktop`,
+# and that rustc is the one the OOM killer takes (`myne_desktop_lib …
+# signal: 9`), which then reads on screen as a compile error in a tree nobody
+# touched. `.woodpecker/e2e.yml` builds this feature set, so the screenshots come
+# from a binary of the same shape CI verifies. The clipper-host sidecar gets the
+# list through `MYNE_SIDECAR_FEATURES` (scripts/lib/e2e-docker.sh) because the
+# `beforeBuildCommand` runs in a child process that never hears about this flag.
+BUILD_CMD='pnpm install --frozen-lockfile && touch src-tauri/src/lib.rs && pnpm tauri build --no-bundle -- --features voice-capture-stub,local-inference-stub'
 if [[ "$SKIP_BUILD" == 1 ]]; then
   BUILD_CMD='pnpm install --frozen-lockfile'
 fi
