@@ -1002,11 +1002,34 @@ steps:
       # an image-freshness gate, and belongs to its own change rather than to a
       # line hidden in this step.
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
+      # Attribution for the ~12 minutes this step costs. `sccache` reports a 100 %
+      # hit rate and `Compilations 0`, so essentially none of that time is
+      # compiling: it is cargo walking the resolved graph once per INVOCATION
+      # (~60 s a walk, mostly hashing inputs for the cache) plus linking, which
+      # is the 414 `Non-cacheable` `crate-type` calls. The count of invocations is
+      # therefore the number to drive down, not the cache. These five echoes are
+      # what makes the split readable in the log instead of inferred from a
+      # twelve-minute total; drop a pair when there is nothing left to attribute.
+      - echo "[t] begin $(date +%s)"
       # Lint the shared `myne-core` crate here (not in the slim cargo-clippy
       # step): myne-core depends on `tauri` (default features), so it needs the
       # webkit/gtk -dev chains the base image bakes. No frontend dist needed,
       # since myne-core has no `generate_context!`.
-      - cargo clippy -p myne-core --all-targets -- -D warnings
+      #
+      # It used to be its own invocation and has since been FOLDED into the
+      # `myne-desktop` clippy below, which is downstream of the sidecar staging
+      # that `src-tauri/build.rs` needs (see the long note there). One invocation
+      # over `-p myne-core -p myne-desktop` walks the graph once instead of twice:
+      # myne-desktop depends on myne-core, so the second walk is the whole first
+      # walk again, ~60 s of fingerprinting that produced no artefact either time.
+      # The same fold absorbed the `cargo check -p e2e-fixture-gen` this step used
+      # to carry alone; clippy `--all-targets` is strictly stronger than `check`
+      # and the crate is warning-clean under it. That crate still owes its place
+      # here: it is the only CI line that touches the workspace member at all
+      # (`cargo-clippy` and `cargo-test` are `-p protocol`, `cargo-test-tauri` is
+      # `-p myne-desktop -p myne-core`), and the one suite that used to compile it
+      # moved to `.woodpecker/e2e.yml`, where a Rust break would surface only at
+      # release time.
       # Default build now compiles the on-device AI (local-inference is in
       # `default` as of decisions.md 2026-07-02) — no `--features` flag needed.
       # `-c` overrides beforeBuildCommand to reuse the dist/ already built by the
@@ -1042,6 +1065,7 @@ steps:
       # Also additive and dependency-free; `cargo-test-tauri` still compiles the
       # production arm.
       - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
+      - echo "[t] sidecars+tauri-build $(date +%s)"
       # Lint the SHIPPED desktop configuration too (myne-md/myne#648): every
       # other clippy invocation in this file misses it — the slim step is
       # `-p protocol`, the wasm steps are cross-target, and the line below is
@@ -1068,18 +1092,8 @@ steps:
       # downstream of the staging, which is why it kept passing while this one
       # did not, and both now compile the same test tree against the same
       # resolved config.
-      - cargo clippy -p myne-desktop --all-targets -- -D warnings
-      # Keep the E2E fixture generator compiling on every push. `cargo build
-      # --release -p e2e-fixture-gen` inside the old `e2e` step was the ONLY
-      # place in CI that touched this workspace member (`cargo-clippy` and
-      # `cargo-test` are `-p protocol`, `cargo-test-tauri` is `-p myne-desktop
-      # -p myne-core`), so when the suite moved to `.woodpecker/e2e.yml` a Rust
-      # break in that crate would have surfaced only when somebody triggered the
-      # manual lane, in its first step, at release time. Same class as the icon
-      # guard above, and the answer is the same: a `check` is cheap and belongs
-      # here. `pre-push`'s `cargo test --workspace` covers it locally, but
-      # `--no-verify` is routine enough that the CI backstop earns its seconds.
-      - cargo check -p e2e-fixture-gen
+      - cargo clippy -p myne-core -p myne-desktop -p e2e-fixture-gen --all-targets -- -D warnings
+      - echo "[t] clippy $(date +%s)"
       # Guard the AI-free auditable variant: `--no-default-features` drops candle
       # entirely and exercises the `#[cfg(not(feature="local-inference"))]` no-op
       # hook arms (hooks.rs / auto_lock.rs) + the zero-ML-symbol reproducible path.
@@ -1097,8 +1111,10 @@ steps:
       # than `check` for the same reason: dead code is a lint, and `-D warnings`
       # is what turns it into a failure.
       - cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
+      - echo "[t] clippy-no-default $(date +%s)"
       # Cache hit-rate visibility (H1) — never fails the step.
       - /cache/bin/sccache --show-stats || true
+      - echo "[t] end $(date +%s)"
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
   # The protocol-scoped cargo-test above can't reach src-tauri: it needs the
@@ -1760,6 +1776,19 @@ steps:
       # moved ref returns this step to green-and-empty, which is the state it
       # spent months in.
       MYNE_VECTORS_REQUIRED: "1"
+      # The shared compile cache, which this step alone went without: every other
+      # Rust step in this file sets these five, and this one built `protocol` and
+      # `myne-core` from an empty `target/` on every push. It was the
+      # second-longest link in the pipeline at 4.9 min of 33.3, and the cache it
+      # was not using reports a 100 % hit rate with `Compilations 0` on the same
+      # crates one step over. `RUSTFLAGS` stays unset here on purpose: it changes
+      # the cache key, and the same-key hits worth having are `cargo-test`'s
+      # `-p protocol` run a few minutes earlier in this pipeline.
+      RUSTC_WRAPPER: /cache/bin/sccache
+      SCCACHE_DIR: /cache/sccache
+      SCCACHE_CACHE_SIZE: "20G"
+      CARGO_INCREMENTAL: "0"
+      CARGO_HOME: /cache/cargo
       VECTORS_TOKEN:
         from_secret: vectors_token
     commands:
@@ -1774,18 +1803,26 @@ steps:
       # separately (chromedriver 151 refuses a Chrome 150 session outright). The
       # rest of what this step needs is already in the image, see above.
       - apt-get update && apt-get install -y --no-install-recommends chromium chromium-driver
+      - echo "[t] chromium $(date +%s)"
       - git clone --depth 1 "https://oauth2:$VECTORS_TOKEN@github.com/myne-md/myne-test-vectors.git" myne-test-vectors
       # Native lane: the desktop and mobile execution target.
       - cargo test -p protocol --test vectors
+      - echo "[t] protocol-vectors $(date +%s)"
       # The core-side merge runners read the same clone (`core/../myne-test-vectors`)
       # and skip when it is absent, which is every lane but this one. Naming it
       # here is what makes "a wrong tombstone rule fails the published cases by
       # name" true of a pipeline rather than of a lucky checkout (myne-md/myne#640).
       - cargo test -p myne-core --lib dictionary_merge_matches_every_published_vector
+      - echo "[t] core-vectors $(date +%s)"
       # Browser lane: the web client's. Same runners, same fixtures, a different
       # wasm engine. The script fails rather than skips when either the fixtures
       # or a driver are missing.
       - CHROMEDRIVER=/usr/bin/chromedriver bash scripts/browser-vectors.sh
+      - echo "[t] browser-vectors $(date +%s)"
+      # Same attribution line as `tauri-compile`: a hit rate of 100 % with
+      # `Compilations 0` means the remaining minutes are the chromium install and
+      # graph walks, and this is where that becomes visible instead of assumed.
+      - /cache/bin/sccache --show-stats || true
 
   # Failure notification via Pushover. The token + group come ONLY from CI
   # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
