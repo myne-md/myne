@@ -4,7 +4,7 @@
 
 > You write. No one else reads. Sync is a server you run.
 
-This is the main repository of the [Myne](https://github.com/myne-md/myne) project: an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. **All three clients live here**: the Tauri 2 desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the desktop-browser client ([`web/`](web/), the same [`src/`](src/) tree with the platform seam substituted at build time), and the iOS and Android client ([`mobile/`](mobile/)). The repository also holds the Rust cryptographic protocol crate ([`protocol/`](protocol/)), the shared Rust backend both native clients build on ([`core/`](core/)), the app-independent decrypter ([`decrypt/`](decrypt/)), the terminal client ([`cli/`](cli/)), the canonical specification, threat model, and decisions log ([`docs/`](docs/)), and the browser-clipper native host ([`src-tauri/src/clipper/`](src-tauri/src/clipper)).
+This is the main repository of the [Myne](https://github.com/myne-md/myne) project: an end-to-end-encrypted, local-first markdown notes app with optional zero-knowledge sync. **All three clients live here**: the Tauri 2 desktop client ([`src/`](src/), [`src-tauri/`](src-tauri/)), the desktop-browser client ([`web/`](web/), the same [`src/`](src/) tree with the platform seam substituted at build time), and the iOS and Android client ([`mobile/`](mobile/)). The repository also holds the Rust cryptographic protocol crate ([`protocol/`](protocol/)), the shared Rust backend both native clients build on ([`core/`](core/)), the app-independent decrypter ([`decrypt/`](decrypt/)), the terminal client ([`cli/`](cli/)), the MCP front-end that lets a program you configure read an unlocked vault through the same local door ([`mcp/`](mcp/)), the canonical specification, threat model, and decisions log ([`docs/`](docs/)), and the browser-clipper native host ([`src-tauri/src/clipper/`](src-tauri/src/clipper)).
 
 The companion repos (server, website, ops, agents, clipper extension, themes, branding assets, test vectors, and the adversarial test range) live under the [`myne-md`](https://github.com/myne-md) organization and are described below. The specs in this repo's [`docs/`](docs/) are the source of truth across every client and implementation.
 
@@ -21,7 +21,7 @@ The threat model is normative: marketing copy and code may not exceed its guaran
 
 ## Status
 
-**Pre-alpha.** The on-disk format is still pre-1.0, and v0.1 and the next major are forward-incompatible by design. Tagged releases exist, `v0.1.0` through `v0.10.0`, published at [downloads.myne.md](https://downloads.myne.md). All three clients are well past scaffold stage. What concretely exists in this repo today:
+**Pre-alpha.** The on-disk format is still pre-1.0, and v0.1 and the next major are forward-incompatible by design. Tagged releases exist, `v0.1.0` through `v0.11.0`, published at [downloads.myne.md](https://downloads.myne.md). All three clients are well past scaffold stage. What concretely exists in this repo today:
 
 - **Protocol crate ([`protocol/`](protocol/))**: `#![no_std]` + `alloc`, built on the RustCrypto stack with no custom primitives. Implements account numbers, KDF, AEAD, subkey derivation, BIP-39 recovery, and every blob family the magic-byte registry allocates ([`docs/spec/protocol.md`](docs/spec/protocol.md) §10.3 is the registry of record, and it is the only place the roster is listed). Covered by a large unit, property-based, and attack test suite.
 - **Desktop core ([`src-tauri/`](src-tauri/))**: Tauri 2 host with atomic writes, auto-lock, snapshot/backup, vault registry and migration, on-device search and spell-check, screen-capture protection, and the browser-clipper native-messaging host. Capability ACLs live under [`src-tauri/capabilities/`](src-tauri/capabilities).
@@ -56,7 +56,8 @@ myne/
 ├── format/              ← myne-format — the on-disk-format read path and the export walk
 ├── decrypt/             ← myne-decrypt — app-independent decrypter CLI
 ├── cli/                 ← myne-cli — the `myne` terminal client, a sidecar to the desktop
-├── tor-sidecar/         ← arti as a loopback SOCKS5 proxy, a second sidecar
+├── mcp/                 ← myne-mcp — the MCP front-end, a second sidecar over the same local door
+├── tor-sidecar/         ← arti as a loopback SOCKS5 proxy, a third sidecar
 ├── theme-validator/     ← custom-theme value allowlist, shared with the themes marketplace
 ├── web/                 ← desktop-browser client (same src/ tree, seam substituted)
 ├── mobile/              ← iOS and Android client (own React tree + Tauri crate)
