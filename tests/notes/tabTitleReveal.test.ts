@@ -8,7 +8,6 @@ import { describe, expect, it } from "vitest";
 import {
   centreScrollLeft,
   marqueeShift,
-  marqueeTiming,
   prefersReducedMotion,
 } from "../../src/notes/components/tabTitleReveal";
 
