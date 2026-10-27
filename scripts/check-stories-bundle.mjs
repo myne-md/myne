@@ -69,6 +69,10 @@ export const ALLOWED_ACCOUNT_STRINGS = new Map([
     "MY-XXXX-XXXX-XXXX-XXXX-XXXX",
     "the schema's own illustrative placeholder (`account-number.md` §2). Shipped by the app's parser/help text, not a real number.",
   ],
+  [
+    "MY-M2Y5-3CAD-5SJ6-0H8A-J8JM",
+    "the account number the `components/identityhome/enrolled` story renders, a prop the story hands its own fixture. Synthetic: it belongs to no person, no Damm-32 issuer minted it, and the story's identity code beside it is likewise made up.",
+  ],
 ]);
 
 // ── runtime globals ──────────────────────────────────────────────────────────
