@@ -18,6 +18,7 @@
 //   GH_TOKEN / MYNE_BOT_PAT  the token used for every REST call (myne-bot, org-wide)
 
 import { readFileSync } from 'node:fs';
+import { extractTemplates } from './parse-templates.mjs';
 
 const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH || '/dev/stdin', 'utf8'));
 const token = process.env.MYNE_BOT_PAT || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
@@ -140,7 +141,7 @@ async function getTemplates() {
   try {
     const items = await gh(`/repos/${t.owner}/${t.repo}/contents/.github/ISSUE_TEMPLATE`);
     if (!Array.isArray(items)) return [];
-    const files = items.filter((x) => x && x.name && /\.(md|ya?ml)$/i.test(x.name) && String(x.name).toLowerCase() !== 'config.yml');
+    const files = items.filter((x) => x && x.name && x.type !== 'dir' && /\.(md|ya?ml)$/i.test(x.name) && String(x.name).toLowerCase() !== 'config.yml');
     return files;
   } catch { return []; }
 }
@@ -149,38 +150,13 @@ async function getTemplates() {
 async function parseTemplates() {
   const picks = await getTemplates();
   if (!picks.length) return [];
-  const bodies = [];
+  const entries = [];
   for (const p of picks) {
-    try { bodies.push(await ghText(p.url)); } catch { bodies.push(''); }
+    let body = '';
+    try { body = await ghText(p.url); } catch { body = ''; }
+    entries.push({ name: p.name, type: p.type || 'file', body });
   }
-  const unq = (s) => String(s).trim().replace(/^["']|["']$/g, '');
-  const out = [];
-  for (let k = 0; k < picks.length; k++) {
-    const p = picks[k];
-    if (!p || !p.filename) continue;
-    const text = bodies[k] || '';
-    if (!text) continue;
-    let name = p.filename; let about = ''; const required = [];
-    if (/\.ya?ml$/i.test(p.filename)) {
-      const nm = text.match(/^name:\s*(.+)$/m); if (nm) name = unq(nm[1]);
-      const de = text.match(/^description:\s*(.+)$/m); if (de) about = unq(de[1]);
-      for (const blk of text.split(/\n\s*-\s+type:\s*/).slice(1)) {
-        const kind = (blk.match(/^\s*([a-z]+)/) || [])[1] || '';
-        if (kind === 'checkboxes' || kind === 'markdown') continue;
-        if (!/required:\s*true/.test(blk)) continue;
-        const lab = blk.match(/label:\s*(.+)/); if (lab) required.push(unq(lab[1]));
-      }
-    } else {
-      const fm = text.match(/^---\n([\s\S]*?)\n---/);
-      if (fm) {
-        const nm = fm[1].match(/^name:\s*(.+)$/m); if (nm) name = unq(nm[1]);
-        const ab = fm[1].match(/^about:\s*(.+)$/m); if (ab) about = unq(ab[1]);
-      }
-      for (const h of (text.match(/^#{1,4}\s+(.+)$/gm) || [])) required.push(unq(h.replace(/^#+\s+/, '')));
-    }
-    out.push({ repo: t.repo, filename: p.filename, name, about, required_sections: required });
-  }
-  return out;
+  return extractTemplates(entries, t.repo);
 }
 
 // --- main -----------------------------------------------------------------

@@ -145,6 +145,10 @@ export function areaQuestionId(slug) {
   return `area_${String(slug).replace(/[^a-z0-9]+/gi, '_')}`;
 }
 
+export function relatedQuestionId(index) {
+  return `rel_${index}`;
+}
+
 export function templateSectionQuestionId(filename, section) {
   // Truncated because an id is also a JSON key the model echoes back, and a very long section
   // heading would make a needlessly large one. 60 chars is well past any real heading.
@@ -255,40 +259,68 @@ export function buildQuestions(packet, shortlist) {
   questions.severity = {
     type: 'score',
     instructions:
-      'How urgent and severe is this issue? Judge the consequence for a user of the released app: '
-      + 'losing or corrupting data, a security or cryptography break, or an app that cannot be '
-      + 'used at all is the top level. A real bug or a wanted feature that does not block anyone is '
-      + 'the middle. A nice-to-have, a rare edge case, or something clearly out of near-term scope '
-      + 'is the bottom.',
+      'How urgent and severe is this issue? Judge the consequence for a user of the released app. '
+      + 'Top level (Critical) is for ACTIVE breaks only: data loss or corruption, a security or '
+      + 'cryptography break, or the app being unusable. Accepted residual exposure, upstream-impossible '
+      + 'or explicitly parked work, and wanted hardening are NOT top level. The middle (Normal) is a '
+      + 'real bug or a wanted feature that does not block anyone, including actionable hardening of an '
+      + 'accepted residual exposure when it is in near-term scope. The bottom (Low) is a nice-to-have, '
+      + 'a rare edge case, something clearly out of near-term scope, explicitly deferred, '
+      + 'upstream-impossible, or parked work. Preserve honest ambiguity: if unsure, do not inflate.',
     criteria: [
-      'Low: nice-to-have, a rare edge case, speculative, or clearly out of near-term scope.',
-      'Normal: a real bug or a wanted feature that does not block anyone from using the app.',
-      'Critical: data loss or corruption, a security or cryptography break, or the app being unusable.',
+      'Low: nice-to-have, a rare edge case, speculative, clearly out of near-term scope, explicitly deferred, upstream-impossible, or parked work.',
+      'Normal: a real bug or a wanted feature that does not block anyone from using the app, including actionable hardening of an accepted residual exposure when it is in near-term scope.',
+      'Critical: an active break only - data loss or corruption, a security or cryptography break, or the app being unusable.',
     ],
   };
 
   // --- duplicate detection ----------------------------------------------------
-  // A noul per shortlisted candidate rather than one choice over all of them. The existing
-  // threshold (0.85) is a calibrated probability, and a noul IS a calibrated probability, so the
-  // number n8n routes on keeps its meaning. A choice over 30 near-identical options would return a
-  // peaked `confidence` that says how decisively the model picked a winner, not how likely that
-  // winner is to really be a duplicate, and those are not the same number.
+  // A noul per shortlisted candidate rather than one choice over all of them. The duplicate-autoclose
+  // threshold (0.85) is applied to this model-reported probability. A choice over 30 near-identical
+  // options would return a peaked `confidence` that says how decisively the model picked a winner,
+  // not how likely that winner is to really be a duplicate, and those are not the same number.
   //
-  // The same answer also yields `relates_to` for free, at no extra token cost: a candidate that
-  // lands between the "related" and "duplicate" bars is genuinely related and is not a duplicate.
+  // Relatedness is asked separately below (`relatedQuestionId`), not inferred from the duplicate
+  // probability: a middling duplicate score is not a proxy for relatedness.
   shortlist.forEach((c, i) => {
     questions[`dup_${i}`] = {
       type: 'noul',
       instructions:
-        `Is the new issue reporting the SAME underlying problem or request as \`existing_issues[${i}]\`? `
-        + 'Judge the underlying problem, not shared words: two reports that mention the same screen '
-        + 'but describe different failures are not duplicates.',
+        `Is the new issue reporting the SAME concrete problem or request as \`existing_issues[${i}]\`? `
+        + 'A duplicate requires that the same concrete fix or request and the same affected scope '
+        + 'resolve BOTH reports. Judge the underlying problem, not shared words: two reports that '
+        + 'mention the same screen but describe different failures are not duplicates. A broad '
+        + 'parent or epic is not a duplicate of a narrower issue. An already-fixed issue on an old '
+        + 'generation or platform does not make a new, uncovered generation or platform a duplicate.',
       criteria: {
         true:
-          `A user reading both would say this is the same problem, and resolving \`existing_issues[${i}]\` `
+          `A user reading both would say this is the same concrete problem or request, the same fix `
+          + `or request resolves both, and the affected scope matches; resolving \`existing_issues[${i}]\` `
           + 'resolves the new report too.',
         false:
-          'The two are different problems. Related subject matter alone does not make them duplicates.',
+          'The two are different problems, or differ in scope or generation/platform. Related subject '
+          + 'matter alone does not make them duplicates, and a broad parent or epic is not a duplicate.',
+      },
+    };
+  });
+
+  // --- relatedness (separate from duplicate) --------------------------------
+  // A candidate can be related without being a duplicate. This is asked on its own so the two
+  // decisions are independent: a middling duplicate probability is not a proxy for relatedness.
+  shortlist.forEach((c, i) => {
+    questions[relatedQuestionId(i)] = {
+      type: 'noul',
+      instructions:
+        `Is the new issue RELATED TO \`existing_issues[${i}]\` (same area, subsystem, workstream, `
+        + 'or a dependency) without being the same concrete problem or request? A broad parent or '
+        + 'epic can be related to a narrower issue. An issue on an old generation or platform can be '
+        + 'related to one on a new generation or platform.',
+      criteria: {
+        true:
+          'The two share an area, subsystem, workstream, or dependency, but are not the same concrete '
+          + 'problem or request.',
+        false:
+          'The two are unrelated, or they are the same concrete problem or request (a duplicate).',
       },
     };
   });
@@ -297,11 +329,16 @@ export function buildQuestions(packet, shortlist) {
   const templates = (packet.templates || []).filter((t) => t && (t.name || t.filename));
   if (templates.length) {
     const criteria = {};
-    for (const t of templates) criteria[t.name || t.filename] = t.about || t.filename;
+    for (const t of templates) {
+      const label = t.name || t.filename;
+      criteria[label] = `${label}: ${t.about || label}`;
+    }
     criteria.none = 'No template applies to this issue.';
     questions.template_used = {
       type: 'choice',
-      instructions: 'Which issue template should this issue have used, if any?',
+      instructions:
+        'Which issue template should this issue have used, if any? Consider the actual template '
+        + 'name and its scope as described.',
       criteria,
     };
   }
@@ -309,10 +346,10 @@ export function buildQuestions(packet, shortlist) {
     for (const section of t.required_sections || []) {
       questions[templateSectionQuestionId(t.filename || t.name || 'x', section)] = {
         type: 'noul',
-        instructions: `Is "${section}" MISSING from this issue's body?`,
+        instructions: `Does the report lack the information that "${section}" asks for?`,
         criteria: {
-          true: `The report does not provide "${section}", so it cannot be acted on without it.`,
-          false: `The report provides "${section}", even if briefly.`,
+          true: `The information "${section}" asks for is absent or unusable, even if a differently worded section exists.`,
+          false: `The report provides the information "${section}" asks for, possibly under a different heading.`,
         },
       };
     }
@@ -324,7 +361,8 @@ export function buildQuestions(packet, shortlist) {
     instructions:
       'Is this report too thin to act on, whatever kind of issue it is? A one-line report with no '
       + 'reproduction, no description of what was expected, or no version is too thin. A detailed '
-      + 'feature request is not thin just because it is a request.',
+      + 'engineering or feature request is not thin just because it is not formatted as a public bug '
+      + 'form, and a detailed report is not thin just because it is a request.',
     criteria: {
       true: 'There is not enough here to start work on without asking the reporter for more.',
       false: 'There is enough here to start work on.',

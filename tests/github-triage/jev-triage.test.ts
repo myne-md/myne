@@ -382,7 +382,7 @@ describe('duplicate', () => {
     const answersAll: any = { ...answers() };
     req._shortlist.forEach((_: any, i: number) => { answersAll[`dup_${i}`] = { type: 'noul', noul: 0.1 }; });
     const openIdx = req._shortlist.findIndex((c: any) => c.state === 'open');
-    answersAll[`dup_${openIdx}`] = { type: 'noul', noul: 0.42 };
+    answersAll[`rel_${openIdx}`] = { type: 'noul', noul: 0.42 };
     const v = buildVerdict(packet(), req, { answers: answersAll });
     expect(v.duplicate.is_duplicate).toBe(false);
     expect(v.relationships.map((r: any) => r.type)).toContain('relates_to');
