@@ -4,14 +4,14 @@
 //! Two commands, identical in logic to the desktop plugin (only the
 //! `vault_sweep` path differs — mobile references `myne_core::vault_sweep`
 //! directly, desktop via its `crate::vault_sweep` re-export):
-//! - [`vault_residue_scan`] — the **read-only detection** half. Counts orphan
-//!   artefacts left under `<app_data_dir>/vault/` by a partial-fail
-//!   `vault_delete` so the Welcome screen can surface a repair banner. A pure
-//!   read: NO `auth_permits`.
-//! - [`vault_repair`] — the **destructive sweep**. The exact mirror of
-//!   `vault_delete::dispatch_empty_arm`: proceeds only on (slot Empty +
-//!   vault.meta byte-absent + residue), `auth_permits`-gated across the
-//!   precondition check and the sweep, `RootDisposal::KeepRoot`. Once the
+//! - [`vault_residue_scan`] — the **read-only detection** half. Reports every
+//!   vault root under `<app_data_dir>` that still holds entries (`vaults/<id>/`
+//!   and the legacy `vault/`), each classified by whether it carries a
+//!   `vault.meta`. A pure read: NO `auth_permits`.
+//! - [`vault_repair`] — the **destructive sweep**. Runs the exact mirror of
+//!   `vault_delete::dispatch_empty_arm` per repairable root: proceeds only on
+//!   (slot Empty + vault.meta byte-absent + residue), `auth_permits`-gated
+//!   across each root's precondition check and sweep, `RootDisposal::KeepRoot`. Once the
 //!   sweep has run it also destroys this vault's sealed-label wrap key
 //!   (myne-md/myne#411), because the sweep is artefact-agnostic and takes
 //!   `vault.label` with the rest of the residue: a key left alive over
@@ -29,36 +29,134 @@ use myne_core::vault_sweep::RootDisposal;
 use std::path::PathBuf;
 use tauri::{AppHandle, Runtime, State};
 
-/// Read-only count of orphan residue under the vault directory.
+/// One vault root that still holds entries, as the Welcome banner sees it.
+///
+/// `has_vault_meta` is what keeps the banner honest. A root carrying
+/// `vault.meta` is not cleanable by [`vault_repair`] by design (it could be
+/// somebody's vault), so offering it the "clean up" button is a button that can
+/// only ever answer "couldn't finish cleaning up". The client routes that root
+/// to `vault_delete` instead, which is the command that owns a
+/// `vault.meta`-gated directory and the one whose typed-DELETE gate makes the
+/// act deliberate.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResidueRootView {
+    /// The id the root is addressable by (the legacy sentinel for `<base>/vault`).
+    pub vault_id: String,
+    /// Recursive entry count under the root.
+    pub entries: usize,
+    /// `vault.meta` byte-present here ⇒ `vault_delete`'s territory.
+    pub has_vault_meta: bool,
+}
+
+/// Read-only report of every vault root that still holds entries.
 #[tauri::command]
-pub async fn vault_residue_scan<R: Runtime>(app: AppHandle<R>) -> Result<usize, VaultRepairError> {
-    let vault_dir = crate::paths::vault_dir_path(&app).map_err(|_| VaultRepairError::Io {
+pub async fn vault_residue_scan<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<Vec<ResidueRootView>, VaultRepairError> {
+    let base = crate::paths::app_data_dir(&app).map_err(|_| VaultRepairError::Io {
         io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
-    Ok(vault_residue_scan_with_dir(&vault_dir))
+    Ok(vault_residue_scan_from_base(&base))
 }
 
 /// Testable core of [`vault_residue_scan`].
-pub(crate) fn vault_residue_scan_with_dir(vault_dir: &std::path::Path) -> usize {
-    myne_core::vault_sweep::count_residue(vault_dir)
+///
+/// Enumerates `<base>/vaults/<id>/` and the legacy `<base>/vault/`, rather than
+/// asking the transitional sole-vault resolver where "the" vault is: that
+/// resolver answers with a LIVE vault the moment one vault remains, so its count
+/// reports a healthy vault's files as leftovers and the sweep is then refused
+/// as `VaultPresent` for good. There is one residue root per vault directory, so
+/// there is one row per vault directory.
+pub(crate) fn vault_residue_scan_from_base(base: &std::path::Path) -> Vec<ResidueRootView> {
+    myne_core::vault_sweep::scan_residue_roots(base)
+        .into_iter()
+        .map(|root| ResidueRootView {
+            vault_id: root.vault_id.to_string(),
+            entries: root.entries,
+            has_vault_meta: root.has_vault_meta,
+        })
+        .collect()
 }
 
 /// One-shot in-app cleanup of orphan vault residue.
+///
+/// Sweeps every residue root that is genuinely repairable (no `vault.meta`) and
+/// resolves to the total number of entries removed. A root that still carries
+/// `vault.meta` is never swept here; when that is ALL that is left, this rejects
+/// with [`VaultRepairError::VaultPresent`] so the caller can route it to
+/// `vault_delete` rather than showing a button that cannot work.
 #[tauri::command]
 pub async fn vault_repair<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
 ) -> Result<usize, VaultRepairError> {
-    let vault_dir = crate::paths::vault_dir_path(&app).map_err(|_| VaultRepairError::Io {
+    let base = crate::paths::app_data_dir(&app).map_err(|_| VaultRepairError::Io {
         io_error_kind: crate::io_failure_kind::IoFailureKind::Other,
     })?;
-    vault_repair_with_dir(
-        vault_dir,
+    vault_repair_from_base(
+        &base,
         state.inner(),
         &myne_core::vault_io::StdVaultIo,
         myne_core::vault_label::key::platform_keychain(),
     )
     .await
+}
+
+/// Testable core of [`vault_repair`]: pick the repairable roots out of the
+/// residue report, sweep each one through [`vault_repair_with_dir`] (which keeps
+/// every precondition per root), and aggregate.
+///
+/// Per root rather than per device on purpose: the gates in
+/// `vault_repair_with_dir` are the load-bearing half (slot Empty, `vault.meta`
+/// byte-absent), and running them once per root means a vault that appeared
+/// between the scan and the sweep is refused rather than swept.
+pub(crate) async fn vault_repair_from_base(
+    base: &std::path::Path,
+    state: &VaultRuntimeState,
+    io: &dyn myne_core::vault_io::VaultIo,
+    keychain: &dyn myne_core::vault_label::key::LabelKeychain,
+) -> Result<usize, VaultRepairError> {
+    let roots = myne_core::vault_sweep::scan_residue_roots(base);
+    let repairable: Vec<_> = roots
+        .iter()
+        .filter(|root| !root.has_vault_meta)
+        .map(|root| root.root.clone())
+        .collect();
+
+    if repairable.is_empty() {
+        return Err(if roots.is_empty() {
+            VaultRepairError::NothingToRepair
+        } else {
+            // What is left is a `vault.meta`-bearing root (or several): that is
+            // `vault_delete`'s typed-DELETE-gated territory, so the honest
+            // answer to a gate-free sweep is the same refusal as ever.
+            VaultRepairError::VaultPresent
+        });
+    }
+
+    let mut removed = 0usize;
+    let mut remaining = 0usize;
+    for dir in repairable {
+        match vault_repair_with_dir(dir, state, io, keychain).await {
+            Ok(n) => removed += n,
+            // A race that put a `vault.meta` back between the scan and this root
+            // refuses that root only; the others are still residue.
+            Err(VaultRepairError::VaultPresent) => {}
+            Err(VaultRepairError::PartialDelete { remaining_count }) => {
+                remaining += remaining_count;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    if remaining == 0 {
+        Ok(removed)
+    } else {
+        Err(VaultRepairError::PartialDelete {
+            remaining_count: remaining,
+        })
+    }
 }
 
 /// Testable core of [`vault_repair`].
@@ -192,25 +290,50 @@ mod tests {
     use crate::test_support::ScopedTempDir;
 
     #[test]
-    fn scan_returns_zero_on_empty_or_missing_dir() {
+    fn scan_reports_nothing_on_a_clean_base() {
         let tmp = ScopedTempDir::new("vr-scan-empty").unwrap();
-        assert_eq!(vault_residue_scan_with_dir(tmp.path()), 0);
-        assert_eq!(
-            vault_residue_scan_with_dir(&tmp.path().join("nope")),
-            0,
-            "missing dir scans 0, no error"
+        assert!(vault_residue_scan_from_base(tmp.path()).is_empty());
+        assert!(
+            vault_residue_scan_from_base(&tmp.path().join("nope")).is_empty(),
+            "a missing base scans empty, no error"
         );
     }
 
     #[test]
-    fn scan_counts_every_entry_under_vault_dir() {
+    fn scan_reports_one_row_per_root_and_says_which_carry_a_vault_meta() {
         let tmp = ScopedTempDir::new("vr-scan-count").unwrap();
-        let notes = tmp.path().join("notes");
-        std::fs::create_dir_all(&notes).unwrap();
-        std::fs::write(notes.join("a.myn"), b"x").unwrap();
-        std::fs::write(notes.join("b.myn"), b"y").unwrap();
-        std::fs::write(tmp.path().join("vault.meta.tmp"), b"orphan").unwrap();
-        assert_eq!(vault_residue_scan_with_dir(tmp.path()), 4);
+
+        // A repairable root: residue, no vault.meta.
+        let repairable = myne_core::vault_id::VaultId::mint();
+        let repairable_root = tmp.path().join("vaults").join(repairable.to_string());
+        std::fs::create_dir_all(repairable_root.join("notes")).unwrap();
+        std::fs::write(repairable_root.join("notes").join("a.myn"), b"x").unwrap();
+
+        // A root the gate-free sweep must NOT touch.
+        let gated = myne_core::vault_id::VaultId::mint();
+        let gated_root = tmp.path().join("vaults").join(gated.to_string());
+        std::fs::create_dir_all(&gated_root).unwrap();
+        std::fs::write(gated_root.join("vault.meta"), b"present").unwrap();
+
+        let rows = vault_residue_scan_from_base(tmp.path());
+        assert_eq!(rows.len(), 2, "one row per root, got {rows:?}");
+
+        let repairable_row = rows
+            .iter()
+            .find(|r| r.vault_id == repairable.to_string())
+            .expect("repairable row");
+        assert_eq!(repairable_row.entries, 2, "notes/ + notes/a.myn");
+        assert!(!repairable_row.has_vault_meta);
+
+        let gated_row = rows
+            .iter()
+            .find(|r| r.vault_id == gated.to_string())
+            .expect("gated row");
+        assert_eq!(gated_row.entries, 1);
+        assert!(
+            gated_row.has_vault_meta,
+            "the banner has to be able to say `this one is not cleanable`"
+        );
     }
 
     #[test]
@@ -495,25 +618,152 @@ mod tests {
     fn vault_repair_succeeds_leaves_dir_and_returns_removed_count() {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("vr-ok").unwrap();
-            seed_residue(tmp.path());
-            let scanned = vault_residue_scan_with_dir(tmp.path());
-            assert_eq!(scanned, 2);
+            // A real `vaults/<id>/` root, because the base-level sweep reads
+            // roots off the disk rather than trusting a caller-supplied path.
+            let id = myne_core::vault_id::VaultId::mint();
+            let root = tmp.path().join("vaults").join(id.to_string());
+            std::fs::create_dir_all(&root).unwrap();
+            seed_residue(&root);
+            assert_eq!(vault_residue_scan_from_base(tmp.path()).len(), 1);
+            assert_eq!(vault_residue_scan_from_base(tmp.path())[0].entries, 2);
 
             let state = VaultRuntimeState::default();
-            let result = repair(tmp.path(), &state).await;
+            let result = vault_repair_from_base(
+                tmp.path(),
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &ScratchKeychain::empty(),
+            )
+            .await;
             assert!(
                 matches!(result, Ok(2)),
                 "expected Ok(removed=2) matching the scan count, got {result:?}"
             );
             assert!(
-                tmp.path().exists() && tmp.path().is_dir(),
-                "vault_dir must be left in place (KeepRoot)"
+                root.exists() && root.is_dir(),
+                "the root must be left in place (KeepRoot)"
             );
-            assert_eq!(
-                vault_residue_scan_with_dir(tmp.path()),
-                0,
+            assert!(
+                vault_residue_scan_from_base(tmp.path()).is_empty(),
                 "no residue must remain after a successful repair"
             );
+        });
+    }
+
+    /// The regression this whole change exists for. Before the per-root scan the
+    /// sweep resolved ONE directory through the transitional sole-vault
+    /// heuristic, so with a live vault and a pyre root on disk it either swept
+    /// the wrong tree or answered `VaultPresent` forever (a banner whose button
+    /// can never succeed). Both halves are asserted here: the residue goes, and
+    /// the live vault is byte-identical afterwards.
+    #[test]
+    fn vault_repair_sweeps_the_residue_and_never_touches_a_live_vault_beside_it() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vr-beside-live").unwrap();
+
+            let live = tmp
+                .path()
+                .join("vaults")
+                .join(myne_core::vault_id::VaultId::mint().to_string());
+            std::fs::create_dir_all(live.join("notes")).unwrap();
+            std::fs::write(live.join("vault.meta"), b"a real vault.meta").unwrap();
+            std::fs::write(live.join("notes").join("keep.myn"), b"precious").unwrap();
+
+            let pyre = tmp
+                .path()
+                .join("vaults")
+                .join(myne_core::vault_id::VaultId::mint().to_string());
+            std::fs::create_dir_all(&pyre).unwrap();
+            std::fs::write(pyre.join("orphan.myn"), b"junk").unwrap();
+
+            let state = VaultRuntimeState::default();
+            let result = vault_repair_from_base(
+                tmp.path(),
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &ScratchKeychain::empty(),
+            )
+            .await;
+            assert!(
+                matches!(result, Ok(1)),
+                "only the orphan goes, got {result:?}"
+            );
+            assert!(
+                !pyre.join("orphan.myn").exists(),
+                "the repairable root's contents are swept"
+            );
+            assert!(
+                pyre.is_dir(),
+                "KeepRoot leaves the (now empty) create destination in place"
+            );
+            assert_eq!(
+                std::fs::read(live.join("notes").join("keep.myn")).unwrap(),
+                b"precious",
+                "a live vault's bytes must be untouched by a gate-free sweep"
+            );
+            assert!(live.join("vault.meta").exists());
+        });
+    }
+
+    /// A leftover `vault.meta` is `vault_delete`'s territory, and the sweep has to
+    /// SAY so rather than reporting success over nothing: the caller routes it to
+    /// the typed-DELETE path on this error code.
+    #[test]
+    fn vault_repair_rejects_vault_present_when_only_a_meta_bearing_root_is_left() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vr-only-meta").unwrap();
+            let root = tmp
+                .path()
+                .join("vaults")
+                .join(myne_core::vault_id::VaultId::mint().to_string());
+            std::fs::create_dir_all(&root).unwrap();
+            std::fs::write(root.join("vault.meta"), b"present").unwrap();
+            std::fs::write(root.join("vault.prefs"), b"prefs").unwrap();
+
+            let state = VaultRuntimeState::default();
+            let result = vault_repair_from_base(
+                tmp.path(),
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &ScratchKeychain::empty(),
+            )
+            .await;
+            assert!(
+                matches!(result, Err(VaultRepairError::VaultPresent)),
+                "expected VaultPresent so the UI routes to vault_delete, got {result:?}"
+            );
+            assert!(root.join("vault.meta").exists(), "the gate held");
+        });
+    }
+
+    /// The legacy `<base>/vault/` directory is a root too. It is the one a
+    /// `vaults/*` walk cannot see, and on a pre-migration install it is the only
+    /// place residue can live.
+    #[test]
+    fn vault_repair_sweeps_the_legacy_root() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("vr-legacy").unwrap();
+            let legacy = tmp.path().join("vault");
+            std::fs::create_dir_all(&legacy).unwrap();
+            std::fs::write(legacy.join("orphan.myn"), b"junk").unwrap();
+
+            let rows = vault_residue_scan_from_base(tmp.path());
+            assert_eq!(rows.len(), 1, "got {rows:?}");
+            assert_eq!(
+                rows[0].vault_id,
+                crate::paths::legacy_vault_id().to_string()
+            );
+
+            let state = VaultRuntimeState::default();
+            let result = vault_repair_from_base(
+                tmp.path(),
+                &state,
+                &myne_core::vault_io::StdVaultIo,
+                &ScratchKeychain::empty(),
+            )
+            .await;
+            assert!(matches!(result, Ok(1)), "got {result:?}");
+            assert!(vault_residue_scan_from_base(tmp.path()).is_empty());
         });
     }
 

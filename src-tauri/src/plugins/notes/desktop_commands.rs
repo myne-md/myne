@@ -1996,10 +1996,12 @@ mod tests {
     /// A host whose `app_data_dir` is a scratch directory, with the active
     /// vault root materialized so the `_from_host` path resolvers succeed.
     fn host_with_vault(base: &Path) -> myne_core::host::test_host::TestHost {
-        let root = base
-            .join("data")
-            .join("vaults")
-            .join(test_vault_id().as_uuid().to_string());
+        // Built through the resolver the production path uses, because
+        // `test_vault_id()` is the legacy sentinel and the sentinel names
+        // `<app_data_dir>/vault/`: a fixture that hardcoded
+        // `vaults/<sentinel>/` would create a directory no resolver reads.
+        let root =
+            myne_core::paths::vault_root_for_id_from_base(&base.join("data"), test_vault_id());
         std::fs::create_dir_all(root.join("notes")).unwrap();
         myne_core::host::test_host::TestHost::new(base)
     }

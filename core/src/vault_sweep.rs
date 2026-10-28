@@ -265,6 +265,102 @@ pub fn count_residue(dir: &Path) -> usize {
     acc
 }
 
+/// One vault root that still holds something on disk, as the repair surfaces
+/// see it.
+///
+/// `entries` is [`count_residue`]'s count, so it matches what a `KeepRoot`
+/// sweep would remove from exactly this root.
+///
+/// `has_vault_meta` is the load-bearing field and the reason this type exists.
+/// A root that still carries `vault.meta` is **not repairable residue**: the
+/// gate-free sweep refuses it by design (a `vault.meta` means "this may be a
+/// vault", and deleting one is `vault_delete`'s typed-DELETE-gated territory).
+/// Without the flag a client can only show a count, so it offers a cleanup
+/// button for a root that is structurally un-cleanable and the user gets
+/// "couldn't finish cleaning up" forever. With it, the client routes the root
+/// to the command that owns it instead.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ResidueRoot {
+    /// The id this root is addressable by. For `<base>/vault/` that is the
+    /// [`legacy_vault_id`](crate::paths::legacy_vault_id) sentinel, which
+    /// [`vault_root_for_id_from_base`](crate::paths::vault_root_for_id_from_base)
+    /// resolves straight back to the legacy directory.
+    pub vault_id: crate::vault_id::VaultId,
+    /// The root directory itself (never a file inside it).
+    pub root: PathBuf,
+    /// Recursive entry count under `root`, i.e. the sweep's working set.
+    pub entries: usize,
+    /// `vault.meta` is byte-present here (see the type docs).
+    pub has_vault_meta: bool,
+}
+
+/// Enumerate **every** vault root under `base` that still holds entries — the
+/// multi-root replacement for asking the transitional sole-vault resolver where
+/// the residue is.
+///
+/// # Why this exists rather than a single `count_residue(vault_dir_path(app))`
+///
+/// `vault_dir_path` answers "where is THE vault", using
+/// [`current_vault_root_from_base`](crate::paths::current_vault_root_from_base)'s
+/// sole-vault disk heuristic: the one `vaults/<id>/` child if there is exactly
+/// one, else the legacy `vault/`. In a multi-vault world neither answer is the
+/// residue's location. It points at a **live** vault whenever one vault remains
+/// (so every file in a healthy vault is reported as leftover and the sweep is
+/// then refused as `VaultPresent`), and it points at the legacy directory
+/// whenever the residue is one of several roots. A banner driven by that number
+/// can therefore fire when nothing is left over, and stay silent when something
+/// is.
+///
+/// So the scan enumerates instead of resolving: `vaults/<id>/` for every child
+/// whose name parses as a [`VaultId`], plus the legacy `vault/`. Roots with no
+/// entries are omitted (a root that was fully swept is not residue, and an
+/// empty `vault.meta`-less container is a create destination, not a leftover).
+///
+/// Sorted by id so the caller's rendering is stable between scans — a list that
+/// reorders under the user's finger is its own defect.
+pub fn scan_residue_roots(base: &Path) -> Vec<ResidueRoot> {
+    let mut found: Vec<ResidueRoot> = Vec::new();
+    let mut push_if_residue = |root: PathBuf, vault_id: crate::vault_id::VaultId| {
+        let entries = count_residue(&root);
+        if entries == 0 {
+            return;
+        }
+        found.push(ResidueRoot {
+            vault_id,
+            has_vault_meta: root.join("vault.meta").try_exists().unwrap_or(true),
+            root,
+            entries,
+        });
+    };
+
+    push_if_residue(
+        base.join(crate::paths::LEGACY_VAULT_DIR_NAME),
+        crate::paths::legacy_vault_id(),
+    );
+
+    if let Ok(entries) = std::fs::read_dir(base.join(crate::paths::VAULTS_DIR_NAME)) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let Some(id) = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .and_then(|n| crate::vault_id::VaultId::parse(n).ok())
+            else {
+                continue;
+            };
+            push_if_residue(path, id);
+        }
+    }
+
+    // `VaultId` is a UUID with `Ord`; the ordering is opaque to the user, which
+    // is the point — it only has to be the same on every scan.
+    found.sort_by_key(|root| root.vault_id);
+    found
+}
+
 /// Remove every child of `dir` (each child subtree fully), leaving `dir`
 /// itself in place. The [`RootDisposal::KeepRoot`] half of [`sweep`].
 fn remove_children(dir: &Path, results: &mut Vec<(PathBuf, std::io::Result<()>)>) {
@@ -725,6 +821,114 @@ mod tests {
         assert_eq!(
             outcome.removed, scanned,
             "scan count must equal what the KeepRoot sweep removes"
+        );
+    }
+
+    // ---- scan_residue_roots: every root, classified ----------------------
+
+    #[test]
+    fn scan_residue_roots_reports_nothing_on_a_clean_base() {
+        let tmp = ScopedTempDir::new("vs-scan-clean").unwrap();
+        assert!(
+            scan_residue_roots(tmp.path()).is_empty(),
+            "no roots, no residue"
+        );
+
+        // An EMPTY `vaults/<id>/` is a create destination, not a leftover.
+        let id = crate::vault_id::VaultId::mint();
+        std::fs::create_dir_all(tmp.path().join("vaults").join(id.to_string())).unwrap();
+        assert!(
+            scan_residue_roots(tmp.path()).is_empty(),
+            "an empty root holds nothing to clean up"
+        );
+    }
+
+    #[test]
+    fn scan_residue_roots_enumerates_every_root_and_classifies_the_meta() {
+        // The defect this holds: the sole-vault heuristic answered with ONE
+        // directory, so with two roots on disk the scan either named the wrong
+        // one or fell back to the legacy path. Both roots must be reported, and
+        // each must carry whether the sweep is even allowed to touch it.
+        let tmp = ScopedTempDir::new("vs-scan-roots").unwrap();
+        let repairable = crate::vault_id::VaultId::mint();
+        let corpse = crate::vault_id::VaultId::mint();
+
+        let repairable_root = tmp.path().join("vaults").join(repairable.to_string());
+        std::fs::create_dir_all(repairable_root.join("notes")).unwrap();
+        std::fs::write(repairable_root.join("notes").join("a.myn"), b"x").unwrap();
+
+        let corpse_root = tmp.path().join("vaults").join(corpse.to_string());
+        std::fs::create_dir_all(&corpse_root).unwrap();
+        std::fs::write(corpse_root.join("vault.meta"), b"meta").unwrap();
+        std::fs::write(corpse_root.join("vault.prefs"), b"prefs").unwrap();
+
+        let roots = scan_residue_roots(tmp.path());
+        assert_eq!(roots.len(), 2, "both roots are residue, got {roots:?}");
+
+        let repairable_report = roots
+            .iter()
+            .find(|r| r.vault_id == repairable)
+            .expect("repairable root reported");
+        assert_eq!(repairable_report.entries, 2, "notes/ + notes/a.myn");
+        assert!(
+            !repairable_report.has_vault_meta,
+            "no vault.meta ⇒ the gate-free sweep owns it"
+        );
+
+        let corpse_report = roots
+            .iter()
+            .find(|r| r.vault_id == corpse)
+            .expect("meta-carrying root reported");
+        assert_eq!(corpse_report.entries, 2, "vault.meta + vault.prefs");
+        assert!(
+            corpse_report.has_vault_meta,
+            "vault.meta present ⇒ vault_delete's gated territory, never the sweep"
+        );
+    }
+
+    #[test]
+    fn scan_residue_roots_names_the_legacy_directory_with_the_sentinel() {
+        // A pre-migration install keeps its root at `<base>/vault`, which is
+        // outside `vaults/` and so invisible to a `vaults/*` walk. The sentinel
+        // id is what makes it addressable at all, and
+        // `vault_root_for_id_from_base` is what turns it back into a path.
+        let tmp = ScopedTempDir::new("vs-scan-legacy").unwrap();
+        let legacy = tmp.path().join(crate::paths::LEGACY_VAULT_DIR_NAME);
+        std::fs::create_dir_all(&legacy).unwrap();
+        std::fs::write(legacy.join("vault.meta"), b"meta").unwrap();
+
+        let roots = scan_residue_roots(tmp.path());
+        assert_eq!(roots.len(), 1, "got {roots:?}");
+        assert_eq!(roots[0].vault_id, crate::paths::legacy_vault_id());
+        assert_eq!(roots[0].root, legacy);
+        assert!(roots[0].has_vault_meta);
+        assert_eq!(
+            crate::paths::vault_root_for_id_from_base(tmp.path(), roots[0].vault_id),
+            legacy,
+            "the reported id must resolve back to the reported root"
+        );
+    }
+
+    #[test]
+    fn scan_residue_roots_is_stable_across_scans() {
+        let tmp = ScopedTempDir::new("vs-scan-stable").unwrap();
+        for _ in 0..3 {
+            let id = crate::vault_id::VaultId::mint();
+            let root = tmp.path().join("vaults").join(id.to_string());
+            std::fs::create_dir_all(&root).unwrap();
+            std::fs::write(root.join("orphan.myn"), b"x").unwrap();
+        }
+        let first: Vec<_> = scan_residue_roots(tmp.path())
+            .into_iter()
+            .map(|r| r.vault_id)
+            .collect();
+        let second: Vec<_> = scan_residue_roots(tmp.path())
+            .into_iter()
+            .map(|r| r.vault_id)
+            .collect();
+        assert_eq!(
+            first, second,
+            "a list that reorders under the user is a defect"
         );
     }
 
