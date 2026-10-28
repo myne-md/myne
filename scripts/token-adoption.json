@@ -100,7 +100,7 @@
   "mobile/src/app/flows/TemplatesSheet.tsx": 23,
   "mobile/src/app/flows/UnlockFlow.tsx": 36,
   "mobile/src/app/flows/ViewEditorSheet.tsx": 34,
-  "mobile/src/app/flows/WelcomeFlow.tsx": 11,
+  "mobile/src/app/flows/WelcomeFlow.tsx": 10,
   "mobile/src/app/flows/editor/EmptyDetail.tsx": 9,
   "mobile/src/app/flows/editor/SidebarPane.tsx": 11,
   "mobile/src/app/flows/editor/chrome/ActionPill.tsx": 4,

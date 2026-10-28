@@ -463,12 +463,15 @@ describe("assembleClip — bookmark composer seam", () => {
     );
   });
 
-  it("leaves the clip path on the DEFAULT composer (source/url/clipped, no title)", async () => {
-    // No composer arg → the default `composeClipPlaintext` is used, byte-for-byte
-    // unchanged. A clip emits BOTH `source:` and `url:` (the SYNC-14 redundancy)
-    // and NO managed `title:` — the proof the default path is unaffected.
+  it("names the clip from the envelope body's leading heading (default composer)", async () => {
+    // myne-md/myne#936. This test used to assert the opposite, "no title", which
+    // certified the defect: a clip sealed without the managed `title:` has no
+    // name in any surface, because a title is read from frontmatter only. The
+    // DEFAULT composer now writes it, and the routine supplies it, so no caller
+    // can land an untitled note by leaving the compose step alone.
     const deps = makeDeps();
     const env = rawEnvelope({
+      markdownBody: "# A Real Page Title\n\nThe article body.\n",
       sourceUrl: "https://example.com/article",
       clipDate: "2026-06-18T12:00:00Z",
     });
@@ -477,8 +480,28 @@ describe("assembleClip — bookmark composer seam", () => {
 
     expect(result.kind).toBe("accepted");
     const sealed = deps.noteCreate.mock.calls[0][0] as string;
+    // The note is NAMED...
+    expect(sealed).toMatch(/^title: A Real Page Title$/m);
+    // ...and a clip still emits BOTH `source:` and `url:` (the SYNC-14
+    // redundancy), which is what distinguishes it from the bookmark shape.
     expect(sealed).toMatch(/^source: https:\/\/example\.com\/article$/m);
     expect(sealed).toMatch(/^url: https:\/\/example\.com\/article$/m);
-    expect(sealed).not.toMatch(/^title\s*:/m);
+  });
+
+  it("leaves the note untitled when the page had no title", async () => {
+    // The degenerate, and the reason the title cannot be read off `resolvedBody`:
+    // no `# ` heading means no title, and an article's own later heading must not
+    // be borrowed as one.
+    const deps = makeDeps();
+    const env = rawEnvelope({
+      markdownBody: "Some lede paragraph.\n\n# Introduction\n\nBody.\n",
+    });
+
+    const result = await assembleClip(env, env.markdownBody, deps);
+
+    expect(result.kind).toBe("accepted");
+    const sealed = deps.noteCreate.mock.calls[0][0] as string;
+    expect(sealed).toMatch(/^title: ""$/m);
+    expect(sealed).not.toMatch(/^title: Introduction$/m);
   });
 });

@@ -30,6 +30,7 @@ import {
   buildInitialPlaintext,
   parse,
   patchFrontmatterField,
+  patchTitleField,
 } from "../../src/dialect";
 
 const enc = new TextEncoder();
@@ -106,7 +107,7 @@ describe("composeClipPlaintext — provenance frontmatter composition", () => {
     expect(out).toContain("clipped: 2026-01-02T03:04:05.678Z");
   });
 
-  it("composes onto an EMPTY body — provenance FM only, no body content", () => {
+  it("composes onto an EMPTY body: the title + provenance FM, no body content", () => {
     const env = envelope({ markdownBody: "" });
     const out = composeClipPlaintext(env, "");
 
@@ -183,16 +184,21 @@ describe("composeClipPlaintext — provenance frontmatter composition", () => {
     expect(sourceLines).toHaveLength(1);
   });
 
-  it("is the arbitrary-FM surgery path, NOT a managed-field setter (criterion #4)", () => {
-    // The composed plaintext must be byte-identical to applying the three
-    // provenance keys via `patchFrontmatterField` (the generic arbitrary-FM
-    // path `setNoteCover` uses) onto the same root-built base. This proves the
-    // provenance keys ride the unmanaged path — no managed-canonical setter is
-    // involved, the closed 7-field set is untouched.
+  it("routes provenance through the arbitrary-FM path and the title through the managed one", () => {
+    // The two writers must stay distinguishable (criterion #4, restated by
+    // myne-md/myne#936). The three provenance keys ride the GENERIC
+    // arbitrary-FM path (`patchFrontmatterField`, the injector `setNoteCover`
+    // uses) onto the same root-built base, so no managed-canonical setter is
+    // involved and the closed 7-field set is untouched. The `title:` rides the
+    // MANAGED writer (`patchTitleField`) instead, because that is exactly what
+    // it is: a canonical field, written like every rename writes it. Composing
+    // the expected bytes with the two writers in the same order is what proves
+    // the split: swap one for the other and this equality breaks.
     const env = envelope({ markdownBody: "" });
-    const out = composeClipPlaintext(env, "");
+    const out = composeClipPlaintext(env, "", "Example Page");
 
     let expected = enc.encode(buildInitialPlaintext(null));
+    expected = patchTitleField(expected, "Example Page");
     expected = patchFrontmatterField(expected, "source", env.sourceUrl);
     expected = patchFrontmatterField(expected, "url", env.sourceUrl);
     expected = patchFrontmatterField(expected, "clipped", env.clipDate);
@@ -208,5 +214,58 @@ describe("composeClipPlaintext — provenance frontmatter composition", () => {
     const out = composeClipPlaintext(env, rewritten);
     expect(out).toContain("REWRITTEN body with");
     expect(out).not.toContain("ORIGINAL envelope body");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The managed `title:` (myne-md/myne#936), the key that makes a clip a NAMED
+// note instead of "Untitled". A title is read from frontmatter `title:` only
+// (decision 0139), so a composer that omits it seals a note with no name, which
+// is what every content clip did until this block existed.
+// ---------------------------------------------------------------------------
+
+describe("composeClipPlaintext: the managed title", () => {
+  it("writes the page title as `title:` so the note is not Untitled", () => {
+    const env = envelope();
+    const out = composeClipPlaintext(env, env.markdownBody, "A Real Page Title");
+
+    const data = parsedFrontmatter(out);
+    expect(data["title"]).toBe("A Real Page Title");
+    // Exactly one title line, and it is a real YAML string.
+    expect(out.split("\n").filter((l) => /^title\s*:/.test(l))).toHaveLength(1);
+    // The body's own heading is still there: the note is named without the
+    // captured bytes being rewritten.
+    expect(out).toContain("# Hello");
+  });
+
+  it("appends the title LAST when the body already carries the user's frontmatter", () => {
+    // A clip body can start with frontmatter-ish content (`source:` above is the
+    // production case, but a body may carry anything). The managed writer merges
+    // into the existing block and keeps every other key.
+    const body = "---\ncustom: kept\n---\n\n# Clipped\n\nContent.";
+    const out = composeClipPlaintext(envelope(), body, "Named Anyway");
+
+    const data = parsedFrontmatter(out);
+    expect(data["title"]).toBe("Named Anyway");
+    expect(data["custom"]).toBe("kept");
+    expect(data["source"]).toBe("https://example.com/article");
+  });
+
+  it("writes an EMPTY title for a page that had none (createNote's house shape)", () => {
+    // Not an omission: every new note is created carrying `title: ""` (myne#653),
+    // and the read boundary normalizes an empty title back to untitled, so the
+    // sidebar still shows the placeholder. Asserted so a future "skip the empty
+    // value" tidy-up has to argue with this line.
+    const out = composeClipPlaintext(envelope(), "# Untitled capture\n\nBody.", "");
+    expect(out).toMatch(/^title: ""$/m);
+    expect(parsedFrontmatter(out)["title"]).toBe("");
+  });
+
+  it("quotes a title that would otherwise re-type (a date-shaped name)", () => {
+    // The managed writer's state matrix quotes a date-/int-/bool-shaped title so
+    // js-yaml cannot re-type it; a clip of a page called `2026-06-07` is exactly
+    // the case `loadNoteBatch` documents.
+    const out = composeClipPlaintext(envelope(), "# 2026-06-07\n\nBody.", "2026-06-07");
+    expect(parsedFrontmatter(out)["title"]).toBe("2026-06-07");
   });
 });
