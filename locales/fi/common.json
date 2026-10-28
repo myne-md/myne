@@ -488,10 +488,7 @@
       "successToast": "Varmuuskopio tarkistettu ja tallennettu.",
       "title": "Varmuuskopioi holvi",
       "verifying": "Tarkistetaan {{done}} / {{total}}…",
-      "drillBody": "Pelkkä varmuuskopio ei palauta sinua sisään, jos menetät salasanasi.",
-      "drillCta": "Tarkista se",
-      "drillOnce": "Näytetään kerran. Kun suljet tämän, se ei tule takaisin.",
-      "drillTitle": "Oletko tarkistanut myös palautuslauseesi?"
+      "phraseNotSubstitute": "Pelkkä varmuuskopio ei palauta sinua sisään, jos menetät salasanasi."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Tämän laitteen näytönkaappausasetusta ei voitu lukea, joten tätä asetusta ei sovelleta. Avaa Asetukset uudelleen ja yritä uudestaan.",
       "screenCaptureSuperseded": "Pois päältä tällä laitteella. Katso alta ”Salli näytönkaappaus tällä laitteella”. Tämä asetus säilytetään ja on taas voimassa, kun poistat tuon asetuksen käytöstä.",
       "screenCaptureSupersededByFlag": "Pois päältä tämän istunnon ajan, koska Myne käynnistettiin valitsimella --disable-screen-capture-protection. Tämä asetus säilytetään ja on taas voimassa, kun avaat Mynen seuraavan kerran ilman sitä.",
-      "recoveryDrillCheck": "Tarkista lause",
-      "recoveryDrillChecking": "Tarkistetaan…",
-      "recoveryDrillError": "Tarkistusta ei juuri nyt voitu suorittaa. Mitään ei muuttunut. Yritä hetken kuluttua uudelleen.",
-      "recoveryDrillHelper": "Kirjoita ne 24 sanaa, jotka kirjoitit muistiin. Myne tarkistaa, avaavatko ne yhä tämän holvin, eikä kerro muuta — sanoja ei näytetä täällä koskaan.",
-      "recoveryDrillLabel": "Tarkista palautuslauseesi",
-      "recoveryDrillPassed": "Nämä sanat avaavat tämän holvin. Säilytä ne siellä, mistä löysit ne.",
-      "recoveryDrillPlaceholder": "24 sanaa järjestyksessä, välilyönneillä erotettuina",
       "hideVaultNamesInline": "Käyttöönotto tuhoaa avaimet, jotka tekevät tänne tallennetuista nimistä luettavia.",
       "topics": {
         "access": "Käyttöoikeus",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Näytönsuojaus",
         "terminal": "Komentorivityökalut",
-        "locking": "Lukitseminen ja avaaminen",
-        "recovery": "Palautus"
+        "locking": "Lukitseminen ja avaaminen"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "päivitys päivitä tarkista päivitykset uusi versio julkaisu lataa",
         "plainFile": "pelkkä tiedosto muokkain markdown paikallinen levy holvin ulkopuolinen selkoteksti avaa paikan päällä",
         "memberPassword": "jaettu holvi salasana jäsen avaa liity lause",
-        "recoveryDrill": "palautuslause tarkista varmista harjoitus testi 24 sanaa siemen varmuuskopio unohtunut salasana",
         "bar": "alapalkki tilarivi ilmaisimet mukauta järjestä piilota näytä työkalurivi",
         "syncDeviceBindings": "laitteet jäsenten ilmoittamat kuka allekirjoitti mikä laite kuuluu",
         "vaultFormat": "holvin muoto päivitä yhden lauseen palautus eläköity holvi palautuslause siirrä identiteetti",

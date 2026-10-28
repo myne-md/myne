@@ -49,7 +49,6 @@ describe("BackupExportModal vault target", () => {
         open
         vaultId="vid-1"
         onClose={() => {}}
-        onOpenDrill={() => {}}
       />,
     );
     await waitFor(() =>
@@ -63,7 +62,6 @@ describe("BackupExportModal vault target", () => {
         open
         vaultId={null}
         onClose={() => {}}
-        onOpenDrill={() => {}}
       />,
     );
     await waitFor(() =>

@@ -49,7 +49,7 @@
 // must DIFFER from the owner's, because `is_self_invite` refuses an invite naming
 // the inviter's own fingerprint, which is why the two constants below are two
 // people rather than one phrase reused. `MEMBER_PHRASE` is the same valid vector
-// `recovery-phrase-check.e2e.ts` carries as `OTHER_PHRASE`, repeated rather than
+// `recovery-drill.e2e.ts` carries as its second phrase, repeated rather than
 // imported so each spec's preconditions read on their own page.
 //
 // # Preconditions

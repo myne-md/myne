@@ -16,7 +16,6 @@ import { WorkspaceProvider } from "@app/notes/workspaceContext";
 import { AboutPanel } from "@app/components/settings/AboutPanel";
 import { DiagnosticsPanel } from "@app/components/settings/DiagnosticsPanel";
 import { BarCustomizeSettings } from "@app/components/settings/BarCustomizeSettings";
-import { RecoveryDrillRow } from "@app/components/settings/RecoveryDrillRow";
 import {
   CUSTOMIZE_LIST_STYLE,
   CustomizeRow,
@@ -1535,17 +1534,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     tags: ["settings", "appearance", "bottom-bar", "customize", "reorder", "show-hide", "commands"],
     fixture: PREFS_FIXTURE,
     render: () => <BarCustomizeSettings />,
-  },
-  {
-    id: "settings/recoverydrillrow/default",
-    group: "settings",
-    surface: "RecoveryDrillRow",
-    state: "default",
-    description:
-      "The recovery-drill row: check that the 24 words you wrote down still open this vault, while it is still open and the phrase can still be exported. It exists because the phrase is never re-displayed after creation and has no rotation.",
-    tags: ["settings", "recovery", "recovery-phrase", "drill", "verification", "backup"],
-    fixture: PREFS_FIXTURE,
-    render: () => <RecoveryDrillRow />,
   },
   {
     id: "settings/customizelist/default",

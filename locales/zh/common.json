@@ -488,10 +488,7 @@
       "successToast": "备份已校验并保存。",
       "title": "备份保险库",
       "verifying": "正在校验第 {{done}} 个，共 {{total}} 个…",
-      "drillBody": "如果丢失密码，仅有备份无法让你重新进入。",
-      "drillCta": "去核对",
-      "drillOnce": "仅显示一次。关闭后将不再出现。",
-      "drillTitle": "你也核对过自己的恢复短语了吗？"
+      "phraseNotSubstitute": "如果丢失密码，仅有备份无法让你重新进入。"
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "无法读取此设备的屏幕捕获设置，因此当前没有应用此偏好设置。请重新打开“设置”再试一次。",
       "screenCaptureSuperseded": "在此设备上已关闭。请参见下方的“允许在此设备上进行屏幕捕获”。此偏好设置会被保留，当你关闭那一项时会再次生效。",
       "screenCaptureSupersededByFlag": "在本次会话中已关闭，因为 Myne 是以 --disable-screen-capture-protection 启动的。此偏好设置会被保留，下次你在不带该参数的情况下打开 Myne 时会再次生效。",
-      "recoveryDrillCheck": "核对短语",
-      "recoveryDrillChecking": "正在核对…",
-      "recoveryDrillError": "暂时无法运行核对。未发生任何改变。请稍后重试。",
-      "recoveryDrillHelper": "输入你写下的那 24 个单词。Myne 会核对它们是否仍能打开此保险库，此外不会告知任何其他信息——这些单词绝不会显示在这里。",
-      "recoveryDrillLabel": "核对你的恢复短语",
-      "recoveryDrillPassed": "这些单词可以打开此保险库。请将它们保存在你找到它们的地方。",
-      "recoveryDrillPlaceholder": "24 个单词，按顺序，以空格分隔",
       "hideVaultNamesInline": "开启它会销毁用于读取本机所存名称的密钥。",
       "topics": {
         "access": "访问",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "屏幕保护",
         "terminal": "命令行工具",
-        "locking": "锁定与解锁",
-        "recovery": "恢复"
+        "locking": "锁定与解锁"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "更新 升级 检查更新 新版本 发布 下载 update upgrade check for updates new version release download",
         "plainFile": "纯文件 编辑器 markdown 本地 磁盘 保险库外 明文 就地打开 plain file editor markdown local disk outside vault plaintext open in place",
         "memberPassword": "共享保险库 密码 成员 解锁 加入 短语 shared vault password member unlock join phrase",
-        "recoveryDrill": "恢复短语 核对 验证 演练 测试 24 个单词 助记词 备份 丢失密码 recovery phrase check verify drill test 24 words seed backup lost password",
         "bar": "底栏 状态栏 指示器 自定义 重新排序 隐藏 显示 工具栏 bottom bar status bar indicators customize reorder hide show toolbar",
         "syncDeviceBindings": "设备 成员声明 归属 谁签名 哪个设备属于 devices claimed by members attribution who signed which device belongs",
         "vaultFormat": "保险库 格式 升级 单短语 恢复 停用 保险库恢复短语 迁移 身份 vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",

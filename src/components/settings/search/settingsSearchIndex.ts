@@ -350,25 +350,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.hideVaultNames",
   },
   {
-    // The recovery drill (myne-md/myne#468). No `capability`: the command is
-    // `myne-core`'s and the web dispatcher routes it, so every client renders
-    // the row. No `developerGated` either — a first-time user is exactly who it
-    // is for, and a control behind Developer mode cannot be found by them.
-    //
-    // Searchable on purpose, and it is the one surface this feature gets:
-    // nothing offers the drill automatically (`RecoveryDrillRow`'s header says
-    // why), so a user who remembers there is a way to check has to be able to
-    // find it by typing "recovery" into Settings.
-    id: "privacy.recovery-drill",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "privacy",
-    topic: "locking",
-    testid: "settings.recovery-drill",
-    titleKey: "settings.privacy.recoveryDrillLabel",
-    descriptionKey: "settings.privacy.recoveryDrillHelper",
-    keywordsKey: "settings.search.keywords.recoveryDrill",
-  },
-  {
     id: "privacy.auto-lock",
     agentWritability: WRITABILITY_CONTROL,
     panelId: "privacy",

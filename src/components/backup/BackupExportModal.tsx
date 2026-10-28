@@ -11,10 +11,11 @@
 //
 // Success is a SCREEN, not a toast (myne-md/myne#468 task 6). The file's
 // existence still means "verified" (SYNC-4), and the screen says so; what it
-// adds is the one-time line this feature is allowed to surface automatically —
-// a backup is not a substitute for the recovery phrase, with a button into the
-// drill. Dismissal persists in `localStorage` (`backup-drill-line.ts`): shown
-// once on this device, then never again.
+// adds is one sentence under the filename, because a backup is not a substitute
+// for the recovery phrase. It carries no control and no dismissal state: the
+// Settings drill and the "Check it" button that used to sit here are withdrawn
+// (`decisions/security/0747`, myne-md/myne#935), and what is left is a fact
+// worth stating on every successful export rather than a nudge to dismiss once.
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
@@ -23,10 +24,6 @@ import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { Spinner } from "../Spinner";
 import { exportFailureMessage } from "../../lib/backup-errors";
-import {
-  hasSeenBackupDrillLine,
-  markBackupDrillLineSeen,
-} from "../../lib/backup-drill-line";
 import {
   backupCancel,
   backupDefaultFilename,
@@ -86,33 +83,16 @@ const SUCCESS_FILE_STYLE: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
-const DRILL_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "flex-start",
-  gap: "var(--space-3)",
+const PHRASE_NOTE_STYLE: CSSProperties = {
   borderTop: "1px solid var(--line-1)",
   paddingTop: "var(--space-3)",
-};
-
-const DRILL_TEXT_STYLE: CSSProperties = {
-  flex: 1,
   color: "var(--fg-2)",
   lineHeight: 1.5,
-};
-
-const DRILL_ONCE_STYLE: CSSProperties = {
-  color: "var(--fg-3)",
-  fontSize: "var(--text-sm)",
-  marginBlockStart: "var(--space-1)",
 };
 
 interface BackupExportModalProps {
   open: boolean;
   onClose: () => void;
-  /** Success → "Check it": close the export surface and land on the recovery
-   *  drill in Settings (myne-md/myne#468). Owned by the parent because opening
-   *  Settings is the Editor's, not this modal's. */
-  onOpenDrill: () => void;
   /**
    * The vault to export. `null` while the active id is still resolving. The
    * command takes `vault_id` as a REQUIRED string, so a null target renders an
@@ -125,7 +105,6 @@ interface BackupExportModalProps {
 export function BackupExportModal({
   open,
   onClose,
-  onOpenDrill,
   vaultId,
 }: BackupExportModalProps) {
   const { t } = useTranslation();
@@ -133,15 +112,9 @@ export function BackupExportModal({
     step: "running",
     progress: null,
   });
-  // Read once per mount: nothing else in the session writes this key. If the
-  // user retires the line while this modal is open, the local state below is
-  // what hides it, so the stored value need not be re-read.
-  const [drillSeen, setDrillSeen] = useState(hasSeenBackupDrillLine);
   // The parent passes inline closures (unstable identities); routing them
   // through a ref keeps the effect keyed on `open` alone — a parent re-render
-  // mid-export must not tear down the progress subscription. `onOpenDrill` is
-  // only read from the render, where the prop is always current, so it needs no
-  // ref.
+  // mid-export must not tear down the progress subscription.
   const callbacksRef = useRef({ onClose, vaultId });
   callbacksRef.current = { onClose, vaultId };
   // Once-per-open guard for the native save dialog: under StrictMode the
@@ -223,19 +196,8 @@ export function BackupExportModal({
     };
   }, [open]);
 
-  // Retire the line for good. Called from every acknowledgement of the success
-  // screen — Done, Esc, the backdrop, and the drill button itself: acting on the
-  // line is the strongest acknowledgement there is.
-  const retireDrillLine = () => {
-    markBackupDrillLineSeen();
-    setDrillSeen(true);
-  };
-
-  // The one close path for the terminal states. Closing a SUCCESS screen is an
-  // acknowledgement, so it retires the line; closing an ERROR screen is not, so
-  // it leaves it alone (the line belongs to a completed backup).
+  // The one close path for the terminal states.
   const handleDismiss = () => {
-    if (state.step === "success" && !drillSeen) retireDrillLine();
     onClose();
   };
 
@@ -294,27 +256,9 @@ export function BackupExportModal({
               </div>
               <div style={SUCCESS_FILE_STYLE}>{state.filename}</div>
             </div>
-            {!drillSeen && (
-              <div style={DRILL_ROW_STYLE} data-testid="backup-export.drill-line">
-                <div style={DRILL_TEXT_STYLE}>
-                  <b>{t("backup.export.drillTitle")}</b>
-                  <div>{t("backup.export.drillBody")}</div>
-                  <div style={DRILL_ONCE_STYLE}>
-                    {t("backup.export.drillOnce")}
-                  </div>
-                </div>
-                <Button
-                  variant="secondary"
-                  onClick={() => {
-                    retireDrillLine();
-                    onOpenDrill();
-                  }}
-                  data-testid="backup-export.drill-test"
-                >
-                  {t("backup.export.drillCta")}
-                </Button>
-              </div>
-            )}
+            <div style={PHRASE_NOTE_STYLE} data-testid="backup-export.phrase-note">
+              {t("backup.export.phraseNotSubstitute")}
+            </div>
           </div>
           <div style={FOOTER_STYLE}>
             <Button

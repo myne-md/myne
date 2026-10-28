@@ -8,8 +8,7 @@
 # `allow-recover-with-phrase`. Task 6 adds `allow-complete-recovery`.
 # MYND-206 adds `allow-resolve-vault-by-account-number` (the optional
 # multi-vault recovery selector — header-only read, no decrypt, no
-# auth_permits). myne-md/myne#468 adds `allow-verify-recovery-phrase`
-# (the read-only recovery drill).
+# auth_permits).
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
@@ -19,7 +18,6 @@ permissions = [
     "allow-recover-with-phrase",
     "allow-complete-recovery",
     "allow-resolve-vault-by-account-number",
-    "allow-verify-recovery-phrase",
 ]
 
 [[permission]]
@@ -31,11 +29,6 @@ commands.allow = ["recover_with_phrase"]
 identifier = "allow-complete-recovery"
 description = "Allow invoking vault_recover:complete_recovery (commit a new master password after a successful recovery; rewrites vault.meta password-side, preserves recovery-side, promotes Slot::Recovering → Slot::Unlocked)."
 commands.allow = ["complete_recovery"]
-
-[[permission]]
-identifier = "allow-verify-recovery-phrase"
-description = "Allow invoking vault_recover:verify_recovery_phrase (the recovery DRILL, myne-md/myne#468: derives the recovery wrap-key on an ALREADY-UNLOCKED vault, attempts the AEAD-open of enc_root_key_recovery, discards the result and returns a bool. No slot transition, no write, rides the shared auth_permits budget. Unlock-gated, which is what bounds the verification oracle, since a caller who has an unlocked vault already has the plaintext)."
-commands.allow = ["verify_recovery_phrase"]
 
 [[permission]]
 identifier = "allow-resolve-vault-by-account-number"

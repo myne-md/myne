@@ -488,10 +488,7 @@
       "successToast": "A biztonsági mentés ellenőrizve és elmentve.",
       "title": "Széf biztonsági mentése",
       "verifying": "Ellenőrzés: {{done}} / {{total}}…",
-      "drillBody": "A biztonsági mentés önmagában nem enged vissza, ha elveszíted a jelszavadat.",
-      "drillCta": "Ellenőrizd",
-      "drillOnce": "Egyszer jelenik meg. Miután bezárod, nem tér vissza.",
-      "drillTitle": "A helyreállító mondatodat is ellenőrizted már?"
+      "phraseNotSubstitute": "A biztonsági mentés önmagában nem enged vissza, ha elveszíted a jelszavadat."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Ennek az eszköznek a képernyőfelvétel-beállítását nem sikerült beolvasni, ezért ez a beállítás nincs érvényben. Nyisd meg újra a Beállításokat az újrapróbálkozáshoz.",
       "screenCaptureSuperseded": "Ezen az eszközön ki van kapcsolva. Lásd lent: „Képernyőfelvétel engedélyezése ezen az eszközön”. Ez a beállítás megmarad, és újra érvénybe lép, ha azt kikapcsolod.",
       "screenCaptureSupersededByFlag": "Ebben a munkamenetben ki van kapcsolva, mert a Myne a --disable-screen-capture-protection kapcsolóval indult. Ez a beállítás megmarad, és legközelebb újra érvénybe lép, amikor a Myne-t enélkül nyitod meg.",
-      "recoveryDrillCheck": "Mondat ellenőrzése",
-      "recoveryDrillChecking": "Ellenőrzés…",
-      "recoveryDrillError": "Most nem sikerült lefuttatni az ellenőrzést. Semmi sem változott. Próbáld újra egy pillanat múlva.",
-      "recoveryDrillHelper": "Írd be a leírt 24 szót. A Myne ellenőrzi, hogy még mindig megnyitják-e ezt a széfet, és semmi mást nem árul el — a szavak itt soha nem jelennek meg.",
-      "recoveryDrillLabel": "Helyreállító mondatod ellenőrzése",
-      "recoveryDrillPassed": "Ezek a szavak megnyitják ezt a széfet. Tartsd ott, ahol találtad őket.",
-      "recoveryDrillPlaceholder": "A 24 szó, sorrendben, szóközzel elválasztva",
       "hideVaultNamesInline": "A bekapcsolása megsemmisíti azokat a kulcsokat, amelyekkel az itt tárolt nevek olvashatók.",
       "topics": {
         "access": "Hozzáférés",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Képernyővédelem",
         "terminal": "Parancssori eszközök",
-        "locking": "Zárolás és feloldás",
-        "recovery": "Helyreállítás"
+        "locking": "Zárolás és feloldás"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "frissítés, frissítés keresése, új verzió, kiadás, letöltés",
         "plainFile": "helyi fájl, szerkesztő, markdown, lemez, széfen kívül, nyílt szöveg, helyben megnyitás",
         "memberPassword": "megosztott széf, jelszó, tag, feloldás, csatlakozás, mondat",
-        "recoveryDrill": "helyreállító mondat, ellenőrzés, gyakorlat, teszt, 24 szó, seed, biztonsági mentés, elveszett jelszó",
         "bar": "alsó sáv, állapotsáv, jelzők, testreszabás, átrendezés, elrejtés, megjelenítés, eszköztár",
         "syncDeviceBindings": "eszközök, tagok által igényelt, hozzárendelés, ki írta alá, melyik eszköz tartozik kihez",
         "vaultFormat": "széf formátum frissítés egy kifejezés helyreállítás nyugdíjazás széf helyreállító kifejezés migráció identitás",

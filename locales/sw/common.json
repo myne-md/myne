@@ -488,10 +488,7 @@
       "successToast": "Hifadhi rudufu imethibitishwa na kuhifadhiwa.",
       "title": "Hifadhi rudufu ya kasha",
       "verifying": "Inathibitisha {{done}} kati ya {{total}}…",
-      "drillBody": "Hifadhi rudufu peke yake haitakuwezesha kurudi ndani ukisahau nenosiri lako.",
-      "drillCta": "Ikague",
-      "drillOnce": "Inaonyeshwa mara moja. Ukiifunga hii, haitarudi tena.",
-      "drillTitle": "Je, umekagua kifungu chako cha urejeshaji pia?"
+      "phraseNotSubstitute": "Hifadhi rudufu peke yake haitakuwezesha kurudi ndani ukisahau nenosiri lako."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Mpangilio wa kunasa skrini wa kifaa hiki haukuweza kusomwa, hivyo mapendeleo haya hayatumiki. Fungua Mipangilio tena ili kujaribu upya.",
       "screenCaptureSuperseded": "Umezimwa kwenye kifaa hiki. Angalia “Ruhusu kunasa skrini kwenye kifaa hiki” hapa chini. Mapendeleo haya yamehifadhiwa na yatatumika tena utakapozima chaguo hilo.",
       "screenCaptureSupersededByFlag": "Umezimwa kwa kipindi hiki, kwa sababu Myne ilianzishwa kwa --disable-screen-capture-protection. Mapendeleo haya yamehifadhiwa na yatatumika tena utakapofungua Myne bila hiyo.",
-      "recoveryDrillCheck": "Kagua kifungu",
-      "recoveryDrillChecking": "Inakagua…",
-      "recoveryDrillError": "Imeshindwa kufanya ukaguzi kwa sasa. Hakuna kilichobadilika. Jaribu tena baada ya muda mfupi.",
-      "recoveryDrillHelper": "Andika maneno 24 uliyoyaandika. Myne hukagua kama bado yanafungua kasha hili na hakukuelezi kingine — maneno hayaonyeshwi hapa kamwe.",
-      "recoveryDrillLabel": "Kagua kifungu chako cha urejeshaji",
-      "recoveryDrillPassed": "Maneno haya hufungua kasha hili. Yaweke pale ulipoyapata.",
-      "recoveryDrillPlaceholder": "Maneno 24, kwa mpangilio, yakitenganishwa kwa nafasi",
       "hideVaultNamesInline": "Kuliwasha huharibu funguo zinazofanya majina yaliyohifadhiwa hapa yasomeke.",
       "topics": {
         "access": "Ufikiaji",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Ulinzi wa skrini",
         "terminal": "Zana za mstari wa amri",
-        "locking": "Kufunga na kufungua",
-        "recovery": "Urejeshaji"
+        "locking": "Kufunga na kufungua"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "sasisha sasisho kagua masasisho toleo jipya toleo pakua",
         "plainFile": "faili wazi kihariri markdown diski ya ndani nje ya kasha maandishi wazi fungua mahali yalipo",
         "memberPassword": "kasha linaloshirikiwa nenosiri mwanachama fungua jiunge kifungu",
-        "recoveryDrill": "kifungu cha urejeshaji kagua thibitisha zoezi jaribio maneno 24 mbegu hifadhi rudufu nenosiri lililopotea",
         "bar": "upau wa chini upau wa hali viashiria boreka panga upya ficha onyesha upau wa zana",
         "syncDeviceBindings": "vifaa vinavyodaiwa na wanachama uhusiano nani alisaini kifaa kipi ni cha nani",
         "vaultFormat": "muundo wa kasha upgradu kurejesha kifungu kimoja staafu kasha kifungu cha kurejesha hamisha utambulisho",

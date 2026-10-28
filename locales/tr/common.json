@@ -488,10 +488,7 @@
       "successToast": "Yedekleme doğrulandı ve kaydedildi.",
       "title": "Kasayı yedekle",
       "verifying": "{{total}} / {{done}} doğrulanıyor…",
-      "drillBody": "Yalnızca bir yedek, parolanızı kaybederseniz sizi geri getirmez.",
-      "drillCta": "Kontrol edin",
-      "drillOnce": "Bir kez gösterilir. Bunu kapattıktan sonra bir daha gelmez.",
-      "drillTitle": "Kurtarma ifadenizi de kontrol ettiniz mi?"
+      "phraseNotSubstitute": "Yalnızca bir yedek, parolanızı kaybederseniz sizi geri getirmez."
     }
   },
   "clipper": {
@@ -3943,13 +3940,6 @@
       "screenCaptureOverrideUnknown": "Bu cihazın ekran yakalama ayarı okunamadı, bu yüzden bu tercih uygulanmıyor. Tekrar denemek için Ayarlar’ı yeniden açın.",
       "screenCaptureSuperseded": "Bu cihazda kapalı. Aşağıdaki “Bu cihazda ekran yakalamaya izin ver” ayarına bakın. Bu tercih korunur ve o ayarı kapattığınızda yeniden geçerli olur.",
       "screenCaptureSupersededByFlag": "Bu oturum için kapalı, çünkü Myne --disable-screen-capture-protection ile başlatıldı. Bu tercih korunur ve Myne’i bu seçenek olmadan bir dahaki açışınızda yeniden geçerli olur.",
-      "recoveryDrillCheck": "İfadeyi kontrol et",
-      "recoveryDrillChecking": "Kontrol ediliyor…",
-      "recoveryDrillError": "Kontrol şu anda çalıştırılamadı. Hiçbir şey değişmedi. Birazdan tekrar deneyin.",
-      "recoveryDrillHelper": "Yazdığınız 24 sözcüğü yazın. Myne bunların bu kasayı hâlâ açıp açmadığını kontrol eder ve başka hiçbir şey söylemez; sözcükler burada asla gösterilmez.",
-      "recoveryDrillLabel": "Kurtarma ifadenizi kontrol edin",
-      "recoveryDrillPassed": "Bu sözcükler bu kasayı açıyor. Onları bulduğunuz yerde saklayın.",
-      "recoveryDrillPlaceholder": "24 sözcük, sırayla, boşluklarla ayrılmış",
       "hideVaultNamesInline": "Bunu açmak, burada saklanan adları okunabilir kılan anahtarları yok eder.",
       "topics": {
         "access": "Erişim",
@@ -3958,8 +3948,7 @@
       "sections": {
         "screen": "Ekran koruması",
         "terminal": "Komut satırı araçları",
-        "locking": "Kilitleme ve kilit açma",
-        "recovery": "Kurtarma"
+        "locking": "Kilitleme ve kilit açma"
       }
     },
     "quickUnlock": {
@@ -4251,7 +4240,6 @@
         "update": "güncelle güncelleme yükselt kontrol yeni sürüm yayın indir update",
         "plainFile": "düz dosya düzenleyici markdown yerel disk kasa dışı düz metin yerinde aç plain file",
         "memberPassword": "paylaşılan kasa parola üye kilit aç katıl ifade member password",
-        "recoveryDrill": "kurtarma ifadesi kontrol doğrula tatbikat test 24 sözcük tohum yedek kayıp parola recovery phrase",
         "bar": "alt çubuk durum çubuğu göstergeler özelleştir yeniden sırala gizle göster araç çubuğu bottom bar",
         "syncDeviceBindings": "cihazlar üyeler tarafından sahiplenilen atıf kim imzaladı hangi cihaz ait device bindings",
         "vaultFormat": "kasa biçimi yükselt tek ifade kurtarma kasa kurtarma ifadesini emekli et taşı kimlik",

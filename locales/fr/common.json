@@ -530,10 +530,7 @@
       "successToast": "Sauvegarde vérifiée et enregistrée.",
       "title": "Sauvegarder le coffre-fort",
       "verifying": "Vérification de {{done}} sur {{total}}…",
-      "drillBody": "Une sauvegarde seule ne vous redonnera pas accès si vous perdez votre mot de passe.",
-      "drillCta": "Vérifiez-la",
-      "drillOnce": "Affiché une seule fois. Une fois ceci fermé, il ne réapparaîtra plus.",
-      "drillTitle": "Avez-vous aussi vérifié votre phrase de récupération ?"
+      "phraseNotSubstitute": "Une sauvegarde seule ne vous redonnera pas accès si vous perdez votre mot de passe."
     }
   },
   "clipper": {
@@ -4104,13 +4101,6 @@
       "screenCaptureOverrideUnknown": "Le réglage de capture d'écran de cet appareil n'a pas pu être lu, cette préférence n'est donc pas appliquée. Rouvrez les Paramètres pour réessayer.",
       "screenCaptureSuperseded": "Désactivée sur cet appareil. Voir « Autoriser la capture d'écran sur cet appareil » ci-dessous. Cette préférence est conservée et s'applique de nouveau lorsque vous désactivez cette autorisation.",
       "screenCaptureSupersededByFlag": "Désactivée pour cette session, car Myne a été démarré avec --disable-screen-capture-protection. Cette préférence est conservée et s'applique de nouveau la prochaine fois que vous ouvrirez Myne sans cette option.",
-      "recoveryDrillCheck": "Vérifier la phrase",
-      "recoveryDrillChecking": "Vérification…",
-      "recoveryDrillError": "Impossible d'effectuer la vérification pour l'instant. Rien n'a changé. Réessayez dans un instant.",
-      "recoveryDrillHelper": "Saisissez les 24 mots que vous avez notés. Myne vérifie s'ils ouvrent toujours ce coffre et ne vous dit rien d'autre — les mots ne sont jamais affichés ici.",
-      "recoveryDrillLabel": "Vérifier votre phrase de récupération",
-      "recoveryDrillPassed": "Ces mots ouvrent ce coffre. Conservez-les là où vous les avez trouvés.",
-      "recoveryDrillPlaceholder": "Les 24 mots, dans l'ordre, séparés par des espaces",
       "hideVaultNamesInline": "L'activer détruit les clés qui rendent lisibles les noms enregistrés ici.",
       "topics": {
         "access": "Accès",
@@ -4119,8 +4109,7 @@
       "sections": {
         "screen": "Protection de l'écran",
         "terminal": "Outils en ligne de commande",
-        "locking": "Verrouillage et déverrouillage",
-        "recovery": "Récupération"
+        "locking": "Verrouillage et déverrouillage"
       }
     },
     "quickUnlock": {
@@ -4416,7 +4405,6 @@
         "update": "mise à jour mise à niveau rechercher des mises à jour nouvelle version publication télécharger",
         "plainFile": "fichier brut éditeur markdown disque local hors coffre en clair ouvrir sur place",
         "memberPassword": "coffre partagé mot de passe membre déverrouiller rejoindre phrase",
-        "recoveryDrill": "phrase de récupération vérifier contrôle exercice test 24 mots graine sauvegarde mot de passe perdu",
         "bar": "barre inférieure barre d'état indicateurs personnaliser réorganiser masquer afficher barre d'outils",
         "syncDeviceBindings": "appareils revendiqués par les membres attribution qui a signé quel appareil appartient",
         "vaultFormat": "format de coffre mise à niveau récupération en une phrase retraite coffre phrase de récupération migrer identité",

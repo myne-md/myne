@@ -48,39 +48,6 @@ export const REMOVE_DEVICE_DISCLOSURE =
 export const SYNC_INTEGRITY_ALERT =
   "Possible sync integrity problem: the server may have sent out-of-date or altered sync data, which Myne did not accept. Your local notes are safe. If this keeps happening, verify your devices.";
 
-// The recovery DRILL's failure sentence (myne-md/myne#468). Here rather than
-// hand-copied into each client's `load-bearing-copy.ts`, because BOTH clients
-// render it and myne-md/myne#474 is the precedent: six literals lived as
-// byte-identical hand copies in two files, "kept identical by hand", which is
-// exactly the distinction SYNC-42 exists to make.
-
-/**
- * Shape 1 twice over: a non-distinguishing collapse that explains its own
- * refusal.
- *
- * **What it must not distinguish.** A wrong phrase, ANOTHER vault's phrase and
- * structurally invalid input all reach this one line, because the backend
- * answers all three with `false` — `recovery-flow.md` §3.4's non-distinguishing
- * tag is what is being checked and it does not tell them apart. So the message
- * cannot either.
- *
- * **Why it says WHY.** The tempting improvement is to name the position that did
- * not match, which is the standard affordance for a multi-field form and here is
- * a vulnerability: it turns one whole-phrase check into twenty-four independent
- * one-word checks, so anyone holding a nearly correct phrase — a photograph of
- * part of a page, a partially remembered set — can complete it by iteration.
- * Saying so out loud is the only thing that stops a later reviewer reading the
- * absence as an oversight and "fixing" it.
- *
- * Rendered verbatim in every locale and pinned by FULL-literal equality rather
- * than a substring, which would pass an edit that appended the missing word.
- * Changing it is a `design-notes.md` event, never a copy edit.
- */
-export const RECOVERY_DRILL_FAILED_SENTENCE =
-  "These words do not open this vault. Myne cannot tell you which word is wrong: " +
-  "saying so would let anyone with a nearly-correct phrase find the rest one word " +
-  "at a time. Check the whole thing against what you wrote down, including the order.";
-
 // Device-enrollment copy (MYND-425 task 5). The add-device flow proves account
 // ownership with {account# + password OR 24-word phrase}; a wrong credential and
 // a wrong account number both fail at the same AEAD-open step, so the failure copy

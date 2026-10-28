@@ -89,14 +89,6 @@ function mapPasswordError(e: VaultRecoveryError): PasswordOutcome {
       // exhaustiveness check forces a mapping. Stage-transition
       // bug-canary.
       return { kind: "fail-closed", reason: "invalid-state" };
-    case "SlotNotUnlocked":
-      // Unreachable from A8f, and mapped rather than ignored because the
-      // exhaustiveness check is what makes that claim checkable. The variant
-      // belongs to the recovery DRILL (myne-md/myne#468), which runs from
-      // Settings on an OPEN vault — the opposite precondition to this screen's.
-      // Reaching it here would mean the two flows had been crossed, which is a
-      // routing bug rather than anything a user can act on.
-      return { kind: "fail-closed", reason: "invalid-state" };
     case "RecoveryAlreadyInProgress":
       // Defensive — A8f's slot peek expects `Recovering`, so this
       // would only fire on a race where slot transitioned between
