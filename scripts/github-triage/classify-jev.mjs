@@ -29,7 +29,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { buildRequest, THRESHOLDS, areaQuestionId, templateSectionQuestionId } from './jev-questions.mjs';
+import { buildRequest, THRESHOLDS, areaQuestionId, templateSectionQuestionId, relatedQuestionId } from './jev-questions.mjs';
 import { renderComment } from './render-comment.mjs';
 
 const __dirname = dirname(new URL(import.meta.url).pathname);
@@ -109,13 +109,17 @@ function topLevel(answer, levelCount) {
 
 function noulOf(answers, id) {
   const a = answers[id];
-  if (!a || typeof a.noul !== 'number') return null;
-  return a.noul;
+  if (!a || a.type !== 'noul' || typeof a.noul !== 'number') return null;
+  const v = a.noul;
+  if (!Number.isFinite(v) || v < 0 || v > 1) return null;
+  return v;
 }
 
 // --- request -----------------------------------------------------------------
 
-export async function askJev(body) {
+export async function askJev(body, apiKey) {
+  const key = (apiKey && String(apiKey).trim()) || process.env.OPENROUTER_API_KEY || '';
+  if (!key) throw new Error('FATAL: set OPENROUTER_API_KEY (Jev is reached through OpenRouter)');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   let res;
@@ -123,7 +127,7 @@ export async function askJev(body) {
     res = await fetch(URL_, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${KEY}`,
+        'Authorization': `Bearer ${key}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://github.com/myne-md/myne',
         'X-Title': 'myne-bot issue triage',
@@ -205,9 +209,11 @@ export function buildVerdict(packet, request, jev) {
   const duplicate = {
     is_duplicate: isDuplicate,
     of_issue: isDuplicate ? best.c.number : null,
-    // The noul IS a calibrated probability, so this is the number the 0.85 threshold means. Rounded
-    // to two places because it is logged and compared, and a 17-digit float is noise in both.
-    confidence: Number(bestP.toFixed(2)),
+    // Preserve the RAW validated probability here. The 0.85 duplicate-autoclose threshold is
+    // applied to this value by render-comment.mjs and apply-verdict.mjs, so rounding before that
+    // comparison is exactly the defect that turns 0.849 into an auto-close. Display rounding
+    // happens only at render time (toFixed(2) in render-comment and the run log).
+    confidence: bestP,
     // Copied from the corpus entry rather than inferred, so the comment can name the release a fix
     // shipped in without the model having to produce a version string.
     ...(isDuplicate ? {
@@ -217,18 +223,22 @@ export function buildVerdict(packet, request, jev) {
     } : {}),
   };
 
-  // relationships: the candidates that are related but not duplicates fall out of the same
-  // probabilities the duplicate block already read, so they cost no extra tokens and no extra
-  // question. `sub_issue_of` is not inferred: parenting live work to a tracked issue is a judgement
-  // about intent, and an empty array is the correct answer far more often than not.
-  const relationships = dupScored
-    .filter((d) => d.p >= THRESHOLDS.relatesFloor && d.p < 0.5 && d.c.state !== 'closed')
+  // relationships: explicit relatedness questions, independent of duplicate. A candidate is related
+  // when its relatedness probability clears the floor, and it is not already a duplicate candidate.
+  // Closed entries are legitimate targets. `sub_issue_of` is not inferred.
+  const relScored = shortlist
+    .map((c, i) => ({ c, p: noulOf(answers, relatedQuestionId(i)) }))
+    .filter((d) => d.p !== null)
+    .sort((a, b) => b.p - a.p);
+  const dupCandidateKeys = new Set(dupScored.filter((d) => d.p >= 0.5).map((d) => `${d.c.repo}#${d.c.number}`));
+  const relationships = relScored
+    .filter((d) => d.p >= THRESHOLDS.relatesFloor && !dupCandidateKeys.has(`${d.c.repo}#${d.c.number}`))
     .slice(0, 3)
     .map((d) => ({
       type: 'relates_to',
       repo: d.c.repo,
       issue: d.c.number,
-      reason: `Overlapping subject matter (${d.p.toFixed(2)}), not the same problem.`,
+      reason: `Related subject matter (${d.p.toFixed(2)}), not the same problem.`,
     }));
 
   // template conformance
@@ -240,12 +250,14 @@ export function buildVerdict(packet, request, jev) {
     if (hit) templateUsed = hit.id;
   }
   const missingFields = [];
-  for (const t of templates) {
-    if (!t.required_sections || !t.required_sections.length) continue;
-    if (templateUsed && t.id !== templateUsed) continue;
-    for (const section of t.required_sections) {
-      const p = noulOf(answers, templateSectionQuestionId(t.filename || t.id, section));
-      if (p !== null && p >= THRESHOLDS.area) missingFields.push(section);
+  if (templateUsed) {
+    for (const t of templates) {
+      if (!t.required_sections || !t.required_sections.length) continue;
+      if (t.id !== templateUsed) continue;
+      for (const section of t.required_sections) {
+        const p = noulOf(answers, templateSectionQuestionId(t.filename || t.id, section));
+        if (p !== null && p >= THRESHOLDS.area) missingFields.push(section);
+      }
     }
   }
   const needsMoreInfoRaw = noulOf(answers, 'needs_more_info');
@@ -323,7 +335,7 @@ function confidenceOverall(answers, targetAnswer, typeAnswer) {
 // --- main --------------------------------------------------------------------
 
 async function main() {
-  if (!KEY) {
+  if (!(process.env.OPENROUTER_API_KEY || '').trim()) {
     console.error('FATAL: set OPENROUTER_API_KEY (Jev is reached through OpenRouter)');
     process.exit(1);
   }

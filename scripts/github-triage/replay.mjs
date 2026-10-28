@@ -28,6 +28,7 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
 import { buildRequest } from './jev-questions.mjs';
+import { extractTemplates } from './parse-templates.mjs';
 import { buildVerdict, askJev } from './classify-jev.mjs';
 
 const __dirname = dirname(new URL(import.meta.url).pathname);
@@ -42,6 +43,11 @@ function arg(name, fallback = null) {
 const KEY = process.env.OPENROUTER_API_KEY || '';
 const DRY = process.argv.includes('--dry-run');
 const WITH_LLM = process.argv.includes('--with-llm');
+const TEMPLATES_SNAPSHOT = (function () {
+  const i = process.argv.indexOf('--templates-snapshot');
+  if (i !== -1) return process.argv[i + 1];
+  return process.env.TRIAGE_TEMPLATES_SNAPSHOT || '';
+})();
 
 // Ground truth comes from the labels a human left. `status: triage` is EXCLUDED on purpose: the bot
 // writes that one, so counting it as agreement would measure the bot against itself. What is left is
@@ -68,14 +74,30 @@ async function gh(path) {
 // A packet shaped exactly like build-packet's, assembled from a single issue rather than from a
 // webhook event. The fields that build-packet derives from the EVENT (node ids, existing labels)
 // are carried in `meta`, which the classifier never reads, so they are stubbed here.
+
+async function ghText(path) {
+  const res = await fetch(`https://api.github.com${path}`, {
+    headers: {
+      Accept: 'application/vnd.github.raw',
+      'User-Agent': 'myne-bot-replay',
+      'X-GitHub-Api-Version': '2022-11-28',
+      ...(process.env.MYNE_BOT_PAT || process.env.GH_TOKEN
+        ? { Authorization: `Bearer ${process.env.MYNE_BOT_PAT || process.env.GH_TOKEN}` }
+        : {}),
+    },
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status} ${path}`);
+  return res.text();
+}
+
 async function packetFor(number) {
   const issue = await gh(`/repos/${OWNER}/${REPO}/issues/${number}`);
   if (issue.pull_request) throw new Error(`#${number} is a PR`);
 
-  const [labels, milestones, templates, corpus] = await Promise.all([
+  const [labels, milestones, templateEntries, corpus] = await Promise.all([
     gh(`/repos/${OWNER}/${REPO}/labels?per_page=100`).catch(() => []),
     gh(`/repos/${OWNER}/${REPO}/milestones?state=open&per_page=100`).catch(() => []),
-    gh(`/repos/${OWNER}/${REPO}/contents/.github/ISSUE_TEMPLATE`).catch(() => []),
+    TEMPLATES_SNAPSHOT ? Promise.resolve([]) : gh(`/repos/${OWNER}/${REPO}/contents/.github/ISSUE_TEMPLATE`).catch(() => []),
     gh(`/search/issues?q=${encodeURIComponent(`org:${OWNER} is:issue`)}&per_page=60&sort=updated&order=desc`)
       .then((r) => (r && r.items) || []).catch(() => []),
   ]);
@@ -101,8 +123,26 @@ async function packetFor(number) {
     if (dedup.length >= 140) break;
   }
 
-  const tplNames = (Array.isArray(templates) ? templates : [])
-    .filter((x) => x && x.name && /\.ya?ml$/i.test(x.name) && x.name.toLowerCase() !== 'config.yml');
+  // Fetch template bodies and parse them with the shared extractor, so replay uses the same
+  // real template names/descriptions/required fields as production.
+  let tplParsed = [];
+  if (Array.isArray(templateEntries)) {
+    const entries = [];
+    for (const te of templateEntries) {
+      if (!te || !te.name || te.type === 'dir') continue;
+      if (!/\.(md|ya?ml)$/i.test(te.name) || String(te.name).toLowerCase() === 'config.yml') continue;
+      let body = '';
+      try { body = await ghText(`/repos/${OWNER}/${REPO}/contents/${te.path}`); } catch { body = ''; }
+      entries.push({ name: te.name, type: te.type || 'file', body });
+    }
+    tplParsed = extractTemplates(entries, REPO);
+  }
+
+  if (TEMPLATES_SNAPSHOT) {
+    const raw = JSON.parse(readFileSync(TEMPLATES_SNAPSHOT, 'utf8'));
+    const entries = raw.map((x) => ({ name: x.metadata ? x.metadata.name : x.name, type: x.metadata ? x.metadata.type : (x.type || 'file'), body: x.body ?? x.text ?? '' }));
+    tplParsed = extractTemplates(entries, REPO);
+  }
 
   return {
     packet: {
@@ -135,7 +175,7 @@ async function packetFor(number) {
         { name: 'agent-tooling', about: 'internal agents/skills (private)', private: true },
         { name: 'operations', about: 'internal ops/infra (private)', private: true },
       ],
-      templates: tplNames.map((t) => ({ repo: REPO, filename: t.name, name: t.name, about: '', required_sections: [] })),
+      templates: tplParsed.length ? tplParsed : [],
     },
     meta: {
       owner: OWNER, repo: REPO, issueNumber: number,
