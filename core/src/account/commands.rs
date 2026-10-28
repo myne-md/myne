@@ -2,10 +2,18 @@
 //! The account-record command surface (the account/vault split,
 //! `decisions.md` 2026-09-07).
 //!
-//! Commands over [`super::store`]: list the account grouping, move a vault
-//! between accounts, and split a vault into a new account. All are reachable
-//! **pre-unlock** (the picker is the surface they govern), and none touches vault
-//! content.
+//! Commands over [`super::store`]: ONE, `account_list`, which reads the device's
+//! grouping. It is reachable **pre-unlock** (the picker is the surface it
+//! governs), and it touches no vault content.
+//!
+//! **Read-only by construction since myne-md/myne#937.** The two mutations this
+//! module used to carry (`account_move`, `account_split`) were the only code that
+//! could ever create a SECOND account: `split_vault_at` pushed the sole new
+//! `Account`, and `move_vault_at`'s destination could only exist because a split
+//! had run first. Multi-account support does not exist anywhere else in the
+//! product, so both commands were the UI for a state nothing else produces, and
+//! they are gone. A device therefore has at most one account on every path, and
+//! the record is what the disk-scan rebuilds, and nothing here needs to write it.
 //!
 //! There is no rename: an account has no name (`docs/decisions/ui/0728`), and the
 //! heading a client draws for a group comes from that group's own vault names.
@@ -19,11 +27,8 @@
 //! that could be logged, quoted in an error, or written in the clear.
 
 use crate::account::error::AccountError;
-use crate::account::store::{
-    hex, hide_names_on, load_account, load_account_tracked, write_account, Account, ACCOUNT_ID_LEN,
-};
+use crate::account::store::{hex, hide_names_on, load_account, Account};
 use crate::io_failure_kind::IoFailureKind;
-use crate::vault_id::VaultId;
 use crate::vault_io::VaultIo;
 use crate::vault_label::key::LabelKeychain;
 use serde::Serialize;
@@ -61,26 +66,16 @@ pub enum AccountCommandError {
     /// grouping. Vaults keep working standalone.
     #[error("device keychain unavailable")]
     KeychainUnavailable,
-    /// The named vault is not a member of any account (or does not exist).
-    #[error("vault not found in any account")]
-    VaultNotFound,
     /// Opaque backend failure.
     #[error("account record backend failure")]
     Backend,
-    /// Account grouping is suppressed while hide-vault-names is on.
-    #[error("account actions unavailable while vault names are hidden")]
-    Hidden,
-    /// The on-disk record is undecryptable, so persisting a rebuild would
-    /// destroy bytes a restored key could still open. The mutation is
-    /// refused; the caller keeps the in-memory view.
-    #[error("account record unreadable, refusing to overwrite")]
-    RecordUnreadable,
-    /// No vault is unlocked. Move and split are refused on a locked device: a
-    /// locked-screen observer may read the grouping but must not persist a
-    /// regrouping without any vault password (myne-md/myne#684 land gate).
-    #[error("account mutations require an unlocked vault")]
-    Locked,
 }
+// There is deliberately no `Hidden` variant. Account grouping IS suppressed on a
+// hide-vault-names device, but the one remaining command answers an EMPTY LIST
+// rather than an error, because no accounts already means standalone rows and
+// there is nothing for a caller to handle. `AccountError::Hidden` still exists
+// one layer down, where `ensure_vault_membership` refuses to mint the grouping a
+// hide just erased.
 
 impl From<AccountError> for AccountCommandError {
     fn from(e: AccountError) -> Self {
@@ -89,8 +84,6 @@ impl From<AccountError> for AccountCommandError {
             AccountError::Io(kind) => AccountCommandError::Io {
                 io_error_kind: kind,
             },
-            AccountError::Hidden => AccountCommandError::Hidden,
-            AccountError::RecordUnreadable => AccountCommandError::RecordUnreadable,
             _ => AccountCommandError::Backend,
         }
     }
@@ -115,99 +108,6 @@ pub async fn list_accounts_at(
     Ok(record.accounts.iter().map(AccountView::from).collect())
 }
 
-/// Move `vault_id` into the account owning `target_vault_id`. Both must be
-/// members of some account; the source account is pruned if it becomes empty.
-///
-/// Rejected while hide-vault-names is on, like the other mutations.
-pub async fn move_vault_at(
-    io: &dyn VaultIo,
-    config_dir: &Path,
-    base: &Path,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-    target_vault_id: VaultId,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    if hide_names_on(io, config_dir).await {
-        return Err(AccountCommandError::Hidden);
-    }
-    let mut loaded = load_account_tracked(io, config_dir, base, keychain).await?;
-    if !loaded.writable() {
-        return Err(AccountCommandError::RecordUnreadable);
-    }
-    let record = &mut loaded.record;
-    if vault_id == target_vault_id {
-        return Ok(record.accounts.iter().map(AccountView::from).collect());
-    }
-    // Find the source and target accounts.
-    let source_idx = record
-        .accounts
-        .iter()
-        .position(|a| a.vaults.contains(&vault_id))
-        .ok_or(AccountCommandError::VaultNotFound)?;
-    let target_idx = record
-        .accounts
-        .iter()
-        .position(|a| a.vaults.contains(&target_vault_id))
-        .ok_or(AccountCommandError::VaultNotFound)?;
-
-    if source_idx == target_idx {
-        // Same account: a no-op.
-        return Ok(record.accounts.iter().map(AccountView::from).collect());
-    }
-
-    // Remove from source, add to target.
-    record.accounts[source_idx]
-        .vaults
-        .retain(|v| *v != vault_id);
-    record.accounts[target_idx].vaults.push(vault_id);
-    // Prune the source account if empty.
-    record.accounts.retain(|a| !a.vaults.is_empty());
-
-    write_account(io, config_dir, keychain, &*record).await?;
-    Ok(record.accounts.iter().map(AccountView::from).collect())
-}
-
-/// Split `vault_id` into a fresh account. The source account is pruned if it
-/// becomes empty.
-///
-/// Rejected while hide-vault-names is on, like the other mutations.
-pub async fn split_vault_at(
-    io: &dyn VaultIo,
-    config_dir: &Path,
-    base: &Path,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    if hide_names_on(io, config_dir).await {
-        return Err(AccountCommandError::Hidden);
-    }
-    let mut loaded = load_account_tracked(io, config_dir, base, keychain).await?;
-    if !loaded.writable() {
-        return Err(AccountCommandError::RecordUnreadable);
-    }
-    let record = &mut loaded.record;
-    let source_idx = record
-        .accounts
-        .iter()
-        .position(|a| a.vaults.contains(&vault_id))
-        .ok_or(AccountCommandError::VaultNotFound)?;
-
-    record.accounts[source_idx]
-        .vaults
-        .retain(|v| *v != vault_id);
-    record.accounts.retain(|a| !a.vaults.is_empty());
-
-    let mut new_id = [0u8; ACCOUNT_ID_LEN];
-    getrandom::getrandom(&mut new_id).map_err(|_| AccountCommandError::Backend)?;
-    record.accounts.push(Account {
-        account_id: new_id,
-        vaults: vec![vault_id],
-    });
-
-    write_account(io, config_dir, keychain, &*record).await?;
-    Ok(record.accounts.iter().map(AccountView::from).collect())
-}
-
 // ---- layer 1: the host-taking cores ----------------------------------------
 
 /// [`list_accounts_at`] against the device's own directories.
@@ -218,29 +118,6 @@ pub async fn list_accounts_from_host(
 ) -> Result<Vec<AccountView>, AccountCommandError> {
     let (base, config_dir) = dirs(host)?;
     list_accounts_at(io, &config_dir, &base, keychain).await
-}
-
-/// [`move_vault_at`] against the device's own directories.
-pub async fn move_vault_from_host(
-    host: &dyn crate::host::HostCtx,
-    io: &dyn VaultIo,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-    target_vault_id: VaultId,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    let (base, config_dir) = dirs(host)?;
-    move_vault_at(io, &config_dir, &base, keychain, vault_id, target_vault_id).await
-}
-
-/// [`split_vault_at`] against the device's own directories.
-pub async fn split_vault_from_host(
-    host: &dyn crate::host::HostCtx,
-    io: &dyn VaultIo,
-    keychain: &dyn LabelKeychain,
-    vault_id: VaultId,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    let (base, config_dir) = dirs(host)?;
-    split_vault_at(io, &config_dir, &base, keychain, vault_id).await
 }
 
 fn dirs(host: &dyn crate::host::HostCtx) -> Result<(PathBuf, PathBuf), AccountCommandError> {
@@ -270,63 +147,12 @@ pub async fn account_list<R: tauri::Runtime>(
     .await
 }
 
-/// Move `vault_id` into the account owning `target_vault_id`.
-///
-/// Refused while hide-vault-names is on, like the other mutations, and when
-/// no vault is unlocked.
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn account_move<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
-    vault_id: String,
-    target_vault_id: String,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    if state.inner().active_vault_id().await.is_none() {
-        return Err(AccountCommandError::Locked);
-    }
-    let host = crate::host::tauri_host::TauriHost::new(app);
-    let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
-    let target_vault_id =
-        VaultId::parse(&target_vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
-    move_vault_from_host(
-        &host,
-        &crate::vault_io::StdVaultIo,
-        crate::vault_label::key::platform_keychain(),
-        vault_id,
-        target_vault_id,
-    )
-    .await
-}
-
-/// Split `vault_id` into a fresh account.
-///
-/// Refused when no vault is unlocked, like the other mutations.
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn account_split<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
-    vault_id: String,
-) -> Result<Vec<AccountView>, AccountCommandError> {
-    if state.inner().active_vault_id().await.is_none() {
-        return Err(AccountCommandError::Locked);
-    }
-    let host = crate::host::tauri_host::TauriHost::new(app);
-    let vault_id = VaultId::parse(&vault_id).map_err(|_| AccountCommandError::VaultNotFound)?;
-    split_vault_from_host(
-        &host,
-        &crate::vault_io::StdVaultIo,
-        crate::vault_label::key::platform_keychain(),
-        vault_id,
-    )
-    .await
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::account::store::{write_account, AccountRecord, ACCOUNT_ID_LEN};
     use crate::test_support::{block_on, ScopedTempDir};
+    use crate::vault_id::VaultId;
     use crate::vault_io::StdVaultIo;
     use crate::vault_label::fake_keychain::FakeKeychain;
     use std::path::PathBuf;
@@ -357,6 +183,18 @@ mod tests {
         id
     }
 
+    /// A record a test can PERSIST directly. Since myne-md/myne#937 no command
+    /// writes one, so a fixture that needs a stored (rather than rebuilt) record
+    /// has to say so at the seam instead of reaching for a mutation.
+    fn record(ids: &[VaultId]) -> AccountRecord {
+        AccountRecord {
+            accounts: vec![Account {
+                account_id: [7u8; ACCOUNT_ID_LEN],
+                vaults: ids.to_vec(),
+            }],
+        }
+    }
+
     #[test]
     fn upgrade_with_n_vaults_produces_one_account_with_n_members() {
         let d = device();
@@ -375,51 +213,6 @@ mod tests {
             let mut expected = vec![a.to_string(), b.to_string(), c.to_string()];
             expected.sort();
             assert_eq!(ids, expected);
-        });
-    }
-
-    #[test]
-    fn split_moves_a_vault_into_a_fresh_account() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let b = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        block_on(async {
-            let views = split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
-                .await
-                .expect("split");
-            assert_eq!(views.len(), 2, "two accounts after split");
-            let mut all: Vec<String> = views.iter().flat_map(|v| v.vaults.clone()).collect();
-            all.sort();
-            let mut expected = vec![a.to_string(), b.to_string()];
-            expected.sort();
-            assert_eq!(all, expected);
-        });
-    }
-
-    #[test]
-    fn move_between_accounts_round_trips() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let _b = seed_vault(&d.base);
-        let c = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        block_on(async {
-            // Split a into its own account first, so there are two accounts.
-            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
-                .await
-                .expect("split");
-            // Now move c into a's account.
-            let views = move_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, c, a)
-                .await
-                .expect("move");
-            assert_eq!(views.len(), 2, "still two accounts");
-            // a's account now holds a and c.
-            let a_account = views
-                .iter()
-                .find(|v| v.vaults.contains(&a.to_string()))
-                .unwrap();
-            assert!(a_account.vaults.contains(&c.to_string()));
         });
     }
 
@@ -451,11 +244,12 @@ mod tests {
         let a = seed_vault(&d.base);
         let b = seed_vault(&d.base);
         let keychain = FakeKeychain::empty();
+        // A write is what persists a record: listing deliberately does not, and
+        // no command does either (myne-md/myne#937).
         block_on(async {
-            // A split is what persists a record: listing deliberately does not.
-            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
+            write_account(&StdVaultIo, &d.config, &keychain, &record(&[a, b]))
                 .await
-                .expect("split");
+                .expect("write");
         });
         let bytes = std::fs::read(crate::account::store::account_path(&d.config)).expect("read");
         for id in [a.to_string(), b.to_string()] {
@@ -521,27 +315,6 @@ mod tests {
     }
 
     #[test]
-    fn mutations_refuse_rather_than_overwrite_unreadable_bytes() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        let path = crate::account::store::account_path(&d.config);
-        std::fs::write(&path, b"not a record {{{").expect("corrupt");
-        block_on(async {
-            // No keychain key for these bytes: the source is Unreadable.
-            assert_eq!(
-                split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a).await,
-                Err(AccountCommandError::RecordUnreadable)
-            );
-        });
-        assert_eq!(
-            std::fs::read(&path).expect("read"),
-            b"not a record {{{",
-            "a refused mutation must not touch the undecryptable bytes"
-        );
-    }
-
-    #[test]
     fn list_preserves_unreadable_bytes() {
         let d = device();
         seed_vault(&d.base);
@@ -569,14 +342,14 @@ mod tests {
     fn list_returns_empty_while_names_are_hidden() {
         let d = device();
         let a = seed_vault(&d.base);
-        seed_vault(&d.base);
+        let b = seed_vault(&d.base);
         let keychain = FakeKeychain::empty();
         block_on(async {
-            // A split persists a record, so the suppression below is proved
-            // against a stored grouping rather than against a rebuild.
-            split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a)
+            // Proved against a STORED grouping rather than against a rebuild, so
+            // the suppression is exercised on the path that reads the file.
+            write_account(&StdVaultIo, &d.config, &keychain, &record(&[a, b]))
                 .await
-                .expect("split");
+                .expect("write");
         });
         hide_the_names(&d.config);
         block_on(async {
@@ -584,20 +357,6 @@ mod tests {
                 .await
                 .expect("list");
             assert!(views.is_empty(), "hidden means no grouping leaves IPC");
-        });
-    }
-
-    #[test]
-    fn mutations_are_rejected_while_names_are_hidden() {
-        let d = device();
-        let a = seed_vault(&d.base);
-        let keychain = FakeKeychain::empty();
-        hide_the_names(&d.config);
-        block_on(async {
-            assert_eq!(
-                split_vault_at(&StdVaultIo, &d.config, &d.base, &keychain, a).await,
-                Err(AccountCommandError::Hidden)
-            );
         });
     }
 }

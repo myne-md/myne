@@ -21,14 +21,19 @@
 //
 // ── The roster, as of 2026-10-23 ─────────────────────────────────────────────
 // The vault list was a naked `<ul>` of names under a paragraph of semantics, so
-// the panel read as a read-out rather than as a surface: no glyph, no state, no
-// way to act, and a count that said "1 vaults". It now reuses the shape
-// `ConnectedExtensions` established in the same panel (a glyph, a primary line,
-// a secondary line, one control on the right), moves the per-device semantics
-// into the row's `explanation` disclosure, and offers the two grouping actions
-// the VAULT PICKER already performs on its context menu (`account_split`,
-// `account_move`, the same `vaultPicker.*` vocabulary) so the grouping can be
-// rearranged from the surface that shows it.
+// the panel read as a read-out rather than as a surface: no glyph, no state and
+// a count that said "1 vaults". It reuses the shape `ConnectedExtensions`
+// established in the same panel (a glyph, a primary line, a secondary line) and
+// moves the per-device semantics into the row's `explanation` disclosure.
+//
+// ── Why the roster offers no actions (myne-md/myne#937) ─────────────────────
+// It carried the two grouping mutations the vault picker also performed
+// (`account_split`, `account_move`, in the same `vaultPicker.*` vocabulary). Both
+// are gone: splitting was the only code path that could ever create a second
+// account, so on a product with no multi-account support the menu's only
+// destination was a state nothing else in the app could reach, and the roster
+// paid for it with a confirm step, a failure line and its own focus trap. A
+// read-out is the honest shape for a grouping the user cannot rearrange.
 //
 // The person account NUMBER is the panel's FIRST block, where the account name
 // used to be (`docs/decisions/ui/0728`). It is derived from the identity phrase,
@@ -52,26 +57,16 @@ import {
   type CSSProperties,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../primitives/Button";
 import { IconButton } from "../primitives/IconButton";
 import { Input } from "../primitives/Input";
 import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
-import { AnchoredPanel } from "../primitives/AnchoredPanel";
 import * as capabilities from "../../platform/capabilities";
 import { ConnectedExtensions } from "./ConnectedExtensions";
 import { SettingsSection, SettingsSectionCounter } from "./SettingsSection";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { BLOCK_STYLE, HELPER_STYLE } from "./panel-styles";
-import {
-  accountCommandErrorKind,
-  accountIdForVault,
-  listAccounts,
-  accountHeading,
-  moveVault,
-  splitVault,
-  type AccountView,
-} from "../../lib/account";
+import { accountIdForVault, listAccounts, type AccountView } from "../../lib/account";
 import { listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { vaultDisplayNameById } from "../../lib/vaultDisplayName";
 import { formatPersonAccountNumber } from "@myne/client-core/person-account";
@@ -83,20 +78,6 @@ import { FolderGlyph } from "../../notes/components/FolderGlyph";
 import { FOLDER_ICON_PATHS } from "../../notes/folderIcons";
 import { formatRelativeTime } from "../../notes/components/relativeTime";
 import type { VaultSummary } from "../../types/vault-summary";
-import i18n from "../../i18n";
-
-/** Copy for an account-command failure, or `null` for the kinds this panel has
- *  no honest sentence for. */
-function accountErrorCopy(e: unknown): string {
-  switch (accountCommandErrorKind(e)) {
-    case "Hidden":
-      return i18n.t("settings.account.groupingHidden");
-    case "RecordUnreadable":
-      return i18n.t("settings.account.groupingUnreadable");
-    default:
-      return i18n.t("settings.account.groupingError");
-  }
-}
 
 const INPUT_ROW_STYLE: CSSProperties = {
   display: "flex",
@@ -162,45 +143,15 @@ const ROW_SECONDARY_DANGER_STYLE: CSSProperties = {
   color: "var(--danger)",
 };
 
-const MENU_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: "var(--space-1)",
-  padding: "var(--space-2)",
-  background: "var(--bg-2)",
-  border: "1px solid var(--line-2)",
-  borderRadius: "var(--radius-2)",
-};
-
-const MENU_HEADING_STYLE: CSSProperties = {
-  margin: 0,
-  padding: "0 var(--space-2)",
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-};
-
-const MENU_ITEM_STYLE: CSSProperties = {
-  justifyContent: "flex-start",
-  width: "100%",
-};
-
-/** One action in a row's menu. */
-interface VaultAction {
-  id: string;
-  label: string;
-  onSelect: () => void;
-  /** A warning this action shows BEFORE it runs, for the one arm that destroys
-   *  something the user cannot see (the account's own name, when the split
-   *  empties it). */
-  confirm?: string;
-}
-
 /**
  * One vault in the account's roster.
  *
  * A local component rather than an export: it exists for this roster alone, and
  * keeping it here means the file stays the unit a reader opens (and the story
  * and surface rosters stay honest about what is a shared component).
+ *
+ * A read-out since myne-md/myne#937: no menu, because there is no other account
+ * to move a vault into and nothing here can split one out.
  */
 function VaultRow({
   vault,
@@ -208,52 +159,14 @@ function VaultRow({
   isCurrent,
   secondary,
   secondaryDanger,
-  menuLabel,
-  moveHeading,
-  cancelLabel,
-  actions,
 }: {
   vault: VaultSummary;
   name: string;
   isCurrent: boolean;
   secondary: string;
   secondaryDanger: boolean;
-  menuLabel: string;
-  moveHeading: string;
-  cancelLabel: string;
-  actions: VaultAction[];
 }) {
-  const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState<VaultAction | null>(null);
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
   const hasGlyph = vault.icon !== null && vault.icon in FOLDER_ICON_PATHS;
-  const moveActions = actions.filter((action) => action.id !== "split");
-  const splitAction = actions.find((action) => action.id === "split");
-
-  // The menu is a keyboard door, not only a pointer one (2026-10-23 review):
-  // focus enters it when it opens and comes back to the trigger when it closes,
-  // the same pair `VaultSwitcher` and `VaultPicker` already implement. Without
-  // it a keyboard user opens the menu and tabs into the panel behind it.
-  useEffect(() => {
-    if (!open) return;
-    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-  }, [open]);
-  const closeMenu = () => {
-    setOpen(false);
-    setPending(null);
-    triggerRef.current?.focus();
-  };
-  const run = (action: VaultAction) => {
-    setOpen(false);
-    setPending(null);
-    triggerRef.current?.focus();
-    action.onSelect();
-  };
-  const choose = (action: VaultAction) => {
-    if (action.confirm !== undefined) setPending(action);
-    else run(action);
-  };
 
   return (
     <li
@@ -273,85 +186,6 @@ function VaultRow({
           {secondary}
         </span>
       </span>
-      {/* One control, and only where the grouping can actually be changed: a
-          standalone vault has actions against no other account, and a corrupted
-          one cannot be moved before it is repaired. */}
-      {actions.length > 0 ? (
-        <Button
-          ref={triggerRef}
-          variant="ghost"
-          icon="more-horizontal"
-          aria-label={menuLabel}
-          aria-haspopup="menu"
-          aria-expanded={open}
-          data-testid="settings.account-vault-actions"
-          onClick={() => setOpen((v) => !v)}
-        />
-      ) : null}
-      {actions.length > 0 ? (
-        <AnchoredPanel
-          open={open}
-          onClose={closeMenu}
-          anchorRef={triggerRef}
-          testId="settings.account-vault-menu"
-          minWidth={220}
-        >
-          <div role="menu" ref={menuRef} style={MENU_STYLE}>
-            {pending !== null ? (
-              <>
-                <p style={MENU_HEADING_STYLE}>{pending.confirm}</p>
-                <div style={{ display: "flex", gap: "var(--space-1)" }}>
-                  <Button
-                    variant="ghost"
-                    data-testid="settings.account-vault-confirm-cancel"
-                    onClick={() => setPending(null)}
-                  >
-                    {cancelLabel}
-                  </Button>
-                  <Button
-                    variant="danger"
-                    data-testid="settings.account-vault-confirm-run"
-                    onClick={() => run(pending)}
-                  >
-                    {pending.label}
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <>
-                {splitAction ? (
-                  <Button
-                    variant="ghost"
-                    role="menuitem"
-                    style={MENU_ITEM_STYLE}
-                    data-testid="settings.account-vault-split"
-                    onClick={() => choose(splitAction)}
-                  >
-                    {splitAction.label}
-                  </Button>
-                ) : null}
-                {moveActions.length > 0 ? (
-                  <>
-                    <p style={MENU_HEADING_STYLE}>{moveHeading}</p>
-                    {moveActions.map((action) => (
-                      <Button
-                        key={action.id}
-                        variant="ghost"
-                        role="menuitem"
-                        style={MENU_ITEM_STYLE}
-                        data-testid="settings.account-vault-move"
-                        onClick={() => choose(action)}
-                      >
-                        {action.label}
-                      </Button>
-                    ))}
-                  </>
-                ) : null}
-              </>
-            )}
-          </div>
-        </AnchoredPanel>
-      ) : null}
     </li>
   );
 }
@@ -384,15 +218,10 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
   // this device (no account record, or a keychain-less device), which is a real
   // state and not an error: the picker shows that vault without a group header
   // and offers no account actions for it.
-  const [accounts, setAccounts] = useState<AccountView[]>([]);
   const [account, setAccount] = useState<AccountView | null>(null);
   const [vaults, setVaults] = useState<VaultSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Every account on this device, which is what a "move" destination is chosen
-  // from: the backend takes a TARGET VAULT id, so a destination can only be an
-  // account that already holds one.
-  const [actionError, setActionError] = useState<string | null>(null);
   // The person account number (2026-10-23). Derived from the identity phrase, so
   // it is read rather than stored, and `null` on a device with no identity.
   // `numberUnavailable` keeps a FAILED read apart from that "no identity" answer:
@@ -400,33 +229,10 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
   const [accountNumber, setAccountNumber] = useState<string | null>(null);
   const [numberUnavailable, setNumberUnavailable] = useState(false);
 
-  /**
-   * Re-seed the panel from a backend answer after a grouping mutation.
-   *
-   * Anchored on the account the panel was SHOWING while that account still
-   * exists, and only then on the active vault: a move can take the open vault
-   * out of the account being edited, and re-anchoring on the vault would swap
-   * the panel's subject mid-action rather than show the record the user was
-   * looking at. `null` is the fresh case: the shown account is gone, so the
-   * active vault's record is the only one left to show.
-   */
-  const applyAccounts = (next: AccountView[], shownAccountId: string | null) => {
-    setAccounts(next);
-    const shown =
-      shownAccountId === null
-        ? null
-        : (next.find((a) => a.id === shownAccountId) ?? null);
-    const activeId = vaultId === null ? null : accountIdForVault(next, vaultId);
-    const found =
-      shown ?? (activeId === null ? null : (next.find((a) => a.id === activeId) ?? null));
-    setAccount(found);
-  };
-
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
     setLoadError(null);
-    setActionError(null);
     void (async () => {
       // The vault list and the account grouping are independent reads: a vault
       // list failure costs the row NAMES and not the panel, so it is folded
@@ -456,7 +262,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
         const list = await listAccounts();
         const vaultList = await vaultsPromise;
         if (cancelled) return;
-        setAccounts(list);
         const id = vaultId === null ? null : accountIdForVault(list, vaultId);
         const found = id === null ? null : (list.find((a) => a.id === id) ?? null);
         setAccount(found);
@@ -466,7 +271,10 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
         // A device with no keychain, or an unreadable record, cannot show the
         // grouping. Say so instead of rendering the standalone state, which
         // would claim the vault has no account when the truth is unknown.
-        setLoadError(accountErrorCopy(e));
+        // One sentence covers every remaining kind, because the two that used to
+        // get their own wording moved with the move/split commands
+        // (myne-md/myne#937) and hide-vault-names answers an empty list.
+        setLoadError(t("settings.account.groupingError"));
       } finally {
         if (!cancelled) setLoaded(true);
       }
@@ -475,18 +283,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
       cancelled = true;
     };
   }, [vaultId]);
-
-  /** Run one grouping mutation. The backend answers with the whole account
-   *  list, and that answer is what re-seeds the panel: re-reading would show the
-   *  same thing twice, and inferring would put a second opinion beside it. */
-  const runAccountAction = (run: () => Promise<AccountView[]>) => {
-    setActionError(null);
-    const shownAccountId = account?.id ?? null;
-    void run().then(
-      (next) => applyAccounts(next, shownAccountId),
-      (e: unknown) => setActionError(accountErrorCopy(e)),
-    );
-  };
 
   // The number's copy confirms itself (2026-10-24): tick plus one pop on the
   // control, announced in the live region below; the toast is kept for the
@@ -522,11 +318,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
   };
 
   const groupingKnown = account !== null;
-  // Move destinations: the other accounts that hold at least one vault, since
-  // the command needs a target vault id and a label can never be one.
-  const moveDestinations = accounts.filter(
-    (a) => a.id !== account?.id && a.vaults.length > 0,
-  );
   const secondaryFor = (vault: VaultSummary): { text: string; danger: boolean } => {
     if (vault.status.kind === "Corrupted") {
       return { text: t("settings.account.vaultCorrupted"), danger: true };
@@ -648,7 +439,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
             testId="settings.account-vaults-row"
             helper={t("settings.account.vaultsHelperShort")}
             explanation={[t("settings.account.vaultsHelper")]}
-            error={actionError}
             control={
               <span
                 data-testid="settings.account-vaults-count"
@@ -675,8 +465,7 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
                 const summary = vaults.find((v) => v.id === id) ?? null;
                 // A vault the list could not enumerate is NOT a vault with no
                 // publish state: the panel would otherwise claim "Device only"
-                // from no data and offer actions against a record it never read
-                // (2026-10-23 review). It states the gap and offers nothing.
+                // from no data (2026-10-23 review). It states the gap.
                 const unreadable = summary === null;
                 const vault: VaultSummary =
                   summary ??
@@ -691,35 +480,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
                 const secondary = unreadable
                   ? { text: t("settings.account.vaultUnreadable"), danger: false }
                   : secondaryFor(vault);
-                const actions: VaultAction[] = [];
-                if (!unreadable && vault.status.kind === "Exists") {
-                  actions.push({
-                    id: "split",
-                    label: t("vaultPicker.moveToNewAccount"),
-                    onSelect: () => runAccountAction(() => splitVault(vault.id)),
-                    // Splitting the account's only vault deletes that account's
-                    // id AND its name, which is unrecoverable and invisible in
-                    // the menu's own wording.
-                    confirm:
-                      account.vaults.length === 1
-                        ? t("settings.account.splitLastConfirm")
-                        : undefined,
-                  });
-                  for (const destination of moveDestinations) {
-                    const anchor = destination.vaults[0];
-                    if (anchor === undefined) continue;
-                    actions.push({
-                      id: `move:${destination.id}`,
-                      label: accountHeading(
-                        destination,
-                        (id) => vaultDisplayNameById(id, vaults, t),
-                        t("picker.accountFallback"),
-                      ),
-                      onSelect: () =>
-                        runAccountAction(() => moveVault(vault.id, anchor)),
-                    });
-                  }
-                }
                 return (
                   <VaultRow
                     key={id}
@@ -731,10 +491,6 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
                     isCurrent={id === vaultId}
                     secondary={secondary.text}
                     secondaryDanger={secondary.danger}
-                    menuLabel={t("settings.account.vaultActions")}
-                    moveHeading={t("vaultPicker.moveToAccount")}
-                    cancelLabel={t("common.cancel")}
-                    actions={actions}
                   />
                 );
               })}

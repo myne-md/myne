@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Gruppering stannar på den här enheten och följer inte med ett valv.",
       "vaultsCount_one": "{{count}} valv",
       "vaultsCount_other": "{{count}} valv",
-      "vaultActions": "Valvåtgärder",
-      "splitLastConfirm": "Det här är det enda valvet i kontot. Att flytta ut det tar bort kontot.",
       "vaultCorrupted": "Det här valvets metadata kunde inte läsas",
       "vaultUnreadable": "Inte läst på den här enheten",
       "vaultDeviceOnly": "Endast enhet",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Det här valvet är inte grupperat under ett konto på den här enheten, så det står för sig självt. Gruppering gäller per enhet: en annan enhet kan visa det inuti en grupp.",
       "unresolvedHelper": "Tar reda på vilket valv som är öppet…",
       "devicesNote": "Enheter, medlemmar i delade valv och din identitet hanteras under Synkronisering.",
-      "groupingHidden": "Kontogruppering är inte tillgänglig medan valvnamn är dolda. Stäng av det alternativet i Integritet för att hantera den.",
-      "groupingUnreadable": "Den här enhetens kontogruppering kunde inte läsas. Ingenting ändrades.",
       "groupingError": "Kunde inte läsa kontogrupperingen på den här enheten. Ingenting ändrades.",
       "sections": {
         "extensions": "Webbläsartillägg",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Återställ från säkerhetskopia",
     "subline": "Du har fler än ett valv på den här enheten. Välj ett att låsa upp.",
     "vaultFallback": "Valv {{n}}",
-    "accountFallback": "Konto",
-    "moveToAccount": "Flytta till konto…",
-    "moveToNewAccount": "Flytta till nytt konto",
-    "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
-    "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
-    "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades.",
+    "accountError": "Kontogrupperingen kunde inte läsas på den här enheten.",
     "createShort": "Nytt valv",
     "joinShort": "Lägg till enhet",
     "restoreShort": "Återställ säkerhetskopia"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "öppnad för {{count}} år sedan",
     "corruptedBadge": "Skadad",
     "accountFallback": "Konto",
-    "moveToNewAccount": "Flytta till nytt konto",
-    "moveToAccount": "Flytta till konto…",
-    "accountError": "Kontogrupperingen kunde inte uppdateras. Inget ändrades.",
-    "accountHidden": "Kontoåtgärder är inte tillgängliga medan vault-namn är dolda.",
-    "accountUnreadable": "Kontogrupperingen kunde inte läsas på denna enhet. Inget ändrades."
+    "accountError": "Kontogrupperingen kunde inte läsas på den här enheten."
   },
   "join": {
     "transportError": "Det gick inte att nå synkroniseringsservern. Kontrollera adressen och din anslutning och försök igen.",

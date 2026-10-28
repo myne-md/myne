@@ -44,7 +44,6 @@ import {
   Fragment,
   useEffect,
   useReducer,
-  useRef,
   useState,
   type CSSProperties,
   type ReactNode,
@@ -65,19 +64,13 @@ import {
   listVaults,
   orderByLastUnlock,
 } from "../lib/vault-list";
-import { vaultDisplayName, vaultDisplayNameById } from "../lib/vaultDisplayName";
+import { vaultDisplayName } from "../lib/vaultDisplayName";
 import {
   listAccounts,
-  moveVault,
-  splitVault,
-  accountHeading,
-  accountIdForVault,
   accountCommandErrorKind,
   groupVaultsByAccount,
 } from "../lib/account";
-import type { AccountView, AccountCommandErrorKind } from "../lib/account";
-import { isVaultUnlocked } from "../lib/vault-unlock";
-import { ContextMenu, type ContextMenuItem } from "../notes/components/ContextMenu";
+import type { AccountView } from "../lib/account";
 import type { VaultId } from "../lib/stage";
 import type { VaultSummary } from "../types/vault-summary";
 import { MyneMark } from "../components/primitives/MyneMark";
@@ -145,41 +138,17 @@ function reducer(state: PickerState, action: PickerAction): PickerState {
 
 
 /**
- * The heading for a group: the names of the vaults inside it, in the order the
- * list holds them (`docs/decisions/ui/0728` removed the user-set account name;
- * a group is identified by its own contents instead). The neutral "Account"
- * fallback survives for the one case that has nothing to name: every member
- * vault failed to enumerate.
- */
-function accountLabel(
-  account: AccountView | null,
-  vaults: readonly VaultSummary[],
-  t: TFunction,
-): string {
-  if (account === null) return "";
-  return accountHeading(
-    account,
-    (id) => vaultDisplayNameById(id, vaults, t),
-    t("vaultPicker.accountFallback"),
-  );
-}
-
-/**
  * Grouping lives in `../lib/account` (`groupVaultsByAccount`, shared with the
  * recovery select and the mobile picker); this file keeps only the label.
  */
 
 /**
- * User-facing copy for an account-grouping failure. The narrowed kinds get
- * their own sentence; everything else (Io, Backend, VaultNotFound, unknown)
- * shares the generic one, because the picker renders standalone either way.
+ * User-facing copy for an account-grouping failure: ONE sentence, because the
+ * picker renders standalone either way. The kinds that used to get their own
+ * wording (`RecordUnreadable`, `Hidden`) are gone with the move/split commands
+ * (myne-md/myne#937): hide-vault-names answers an empty list, not an error.
  */
-function accountErrorCopy(
-  kind: AccountCommandErrorKind | null,
-  t: TFunction,
-): string {
-  if (kind === "Hidden") return t("vaultPicker.accountHidden");
-  if (kind === "RecordUnreadable") return t("vaultPicker.accountUnreadable");
+function accountErrorCopy(t: TFunction): string {
   return t("vaultPicker.accountError");
 }
 
@@ -551,8 +520,6 @@ function VaultRow({
   meta,
   publishNote,
   onSelect,
-  onContextMenu,
-  rowRef,
 }: {
   vault: VaultSummary;
   label: string;
@@ -562,8 +529,6 @@ function VaultRow({
    *  (myne-md/myne#911 task 8). */
   publishNote: string;
   onSelect: (vaultId: VaultId) => void;
-  onContextMenu: (vault: VaultSummary, pos: { x: number; y: number }) => void;
-  rowRef: (vaultId: VaultId, el: HTMLButtonElement | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   // The fill is computed from state, so the press fact is folded into it rather
@@ -574,22 +539,7 @@ function VaultRow({
   return (
     <button
       type="button"
-      ref={(el) => rowRef(vault.id, el)}
       onClick={() => onSelect(vault.id)}
-      onContextMenu={(e) => {
-        e.preventDefault();
-        onContextMenu(vault, { x: e.clientX, y: e.clientY });
-      }}
-      onKeyDown={(e) => {
-        // Keyboard path to the same menu: the ContextMenu key, or
-        // Shift+F10, opens it anchored under the row. A control
-        // reachable only by right-click strands keyboard users.
-        if (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10")) {
-          e.preventDefault();
-          const rect = e.currentTarget.getBoundingClientRect();
-          onContextMenu(vault, { x: rect.left + 24, y: rect.bottom + 4 });
-        }
-      }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onFocus={() => setHovered(true)}
@@ -636,23 +586,10 @@ export function VaultPicker({ onSelect, onCreateAnother,
   // The last account-grouping failure, shown as a banner. `null` is no error.
   // Grouping failures never strand the picker: the list renders standalone.
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  // Whether some vault is unlocked. Account mutations (move/split) are
-  // refused while locked (backend `Locked`), so the menu offers them only
-  // when unlocked; the locked picker stays a read surface.
-  const [unlocked, setUnlocked] = useState(false);
-  // Row buttons by vault id, so closing the menu can return focus to the row
-  // that opened it (keyboard path).
-  const rowRefs = useRef(new Map<VaultId, HTMLButtonElement>());
   // Soft top/bottom edges on the vault list once it outgrows the card.
   const { ref: listRef, fadeProps: listFade } = useScrollEdges<HTMLDivElement>();
   // Subscribe to the shared 30s tick so the row timestamps stay live.
   useTick();
-  // The open row context menu (move / split), or null when closed.
-  const [menu, setMenu] = useState<{
-    vault: VaultSummary;
-    x: number;
-    y: number;
-  } | null>(null);
 
   // MYND-628 — re-show the window after an idle-lock hid it. This screen is a
   // locked boot surface exactly like `Unlock`, and at TWO OR MORE vaults it is
@@ -679,14 +616,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
         accountsPromise,
       ]);
       if (cancelled) return;
-      // A probe the host cannot answer (web, or a partial test mock) reads as
-      // locked, which is the safe direction: the mutation menu stays hidden
-      // rather than offering an action the backend will refuse.
-      void isVaultUnlocked()
-        .then((ok) => {
-          if (!cancelled) setUnlocked(ok);
-        })
-        .catch(() => {});
       let accounts: AccountView[] = [];
       if (accountsOutcome.ok) {
         accounts = accountsOutcome.accounts;
@@ -696,12 +625,7 @@ export function VaultPicker({ onSelect, onCreateAnother,
       ) {
         setAccountsError(null);
       } else {
-        setAccountsError(
-          accountErrorCopy(
-            accountCommandErrorKind(accountsOutcome.error),
-            t,
-          ),
-        );
+        setAccountsError(accountErrorCopy(t));
       }
       if ("ok" in vaultsResult) {
         dispatch({
@@ -768,83 +692,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
 
   const groups = groupVaultsByAccount(state.vaults, state.accounts);
 
-  // Run an account mutation, then reload truth. Failures surface the banner;
-  // a failed write is never silent and never leaves stale grouping on screen.
-  const runAccountAction = (fn: () => Promise<unknown>) => {
-    setAccountsError(null);
-    void (async () => {
-      try {
-        await fn();
-      } catch (e) {
-        setAccountsError(accountErrorCopy(accountCommandErrorKind(e), t));
-      }
-      reload();
-    })();
-  };
-
-  const closeMenuAndRefocusRow = (vaultId: VaultId) => {
-    setMenu(null);
-    rowRefs.current.get(vaultId)?.focus();
-  };
-
-  // Account actions are offered only for member vaults. A standalone vault
-  // (no account, keychain-less device, or hidden names) has no account to move
-  // from, and every command would answer VaultNotFound, so offering them is
-  // offering a guaranteed failure.
-  const menuAccountId =
-    menu !== null && state.kind === "loaded"
-      ? accountIdForVault(state.accounts, menu.vault.id)
-      : null;
-  const menuAccount =
-    menuAccountId !== null && state.kind === "loaded"
-      ? (state.accounts.find((a) => a.id === menuAccountId) ?? null)
-      : null;
-  const moveDestinations =
-    state.kind === "loaded"
-      ? state.accounts.filter(
-          (a) => a.id !== menuAccountId && a.vaults.length > 0,
-        )
-      : [];
-  // The loaded list, for the display names a move destination's heading is
-  // built from. Empty while loading, which is also when the menu offers nothing.
-  const loadedVaults = state.kind === "loaded" ? state.vaults : [];
-  const menuItems: ContextMenuItem[] =
-    menu !== null && menuAccount !== null && unlocked
-      ? [
-          {
-            id: "picker.account-move-new",
-            label: t("vaultPicker.moveToNewAccount"),
-            onSelect: () => {
-              const vault = menu.vault;
-              setMenu(null);
-              runAccountAction(() => splitVault(vault.id));
-            },
-          },
-          // The destination is chosen from the other accounts, never typed:
-          // the backend needs the TARGET VAULT id, and a name can never be one.
-          // Each child names its account by that account's own vaults and
-          // anchors on the first member.
-          ...(moveDestinations.length > 0
-            ? [
-                {
-                  id: "picker.account-move",
-                  label: t("vaultPicker.moveToAccount"),
-                  children: moveDestinations.map((a, i) => ({
-                    id: `picker.account-move-to-${i}`,
-                    label: accountLabel(a, loadedVaults, t),
-                    onSelect: () => {
-                      const vault = menu.vault;
-                      setMenu(null);
-                      runAccountAction(() => moveVault(vault.id, a.vaults[0] as VaultId));
-                    },
-                  })),
-                  onSelect: () => {},
-                } satisfies ContextMenuItem,
-              ]
-            : []),
-        ]
-      : [];
-
   return (
     <PickerCard
       subline={t("vaultPicker.subline")}
@@ -886,24 +733,11 @@ export function VaultPicker({ onSelect, onCreateAnother,
                   vault.published ? "" : t("vaultPicker.deviceOnly")
                 }
                 onSelect={onSelect}
-                onContextMenu={(v, pos) => setMenu({ vault: v, x: pos.x, y: pos.y })}
-                rowRef={(id, el) => {
-                  if (el === null) rowRefs.current.delete(id);
-                  else rowRefs.current.set(id, el);
-                }}
               />
             ))}
           </Fragment>
         ))}
       </div>
-      {menu !== null && menuItems.length > 0 && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          items={menuItems}
-          onClose={() => closeMenuAndRefocusRow(menu.vault.id)}
-        />
-      )}
     </PickerCard>
   );
 }

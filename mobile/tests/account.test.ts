@@ -18,13 +18,15 @@ import { describe, expect, it } from "vitest";
 const sib = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 const read = (p: string) => readFileSync(sib(p), "utf8");
 
-// Three since `docs/decisions/ui/0728` removed `account_rename`: an account has
-// no name, so the command is gone from every site rather than left authorized
-// with nothing behind it.
-const THE_COMMANDS = ["account_list", "account_move", "account_split"];
+// One since `docs/decisions/ui/0728` removed `account_rename` (an account has no
+// name) and myne-md/myne#937 removed the move/split pair (the grouping is
+// single-account, so there is nothing to move a vault into). A command that no
+// longer exists is gone from every site rather than left authorized with
+// nothing behind it.
+const THE_COMMANDS = ["account_list"];
 
 describe("the account ACL is mirrored, not half-mirrored", () => {
-  it("registers all three commands at every backend site", () => {
+  it("registers the one command at every backend site", () => {
     const sites = [
       "../src-tauri/build.rs",
       "../src-tauri/permissions/account/default.toml",
@@ -42,11 +44,7 @@ describe("the account ACL is mirrored, not half-mirrored", () => {
     const toml = read("../src-tauri/permissions/account/default.toml");
     const declared = [...toml.matchAll(/identifier = "([a-z-]+)"/g)].map((m) => m[1]).sort();
     const bundled = [...toml.matchAll(/^\s+"(allow-[a-z-]+)",$/gm)].map((m) => m[1]).sort();
-    expect(declared).toEqual([
-      "allow-account-list",
-      "allow-account-move",
-      "allow-account-split",
-    ]);
+    expect(declared).toEqual(["allow-account-list"]);
     expect(bundled).toEqual(declared);
   });
 

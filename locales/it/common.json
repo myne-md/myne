@@ -4560,8 +4560,6 @@
       "vaultsHelperShort": "Il raggruppamento resta su questo dispositivo e non viaggia con una cassaforte.",
       "vaultsCount_one": "{{count}} casseforti",
       "vaultsCount_other": "{{count}} casseforti",
-      "vaultActions": "Azioni sulla cassaforte",
-      "splitLastConfirm": "Questa è l'unica cassaforte dell'account. Spostarla fuori elimina questo account.",
       "vaultCorrupted": "I metadati di questa cassaforte non sono stati letti",
       "vaultUnreadable": "Non letta su questo dispositivo",
       "vaultDeviceOnly": "Solo dispositivo",
@@ -4578,8 +4576,6 @@
       "standaloneHelper": "Questa cassaforte non è raggruppata sotto un account su questo dispositivo, quindi sta da sola. Il raggruppamento è per dispositivo: un altro dispositivo può mostrarla dentro uno.",
       "unresolvedHelper": "Determinazione della cassaforte aperta in corso…",
       "devicesNote": "Dispositivi, membri delle casseforti condivise e la tua identità sono gestiti in Sincronizzazione.",
-      "groupingHidden": "Il raggruppamento dell'account non è disponibile mentre i nomi delle casseforti sono nascosti. Disattiva quella opzione in Privacy per gestirlo.",
-      "groupingUnreadable": "Il raggruppamento dell'account di questo dispositivo non è stato letto. Nulla è cambiato.",
       "groupingError": "Impossibile leggere il raggruppamento dell'account su questo dispositivo. Nulla è cambiato.",
       "sections": {
         "extensions": "Estensioni del browser",
@@ -5628,12 +5624,7 @@
     "restoreFromBackup": "Ripristina da backup",
     "subline": "Hai più di una cassaforte su questo dispositivo. Scegline una da sbloccare.",
     "vaultFallback": "Cassaforte {{n}}",
-    "accountFallback": "Account",
-    "moveToAccount": "Sposta sull'account…",
-    "moveToNewAccount": "Sposta su un nuovo account",
-    "accountError": "Impossibile aggiornare il raggruppamento account. Nulla è cambiato.",
-    "accountHidden": "Le azioni account non sono disponibili mentre i nomi dei caveau sono nascosti.",
-    "accountUnreadable": "Impossibile leggere il raggruppamento account su questo dispositivo. Nulla è cambiato.",
+    "accountError": "Impossibile leggere il raggruppamento degli account su questo dispositivo.",
     "createShort": "Nuova cassaforte",
     "joinShort": "Aggiungi dispositivo",
     "restoreShort": "Ripristina backup"
@@ -5861,11 +5852,7 @@
     "openedYearsAgo_other": "aperta {{count}} anni fa",
     "corruptedBadge": "Danneggiata",
     "accountFallback": "Account",
-    "moveToNewAccount": "Sposta su un nuovo account",
-    "moveToAccount": "Sposta sull'account…",
-    "accountError": "Impossibile aggiornare il raggruppamento account. Nulla è cambiato.",
-    "accountHidden": "Le azioni account non sono disponibili mentre i nomi dei caveau sono nascosti.",
-    "accountUnreadable": "Impossibile leggere il raggruppamento account su questo dispositivo. Nulla è cambiato."
+    "accountError": "Impossibile leggere il raggruppamento degli account su questo dispositivo."
   },
   "join": {
     "transportError": "Impossibile raggiungere quel server di sincronizzazione. Controlla l'indirizzo e la tua connessione, poi riprova.",

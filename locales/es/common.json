@@ -4560,8 +4560,6 @@
       "vaultsHelperShort": "La agrupación se queda en este dispositivo y no viaja con la bóveda.",
       "vaultsCount_one": "{{count}} bóvedas",
       "vaultsCount_other": "{{count}} bóvedas",
-      "vaultActions": "Acciones de la bóveda",
-      "splitLastConfirm": "Esta es la única bóveda de la cuenta. Moverla fuera borra esta cuenta.",
       "vaultCorrupted": "No se pudieron leer los metadatos de esta bóveda",
       "vaultUnreadable": "No leída en este dispositivo",
       "vaultDeviceOnly": "Solo este dispositivo",
@@ -4578,8 +4576,6 @@
       "standaloneHelper": "Esta bóveda no está agrupada bajo una cuenta en este dispositivo, así que va por su cuenta. La agrupación es por dispositivo: otro dispositivo puede mostrarla dentro de una.",
       "unresolvedHelper": "Averiguando qué bóveda está abierta…",
       "devicesNote": "Los dispositivos, los miembros de las bóvedas compartidas y tu identidad se gestionan en Sincronización.",
-      "groupingHidden": "La agrupación de cuentas no está disponible mientras los nombres de las bóvedas estén ocultos. Desactiva esa opción en Privacidad para gestionarla.",
-      "groupingUnreadable": "No se pudo leer la agrupación de cuentas de este dispositivo. No cambió nada.",
       "groupingError": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
       "sections": {
         "extensions": "Extensiones del navegador",
@@ -5628,12 +5624,7 @@
     "restoreFromBackup": "Restaurar desde copia de seguridad",
     "subline": "Tienes más de una bóveda en este dispositivo. Elige una para desbloquear.",
     "vaultFallback": "Bóveda {{n}}",
-    "accountFallback": "Cuenta",
-    "moveToAccount": "Mover a la cuenta…",
-    "moveToNewAccount": "Mover a una cuenta nueva",
-    "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
-    "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
-    "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
+    "accountError": "No se pudo leer la agrupación de cuentas en este dispositivo.",
     "createShort": "Bóveda nueva",
     "joinShort": "Añadir dispositivo",
     "restoreShort": "Restaurar copia de seguridad"
@@ -5861,11 +5852,7 @@
     "openedYearsAgo_other": "abierta hace {{count}} años",
     "corruptedBadge": "Dañada",
     "accountFallback": "Cuenta",
-    "moveToNewAccount": "Mover a una cuenta nueva",
-    "moveToAccount": "Mover a la cuenta…",
-    "accountError": "No se pudo actualizar la agrupación de cuentas. No cambió nada.",
-    "accountHidden": "Las acciones de cuenta no están disponibles mientras los nombres de las bóvedas están ocultos.",
-    "accountUnreadable": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada."
+    "accountError": "No se pudo leer la agrupación de cuentas en este dispositivo."
   },
   "join": {
     "transportError": "No se pudo conectar con ese servidor de sincronización. Comprueba la dirección y tu conexión, luego inténtalo de nuevo.",

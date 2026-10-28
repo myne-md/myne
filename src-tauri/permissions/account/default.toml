@@ -4,28 +4,20 @@
 # `__app-acl__` and never match the `plugin:account|<cmd>` form. The
 # `generate_handler!` in `src-tauri/src/plugins/account/mod.rs` ships the
 # commands; this file authorizes them.
+#
+# ONE command since myne-md/myne#937: the grouping is read-only, because
+# `account_split` was the only code path that could ever create a second account
+# and multi-account support exists nowhere else in the product.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the account plugin: read the account grouping, move a vault between accounts, and split a vault into a fresh account."
+description = "Default permission set for the account plugin: read the device-local account grouping. Read-only: the move/split mutations were removed with the single-account grouping (myne-md/myne#937)."
 permissions = [
   "allow-account-list",
-  "allow-account-move",
-  "allow-account-split",
 ]
 
 [[permission]]
 identifier = "allow-account-list"
 description = "Allow invoking account:account_list (read the device-local account grouping from app_config_dir/account.json; absent means no grouping, a damaged file rebuilds from the disk-scan). A list of accounts out; no vault content, no keychain write."
 commands.allow = ["account_list"]
-
-[[permission]]
-identifier = "allow-account-move"
-description = "Allow invoking account:account_move (move a vault into the account owning another vault). Takes two vault ids; writes the sealed record. No vault content."
-commands.allow = ["account_move"]
-
-[[permission]]
-identifier = "allow-account-split"
-description = "Allow invoking account:account_split (split a vault into a fresh account). Takes a vault id; writes the sealed record. No vault content."
-commands.allow = ["account_split"]

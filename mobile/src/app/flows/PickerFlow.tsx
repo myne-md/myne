@@ -1,15 +1,13 @@
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark, Sheet, ListGroup, ListRow } from "../../components";
+import { Screen, ScreenScroll, Title, FooterBar, Button, Banner, Spinner, MyneMark } from "../../components";
 import { listVaults, orderByLastUnlock, stableVaultNumber } from "../../lib/vault-list";
-import { listAccounts, moveVault, splitVault, accountHeading, accountIdForVault, accountCommandErrorKind, groupVaultsByAccount } from "../../lib/account";
-import type { AccountView, AccountCommandErrorKind } from "../../lib/account";
+import { listAccounts, accountHeading, accountCommandErrorKind, groupVaultsByAccount } from "../../lib/account";
+import type { AccountView } from "../../lib/account";
 import { vaultDisplayLabel } from "../../lib/vault-label";
-import { isVaultUnlocked } from "../../lib/vault-unlock";
 import { ioBanner } from "../../lib/io-banner";
 import { HAS_TAURI } from "../../lib/app-window";
-import { useHold } from "./editor/chrome/useHold";
 import type { VaultSummary } from "../../types/vault-summary";
 import type { PickerFlowProps } from "./types";
 
@@ -24,10 +22,11 @@ import type { PickerFlowProps } from "./types";
  *
  * The account/vault split (myne-md/myne#684) groups rows, and a group's heading
  * is the names of the vaults inside it (`docs/decisions/ui/0728`: an account has
- * no name of its own). A long-press on a row opens a sheet with
- * move-to-new-account / move-to-account. On Android the keychain has no
- * backend, so `account_list` answers empty and every vault shows standalone (no
- * header, no error).
+ * no name of its own). The grouping is READ-ONLY since myne-md/myne#937: the
+ * long-press sheet that carried move-to-new-account / move-to-account is gone
+ * with the two commands behind it, because splitting was the only way a second
+ * account could exist. On Android the keychain has no backend, so `account_list`
+ * answers empty and every vault shows standalone (no header, no error).
  */
 
 /** Dot palette for labeled vaults (cycled by position); placeholder rows use a muted dot. */
@@ -112,7 +111,6 @@ function VaultRow({
   italic,
   corrupted,
   onClick,
-  onHold,
 }: {
   dot: string;
   name: string;
@@ -120,17 +118,11 @@ function VaultRow({
   italic: boolean;
   corrupted: boolean;
   onClick: () => void;
-  onHold: () => void;
 }) {
   const { t } = useTranslation();
-  const { handlers, consumeHeldClick } = useHold(onHold);
   return (
     <button
-      onClick={() => {
-        if (consumeHeldClick()) return;
-        onClick();
-      }}
-      {...handlers}
+      onClick={onClick}
       style={{
         display: "flex",
         alignItems: "center",
@@ -207,20 +199,11 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   const [accounts, setAccounts] = useState<AccountView[]>([]);
   const [ioError, setIoError] = useState<string | null>(null);
   const [accountsError, setAccountsError] = useState<string | null>(null);
-  const [heldVault, setHeldVault] = useState<VaultSummary | null>(null);
-  // Whether some vault is unlocked. Account mutations are refused while
-  // locked (backend `Locked`), so the hold sheet opens only when unlocked;
-  // the locked picker stays a read surface.
-  const [unlocked, setUnlocked] = useState(false);
-  // Sheet mode: the action menu, or the destination-account list for a move.
-  // One sheet, two faces.
-  const [sheetMode, setSheetMode] = useState<"menu" | "move">("menu");
 
-  const accountErrorCopy = (kind: AccountCommandErrorKind | null): string => {
-    if (kind === "Hidden") return t("picker.accountHidden");
-    if (kind === "RecordUnreadable") return t("picker.accountUnreadable");
-    return t("picker.accountError");
-  };
+  // One sentence: the kinds that used to get their own wording are gone with the
+  // move/split commands (myne-md/myne#937), and hide-vault-names answers an
+  // empty list rather than an error.
+  const accountErrorCopy = (): string => t("picker.accountError");
 
   const reload = () => {
     let cancelled = false;
@@ -242,16 +225,10 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         if (accountCommandErrorKind(e) === "KeychainUnavailable") {
           setAccountsError(null);
         } else {
-          setAccountsError(accountErrorCopy(accountCommandErrorKind(e)));
+          setAccountsError(accountErrorCopy());
         }
       }
       if (cancelled) return;
-      void isVaultUnlocked()
-        .then((ok) => {
-          if (!cancelled) setUnlocked(ok);
-        })
-        // A probe the host cannot answer reads as locked, the safe direction.
-        .catch(() => {});
       if ("ok" in result) {
         setVaults(orderByLastUnlock(result.ok));
         setAccounts(accts);
@@ -267,19 +244,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
   };
 
   useEffect(reload, []);
-
-  const runAccountAction = (fn: () => Promise<unknown>) => {
-    setAccountsError(null);
-    setHeldVault(null);
-    void (async () => {
-      try {
-        await fn();
-      } catch (e) {
-        setAccountsError(accountErrorCopy(accountCommandErrorKind(e)));
-      }
-      reload();
-    })();
-  };
 
   // Grouping lives in `../../lib/account` (`groupVaultsByAccount`, shared with
   // both desktop pickers); this file keeps only the heading.
@@ -304,19 +268,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
       },
       t("picker.accountFallback"),
     );
-  };
-
-  const holdActions = (vault: VaultSummary): void => {
-    if (!HAS_TAURI) return;
-    // Mutations are refused while locked (backend `Locked`): the hold sheet
-    // is the mutation surface, so it opens only when unlocked.
-    if (!unlocked) return;
-    // Account actions are offered only for member vaults: a standalone
-    // vault has no account to move from, and every command would
-    // answer VaultNotFound.
-    if (accountIdForVault(accounts, vault.id) === null) return;
-    setSheetMode("menu");
-    setHeldVault(vault);
   };
 
   return (
@@ -365,7 +316,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
                       italic={!labeled}
                       corrupted={corrupted}
                       onClick={() => onSelect(vault.id, true)}
-                      onHold={() => holdActions(vault)}
                     />
                   );
                 })}
@@ -387,64 +337,6 @@ export function PickerFlow({ onSelect, onCreate, onJoin }: PickerFlowProps) {
         </Button>
       </FooterBar>
 
-      {heldVault !== null && (
-        <Sheet
-          onClose={() => {
-            setHeldVault(null);
-            setSheetMode("menu");
-          }}
-        >
-          {(() => {
-            const heldAccountId = accountIdForVault(accounts, heldVault.id);
-            const destinations = accounts.filter(
-              (a) => a.id !== heldAccountId && a.vaults.length > 0,
-            );
-            if (sheetMode === "move") {
-              return (
-                <ListGroup>
-                  {destinations.map((a, i) => (
-                    <ListRow
-                      key={a.id}
-                      title={accountLabel(a)}
-                      isLast={i === destinations.length - 1}
-                      testID={`picker.account-move-to-${i}`}
-                      onClick={() => {
-                        const vault = heldVault;
-                        const anchor = a.vaults[0];
-                        if (anchor === undefined) return;
-                        runAccountAction(() => moveVault(vault.id, anchor));
-                        setSheetMode("menu");
-                      }}
-                    />
-                  ))}
-                </ListGroup>
-              );
-            }
-            return (
-              <ListGroup>
-                <ListRow
-                  title={t("picker.moveToNewAccount")}
-                  isLast={destinations.length === 0}
-                  testID="picker.account-move-new"
-                  onClick={() => {
-                    const vault = heldVault;
-                    runAccountAction(() => splitVault(vault.id));
-                  }}
-                />
-                {destinations.length > 0 && (
-                  <ListRow
-                    title={t("picker.moveToAccount")}
-                    isLast
-                    testID="picker.account-move"
-                    chevron
-                    onClick={() => setSheetMode("move")}
-                  />
-                )}
-              </ListGroup>
-            );
-          })()}
-        </Sheet>
-      )}
     </Screen>
   );
 }

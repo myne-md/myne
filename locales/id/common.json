@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Pengelompokan tetap di perangkat ini dan tidak ikut berpindah dengan brankas.",
       "vaultsCount_one": "{{count}} brankas",
       "vaultsCount_other": "{{count}} brankas",
-      "vaultActions": "Tindakan brankas",
-      "splitLastConfirm": "Ini adalah satu-satunya brankas di akun. Memindahkannya keluar menghapus akun ini.",
       "vaultCorrupted": "Metadata brankas ini tidak dapat dibaca",
       "vaultUnreadable": "Tidak dibaca di perangkat ini",
       "vaultDeviceOnly": "Hanya perangkat",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Brankas ini tidak dikelompokkan di bawah akun di perangkat ini, jadi ia berdiri sendiri. Pengelompokan per perangkat: perangkat lain mungkin menampilkannya di dalam satu.",
       "unresolvedHelper": "Memastikan brankas mana yang terbuka…",
       "devicesNote": "Perangkat, anggota brankas bersama dan identitas Anda dikelola di Sinkronisasi.",
-      "groupingHidden": "Pengelompokan akun tidak tersedia saat nama brankas disembunyikan. Matikan opsi itu di Privasi untuk mengelolanya.",
-      "groupingUnreadable": "Pengelompokan akun perangkat ini tidak dapat dibaca. Tidak ada yang berubah.",
       "groupingError": "Tidak dapat membaca pengelompokan akun di perangkat ini. Tidak ada yang berubah.",
       "sections": {
         "extensions": "Ekstensi peramban",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Pulihkan dari cadangan",
     "subline": "Anda memiliki lebih dari satu brankas di perangkat ini. Pilih salah satu untuk membuka kunci.",
     "vaultFallback": "Brankas {{n}}",
-    "accountFallback": "Akun",
-    "moveToAccount": "Pindah ke akun…",
-    "moveToNewAccount": "Pindah ke akun baru",
-    "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
-    "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
-    "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah.",
+    "accountError": "Pengelompokan akun tidak dapat dibaca di perangkat ini.",
     "createShort": "Brankas baru",
     "joinShort": "Tambah perangkat",
     "restoreShort": "Pulihkan cadangan"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "dibuka {{count}} tahun lalu",
     "corruptedBadge": "Rusak",
     "accountFallback": "Akun",
-    "moveToNewAccount": "Pindah ke akun baru",
-    "moveToAccount": "Pindah ke akun…",
-    "accountError": "Pengelompokan akun tidak dapat diperbarui. Tidak ada yang diubah.",
-    "accountHidden": "Tindakan akun tidak tersedia saat nama brankas disembunyikan.",
-    "accountUnreadable": "Pengelompokan akun tidak dapat dibaca di perangkat ini. Tidak ada yang diubah."
+    "accountError": "Pengelompokan akun tidak dapat dibaca di perangkat ini."
   },
   "join": {
     "transportError": "Tidak dapat menjangkau server sinkronisasi itu. Periksa alamat dan koneksi Anda, lalu coba lagi.",

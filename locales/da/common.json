@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Gruppering bliver på denne enhed og rejser ikke med en boks.",
       "vaultsCount_one": "{{count}} bokse",
       "vaultsCount_other": "{{count}} bokse",
-      "vaultActions": "Bokshandlinger",
-      "splitLastConfirm": "Dette er den eneste boks i kontoen. At flytte den ud sletter denne konto.",
       "vaultCorrupted": "Denne boks' metadata kunne ikke læses",
       "vaultUnreadable": "Ikke læst på denne enhed",
       "vaultDeviceOnly": "Kun enhed",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Denne boks er ikke grupperet under en konto på denne enhed, så den står alene. Gruppering er per enhed: en anden enhed kan vise den inden i en.",
       "unresolvedHelper": "Finder ud af, hvilken boks der er åben…",
       "devicesNote": "Enheder, delte bokses medlemmer og din identitet administreres i Synk.",
-      "groupingHidden": "Konto-gruppering er utilgængelig, mens boksnavne er skjulte. Slå den indstilling fra i Privatliv for at administrere den.",
-      "groupingUnreadable": "Denne enheds konto-gruppering kunne ikke læses. Intet blev ændret.",
       "groupingError": "Kunne ikke læse konto-grupperingen på denne enhed. Intet blev ændret.",
       "sections": {
         "extensions": "Browserudvidelser",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Gendan fra sikkerhedskopi",
     "subline": "Du har mere end én boks på denne enhed. Vælg en at låse op.",
     "vaultFallback": "Boks {{n}}",
-    "accountFallback": "Konto",
-    "moveToAccount": "Flyt til konto…",
-    "moveToNewAccount": "Flyt til ny konto",
-    "accountError": "Konto-grupperingen kunne ikke opdateres. Intet blev ændret.",
-    "accountHidden": "Konto-handlinger er ikke tilgængelige, mens bognavne er skjulte.",
-    "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret.",
+    "accountError": "Kontogrupperingen kunne ikke læses på denne enhed.",
     "createShort": "Ny boks",
     "joinShort": "Tilføj enhed",
     "restoreShort": "Gendan sikkerhedskopi"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "åbnet for {{count}} år siden",
     "corruptedBadge": "Beskadiget",
     "accountFallback": "Konto",
-    "moveToNewAccount": "Flyt til ny konto",
-    "moveToAccount": "Flyt til konto…",
-    "accountError": "Konto-grupperingen kunne ikke opdateres. Intet blev ændret.",
-    "accountHidden": "Konto-handlinger er ikke tilgængelige, mens bognavne er skjulte.",
-    "accountUnreadable": "Konto-grupperingen kunne ikke læses på denne enhed. Intet blev ændret."
+    "accountError": "Kontogrupperingen kunne ikke læses på denne enhed."
   },
   "join": {
     "transportError": "Kunne ikke få forbindelse til den synkroniseringsserver. Tjek adressen og din forbindelse, og prøv igen.",

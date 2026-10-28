@@ -374,18 +374,15 @@ fn main() {
             )
             .plugin(
                 // Account record (the account/vault split, myne-md/myne#684):
-                // shared from `myne-core`; the same THREE commands the desktop
-                // registers. On iOS the keychain exists so grouping works; on
-                // Android `platform_keychain` has no backend, so the store holds
-                // nothing and vaults show standalone (never an error, never
-                // plaintext). Adding a command here without a matching entry in
+                // shared from `myne-core`; the same ONE read-only command the
+                // desktop registers (move/split removed, myne-md/myne#937). On
+                // iOS the keychain exists so grouping works; on Android
+                // `platform_keychain` has no backend, so the store holds nothing
+                // and vaults show standalone (never an error, never plaintext).
+                // Adding a command here without a matching entry in
                 // `permissions/account/default.toml` is a security bug.
                 "account",
-                tauri_build::InlinedPlugin::new().commands(&[
-                    "account_list",
-                    "account_move",
-                    "account_split",
-                ]),
+                tauri_build::InlinedPlugin::new().commands(&["account_list"]),
             )
             .plugin(
                 // Custom themes (MYT1, §9.21): shared from `myne-core`, but ONE

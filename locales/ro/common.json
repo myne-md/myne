@@ -4560,8 +4560,6 @@
       "vaultsHelperShort": "Gruparea rămâne pe acest dispozitiv și nu călătorește cu un seif.",
       "vaultsCount_one": "{{count}} seifuri",
       "vaultsCount_other": "{{count}} seifuri",
-      "vaultActions": "Acțiuni pentru seif",
-      "splitLastConfirm": "Acesta este singurul seif din cont. Mutarea lui șterge acest cont.",
       "vaultCorrupted": "Metadatele acestui seif nu au putut fi citite",
       "vaultUnreadable": "Nu se citește pe acest dispozitiv",
       "vaultDeviceOnly": "Doar pe dispozitiv",
@@ -4578,8 +4576,6 @@
       "standaloneHelper": "Acest seif nu este grupat sub un cont pe acest dispozitiv, așa că stă singur. Gruparea este per dispozitiv: un alt dispozitiv îl poate arăta înăuntrul unuia.",
       "unresolvedHelper": "Se stabilește ce seif este deschis…",
       "devicesNote": "Dispozitivele, membrii seifurilor partajate și identitatea ta sunt gestionate în Sincronizare.",
-      "groupingHidden": "Gruparea contului este indisponibilă cât timp numele seifurilor sunt ascunse. Dezactivează opțiunea aceea în Confidențialitate pentru a o gestiona.",
-      "groupingUnreadable": "Gruparea contului acestui dispozitiv nu a putut fi citită. Nimic nu s-a schimbat.",
       "groupingError": "Gruparea contului nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat.",
       "sections": {
         "extensions": "Extensii de browser",
@@ -5628,12 +5624,7 @@
     "restoreFromBackup": "Restaurează dintr-o copie de rezervă",
     "subline": "Ai mai mult de un seif pe acest dispozitiv. Alege unul de deblocat.",
     "vaultFallback": "Seif {{n}}",
-    "accountFallback": "Cont",
-    "moveToAccount": "Mută în cont…",
-    "moveToNewAccount": "Mută într-un cont nou",
-    "accountError": "Gruparea conturilor nu a putut fi actualizată. Nimic nu s-a schimbat.",
-    "accountHidden": "Acțiunile de cont nu sunt disponibile când numele depozitelor sunt ascunse.",
-    "accountUnreadable": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat.",
+    "accountError": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv.",
     "createShort": "Seif nou",
     "joinShort": "Adaugă dispozitiv",
     "restoreShort": "Restaurează copia de rezervă"
@@ -5861,11 +5852,7 @@
     "openedYearsAgo_other": "deschis acum {{count}} ani",
     "corruptedBadge": "Corupt",
     "accountFallback": "Cont",
-    "moveToNewAccount": "Mută într-un cont nou",
-    "moveToAccount": "Mută în cont…",
-    "accountError": "Gruparea conturilor nu a putut fi actualizată. Nimic nu s-a schimbat.",
-    "accountHidden": "Acțiunile de cont nu sunt disponibile când numele depozitelor sunt ascunse.",
-    "accountUnreadable": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat."
+    "accountError": "Gruparea conturilor nu a putut fi citită pe acest dispozitiv."
   },
   "join": {
     "transportError": "Serverul de sincronizare nu a putut fi contactat. Verifică adresa și conexiunea, apoi încearcă din nou.",

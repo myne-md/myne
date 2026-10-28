@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Ugawaji unabaki kwenye kifaa hiki na haufuati kasha.",
       "vaultsCount_one": "Makasha {{count}}",
       "vaultsCount_other": "Makasha {{count}}",
-      "vaultActions": "Vitendo vya kasha",
-      "splitLastConfirm": "Hiki ndicho kasha pekee kwenye akaunti. Kukihamisha kunafuta akaunti hii.",
       "vaultCorrupted": "Metadata ya kasha hiki haikuweza kusomwa",
       "vaultUnreadable": "Haisomwi kwenye kifaa hiki",
       "vaultDeviceOnly": "Kifaa pekee",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Kasha hili halijagawiwa chini ya akaunti kwenye kifaa hiki, kwa hivyo kinasimama kwa kujitegemea. Ugawaji ni kwa kila kifaa: kifaa kingine kinaweza kulionyesha ndani ya moja.",
       "unresolvedHelper": "Inakokotoa kasha lililofunguliwa…",
       "devicesNote": "Vifaa, wanachama wa kasha shirikishi na utambulisho wako vinasimamiwa kwenye Sync.",
-      "groupingHidden": "Ugawaji wa akaunti haupatikani wakati majina ya makasha yanafichwa. Zima chaguo hilo kwenye Faragha ili kuusimamia.",
-      "groupingUnreadable": "Ugawaji wa akaunti wa kifaa hiki haikuweza kusomwa. Hakuna kilichobadilika.",
       "groupingError": "Haikuweza kusoma ugawaji wa akaunti kwenye kifaa hiki. Hakuna kilichobadilika.",
       "sections": {
         "extensions": "Viendelezi vya kivinjari",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Rejesha kutoka kwenye hifadhi rudufu",
     "subline": "Una zaidi ya kasha moja kwenye kifaa hiki. Chagua moja ili kulifungua.",
     "vaultFallback": "Kasha {{n}}",
-    "accountFallback": "Akaunti",
-    "moveToAccount": "Hamisha kwenye akaunti…",
-    "moveToNewAccount": "Hamisha kwenye akaunti mpya",
-    "accountError": "Unganisho wa akaunti haukuweza kusasishwa. Hakuna kilichobadilika.",
-    "accountHidden": "Vitendo vya akaunti havipatikani majina ya hazina yakifichwa.",
-    "accountUnreadable": "Unganisho wa akaunti haukuweza kusomeka kwenye kifaa hiki. Hakuna kilichobadilika.",
+    "accountError": "Imeshindwa kusoma upangaji wa akaunti kwenye kifaa hiki.",
     "createShort": "Kasha jipya",
     "joinShort": "Ongeza kifaa",
     "restoreShort": "Rejesha hifadhi rudufu"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "limefunguliwa miaka {{count}} iliyopita",
     "corruptedBadge": "Limeharibika",
     "accountFallback": "Akaunti",
-    "moveToNewAccount": "Hamisha kwenye akaunti mpya",
-    "moveToAccount": "Hamisha kwenye akaunti…",
-    "accountError": "Unganisho wa akaunti haukuweza kusasishwa. Hakuna kilichobadilika.",
-    "accountHidden": "Vitendo vya akaunti havipatikani majina ya hazina yakifichwa.",
-    "accountUnreadable": "Unganisho wa akaunti haukuweza kusomeka kwenye kifaa hiki. Hakuna kilichobadilika."
+    "accountError": "Imeshindwa kusoma upangaji wa akaunti kwenye kifaa hiki."
   },
   "join": {
     "transportError": "Imeshindwa kufikia seva hiyo ya usawazishaji. Kagua anwani na muunganisho wako, kisha ujaribu tena.",

@@ -2,9 +2,10 @@
 //! `account` Tauri plugin (mobile shim): the account-record command surface
 //! (the account/vault split, myne-md/myne#684).
 //!
-//! Owns the same three commands the desktop plugin does: `account_list`,
-//! `account_move` and `account_split`. The record they govern lives in
-//! `myne_core::account`, so nothing about the format is redefined here.
+//! Owns the same one command the desktop plugin does: `account_list`. The
+//! record it reads lives in `myne_core::account`, so nothing about the format is
+//! redefined here. It is read-only since myne-md/myne#937 (the move/split pair
+//! is gone from both clients with the single-account grouping).
 //!
 //! ## iOS groups, Android shows standalone
 //!
@@ -17,13 +18,10 @@
 //!
 //! ## Capability ACL
 //!
-//! `account:default` bundles the three commands, main-window-only. `list` is
-//! reachable **pre-unlock** and deliberately so: the picker is the surface it
-//! serves and it runs before any vault is open. The two mutations (move,
-//! split) are **refused while no vault is unlocked** (`Locked`): a
-//! locked-screen observer reads the grouping but never regroups without any
-//! vault password (myne-md/myne#684 land gate). None touches vault content, and
-//! the only values that cross are hex account ids and vault ids.
+//! `account:default` bundles the one command, main-window-only. It is reachable
+//! **pre-unlock** and deliberately so: the picker is the surface it serves and it
+//! runs before any vault is open. None of this touches vault content, and the
+//! only values that cross are hex account ids and vault ids.
 
 // The command bodies and their error enum live in `myne-core` (shared with the
 // desktop client). Re-exported so `crate::plugins::account::…` resolves like
@@ -38,10 +36,6 @@ use tauri::Runtime;
 /// keychain is the OS's, so there is nothing to `manage`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("account")
-        .invoke_handler(tauri::generate_handler![
-            commands::account_list,
-            commands::account_move,
-            commands::account_split,
-        ])
+        .invoke_handler(tauri::generate_handler![commands::account_list])
         .build()
 }

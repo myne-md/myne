@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Die Gruppierung bleibt auf diesem Gerät und reist nicht mit einem Tresor.",
       "vaultsCount_one": "{{count}} Tresore",
       "vaultsCount_other": "{{count}} Tresore",
-      "vaultActions": "Tresoraktionen",
-      "splitLastConfirm": "Dies ist der einzige Tresor im Konto. Wenn Sie ihn herauslösen, wird dieses Konto gelöscht.",
       "vaultCorrupted": "Die Metadaten dieses Tresors konnten nicht gelesen werden",
       "vaultUnreadable": "Auf diesem Gerät nicht gelesen",
       "vaultDeviceOnly": "Nur auf diesem Gerät",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Dieser Tresor ist auf diesem Gerät nicht unter einem Konto gruppiert, er steht also für sich. Gruppierung gilt pro Gerät: Ein anderes Gerät kann ihn in einem anzeigen.",
       "unresolvedHelper": "Es wird ermittelt, welcher Tresor offen ist…",
       "devicesNote": "Geräte, Mitglieder gemeinsamer Tresore und Ihre Identität werden unter Synchronisierung verwaltet.",
-      "groupingHidden": "Kontogruppierung ist nicht verfügbar, solange Tresornamen verborgen sind. Schalten Sie diese Option unter Privatsphäre aus, um sie zu verwalten.",
-      "groupingUnreadable": "Die Kontogruppierung dieses Geräts konnte nicht gelesen werden. Es wurde nichts geändert.",
       "groupingError": "Die Kontogruppierung auf diesem Gerät konnte nicht gelesen werden. Es wurde nichts geändert.",
       "sections": {
         "extensions": "Browser-Erweiterungen",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Aus Sicherung wiederherstellen",
     "subline": "Sie haben mehr als einen Tresor auf diesem Gerät. Wählen Sie einen zum Entsperren.",
     "vaultFallback": "Tresor {{n}}",
-    "accountFallback": "Konto",
-    "moveToAccount": "Zu Konto verschieben…",
-    "moveToNewAccount": "Zu neuem Konto verschieben",
-    "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
-    "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
-    "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert.",
+    "accountError": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden.",
     "createShort": "Neuer Tresor",
     "joinShort": "Gerät hinzufügen",
     "restoreShort": "Sicherung wiederherstellen"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "vor {{count}} Jahren geöffnet",
     "corruptedBadge": "Beschädigt",
     "accountFallback": "Konto",
-    "moveToNewAccount": "Zu neuem Konto verschieben",
-    "moveToAccount": "Zu Konto verschieben…",
-    "accountError": "Die Kontogruppierung konnte nicht aktualisiert werden. Nichts wurde geändert.",
-    "accountHidden": "Kontoaktionen sind nicht verfügbar, während Tresornamen ausgeblendet sind.",
-    "accountUnreadable": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden. Nichts wurde geändert."
+    "accountError": "Die Kontogruppierung konnte auf diesem Gerät nicht gelesen werden."
   },
   "join": {
     "transportError": "Der Sync-Server konnte nicht erreicht werden. Überprüfe die Adresse und deine Verbindung und versuche es dann erneut.",

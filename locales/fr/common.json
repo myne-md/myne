@@ -4560,8 +4560,6 @@
       "vaultsHelperShort": "Le regroupement reste sur cet appareil et ne voyage pas avec un coffre.",
       "vaultsCount_one": "{{count}} coffres",
       "vaultsCount_other": "{{count}} coffres",
-      "vaultActions": "Actions sur le coffre",
-      "splitLastConfirm": "C'est le seul coffre du compte. Le sortir supprime ce compte.",
       "vaultCorrupted": "Les métadonnées de ce coffre n'ont pas pu être lues",
       "vaultUnreadable": "Non lu sur cet appareil",
       "vaultDeviceOnly": "Appareil uniquement",
@@ -4578,8 +4576,6 @@
       "standaloneHelper": "Ce coffre n'est pas regroupé sous un compte sur cet appareil, il est donc autonome. Le regroupement est par appareil : un autre appareil peut l'afficher dans un.",
       "unresolvedHelper": "Détermination du coffre ouvert…",
       "devicesNote": "Les appareils, les membres des coffres partagés et votre identité se gèrent dans Synchronisation.",
-      "groupingHidden": "Le regroupement de comptes est indisponible tant que les noms de coffre sont masqués. Désactivez cette option dans Confidentialité pour le gérer.",
-      "groupingUnreadable": "Le regroupement de comptes de cet appareil n'a pas pu être lu. Rien n'a changé.",
       "groupingError": "Impossible de lire le regroupement de comptes sur cet appareil. Rien n'a changé.",
       "sections": {
         "extensions": "Extensions de navigateur",
@@ -5628,12 +5624,7 @@
     "restoreFromBackup": "Restaurer depuis une sauvegarde",
     "subline": "Vous avez plusieurs coffres-forts sur cet appareil. Choisissez-en un à déverrouiller.",
     "vaultFallback": "Coffre-fort {{n}}",
-    "accountFallback": "Compte",
-    "moveToAccount": "Déplacer vers le compte…",
-    "moveToNewAccount": "Déplacer vers un nouveau compte",
-    "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
-    "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
-    "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé.",
+    "accountError": "Impossible de lire le regroupement des comptes sur cet appareil.",
     "createShort": "Nouveau coffre",
     "joinShort": "Ajouter un appareil",
     "restoreShort": "Restaurer une sauvegarde"
@@ -5861,11 +5852,7 @@
     "openedYearsAgo_other": "ouvert il y a {{count}} ans",
     "corruptedBadge": "Corrompu",
     "accountFallback": "Compte",
-    "moveToNewAccount": "Déplacer vers un nouveau compte",
-    "moveToAccount": "Déplacer vers le compte…",
-    "accountError": "Impossible de mettre à jour le regroupement des comptes. Rien n'a changé.",
-    "accountHidden": "Les actions de compte sont indisponibles tant que les noms de coffres sont masqués.",
-    "accountUnreadable": "Le regroupement des comptes n'a pas pu être lu sur cet appareil. Rien n'a changé."
+    "accountError": "Impossible de lire le regroupement des comptes sur cet appareil."
   },
   "join": {
     "transportError": "Impossible de joindre ce serveur de synchronisation. Vérifiez l'adresse et votre connexion, puis réessayez.",

@@ -19,16 +19,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 
 // ── Mock the IPC-boundary lib wrappers, keeping the pure helpers real ──────
 const listAccounts = vi.fn();
-const splitVault = vi.fn();
-const moveVault = vi.fn();
 const listVaults = vi.fn();
 const personAccountNumber = vi.fn();
 
 vi.mock("../../src/lib/account", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/account")>()),
   listAccounts: (...a: unknown[]) => listAccounts(...a),
-  splitVault: (...a: unknown[]) => splitVault(...a),
-  moveVault: (...a: unknown[]) => moveVault(...a),
 }));
 vi.mock("../../src/lib/personAccount", () => ({
   personAccountNumber: (...a: unknown[]) => personAccountNumber(...a),
@@ -90,8 +86,6 @@ const VAULTS = [
 beforeEach(() => {
   listAccounts.mockReset().mockResolvedValue([ACCOUNT]);
   listVaults.mockReset().mockResolvedValue({ ok: VAULTS });
-  splitVault.mockReset().mockResolvedValue([ACCOUNT]);
-  moveVault.mockReset().mockResolvedValue([ACCOUNT]);
   personAccountNumber.mockReset().mockResolvedValue(null);
 });
 
@@ -159,11 +153,11 @@ describe("AccountPanel — states that are not 'an account'", () => {
     expect(screen.queryByTestId("settings.account-vaults")).toBeNull();
   });
 
-  it("an unreadable grouping is an ERROR, never the standalone state", async () => {
+  it("a grouping that cannot be read is an ERROR, never the standalone state", async () => {
     // The distinction is the whole reason the load error is separate state:
     // "this vault has no account" is a claim the panel cannot make when the
     // record could not be read.
-    listAccounts.mockRejectedValue({ kind: "RecordUnreadable" });
+    listAccounts.mockRejectedValue({ kind: "Io", io_error_kind: "PermissionDenied" });
     renderPanel();
     await screen.findByTestId("settings.account-error");
     expect(screen.queryByTestId("settings.account-standalone")).toBeNull();
@@ -206,58 +200,18 @@ describe("AccountPanel — the vault roster", () => {
     expect(count.textContent).toBe("2 vaults");
   });
 
-  it("offers the grouping actions the picker already performs", async () => {
-    // Two accounts, so a move DESTINATION exists: the backend takes a target
-    // vault id, so a destination can only be an account that already holds one.
-    const other = { id: "acct-2", vaults: ["v-third"] };
-    listAccounts.mockResolvedValue([ACCOUNT, other]);
-    splitVault.mockResolvedValue([
-      { ...ACCOUNT, vaults: ["v-other"] },
-      { id: "acct-3", vaults: ["v-active"] },
-    ]);
-    renderPanel();
-    const actions = await screen.findAllByTestId("settings.account-vault-actions");
-    fireEvent.click(actions[0]!);
-    fireEvent.click(await screen.findByTestId("settings.account-vault-split"));
-    await waitFor(() => expect(splitVault).toHaveBeenCalledWith("v-active"));
-
-    // The panel stays on the account it was SHOWING rather than following the
-    // open vault into the account the split just created: swapping the panel's
-    // subject mid-action is the failure this anchors against (2026-10-23
-    // review). The shown account kept `v-other`, so its roster reads one vault.
-    await waitFor(() => expect(splitVault).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getByTestId("settings.account-vaults-count").textContent).toBe(
-        "1 vault",
-      ),
-    );
-  });
-
-  it("names a move destination by its own vaults, and moves into its first", async () => {
+  it("is a read-out: the roster offers no actions at all", async () => {
+    // myne-md/myne#937 removed the move/split pair, and with it the row menu.
+    // A two-account record is still RENDERED (it can exist on a device that
+    // split before the removal) but nothing about it can be rearranged, so the
+    // control that opened the menu must not come back as a bare button.
     const other = { id: "acct-2", vaults: ["v-third"] };
     listAccounts.mockResolvedValue([ACCOUNT, other]);
     renderPanel();
-    const actions = await screen.findAllByTestId("settings.account-vault-actions");
-    fireEvent.click(actions[0]!);
-    const destinations = await screen.findAllByTestId("settings.account-vault-move");
-    // An account has no name of its own, so the menu identifies it by what is
-    // inside it (`docs/decisions/ui/0728`). A bare "Account" would make two
-    // destinations indistinguishable.
-    expect(destinations[0]!.textContent).toContain("Home vault");
-    fireEvent.click(destinations[0]!);
-    await waitFor(() => expect(moveVault).toHaveBeenCalledWith("v-active", "v-third"));
-  });
-
-  it("offers only 'move to a new account' when there is no destination yet", async () => {
-    // With one vault there is nowhere to move it TO (the backend needs a target
-    // vault id), so the menu keeps the split and drops the empty heading.
-    listAccounts.mockResolvedValue([{ ...ACCOUNT, vaults: ["v-active"] }]);
-    renderPanel();
-    const actions = await screen.findAllByTestId("settings.account-vault-actions");
-    expect(actions).toHaveLength(1);
-    fireEvent.click(actions[0]!);
-    expect(await screen.findByTestId("settings.account-vault-split")).toBeTruthy();
-    expect(screen.queryByTestId("settings.account-vault-move")).toBeNull();
+    await screen.findByTestId("settings.account-vaults");
+    expect(screen.getAllByTestId("settings.account-vault-row")).toHaveLength(2);
+    expect(screen.queryAllByTestId("settings.account-vault-actions")).toHaveLength(0);
+    expect(screen.queryByTestId("settings.account-vault-menu")).toBeNull();
   });
 
   it("shows the person account number, and only when the device has one", async () => {
@@ -294,23 +248,6 @@ describe("AccountPanel — the vault roster", () => {
 
 // 2026-10-23 review: the three arms the roster grew and did not pin.
 describe("AccountPanel — the roster's careful arms", () => {
-  it("asks before splitting the account's only vault, and cancelling writes nothing", async () => {
-    listAccounts.mockResolvedValue([{ ...ACCOUNT, vaults: ["v-active"] }]);
-    renderPanel();
-    fireEvent.click((await screen.findAllByTestId("settings.account-vault-actions"))[0]!);
-    fireEvent.click(await screen.findByTestId("settings.account-vault-split"));
-    // The split deletes the account's id, which the menu's own wording cannot
-    // say, so it is a second step rather than a click.
-    expect(splitVault).not.toHaveBeenCalled();
-    expect(await screen.findByTestId("settings.account-vault-confirm-run")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("settings.account-vault-confirm-cancel"));
-    expect(splitVault).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByTestId("settings.account-vault-split"));
-    fireEvent.click(await screen.findByTestId("settings.account-vault-confirm-run"));
-    await waitFor(() => expect(splitVault).toHaveBeenCalledWith("v-active"));
-  });
-
   it("does not claim a state for a vault the list could not read", async () => {
     // The list failure folds to [], so every id in the record is a vault this
     // device did not enumerate. "Device only" would be a claim from no data.
@@ -319,7 +256,6 @@ describe("AccountPanel — the roster's careful arms", () => {
     await screen.findByTestId("settings.account-vaults");
     const rows = screen.getAllByTestId("settings.account-vault-row");
     expect(rows[0]!.textContent).toContain("Not read on this device");
-    expect(screen.queryAllByTestId("settings.account-vault-actions")).toHaveLength(0);
   });
 
   it("copies the number and reports both outcomes", async () => {

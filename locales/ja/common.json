@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "グループ化はこの端末に残り、保管庫には付いていきません。",
       "vaultsCount_one": "{{count}} 個の保管庫",
       "vaultsCount_other": "{{count}} 個の保管庫",
-      "vaultActions": "保管庫の操作",
-      "splitLastConfirm": "これがアカウント内の唯一の保管庫です。移動するとこのアカウントは削除されます。",
       "vaultCorrupted": "この保管庫のメタデータを読み取れませんでした",
       "vaultUnreadable": "この端末では読み取れません",
       "vaultDeviceOnly": "この端末のみ",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "この保管庫はこの端末ではアカウントにグループ化されていないため、単独で存在します。グループ化は端末ごとなので、別の端末ではグループ内に表示される場合があります。",
       "unresolvedHelper": "開いている保管庫を確認中…",
       "devicesNote": "デバイス、共有保管庫のメンバー、アイデンティティは同期で管理します。",
-      "groupingHidden": "保管庫名が非表示の間はアカウントグループ化は利用できません。プライバシーでそのオプションをオフにしてから管理してください。",
-      "groupingUnreadable": "この端末のアカウントグループ化を読み取れませんでした。何も変更されていません。",
       "groupingError": "この端末のアカウントグループ化を読み取れませんでした。何も変更されていません。",
       "sections": {
         "extensions": "ブラウザ拡張機能",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "バックアップから復元",
     "subline": "このデバイスには複数の保管庫があります。ロックを解除する保管庫を選んでください。",
     "vaultFallback": "保管庫{{n}}",
-    "accountFallback": "アカウント",
-    "moveToAccount": "アカウントへ移動…",
-    "moveToNewAccount": "新しいアカウントへ移動",
-    "accountError": "アカウントのグループ化を更新できませんでした。変更はありません。",
-    "accountHidden": "ボールト名を隠している間、アカウント操作は利用できません。",
-    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。",
+    "accountError": "このデバイスではアカウントのグループ化を読み取れませんでした。",
     "createShort": "新しい保管庫",
     "joinShort": "デバイスを追加",
     "restoreShort": "バックアップを復元"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "{{count}}年前に開きました",
     "corruptedBadge": "破損",
     "accountFallback": "アカウント",
-    "moveToNewAccount": "新しいアカウントへ移動",
-    "moveToAccount": "アカウントへ移動…",
-    "accountError": "アカウントのグループ化を更新できませんでした。変更はありません。",
-    "accountHidden": "ボールト名を隠している間、アカウント操作は利用できません。",
-    "accountUnreadable": "このデバイスでアカウントのグループ化を読み取れませんでした。変更はありません。"
+    "accountError": "このデバイスではアカウントのグループ化を読み取れませんでした。"
   },
   "join": {
     "transportError": "その同期サーバーに接続できませんでした。アドレスと接続を確認してから、もう一度お試しください。",
