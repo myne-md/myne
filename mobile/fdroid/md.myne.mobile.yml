@@ -46,13 +46,13 @@ Repo: https://github.com/myne-md/myne.git
 # Four build blocks, one per ABI, because F-Droid installs the highest
 # versionCode a device can run and therefore every architecture needs its own.
 # The digit order is F-Droid's (armeabi-v7a < arm64-v8a < x86 < x86_64), applied
-# by the `sed` in `prebuild`: 0.11.0 derives versionCode 11000, so the four APKs
-# carry 110001..110004 and `versionCode:` below is that final value, matching the
+# by the `sed` in `prebuild`: 0.11.1 derives versionCode 11001, so the four APKs
+# carry 110011..110014 and `versionCode:` below is that final value, matching the
 # changelog filenames in `fastlane/metadata/android/en-US/changelogs/`.
 Builds:
-  # armeabi-v7a, 32-bit ARM. versionCode 110001.
-  - versionName: 0.11.0
-    versionCode: 110001
+  # armeabi-v7a, 32-bit ARM. versionCode 110011.
+  - versionName: 0.11.1
+    versionCode: 110011
     # OWED: the commit SHA the release tag points at, e.g.
     # `git rev-parse v0.10.1`. A placeholder here fails `fdroid lint` by name.
     commit: REPLACE_WITH_RELEASE_COMMIT
@@ -131,9 +131,9 @@ Builds:
     # build's identity, since the NDK's clang is what links the shipped `.so`.
     ndk: 29.0.14206865
 
-  # arm64-v8a. versionCode 110002.
-  - versionName: 0.11.0
-    versionCode: 110002
+  # arm64-v8a. versionCode 110012.
+  - versionName: 0.11.1
+    versionCode: 110012
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -177,9 +177,9 @@ Builds:
       - cargo tauri android build --apk --split-per-abi --target aarch64
     ndk: 29.0.14206865
 
-  # x86 (emulator and some tablets). versionCode 110003.
-  - versionName: 0.11.0
-    versionCode: 110003
+  # x86 (emulator and some tablets). versionCode 110013.
+  - versionName: 0.11.1
+    versionCode: 110013
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -223,9 +223,9 @@ Builds:
       - cargo tauri android build --apk --split-per-abi --target i686
     ndk: 29.0.14206865
 
-  # x86_64 (emulator). versionCode 110004.
-  - versionName: 0.11.0
-    versionCode: 110004
+  # x86_64 (emulator). versionCode 110014.
+  - versionName: 0.11.1
+    versionCode: 110014
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
