@@ -502,6 +502,10 @@ const V = {
   "src/lib/themeCanon.ts": ["ported", "Reads the built-in canon off the live stylesheet; shared with mobile."],
   "src/lib/themeMeasure.ts": ["ported", "Pure arithmetic + getComputedStyle."],
   "src/lib/themeDeepLink.ts": ["adapted", "Deep links arrive through the seam; a browser has no OS URL registration."],
+  "src/lib/themesSignal.ts": [
+    "ported",
+    "A monotonic change signal with no host call: the writers in `themes.ts` bump it and the picker subscribes, on every client that can show a custom theme. myne#934. The browser client's Settings is the same shared tree, so a theme installed there behind an open picker needed the same fix rather than a second mechanism.",
+  ],
   "src/lib/themes.ts": ["ported", "`MYT1` IPC; the plugin is dispatched (task 45)."],
   "src/lib/transcribe.ts": ["adapted", "Unreachable where `localAi` is absent."],
   "src/lib/vault-backup.ts": [

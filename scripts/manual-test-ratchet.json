@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11980,
+  "totalMinutesCeiling": 12000,
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",
@@ -1433,5 +1433,31 @@
     "",
     "The item is standard tier, so gatedMinutes is untouched (3837 before and",
     "after) and the whole 45 lands on the ceiling. Nothing was subtracted."
+  ],
+  "$comment29": [
+    "CEILING RAISED 11980 -> 12000 by myne-md/myne#934, in the sanctioned direction: a NEW surface that genuinely needs a human. What added the minutes, named so the raise is an argument rather than a number:",
+    "",
+    "  + one standard item on settings.panel.appearance, 5 minutes on each of",
+    "    desktop-macos, desktop-linux, desktop-windows and web = 20, the whole of",
+    "    11980 -> 12000. It asks a person to install a custom theme from the",
+    "    gallery while Settings > Appearance is already open, and then to press a",
+    "    built-in theme card, because those are the refresh path and the",
+    "    precedence rule between custom_theme and theme (docs/spec/protocol.md",
+    "    §9.5.2), and neither is observable by any lane here.",
+    "",
+    "WHY IT IS NOT A SCENARIO. The panel refreshes off TS module state",
+    "(`src/lib/themesSignal.ts`) that only the writer in `src/lib/themes.ts`",
+    "advances, and both writers that reach it are un-drivable from the page seat:",
+    "the Import action opens the native OS file dialog, and a gallery install",
+    "arrives through the deep-link plugin's OS handoff, which tauri-driver cannot",
+    "deliver to a running app. A scenario can only fire",
+    "plugin:themes|themes_import over IPC, which bypasses the writer and the",
+    "signal with it: it observes the store and never the refresh. This branch",
+    "carried a ct3 scenario doing exactly that, and dropped it for this reason,",
+    "so the observation is recorded here rather than claimed in",
+    "e2e/custom-themes.e2e.ts.",
+    "",
+    "The item is standard tier, so gatedMinutes is untouched (3837 before and",
+    "after) and the whole 20 lands on the ceiling. Nothing was subtracted."
   ]
 }

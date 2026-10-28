@@ -33,6 +33,7 @@ import {
   type ThemePreview,
 } from "../../lib/themes";
 import { prefsRead, setCustomTheme } from "../../lib/prefs";
+import { useThemesNonce } from "../../lib/themesSignal";
 import { applyCustomTheme, applyTheme } from "../../lib/theme";
 import { describeImportError } from "../../lib/theme-errors";
 import { saveJsonAsFile } from "../../lib/secret-export";
@@ -143,9 +144,19 @@ export function CustomThemesSection({
     }
   }
 
+  // One read per store change, and the store is the only thing that can change
+  // the list. The signal is advanced by the WRITERS in `src/lib/themes.ts`, so
+  // this covers all three routes to a new row: this panel's own Import, the
+  // `myne://theme/install` dialog's Apply, and a delete from either. Reading on
+  // mount alone is what made an installed theme invisible until Settings was
+  // closed and reopened (myne#934).
+  const themesNonce = useThemesNonce();
   useEffect(() => {
     void refresh();
-  }, []);
+    // The nonce is the trigger, not `refresh`: the function is re-created every
+    // render, so naming it would re-read on every render instead of on every
+    // store change.
+  }, [themesNonce]);
 
   async function apply(name: string) {
     setError(null);
@@ -192,7 +203,6 @@ export function CustomThemesSection({
         }
       }
       setConfirmingDelete(null);
-      await refresh();
     } catch {
       setError(translate("settings.customThemes.deleteError"));
     }
@@ -214,8 +224,9 @@ export function CustomThemesSection({
     const name = themeNameFromPickedFile(file);
     try {
       const paletteJson = await readPickedSmallText(file);
+      // No `refresh()` here: `importCustomTheme` advances the store signal and
+      // the subscription above is the one path back to the list.
       await importCustomTheme(name, paletteJson);
-      await refresh();
     } catch (e) {
       setError(describeImportError(e, "settings.customThemes.importError"));
     }

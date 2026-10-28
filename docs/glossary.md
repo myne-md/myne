@@ -4049,6 +4049,16 @@ Distinguish it from the **value-shape allowlist**, which is a security control o
 
 Used in: `decisions.md` 2026-08-06; `spec/protocol.md` §9.21
 
+### **themes-changed nonce** &nbsp; 🛠️ *Tooling*
+
+A monotonic in-memory counter, one per client, advanced after a [`vault.themes`](#vaultthemes) write resolves (myne#934). The sibling of the [prefs-changed nonce](#prefs-changed-nonce) and built for the same reason: the Settings picker reads the store once and holds the result in component state, so a theme imported from another surface behind the still-open Settings modal left the panel advertising "No custom themes yet" until it was remounted. Subscribers re-read the blob on an advance; bumping before the write resolves is a defect for the same reason it is in prefs.
+
+**The bump belongs to the writer, not to a surface.** `src/lib/themes.ts` (`importCustomTheme`, `deleteCustomTheme`) is the one module every surface goes through, so the advance lives there and the `myne://theme/install` dialog's Apply inherits it without a line of its own.
+
+**What it does NOT cover, and why that is stated rather than fixed here.** A sync round landing a peer's `vault.themes` advances nothing, because no event announces that merge: `core` reports it as `SyncCycleSummary::themes_applied_remote` and its own doc comment records that no listener is wired yet, where `vault.prefs` gets `myne://prefs-changed` off the same flag (`PREFS_CHANGED_EVENT`, MYND-478). A peer's theme therefore reaches an open picker on the next mount, which is the refresh boundary the paint path has too (`src/App.tsx` re-applies a custom palette on a stage transition, not on a sync).
+
+Used in: `src/lib/themesSignal.ts`; `src/lib/themes.ts`; `src/components/settings/CustomThemesSection.tsx`
+
 ### **throughput routing preference** &nbsp; 📋 *Protocol*
 
 The `provider.sort = throughput` field on every OpenRouter request (myne-md/myne#620), including ordinary chat as well as [agent runs](#agent-run). OpenRouter is a broker that forwards to model vendors, so "who receives this" is a set Myne can bound only at its first hop; the `provider` object is the one surface Myne has over the second hop, and this is Myne starting to use it.

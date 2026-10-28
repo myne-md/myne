@@ -129,7 +129,7 @@ export function WelcomeFlow({ onHaveIdentity, onIdentity }: WelcomeFlowProps) {
         {roots.length > 0 && (
           <Banner kind="warning">
             {repairableEntries > 0 && (
-              <div data-testid="welcome.residue-banner" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              <div data-testid="welcome.residue-banner" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
                 <div>{t("welcome.residueBanner", { n: repairableEntries })}</div>
                 <Button variant="secondary" onClick={() => void cleanUp()} disabled={busy} data-testid="welcome.residue-clean">
                   {busy ? t("welcome.repairResidue.cleaningUp") : t("welcome.cleanUpFiles")}
@@ -139,7 +139,7 @@ export function WelcomeFlow({ onHaveIdentity, onIdentity }: WelcomeFlowProps) {
             {gated && (
               <div
                 data-testid="welcome.residue-gated"
-                style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: repairableEntries > 0 ? 14 : 0 }}
+                style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", marginTop: repairableEntries > 0 ? 14 : 0 }}
               >
                 {/* Not called "leftover": this may be a vault nobody can open
                     any more, and telling the user it is already unreadable would

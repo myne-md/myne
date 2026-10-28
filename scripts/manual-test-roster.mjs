@@ -5621,6 +5621,11 @@ export const ROSTER = Object.freeze([
       "src/components/settings/BarCustomizeSettings.tsx",
       "src/components/settings/CustomizeList.tsx",
       "src/lib/theme.ts",
+      // The live-refresh signal the picker subscribes to (myne-md/myne#934). It
+      // is module state advanced by the writer in `src/lib/themes.ts`, which is
+      // why the observation below cannot be driven from the page seat: the
+      // suite's own write path calls the IPC directly and never enters it.
+      "src/lib/themesSignal.ts",
       "src/styles/tokens.css",
       "mobile/src/lib/themes.ts",
       "mobile/src/styles/tokens.css",
@@ -5639,6 +5644,13 @@ export const ROSTER = Object.freeze([
       "e2e/a11y-axe.e2e.ts",
     ],
     manual: [
+      {
+        see: "With Settings → Appearance open and the Custom themes list visible, install a theme from the gallery (or from an imported `.json` through the Import button) and confirm the row appears in that list without closing and reopening the panel, and that a delete removes it the same way. Then press a built-in theme card while the custom theme is active: confirm the card becomes the checked one, the custom row stops reading as active, and the override line under the cards goes away. PASS is that no part of this needs a reopen, and that at no point do the built-in cards and the custom row both read as selected.",
+        whyNotAutomated: "The panel refreshes off TS module state (`src/lib/themesSignal.ts`) that only the writer in `src/lib/themes.ts` advances, and both writers that reach it are un-drivable from the page seat: the Import action opens the native OS file dialog, and a gallery install arrives through the deep-link plugin's OS handoff (`myne://theme/install`) which tauri-driver cannot deliver to a running app. A scenario can only call `plugin:themes|themes_import` over IPC, which bypasses the writer and the signal with it, so it observes the store and never the refresh.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
+        estimateMin: 5,
+        tier: "standard",
+      },
       {
         see: "Turn Windows high-contrast mode on and open Myne. Confirm no text becomes invisible, every control still has a visible boundary, and the Appearance panel does not claim a theme different from what is on screen. Then on an Android phone turn battery-saver on with its dark override and record whether the app follows or keeps its own theme.",
         whyNotAutomated: "Windows high-contrast is an OS forced-colors mode on a platform with no driver lane, and the Android battery-saver dark override is a system WebView forced-dark path with no mobile lane; both change what the app shows with no Myne interaction to drive.",
