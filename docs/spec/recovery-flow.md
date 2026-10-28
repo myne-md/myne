@@ -81,7 +81,7 @@ A bare "I have written it down" checkbox is **insufficient** (`protocol.md` §7.
 
 The recovery phrase is shown to the user on §2.2 **exactly once**, and never again by any client surface. After the user advances past the confirmation step, the in-memory phrase string MUST be dropped from the client's state.
 
-Reaffirmed 2026-09-27 (myne-md/myne#468): the read-only verification in §3.6 does not weaken this. It takes the phrase as INPUT and answers yes or no; it never displays one.
+Amended 2026-10-28 (myne-md/myne#935): the read-only verification §3.6 once specified is withdrawn, so this commitment is now unqualified. Nothing in any client accepts the phrase again while the vault is unlocked, and no client MAY add such a surface without a new `decisions.md` entry.
 
 This commitment is **narrow**: it covers the *generated* phrase displayed at vault creation. It does not extend to user-typed input during recovery (§3.2), which is governed separately (§3.5). A future client MUST NOT add a "show me my recovery phrase" affordance under any authenticated condition; the architecture additionally enforces this structurally because the phrase plaintext is zeroized at vault creation and only `enc_root_key_recovery` survives on disk.
 
@@ -113,7 +113,7 @@ Normative properties:
 
 > **Where the surfaces are, so the list can be checked rather than assumed.** Recovery (`src/screens/vault-recover/PhraseEntryStep.tsx`), device enrolment (`src/components/sync/EnrollPhraseCredential.tsx`), the vault-import source credential (`src/notes/import/MyneVaultSetup.tsx`), the B2B member-identity unlock (`src/components/sync/PersonIdentityUnlock.tsx`), the B2B member-vault unlock (`src/components/sync/MemberVaultUnlockCard.tsx`), identity-only recovery (`src/components/IdentitySetupDialog.tsx`), the vault-migration credential (`src/components/settings/MigrateVaultForm.tsx`), and the two person-identity registration surfaces (`src/components/sync/PersonRegisterForm.tsx`, mounted by `src/screens/IdentityHome.tsx` and `src/components/settings/SyncPanel.tsx`) each provide a caller-specific credential surface, and the mobile join provides two more on its own tree (`mobile/src/app/flows/JoinFlow.tsx`: the join form's grid and the pending screen's escape), which follow §3.2 like every surface above. **Every one of the nine shared-tree surfaces ships in the web bundle**: `decisions.md` 2026-10-18 (entry 0704) retired the build-time substitutions and deleted the `scripts/check-web-no-phrase.mjs` artefact grep, so the one-`data-testid`-per-surface rule that guard required is required by nothing now, and the shared grid is free to collapse those seven into one primitive. The mobile join's pair ships in the mobile bundle only. What still differs per client is **reachability**, and that is a runtime capability decision rather than a build one: on web the member, identity, import and migration surfaces are not rendered, because their capabilities are absent. §3.2's properties bind every surface on every client, whether or not it renders.
 
-> **Open implementation question (B4b).** If the recovery-drill smoke test reveals the typo-cost-per-attempt is too punishing in practice, this rule MAY be revisited via a new `decisions.md` entry. Candidate softening: a single batched, non-cell-specific message ("phrase contains words not in the BIP-39 list — please re-check") shown only after a failed Argon2id+AEAD cycle, without per-cell highlighting.
+> **Open implementation question (B4b).** If the recovery-flow smoke test reveals the typo-cost-per-attempt is too punishing in practice, this rule MAY be revisited via a new `decisions.md` entry. Candidate softening: a single batched, non-cell-specific message ("phrase contains words not in the BIP-39 list, please re-check") shown only after a failed Argon2id+AEAD cycle, without per-cell highlighting.
 
 ### 3.3 Submit and in-flight state
 
@@ -158,16 +158,11 @@ The 24-word phrase is one of two critical secrets per `threat-model.md` AS11. Th
 
 The spec deliberately avoids promising "the phrase is zeroized" without qualification, because that would misrepresent what the V8 runtime can deliver.
 
-### 3.6 Read-only verification (the drill)
+### 3.6 Read-only verification (withdrawn 2026-10-28)
 
-A client MUST offer a way to check, on an UNLOCKED vault, whether a phrase the user types opens that vault (`decisions/security/0640`, myne-md/myne#468). §2.4 means a phrase mis-copied at creation is otherwise discovered on the day it is needed, which is the day the password is already gone.
+This section used to specify a MUST: a client offered a way to check, on an unlocked vault, whether a phrase the user types opens that vault (`decisions/security/0640`). It is withdrawn (`decisions/security/0747`, myne-md/myne#935). No client offers the check, and no client MAY add one without a new `decisions.md` entry, because it is a verification oracle and, on the web client, a phrase prompt staged outside a flow the user started.
 
-- **Read-only.** The command derives the recovery wrap-key under the vault's recovery salt domain, attempts the AEAD-open of `enc_root_key_recovery`, discards the result, and returns a boolean. It MUST NOT transition any slot (in particular it MUST NOT populate `Recovering`, which would demand a password reset from a user who was only checking) and MUST NOT write.
-- **Unlock-gated.** It MUST refuse when no vault is unlocked. This is what bounds it as an oracle: a caller at a locked app cannot reach it, and a caller at an unlocked app already holds the plaintext.
-- **Shared auth budget.** Attempts ride the same single-permit budget as unlock, recovery and password change, so a check cannot run beside any of them or be used to keep that budget busy.
-- **One failure answer.** A wrong phrase, another vault's phrase and structurally invalid input MUST all produce the same result and the same message. The message MUST NOT name a mismatched position — that would turn one whole-phrase check into twenty-four one-word checks — and SHOULD say why it does not. A `vault.meta` that cannot be read or parsed is an ERROR, not a wrong phrase.
-- **Entry only.** The surface MUST NOT display a phrase. It clears its input after every attempt.
-- **Not surfaced automatically,** with one exception: a single, dismissible line on the backup-success screen, which never returns once dismissed.
+The section number is kept rather than closed up so that existing references to §3.7 keep resolving. The cost of the withdrawal is recorded rather than absorbed: this was the only check of a phrase held on paper, §2.4 forbids re-displaying one, and the §2.3 type-back challenges four of the 24 positions. A phrase mis-transcribed at creation is therefore discovered on the day it is needed.
 
 ### 3.7 Joining a new device with the phrase
 

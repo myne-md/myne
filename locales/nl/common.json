@@ -488,10 +488,7 @@
       "successToast": "Back-up geverifieerd en opgeslagen.",
       "title": "Back-up van kluis maken",
       "verifying": "{{done}} van {{total}} verifiëren…",
-      "drillBody": "Een back-up alleen krijg je niet terug binnen als je je wachtwoord kwijtraakt.",
-      "drillCta": "Controleren",
-      "drillOnce": "Eén keer getoond. Nadat je dit sluit, komt het niet terug.",
-      "drillTitle": "Heb je ook je herstelzin gecontroleerd?"
+      "phraseNotSubstitute": "Een back-up alleen krijg je niet terug binnen als je je wachtwoord kwijtraakt."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "De schermopname-instelling van dit apparaat kon niet worden gelezen, dus deze voorkeur wordt niet toegepast. Open Instellingen opnieuw om het nog eens te proberen.",
       "screenCaptureSuperseded": "Uit op dit apparaat. Zie “Schermopname op dit apparaat toestaan” hieronder. Deze voorkeur blijft bewaard en geldt weer zodra je die optie uitzet.",
       "screenCaptureSupersededByFlag": "Uit voor deze sessie, omdat Myne is gestart met --disable-screen-capture-protection. Deze voorkeur blijft bewaard en geldt weer de volgende keer dat je Myne zonder die optie opent.",
-      "recoveryDrillCheck": "Zin controleren",
-      "recoveryDrillChecking": "Controleren…",
-      "recoveryDrillError": "Kon de controle nu niet uitvoeren. Er is niets gewijzigd. Probeer het zo meteen opnieuw.",
-      "recoveryDrillHelper": "Typ de 24 woorden die je hebt opgeschreven. Myne controleert of ze deze kluis nog openen en vertelt je niets anders — de woorden worden hier nooit getoond.",
-      "recoveryDrillLabel": "Je herstelzin controleren",
-      "recoveryDrillPassed": "Deze woorden openen deze kluis. Bewaar ze waar je ze vond.",
-      "recoveryDrillPlaceholder": "De 24 woorden, in volgorde, gescheiden door spaties",
       "hideVaultNamesInline": "Als je dit aanzet, worden de sleutels vernietigd die de hier opgeslagen namen leesbaar maken.",
       "topics": {
         "access": "Toegang",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Schermbeveiliging",
         "terminal": "Opdrachtregelprogramma's",
-        "locking": "Vergrendelen en ontgrendelen",
-        "recovery": "Herstel"
+        "locking": "Vergrendelen en ontgrendelen"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "update bijwerken controleren op updates nieuwe versie release downloaden",
         "plainFile": "plat bestand editor markdown lokaal schijf buiten kluis platte tekst ter plaatse openen",
         "memberPassword": "gedeelde kluis wachtwoord lid ontgrendelen toetreden zin",
-        "recoveryDrill": "herstelzin controleren verifiëren oefenen test 24 woorden seed back-up wachtwoord kwijt",
         "bar": "onderbalk statusbalk indicatoren aanpassen herordenen verbergen tonen werkbalk",
         "syncDeviceBindings": "apparaten opgeëist door leden toeschrijving wie ondertekende welk apparaat hoort",
         "vaultFormat": "kluis formaat bijwerken een-zins herstel intrekken kluis herstelzin migreren identiteit vault format upgrade recovery phrase",

@@ -530,10 +530,7 @@
       "successToast": "Copie de rezervă verificată și salvată.",
       "title": "Creează copie de rezervă a seifului",
       "verifying": "Se verifică {{done}} din {{total}}…",
-      "drillBody": "Doar o copie de rezervă nu te va readuce înăuntru dacă îți pierzi parola.",
-      "drillCta": "Verific-o",
-      "drillOnce": "Afișată o singură dată. După ce închizi aceasta, nu va mai reveni.",
-      "drillTitle": "Ai verificat și fraza de recuperare?"
+      "phraseNotSubstitute": "Doar o copie de rezervă nu te va readuce înăuntru dacă îți pierzi parola."
     }
   },
   "clipper": {
@@ -4104,13 +4101,6 @@
       "screenCaptureOverrideUnknown": "Setarea acestui dispozitiv privind capturarea ecranului nu a putut fi citită, așa că această preferință nu este aplicată. Redeschide Setările pentru a încerca din nou.",
       "screenCaptureSuperseded": "Dezactivată pe acest dispozitiv. Vezi „Permite capturarea ecranului pe acest dispozitiv” mai jos. Această preferință este păstrată și se aplică din nou când dezactivezi acea opțiune.",
       "screenCaptureSupersededByFlag": "Dezactivată pentru această sesiune, pentru că Myne a fost pornit cu --disable-screen-capture-protection. Această preferință este păstrată și se aplică din nou data viitoare când deschizi Myne fără acest parametru.",
-      "recoveryDrillCheck": "Verifică fraza",
-      "recoveryDrillChecking": "Se verifică…",
-      "recoveryDrillError": "Verificarea nu a putut rula acum. Nu s-a schimbat nimic. Încearcă din nou într-o clipă.",
-      "recoveryDrillHelper": "Tastează cele 24 de cuvinte pe care le-ai notat. Myne verifică dacă ele deschid în continuare acest seif și nu îți spune nimic altceva — cuvintele nu sunt afișate niciodată aici.",
-      "recoveryDrillLabel": "Verifică-ți fraza de recuperare",
-      "recoveryDrillPassed": "Aceste cuvinte deschid acest seif. Păstrează-le acolo unde le-ai găsit.",
-      "recoveryDrillPlaceholder": "Cele 24 de cuvinte, în ordine, separate prin spații",
       "hideVaultNamesInline": "Activarea ei distruge cheile care fac lizibile numele stocate aici.",
       "topics": {
         "access": "Acces",
@@ -4119,8 +4109,7 @@
       "sections": {
         "screen": "Protecția ecranului",
         "terminal": "Unelte pentru linia de comandă",
-        "locking": "Blocare și deblocare",
-        "recovery": "Recuperare"
+        "locking": "Blocare și deblocare"
       }
     },
     "quickUnlock": {
@@ -4416,7 +4405,6 @@
         "update": "actualizare upgrade verifică actualizări versiune nouă lansare descărcare",
         "plainFile": "fișier simplu editor markdown disc local în afara seifului text simplu deschide la fața locului",
         "memberPassword": "seif partajat parolă membru deblocare alăturare frază",
-        "recoveryDrill": "frază de recuperare verificare verifică exercițiu test 24 de cuvinte seed copie de rezervă parolă pierdută",
         "bar": "bară de jos bară de stare indicatori personalizare reordonare ascunde arată bară de instrumente",
         "syncDeviceBindings": "dispozitive revendicate de membri atribuire cine a semnat cărui dispozitiv aparține",
         "vaultFormat": "format seif actualizare recuperare dintr-o singură frază retrage frază de recuperare seif migrare identitate",

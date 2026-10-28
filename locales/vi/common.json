@@ -488,10 +488,7 @@
       "successToast": "Đã xác minh và lưu bản sao lưu.",
       "title": "Sao lưu kho",
       "verifying": "Đang xác minh {{done}} trên {{total}}…",
-      "drillBody": "Chỉ riêng bản sao lưu sẽ không giúp bạn vào lại nếu bạn mất mật khẩu.",
-      "drillCta": "Kiểm tra đi",
-      "drillOnce": "Chỉ hiện một lần. Sau khi bạn đóng, nó sẽ không hiện lại.",
-      "drillTitle": "Bạn đã kiểm tra cụm từ khôi phục của mình chưa?"
+      "phraseNotSubstitute": "Chỉ riêng bản sao lưu sẽ không giúp bạn vào lại nếu bạn mất mật khẩu."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Không đọc được cài đặt chụp màn hình của thiết bị này, nên tùy chọn này chưa được áp dụng. Hãy mở lại Cài đặt để thử lần nữa.",
       "screenCaptureSuperseded": "Đang tắt trên thiết bị này. Xem “Cho phép chụp màn hình trên thiết bị này” bên dưới. Tùy chọn này vẫn được giữ và sẽ áp dụng trở lại khi bạn tắt tùy chọn kia.",
       "screenCaptureSupersededByFlag": "Đang tắt trong phiên này, vì Myne được khởi động với --disable-screen-capture-protection. Tùy chọn này vẫn được giữ và sẽ áp dụng trở lại vào lần tiếp theo bạn mở Myne mà không dùng tùy chọn đó.",
-      "recoveryDrillCheck": "Kiểm tra cụm từ",
-      "recoveryDrillChecking": "Đang kiểm tra…",
-      "recoveryDrillError": "Hiện không chạy được việc kiểm tra. Không có gì thay đổi. Hãy thử lại sau một lát.",
-      "recoveryDrillHelper": "Hãy nhập 24 từ bạn đã ghi lại. Myne kiểm tra xem chúng còn mở được kho này không và không cho bạn biết gì khác — các từ không bao giờ được hiển thị ở đây.",
-      "recoveryDrillLabel": "Kiểm tra cụm từ khôi phục của bạn",
-      "recoveryDrillPassed": "Những từ này mở được kho này. Hãy giữ chúng ở nơi bạn đã cất.",
-      "recoveryDrillPlaceholder": "24 từ, theo đúng thứ tự, cách nhau bằng dấu cách",
       "hideVaultNamesInline": "Bật nó sẽ hủy các khóa giúp đọc được những tên đã lưu tại đây.",
       "topics": {
         "access": "Truy cập",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Bảo vệ màn hình",
         "terminal": "Công cụ dòng lệnh",
-        "locking": "Khóa và mở khóa",
-        "recovery": "Khôi phục"
+        "locking": "Khóa và mở khóa"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "cập nhật nâng cấp kiểm tra cập nhật phiên bản mới phát hành tải xuống",
         "plainFile": "tệp thuần trình soạn thảo markdown đĩa cục bộ ngoài kho văn bản thuần mở tại chỗ",
         "memberPassword": "kho chia sẻ mật khẩu thành viên mở khóa tham gia cụm từ",
-        "recoveryDrill": "cụm từ khôi phục kiểm tra xác minh diễn tập thử 24 từ hạt giống sao lưu mất mật khẩu",
         "bar": "thanh dưới thanh trạng thái chỉ báo tùy chỉnh sắp xếp lại ẩn hiện thanh công cụ",
         "syncDeviceBindings": "thiết bị được thành viên nhận ai đã ký thiết bị nào thuộc về",
         "vaultFormat": "định dạng kho nâng cấp khôi phục một cụm từ nghỉ hưu kho cụm từ khôi phục di chuyển danh tính",

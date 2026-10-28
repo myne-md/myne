@@ -488,10 +488,7 @@
       "successToast": "Sikkerhetskopi verifisert og lagret.",
       "title": "Sikkerhetskopier hvelv",
       "verifying": "Verifiserer {{done}} av {{total}}…",
-      "drillBody": "En sikkerhetskopi alene får deg ikke inn igjen hvis du mister passordet.",
-      "drillCta": "Sjekk den",
-      "drillOnce": "Vises én gang. Når du lukker dette, kommer det ikke tilbake.",
-      "drillTitle": "Har du sjekket gjenopprettingsfrasen din også?"
+      "phraseNotSubstitute": "En sikkerhetskopi alene får deg ikke inn igjen hvis du mister passordet."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Denne enhetens innstilling for skjermopptak kunne ikke leses, så dette valget blir ikke brukt. Åpne Innstillinger på nytt for å prøve igjen.",
       "screenCaptureSuperseded": "Av på denne enheten. Se «Tillat skjermopptak på denne enheten» nedenfor. Dette valget beholdes og gjelder igjen når du slår av den innstillingen.",
       "screenCaptureSupersededByFlag": "Av for denne økten, fordi Myne ble startet med --disable-screen-capture-protection. Dette valget beholdes og gjelder igjen neste gang du åpner Myne uten det flagget.",
-      "recoveryDrillCheck": "Sjekk frasen",
-      "recoveryDrillChecking": "Sjekker…",
-      "recoveryDrillError": "Kunne ikke kjøre sjekken akkurat nå. Ingenting ble endret. Prøv igjen om litt.",
-      "recoveryDrillHelper": "Skriv inn de 24 ordene du skrev ned. Myne sjekker om de fortsatt åpner dette hvelvet og sier ikke noe annet — ordene vises aldri her.",
-      "recoveryDrillLabel": "Sjekk gjenopprettingsfrasen din",
-      "recoveryDrillPassed": "Disse ordene åpner dette hvelvet. Oppbevar dem der du fant dem.",
-      "recoveryDrillPlaceholder": "De 24 ordene, i rekkefølge, atskilt med mellomrom",
       "hideVaultNamesInline": "Å slå det på ødelegger nøklene som gjør de lagrede navnene lesbare.",
       "topics": {
         "access": "Tilgang",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Skjermbeskyttelse",
         "terminal": "Kommandolinjeverktøy",
-        "locking": "Låsing og opplåsing",
-        "recovery": "Gjenoppretting"
+        "locking": "Låsing og opplåsing"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "oppdatering oppgrader se etter oppdateringer ny versjon utgivelse nedlasting update upgrade check for updates new version release download",
         "plainFile": "klartekstfil fil editor markdown lokal disk utenfor hvelv klartekst åpne på stedet plain file editor markdown local disk outside vault plaintext open in place",
         "memberPassword": "delt hvelv passord medlem lås opp bli med frase shared vault password member unlock join phrase",
-        "recoveryDrill": "gjenopprettingsfrase sjekk verifiser øvelse test 24 ord seed sikkerhetskopi mistet passord recovery phrase check verify drill test 24 words seed backup lost password",
         "bar": "bunnlinje statuslinje indikatorer tilpass endre rekkefølge skjul vis verktøylinje bottom bar status bar indicators customize reorder hide show toolbar",
         "syncDeviceBindings": "enheter gjort krav på av medlemmer tilskrivning hvem signerte hvilken enhet tilhører devices claimed by members attribution who signed which device belongs",
         "vaultFormat": "hvelvformat oppgrader en-frase gjenoppretting trekk tilbake hvelv gjenopprettingsfrase migrer identitet",

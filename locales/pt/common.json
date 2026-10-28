@@ -530,10 +530,7 @@
       "successToast": "Cópia de segurança verificada e guardada.",
       "title": "Fazer cópia de segurança do cofre",
       "verifying": "A verificar {{done}} de {{total}}…",
-      "drillBody": "Uma cópia de segurança, sozinha, não o deixa voltar a entrar se perder a palavra-passe.",
-      "drillCta": "Verificá-la",
-      "drillOnce": "Mostrado uma vez. Depois de fechar isto, não volta a aparecer.",
-      "drillTitle": "Já verificou também a sua frase de recuperação?"
+      "phraseNotSubstitute": "Uma cópia de segurança, sozinha, não o deixa voltar a entrar se perder a palavra-passe."
     }
   },
   "clipper": {
@@ -4104,13 +4101,6 @@
       "screenCaptureOverrideUnknown": "Não foi possível ler a definição de captura de ecrã deste dispositivo, por isso esta preferência não está a ser aplicada. Volte a abrir as Definições para tentar novamente.",
       "screenCaptureSuperseded": "Desativada neste dispositivo. Consulte “Permitir a captura de ecrã neste dispositivo” mais abaixo. Esta preferência é mantida e volta a aplicar-se quando desativar essa opção.",
       "screenCaptureSupersededByFlag": "Desativada nesta sessão, porque o Myne foi iniciado com --disable-screen-capture-protection. Esta preferência é mantida e volta a aplicar-se da próxima vez que abrir o Myne sem essa opção.",
-      "recoveryDrillCheck": "Verificar frase",
-      "recoveryDrillChecking": "A verificar…",
-      "recoveryDrillError": "Não foi possível fazer a verificação agora. Nada mudou. Tente novamente daqui a pouco.",
-      "recoveryDrillHelper": "Escreva as 24 palavras que anotou. O Myne verifica se ainda abrem este cofre e não lhe diz mais nada — as palavras nunca são mostradas aqui.",
-      "recoveryDrillLabel": "Verificar a sua frase de recuperação",
-      "recoveryDrillPassed": "Estas palavras abrem este cofre. Guarde-as onde as encontrou.",
-      "recoveryDrillPlaceholder": "As 24 palavras, por ordem, separadas por espaços",
       "hideVaultNamesInline": "Ligá-lo destrói as chaves que tornam legíveis os nomes guardados aqui.",
       "topics": {
         "access": "Acesso",
@@ -4119,8 +4109,7 @@
       "sections": {
         "screen": "Proteção do ecrã",
         "terminal": "Ferramentas de linha de comandos",
-        "locking": "Bloquear e desbloquear",
-        "recovery": "Recuperação"
+        "locking": "Bloquear e desbloquear"
       }
     },
     "quickUnlock": {
@@ -4416,7 +4405,6 @@
         "update": "atualização atualizar verificar atualizações versão nova lançamento descarregar download",
         "plainFile": "ficheiro simples editor markdown disco local fora do cofre texto simples abrir no local plain file",
         "memberPassword": "cofre partilhado palavra-passe membro desbloquear juntar frase",
-        "recoveryDrill": "frase de recuperação verificar teste 24 palavras semente cópia de segurança palavra-passe perdida",
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de ferramentas",
         "syncDeviceBindings": "dispositivos reclamados por membros atribuição quem assinou a que dispositivo pertence",
         "vaultFormat": "formato do cofre atualização recuperação de uma frase aposentar cofre frase de recuperação migrar identidade",

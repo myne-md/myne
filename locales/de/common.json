@@ -488,10 +488,7 @@
       "successToast": "Sicherung verifiziert und gespeichert.",
       "title": "Tresor sichern",
       "verifying": "{{done}} von {{total}} werden verifiziert…",
-      "drillBody": "Eine Sicherung allein bringt Sie nicht wieder hinein, wenn Sie Ihr Passwort verlieren.",
-      "drillCta": "Jetzt prüfen",
-      "drillOnce": "Einmal angezeigt. Nachdem Sie dies geschlossen haben, kommt es nicht wieder.",
-      "drillTitle": "Haben Sie auch Ihre Wiederherstellungsphrase geprüft?"
+      "phraseNotSubstitute": "Eine Sicherung allein bringt Sie nicht wieder hinein, wenn Sie Ihr Passwort verlieren."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Die Bildschirmaufnahme-Einstellung dieses Geräts konnte nicht gelesen werden, daher wird diese Einstellung nicht angewendet. Öffnen Sie die Einstellungen erneut, um es noch einmal zu versuchen.",
       "screenCaptureSuperseded": "Auf diesem Gerät deaktiviert. Siehe „Bildschirmaufnahme auf diesem Gerät erlauben“ unten. Diese Einstellung bleibt erhalten und greift wieder, sobald Sie jene Option deaktivieren.",
       "screenCaptureSupersededByFlag": "Für diese Sitzung deaktiviert, weil Myne mit --disable-screen-capture-protection gestartet wurde. Diese Einstellung bleibt erhalten und greift wieder, wenn Sie Myne das nächste Mal ohne diese Option öffnen.",
-      "recoveryDrillCheck": "Phrase prüfen",
-      "recoveryDrillChecking": "Wird geprüft…",
-      "recoveryDrillError": "Die Prüfung konnte gerade nicht ausgeführt werden. Es hat sich nichts geändert. Versuchen Sie es gleich erneut.",
-      "recoveryDrillHelper": "Geben Sie die 24 Wörter ein, die Sie aufgeschrieben haben. Myne prüft, ob sie diesen Tresor noch öffnen, und sagt Ihnen nichts weiter — die Wörter werden hier nie angezeigt.",
-      "recoveryDrillLabel": "Ihre Wiederherstellungsphrase prüfen",
-      "recoveryDrillPassed": "Diese Wörter öffnen diesen Tresor. Bewahren Sie sie dort auf, wo Sie sie gefunden haben.",
-      "recoveryDrillPlaceholder": "Die 24 Wörter, in der Reihenfolge, durch Leerzeichen getrennt",
       "hideVaultNamesInline": "Wenn Sie dies einschalten, werden die Schlüssel zerstört, die die hier gespeicherten Namen lesbar machen.",
       "topics": {
         "access": "Zugriff",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Bildschirmschutz",
         "terminal": "Kommandozeilenwerkzeuge",
-        "locking": "Sperren und Entsperren",
-        "recovery": "Wiederherstellung"
+        "locking": "Sperren und Entsperren"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "aktualisierung aktualisieren nach aktualisierungen suchen neue version release herunterladen",
         "plainFile": "klartext datei editor markdown lokale festplatte außerhalb tresor vor ort öffnen",
         "memberPassword": "geteilter tresor passwort mitglied entsperren beitreten phrase",
-        "recoveryDrill": "wiederherstellungsphrase prüfen überprüfen übung test 24 wörter seed sicherung passwort vergessen",
         "bar": "untere leiste statusleiste indikatoren anpassen umsortieren ausblenden anzeigen symbolleiste",
         "syncDeviceBindings": "geräte beansprucht von mitgliedern zuordnung wer welches gerät unterschrieben gehört",
         "vaultFormat": "tresor format upgrade eine-phrase wiederherstellung phrase zurückziehen tresor wiederherstellungsphrase migrieren identität",

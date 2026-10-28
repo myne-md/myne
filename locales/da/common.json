@@ -488,10 +488,7 @@
       "successToast": "Sikkerhedskopi verificeret og gemt.",
       "title": "Sikkerhedskopiér boks",
       "verifying": "Verificerer {{done}} af {{total}}…",
-      "drillBody": "En sikkerhedskopi alene giver dig ikke adgang igen, hvis du mister din adgangskode.",
-      "drillCta": "Tjek den",
-      "drillOnce": "Vises én gang. Når du lukker dette, kommer det ikke igen.",
-      "drillTitle": "Har du også tjekket din gendannelsessætning?"
+      "phraseNotSubstitute": "En sikkerhedskopi alene giver dig ikke adgang igen, hvis du mister din adgangskode."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Denne enheds indstilling for skærmoptagelse kunne ikke læses, så denne indstilling anvendes ikke. Åbn Indstillinger igen for at prøve på ny.",
       "screenCaptureSuperseded": "Slået fra på denne enhed. Se “Tillad skærmoptagelse på denne enhed” nedenfor. Denne indstilling bevares og gælder igen, når du slår den mulighed fra.",
       "screenCaptureSupersededByFlag": "Slået fra i denne session, fordi Myne blev startet med --disable-screen-capture-protection. Denne indstilling bevares og gælder igen, næste gang du åbner Myne uden det.",
-      "recoveryDrillCheck": "Tjek sætning",
-      "recoveryDrillChecking": "Tjekker…",
-      "recoveryDrillError": "Kunne ikke køre tjekket lige nu. Intet blev ændret. Prøv igen om et øjeblik.",
-      "recoveryDrillHelper": "Skriv de 24 ord, du skrev ned. Myne tjekker, om de stadig åbner denne boks, og fortæller dig intet andet — ordene vises aldrig her.",
-      "recoveryDrillLabel": "Tjek din gendannelsessætning",
-      "recoveryDrillPassed": "Disse ord åbner denne boks. Opbevar dem, hvor du fandt dem.",
-      "recoveryDrillPlaceholder": "De 24 ord, i rækkefølge, adskilt af mellemrum",
       "hideVaultNamesInline": "Når du slår det til, destrueres de nøgler, der gør de navne, som er gemt her, læsbare.",
       "topics": {
         "access": "Adgang",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Skærmbeskyttelse",
         "terminal": "Kommandolinjeværktøjer",
-        "locking": "Låsning og oplåsning",
-        "recovery": "Gendannelse"
+        "locking": "Låsning og oplåsning"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "opdatering opgrader tjek for opdateringer ny version udgivelse download",
         "plainFile": "almindelig fil editor markdown lokal disk uden for boks klartekst åbn på stedet",
         "memberPassword": "delt boks adgangskode medlem lås op tilslut sætning",
-        "recoveryDrill": "gendannelsessætning tjek verificer øvelse test 24 ord seed sikkerhedskopi mistet adgangskode",
         "bar": "bundlinje statuslinje indikatorer tilpas omorganiser skjul vis værktøjslinje",
         "syncDeviceBindings": "enheder gjort krav på af medlemmer tilskrivning hvem signerede hvilken enhed tilhører",
         "vaultFormat": "boksformat opgrader ét-sætning gendannelse pensionér boks gendannelsessætning migrér identitet",

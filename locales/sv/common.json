@@ -488,10 +488,7 @@
       "successToast": "Säkerhetskopia verifierad och sparad.",
       "title": "Säkerhetskopiera valv",
       "verifying": "Verifierar {{done}} av {{total}}…",
-      "drillBody": "En säkerhetskopia räcker inte för att komma in igen om du tappar bort ditt lösenord.",
-      "drillCta": "Kontrollera den",
-      "drillOnce": "Visas en gång. När du stänger det här kommer det inte tillbaka.",
-      "drillTitle": "Har du kontrollerat din återställningsfras också?"
+      "phraseNotSubstitute": "En säkerhetskopia räcker inte för att komma in igen om du tappar bort ditt lösenord."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "Den här enhetens inställning för skärminspelning kunde inte läsas, så det här alternativet tillämpas inte. Öppna Inställningar igen för att försöka på nytt.",
       "screenCaptureSuperseded": "Avstängt på den här enheten. Se ”Tillåt skärminspelning på den här enheten” nedan. Den här inställningen behålls och gäller igen när du stänger av det alternativet.",
       "screenCaptureSupersededByFlag": "Avstängt för den här sessionen, eftersom Myne startades med --disable-screen-capture-protection. Den här inställningen behålls och gäller igen nästa gång du öppnar Myne utan den flaggan.",
-      "recoveryDrillCheck": "Kontrollera frasen",
-      "recoveryDrillChecking": "Kontrollerar…",
-      "recoveryDrillError": "Det gick inte att köra kontrollen just nu. Inget ändrades. Försök igen om en stund.",
-      "recoveryDrillHelper": "Skriv de 24 ord du skrev ner. Myne kontrollerar om de fortfarande öppnar det här valvet och berättar inget annat — orden visas aldrig här.",
-      "recoveryDrillLabel": "Kontrollera din återställningsfras",
-      "recoveryDrillPassed": "De här orden öppnar det här valvet. Förvara dem där du hittade dem.",
-      "recoveryDrillPlaceholder": "De 24 orden, i ordning, åtskilda av mellanslag",
       "hideVaultNamesInline": "Att slå på det förstör nycklarna som gör namnen som lagras här läsbara.",
       "topics": {
         "access": "Åtkomst",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "Skärmskydd",
         "terminal": "Kommandoradsverktyg",
-        "locking": "Låsa och låsa upp",
-        "recovery": "Återställning"
+        "locking": "Låsa och låsa upp"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "uppdatering uppgradera sök efter uppdateringar ny version utgåva ladda ner",
         "plainFile": "vanlig fil redigerare markdown lokal disk utanför valv klartext öppna på plats",
         "memberPassword": "delat valv lösenord medlem lås upp gå med fras",
-        "recoveryDrill": "återställningsfras kontrollera verifiera övning test 24 ord seed säkerhetskopia förlorat lösenord",
         "bar": "nedre fält statusfält indikatorer anpassa ordna om dölj visa verktygsfält",
         "syncDeviceBindings": "enheter anspråk medlemmar tillskrivning vem som signerade vilken enhet tillhör",
         "vaultFormat": "valvformat uppgradering en-fras återställning pensionera valvåterställningsfras migrera identitet",

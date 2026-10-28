@@ -709,7 +709,7 @@
     "that batch, and neither was quarantined: `describeE2E.flaky` is for a",
     "contention victim, not for a real failure."
   ],
-  "stable": 381,
+  "stable": 380,
   "stable_max_failures": 0,
   "_comment_382_to_381": [
     "LOWERED 382 -> 381 for the retirement of the MYR1 AI-embeddings family",
@@ -993,6 +993,25 @@
     "after which this number moves to whatever that run executed. Four of the six",
     "are server-gated, so that run is also the first evidence they execute rather",
     "than skip.",
+    "",
+    "`stable_max_failures` stays 0."
+  ],
+  "_comment_381_to_380": [
+    "381 -> 380 for myne-md/myne#935, which withdraws the recovery drill. The",
+    "drill's only scenario, RD-1 in `e2e/recovery-phrase-check.e2e.ts`, goes with",
+    "it: the file is deleted, the Settings row it drove no longer exists, and the",
+    "command behind it (`vault_recover::verify_recovery_phrase`) is gone from",
+    "`myne-core`, so there is nothing left for a scenario to drive.",
+    "",
+    "The drop is INTENDED, and it is the one direction this file can be edited in",
+    "without a fresh measurement: the guard's own rule is that the floor is a",
+    "MINIMUM, so adding scenarios never requires touching it while removing them",
+    "must be deliberate. 380 is 381 minus exactly the one scenario the deletion",
+    "removes; nothing else about the suite moved.",
+    "",
+    "Arithmetic on the CI-measured base rather than a new count, which is the same",
+    "basis every entry above uses. The next pre-release lane run replaces it with",
+    "what that run actually executed.",
     "",
     "`stable_max_failures` stays 0."
   ],

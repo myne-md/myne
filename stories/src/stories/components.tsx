@@ -958,14 +958,13 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "BackupExportModal",
     state: "default",
     description:
-      "The backup modal: write an encrypted `.myne-backup`, with the recovery drill offered beside it. Mounted with an unlocked-vault fixture because the export path reads the vault.",
-    tags: ["components", "backup", "export", "modal", "drill", "vault"],
+      "The backup modal: write an encrypted `.myne-backup`, and say on the success screen that a backup is not a substitute for the recovery phrase. Mounted with an unlocked-vault fixture because the export path reads the vault.",
+    tags: ["components", "backup", "export", "modal", "recovery-phrase", "vault"],
     fixture: "unlocked",
     render: () => (
       <BackupExportModal
         open
         onClose={action("onClose")}
-        onOpenDrill={action("onOpenDrill")}
         vaultId={FIXTURE_VAULT_ID}
       />
     ),

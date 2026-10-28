@@ -530,10 +530,7 @@
       "successToast": "Copia de seguridad verificada y guardada.",
       "title": "Respaldar bóveda",
       "verifying": "Verificando {{done}} de {{total}}…",
-      "drillBody": "Una copia de seguridad por sí sola no te permitirá volver a entrar si pierdes tu contraseña.",
-      "drillCta": "Comprobarla",
-      "drillOnce": "Se muestra una sola vez. Cuando lo cierres, no volverá a aparecer.",
-      "drillTitle": "¿También has comprobado tu frase de recuperación?"
+      "phraseNotSubstitute": "Una copia de seguridad por sí sola no te permitirá volver a entrar si pierdes tu contraseña."
     }
   },
   "clipper": {
@@ -4104,13 +4101,6 @@
       "screenCaptureOverrideUnknown": "No se pudo leer el ajuste de captura de pantalla de este dispositivo, así que esta preferencia no se está aplicando. Vuelve a abrir Ajustes para intentarlo de nuevo.",
       "screenCaptureSuperseded": "Desactivada en este dispositivo. Consulta «Permitir la captura de pantalla en este dispositivo» más abajo. Esta preferencia se conserva y vuelve a aplicarse cuando desactives esa opción.",
       "screenCaptureSupersededByFlag": "Desactivada en esta sesión, porque Myne se inició con --disable-screen-capture-protection. Esta preferencia se conserva y vuelve a aplicarse la próxima vez que abras Myne sin ese parámetro.",
-      "recoveryDrillCheck": "Comprobar frase",
-      "recoveryDrillChecking": "Comprobando…",
-      "recoveryDrillError": "Ahora mismo no se pudo hacer la comprobación. No ha cambiado nada. Inténtalo de nuevo dentro de un momento.",
-      "recoveryDrillHelper": "Escribe las 24 palabras que anotaste. Myne comprueba si todavía abren esta bóveda y no te dice nada más: las palabras nunca se muestran aquí.",
-      "recoveryDrillLabel": "Comprobar tu frase de recuperación",
-      "recoveryDrillPassed": "Estas palabras abren esta bóveda. Guárdalas donde las tenías.",
-      "recoveryDrillPlaceholder": "Las 24 palabras, en orden, separadas por espacios",
       "hideVaultNamesInline": "Activarlo destruye las claves que hacen legibles los nombres guardados aquí.",
       "topics": {
         "access": "Acceso",
@@ -4119,8 +4109,7 @@
       "sections": {
         "screen": "Protección de pantalla",
         "terminal": "Herramientas de línea de comandos",
-        "locking": "Bloqueo y desbloqueo",
-        "recovery": "Recuperación"
+        "locking": "Bloqueo y desbloqueo"
       }
     },
     "quickUnlock": {
@@ -4416,7 +4405,6 @@
         "update": "actualización actualizar buscar actualizaciones versión nueva publicación descarga",
         "plainFile": "archivo sin formato editor markdown disco local fuera de la bóveda texto plano abrir en su sitio",
         "memberPassword": "bóveda compartida contraseña miembro desbloquear unirse frase",
-        "recoveryDrill": "frase de recuperación comprobar verificar simulacro prueba 24 palabras semilla copia de seguridad contraseña perdida",
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de herramientas",
         "syncDeviceBindings": "dispositivos reclamados por miembros atribución quién firmó a qué dispositivo pertenece",
         "vaultFormat": "formato de bóveda actualización recuperación de una frase retirar bóveda frase de recuperación migrar identidad",

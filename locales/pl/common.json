@@ -572,10 +572,7 @@
       "successToast": "Kopia zapasowa zweryfikowana i zapisana.",
       "title": "Utwórz kopię zapasową skarbca",
       "verifying": "Weryfikowanie {{done}} z {{total}}…",
-      "drillBody": "Sama kopia zapasowa nie przywróci Ci dostępu, jeśli zgubisz hasło.",
-      "drillCta": "Sprawdź ją",
-      "drillOnce": "Pokazywane raz. Gdy to zamkniesz, nie wróci.",
-      "drillTitle": "Czy sprawdzono też Twoją frazę odzyskiwania?"
+      "phraseNotSubstitute": "Sama kopia zapasowa nie przywróci Ci dostępu, jeśli zgubisz hasło."
     }
   },
   "clipper": {
@@ -4238,13 +4235,6 @@
       "screenCaptureOverrideUnknown": "Nie udało się odczytać ustawienia przechwytywania ekranu na tym urządzeniu, więc ta preferencja nie jest stosowana. Otwórz Ustawienia ponownie, aby spróbować jeszcze raz.",
       "screenCaptureSuperseded": "Wyłączona na tym urządzeniu. Zobacz „Zezwalaj na przechwytywanie ekranu na tym urządzeniu” poniżej. Ta preferencja jest zachowana i zacznie znów obowiązywać, gdy wyłączysz tamtą opcję.",
       "screenCaptureSupersededByFlag": "Wyłączona w tej sesji, ponieważ Myne uruchomiono z --disable-screen-capture-protection. Ta preferencja jest zachowana i zacznie znów obowiązywać przy następnym otwarciu Myne bez tego przełącznika.",
-      "recoveryDrillCheck": "Sprawdź frazę",
-      "recoveryDrillChecking": "Sprawdzanie…",
-      "recoveryDrillError": "Nie udało się teraz przeprowadzić sprawdzenia. Nic się nie zmieniło. Spróbuj ponownie za chwilę.",
-      "recoveryDrillHelper": "Wpisz zapisane 24 słowa. Myne sprawdza tylko, czy nadal otwierają ten skarbiec, i nie mówi nic więcej — nigdy nie pokazuje tu tych słów.",
-      "recoveryDrillLabel": "Sprawdź swoją frazę odzyskiwania",
-      "recoveryDrillPassed": "Te słowa otwierają ten skarbiec. Trzymaj je w miejscu, w którym je zapisano.",
-      "recoveryDrillPlaceholder": "24 słowa, po kolei, oddzielone spacjami",
       "hideVaultNamesInline": "Włączenie niszczy klucze, dzięki którym przechowywane tutaj nazwy dają się odczytać.",
       "topics": {
         "access": "Dostęp",
@@ -4253,8 +4243,7 @@
       "sections": {
         "screen": "Ochrona ekranu",
         "terminal": "Narzędzia wiersza poleceń",
-        "locking": "Blokowanie i odblokowywanie",
-        "recovery": "Odzyskiwanie"
+        "locking": "Blokowanie i odblokowywanie"
       }
     },
     "quickUnlock": {
@@ -4554,7 +4543,6 @@
         "update": "aktualizacja aktualizuj sprawdź aktualizacje nowa wersja wydanie pobierz",
         "plainFile": "plik lokalny edytor markdown dysk lokalny poza skarbcem jawny tekst otwórz na miejscu",
         "memberPassword": "współdzielony skarbiec hasło członek odblokuj dołącz fraza",
-        "recoveryDrill": "fraza odzyskiwania sprawdź zweryfikuj próba test 24 słowa seed kopia zapasowa utracone hasło",
         "bar": "dolny pasek pasek stanu wskaźniki dostosuj kolejność ukryj pokaż pasek narzędzi",
         "syncDeviceBindings": "urządzenia przypisane przez członków atrybucja kto podpisał które urządzenie należy",
         "vaultFormat": "format skarbca aktualizacja jedna fraza odzyskiwanie wycofaj skarbiec fraza odzyskiwania migruj tożsamość",

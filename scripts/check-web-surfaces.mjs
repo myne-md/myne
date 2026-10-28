@@ -187,10 +187,6 @@ const V = {
     "adapted",
     "The shared-vault unlock row (password / PIN / biometric). It self-gates on `memberVaultStatus`, which is `Unsupported` on web (the dispatcher answers `Unsupported` for the whole B2B member plane), so it renders nothing in a browser rather than offering a setting that cannot land. `setMemberPassword` / `setMemberPin` / `setMemberBiometric` / `clearMemberUnlock` / `memberUnlockStatus` are likewise `Unsupported`.",
   ],
-  "src/components/settings/RecoveryDrillRow.tsx": [
-    "ported",
-    "The recovery drill (myne-md/myne#468), and it renders unchanged on web because the web client HAS phrase recovery: `plugin:vault-recover|verify_recovery_phrase` is on the wasm dispatcher's DISPATCHED roster beside `recover_with_phrase`, so the row works rather than sitting there reporting an error. No capability gate for the same reason, and no `developer_mode` gate because a first-time user is exactly who it is for.",
-  ],
   "src/components/settings/ReminderSettings.tsx": [
     "adapted",
     "Renders and persists through the prefs setters like its siblings. The copy it shows follows `reminderTier`, which reports in-app-only on every host — so a browser reads the same honest sentence a desktop does, and neither is shown the OS-registration disclosure while no registration happens.",
@@ -331,11 +327,6 @@ const V = {
   "src/lib/backup-errors.ts": [
     "excluded",
     "Backup error copy; leaves with the modules that produce those errors.",
-  ],
-  "src/lib/backup-drill-line.ts": [
-    "excluded",
-    "The post-backup drill line's one-time dismissal store (myne-md/myne#468). Its only importer is `BackupExportModal`, which web substitutes, so it leaves the bundle with it.",
-    "myne.backup.drill-line-seen",
   ],
   "src/lib/backup-schedule.ts": [
     "excluded",

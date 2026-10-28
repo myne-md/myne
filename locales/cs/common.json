@@ -572,10 +572,7 @@
       "successToast": "Záloha ověřena a uložena.",
       "title": "Zálohovat trezor",
       "verifying": "Ověřuje se {{done}} z {{total}}…",
-      "drillBody": "Samotná záloha vás zpět nedostane, pokud ztratíte heslo.",
-      "drillCta": "Zkontrolovat",
-      "drillOnce": "Zobrazí se jednou. Až to zavřete, už se to nevrátí.",
-      "drillTitle": "Zkontrolovali jste i svou frázi pro obnovení?"
+      "phraseNotSubstitute": "Samotná záloha vás zpět nedostane, pokud ztratíte heslo."
     }
   },
   "clipper": {
@@ -4238,13 +4235,6 @@
       "screenCaptureOverrideUnknown": "Nastavení snímání obrazovky na tomto zařízení se nepodařilo přečíst, takže se tato předvolba neuplatňuje. Otevřete Nastavení znovu a zkuste to.",
       "screenCaptureSuperseded": "Na tomto zařízení vypnuto. Viz „Povolit snímání obrazovky na tomto zařízení“ níže. Tato předvolba zůstává zachována a znovu se uplatní, jakmile toto povolení vypnete.",
       "screenCaptureSupersededByFlag": "V této relaci vypnuto, protože Myne byl spuštěn s --disable-screen-capture-protection. Tato předvolba zůstává zachována a znovu se uplatní, až Myne příště otevřete bez tohoto přepínače.",
-      "recoveryDrillCheck": "Zkontrolovat frázi",
-      "recoveryDrillChecking": "Kontroluje se…",
-      "recoveryDrillError": "Kontrolu se teď nepodařilo spustit. Nic se nezměnilo. Zkuste to za chvíli znovu.",
-      "recoveryDrillHelper": "Napište 24 slov, která jste si zapsali. Myne zkontroluje, zda stále otevírají tento trezor, a neřekne vám nic dalšího — slova se tu nikdy nezobrazují.",
-      "recoveryDrillLabel": "Zkontrolovat frázi pro obnovení",
-      "recoveryDrillPassed": "Tato slova otevírají tento trezor. Uchovejte je tam, kde jste je měli.",
-      "recoveryDrillPlaceholder": "24 slov, v pořadí, oddělená mezerami",
       "hideVaultNamesInline": "Zapnutím se zničí klíče, díky nimž jsou zde uložené názvy čitelné.",
       "topics": {
         "access": "Přístup",
@@ -4253,8 +4243,7 @@
       "sections": {
         "screen": "Ochrana obrazovky",
         "terminal": "Nástroje příkazového řádku",
-        "locking": "Zamykání a odemykání",
-        "recovery": "Obnovení"
+        "locking": "Zamykání a odemykání"
       }
     },
     "quickUnlock": {
@@ -4554,7 +4543,6 @@
         "update": "aktualizace upgrade kontrola aktualizací nová verze vydání stažení",
         "plainFile": "prostý soubor editor markdown místní disk mimo trezor prostý text otevřít na místě",
         "memberPassword": "sdílený trezor heslo člen odemknout připojit fráze",
-        "recoveryDrill": "fráze pro obnovení kontrola ověřit zkouška test 24 slov seed záloha ztracené heslo",
         "bar": "spodní lišta stavová lišta ukazatele přizpůsobit pořadí skrýt zobrazit panel nástrojů",
         "syncDeviceBindings": "zařízení nárokovaná členy přiřazení kdo podepsal které zařízení patří",
         "vaultFormat": "formát trezoru upgrade jedna fráze pro obnovení vyřadit trezor fráze pro obnovení migrace identita",

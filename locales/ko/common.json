@@ -488,10 +488,7 @@
       "successToast": "백업이 검증되어 저장되었습니다.",
       "title": "보관함 백업",
       "verifying": "검증 중 {{done}}/{{total}}…",
-      "drillBody": "비밀번호를 잃으면 백업만으로는 다시 들어갈 수 없습니다.",
-      "drillCta": "확인하기",
-      "drillOnce": "한 번만 표시됩니다. 닫으면 다시 나타나지 않습니다.",
-      "drillTitle": "복구 구문도 확인했나요?"
+      "phraseNotSubstitute": "비밀번호를 잃으면 백업만으로는 다시 들어갈 수 없습니다."
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "이 기기의 화면 캡처 설정을 읽지 못해 이 옵션이 적용되지 않고 있습니다. 설정을 다시 열어 시도하세요.",
       "screenCaptureSuperseded": "이 기기에서는 꺼져 있습니다. 아래의 “이 기기에서 화면 캡처 허용”을 확인하세요. 이 설정은 그대로 유지되며, 그 옵션을 끄면 다시 적용됩니다.",
       "screenCaptureSupersededByFlag": "이 세션에서는 꺼져 있습니다. Myne가 --disable-screen-capture-protection 옵션으로 시작되었기 때문입니다. 이 설정은 그대로 유지되며, 그 옵션 없이 Myne를 다음에 열면 다시 적용됩니다.",
-      "recoveryDrillCheck": "구문 확인",
-      "recoveryDrillChecking": "확인 중…",
-      "recoveryDrillError": "지금은 확인을 실행하지 못했습니다. 아무것도 변경되지 않았습니다. 잠시 후 다시 시도하세요.",
-      "recoveryDrillHelper": "적어 둔 24개 단어를 입력하세요. Myne는 그 단어로 이 보관함이 여전히 열리는지만 확인하고 그 외에는 아무것도 알려주지 않습니다. 단어는 여기에 표시되지 않습니다.",
-      "recoveryDrillLabel": "복구 구문 확인",
-      "recoveryDrillPassed": "이 단어로 보관함이 열립니다. 원래 있던 곳에 계속 보관하세요.",
-      "recoveryDrillPlaceholder": "24개 단어를 순서대로, 공백으로 구분",
       "hideVaultNamesInline": "이 옵션을 켜면 여기에 저장된 이름을 읽을 수 있게 하는 키가 파기됩니다.",
       "topics": {
         "access": "접근",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "화면 보호",
         "terminal": "명령줄 도구",
-        "locking": "잠금 및 잠금 해제",
-        "recovery": "복구"
+        "locking": "잠금 및 잠금 해제"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "업데이트 업그레이드 업데이트 확인 새 버전 릴리스 다운로드",
         "plainFile": "일반 파일 편집기 마크다운 로컬 디스크 보관함 밖 평문 제자리에서 열기",
         "memberPassword": "공유 보관함 비밀번호 멤버 잠금 해제 참여 구문",
-        "recoveryDrill": "복구 구문 확인 검증 연습 테스트 24단어 시드 백업 비밀번호 분실",
         "bar": "하단 표시줄 상태 표시줄 지표 사용자 지정 순서 바꾸기 숨기기 표시 도구 모음",
         "syncDeviceBindings": "기기 멤버가 등록한 귀속 누가 서명했는지 어떤 기기가 속하는지",
         "vaultFormat": "보관함 형식 업그레이드 한 구문 복구 폐기 복구 구문 마이그레이션 정체성 vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",

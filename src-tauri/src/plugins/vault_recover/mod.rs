@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Vault-recover Tauri plugin.
 //!
-//! Owns `vault_recover_with_phrase`, `vault_complete_recovery` and
-//! `vault_verify_recovery_phrase` (the read-only recovery drill).
+//! Owns `vault_recover_with_phrase` and `vault_complete_recovery`.
 //! Sibling to `vault_unlock` rather than a submodule — plugin
 //! boundary mirrors the user-facing flow boundary (unlock vs
 //! recover). Both plugins share `VaultRuntimeState`, registered at
@@ -36,8 +35,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
         .invoke_handler(tauri::generate_handler![
             commands::recover_with_phrase,
             commands::complete_recovery,
-            commands::resolve_vault_by_account_number,
-            commands::verify_recovery_phrase
+            commands::resolve_vault_by_account_number
         ])
         .build()
 }

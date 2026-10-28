@@ -505,10 +505,7 @@
       "cancel": "Cancel",
       "close": "Close",
       "copying": "Copying {{done}} of {{total}}…",
-      "drillBody": "A backup alone will not get you back in if you lose your password.",
-      "drillCta": "Check it",
-      "drillOnce": "Shown once. After you close this it will not come back.",
-      "drillTitle": "Have you checked your recovery phrase too?",
+      "phraseNotSubstitute": "A backup alone will not get you back in if you lose your password.",
       "preparing": "Preparing…",
       "successToast": "Backup verified and saved.",
       "title": "Back up vault",
@@ -4249,13 +4246,6 @@
       "autoLock1h": "1h",
       "quickUnlockSubtitleAndroid": "Re-enter with a PIN after auto-lock",
       "quickUnlockSubtitle": "Re-enter with {{method}} or a PIN after auto-lock",
-      "recoveryDrillCheck": "Check phrase",
-      "recoveryDrillChecking": "Checking…",
-      "recoveryDrillError": "Couldn't run the check just now. Nothing changed. Try again in a moment.",
-      "recoveryDrillHelper": "Type the 24 words you wrote down. Myne checks whether they still open this vault and tells you nothing else — the words are never shown here.",
-      "recoveryDrillLabel": "Check your recovery phrase",
-      "recoveryDrillPassed": "These words open this vault. Keep them where you found them.",
-      "recoveryDrillPlaceholder": "The 24 words, in order, separated by spaces",
       "topics": {
         "access": "Access",
         "locking": "Locking"
@@ -4263,8 +4253,7 @@
       "sections": {
         "screen": "Screen protection",
         "terminal": "Command line tools",
-        "locking": "Locking and unlocking",
-        "recovery": "Recovery"
+        "locking": "Locking and unlocking"
       }
     },
     "quickUnlock": {
@@ -4548,7 +4537,6 @@
         "torRouting": "tor routing onion proxy network ip address location hide sync anonymity",
         "quickUnlock": "quick unlock pin touch id biometric face unlock",
         "memberPassword": "shared vault password member unlock join phrase",
-        "recoveryDrill": "recovery phrase check verify drill test 24 words seed backup lost password",
         "reminders": "reminders notify notification alert task due remind horizon registration ahead days",
         "bar": "bottom bar status bar indicators customize reorder hide show toolbar",
         "ribbon": "left ribbon rail pin pins command commands customize reorder unpin toolbar shortcuts",

@@ -149,9 +149,10 @@ export const APPEARANCE_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
  * or what can get at my notes". It is its own developer-group panel now
  * (`CliPanel`, `decisions/ui/0678`), so `Access` holds the screen rows alone.
  *
- * `Locking` is the family the panel's own comments already describe: the
- * recovery drill is here rather than in Account because what it protects is the
- * ability to get back IN, the same family as auto-lock and quick unlock.
+ * `Locking` is the family the panel's own comments already describe: how the
+ * vault locks and reopens, as opposed to what can see the notes. It used to
+ * carry the recovery drill for the same reason, and that row is withdrawn with
+ * it (`decisions/security/0747`, myne-md/myne#935).
  *
  * **`Access` carries `liveOn`, and it is the one topic in the tree that needs
  * it.** Every row in its body is capability-gated: the per-vault screen-capture

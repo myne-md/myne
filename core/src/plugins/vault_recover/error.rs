@@ -111,20 +111,6 @@ pub enum VaultRecoveryError {
     #[error("vault recovery requires active session")]
     VaultRecoveryRequiresActiveSession,
 
-    /// `verify_recovery_phrase` (the recovery drill, myne-md/myne#468) was
-    /// invoked with no vault unlocked.
-    ///
-    /// The drill needs no key material, so this gate is not about access to one:
-    /// it is what BOUNDS the verification oracle. An attacker at a locked app
-    /// cannot reach the command; one at an unlocked app already has the
-    /// plaintext, so a phrase answer tells them nothing they do not have.
-    ///
-    /// Named to match `prefs`'s `SlotNotUnlocked` rather than inventing a third
-    /// spelling for the same precondition. Not expected to surface in normal
-    /// use: the drill lives in Settings, which is unreachable while locked.
-    #[error("no vault is unlocked")]
-    SlotNotUnlocked,
-
     /// `tokio::task::spawn_blocking` join handle returned an error
     /// (panic in the blocking task, runtime shutdown). User-facing
     /// CTA is "try again" — recoverable banner, not a credential
@@ -231,14 +217,6 @@ mod tests {
                 json(&VaultRecoveryError::VaultRecoveryRequiresActiveSession),
                 r#"{"kind":"VaultRecoveryRequiresActiveSession"}"#,
             ),
-            // The drill's precondition (myne-md/myne#468). Asserted here rather
-            // than trusted, because the TS mirror in
-            // `src/types/vault-recovery-error.ts` discriminates on this exact
-            // string and nothing else compares the two.
-            (
-                json(&VaultRecoveryError::SlotNotUnlocked),
-                r#"{"kind":"SlotNotUnlocked"}"#,
-            ),
             (
                 json(&VaultRecoveryError::JoinFailure),
                 r#"{"kind":"JoinFailure"}"#,
@@ -292,7 +270,6 @@ mod tests {
                 VaultRecoveryError::RecoveryAbortedByLock => {}
                 VaultRecoveryError::WeakNewPassword => {}
                 VaultRecoveryError::VaultOpenAsImportSource => {}
-                VaultRecoveryError::SlotNotUnlocked => {}
             }
         }
         assert_closed(&VaultRecoveryError::VaultNotFound);

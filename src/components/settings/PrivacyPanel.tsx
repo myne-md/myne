@@ -33,7 +33,6 @@ import type { SelectOption } from "../primitives/Select";
 import { Switch } from "../primitives/Switch";
 import { QuickUnlockSettings } from "./QuickUnlockSettings";
 import { MemberPasswordSettings } from "./MemberPasswordSettings";
-import { RecoveryDrillRow } from "./RecoveryDrillRow";
 import { SettingRow } from "./SettingRow";
 import { SettingsTopicPanel } from "./SettingsTabs";
 import { SettingsSection } from "./SettingsSection";
@@ -476,15 +475,11 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
           the screen section alone. */}
       </SettingsTopicPanel>
 
-      {/* **Locking**: how the vault locks and how you get back in. The recovery
-          drill is here rather than in Account because what it protects is the
-          ability to get back IN, the same family as the auto-lock and
-          quick-unlock rows it sits beside. */}
+      {/* **Locking**: how the vault locks and reopens. The drill that used to sit
+          here (and the section that separated it, myne-md/myne#885) is withdrawn
+          with it (`decisions/security/0747`, myne-md/myne#935), so this topic is
+          a settings section again rather than a settings section plus a check. */}
       <SettingsTopicPanel panelId="privacy" topicId="locking">
-      {/* Two sections (myne-md/myne#885): how the vault locks and reopens, and
-          the one control that checks you can still get back in. The second is
-          separated because it is a check rather than a setting, which is the
-          distinction the row's own comment already draws. */}
       <SettingsSection title={t("settings.privacy.sections.locking")}>
       <AutoLockRow
         seconds={selectedAutoLockSecs(prefs.auto_lock_seconds)}
@@ -494,18 +489,6 @@ export function PrivacyPanel({ onShowToast }: PrivacyPanelProps = {}) {
       />
       <QuickUnlockSettings />
       <MemberPasswordSettings />
-      </SettingsSection>
-      <SettingsSection title={t("settings.privacy.sections.recovery")}>
-      {/* The recovery drill (myne-md/myne#468). In Privacy rather than Account
-          because what it protects is the ability to get back IN, which is the
-          same family as the auto-lock and quick-unlock rows it sits beside, and
-          because Account is where the vault's NAME and number live - a phrase
-          field there would read as another identifier to manage.
-
-          Ungated: it needs no capability the web client lacks (the command is
-          `myne-core`'s and the web dispatcher routes it), and it is not behind
-          Developer mode because a first-time user is exactly who it is for. */}
-      <RecoveryDrillRow />
       </SettingsSection>
       </SettingsTopicPanel>
     </div>

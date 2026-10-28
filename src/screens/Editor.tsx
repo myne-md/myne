@@ -2903,10 +2903,6 @@ function EditorChrome({
       <BackupExportModal
         open={backupExportOpen}
         onClose={() => setBackupExportOpen(false)}
-        onOpenDrill={() => {
-          setBackupExportOpen(false);
-          openSettings("privacy", "privacy.recovery-drill");
-        }}
         vaultId={vaultId}
       />
       <VaultExportModal

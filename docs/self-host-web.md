@@ -33,12 +33,11 @@ from you.
 
 **And one surface you now serve that you did not before.** The recovery phrase
 reaches served code on every path since `decisions.md` 2026-10-18 entry 0704:
-creation displays it, recovery accepts it, the Settings drill checks one the user
-already holds, and device enrolment accepts it as a credential. Before that entry
-the enrolment grid was substituted out of the bundle and an artefact grep
-(`scripts/check-web-no-phrase.mjs`) held it out, which is why this document did
-not mention the surface; both are gone. So the 24 words a user types into any of
-those flows pass through the process you operate, inside the DOM of the page you
+creation displays it, recovery accepts it, and device enrolment accepts it as a
+credential. Before that entry the enrolment grid was substituted out of the
+bundle and an artefact grep (`scripts/check-web-no-phrase.mjs`) held it out,
+which is why this document did not mention the surface; both are gone. So the 24
+words a user types into any of those flows pass through the process you operate, inside the DOM of the page you
 serve. What that means for you is narrow, and stating it precisely matters more
 than stating it strongly. You are not being asked to protect the phrase: nothing
 in this design ever hands it to a server, the client sends no copy of it

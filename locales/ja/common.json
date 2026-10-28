@@ -488,10 +488,7 @@
       "successToast": "バックアップを検証して保存しました。",
       "title": "保管庫をバックアップ",
       "verifying": "{{total}}件中{{done}}件を検証中…",
-      "drillBody": "パスワードを失った場合、バックアップだけでは戻れません。",
-      "drillCta": "確認する",
-      "drillOnce": "表示は一度きりです。これを閉じると再び表示されません。",
-      "drillTitle": "復元フレーズも確認しましたか？"
+      "phraseNotSubstitute": "パスワードを失った場合、バックアップだけでは戻れません。"
     }
   },
   "clipper": {
@@ -3970,13 +3967,6 @@
       "screenCaptureOverrideUnknown": "このデバイスの画面キャプチャ設定を読み取れなかったため、この設定は適用されていません。設定を開き直してもう一度お試しください。",
       "screenCaptureSuperseded": "このデバイスではオフです。下の「このデバイスで画面キャプチャを許可」を確認してください。この設定は保持されており、そちらをオフにすると再び適用されます。",
       "screenCaptureSupersededByFlag": "Myneが --disable-screen-capture-protection を付けて起動されたため、このセッションではオフです。この設定は保持されており、次にそれを付けずにMyneを開いたときに再び適用されます。",
-      "recoveryDrillCheck": "フレーズを確認",
-      "recoveryDrillChecking": "確認中…",
-      "recoveryDrillError": "今は確認を実行できませんでした。何も変更されていません。しばらくしてからもう一度お試しください。",
-      "recoveryDrillHelper": "書き留めた24語を入力してください。Myneはそれらが今もこの保管庫を開けるかを確認し、それ以外のことは伝えません。入力した語がここに表示されることはありません。",
-      "recoveryDrillLabel": "復元フレーズを確認",
-      "recoveryDrillPassed": "これらの語でこの保管庫を開けます。見つけた場所にそのまま保管してください。",
-      "recoveryDrillPlaceholder": "24語を順番に、スペースで区切って入力",
       "hideVaultNamesInline": "オンにすると、ここに保存されている名前を読み取れるようにしている鍵が破棄されます。",
       "topics": {
         "access": "アクセス",
@@ -3985,8 +3975,7 @@
       "sections": {
         "screen": "画面保護",
         "terminal": "コマンドラインツール",
-        "locking": "ロックとロック解除",
-        "recovery": "復元"
+        "locking": "ロックとロック解除"
       }
     },
     "quickUnlock": {
@@ -4278,7 +4267,6 @@
         "update": "更新 アップグレード 更新確認 新しいバージョン リリース ダウンロード update upgrade check release download",
         "plainFile": "プレーンファイル エディタ markdown ローカル ディスク 保管庫の外 平文 その場で開く plain file editor local disk plaintext open in place",
         "memberPassword": "共有保管庫 パスワード メンバー ロック解除 参加 フレーズ shared vault password member unlock join phrase",
-        "recoveryDrill": "復元フレーズ 確認 検証 テスト 24語 シード バックアップ パスワードを忘れた recovery phrase check verify drill seed backup",
         "bar": "下部バー ステータスバー インジケーター カスタマイズ 並べ替え 非表示 表示 ツールバー bottom bar status bar indicators customize reorder hide show",
         "syncDeviceBindings": "デバイス クレーム メンバー 署名 帰属 所有者 devices claimed by members attribution signed belongs",
         "vaultFormat": "保管庫形式 アップグレード 一括フレーズ復元 廃止 保管庫復元フレーズ 移行 アイデンティティ vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",

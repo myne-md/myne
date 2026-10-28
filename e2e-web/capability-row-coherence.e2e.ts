@@ -58,7 +58,6 @@ import { openFixtureVault, openSettingsTab } from "./support/fixture-session";
 const PRIVACY_ROWS: Record<string, string | null> = {
   "settings.screen-capture": "screenCaptureProtection",
   "settings.quick-unlock": null, // the PIN path is portable — Argon2id + files
-  "settings.recovery-drill": null, // phrase + Argon2id, portable like quick-unlock
   "settings.hide-vault-names": null,
   "settings.cli-access": null, // developer-gated, not capability-gated
 };

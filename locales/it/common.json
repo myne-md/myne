@@ -530,10 +530,7 @@
       "successToast": "Backup verificato e salvato.",
       "title": "Esegui il backup della cassaforte",
       "verifying": "Verifica di {{done}} di {{total}}…",
-      "drillBody": "Un backup da solo non ti farà rientrare se perdi la password.",
-      "drillCta": "Verificalo",
-      "drillOnce": "Mostrato una sola volta. Dopo che lo chiudi non comparirà più.",
-      "drillTitle": "Hai verificato anche la tua frase di recupero?"
+      "phraseNotSubstitute": "Un backup da solo non ti farà rientrare se perdi la password."
     }
   },
   "clipper": {
@@ -4104,13 +4101,6 @@
       "screenCaptureOverrideUnknown": "Non è stato possibile leggere l'impostazione di cattura schermo di questo dispositivo, quindi questa preferenza non viene applicata. Riapri le Impostazioni per riprovare.",
       "screenCaptureSuperseded": "Disattivata su questo dispositivo. Vedi “Consenti la cattura schermo su questo dispositivo” qui sotto. Questa preferenza viene conservata e torna ad applicarsi quando disattivi quell'opzione.",
       "screenCaptureSupersededByFlag": "Disattivata per questa sessione, perché Myne è stato avviato con --disable-screen-capture-protection. Questa preferenza viene conservata e torna ad applicarsi la prossima volta che apri Myne senza quell'opzione.",
-      "recoveryDrillCheck": "Verifica la frase",
-      "recoveryDrillChecking": "Verifica in corso…",
-      "recoveryDrillError": "Impossibile eseguire la verifica ora. Nulla è cambiato. Riprova tra un momento.",
-      "recoveryDrillHelper": "Digita le 24 parole che hai annotato. Myne verifica se aprono ancora questa cassaforte e non ti dice nient'altro: le parole non vengono mai mostrate qui.",
-      "recoveryDrillLabel": "Verifica la tua frase di recupero",
-      "recoveryDrillPassed": "Queste parole aprono questa cassaforte. Conservale dove le hai trovate.",
-      "recoveryDrillPlaceholder": "Le 24 parole, in ordine, separate da spazi",
       "hideVaultNamesInline": "Attivandola si distruggono le chiavi che rendono leggibili i nomi memorizzati qui.",
       "topics": {
         "access": "Accesso",
@@ -4119,8 +4109,7 @@
       "sections": {
         "screen": "Protezione dello schermo",
         "terminal": "Strumenti da riga di comando",
-        "locking": "Blocco e sblocco",
-        "recovery": "Recupero"
+        "locking": "Blocco e sblocco"
       }
     },
     "quickUnlock": {
@@ -4416,7 +4405,6 @@
         "update": "aggiornamento aggiorna controllo aggiornamenti nuova versione rilascio download",
         "plainFile": "file in chiaro editor markdown disco locale fuori cassaforte testo in chiaro apri sul posto",
         "memberPassword": "cassaforte condivisa password membro sblocco unione frase",
-        "recoveryDrill": "frase di recupero verifica controllo prova test 24 parole seed backup password persa",
         "bar": "barra inferiore barra di stato indicatori personalizza riordina nascondi mostra barra degli strumenti",
         "syncDeviceBindings": "dispositivi rivendicati dai membri attribuzione chi ha firmato a chi appartiene un dispositivo",
         "vaultFormat": "formato cassaforte aggiornamento recupero una frase ritira frase di recupero cassaforte migra identità",

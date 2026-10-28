@@ -195,8 +195,7 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       // REAL created-by-the-app vault and its password. It no longer carries a
       // phrase, because this vault has none: a suite that needs to RECOVER a
       // vault seeds a legacy one instead (`seedVault({kdf:"production"})`), and
-      // that is the path `recovery-drill`, `recovery-phrase-check` and
-      // `change-password` now take.
+      // that is the path `recovery-drill` and `change-password` now take.
       saveRealisticFixture(
         { vaultId, password: VC1_PASSWORD, phrase: null, account: null },
         metaBytes,

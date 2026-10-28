@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! The four registration sites of the `vault-recover` plugin, compared.
 //!
-//! Added with the recovery drill (myne-md/myne#468), which is the fourth command
-//! this plugin declares across four files no compiler compares: the `[default]`
-//! bundle, the `[[permission]]` blocks, `generate_handler!`, and `build.rs`'s
-//! `InlinedPlugin` arm. The permissions file's own header has said since task 4
-//! that adding a command without its `commands.allow` entry is a security
-//! regression — this is the check that statement was missing.
+//! The three commands this plugin ships sit in four files no compiler compares:
+//! the `[default]` bundle, the `[[permission]]` blocks, `generate_handler!`, and
+//! `build.rs`'s `InlinedPlugin` arm. A fourth, the recovery drill
+//! (myne-md/myne#468), is withdrawn (`decisions/security/0747`,
+//! myne-md/myne#935), and the check is kept because what it protects is the
+//! SHAPE: every command in this plugin is on a credential path, and the count
+//! has been four before and may be again. The permissions file's own header has said since task 4 that adding a
+//! command without its `commands.allow` entry is a security regression. This is
+//! the check that statement was missing.
 //!
 //! Silent in both directions, and worse here than on most plugins because every
 //! command in it is on a credential path. A permitted command absent from
@@ -123,11 +126,14 @@ mod tests {
                  would compare an empty set against an empty set"
             );
         }
-        // And a floor, because "not empty" is satisfied by one. Four commands
+        // And a floor, because "not empty" is satisfied by one. Three commands
         // ship today; a drop below that is a command that left one of the four
-        // sites, which is precisely what this test exists to catch.
+        // sites, which is precisely what this test exists to catch. The floor
+        // was four until the recovery drill was withdrawn and took its grant
+        // with it (`decisions/security/0747`, myne-md/myne#935): lowering it is
+        // that removal, not a loosening.
         assert!(
-            permitted.len() >= 4,
+            permitted.len() >= 3,
             "only {} permitted command(s) found; the extraction is reading less than \
              the file declares",
             permitted.len()
@@ -163,26 +169,6 @@ mod tests {
         assert_eq!(
             registered, declared,
             "generate_handler! and build.rs's InlinedPlugin arm disagree"
-        );
-    }
-
-    /// The drill's grant, by name.
-    ///
-    /// Pinned separately from the set comparison above for the reason its
-    /// screen-capture twin gives: a rename that moved consistently through all
-    /// four Rust sites would pass that comparison and still break the TypeScript
-    /// literal the frontend invokes, which lives outside every one of them.
-    #[test]
-    fn the_drill_grant_is_named_exactly_as_the_frontend_invokes_it() {
-        let toml = include_str!("../../../permissions/vault-recover/default.toml");
-        assert!(
-            toml.contains("identifier = \"allow-verify-recovery-phrase\""),
-            "the drill grant is missing"
-        );
-        assert!(
-            toml.contains("\"allow-verify-recovery-phrase\","),
-            "the drill grant has a block but is not in the [default] bundle, which \
-             resolves to an EMPTY permission set at runtime"
         );
     }
 }
