@@ -454,7 +454,8 @@ pub fn vault_id_from_root(root: &Path) -> VaultId {
 }
 
 /// Resolve the vault ROOT for an EXPLICIT [`VaultId`] from an already-resolved
-/// `<app_data_dir>` base: `<base>/vaults/<id>/`.
+/// `<app_data_dir>` base: `<base>/vaults/<id>/`, or `<base>/vault/` for the
+/// [`legacy_vault_id`] sentinel.
 ///
 /// This is the targeting counterpart to [`current_vault_root_from_base`] (which
 /// resolves the *sole* vault transitionally): a caller that already knows WHICH
@@ -463,10 +464,25 @@ pub fn vault_id_from_root(root: &Path) -> VaultId {
 /// `VaultId`'s strict parse contract guarantees `id.to_string()` is a safe path
 /// component (no traversal / case-folding), so the join is sound.
 ///
+/// **The legacy sentinel is the one id that is not a child of `vaults/`**, and
+/// this resolver has to say so. [`vault_id_from_root`] names the legacy
+/// `vault/` directory with [`legacy_vault_id`], so a client that resolved a root
+/// and then threaded the id back through here got `<base>/vaults/<sentinel>/`
+/// — a directory that never exists. That asymmetry is not cosmetic: it made a
+/// widen-target write land nowhere (silently, as `VaultNotFound`) on exactly
+/// the installs that still have a pre-migration `vault/`, and it left the
+/// residue that `vault_repair` refuses to touch (a `vault/` carrying its
+/// `vault.meta`) unreachable by `vault_delete`, which is the command that owns
+/// it. Verified by `legacy_id_resolves_back_to_the_legacy_directory`, which
+/// asserts the round trip in the direction that used to be broken.
+///
 /// `pub` so the unlock / recover / create targeting wrappers — each with
 /// its own error universe — can map their own `app_data_dir` lookup and then
 /// layer this pure join on top.
 pub fn vault_root_for_id_from_base(base: &Path, id: VaultId) -> PathBuf {
+    if id == legacy_vault_id() {
+        return base.join(LEGACY_VAULT_DIR_NAME);
+    }
     base.join(VAULTS_DIR_NAME).join(id.to_string())
 }
 
@@ -1128,6 +1144,30 @@ mod tests {
             vault_id_from_root(&root),
             id,
             "an explicit-id root must name back to that id"
+        );
+    }
+
+    #[test]
+    fn legacy_id_resolves_back_to_the_legacy_directory() {
+        // The two directions have to agree, because `vault_id_from_root` is
+        // what names a resolved root and this is what turns a name back into a
+        // root: `vault/` → sentinel → `vaults/<sentinel>/` was the broken half,
+        // and it is the direction a delete of a pre-migration leftover takes.
+        let tmp = ScopedTempDir::new("vrfid-legacy").unwrap();
+        let legacy_root = tmp.path().join(LEGACY_VAULT_DIR_NAME);
+        let sentinel = vault_id_from_root(&legacy_root);
+        assert_eq!(sentinel, legacy_vault_id());
+        assert_eq!(
+            vault_root_for_id_from_base(tmp.path(), sentinel),
+            legacy_root,
+            "the sentinel must resolve back to `<base>/vault`, not `vaults/<sentinel>`"
+        );
+        // A real id keeps the `vaults/<id>/` join, so the special case cannot
+        // swallow the ordinary path.
+        let real = VaultId::mint();
+        assert_eq!(
+            vault_root_for_id_from_base(tmp.path(), real),
+            tmp.path().join(VAULTS_DIR_NAME).join(real.to_string())
         );
     }
 

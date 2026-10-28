@@ -6321,9 +6321,11 @@ mod tests {
 
         // A discoverable vault on disk: `record_unlock` is a deliberate no-op
         // for an id that names no `vaults/<id>/`, so without this the assertion
-        // below would pass for the wrong reason.
-        let id = test_vault_id();
-        let vault_dir = base.join("vaults").join(id.to_string());
+        // below would pass for the wrong reason. The id is a REAL one rather
+        // than the legacy sentinel, because the sentinel names `<base>/vault/`
+        // and this fixture needs a `vaults/<id>/` directory to exist at all.
+        let id = crate::plugins::vault_unlock::state::test_vault_id_b();
+        let vault_dir = crate::paths::vault_root_for_id_from_base(&base, id);
         std::fs::create_dir_all(&vault_dir).expect("create vault dir");
         std::fs::write(vault_dir.join("vault.meta"), b"any vault.meta bytes")
             .expect("seed vault.meta");
@@ -6363,8 +6365,8 @@ mod tests {
         let host = crate::host::test_host::TestHost::new(tmp.path());
         let base = host.app_data_dir().expect("test host data dir");
 
-        let id = test_vault_id();
-        let vault_dir = base.join("vaults").join(id.to_string());
+        let id = crate::plugins::vault_unlock::state::test_vault_id_b();
+        let vault_dir = crate::paths::vault_root_for_id_from_base(&base, id);
         std::fs::create_dir_all(&vault_dir).expect("create vault dir");
         std::fs::write(vault_dir.join("vault.meta"), b"any vault.meta bytes")
             .expect("seed vault.meta");
@@ -6419,7 +6421,13 @@ mod tests {
         let host = crate::host::test_host::TestHost::new(tmp.path());
         let base = host.app_data_dir().expect("test host data dir");
         let id = test_vault_id();
-        let vault_dir = base.join("vaults").join(id.to_string());
+        // `test_vault_id()` is the LEGACY SENTINEL, so the root that carries it is
+        // the legacy directory: `vault_root_for_id_from_base` resolves the
+        // sentinel to `<base>/vault`, and `vault_id_from_root` reads `vault/` back
+        // to the sentinel. Building the fixture at `vaults/<sentinel>/` instead
+        // names one root and creates another, so a pipeline that resolves by id
+        // seals the name into a directory the assertion never reads.
+        let vault_dir = crate::paths::vault_root_for_id_from_base(&base, id);
         std::fs::create_dir_all(&vault_dir).expect("create vault dir");
         // `0x33` is the account_number_hash the prefs AAD binds; `0x42` is the
         // root_key the fixture slot holds. They have to be the pair the prefs
