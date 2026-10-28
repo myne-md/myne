@@ -35,6 +35,7 @@ import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { Switch } from "../primitives/Switch";
 import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
+import { subscribePrefsNonce } from "../../notes/prefsNonce";
 import {
   prefsRead,
   setCustomTheme,
@@ -225,6 +226,14 @@ function SystemMockup() {
 
 interface ThemePreviewCardsProps {
   selected: ThemeOption["value"];
+  /**
+   * A custom theme is painting the app, so NONE of these is in effect
+   * (spec § 9.5.2: `custom_theme` takes precedence over `theme`). myne#934:
+   * the row used to keep a checkmark on the stored built-in while a custom
+   * palette overrode it, which read as "System is active" while the app was
+   * clearly not in System.
+   */
+  customActive: boolean;
   onChoose: (value: ThemeOption["value"]) => void;
   ariaLabel: string;
   optionAria: (label: string) => string;
@@ -459,6 +468,7 @@ function AccentColorRow({ onDialogOpenChange }: { onDialogOpenChange?: (open: bo
 /** The theme picker: one preview card per theme, a radiogroup like `Segmented`. */
 function ThemePreviewCards({
   selected,
+  customActive,
   onChoose,
   ariaLabel,
   optionAria,
@@ -467,7 +477,11 @@ function ThemePreviewCards({
   return (
     <div role="radiogroup" aria-label={ariaLabel} data-testid="settings.theme" style={CARDS_ROW_STYLE}>
       {THEMES.map((o) => {
-        const isSel = o.value === selected;
+        // No card is checked while a custom theme overrides them, and the click
+        // handler below then fires for every card: clicking the segment that
+        // happens to equal the stored built-in is what CLEARS the custom theme
+        // (see `choose`), so it must not be swallowed as a no-op here.
+        const isSel = !customActive && o.value === selected;
         const label = labelFor(o.labelKey);
         return (
           <button
@@ -557,29 +571,55 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
   // pref's own omit-when-default polarity.
   const [showTaskMarkerState, setShowTaskMarkerState] = useState(true);
   const [markerError, setMarkerError] = useState<string | null>(null);
+  // Read ordering, not display state: see the effect below.
+  const prefsRequest = useRef(0);
+  const prefsApplied = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
-    void prefsRead()
-      .then((prefs) => {
-        if (!cancelled) {
-          setSelected(segmentFor(prefs.theme));
-          setShowTimestamps(prefs.show_note_timestamps);
-          setShowTaskMarkerState(prefs.show_task_marker);
-          setActiveCustom(prefs.custom_theme);
-        }
-      })
-      .catch(() => {
+    // Latest-read-wins, across the mount read and the nonce-driven re-reads.
+    // A user action that writes several prefs advances the nonce once per
+    // write, so two reads are routinely in flight; if the older one resolved
+    // last it would reinstate the pre-write view with no further bump coming.
+    // `usePrefs` carries the same pair for the same reason.
+    const read = async () => {
+      const mine = (prefsRequest.current += 1);
+      try {
+        const prefs = await prefsRead();
+        if (cancelled || mine <= prefsApplied.current) return;
+        prefsApplied.current = mine;
+        setSelected(segmentFor(prefs.theme));
+        setShowTimestamps(prefs.show_note_timestamps);
+        setShowTaskMarkerState(prefs.show_task_marker);
+        setActiveCustom(prefs.custom_theme);
+      } catch {
         // Keep the "system" default if the read fails — it is the safest
         // (OS-following) baseline and matches a vault with no theme set.
-      });
+      }
+    };
+    void read();
+    // Another surface writes these fields behind the panel's back: the
+    // gallery's `myne://theme/install` dialog selects a custom theme, the
+    // command palette applies one, a folder rename moves other rows. Each of
+    // those writes advances the prefs nonce, and without this subscription the
+    // row kept claiming System until Settings was closed and reopened
+    // (myne#934). The theme STORE has its own signal (`lib/themesSignal`),
+    // which is what the list below listens to; the pointer at `custom_theme`
+    // lives in prefs, which is why this panel needs this one.
+    const unsubscribe = subscribePrefsNonce(() => void read());
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, []);
 
   async function choose(value: ThemeOption["value"]) {
-    if (value === selected) return;
+    // The guard is `&& activeCustom === null` deliberately (myne#934). While a
+    // custom theme is active the row shows NO segment as selected, so the
+    // stored built-in is the one the user presses to get back to a built-in
+    // theme; early-returning on it made that a dead click and left clearing the
+    // override reachable only by picking a DIFFERENT built-in first.
+    if (value === selected && activeCustom === null) return;
     setError(null);
     const theme = wireValue(value);
     try {
@@ -649,11 +689,20 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
       <ControlBlock
         anchorId="appearance.theme"
         label={t("settings.appearance.themeLabel")}
-        helper={t("settings.appearance.themeHelper")}
+        // The helper describes the row's CURRENT state, which a custom theme
+        // changes: saying "switch between light and dark" under a row where
+        // nothing is switchable, with no card checked, is the line that made a
+        // working custom theme look like a broken System selection (myne#934).
+        helper={
+          activeCustom === null
+            ? t("settings.appearance.themeHelper")
+            : t("settings.appearance.themeCustomOverride", { name: activeCustom })
+        }
         control={
           <>
             <ThemePreviewCards
               selected={selected}
+              customActive={activeCustom !== null}
               onChoose={(value) => void choose(value)}
               ariaLabel={t("settings.appearance.themeLabel")}
               optionAria={(label) =>

@@ -403,7 +403,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-woodpecker-split.mjs` | the ONE contract the two workflow files duplicate by design: the desktop release build's… | `pre-commit` + CI `pnpm-build` |
 | `scripts/lib/woodpecker-configs.mjs` (the roster behind both, plus `check-playwright-image.mjs`) | the one place that knows the CI config is `.woodpecker/`, imported rather than copied… | `pre-commit` |
 | `check-ignored-tests.mjs` | an `#[ignore]` in `core/` whose reason claims a defect is outstanding is a DEFERRAL, and… | `pre-commit` + CI `ignored-tests` |
-| `check-test-typecheck.mjs` | ratchet: the per-file count of type errors in the trees `tsconfig.json` deliberately… | `pre-commit` + CI `pnpm-build` |
+| `check-test-typecheck.mjs` | ratchet: the per-file count of type errors in the trees `tsconfig.json` deliberately… | CI `pnpm-build` (no local hook) |
 | `hooks-parity-check.sh` | CI backstop for the pre-commit checks that are otherwise `--no-verify`-bypassable: SPDX… | CI `hooks-parity` |
 | `check-bundle-record.mjs` | the published-bundle-hash record is append-only (`--append-only`), and a deploy may only… | CI `bundle-record`; `--has` by hand |
 | `wasm-csprng-check.sh` | `protocol` builds for `wasm32-unknown-unknown` and its `getrandom` hook stays *undefined*… | CI `wasm-protocol` |

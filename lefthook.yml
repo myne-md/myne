@@ -493,7 +493,15 @@ pre-commit:
       run: node scripts/check-update-channel.mjs
 
     token-adoption:
-      glob: "{src,editor/src}/**/*.{ts,tsx,css}"
+      # The glob names EVERY tree `check-token-adoption.mjs` counts, because the
+      # guard imports the shared-roots roster and scans all of it. It used to name
+      # only `src` and `editor/src`, so a UI change in `web/src`, `mobile/src`,
+      # `stories/src` or the three source-consumed packages raised a count and ran
+      # nothing: `mobile/src/app/flows/WelcomeFlow.tsx` grew by one literal in the
+      # residue-banner change and the drift sat on develop until an unrelated
+      # branch's pre-commit hook tripped over it. A trigger narrower than the scan
+      # roots is a guard that is green because it never ran (myne-md/myne#934).
+      glob: "{src,editor/src,dialect/src,copy/src,client-core/src,ornaments/src,web/src,mobile/src,stories/src}/**/*.{ts,tsx,css}"
       # myne#394: a hardcoded visual value in an inline style is unreachable to
       # every custom theme, permanently — inline style outranks any stylesheet,
       # so there is no override. The deep-customization plan pays that debt down

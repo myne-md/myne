@@ -43,6 +43,10 @@ vi.mock("../../src/components/settings/CustomThemesSection", () => ({
 
 import { AppearancePanel } from "../../src/components/settings/AppearancePanel";
 import {
+  __resetPrefsNonceForTest,
+  bumpPrefsNonce,
+} from "../../src/notes/prefsNonce";
+import {
   resetSettingsTopics,
   setActiveSettingsTopic,
 } from "../../src/components/settings/SettingsTabs";
@@ -68,6 +72,9 @@ beforeEach(() => {
   setCustomTheme.mockReset().mockResolvedValue(undefined);
   setShowNoteTimestamps.mockReset().mockResolvedValue(undefined);
   applyTheme.mockReset();
+  // Module-scope by design (a mounted panel subscribes to it), so a spec that
+  // left it advanced would decide the next one.
+  __resetPrefsNonceForTest();
 });
 
 afterEach(cleanup);
@@ -170,6 +177,60 @@ describe("AppearancePanel — theme segmented control", () => {
     expect(
       screen.getByTestId("settings.theme-system").getAttribute("aria-checked"),
     ).toBe("true");
+  });
+});
+
+describe("AppearancePanel: an active custom theme (myne#934)", () => {
+  // The row was drawn from `prefs.theme` alone, so `custom_theme` taking
+  // precedence over it (spec § 9.5.2) was invisible here: the app wore one
+  // palette while the picker said "System". Worse, the stored segment was
+  // already checked, and `choose()` early-returns on the segment it already
+  // shows, so clicking System was a dead click and the only way out of the
+  // custom theme was to click Dark first.
+  it("checks no built-in card and names the theme that overrides them", async () => {
+    prefsRead.mockResolvedValue({ ...BASE, custom_theme: "nord" });
+    render(<AppearancePanel />);
+    await waitFor(() => expect(screen.getByText(/overrides these choices/)).toBeTruthy());
+    for (const id of ["system", "light", "dark", "amoled"]) {
+      expect(
+        screen.getByTestId(`settings.theme-${id}`).getAttribute("aria-checked"),
+      ).toBe("false");
+    }
+    expect(screen.getByText(/overrides these choices/).textContent).toContain("nord");
+  });
+
+  it("clicking the stored built-in theme clears the custom selection", async () => {
+    // `theme` is unset → System, which is the segment the row used to check.
+    prefsRead.mockResolvedValue({ ...BASE, custom_theme: "nord" });
+    render(<AppearancePanel />);
+    await waitFor(() => expect(screen.getByText(/overrides these choices/)).toBeTruthy());
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("settings.theme-system"));
+    });
+
+    expect(setCustomTheme).toHaveBeenCalledWith(null);
+    expect(setTheme).toHaveBeenCalledWith(null);
+    expect(applyTheme).toHaveBeenCalledWith(null);
+    await waitFor(() =>
+      expect(screen.queryByText(/overrides these choices/)).toBeNull(),
+    );
+  });
+
+  // The gallery's install dialog writes the selection through `setCustomTheme`,
+  // which advances the prefs nonce. Without a subscription the panel kept
+  // saying System until it was remounted, which is the half of the report that
+  // reopening Settings DID fix.
+  it("re-reads prefs when another surface changes them", async () => {
+    render(<AppearancePanel />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalledTimes(1));
+
+    prefsRead.mockResolvedValue({ ...BASE, custom_theme: "nord" });
+    act(() => bumpPrefsNonce());
+
+    await waitFor(() =>
+      expect(screen.getByText(/overrides these choices/).textContent).toContain("nord"),
+    );
   });
 });
 

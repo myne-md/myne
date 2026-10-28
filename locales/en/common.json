@@ -3424,6 +3424,7 @@
         "light": "Light",
         "system": "System"
       },
+      "themeCustomOverride": "{{name}} is active and overrides these choices.",
       "themeHelper": "Switch between light and dark themes, or follow the system preference.",
       "themeLabel": "Theme",
       "themeOptionAria": "{{label}} theme",

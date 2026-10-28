@@ -5,11 +5,15 @@
 // real handler wiring against mocked IPC-boundary wrappers: empty state, a
 // row + preview, Apply (read → persist → apply → mark active), Export (read →
 // save .json), the inline two-step delete confirm, and Import (file dialog →
-// read picked file → import → refresh). Every stored theme is valid (import
-// validates before sealing), so there is no invalid-row case.
+// read picked file → import → the store signal → refresh). Every stored theme
+// is valid (import validates before sealing), so there is no invalid-row case.
+//
+// myne#934 added the store-signal cases: the list refreshes when the store is
+// written from ANOTHER surface (the gallery's install dialog), because the row
+// is what tells the user their theme arrived.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const listCustomThemes = vi.fn();
 const readCustomTheme = vi.fn();
@@ -29,8 +33,18 @@ vi.mock("../../src/lib/themes", () => ({
   listCustomThemes: (...a: unknown[]) => listCustomThemes(...a),
   readCustomTheme: (...a: unknown[]) => readCustomTheme(...a),
   exportCustomTheme: (...a: unknown[]) => exportCustomTheme(...a),
-  importCustomTheme: (...a: unknown[]) => importCustomTheme(...a),
-  deleteCustomTheme: (...a: unknown[]) => deleteCustomTheme(...a),
+  // The real writers bump the store signal after a write RESOLVES
+  // (`src/lib/themes.ts`), and that bump is what refreshes an open picker.
+  // Reproduced here rather than stubbed away: a mock that does not bump makes
+  // every refresh assertion below vacuous.
+  importCustomTheme: async (...a: unknown[]) => {
+    await importCustomTheme(...a);
+    bumpThemesNonce();
+  },
+  deleteCustomTheme: async (...a: unknown[]) => {
+    await deleteCustomTheme(...a);
+    bumpThemesNonce();
+  },
   // Pure helper — a light real-ish impl so the row's preview chiplet renders.
   themePreview: (palette: Record<string, string>) => ({
     background: palette["--paper"] ?? "",
@@ -65,6 +79,7 @@ vi.mock("@tauri-apps/plugin-dialog", () => ({
 }));
 
 import { CustomThemesSection } from "../../src/components/settings/CustomThemesSection";
+import { __resetThemesNonceForTest, bumpThemesNonce } from "../../src/lib/themesSignal";
 
 const PALETTE = {
   "--paper": "#111111",
@@ -96,6 +111,9 @@ beforeEach(() => {
   applyTheme.mockReset();
   saveJsonAsFile.mockReset().mockResolvedValue(undefined);
   openFileDialog.mockReset().mockResolvedValue(null);
+  // Module-scope by design (it is what a mounted picker subscribes to), so a
+  // spec that left it advanced would decide the next one.
+  __resetThemesNonceForTest();
 });
 
 afterEach(cleanup);
@@ -176,5 +194,43 @@ describe("CustomThemesSection", () => {
     fireEvent.click(screen.getByTestId("settings.custom-theme-import"));
     await waitFor(() => expect(pickFiles).toHaveBeenCalled());
     expect(importCustomTheme).not.toHaveBeenCalled();
+  });
+
+  // myne#934. The failure this pins is the one that shipped: a theme installed
+  // from the gallery's `myne://theme/install` dialog (or applied from the
+  // command palette) writes `vault.themes` behind an ALREADY-OPEN panel. The
+  // store write succeeds, the palette paints, and the panel keeps advertising
+  // "No custom themes yet" until Settings is closed and reopened, because the
+  // list was read exactly once on mount.
+  it("lists a theme installed from another surface, without a remount", async () => {
+    renderSection();
+    await waitFor(() =>
+      expect(screen.getByTestId("settings.custom-theme-empty")).toBeTruthy(),
+    );
+
+    // Another surface wrote the store; the signal is all this panel gets.
+    listCustomThemes.mockResolvedValue([{ name: "nord", palette: PALETTE }]);
+    act(() => bumpThemesNonce());
+
+    const row = await screen.findByTestId("settings.custom-theme-row");
+    expect(row.getAttribute("data-theme-name")).toBe("nord");
+    expect(screen.queryByTestId("settings.custom-theme-empty")).toBeNull();
+  });
+
+  // The panel's OWN import went through the same signal, so the path a user
+  // actually takes is covered by the same mechanism as the external one. This
+  // is what fails if the section keeps a private `refresh()` call instead of
+  // subscribing: the mock's bump would be the only route to a row.
+  it("Import lands the imported theme in the list through the store signal", async () => {
+    const picked = { name: "my-theme.json", size: 12, mimeHint: null, handle: {} };
+    pickFiles.mockResolvedValue([picked]);
+    renderSection();
+    await waitFor(() => expect(listCustomThemes).toHaveBeenCalledTimes(1));
+
+    listCustomThemes.mockResolvedValue([{ name: "my-theme", palette: PALETTE }]);
+    fireEvent.click(screen.getByTestId("settings.custom-theme-import"));
+
+    const row = await screen.findByTestId("settings.custom-theme-row");
+    expect(row.getAttribute("data-theme-name")).toBe("my-theme");
   });
 });

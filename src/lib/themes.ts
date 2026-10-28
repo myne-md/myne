@@ -10,6 +10,7 @@
 // types in lockstep with the Rust `ThemesError` / `ThemeError` serde shapes.
 
 import { invoke } from "../platform/core";
+import { bumpThemesNonce } from "./themesSignal";
 
 /** Mirror of Rust `theme_validator::ThemeErrorKind`. */
 export type ThemeErrorKind =
@@ -113,9 +114,16 @@ export async function exportCustomTheme(name: string): Promise<ThemePalette> {
  * of a user-picked `.json` theme file; the host validates it through the shared
  * value-shape allowlist BEFORE sealing it into `vault.themes`. Rejects (with a
  * {@link ThemesError}, `kind === "Invalid"`) on an invalid palette shape.
+ *
+ * Bumps the store signal on success (myne#934), which is what refreshes a picker
+ * that is already mounted: this module is the ONE writer every surface shares,
+ * so the bump lives here rather than in each caller (the Settings import, the
+ * `myne://theme/install` dialog). A rejection wrote nothing, so it bumps
+ * nothing.
  */
 export async function importCustomTheme(name: string, paletteJson: string): Promise<void> {
   await invoke<void>("plugin:themes|themes_import", { name, paletteJson });
+  bumpThemesNonce();
 }
 
 /**
@@ -136,9 +144,12 @@ export function nextAvailableThemeName(name: string, taken: readonly string[]): 
   return candidate;
 }
 
-/** Delete one custom theme by name. Idempotent (absent → success). */
+/** Delete one custom theme by name. Idempotent (absent → success). Bumps the
+ *  store signal like {@link importCustomTheme}, so an open picker drops the row
+ *  whether the delete came from its own button or another surface. */
 export async function deleteCustomTheme(name: string): Promise<void> {
   await invoke<void>("plugin:themes|themes_delete", { name });
+  bumpThemesNonce();
 }
 
 /**
