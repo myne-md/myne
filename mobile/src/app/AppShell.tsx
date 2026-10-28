@@ -104,6 +104,11 @@ function StageSwitch() {
   const [joinFrom, setJoinFrom] = useState<JoinEntry | null>(null);
   /** The identity-first overlay on the welcome arm (myne-md/myne#768). */
   const [identityOpen, setIdentityOpen] = useState(false);
+  // Which step the identity flow opens on (myne-md/myne#932). The first-run
+  // screen has two doors and they lead to different steps: create, or the fork
+  // that brings an existing identity across. Reset by the overlay's own exit so a
+  // later Settings entry lands on the gate it has always used.
+  const [identityStart, setIdentityStart] = useState<"gate" | "join-fork" | "create">("gate");
   /**
    * A scanned member-vault QR awaiting the identity flow's join step. Held here
    * rather than inside `JoinFlow` because the join overlay CLOSES when it hands
@@ -351,7 +356,24 @@ function StageSwitch() {
         return (
           <PhoneColumn>
             <IdentityFlow
-              onCancel={() => setIdentityOpen(false)}
+              initialStep={identityStart}
+              // The fork's "scan the code" arm hands control back here: the scanner
+              // owns the decode and re-enters this flow with `fromPersonQr`.
+              onScanCode={() => {
+                setIdentityOpen(false);
+                setJoinFrom("welcome");
+              }}
+              // The fork's third row: the account-and-password join this screen's
+              // second button used to open directly, kept reachable because a
+              // pre-identity account is not an identity (myne-md/myne#932).
+              onJoinAccount={() => {
+                setIdentityOpen(false);
+                setJoinFrom("welcome");
+              }}
+              onCancel={() => {
+                setIdentityOpen(false);
+                setIdentityStart("gate");
+              }}
               // The identity home's create-vault action, and the exit of the
               // first run (myne-md/myne#911 task 12): the identity exists by the
               // time this is reachable, so the next step of the same chain is the
@@ -379,8 +401,23 @@ function StageSwitch() {
       return (
         <PhoneColumn>
           <WelcomeFlow
-            onJoin={() => setJoinFrom("welcome")}
-            onIdentity={() => setIdentityOpen(true)}
+            // Both doors open the identity flow, at different steps
+            // (myne-md/myne#932). The create door keeps the gate it has always
+            // had, because the gate is also the only path to "use this device
+            // only"; the second door opens the fork that offers the two
+            // credentials an existing identity comes with (24 words, or a code
+            // from a device that has it). What changed is the LABEL on that second
+            // door: it used to say "Connect to my account" and open the QR scanner
+            // alone, so a returning user had to walk into the create flow to find
+            // their own identity.
+            onIdentity={() => {
+              setIdentityStart("gate");
+              setIdentityOpen(true);
+            }}
+            onHaveIdentity={() => {
+              setIdentityStart("join-fork");
+              setIdentityOpen(true);
+            }}
           />
         </PhoneColumn>
       );

@@ -128,6 +128,8 @@ export interface MockConfig {
     fingerprint_hex: string;
     person_id_hex: string;
     identity_code: string;
+    /** Canonical account-number body the person plane answers, if a spec cares. */
+    accountNumber?: string | null;
     approved: boolean;
   };
   /** `sync_person_setup` refusal, e.g. `{ kind: "BadRequest" }` for the
@@ -640,7 +642,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     const deviceNames: Record<string, string> = { ...(config.deviceNames ?? {}) };
     // Declared HERE, not at module scope: this callback is serialized into the
     // browser, so a Node-side const would be a ReferenceError at call time.
-    const DEFAULT_DEVICE_ID = "aa11bb22cc33dd44ee55ff6677889900";
+    /** A canonical 20-character body: what `sync_person_account_number` answers. */
+  const ACCOUNT_NUMBER_BODY = "4K7P9RH2JR3T8XW6VZ0A";
+  const DEFAULT_DEVICE_ID = "aa11bb22cc33dd44ee55ff6677889900";
 
     // STATEFUL deliberate-folders store (MYND-560). An empty folder exists ONLY
     // as a `deliberate_folders` entry — no note carries its path — so a
@@ -2123,6 +2127,12 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:sync|sync_verify_hold_begin": () => null,
       "plugin:sync|sync_verify_hold_end": () => null,
       "plugin:sync|sync_pending_conflicts": () => config.pendingConflicts ?? [],
+      // The canonical body the identity home formats into its display form. It
+      // needs an arm of its own: without one the unknown-command fallback answers
+      // `[]`, which is truthy, and a number-shaped value rendered as an account
+      // number is exactly the kind of fixture gap that reads as a product defect
+      // (myne-md/myne#932 caught it through the home step's crash).
+      "plugin:sync|sync_person_account_number": () => config.accountNumber ?? ACCOUNT_NUMBER_BODY,
       // ── The person plane (myne-md/myne#851 tasks 14 and 15) ──────────────
       // The identity flow's whole backend surface. Nothing here is stateful
       // except `acceptedVaultId`, and that is deliberate: the accept's only

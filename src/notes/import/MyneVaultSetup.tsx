@@ -53,6 +53,7 @@ type CredentialKind = "password" | "phrase";
 /** 24 words, per `protocol.md` §3.1, from the one definition. */
 import { PhraseEntryGrid } from "../../components/PhraseEntryGrid";
 import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 
 /** The `<Select>` value that means "nothing chosen yet". */
 const NO_VAULT = "";
@@ -232,18 +233,15 @@ function PhraseGrid({
     next[i] = value;
     onCells(next);
   };
-  const onPaste = (i: number) => (e: ClipboardEvent<HTMLInputElement>) => {
+  const onPaste = () => (e: ClipboardEvent<HTMLInputElement>) => {
     // §3.2 paste-to-distribute: a phrase kept as one string in a password
     // manager is the common case, and asking the user to split it by hand is
-    // 24 chances to put a word in the wrong cell.
-    const tokens = e.clipboardData.getData("text").trim().split(/\s+/);
+    // 24 chances to put a word in the wrong cell. The distribution itself is
+    // `@myne/client-core`'s, so every phrase surface fills from cell 1.
+    const tokens = phrasePasteTokens(e.clipboardData.getData("text"));
     if (tokens.length < 2) return;
     e.preventDefault();
-    const next = [...cells];
-    for (let k = 0; k < tokens.length && i + k < PHRASE_CELL_COUNT; k += 1) {
-      next[i + k] = tokens[k];
-    }
-    onCells(next);
+    onCells(applyPastedPhrase(cells, tokens));
   };
   return (
     <PhraseEntryGrid

@@ -600,6 +600,14 @@ pub struct PersonJoinView {
 /// somebody else is refused before anything is written) and the cached claim
 /// secret, which is what lets the device finish on its own once approved
 /// (decision: cache the derived secret, never the phrase).
+/// Admit THIS device to a person's account from a scanned code and the phrase.
+///
+/// `invite_code` is a server that gates NEW accounts behind a shared code
+/// (myne-md/myne#932). The join is the ONLY enrolment surface a phone-first user
+/// has, and the code would otherwise have to come from sync config, which a phone
+/// has never written for this server. It rides the same config write the endpoint
+/// does, so the later `person_register_with_path` reads it from the one place it
+/// already looks.
 pub async fn person_join_device_from_host(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
@@ -607,6 +615,7 @@ pub async fn person_join_device_from_host(
     scanned_person_id_hex: String,
     endpoint_url: String,
     phrase: String,
+    invite_code: Option<String>,
 ) -> Result<PersonJoinView, SyncDeviceError> {
     // Same wrap, same reason: this is one of the four entry points that take the
     // identity phrase, and the other three now wrap it first.
@@ -642,7 +651,10 @@ pub async fn person_join_device_from_host(
             super::transport::TransportError::Tls => SyncDeviceError::TlsFailure,
             _ => SyncDeviceError::Transport,
         })?;
-    super::config::set_endpoint(host, io, Some(endpoint_url), None, None)
+    // The invite code is written with the endpoint rather than threaded further:
+    // `person_register_with_path` already reads it from this config, and a second
+    // path for it would be a second place to forget (myne-md/myne#932).
+    super::config::set_endpoint(host, io, Some(endpoint_url), None, invite_code)
         .await
         .map_err(|_| SyncDeviceError::NotConfigured)?;
 
@@ -800,6 +812,7 @@ pub async fn sync_person_join_device<R: tauri::Runtime>(
     person_id_hex: String,
     endpoint_url: String,
     phrase: String,
+    invite_code: Option<String>,
 ) -> Result<PersonJoinView, SyncDeviceError> {
     person_join_device_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
@@ -808,6 +821,7 @@ pub async fn sync_person_join_device<R: tauri::Runtime>(
         person_id_hex,
         endpoint_url,
         phrase,
+        invite_code,
     )
     .await
 }
@@ -6399,7 +6413,8 @@ mod device_join_tests {
 
         block_on(async {
             let refused =
-                person_join_device_from_host(&host, &io, &state, other, endpoint, phrase).await;
+                person_join_device_from_host(&host, &io, &state, other, endpoint, phrase, None)
+                    .await;
             assert!(
                 matches!(refused, Err(SyncDeviceError::PersonMismatch)),
                 "a phrase for a different person must be refused as a mismatch"
@@ -6437,6 +6452,7 @@ mod device_join_tests {
                     bad.to_string(),
                     "http://127.0.0.1:9".to_string(),
                     "abandon ".repeat(23).trim().to_string() + " about",
+                    None,
                 )
                 .await;
                 assert!(

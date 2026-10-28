@@ -83,10 +83,18 @@ const ENROLLED = {
   state: "enrolled",
 };
 
-/** The "Connect to my account" door on Welcome (the owner's join flow). */
+/** The first-run display name for the scan door (myne-md/myne#932): Welcome's
+ *  second button opens the identity fork, whose code row starts the scanner. */
 async function openJoinDoor(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: "Connect to my account" }).click();
+  await page.getByTestId("welcome.have-identity-cta").click();
+  // Two landings, one door. A device with no identity is offered the fork and its
+  // code row; a device that already holds the identity lands on the identity home,
+  // which carries the scanner itself (myne-md/myne#932). Whichever is on screen is
+  // the one to press, so the helper asks rather than assuming.
+  const forkCode = page.getByTestId("identity-flow.fork-code");
+  const homeScan = page.getByTestId("identity-flow.home-scan");
+  await forkCode.or(homeScan).first().click();
   await expect(page.getByTestId("sync.join.scan-qr")).toBeVisible();
 }
 

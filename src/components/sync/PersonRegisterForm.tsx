@@ -42,6 +42,7 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
 import { Input } from "../primitives/Input";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import { BetaTermsConsent } from "./BetaTermsConsent";
 import { HELPER_STYLE, LABEL_STYLE } from "../settings/panel-styles";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
@@ -348,21 +349,12 @@ export function PersonRegisterForm({
                   ),
                 );
               }}
-              onCellPaste={(index) => (event) => {
-                const tokens = event.clipboardData
-                  .getData("text")
-                  .split(/\s+/)
-                  .filter((token) => token.length > 0);
+              onCellPaste={() => (event) => {
+                const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
                 if (tokens.length < 2) return;
                 event.preventDefault();
                 setFailure(null);
-                setWords((cells) => {
-                  const next = [...cells];
-                  for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-                    next[index + i] = tokens[i];
-                  }
-                  return next;
-                });
+                setWords((cells) => applyPastedPhrase(cells, tokens));
               }}
             />
           </>

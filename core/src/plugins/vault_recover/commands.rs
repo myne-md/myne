@@ -1017,6 +1017,14 @@ pub(crate) fn derive_root_key_from_phrase(
 
 /// The recovery DRILL: does this phrase still open this vault?
 ///
+/// **Two generations, one question.** The answer is `true` when the phrase opens
+/// the credential THIS vault was born with: its recovery-phrase wrap for every
+/// generation that has one, and the OWNER'S PERSON WRAP for a person-born `NTV7`
+/// vault, whose recovery wrap is retired by construction (`protocol.md` §9.3.5).
+/// The second arm is not an extension. Without it the drill answers `false` for
+/// every phrase on a person-born vault, including the identity phrase that just
+/// opened it, and it is the only pre-loss check a user has (myne-md/myne#932).
+///
 /// The whole point of a drill (myne-md/myne#468) is that the user finds out
 /// while they can still do something about it. `recovery-flow.md` §2.4 is a
 /// no-re-display commitment and `protocol.md` §7 gives the phrase no rotation,
@@ -1147,6 +1155,17 @@ pub(crate) async fn verify_recovery_phrase_with_path(
     // (3) Derive and attempt the unwrap off the runtime worker — Argon2id at
     //     production parameters is the whole cost of this command.
     let join_outcome = crate::task::run_blocking(move || -> Result<bool, VaultRecoveryError> {
+        // A person-born vault has no phrase wrap of its own, so the arm below
+        // would answer `false` for every input including the phrase that opens
+        // the vault. Its recovery credential is the IDENTITY phrase, and the
+        // wrap it opens is the person wrap. Dispatching on the magic here rather
+        // than on `meta_version_of` is deliberate: the version callback answers
+        // `V0_2` for `NTV7`, which is the same answer `NTV6` gets, and the two
+        // generations seal different fields.
+        if protocol::vault_meta_generation(&bytes) == protocol::VaultMetaGeneration::Person {
+            return verify_with_person_wrap(&phrase, &bytes);
+        }
+
         let version = protocol::meta_version_of(&bytes).unwrap_or(protocol::MetaVersion::V0_1);
         let meta = protocol::parse_vault_meta_any(&bytes).map_err(|e| {
             tracing::error!(
@@ -1199,6 +1218,59 @@ pub(crate) async fn verify_recovery_phrase_with_path(
             );
             Err(VaultRecoveryError::JoinFailure)
         }
+    }
+}
+
+/// Unwrap an `NTV7` vault's `root_key` with the phrase's person keypair.
+///
+/// The derivation is `derive_keys_from_person_phrase`'s first half, deliberately
+/// mirroring it rather than inventing a second way to turn a phrase into a
+/// person: `person_id_hash` → `derive_person_identity_seed` → the three key-type
+/// seeds → the pair, all under `DEFAULT_V0_1_KDF_PARAMS` (the identity plane's
+/// parameters, NOT the vault's; the vault's govern the password wrap).
+///
+/// No host memory ceiling is checked, and that matches the module rather than
+/// skipping a rule: `recover_with_phrase`, the real recovery path beside this
+/// one, derives the vault's Argon2id parameters without one too. The drill adds
+/// no derivation the recovery flow does not already perform.
+fn verify_with_person_wrap(phrase: &str, bytes: &[u8]) -> Result<bool, VaultRecoveryError> {
+    let meta = protocol::parse_vault_meta_ntv7(bytes).map_err(|e| {
+        tracing::error!(
+            stage = "parse_meta_ntv7",
+            error_kind = "InvalidVaultMeta",
+            protocol_error_kind = protocol_error_kind(&e),
+            "person-born vault.meta parse rejected"
+        );
+        VaultRecoveryError::InvalidVaultMeta
+    })?;
+
+    // Match the legacy arm and `vault_creation`: the phrase is normalized
+    // before it becomes an identity, so a typed variant (extra spaces, case)
+    // of the right words still opens the wrap.
+    let normalized = protocol::normalize_user_phrase(phrase);
+    let person_id = protocol::person_id_hash(&normalized);
+    let Ok(seed) = protocol::kdf::derive_person_identity_seed(
+        &normalized,
+        &person_id,
+        &protocol::DEFAULT_V0_1_KDF_PARAMS,
+    ) else {
+        // A derivation that cannot run is §3.4's non-distinguishing answer, the
+        // same one a wrong phrase gets: the surface must not gain a third state
+        // meaning "these words are the right shape but the KDF refused".
+        return Ok(false);
+    };
+    let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+    let owner = protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+
+    match protocol::open_person_wrapped_root_key(&owner, &meta.person_wrap, &meta.base.items_key_id)
+    {
+        // Dropped immediately, and `Zeroizing` wipes it: the drill has no use for
+        // the key, its whole output is the fact that it existed.
+        Ok(root_key) => {
+            drop(root_key);
+            Ok(true)
+        }
+        Err(_) => Ok(false),
     }
 }
 
@@ -1323,6 +1395,56 @@ mod tests {
         ScratchVault::new("recover_test")
     }
 
+    /// The identity phrase the person-born fixture is built under.
+    const PERSON_VAULT_PHRASE: &str = "abandon ability able about above absent absorb abstract \
+         absurd abuse access accident account accuse achieve acid acoustic acquire across act \
+         action actor actress actual";
+
+    /// A second, unrelated phrase: it must read as a WRONG answer rather than as
+    /// an error, which is the property the drill's non-distinguishing copy rests
+    /// on.
+    const OTHER_PERSON_PHRASE: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank year wave sausage \
+         worth useful legal winner thank year wave sausage worth title";
+
+    /// A person-born (`NTV7`) `vault.meta` plus the identity phrase that opens it.
+    ///
+    /// The fixture keypair is derived the way PRODUCTION derives it: the identity
+    /// seed under `DEFAULT_V0_1_KDF_PARAMS`, rather than under `FAST_TEST_KDF`.
+    /// That is not pedantry: the drill derives the same way, so a fixture built on
+    /// test-speed parameters would seal the `root_key` to a keypair the production
+    /// derivation never reaches, and the test would fail for the wrong reason.
+    fn seed_person_vault_meta(password: &str) -> (Vec<u8>, String) {
+        let phrase = PERSON_VAULT_PHRASE.to_string();
+        let normalized = protocol::normalize_user_phrase(&phrase);
+        let person_id = protocol::person_id_hash(&normalized);
+        let seed = protocol::kdf::derive_person_identity_seed(
+            &normalized,
+            &person_id,
+            &protocol::DEFAULT_V0_1_KDF_PARAMS,
+        )
+        .expect("identity seed");
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        let person = crate::plugins::vault_creation::state::CreationPerson {
+            pair: protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa),
+            person_id,
+            number: protocol::account_number_from_person_id(&person_id),
+        };
+        let session = crate::plugins::vault_creation::commands::build_person_session(
+            crate::vault_id::VaultId::mint(),
+            password,
+            FAST_TEST_KDF,
+            person,
+        )
+        .expect("person session");
+        let (bytes, _group) =
+            crate::plugins::vault_creation::commands::build_and_serialize_person_vault_meta(
+                &session,
+            )
+            .expect("serialize NTV7");
+        (bytes, phrase)
+    }
+
     /// Seed a real `vault.meta` via `vault_creation::build_session`
     /// plus `build_and_serialize_vault_meta`. Returns the bytes, the
     /// original session-side `root_key`, and the freshly-generated
@@ -1440,6 +1562,55 @@ mod tests {
             .await
             .expect("a wrong phrase is an ANSWER, not an error");
             assert!(!verified, "another vault's phrase was accepted");
+        });
+    }
+
+    #[test]
+    fn verify_recovery_phrase_reads_an_ntv7_vault_through_its_person_wrap() {
+        // The regression this pins (myne-md/myne#932): on a person-born vault the
+        // drill used to derive the RETIRED recovery wrap, which `NTV7` stores as
+        // zeros, so it answered `false` for every phrase, including the identity
+        // phrase that opens the vault. The user's only pre-loss check told them
+        // their phrase was wrong, and the copy is deliberately non-distinguishing,
+        // so the honest-looking next move was to regenerate the identity.
+        //
+        // Both directions are asserted in one test on purpose: each costs one
+        // Argon2id run at PRODUCTION parameters (the identity plane derives under
+        // `DEFAULT_V0_1_KDF_PARAMS`, and a fixture that cheated with
+        // `FAST_TEST_KDF` would not open here at all), so one fixture plus two
+        // drills keeps the cost at the minimum that still proves both answers.
+        rt().block_on(async {
+            let scratch = scratch_vault();
+            let (meta_bytes, phrase) = seed_person_vault_meta("pw");
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            unlock_fixture(&state, test_vault_id()).await;
+
+            let verified = verify_recovery_phrase_with_path(
+                phrase,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("drill should complete");
+            assert!(
+                verified,
+                "the identity phrase that opens a person-born vault was rejected"
+            );
+
+            // A different, well-formed phrase must still be an ANSWER rather than
+            // an error, exactly as the legacy arm promises.
+            let verified = verify_recovery_phrase_with_path(
+                OTHER_PERSON_PHRASE.to_string(),
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+            )
+            .await
+            .expect("a wrong phrase is an ANSWER, not an error");
+            assert!(!verified, "another identity's phrase was accepted");
         });
     }
 

@@ -239,12 +239,18 @@ export function vaultRecoverReducer(
     }
     case "paste-into-cell": {
       if (state.subStep !== "phrase-entry") return state;
+      // The index is still validated even though it no longer decides WHERE the
+      // words go: the action carries the cell the paste landed on, and a caller
+      // that fabricated a nonsense one is refused rather than silently treated as
+      // a first-cell paste (myne-md/myne#932).
       if (action.index < 0 || action.index >= PHRASE_CELL_COUNT) return state;
-      const cap = PHRASE_CELL_COUNT - action.index;
-      const tokens = action.tokens.slice(0, cap);
+      // Filled from cell 1 whatever cell the paste landed on: §3.2 defines paste
+      // to distribute over cells 1..N, and an index-relative spread silently
+      // shifted the phrase and dropped the tail.
+      const tokens = action.tokens.slice(0, PHRASE_CELL_COUNT);
       const cells = [...state.cells];
       for (let i = 0; i < tokens.length; i++) {
-        cells[action.index + i] = sanitizeCellValue(tokens[i]);
+        cells[i] = sanitizeCellValue(tokens[i]);
       }
       return { ...state, cells, banner: null };
     }

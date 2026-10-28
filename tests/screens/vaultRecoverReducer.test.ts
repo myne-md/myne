@@ -113,31 +113,38 @@ describe("set-cell", () => {
 });
 
 describe("paste-into-cell", () => {
-  it("fills forward from index, sanitizes tokens, preserves earlier cells", () => {
+  it("fills from the FIRST cell and sanitizes tokens, whatever index the paste carried", () => {
+    // The index used to decide where the spread STARTED, which is the defect
+    // myne-md/myne#932 fixed: `recovery-flow.md` §3.2 defines paste-to-distribute
+    // as filling cells 1..N from the paste, and an index-relative spread shifted
+    // the phrase and dropped its tail without a word.
     const prior = phraseEntry({ cells: ["keep", ...EMPTY_CELLS.slice(1)] });
     const s = vaultRecoverReducer(prior, {
       type: "paste-into-cell",
       index: 1,
       tokens: ["al pha", "beta"],
     });
-    expect(s.cells[0]).toBe("keep");
-    expect(s.cells[1]).toBe("alpha");
-    expect(s.cells[2]).toBe("beta");
+    expect(s.cells[0]).toBe("alpha");
+    expect(s.cells[1]).toBe("beta");
     expect(s.banner).toBeNull();
   });
 
-  it("truncates tokens past the 24-cell cap (Q5 P2)", () => {
+  it("caps at the 24-cell count and never grows", () => {
     const s = vaultRecoverReducer(phraseEntry(), {
       type: "paste-into-cell",
       index: 22,
-      tokens: ["a", "b", "c", "d"], // cap = 24 - 22 = 2
+      tokens: ["a", "b", "c", "d"],
     });
-    expect(s.cells[22]).toBe("a");
-    expect(s.cells[23]).toBe("b");
-    expect(s.cells).toHaveLength(PHRASE_CELL_COUNT); // never grows
+    expect(s.cells[0]).toBe("a");
+    expect(s.cells[3]).toBe("d");
+    expect(s.cells[22]).toBe("");
+    expect(s.cells).toHaveLength(PHRASE_CELL_COUNT);
   });
 
   it("is a no-op for an out-of-range index", () => {
+    // Kept as the reducer's own guard: the action still carries the cell the paste
+    // landed on, so a caller that fabricated a nonsense index is refused rather
+    // than silently treated as a first-cell paste.
     const s = phraseEntry();
     expect(
       vaultRecoverReducer(s, { type: "paste-into-cell", index: 99, tokens: ["a"] }),

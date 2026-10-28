@@ -82,7 +82,13 @@ export async function personRegister(phrase: string): Promise<PersonSetupView> {
  * the one place the `MY-` grouping lives on the client side.
  */
 export async function personAccountNumber(): Promise<string | null> {
-  return invoke<string | null>("plugin:sync|sync_person_account_number");
+  // The declared type is a promise about the Rust side, not a guarantee about
+  // the bytes: this value crosses IPC, and a command that answered something
+  // else (an unhandled mock's `[]`, a payload that drifted) would otherwise reach
+  // `formatPersonAccountNumber` and throw there, taking the whole identity home
+  // down with it (myne-md/myne#932). Presentation refuses a non-string instead.
+  const value = await invoke<unknown>("plugin:sync|sync_person_account_number");
+  return typeof value === "string" ? value : null;
 }
 
 /** The device's sync-server configuration, as the register dialog must state it. */
@@ -394,6 +400,11 @@ export async function personJoinDevice(
   endpointUrl: string,
   phrase: string,
 ): Promise<PersonJoinView> {
+  // No invite-code argument here, deliberately: this surface has no field for one
+  // and the Rust command takes it as an option, so the omission is a decision
+  // rather than a missing wire. The mobile join is the client whose entire first
+  // run is that screen, and it is where a gated server's code is typed
+  // (myne-md/myne#932).
   return invoke<PersonJoinView>("plugin:sync|sync_person_join_device", {
     personIdHex,
     endpointUrl,

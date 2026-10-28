@@ -33,6 +33,9 @@ const namesMocks = vi.hoisted(() => ({
   setMyMemberName: vi.fn<(name: string) => Promise<unknown>>(() => Promise.resolve({})),
   clearMyMemberName: vi.fn<() => Promise<unknown>>(() => Promise.resolve({})),
 }));
+// The roster hook's retry. Hoisted for the same reason: the `vi.mock` factory
+// runs during the import phase, before any top-level `const` below it exists.
+const rosterMocks = vi.hoisted(() => ({ reload: vi.fn() }));
 // The REAL module is spread so `memberNameErrorKey` (its pure mapper) stays
 // available: the panel resolves the refusal copy through it, and a wholesale
 // replacement would leave the mapper undefined and the catch block throwing.
@@ -80,6 +83,12 @@ let mockVaultInvites: Array<{
   declined: boolean;
 }> = [];
 
+// The roster read's rejection per test (myne-md/myne#932). `kind` is what the
+// panel branches on: `NotOwner` beside a locked identity is the STATE, and
+// everything else is a failure.
+let mockError: string | null = null;
+let mockErrorKind: string | null = null;
+
 /** One row over the base fixture, so a test states only what it is about. */
 const rowView = (over: Partial<RosterMemberView>): RosterMemberView => ({
   ...mockMembers[0],
@@ -96,8 +105,9 @@ vi.mock("../../src/hooks/useRoster", () => ({
     // shared, and a mock that always says "not shared" would hide it.
     shared: mockGroupKeyEpoch !== null,
     loading: false,
-    error: null,
-    reload: vi.fn(),
+    error: mockError,
+    errorKind: mockErrorKind,
+    reload: rosterMocks.reload,
     lockPerson: vi.fn(() => Promise.resolve()),
     inviting: false,
     lastInvite: null,
@@ -117,6 +127,50 @@ vi.mock("../../src/hooks/useFocusTrap", () => ({
 }));
 
 import { MemberRosterPanel } from "../../src/components/sync/MemberRosterPanel";
+
+describe("MemberRosterPanel roster failure", () => {
+  it("reads a locked identity's NotOwner as the state it is, not as an error", () => {
+    // A person-born vault with a locked identity has no owner public half to
+    // verify its own signed roster with, so `sync_list_roster` answers
+    // `NotOwner`. Reporting that as a failure told the user their vault was
+    // broken when the only thing missing was the phrase for this session.
+    mockError = "NotOwner not from the panel's own vocabulary";
+    mockErrorKind = "NotOwner";
+    resetPersonIdentityState();
+    render(<MemberRosterPanel />);
+    try {
+      expect(screen.queryByTestId("member-roster.error")).toBeNull();
+      // The door that fixes the state is on screen instead.
+      expect(screen.getByTestId("member-roster.identity-locked")).toBeDefined();
+    } finally {
+      cleanup();
+      mockError = null;
+      mockErrorKind = null;
+    }
+  });
+
+  it("keeps the panel and puts a genuine failure under the section that owns it", () => {
+    mockError = "Transport";
+    mockErrorKind = "Transport";
+    setPersonIdentityState({ ready: true, ownerCode: null });
+    rosterMocks.reload.mockClear();
+    render(<MemberRosterPanel />);
+    try {
+      // The failure used to replace the whole panel, which deleted the heading
+      // that says which block failed (myne-md/myne#932).
+      expect(screen.getByTestId("member-roster.identity-section")).toBeDefined();
+      const failure = screen.getByTestId("member-roster.error");
+      expect(failure.textContent).toContain("sync.memberRoster.error");
+      fireEvent.click(screen.getByTestId("member-roster.retry"));
+      expect(rosterMocks.reload).toHaveBeenCalledTimes(1);
+    } finally {
+      cleanup();
+      mockError = null;
+      mockErrorKind = null;
+      resetPersonIdentityState();
+    }
+  });
+});
 
 describe("MemberRosterPanel removal", () => {
   it("offers the owner a Remove button that opens a confirm stating the limits", () => {

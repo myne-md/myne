@@ -15,7 +15,7 @@ import type { WelcomeFlowProps } from "./types";
  *  fork is gone, so the primary door starts the identity chain and the vault
  *  follows from the identity home. The join door stays, because adding this
  *  device to an account that already exists is not a create. */
-export function WelcomeFlow({ onJoin, onIdentity }: WelcomeFlowProps) {
+export function WelcomeFlow({ onHaveIdentity, onIdentity }: WelcomeFlowProps) {
   const { t } = useTranslation();
   const [residue, setResidue] = useState(0);
   const [repairing, setRepairing] = useState(false);
@@ -97,8 +97,13 @@ export function WelcomeFlow({ onJoin, onIdentity }: WelcomeFlowProps) {
         <Button onClick={onIdentity} data-testid="welcome.create-cta">
           {t("welcome.startAction")}
         </Button>
-        <Button variant="ghost" onClick={onJoin} data-testid="welcome.join-cta">
-          {t("welcome.connect")}
+        {/* Two doors, and the second one now says what it does (myne-md/myne#932).
+            "Connect to my account" carried the QR scanner only, while the phrase
+            door sat behind "Create your identity and vault", so a returning user
+            had to walk into a create action to find their own identity. This opens
+            the identity flow's fork, which offers both credentials. */}
+        <Button variant="ghost" onClick={onHaveIdentity} data-testid="welcome.have-identity-cta">
+          {t("identityFlow.recover.open")}
         </Button>
       </div>
     </Screen>

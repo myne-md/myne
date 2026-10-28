@@ -140,11 +140,13 @@ export async function personJoinDevice(
   personIdHex: string,
   endpointUrl: string,
   phrase: string,
+  inviteCode?: string,
 ): Promise<PersonJoinView> {
   return invoke<PersonJoinView>("plugin:sync|sync_person_join_device", {
     personIdHex,
     endpointUrl,
     phrase,
+    inviteCode: inviteCode?.trim() ? inviteCode.trim() : null,
   });
 }
 
