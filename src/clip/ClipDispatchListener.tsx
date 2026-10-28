@@ -124,20 +124,23 @@ export function ClipDispatchListener({
       // `assembleClip` (which must not branch on captureKind). A bookmark
       // (sub-feature 5, MYND-447) is a SYNC-16 content-light note: swap in a
       // content-light body (the bare-autolink source URL) + the bookmark composer
-      // (managed `title:` + `source:`/`clipped:`). The title folds into the wire
-      // `markdownBody` (`# <title>\n\n<url>`, `buildBookmarkEnvelope` — the Rust
-      // envelope has no `page_title` field), so extract it here. A clip leaves the
-      // body = `markdownBody` and the composer defaulted (byte-for-byte unchanged).
+      // (managed `title:` + `source:`/`clipped:`). A clip leaves the body =
+      // `markdownBody` and the composer defaulted. Either way the page TITLE comes
+      // from the routine itself, lifted off the wire body's leading heading
+      // (`clipTitleFromMarkdownBody`, myne-md/myne#936). Every composer is handed
+      // it, so this call site no longer derives it and cannot forget it.
       const isBookmark = payload.captureKind === "bookmark";
       const body = isBookmark ? payload.sourceUrl + "\n" : payload.markdownBody;
       // The bookmark composer re-derives the body line from `url`, so it ignores
-      // the resolved-body arg the seam passes (the content-light bare URL has no
-      // wikilinks / images to splice). Title is lifted from the wire `markdownBody`.
+      // the resolved-body and title arguments' body half; the title is the one it
+      // needs (the content-light bare URL carries no wikilinks or images to
+      // splice, and it DOES need the name: a bookmark body has no heading of its
+      // own once the URL replaces it).
       const composePlaintext: ClipPlaintextComposer | undefined = isBookmark
-        ? (envelope) =>
+        ? (envelope, _resolvedBody, title) =>
             composeBookmarkPlaintext({
               url: envelope.sourceUrl,
-              title: bookmarkTitleFromBody(payload.markdownBody),
+              title,
               clippedDate: envelope.clipDate,
             })
         : undefined;
@@ -239,22 +242,4 @@ function composeNoticeMessage(notice: ClipNotice): string {
     notice.compressionLine,
   ].filter((p): p is string => p !== null);
   return parts.length === 0 ? notice.message : `${notice.message} ${parts.join(" · ")}`;
-}
-
-/**
- * Recover the page TITLE the extension folded into the bookmark's wire
- * `markdown_body`. The Rust handoff envelope has NO `page_title` field, so
- * `buildBookmarkEnvelope` (myne-clipper) emits the body as `# <title>\n\n<url>`
- * (or the bare `<url>` alone when the title is empty). The desktop composer wants
- * the title as the managed `title:`, so lift it from the leading `# ` heading.
- *
- * Returns `""` when there is no leading-heading title (an empty / heading-less
- * body) — the composer then writes an empty managed `title:` (which the dialect
- * renders as "Untitled", the correct degenerate). Pure; the URL is taken from
- * `envelope.sourceUrl`, never re-parsed out of the body.
- */
-function bookmarkTitleFromBody(markdownBody: string): string {
-  const firstLine = markdownBody.split("\n", 1)[0] ?? "";
-  const headingMatch = /^#\s+(.*)$/.exec(firstLine);
-  return headingMatch !== null ? (headingMatch[1] ?? "").trim() : "";
 }

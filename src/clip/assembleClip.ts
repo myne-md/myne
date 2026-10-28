@@ -78,21 +78,30 @@
 // routine — the body is the parameterization point. This module does NOT build the
 // bookmark body (that is sub-feature 5); it only exposes the seam.
 //
-// The COMPOSE step is the OTHER parameterization point. A clip composes provenance
-// via `composeClipPlaintext` (managed-blind `source:`/`url:`/`clipped:`); a
+// The COMPOSE step is the OTHER parameterization point. A clip composes the managed
+// `title:` + provenance via `composeClipPlaintext` (`source:`/`url:`/`clipped:`); a
 // bookmark needs a DIFFERENT shape (managed `title:` + `source:`/`clipped:`, no
 // `url:`). Per desktop-ingest task 9 this routine must NOT branch on `captureKind`
 // internally — so the composer is a caller-supplied `composePlaintext` arg
-// DEFAULTING to `composeClipPlaintext`. Every existing clip test + the live clip
-// path is byte-for-byte unchanged (the default is the clip composer); the bookmark
-// caller passes its own composer. Only the compose function is swapped — the
+// DEFAULTING to `composeClipPlaintext`. Only the compose function is swapped; the
 // validate → images → wikilinks → seal logic stays identical.
+//
+// THE TITLE IS LIFTED HERE, ONCE (myne-md/myne#936). The page title is not on the
+// wire; it rides in the first line of `markdown_body`, and it has to become the
+// note's managed `title:` or the note has no name at all. Derived in this routine
+// from the RAW envelope body (`clipTitleFromMarkdownBody`) and handed to the
+// composer as its third argument, so it is extracted in one place rather than
+// once per composer, and so a composer CANNOT be written that forgets it: the
+// default composer writes it, and a caller-supplied one is handed it whether it
+// asked or not. That is the fix for the whole defect: the clip path was the only
+// one of the two composers with no title, and nothing forced the decision.
 //
 // INJECTABLE SEAMS. Every IPC seam is injected via the {@link ClipAssemblyDeps}
 // object (`{ noteCreate, importImage, isVaultUnlocked, loadResolverNotes }`) so the
 // routine is fully unit-testable with fakes. {@link defaultClipAssemblyDeps} binds
 // the real ports (the production wiring); tests pass fakes.
 
+import { clipTitleFromMarkdownBody } from "./clipTitleFromMarkdownBody";
 import { composeClipPlaintext } from "./composeClipPlaintext";
 import { ingestClipImages, type ClipImageImporter } from "./ingestClipImages";
 import { resolveClipWikilinks } from "./resolveClipWikilinks";
@@ -130,19 +139,26 @@ export interface ClipAssemblyDeps {
 }
 
 /**
- * The compose step's caller-supplied seam: turn the validated envelope + the
- * fully-resolved body into the final note plaintext. DEFAULTS to
- * {@link composeClipPlaintext} (the clip provenance shape — managed-blind
- * `source:`/`url:`/`clipped:`), so every existing clip test + the live clip path
- * is byte-for-byte unchanged. A url-bookmark (sub-feature 5, MYND-447) passes its
- * own composer (managed `title:` + `source:`/`clipped:`, no `url:`) — the ONLY
- * delta from a clip is this function + the content-light body + no images. The
+ * The compose step's caller-supplied seam: turn the validated envelope, the
+ * fully-resolved body and the source page's TITLE into the final note plaintext.
+ * DEFAULTS to {@link composeClipPlaintext} (the clip shape: managed `title:` +
+ * `source:`/`url:`/`clipped:`). A url-bookmark (sub-feature 5, MYND-447) passes
+ * its own composer (managed `title:` + `source:`/`clipped:`, no `url:`). The ONLY
+ * deltas from a clip are this function, the content-light body and no images. The
  * routine never branches on `captureKind`; the captureKind decision lives at the
  * CALLER (the dispatch listener).
+ *
+ * `title` is supplied BY THE ROUTINE, not by the caller: it is recovered from the
+ * raw envelope body's leading heading (myne-md/myne#936), which is the only place
+ * either capture kind carries it. A composer that ignores it is fine (a
+ * content-light bookmark body has no heading of its own to keep), but a composer
+ * that WRITES a title cannot invent one, and one written before this argument
+ * existed cannot silently keep landing untitled notes.
  */
 export type ClipPlaintextComposer = (
   envelope: ValidatedClipEnvelope,
   resolvedBody: string,
+  title: string,
 ) => string;
 
 /**
@@ -212,7 +228,8 @@ function noteCreateErrorReason(err: unknown): string {
  *   production; tests pass fakes.
  * @param composePlaintext the OPTIONAL compose-step seam (defaults to the clip
  *   composer {@link composeClipPlaintext}). A url-bookmark passes its own composer;
- *   the clip path leaves it defaulted, so it is byte-for-byte unchanged.
+ *   the clip path leaves it defaulted. Either way the routine supplies the
+ *   source page's title as the third argument.
  * @returns the typed result (`accepted` only after the seal resolves).
  */
 export async function assembleClip(
@@ -250,11 +267,16 @@ export async function assembleClip(
     deps.loadResolverNotes,
   );
 
-  // (5) COMPOSE provenance frontmatter + the resolved body → the final ROOT-note
-  //     plaintext. The composer is the caller-supplied seam (defaulting to the
-  //     clip composer); a url-bookmark swaps ONLY this function (the routine never
-  //     branches on captureKind — that decision lives at the caller).
-  const plaintext = composePlaintext(validated.envelope, resolvedBody);
+  // (5) COMPOSE the managed title + provenance frontmatter + the resolved body →
+  //     the final ROOT-note plaintext. The composer is the caller-supplied seam
+  //     (defaulting to the clip composer); a url-bookmark swaps ONLY this
+  //     function (the routine never branches on captureKind; that decision lives
+  //     at the caller). The title is lifted from the RAW envelope body, never from
+  //     `resolvedBody`: image splicing and wikilink resolution only touch content
+  //     below the heading, and deriving the note's name from a transformed string
+  //     would let either one move it (myne-md/myne#936).
+  const title = clipTitleFromMarkdownBody(validated.envelope.markdownBody);
+  const plaintext = composePlaintext(validated.envelope, resolvedBody, title);
 
   // (6) SEAL via the EXISTING `noteCreate`. The 16 MiB composed-body cap is
   //     enforced Rust-side; a `PlaintextTooLarge` (or any other) reject maps to

@@ -181,7 +181,7 @@ export function WelcomeFlow({ onHaveIdentity, onIdentity }: WelcomeFlowProps) {
           </Banner>
         )}
         {repairMsg && (
-          <div data-testid="welcome.repair-message" style={{ fontSize: 13, color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
+          <div data-testid="welcome.repair-message" style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", textAlign: "center" }}>{repairMsg}</div>
         )}
         <Button onClick={onIdentity} data-testid="welcome.create-cta">
           {t("welcome.startAction")}
