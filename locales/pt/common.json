@@ -4560,8 +4560,6 @@
       "vaultsHelperShort": "O agrupamento fica neste dispositivo e não viaja com um cofre.",
       "vaultsCount_one": "{{count}} cofres",
       "vaultsCount_other": "{{count}} cofres",
-      "vaultActions": "Ações do cofre",
-      "splitLastConfirm": "Este é o único cofre da conta. Movê-lo para fora apaga esta conta.",
       "vaultCorrupted": "Não foi possível ler os metadados deste cofre",
       "vaultUnreadable": "Não lido neste dispositivo",
       "vaultDeviceOnly": "Só no dispositivo",
@@ -4578,8 +4576,6 @@
       "standaloneHelper": "Este cofre não está agrupado sob uma conta neste dispositivo, por isso fica sozinho. O agrupamento é por dispositivo: outro dispositivo pode mostrá-lo dentro de um.",
       "unresolvedHelper": "A determinar que cofre está aberto…",
       "devicesNote": "Dispositivos, membros de cofres partilhados e a sua identidade são geridos em Sincronização.",
-      "groupingHidden": "O agrupamento de contas está indisponível enquanto os nomes dos cofres estiverem ocultos. Desligue essa opção em Privacidade para o gerir.",
-      "groupingUnreadable": "Não foi possível ler o agrupamento de contas deste dispositivo. Nada foi alterado.",
       "groupingError": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado.",
       "sections": {
         "extensions": "Extensões do navegador",
@@ -5628,12 +5624,7 @@
     "restoreFromBackup": "Restaurar a partir de cópia de segurança",
     "subline": "Tem mais do que um cofre neste dispositivo. Escolha um para desbloquear.",
     "vaultFallback": "Cofre {{n}}",
-    "accountFallback": "Conta",
-    "moveToAccount": "Mover para a conta…",
-    "moveToNewAccount": "Mover para uma conta nova",
-    "accountError": "Não foi possível atualizar o agrupamento de contas. Nada foi alterado.",
-    "accountHidden": "As ações de conta estão indisponíveis enquanto os nomes dos cofres estão ocultos.",
-    "accountUnreadable": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado.",
+    "accountError": "Não foi possível ler o agrupamento de contas neste dispositivo.",
     "createShort": "Novo cofre",
     "joinShort": "Adicionar dispositivo",
     "restoreShort": "Restaurar cópia de segurança"
@@ -5861,11 +5852,7 @@
     "openedYearsAgo_other": "aberto há {{count}} anos",
     "corruptedBadge": "Corrompido",
     "accountFallback": "Conta",
-    "moveToNewAccount": "Mover para uma conta nova",
-    "moveToAccount": "Mover para a conta…",
-    "accountError": "Não foi possível atualizar o agrupamento de contas. Nada foi alterado.",
-    "accountHidden": "As ações de conta estão indisponíveis enquanto os nomes dos cofres estão ocultos.",
-    "accountUnreadable": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado."
+    "accountError": "Não foi possível ler o agrupamento de contas neste dispositivo."
   },
   "join": {
     "transportError": "Não foi possível contactar esse servidor de sincronização. Verifique o endereço e a sua ligação e tente novamente.",

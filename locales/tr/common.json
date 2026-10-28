@@ -4395,8 +4395,6 @@
       "vaultsHelperShort": "Gruplama bu cihazda kalır, kasayla birlikte taşınmaz.",
       "vaultsCount_one": "{{count}} kasa",
       "vaultsCount_other": "{{count}} kasa",
-      "vaultActions": "Kasa işlemleri",
-      "splitLastConfirm": "Bu hesaptaki tek kasa bu. Taşımak bu hesabı siler.",
       "vaultCorrupted": "Bu kasanın üst verisi okunamadı",
       "vaultUnreadable": "Bu cihazda okunamadı",
       "vaultDeviceOnly": "Yalnızca bu cihazda",
@@ -4414,8 +4412,6 @@
       "unresolvedHelper": "Hangi kasann açık olduğu çözümleniyor…",
       "devicesNote": "Cihazlar, paylaşılan kasa üyeleri ve kimliğiniz Eşitleme bölümünden yönetilir.",
       "openSync": "Eşitleme'yi aç",
-      "groupingHidden": "Kasa adları gizliyken hesap gruplaması kullanılamaz. Yönetmek için Gizlilik bölümünde o seçeneği kapatın.",
-      "groupingUnreadable": "Bu cihazın hesap gruplaması okunamadı. Hiçbir şey değiştirilmedi.",
       "groupingError": "Bu cihazdaki hesap gruplaması okunamadı. Hiçbir şey değiştirilmedi.",
       "sections": {
         "extensions": "Tarayıcı uzantıları",
@@ -5453,12 +5449,7 @@
     "restoreFromBackup": "Yedeklemeden geri yükle",
     "subline": "Bu cihazda birden fazla kasanız var. Kilidini açmak için birini seçin.",
     "vaultFallback": "Kasa {{n}}",
-    "accountFallback": "Hesap",
-    "moveToAccount": "Hesaba taşı…",
-    "moveToNewAccount": "Yeni hesaba taşı",
-    "accountError": "Hesap gruplaması güncellenemedi. Hiçbir şey değişmedi.",
-    "accountHidden": "Kasa adları gizliyken hesap eylemleri kullanılamaz.",
-    "accountUnreadable": "Hesap gruplaması bu cihazda okunamadı. Hiçbir şey değişmedi.",
+    "accountError": "Bu cihazda hesap gruplaması okunamadı.",
     "createShort": "Yeni kasa",
     "joinShort": "Cihaz ekle",
     "restoreShort": "Yedeği geri yükle"
@@ -5675,11 +5666,7 @@
     "openedYearsAgo_other": "{{count}} yıl önce açıldı",
     "corruptedBadge": "Bozuk",
     "accountFallback": "Hesap",
-    "moveToNewAccount": "Yeni hesaba taşı",
-    "moveToAccount": "Hesaba taşı…",
-    "accountError": "Hesap gruplaması güncellenemedi. Hiçbir şey değişmedi.",
-    "accountHidden": "Kasa adları gizliyken hesap eylemleri kullanılamaz.",
-    "accountUnreadable": "Hesap gruplaması bu cihazda okunamadı. Hiçbir şey değişmedi."
+    "accountError": "Bu cihazda hesap gruplaması okunamadı."
   },
   "join": {
     "transportError": "O eşitleme sunucusuna ulaşılamadı. Adresi ve bağlantınızı kontrol edip tekrar deneyin.",

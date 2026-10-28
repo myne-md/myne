@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Nhóm chỉ ở trên thiết bị này và không đi cùng kho.",
       "vaultsCount_one": "{{count}} kho",
       "vaultsCount_other": "{{count}} kho",
-      "vaultActions": "Hành động với kho",
-      "splitLastConfirm": "Đây là kho duy nhất trong tài khoản. Di chuyển nó ra sẽ xóa tài khoản này.",
       "vaultCorrupted": "Không đọc được metadata của kho này",
       "vaultUnreadable": "Không đọc được trên thiết bị này",
       "vaultDeviceOnly": "Chỉ thiết bị",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Kho này không được nhóm dưới tài khoản trên thiết bị này, nên nó đứng riêng. Nhóm là theo thiết bị: thiết bị khác có thể hiện nó trong một nhóm.",
       "unresolvedHelper": "Đang xác định kho đang mở…",
       "devicesNote": "Thiết bị, thành viên kho dùng chung và danh tính được quản lý trong Đồng bộ.",
-      "groupingHidden": "Nhóm tài khoản không khả dụng khi tên kho bị ẩn. Tắt tùy chọn đó trong Riêng tư để quản lý.",
-      "groupingUnreadable": "Không đọc được nhóm tài khoản của thiết bị này. Không có gì thay đổi.",
       "groupingError": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi.",
       "sections": {
         "extensions": "Tiện ích mở rộng trình duyệt",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Khôi phục từ bản sao lưu",
     "subline": "Bạn có nhiều hơn một kho trên thiết bị này. Chọn một kho để mở khóa.",
     "vaultFallback": "Kho {{n}}",
-    "accountFallback": "Tài khoản",
-    "moveToAccount": "Chuyển vào tài khoản…",
-    "moveToNewAccount": "Chuyển vào tài khoản mới",
-    "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
-    "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
-    "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi.",
+    "accountError": "Không đọc được nhóm tài khoản trên thiết bị này.",
     "createShort": "Kho mới",
     "joinShort": "Thêm thiết bị",
     "restoreShort": "Khôi phục bản sao lưu"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "đã mở {{count}} năm trước",
     "corruptedBadge": "Bị hỏng",
     "accountFallback": "Tài khoản",
-    "moveToNewAccount": "Chuyển vào tài khoản mới",
-    "moveToAccount": "Chuyển vào tài khoản…",
-    "accountError": "Không cập nhật được nhóm tài khoản. Không có gì thay đổi.",
-    "accountHidden": "Thao tác tài khoản không khả dụng khi tên kho đang bị ẩn.",
-    "accountUnreadable": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi."
+    "accountError": "Không đọc được nhóm tài khoản trên thiết bị này."
   },
   "join": {
     "transportError": "Không thể kết nối tới máy chủ đồng bộ đó. Kiểm tra địa chỉ và kết nối của bạn, rồi thử lại.",

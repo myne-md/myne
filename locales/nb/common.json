@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Gruppering blir på denne enheten og følger ikke med et hvelv.",
       "vaultsCount_one": "{{count}} hvelv",
       "vaultsCount_other": "{{count}} hvelv",
-      "vaultActions": "Hvelvhandlinger",
-      "splitLastConfirm": "Dette er det eneste hvelvet i kontoen. Å flytte det ut sletter denne kontoen.",
       "vaultCorrupted": "Dette hvelvets metadata kunne ikke leses",
       "vaultUnreadable": "Ikke lest på denne enheten",
       "vaultDeviceOnly": "Bare enhet",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Dette hvelvet er ikke gruppert under en konto på denne enheten, så det står på egne ben. Gruppering er per enhet: en annen enhet kan vise det inni en.",
       "unresolvedHelper": "Arbeider ut hvilket hvelv som er åpent…",
       "devicesNote": "Enheter, delte hvelvmedlemmer og identiteten din administreres i Synk.",
-      "groupingHidden": "Konto-gruppering er utilgjengelig mens hvelvnavn er skjult. Slå det alternativet av i Personvern for å administrere det.",
-      "groupingUnreadable": "Denne enhetens konto-gruppering kunne ikke leses. Ingenting ble endret.",
       "groupingError": "Kunne ikke lese konto-grupperingen på denne enheten. Ingenting ble endret.",
       "sections": {
         "extensions": "Nettleserutvidelser",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Gjenopprett fra sikkerhetskopi",
     "subline": "Du har mer enn ett hvelv på denne enheten. Velg ett for å låse opp.",
     "vaultFallback": "Hvelv {{n}}",
-    "accountFallback": "Konto",
-    "moveToAccount": "Flytt til konto…",
-    "moveToNewAccount": "Flytt til ny konto",
-    "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
-    "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
-    "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret.",
+    "accountError": "Kontogrupperingen kunne ikke leses på denne enheten.",
     "createShort": "Nytt hvelv",
     "joinShort": "Legg til enhet",
     "restoreShort": "Gjenopprett sikkerhetskopi"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "åpnet for {{count}} år siden",
     "corruptedBadge": "Skadet",
     "accountFallback": "Konto",
-    "moveToNewAccount": "Flytt til ny konto",
-    "moveToAccount": "Flytt til konto…",
-    "accountError": "Kontogrupperingen kunne ikke oppdateres. Ingenting ble endret.",
-    "accountHidden": "Konto-handlinger er utilgjengelige mens vault-navn er skjult.",
-    "accountUnreadable": "Kontogrupperingen kunne ikke leses på denne enheten. Ingenting ble endret."
+    "accountError": "Kontogrupperingen kunne ikke leses på denne enheten."
   },
   "join": {
     "transportError": "Kunne ikke nå den synkroniseringsserveren. Sjekk adressen og tilkoblingen din, og prøv igjen.",

@@ -3296,8 +3296,6 @@
       "vaultsHelperShort": "Grouping stays on this device and does not travel with a vault.",
       "vaultsCount_one": "{{count}} vault",
       "vaultsCount_other": "{{count}} vaults",
-      "vaultActions": "Vault actions",
-      "splitLastConfirm": "This is the only vault in the account. Moving it out deletes this account.",
       "vaultCorrupted": "This vault's metadata could not be read",
       "vaultUnreadable": "Not read on this device",
       "vaultDeviceOnly": "Device only",
@@ -3314,8 +3312,6 @@
       "standaloneHelper": "This vault is not grouped under an account on this device, so it stands on its own. Grouping is per device: another device may show it inside one.",
       "unresolvedHelper": "Working out which vault is open…",
       "devicesNote": "Devices, shared-vault members and your identity are managed in Sync.",
-      "groupingHidden": "Account grouping is unavailable while vault names are hidden. Turn that option off in Privacy to manage it.",
-      "groupingUnreadable": "This device's account grouping could not be read. Nothing was changed.",
       "groupingError": "Could not read the account grouping on this device. Nothing was changed."
     },
     "vault": {
@@ -5628,22 +5624,17 @@
     "stepIndicator": "Step {{n}} of {{total}} · {{label}}"
   },
   "vaultPicker": {
-    "accountFallback": "Account",
     "createAnother": "Create another vault",
     "deviceOnly": "Device only",
     "heading": "Choose a vault",
     "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
-    "moveToAccount": "Move to account…",
-    "moveToNewAccount": "Move to new account",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
     "restoreFromBackup": "Restore from backup",
     "subline": "You have more than one vault on this device. Pick one to unlock.",
     "vaultFallback": "Vault {{n}}",
-    "accountError": "Could not update the account grouping. Nothing was changed.",
-    "accountHidden": "Account actions are unavailable while vault names are hidden.",
-    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed.",
+    "accountError": "Could not read the account grouping on this device.",
     "createShort": "New vault",
     "joinShort": "Add device",
     "restoreShort": "Restore backup"
@@ -6076,11 +6067,7 @@
     "openedYearsAgo_other": "opened {{count}} years ago",
     "corruptedBadge": "Corrupted",
     "accountFallback": "Account",
-    "moveToNewAccount": "Move to new account",
-    "moveToAccount": "Move to account…",
-    "accountError": "Could not update the account grouping. Nothing was changed.",
-    "accountHidden": "Account actions are unavailable while vault names are hidden.",
-    "accountUnreadable": "The account grouping could not be read on this device. Nothing was changed."
+    "accountError": "Could not read the account grouping on this device."
   },
   "join": {
     "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",

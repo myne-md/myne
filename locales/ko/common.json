@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "그룹핑은 이 기기에 남고 보관함과 함께 이동하지 않습니다.",
       "vaultsCount_one": "보관함 {{count}}개",
       "vaultsCount_other": "보관함 {{count}}개",
-      "vaultActions": "보관함 작업",
-      "splitLastConfirm": "계정의 유일한 보관함입니다. 빼내면 이 계정이 삭제됩니다.",
       "vaultCorrupted": "이 보관함의 메타데이터를 읽지 못했습니다",
       "vaultUnreadable": "이 기기에서 읽지 못함",
       "vaultDeviceOnly": "이 기기에만 있음",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "이 보관함은 이 기기에서 계정 아래에 묶여 있지 않아 독립적으로 존재합니다. 그룹핑은 기기별이므로 다른 기기에서는 계정 안에 보일 수 있습니다.",
       "unresolvedHelper": "어떤 보관함이 열려 있는지 확인하는 중…",
       "devicesNote": "기기, 공유 보관함 구성원, 정체성은 동기화에서 관리합니다.",
-      "groupingHidden": "보관함 이름이 숨겨진 동안 계정 그룹핑을 사용할 수 없습니다. 관리하려면 개인정보에서 그 옵션을 끄세요.",
-      "groupingUnreadable": "이 기기의 계정 그룹핑을 읽지 못했습니다. 아무것도 바뀌지 않았습니다.",
       "groupingError": "이 기기의 계정 그룹핑을 읽지 못했습니다. 아무것도 바뀌지 않았습니다.",
       "sections": {
         "extensions": "브라우저 확장 프로그램",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "백업에서 복원",
     "subline": "이 기기에 보관함이 둘 이상 있습니다. 잠금 해제할 보관함을 선택하세요.",
     "vaultFallback": "보관함 {{n}}",
-    "accountFallback": "계정",
-    "moveToAccount": "계정으로 이동…",
-    "moveToNewAccount": "새 계정으로 이동",
-    "accountError": "계정 그룹을 업데이트할 수 없습니다. 변경된 것은 없습니다.",
-    "accountHidden": "볼트 이름을 숨기는 동안에는 계정 작업을 사용할 수 없습니다.",
-    "accountUnreadable": "이 기기에서 계정 그룹을 읽을 수 없습니다. 변경된 것은 없습니다.",
+    "accountError": "이 기기에서 계정 그룹을 읽을 수 없습니다.",
     "createShort": "새 보관함",
     "joinShort": "기기 추가",
     "restoreShort": "백업 복원"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "{{count}}년 전에 열림",
     "corruptedBadge": "손상됨",
     "accountFallback": "계정",
-    "moveToNewAccount": "새 계정으로 이동",
-    "moveToAccount": "계정으로 이동…",
-    "accountError": "계정 그룹을 업데이트할 수 없습니다. 변경된 것은 없습니다.",
-    "accountHidden": "볼트 이름을 숨기는 동안에는 계정 작업을 사용할 수 없습니다.",
-    "accountUnreadable": "이 기기에서 계정 그룹을 읽을 수 없습니다. 변경된 것은 없습니다."
+    "accountError": "이 기기에서 계정 그룹을 읽을 수 없습니다."
   },
   "join": {
     "transportError": "그 동기화 서버에 연결하지 못했습니다. 주소와 연결을 확인한 다음 다시 시도하세요.",

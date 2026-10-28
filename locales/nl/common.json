@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Groepering blijft op dit apparaat en reist niet mee met een kluis.",
       "vaultsCount_one": "{{count}} kluizen",
       "vaultsCount_other": "{{count}} kluizen",
-      "vaultActions": "Kluisacties",
-      "splitLastConfirm": "Dit is de enige kluis in het account. Er uithalen verwijdert dit account.",
       "vaultCorrupted": "De metadata van deze kluis kon niet worden gelezen",
       "vaultUnreadable": "Niet gelezen op dit apparaat",
       "vaultDeviceOnly": "Alleen op dit apparaat",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Deze kluis is op dit apparaat niet onder een account gegroepeerd, dus staat hij op zichzelf. Groeperen is per apparaat: een ander apparaat kan hem binnen een account tonen.",
       "unresolvedHelper": "Bepalen welke kluis open is…",
       "devicesNote": "Apparaten, leden van gedeelde kluizen en je identiteit beheer je bij Synchronisatie.",
-      "groupingHidden": "Accountnamen zijn niet beschikbaar zolang kluisnamen verborgen zijn. Zet die optie uit bij Privacy om dit account te beheren.",
-      "groupingUnreadable": "De accountgroepering van dit apparaat kon niet worden gelezen. Er is niets gewijzigd.",
       "groupingError": "Kon de accountgroepering op dit apparaat niet lezen. Er is niets gewijzigd.",
       "sections": {
         "extensions": "Browserextensies",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Herstellen vanuit back-up",
     "subline": "Je hebt meer dan één kluis op dit apparaat. Kies er een om te ontgrendelen.",
     "vaultFallback": "Kluis {{n}}",
-    "accountFallback": "Account",
-    "moveToAccount": "Verplaatsen naar account…",
-    "moveToNewAccount": "Verplaatsen naar nieuw account",
-    "accountError": "De accountgroepering kon niet worden bijgewerkt. Er is niets gewijzigd.",
-    "accountHidden": "Accountacties zijn niet beschikbaar terwijl kluinamen verborgen zijn.",
-    "accountUnreadable": "De accountgroepering kon op dit apparaat niet worden gelezen. Er is niets gewijzigd.",
+    "accountError": "De accountgroepering kon op dit apparaat niet worden gelezen.",
     "createShort": "Nieuwe kluis",
     "joinShort": "Apparaat toevoegen",
     "restoreShort": "Back-up herstellen"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "{{count}} jaar geleden geopend",
     "corruptedBadge": "Beschadigd",
     "accountFallback": "Account",
-    "moveToNewAccount": "Verplaatsen naar nieuw account",
-    "moveToAccount": "Verplaatsen naar account…",
-    "accountError": "De accountgroepering kon niet worden bijgewerkt. Er is niets gewijzigd.",
-    "accountHidden": "Accountacties zijn niet beschikbaar terwijl kluinamen verborgen zijn.",
-    "accountUnreadable": "De accountgroepering kon op dit apparaat niet worden gelezen. Er is niets gewijzigd."
+    "accountError": "De accountgroepering kon op dit apparaat niet worden gelezen."
   },
   "join": {
     "transportError": "Kon die synchronisatieserver niet bereiken. Controleer het adres en je verbinding en probeer het opnieuw.",

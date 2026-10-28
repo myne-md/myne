@@ -4698,8 +4698,6 @@
       "vaultsHelperShort": "Seskupování zůstává na tomto zařízení a necestuje s trezorem.",
       "vaultsCount_one": "{{count}} trezorů",
       "vaultsCount_other": "{{count}} trezorů",
-      "vaultActions": "Akce s trezorem",
-      "splitLastConfirm": "Toto je jediný trezor v účtu. Jeho přesunutím se tento účet smaže.",
       "vaultCorrupted": "Metadata tohoto trezoru se nepodařilo přečíst",
       "vaultUnreadable": "Na tomto zařízení nepřečteno",
       "vaultDeviceOnly": "Jen zařízení",
@@ -4716,8 +4714,6 @@
       "standaloneHelper": "Tento trezor není na tomto zařízení seskupen pod účtem, takže stojí sám. Seskupování je podle zařízení: jiné zařízení ho může ukazovat uvnitř jednoho.",
       "unresolvedHelper": "Zjišťuje se, který trezor je otevřen…",
       "devicesNote": "Zařízení, členové sdílených trezorů a vaše identita se spravují v Synchronizaci.",
-      "groupingHidden": "Seskupování účtů není k dispozici, dokud jsou názvy trezorů skryté. Vypněte tuto volbu v Soukromí, abyste ho mohli spravovat.",
-      "groupingUnreadable": "Seskupení účtů tohoto zařízení se nepodařilo přečíst. Nic se nezměnilo.",
       "groupingError": "Seskupení účtů se na tomto zařízení nepodařilo přečíst. Nic se nezměnilo.",
       "sections": {
         "extensions": "Rozšíření prohlížeče",
@@ -5777,12 +5773,7 @@
     "restoreFromBackup": "Obnovit ze zálohy",
     "subline": "Na tomto zařízení máte více než jeden trezor. Vyberte jeden k odemknutí.",
     "vaultFallback": "Trezor {{n}}",
-    "accountFallback": "Účet",
-    "moveToAccount": "Přesunout na účet…",
-    "moveToNewAccount": "Přesunout na nový účet",
-    "accountError": "Seskupení účtů se nepodařilo aktualizovat. Nic se nezměnilo.",
-    "accountHidden": "Akce s účtem nejsou k dispozici, dokud jsou názvy úložišť skryté.",
-    "accountUnreadable": "Seskupení účtů se nepodařilo přečíst na tomto zařízení. Nic se nezměnilo.",
+    "accountError": "Seskupení účtů se na tomto zařízení nepodařilo načíst.",
     "createShort": "Nový trezor",
     "joinShort": "Přidat zařízení",
     "restoreShort": "Obnovit ze zálohy"
@@ -6024,11 +6015,7 @@
     "openedYearsAgo_other": "otevřeno před {{count}} lety",
     "corruptedBadge": "Poškozeno",
     "accountFallback": "Účet",
-    "moveToNewAccount": "Přesunout na nový účet",
-    "moveToAccount": "Přesunout na účet…",
-    "accountError": "Seskupení účtů se nepodařilo aktualizovat. Nic se nezměnilo.",
-    "accountHidden": "Akce s účtem nejsou k dispozici, dokud jsou názvy úložišť skryté.",
-    "accountUnreadable": "Seskupení účtů se nepodařilo přečíst na tomto zařízení. Nic se nezměnilo."
+    "accountError": "Seskupení účtů se na tomto zařízení nepodařilo načíst."
   },
   "join": {
     "transportError": "Tento synchronizační server se nepodařilo kontaktovat. Zkontrolujte adresu a připojení a zkuste to znovu.",

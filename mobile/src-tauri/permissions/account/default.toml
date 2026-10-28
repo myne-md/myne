@@ -1,16 +1,18 @@
 # Permissions for the in-app `account` Tauri plugin, mobile (myne-md/myne#684).
 # Mirror of the desktop `src-tauri/permissions/account/default.toml`, down to
-# the three identifiers and what each one is allowed to reach. Picked up under
-# the `account:` ACL namespace only because `build.rs` declares this as an
-# `InlinedPlugin`. Capability files reference these as `account:default`.
+# the identifier and what it is allowed to reach. Picked up under the
+# `account:` ACL namespace only because `build.rs` declares this as an
+# `InlinedPlugin`. Capability files reference this as `account:default`.
 #
-# All three commands are reachable PRE-UNLOCK, deliberately: the surface they
-# govern is the vault picker, which renders before any vault is open. None
-# reaches vault content: the only values crossing are hex account ids and vault
-# ids. Adding a command here without a matching
-# entry in `src-tauri/src/plugins/account/mod.rs`'s `generate_handler!` ships
-# it dead (root AGENTS.md: an ACL entry does not wire a command, and nothing
-# checks that it does).
+# ONE command since myne-md/myne#937, and it is READ-ONLY: `account_split` was
+# the only code path that could create a second account, so it went with the
+# move/split pair. The command is reachable PRE-UNLOCK, deliberately: the surface
+# it governs is the vault picker, which renders before any vault is open. It
+# reaches no vault content: the only values crossing are hex account ids and
+# vault ids. Adding a command here without a matching entry in
+# `src-tauri/src/plugins/account/mod.rs`'s `generate_handler!` ships it dead
+# (root AGENTS.md: an ACL entry does not wire a command, and nothing checks that
+# it does).
 #
 # On Android `myne_core::vault_label::key::platform_keychain` has no backend, so
 # the record holds nothing and `account_list` answers an empty list: vaults show
@@ -19,24 +21,12 @@
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the account plugin: read the account grouping, move a vault between accounts, and split a vault into a fresh account."
+description = "Default permission set for the account plugin: read the device-local account grouping. Read-only: the move/split mutations were removed with the single-account grouping (myne-md/myne#937)."
 permissions = [
   "allow-account-list",
-  "allow-account-move",
-  "allow-account-split",
 ]
 
 [[permission]]
 identifier = "allow-account-list"
 description = "Allow invoking account:account_list (read the device-local account grouping from app_config_dir/account.json; absent means no grouping, a damaged file rebuilds from the disk-scan). A list of accounts out; no vault content, no keychain write."
 commands.allow = ["account_list"]
-
-[[permission]]
-identifier = "allow-account-move"
-description = "Allow invoking account:account_move (move a vault into the account owning another vault). Takes two vault ids; writes the sealed record. No vault content."
-commands.allow = ["account_move"]
-
-[[permission]]
-identifier = "allow-account-split"
-description = "Allow invoking account:account_split (split a vault into a fresh account). Takes a vault id; writes the sealed record. No vault content."
-commands.allow = ["account_split"]

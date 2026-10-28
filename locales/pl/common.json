@@ -4698,8 +4698,6 @@
       "vaultsHelperShort": "Grupowanie zostaje na tym urządzeniu i nie podróżuje ze skarbcem.",
       "vaultsCount_one": "{{count}} skarbców",
       "vaultsCount_other": "{{count}} skarbców",
-      "vaultActions": "Akcje skarbca",
-      "splitLastConfirm": "To jedyny skarbiec w koncie. Przeniesienie go usuwa to konto.",
       "vaultCorrupted": "Nie udało się odczytać metadanych tego skarbca",
       "vaultUnreadable": "Nie odczytano na tym urządzeniu",
       "vaultDeviceOnly": "Tylko to urządzenie",
@@ -4716,8 +4714,6 @@
       "standaloneHelper": "Ten skarbiec nie jest grupowany pod kontem na tym urządzeniu, więc stoi samodzielnie. Grupowanie jest per urządzenie: inne urządzenie może pokazać go wewnątrz jednego.",
       "unresolvedHelper": "Ustalanie, który skarbiec jest otwarty…",
       "devicesNote": "Urządzenia, członkowie skarbca współdzielonego i Twoja tożsamość są zarządzane w Synchronizacji.",
-      "groupingHidden": "Grupowanie kont jest niedostępne, gdy nazwy skarbców są ukryte. Wyłącz tę opcję w Prywatności, aby nim zarządzać.",
-      "groupingUnreadable": "Nie udało się odczytać grupowania kont tego urządzenia. Nic się nie zmieniło.",
       "groupingError": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło.",
       "sections": {
         "extensions": "Rozszerzenia przeglądarki",
@@ -5777,12 +5773,7 @@
     "restoreFromBackup": "Przywróć z kopii zapasowej",
     "subline": "Masz więcej niż jeden skarbiec na tym urządzeniu. Wybierz jeden do odblokowania.",
     "vaultFallback": "Skarbiec {{n}}",
-    "accountFallback": "Konto",
-    "moveToAccount": "Przenieś na konto…",
-    "moveToNewAccount": "Przenieś na nowe konto",
-    "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
-    "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
-    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło.",
+    "accountError": "Nie udało się odczytać grupowania kont na tym urządzeniu.",
     "createShort": "Nowy skarbiec",
     "joinShort": "Dodaj urządzenie",
     "restoreShort": "Przywróć kopię"
@@ -6024,11 +6015,7 @@
     "openedYearsAgo_other": "otwarto {{count}} lat temu",
     "corruptedBadge": "Uszkodzony",
     "accountFallback": "Konto",
-    "moveToNewAccount": "Przenieś na nowe konto",
-    "moveToAccount": "Przenieś na konto…",
-    "accountError": "Nie udało się zaktualizować grupowania kont. Nic się nie zmieniło.",
-    "accountHidden": "Akcje konta są niedostępne, gdy nazwy skarbców są ukryte.",
-    "accountUnreadable": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło."
+    "accountError": "Nie udało się odczytać grupowania kont na tym urządzeniu."
   },
   "join": {
     "transportError": "Nie udało się połączyć z serwerem synchronizacji. Sprawdź adres i połączenie, a następnie spróbuj ponownie.",

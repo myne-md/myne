@@ -393,13 +393,13 @@ impl LoadedAccount {
 ///
 /// READ-ONLY by construction: reconciling, rebuilding, and pruning all happen
 /// in memory and nothing here writes. Merely listing the picker must not
-/// regroup vaults, so persistence belongs to the mutation paths
-/// (`move/split`, [`ensure_vault_membership`]), which write back explicitly and
-/// propagate the failure. In particular an `Unreadable` source (key destroyed,
-/// or a record restored onto a device that never held it) is never overwritten:
-/// the undecryptable bytes stay on disk and the caller gets the in-memory
-/// rebuild, so keychain loss costs the grouping but cannot also destroy the
-/// evidence.
+/// regroup vaults, so persistence belongs to [`ensure_vault_membership`], the
+/// one writer left after the account move/split mutations were removed
+/// (myne-md/myne#937); it writes back explicitly and propagates the failure. In
+/// particular an `Unreadable` source (key destroyed, or a record restored onto a
+/// device that never held it) is never overwritten: the undecryptable bytes stay
+/// on disk and the caller gets the in-memory rebuild, so keychain loss costs the
+/// grouping but cannot also destroy the evidence.
 ///
 /// Returns an empty record when there is no account (no vaults, or the keychain
 /// is unavailable), which is the standalone state, never an error.

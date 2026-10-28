@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "Ryhmittely jää tälle laitteelle eikä matkusta holvin mukana.",
       "vaultsCount_one": "{{count}} holvia",
       "vaultsCount_other": "{{count}} holvia",
-      "vaultActions": "Holvitoiminnot",
-      "splitLastConfirm": "Tämä on tilin ainoa holvi. Sen siirtäminen pois poistaa tilin.",
       "vaultCorrupted": "Tämän holvin metatietoja ei voitu lukea",
       "vaultUnreadable": "Ei luettu tällä laitteella",
       "vaultDeviceOnly": "Vain laite",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Tätä holvia ei ole ryhmitelty tilin alle tällä laitteella, joten se on itsenäinen. Ryhmittely on laitekohtaista: toinen laite saattaa näyttää sen tilin sisällä.",
       "unresolvedHelper": "Selvitetään, mikä holvi on auki…",
       "devicesNote": "Laitteita, jaetun holvin jäseniä ja identiteettiä hallinnoidaan kohdassa Synkronointi.",
-      "groupingHidden": "Tilin ryhmittely ei ole käytettävissä, kun holvien nimet ovat piilotettuina. Poista kyseinen valinta yksityisyydestä hallitaksesi sitä.",
-      "groupingUnreadable": "Tämän laitteen tilin ryhmittelyä ei voitu lukea. Mitään ei muuttunut.",
       "groupingError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muuttunut.",
       "sections": {
         "extensions": "Selainlaajennukset",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Palauta varmuuskopiosta",
     "subline": "Tällä laitteella on useampi kuin yksi holvi. Valitse avattava holvi.",
     "vaultFallback": "Holvi {{n}}",
-    "accountFallback": "Tili",
-    "moveToAccount": "Siirry tilille…",
-    "moveToNewAccount": "Siirry uudelle tiliin",
-    "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
-    "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
-    "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu.",
+    "accountError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella.",
     "createShort": "Uusi holvi",
     "joinShort": "Lisää laite",
     "restoreShort": "Palauta varmuuskopiosta"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "avattu {{count}} vuotta sitten",
     "corruptedBadge": "Vioittunut",
     "accountFallback": "Tili",
-    "moveToNewAccount": "Siirry uudelle tiliin",
-    "moveToAccount": "Siirry tilille…",
-    "accountError": "Tilin ryhmittelyä ei voitu päivittää. Mitään ei muutettu.",
-    "accountHidden": "Tilin toiminnot eivät ole käytettävissä, kun valtiointien nimet ovat piilotettuina.",
-    "accountUnreadable": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muutettu."
+    "accountError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella."
   },
   "join": {
     "transportError": "Synkronointipalvelinta ei tavoitettu. Tarkista osoite ja yhteytesi, ja yritä sitten uudelleen.",

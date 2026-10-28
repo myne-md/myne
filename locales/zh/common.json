@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "分组仅在此设备上，不会随保险库迁移。",
       "vaultsCount_one": "{{count}} 个保险库",
       "vaultsCount_other": "{{count}} 个保险库",
-      "vaultActions": "保险库操作",
-      "splitLastConfirm": "这是账户中唯一的保险库。将其移出将删除此账户。",
       "vaultCorrupted": "无法读取此保险库的元数据",
       "vaultUnreadable": "此设备未读取",
       "vaultDeviceOnly": "仅设备",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "此保险库在此设备上未归入账户，因此独立存在。分组按设备进行：另一台设备可能将其显示在某个账户内。",
       "unresolvedHelper": "正在确定打开的是哪个保险库…",
       "devicesNote": "设备、共享保险库成员和身份在同步中管理。",
-      "groupingHidden": "隐藏保险库名称时账户分组不可用。请在隐私中关闭该选项以管理它。",
-      "groupingUnreadable": "此设备的账户分组无法读取。未更改任何内容。",
       "groupingError": "无法读取此设备上的账户分组。未更改任何内容。",
       "sections": {
         "extensions": "浏览器扩展",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "从备份恢复",
     "subline": "你在本设备上拥有多个保险库。请选择一个进行解锁。",
     "vaultFallback": "保险库 {{n}}",
-    "accountFallback": "账户",
-    "moveToAccount": "移动到账户…",
-    "moveToNewAccount": "移动到新账户",
-    "accountError": "无法更新账户分组。没有任何更改。",
-    "accountHidden": "保险库名称隐藏时，账户操作不可用。",
-    "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。",
+    "accountError": "无法读取此设备上的账户分组。",
     "createShort": "新建保险库",
     "joinShort": "添加设备",
     "restoreShort": "从备份恢复"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "{{count}} 年前打开",
     "corruptedBadge": "已损坏",
     "accountFallback": "账户",
-    "moveToNewAccount": "移动到新账户",
-    "moveToAccount": "移动到账户…",
-    "accountError": "无法更新账户分组。没有任何更改。",
-    "accountHidden": "保险库名称隐藏时，账户操作不可用。",
-    "accountUnreadable": "无法在此设备上读取账户分组。没有任何更改。"
+    "accountError": "无法读取此设备上的账户分组。"
   },
   "join": {
     "transportError": "无法连接到该同步服务器。请检查地址和你的网络连接，然后重试。",

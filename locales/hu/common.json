@@ -4422,8 +4422,6 @@
       "vaultsHelperShort": "A csoportosítás ezen az eszközön marad, és nem utazik a széffel együtt.",
       "vaultsCount_one": "{{count}} széf",
       "vaultsCount_other": "{{count}} széf",
-      "vaultActions": "Széfműveletek",
-      "splitLastConfirm": "Ez az egyetlen széf a fiókban. Az áthelyezés törli ezt a fiókot.",
       "vaultCorrupted": "Ennek a széfnek az adatait nem sikerült olvasni",
       "vaultUnreadable": "Nem olvasható ezen az eszközön",
       "vaultDeviceOnly": "Csak eszköz",
@@ -4440,8 +4438,6 @@
       "standaloneHelper": "Ez a széf nincs fiókhoz csoportosítva ezen az eszközön, így önállóan áll. A csoportosítás eszközönkénti: egy másik eszköz mutathatja egy fiókban.",
       "unresolvedHelper": "Annak kiderítése, melyik széf van nyitva…",
       "devicesNote": "Eszközök, megosztott széf tagok és az identitásod a Szinkronban kezelhető.",
-      "groupingHidden": "A fiókcsoportosítás nem érhető el, amíg a széfnevek rejtve vannak. Kapcsold ki ezt a lehetőséget az Adatvédelemben a kezeléshez.",
-      "groupingUnreadable": "Ezen az eszközön a fiókcsoportosítást nem sikerült beolvasni. Semmi nem változott.",
       "groupingError": "Nem sikerült olvasni a fiókcsoportosítást ezen az eszközön. Semmi nem változott.",
       "sections": {
         "extensions": "Böngészőbővítmények",
@@ -5479,12 +5475,7 @@
     "restoreFromBackup": "Visszaállítás biztonsági mentésből",
     "subline": "Egynél több széf van ezen az eszközön. Válassz egyet a feloldáshoz.",
     "vaultFallback": "{{n}}. széf",
-    "accountFallback": "Fiók",
-    "moveToAccount": "Áthelyezés fiókba…",
-    "moveToNewAccount": "Áthelyezés új fiókba",
-    "accountError": "A fiókcsoportosítást nem sikerült frissíteni. Semmi sem változott.",
-    "accountHidden": "A fiókműveletek nem érhetők el, amíg a trezornevek rejtve vannak.",
-    "accountUnreadable": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön. Semmi sem változott.",
+    "accountError": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön.",
     "createShort": "Új széf",
     "joinShort": "Eszköz hozzáadása",
     "restoreShort": "Biztonsági mentés visszaállítása"
@@ -5698,11 +5689,7 @@
     "openedYearsAgo_other": "{{count}} éve megnyitva",
     "corruptedBadge": "Sérült",
     "accountFallback": "Fiók",
-    "moveToNewAccount": "Áthelyezés új fiókba",
-    "moveToAccount": "Áthelyezés fiókba…",
-    "accountError": "A fiókcsoportosítást nem sikerült frissíteni. Semmi sem változott.",
-    "accountHidden": "A fiókműveletek nem érhetők el, amíg a trezornevek rejtve vannak.",
-    "accountUnreadable": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön. Semmi sem változott."
+    "accountError": "A fiókcsoportosítást nem sikerült beolvasni ezen az eszközön."
   },
   "join": {
     "transportError": "Nem sikerült elérni a szinkronizálási kiszolgálót. Ellenőrizze a címet és a kapcsolatát, majd próbálja újra.",

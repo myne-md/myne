@@ -419,28 +419,12 @@
     "reason": "Same empty-state on the vault picker and recover select; one state, two screens."
   },
   {
-    "value": "Could not update the account grouping. Nothing was changed.",
+    "value": "Could not read the account grouping on this device.",
     "keys": [
       "picker.accountError",
       "vaultPicker.accountError"
     ],
-    "reason": "Same grouping-write error on the picker twins; identical screens, identical string."
-  },
-  {
-    "value": "Account actions are unavailable while vault names are hidden.",
-    "keys": [
-      "picker.accountHidden",
-      "vaultPicker.accountHidden"
-    ],
-    "reason": "Same hidden-names notice on the picker twins; identical screens, identical string."
-  },
-  {
-    "value": "The account grouping could not be read on this device. Nothing was changed.",
-    "keys": [
-      "picker.accountUnreadable",
-      "vaultPicker.accountUnreadable"
-    ],
-    "reason": "Same unreadable-grouping notice on the picker twins; identical screens, identical string."
+    "reason": "The vault picker and the Settings Account panel report the same fact when this device's account grouping cannot be read; one failure, two surfaces."
   },
   {
     "value": "Enter these four words from the identity phrase you just saved.",

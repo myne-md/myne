@@ -1,6 +1,11 @@
 // The device-local account record (the account/vault split, myne-md/myne#684):
 // the types the backend answers with, the narrowing that reads its error tag,
-// and the three command wrappers.
+// and the ONE command wrapper.
+//
+// **Read-only since myne-md/myne#937.** `moveVault` and `splitVault` are gone:
+// `account_split` was the only code path that could ever create a second account,
+// so the grouping is single-account and there is nowhere to move a vault to. The
+// record still decides which vaults a picker renders together.
 //
 // The record itself is `myne_core::account`. Nothing here carries user-authored
 // text: an account has no name (`design-notes/ui/0728`), so the only values
@@ -18,25 +23,12 @@ export interface AccountView {
 }
 
 /** Mirrors `myne_core::account::commands::AccountCommandError`'s `kind` tag. */
-export type AccountCommandErrorKind =
-  | "Io"
-  | "KeychainUnavailable"
-  | "VaultNotFound"
-  | "Backend"
-  | "Hidden"
-  | "RecordUnreadable"
-  | "Locked";
+export type AccountCommandErrorKind = "Io" | "KeychainUnavailable" | "Backend";
 
 /** Narrow an unknown thrown value to the backend error's `kind` tag. */
 export function accountCommandErrorKind(e: unknown): AccountCommandErrorKind | null {
   const kind = (e as { kind?: unknown } | null)?.kind;
-  return kind === "Io" ||
-    kind === "KeychainUnavailable" ||
-    kind === "VaultNotFound" ||
-    kind === "Backend" ||
-    kind === "Hidden" ||
-    kind === "RecordUnreadable" ||
-    kind === "Locked"
+  return kind === "Io" || kind === "KeychainUnavailable" || kind === "Backend"
     ? kind
     : null;
 }
@@ -45,16 +37,6 @@ export function accountCommandErrorKind(e: unknown): AccountCommandErrorKind | n
  *  keychain), which is the standalone state. */
 export async function listAccounts(): Promise<AccountView[]> {
   return invoke<AccountView[]>("plugin:account|account_list");
-}
-
-/** Move `vaultId` into the account owning `targetVaultId`. */
-export async function moveVault(vaultId: string, targetVaultId: string): Promise<AccountView[]> {
-  return invoke<AccountView[]>("plugin:account|account_move", { vaultId, targetVaultId });
-}
-
-/** Split `vaultId` into a fresh account. */
-export async function splitVault(vaultId: string): Promise<AccountView[]> {
-  return invoke<AccountView[]>("plugin:account|account_split", { vaultId });
 }
 
 /**
