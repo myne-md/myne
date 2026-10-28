@@ -26,7 +26,11 @@ test.describe("sync join flow", () => {
     await page.goto("/");
 
     // Welcome offers the new entry; open the join flow.
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await expect(page.getByTestId("sync.join")).toBeVisible();
 
     // MYND-548: the join door carries the same pre-filled name field the Settings
@@ -56,7 +60,11 @@ test.describe("sync join flow", () => {
       joinError: { kind: "BadRequest" }, // account/password/existence all collapse
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
 
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
     await page.getByTestId("sync.join.account-input").fill("MY-0000-0000-0000-0000-0000");
@@ -81,7 +89,11 @@ test.describe("sync join flow", () => {
       headFingerprint: "TYRS-N318",
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
 
     // Scan → confirm screen shows the decoded server + account#.
     await page.getByTestId("sync.join.scan-qr").click();
@@ -111,7 +123,11 @@ test.describe("sync join flow", () => {
       },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await page.getByTestId("sync.join.scan-qr").click();
     await expect(page.getByTestId("sync.join.error")).toBeVisible();
     await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
@@ -124,7 +140,11 @@ test.describe("sync join flow", () => {
       qrDecodeError: { kind: "NotAQrJoinPayload" },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await page.getByTestId("sync.join.scan-qr").click();
     await expect(page.getByTestId("sync.join.error")).toBeVisible();
     await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
@@ -157,7 +177,11 @@ test.describe("sync join flow", () => {
       qrScanError: { kind: "Unsupported" },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await page.getByTestId("sync.join.scan-qr").click();
 
     await expect(page.getByTestId("sync.join.error")).toHaveText(
@@ -247,7 +271,11 @@ test.describe("sync join flow", () => {
       },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await expect(page.getByTestId("sync.join")).toBeVisible();
 
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
@@ -313,7 +341,11 @@ test.describe("sync join flow", () => {
       enrollResult: { approved: true, device_id_hex: "bb11cc22dd33ee44ff55667788990011" },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
 
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
     await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
@@ -358,7 +390,11 @@ test.describe("sync join flow", () => {
       enrollError: { kind: "BadRequest" },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
     await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
     await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");
@@ -392,7 +428,11 @@ test.describe("sync join flow", () => {
       enrollResult: { approved: false, device_id_hex: "bb11cc22dd33ee44ff55667788990011" },
     });
     await page.goto("/");
-    await page.getByRole("button", { name: "Connect to my account" }).click();
+    await page.getByTestId("welcome.have-identity-cta").click();
+    // The account door is now the first-run fork's third row: the welcome
+    // button opens the identity fork, which offers the phrase, the code and
+    // this account route (myne-md/myne#932).
+    await page.getByTestId("identity-flow.fork-account").click();
     await page.getByTestId("sync.join.server-input").fill("https://sync.example.com");
     await page.getByTestId("sync.join.account-input").fill("MY-4K7P-9RH2-JR3T-8XW6-VZ0A");
     await page.getByTestId("sync.join.password-input").fill("correct horse battery staple");

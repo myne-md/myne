@@ -21,7 +21,12 @@ export interface WelcomeFlowProps {
    * offer it either and a client that invented one would be the only place the
    * two-phrase model still existed.
    */
-  onJoin: () => void;
+  /**
+   * The QR door is no longer on this screen (myne-md/myne#932): it lives inside
+   * the identity flow's fork step, beside the phrase door, because "I already have
+   * an identity" has two credentials and the first-run screen cannot show both.
+   */
+  onJoin?: () => void;
   /**
    * The one create door (myne-md/myne#768, narrowed by myne-md/myne#911 task 12).
    * Opens the mobile identity flow, which fronts the sync-server step when none is
@@ -29,12 +34,34 @@ export interface WelcomeFlowProps {
    * create-vault action is the next step of the same chain.
    */
   onIdentity: () => void;
+  /**
+   * "I already have an identity" (myne-md/myne#932), the second door on the
+   * first-run screen.
+   *
+   * It opens the identity flow at its fork step, which offers the two credentials
+   * a device can bring an existing identity with: the 24 words, or a code from a
+   * device that already has it. The door used to be one level in, behind the
+   * button labelled "Create your identity and vault", which is the mislabel this
+   * fixes: a returning user will not look for their own identity inside a create
+   * action. The desktop has answered this fork at the top level since it shipped
+   * (`IdentitySetupPanel`: "A new identity" beside "I already have one").
+   */
+  onHaveIdentity: () => void;
 }
 
 export interface IdentityFlowProps {
   /** Leave the flow. From the gate it is the skip path; from the home it
    *  dismisses the overlay. An identity, once created, is not undone here. */
   onCancel: () => void;
+  /**
+   * The third row of the first-run fork: the account-and-password door that used
+   * to BE the welcome screen's second button (myne-md/myne#932). It is kept
+   * reachable because an account made before identities existed is not an
+   * identity, and a fresh device with one had no other way in once the label on
+   * that button changed. Absent means the surface offers only the identity
+   * credentials, which is what Settings' own entry does.
+   */
+  onJoinAccount?: () => void;
   /**
    * Prefill from a scanned member-vault code: the endpoint to offer, and the
    * vault whose invite row to open the join wizard for. Seeded into the server
@@ -51,6 +78,22 @@ export interface IdentityFlowProps {
    * creates one.
    */
   fromPersonQr?: { endpointUrl: string; personIdHex: string };
+  /**
+   * Which step the flow opens on when nothing scanned it here (myne-md/myne#932).
+   *
+   * The shell decides, because the shell owns the door that was pressed: the
+   * create button opens `"create"`, and "I already have an identity" opens the
+   * `"join-fork"` step. Absent, the flow opens on its gate, which is what every
+   * Settings entry wants.
+   */
+  initialStep?: "gate" | "join-fork" | "create" | "recover";
+  /**
+   * Hand a scan request back to the shell (myne-md/myne#932). The fork step offers
+   * "Scan the code from my other device", and the scanner is the shell's: it owns
+   * the overlay, decodes the payload and re-enters this flow with `fromPersonQr`.
+   * Absent when the flow was not opened from the first-run fork.
+   */
+  onScanCode?: () => void;
   /**
    * An invite was accepted, this device has named itself, and the member vault
    * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell

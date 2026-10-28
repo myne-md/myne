@@ -47,6 +47,7 @@ import { useTranslation } from "react-i18next";
 import { DestructiveBanner } from "../../components/DestructiveBanner";
 import { PhraseEntryGrid } from "../../components/PhraseEntryGrid";
 import { normalizeBip39Phrase } from "../../lib/bip39-normalize";
+import { phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import {
   PHRASE_CELL_COUNT,
   type Action,
@@ -215,9 +216,11 @@ export function PhraseEntryStep({
     dispatch({ type: "set-cell", index, value: e.target.value });
   };
 
+  // `index` still travels with the action so the reducer's signature is
+  // unchanged, but the distribution itself ignores it: §3.2 fills cells 1..N
+  // (myne-md/myne#932).
   const handlePaste = (index: number) => (e: ClipboardEvent<HTMLInputElement>) => {
-    const pasted = e.clipboardData.getData("text");
-    const tokens = pasted.split(/\s+/).filter((t) => t.length > 0);
+    const tokens = phrasePasteTokens(e.clipboardData.getData("text"));
     if (tokens.length < 2) return; // single-token: native paste fills only the target cell
     e.preventDefault();
     dispatch({ type: "paste-into-cell", index, tokens });

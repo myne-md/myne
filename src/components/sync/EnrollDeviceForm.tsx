@@ -30,6 +30,7 @@ import { DestructiveBanner } from "../DestructiveBanner";
 // directly here is what used to leave served code one import edge away from the
 // BIP-39 wordlist.
 import { buildPhraseCredential, PHRASE_CELL_COUNT } from "./phrase-credential";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import { formatAccountNumberInput } from "../../lib/account-number-format";
 import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../../lib/device-name";
 import { useEnroll, type EnrollCredentialKind } from "../../hooks/useEnroll";
@@ -188,23 +189,13 @@ export function EnrollDeviceForm() {
     (index: number) => (e: ChangeEvent<HTMLInputElement>) =>
       setCell(index, e.target.value);
 
-  const handlePaste =
-    (index: number) => (e: ClipboardEvent<HTMLInputElement>) => {
-      const tokens = e.clipboardData
-        .getData("text")
-        .split(/\s+/)
-        .filter((t) => t.length > 0);
-      if (tokens.length < 2) return; // single token → native paste fills this cell
-      e.preventDefault();
-      clearOutcome();
-      setCells((prev) => {
-        const next = [...prev];
-        for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i++) {
-          next[index + i] = tokens[i];
-        }
-        return next;
-      });
-    };
+  const handlePaste = () => (e: ClipboardEvent<HTMLInputElement>) => {
+    const tokens = phrasePasteTokens(e.clipboardData.getData("text"));
+    if (tokens.length < 2) return; // single token → native paste fills this cell
+    e.preventDefault();
+    clearOutcome();
+    setCells((prev) => applyPastedPhrase(prev, tokens));
+  };
 
   const handleSubmit = () => {
     if (!canSubmit) return;

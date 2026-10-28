@@ -7,7 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { useTranslation } from "react-i18next";
-import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
+import { applyPastedPhrase, PHRASE_CELL_COUNT, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import { Icon } from "./Icon";
 
 /**
@@ -664,6 +664,13 @@ export function TextField({
         }}
         autoCapitalize={autoCapitalize}
         autoComplete={autoComplete}
+        // `spellCheck={false}` does NOT suppress iOS autocorrect: the attribute
+        // that does is `autoCorrect`, and without it the keyboard can substitute
+        // a word in a phrase cell silently. The desktop grid has always set it
+        // (`src/components/PhraseEntryGrid.tsx`), and so does every other mobile
+        // secret field by hand; this one backs the phrase grids
+        // (myne-md/myne#932).
+        autoCorrect="off"
         spellCheck={false}
         style={{
           flex: 1,
@@ -796,22 +803,19 @@ export function PhraseEntryGrid({
     next[index] = value;
     onCells(next);
   };
-  const paste = (index: number, event: ClipboardEvent<HTMLInputElement>): void => {
+  // `index` is deliberately unused: §3.2 distributes from the FIRST cell whatever
+  // cell the paste landed on, and the shared helper below is what enforces that
+  // (myne-md/myne#932). Distributing from the landing cell shifted the phrase and
+  // dropped its tail without a word.
+  const paste = (_index: number, event: ClipboardEvent<HTMLInputElement>): void => {
     // §3.2 paste-to-distribute: a phrase kept as one string in a password
     // manager is the common case, and asking the user to split it by hand is 24
     // chances to put a word in the wrong cell.
-    const tokens = event.clipboardData
-      .getData("text")
-      .split(/\s+/)
-      .filter((token) => token.length > 0);
+    const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
     if (tokens.length < 2) return;
     event.preventDefault();
     onCellEdited?.();
-    const next = [...cells];
-    for (let i = 0; i < tokens.length && index + i < count; i += 1) {
-      next[index + i] = tokens[i];
-    }
-    onCells(next);
+    onCells(applyPastedPhrase(cells, tokens, count));
   };
   return (
     <div

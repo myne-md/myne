@@ -155,6 +155,7 @@ export function MemberRosterPanel({
     authority,
     loading,
     error,
+    errorKind,
     inviting,
     lastInvite,
     invite,
@@ -313,13 +314,20 @@ export function MemberRosterPanel({
     );
   }
 
-  if (error) {
-    return (
-      <p data-testid="member-roster.error" style={ERROR_STYLE}>
-        {t("sync.memberRoster.error")}
-      </p>
-    );
-  }
+  // **The panel keeps its shape when the read fails** (myne-md/myne#932). It used
+  // to return one red sentence here, which deleted the panel's own sections: the
+  // reader lost the heading that says WHICH block failed, the "unlock your
+  // identity" sentence and its unlock door, and any invitation state. The
+  // failure is now reported where the member list would be, and the one case
+  // that is a STATE rather than a fault is not reported as an error at all:
+  //
+  // a person-born vault (`NTV7`) with a LOCKED identity has no owner public half
+  // to verify its own signed roster with (`sync_list_roster` answers `NotOwner`
+  // precisely then), and the panel already renders the sentence and the door for
+  // that state below. A red line beside them told the user their vault was broken
+  // when the only thing missing was the phrase for this session.
+  const identityLockedExplainsIt = error !== null && !personReady && errorKind === "NotOwner";
+  const rosterFailed = error !== null && !identityLockedExplainsIt;
 
   // The one lock control, rendered either inside the identity-code row (owner,
   // beside Copy) or on its own line (a member has no code to show). Declared
@@ -521,7 +529,24 @@ export function MemberRosterPanel({
         title={t("sync.memberRoster.membersHeading")}
         testId="member-roster.members-section"
       >
-      {members.length === 0 ? (
+      {rosterFailed ? (
+        /* The failure sits where the list would be, under the section that owns
+           it, with a retry. Not a whole-panel replacement: the identity and
+           invitation sections below still describe real state this device holds
+           (myne-md/myne#932). */
+        <div data-testid="member-roster.error" style={SECTION_STYLE}>
+          <p style={ERROR_STYLE}>{t("sync.memberRoster.error")}</p>
+          <Button
+            type="button"
+            variant="secondary"
+            data-testid="member-roster.retry"
+            onClick={reload}
+            style={{ alignSelf: "flex-start" }}
+          >
+            {t("invites.retry")}
+          </Button>
+        </div>
+      ) : members.length === 0 ? (
         <EmptyState
           variant="firstRun"
           icon="user"

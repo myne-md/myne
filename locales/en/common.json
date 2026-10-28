@@ -5747,6 +5747,17 @@
   },
   "identityFlow": {
     "title": "Create an identity",
+    "fork": {
+      "title": "Your identity",
+      "lead": "Bring the identity you already have onto this device, or start a new one.",
+      "words": "Enter my 24 words",
+      "wordsBody": "The identity phrase you saved when you created it. It is not a vault phrase.",
+      "code": "Scan the code from my other device",
+      "codeBody": "A device that already has your identity shows a code; this one joins the account and waits for its approval."
+    },
+    "forget": {
+      "cancel": "Cancel"
+    },
     "lead": "An identity lets people invite you to a vault, and lets one identity own many vaults. It needs a sync server to hold your encrypted notes and reach you.",
     "start": "Create an identity",
     "skip": "Not now, use this device only",
@@ -5809,6 +5820,8 @@
       "failed": "Could not register this identity. It stays on this device and you can try again."
     },
     "personJoin": {
+      "inviteLabel": "Invite code",
+      "inviteHint": "Only if your server asks for one. Most servers let a device that already has the account in.",
       "title": "Add this phone to your account",
       "lead": "Type the 24 words of the account this code came from. An existing device then approves this phone, so a phrase on its own cannot add one.",
       "phraseLabel": "Identity phrase",
@@ -5816,6 +5829,17 @@
       "cta": "Add this phone",
       "working": "Adding this phone…",
       "mismatch": "Those words belong to a different identity than this code.",
+      "error": {
+        "held": "This device already holds a different identity, so it cannot seal this one. Forget it on this device first, then add it again.",
+        "inviteRequired": "Your server admits new accounts only with an invite code. Type the code it gave you and try again.",
+        "inviteInvalid": "That invite code does not match the one your server expects.",
+        "deviceLimit": "Your account has reached its device limit. Remove a device on a device that already has the account, then try again.",
+        "alreadyInstalled": "This device is already admitted to that account. Open it instead of adding it again.",
+        "awaitingApproval": "This device is added and waiting for approval on a device that already has your account.",
+        "accountFrozen": "Your server has frozen this account. Nothing you type here will change that; contact whoever runs the server.",
+        "notConfigured": "Set the server address first, then add this device.",
+        "transport": "Could not reach your server. Your identity is unchanged; try again when the connection is back."
+      },
       "failed": "That did not add this phone. Check the words and try again.",
       "pendingTitle": "Waiting for approval",
       "pendingLead": "This phone is added and waiting. Approve it on a device that already has your account, and this screen finishes on its own.",

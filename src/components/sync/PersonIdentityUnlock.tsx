@@ -32,6 +32,7 @@ import { personUnlock } from "../../lib/invite";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import { buildPhraseCredential } from "./phrase-credential";
 import {
   getPersonIdentityGeneration,
@@ -94,23 +95,13 @@ export function PersonIdentityUnlock({
       setPhraseCell(index, event.target.value);
     };
 
-  const handlePhraseCellPaste =
-    (index: number) => (event: ClipboardEvent<HTMLInputElement>) => {
-      const tokens = event.clipboardData
-        .getData("text")
-        .split(/\s+/)
-        .filter((token) => token.length > 0);
-      if (tokens.length < 2) return;
-      event.preventDefault();
-      setError(false);
-      setPhraseCells((cells) => {
-        const next = [...cells];
-        for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-          next[index + i] = tokens[i];
-        }
-        return next;
-      });
-    };
+  const handlePhraseCellPaste = () => (event: ClipboardEvent<HTMLInputElement>) => {
+    const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
+    if (tokens.length < 2) return;
+    event.preventDefault();
+    setError(false);
+    setPhraseCells((cells) => applyPastedPhrase(cells, tokens));
+  };
 
   const unlock = async () => {
     if (busy) return;

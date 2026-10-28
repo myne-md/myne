@@ -2616,6 +2616,12 @@ The addressable, recoverable person that Myne's first run is now rooted at (myne
 
 Used in: `docs/decisions/ui/0615-first-run-is-identity-first.md`; `myne-md/myne#768`.
 
+### **person-born vault** &nbsp; 📦 *Product*
+
+A [vault](#vault) created while this device held a [person identity](#person-identity), and therefore written in the `NTV7` generation (`decisions/storage/0723`): its `root_key` is sealed to the owner's person key, its salts bind a random [vault id](#vault-id) instead of an account number hash, and it keeps **no recovery phrase of its own**, because the [identity phrase](#identity-phrase) is the single recovery credential and the outcome was measured (a vault born this way opens with the words that opened the identity, and there is no second phrase to keep). The retired phrase wrap is not merely unused: `spec/protocol.md` §9.3.5 makes its three fields structurally zero on both the writer and the parser, so anything that reads the vault through that wrap has nothing to open. That is why the [recovery drill](#recovery-drill) reads this generation through the person wrap (`decisions/security/0745`). The term is used in code comments (`core/src/plugins/vault_creation`, `core/src/plugins/vault_recover`) to name the generation without repeating "a vault born under a person identity"; the pre-change birth, which keeps its own phrase, account number and `root_key`, is described as an `NTV5` or legacy vault.
+
+Used in: `protocol/src/vault_meta_ntv7.rs`; `core/src/plugins/vault_creation/commands.rs`; `core/src/plugins/vault_recover/commands.rs`; `docs/decisions/security/0745-recovery-drill-reads-a-person-born-vault-through-its-person-wrap.md`.
+
 ### **person token** &nbsp; 🗝️ *Key/identifier*
 
 The device token a person's SCRAM session on its [person account](#person-account) yields (`server-protocol.md` §3.1a, `decisions/sync/0720`). It is the SAME credential class as any device token, not a second kind: the server cannot tell a person id from a vault id, which is the property the whole B2B model leans on, and a new class would have had to be minted, stored, revoked and rotated beside the one that exists. What differs is what it addresses. A vault device token carries its vault, and a per-vault membership token carries its binding; a person token carries **no** vault, so a request names one with the `?account=<account_number_hash>` selector and the server authorizes it against the membership table per request (unbound is `403`, malformed is `400`, and neither falls back to the caller's own namespace). It lives in `person-auth.json`, one per device, and is revoked by revoking the device ([reserved identity](#reserved-identity) covers the token-less states).
@@ -3113,7 +3119,9 @@ Used in: `spec/recovery-flow.md` §2.2, `decisions/ui/0642`, `docs/decisions/pro
 
 The read-only check that a saved recovery phrase still opens the vault that is open now (myne-md/myne#468). It derives `recovery_wrap_key` from the entered phrase, attempts the AEAD-open of `enc_root_key_recovery`, discards the derived key, and answers a boolean. It performs no slot transition and writes nothing, so it is not a recovery: a caller who is only checking is not forced through a password reset. It is unlock-gated and rides the shared `auth_permits` budget, which is what bounds it as a verification oracle, since a caller with an unlocked vault already holds the plaintext. On the web client it is the second place the phrase is entered, alongside a user-started recovery, which is why it amends A18 (`decisions/security/0645`).
 
-Used in: `spec/recovery-flow.md` §3.6, `decisions/security/0640`, `decisions/security/0645`, `threat-model.md` A18
+Two generations, one question: on a pre-`NTV7` vault it opens the recovery wrap, and on a [person-born vault](#person-born-vault) it derives the person keypair from the phrase and opens the person wrap instead, because that generation has no recovery wrap to try (`decisions/security/0745`, which extends `0640` and keeps its bounds).
+
+Used in: `spec/recovery-flow.md` §3.6, `decisions/security/0640`, `decisions/security/0645`, `decisions/security/0745`, `threat-model.md` A18
 
 ### **recovery phrase** &nbsp; 🗝️ *Key/identifier* (deep entry)
 

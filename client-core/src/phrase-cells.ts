@@ -26,3 +26,41 @@
  * 24 words, per `protocol.md` §7.
  */
 export const PHRASE_CELL_COUNT = 24;
+
+/**
+ * The tokens a pasted value distributes over a phrase grid (myne-md/myne#932).
+ *
+ * The split is `recovery-flow.md` section 3.2's: whitespace, one token per cell.
+ * Callers treat fewer than two tokens as "not a phrase paste" and let the browser
+ * fill the single cell natively, which is the rule the spec states.
+ */
+export function phrasePasteTokens(pasted: string): string[] {
+  return pasted.split(/\s+/).filter((token) => token.length > 0);
+}
+
+/**
+ * Distribute a pasted phrase over the grid's cells, **from the first cell**.
+ *
+ * The first cell is the whole point, and it is what `recovery-flow.md` section 3.2
+ * specifies: "paste into the first cell ... populate cells 1 through N (where N is
+ * the token count, capped at 24)". Ten call sites in this tree distributed from the
+ * cell the paste LANDED on instead, so a paste into cell 5 wrote the first twenty
+ * words into cells 5-24 and **silently dropped the last four**: a fully populated
+ * grid holding a phrase nobody typed, which the submit gate cannot tell from the
+ * real one. One implementation, so the rule cannot drift per surface.
+ *
+ * Cells past the token count keep what they held: a short paste over a full grid is
+ * visible state (the words are still on screen), not the hidden shift this function
+ * exists to remove.
+ */
+export function applyPastedPhrase(
+  cells: readonly string[],
+  tokens: readonly string[],
+  count: number = PHRASE_CELL_COUNT,
+): string[] {
+  const next = [...cells];
+  for (let i = 0; i < tokens.length && i < count; i += 1) {
+    next[i] = tokens[i];
+  }
+  return next;
+}

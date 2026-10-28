@@ -28,7 +28,20 @@ export interface RosterHook {
    *  roster that has no group tier. */
   groupKeyEpoch: number | null;
   loading: boolean;
+  /** The rejection, as text. */
   error: string | null;
+  /**
+   * The rejection's `kind`, when the backend sent one (`NotOwner`, `BadRequest`,
+   * `Transport`, …).
+   *
+   * Separate from `error` because the PANEL has to answer two different
+   * questions with it (myne-md/myne#932): whether this failure is the state
+   * rather than a fault (a person-born vault with a LOCKED identity has no owner
+   * public half to verify the roster with, so `NotOwner` is the honest answer and
+   * the panel already owns the block that explains it), and whether a retry is
+   * worth offering. A single string can only be printed.
+   */
+  errorKind: string | null;
   reload: () => void;
   /** Person identity lifecycle: lock (the unlock lives in the Sync panel's
    *  Identity block, myne-md/myne#831). */
@@ -64,6 +77,7 @@ export function useRoster(personReady: boolean): RosterHook {
   const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorKind, setErrorKind] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const [lastInvite, setLastInvite] = useState<InviteCommandView | null>(null);
   const [removing, setRemoving] = useState(false);
@@ -83,6 +97,7 @@ export function useRoster(personReady: boolean): RosterHook {
           setGroupKeyEpoch(view.group_key_epoch);
           setShared(view.group_key_epoch !== null);
           setError(null);
+          setErrorKind(null);
         }
       })
       .catch((e) => {
@@ -92,6 +107,14 @@ export function useRoster(personReady: boolean): RosterHook {
           setGroupKeyEpoch(null);
           setShared(false);
           setError(String(e));
+          // The serialized error carries `kind` and the panel branches on it; a
+          // rejection from somewhere other than the command (an IPC refusal, a
+          // harness error) has none, and reads as a plain failure.
+          setErrorKind(
+            e && typeof e === "object" && "kind" in e
+              ? String((e as { kind?: unknown }).kind ?? "") || null
+              : null,
+          );
         }
       })
       .finally(() => {
@@ -166,6 +189,7 @@ export function useRoster(personReady: boolean): RosterHook {
     groupKeyEpoch,
     loading,
     error,
+    errorKind,
     reload,
     lockPerson: personLock,
     inviting,

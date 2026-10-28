@@ -9,6 +9,8 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
+import { formatPersonAccountNumber } from "@myne/client-core/person-account";
+import { personJoinErrorKey } from "@myne/client-core/person-join";
 import {
   Screen,
   ScreenScroll,
@@ -61,6 +63,17 @@ type Step =
   // brings it across with its 24-word phrase instead of minting a new one. It
   // sits beside `create` because it is the same fork, one step over.
   | "recover"
+  /**
+   * "I already have an identity", as its own first-run step (myne-md/myne#932).
+   *
+   * The welcome screen's second button used to be "Connect to my account", which
+   * only ever opened the QR scanner, and the phrase door sat behind a button
+   * labelled "Create". The desktop answers the same fork at the top level
+   * (`IdentitySetupPanel`: "A new identity → Create" beside "I already have one →
+   * Recover"), so this step offers the two CREDENTIALS one already has: the 24
+   * words, or a code from a device that has the identity.
+   */
+  | "join-fork"
   | "phrase"
   // The type-back challenge gets a step of its own (myne-md/myne#869), the
   // `kit`/`typeback` split `CreateVaultFlow` has had since it shipped: the
@@ -367,6 +380,9 @@ export function IdentityFlow({
   onCreateVault,
   fromQr,
   fromPersonQr,
+  initialStep,
+  onJoinAccount,
+  onScanCode,
 }: IdentityFlowProps) {
   const { t } = useTranslation();
   // Names the accept step's phrase grid, which is 24 bare inputs with no visible
@@ -382,7 +398,7 @@ export function IdentityFlow({
   // …and the recover step's, a third grid of the same fields, for the same reason
   // a third time.
   const recoverPhraseLabelId = useId();
-  const [step, setStep] = useState<Step>("gate");
+  const [step, setStep] = useState<Step>(initialStep ?? "gate");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -459,6 +475,13 @@ export function IdentityFlow({
   const registerEndpointLoaded = useRef(false);
   /** The person join's phrase cells, and whether the claim still needs them. */
   const [personWords, setPersonWords] = useState<string[]>(() => Array(PHRASE_WORDS).fill(""));
+  // The forget act's own two-step state: the acknowledgement is only on screen
+  // once the user has asked to forget (myne-md/myne#932).
+  const [forgetOpen, setForgetOpen] = useState(false);
+  // The invite code a gated server asks for (myne-md/myne#932). Optional by
+  // design: a server that does not gate new accounts never reads it, and an
+  // existing account registers without one.
+  const [personInvite, setPersonInvite] = useState("");
   const [personBusy, setPersonBusy] = useState(false);
   const [personError, setPersonError] = useState<string | null>(null);
   const [personClaimNeedsPhrase, setPersonClaimNeedsPhrase] = useState(false);
@@ -467,6 +490,11 @@ export function IdentityFlow({
    *  refused credential, the other is an admitted device whose vault list did not
    *  arrive. */
   const [personListError, setPersonListError] = useState<string | null>(null);
+  // The account's vaults did not arrive (myne-md/myne#932). Its own state rather
+  // than the flow's `error`, which is about the identity: a listing failure leaves
+  // the identity fine and only the picker short, and saying so beside the vaults is
+  // where a reader looks for it.
+  const [vaultListFailed, setVaultListFailed] = useState(false);
   // Forget-this-identity acknowledgement (myne-md/myne#782).
   const [forgetAck, setForgetAck] = useState(false);
 
@@ -581,7 +609,7 @@ export function IdentityFlow({
       return;
     }
     if (!HAS_TAURI) {
-      setStep("gate");
+      setStep(initialStep ?? "gate");
       return;
     }
     let cancelled = false;
@@ -613,16 +641,20 @@ export function IdentityFlow({
           // create that is guaranteed to fail.
           setStep("held");
         } else {
-          setStep("gate");
+          // No identity on this device: leave the door the CALLER opened
+          // (myne-md/myne#932). The first-run screen has two of them, and the
+          // probe used to overwrite the fork with the gate, so "I already have an
+          // identity" landed on a screen offering to create one.
+          setStep(initialStep ?? "gate");
         }
       })
       .catch(() => {
-        if (!cancelled) setStep("gate");
+        if (!cancelled) setStep(initialStep ?? "gate");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialStep]);
 
   // Load invites whenever the home step is shown, and refresh the lifecycle
   // state with them: registration happens on another step and must remove its own
@@ -643,6 +675,25 @@ export function IdentityFlow({
         if (cancelled) return;
         setAccountState(s.state);
         setIdentityUnlocked(s.identity_unlocked);
+        // The account's vaults, written locally as frames (myne-md/myne#932).
+        // Listing them HERE as well as after a register is what makes the home
+        // step self-sufficient: a device that reached it by any other road (a
+        // re-opened app, a reclaimed identity, frames cleared by a reinstall)
+        // would otherwise show a picker with only "create a vault" while its
+        // account owned one. Only for an ENROLLED identity: a reserved one has no
+        // account to ask, and the command would refuse.
+        if (s.state !== "enrolled") return;
+        void personListVaults()
+          .then(() => {
+            if (!cancelled) setVaultListFailed(false);
+          })
+          .catch(() => {
+            // A listing failure is not a wrong phrase and not a lost vault: the
+            // frames simply did not arrive, and the retry is reopening this step.
+            // Said rather than swallowed, because the alternative is a picker that
+            // looks merely empty (myne-md/myne#932 review).
+            if (!cancelled) setVaultListFailed(true);
+          });
       })
       .catch(() => {
         /* keep the last-known state */
@@ -650,7 +701,7 @@ export function IdentityFlow({
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, t]);
 
   // The register step's server row, read when the step opens (2026-10-24): the
   // address this identity would be registered against today, prefilled so the
@@ -767,6 +818,18 @@ export function IdentityFlow({
       const view = await personRegister(phrase);
       setIdentityCode(view.identity_code);
       setRegisterWords(Array(PHRASE_WORDS).fill(""));
+      // The account's vaults, written locally as frames (myne-md/myne#932).
+      // Nothing else on this path lists them, so a device that registered here
+      // showed a picker with only "create a vault" while its account owned one.
+      // Tolerated rather than fatal: the registration SUCCEEDED, and a listing
+      // failure is a fetch to retry, not a reason to tell the user their phrase
+      // did not work.
+      await personListVaults().catch(() => {
+        // The registration succeeded, so this is not a phrase failure; the vaults
+        // are the part that did not arrive. The home step's own listing retries,
+        // and its banner is what would say so, so nothing is claimed here beyond
+        // leaving the enrolment intact.
+      });
       // Re-probe rather than assume: the lifecycle state is DERIVED from disk
       // (myne-md/myne#911 task 4), and the home step's own effect reads it on
       // entry. Setting it from this call's answer would be a second opinion about
@@ -876,6 +939,7 @@ export function IdentityFlow({
         fromPersonQr.personIdHex,
         fromPersonQr.endpointUrl,
         phrase,
+        personInvite,
       );
       if (view.approved) {
         finishPersonJoin();
@@ -883,18 +947,15 @@ export function IdentityFlow({
       }
       setStep("person-pending");
     } catch (e) {
-      const kind = (e as { kind?: string } | null)?.kind;
-      setPersonError(
-        kind === "PersonMismatch"
-          ? t("identityFlow.personJoin.mismatch")
-          : kind === "TlsFailure"
-            ? t("sync.endpoint.tlsFailure")
-            : t("identityFlow.personJoin.failed"),
-      );
+      // One mapper for every arm, in `@myne/client-core` (myne-md/myne#932). This
+      // used to answer two kinds and collapse the rest into "check the words",
+      // which blamed a correct phrase for a server refusal: an invite-code gate, a
+      // device cap and an unapproved device all read as "your words are wrong".
+      setPersonError(t(personJoinErrorKey(e)));
     } finally {
       setPersonBusy(false);
     }
-  }, [fromPersonQr, personWords, personBusy, finishPersonJoin, t]);
+  }, [fromPersonQr, personWords, personInvite, personBusy, finishPersonJoin, t]);
 
   // While the device waits, ask the server whether the approval has landed. The
   // poll re-runs the SAME handshake with the session's cached secret, which is why
@@ -1358,6 +1419,62 @@ export function IdentityFlow({
     </Screen>
   );
 
+  /**
+   * The "I already have an identity" fork (myne-md/myne#932): the two credentials
+   * a device can bring an existing identity with, side by side the way the
+   * desktop's identity setup offers create beside recover.
+   *
+   * Both arms end somewhere this flow already knows: the 24 words go to the
+   * recover step, and a code hands control back to the shell's scanner, which
+   * opens the person-join step with the scanned target.
+   */
+  const renderJoinFork = () => (
+    <Screen>
+      <FlowHeader label={t("identityFlow.fork.title")} onBack={onCancel} />
+      <ScreenScroll style={{ padding: "18px 22px 0" }}>
+        <Title>{t("identityFlow.fork.title")}</Title>
+        <Lead>{t("identityFlow.fork.lead")}</Lead>
+      </ScreenScroll>
+      <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
+        {/* The desktop's own vocabulary (`identitySetup.*`), reused rather than
+            re-coined: the same two credentials are offered there, and one name per
+            thing is the rule that keeps the two clients reading alike. */}
+        <Button onClick={openRecover} data-testid="identity-flow.fork-words">
+          {t("identitySetup.recoverAction")}
+        </Button>
+        <div data-testid="identity-flow.fork-words-body" style={HINT_STYLE}>
+          {t("identitySetup.recoverHint")}
+        </div>
+        {onScanCode ? (
+          <>
+            <Button
+              variant="secondary"
+              onClick={onScanCode}
+              data-testid="identity-flow.fork-code"
+            >
+              {t("identityFlow.fork.code")}
+            </Button>
+            <div data-testid="identity-flow.fork-code-body" style={HINT_STYLE}>
+              {t("identityFlow.fork.codeBody")}
+            </div>
+          </>
+        ) : null}
+        {/* The account-and-password door this screen's second button used to BE
+            (myne-md/myne#932). Without it the label change would have removed the
+            only route a fresh device with a pre-identity account had: the code row
+            joins an IDENTITY, which such an account does not have. */}
+        {onJoinAccount ? (
+          <Button variant="ghost" onClick={onJoinAccount} data-testid="identity-flow.fork-account">
+            {t("welcome.connect")}
+          </Button>
+        ) : null}
+        <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.fork-skip">
+          {t("identityFlow.skip")}
+        </Button>
+      </FooterBar>
+    </Screen>
+  );
+
   const renderGate = () => (
     <Screen>
       <FlowHeader label={t("identityFlow.title")} onBack={onCancel} />
@@ -1573,6 +1690,22 @@ export function IdentityFlow({
             {t("identityFlow.personJoin.sessionEnded")}
           </Banner>
         ) : null}
+        {/* A server that gates NEW accounts needs its code here, and this screen
+            is the only enrolment surface a phone has (myne-md/myne#932). Above the
+            grid rather than below it: it arrives from the same place the phrase
+            does, and a field under 24 cells reads as an afterthought. */}
+        <div style={{ marginTop: "var(--space-4)" }}>
+          <FieldLabel>{t("identityFlow.personJoin.inviteLabel")}</FieldLabel>
+        </div>
+        <div style={HINT_STYLE}>{t("identityFlow.personJoin.inviteHint")}</div>
+        <TextField
+          value={personInvite}
+          onChange={setPersonInvite}
+          label={t("identityFlow.personJoin.inviteLabel")}
+          testId="identity-flow.person-join-invite"
+          autoComplete="off"
+          mono
+        />
         <div style={{ marginTop: "var(--space-4)" }}>
           <FieldLabel id={personPhraseLabelId}>
             {t("identityFlow.personJoin.phraseLabel")}
@@ -1953,7 +2086,16 @@ export function IdentityFlow({
           {accountNumber ? (
             <div style={{ marginTop: "var(--space-4)" }}>
               <FieldLabel>{t("identityHome.accountNumberHeading")}</FieldLabel>
-              <MonoBox value={accountNumber} testId="identity-flow.home-account-number" />
+              {/* The display form, not the canonical body: the command answers the
+                  body on purpose (`core/src/plugins/sync/person_account.rs`) and the
+                  grouping lives in `@myne/client-core`, which is where the desktop
+                  takes it from. Rendering the raw 20 characters here showed the
+                  number without its `MY-` prefix or its dash groups
+                  (myne-md/myne#932). */}
+              <MonoBox
+                value={formatPersonAccountNumber(accountNumber)}
+                testId="identity-flow.home-account-number"
+              />
               <Lead style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
                 {t("identityHome.accountNumberHint")}
               </Lead>
@@ -2088,6 +2230,11 @@ export function IdentityFlow({
               <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
                 {t("identityFlow.home.vaultHint")}
               </div>
+              {vaultListFailed ? (
+                <div data-testid="identity-flow.home-vault-list-failed" style={HINT_STYLE}>
+                  <Banner kind="warning">{t("identityFlow.personJoin.listFailed")}</Banner>
+                </div>
+              ) : null}
               {/* The action is WITHHELD while the identity is sealed, not shown
                   disabled: creating a vault signs its first member list with the
                   identity, so the sealed state makes the command answer
@@ -2129,6 +2276,25 @@ export function IdentityFlow({
               usable, and not reachable by anybody else. Registration is the act
               that makes it invitable, and it asks for the phrase because the
               phrase is the proof of possession. */}
+          {/* Scanning a code from the identity home (myne-md/myne#932). This
+              screen is where an invitee waits, and the scanner used to be
+              reachable only through the welcome screen's join door: a device that
+              already held the identity landed here and had nowhere to scan the
+              code an owner had just shown it. Same handler the fork's code row
+              uses, so there is one scanner rather than two. */}
+          {onScanCode ? (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <Button
+                variant="secondary"
+                full={false}
+                onClick={onScanCode}
+                data-testid="identity-flow.home-scan"
+              >
+                {t("identityFlow.fork.code")}
+              </Button>
+            </div>
+          ) : null}
+
           {accountState === "reserved" ? (
             <div style={{ marginTop: "var(--space-5)" }}>
               <FieldLabel>{t("identityFlow.home.registerHeading")}</FieldLabel>
@@ -2148,7 +2314,14 @@ export function IdentityFlow({
           ) : null}
 
           {/* Forget this identity on this device (myne-md/myne#782). Device-local:
-              the server account survives and is recoverable with the phrase. */}
+              the server account survives and is recoverable with the phrase.
+
+              **The acknowledgement sits BEHIND the trigger** (myne-md/myne#932).
+              It used to render permanently, with the destructive button disabled
+              until it was ticked, so anyone merely visiting this screen was shown
+              a statement about an act they had not started. The desktop puts the
+              same checkbox inside the confirmation for the act
+              (`MemberRosterPanel`'s `identityForget*`); this is that shape. */}
           <div style={{ marginTop: "var(--space-5)", paddingTop: "var(--space-4)", borderTop: "1px solid var(--line-1)" }}>
             <FieldLabel>{t("identityFlow.home.forgetHeading")}</FieldLabel>
             {error ? (
@@ -2156,22 +2329,47 @@ export function IdentityFlow({
                 {error}
               </Banner>
             ) : null}
-            <AckRow
-              checked={forgetAck}
-              onToggle={() => setForgetAck((v) => !v)}
-              testId="identity-flow.home-forget-ack"
-            >
-              {t("identityFlow.home.forgetCheckbox")}
-            </AckRow>
-            <Button
-              variant="ghost"
-              disabled={!forgetAck || busy}
-              onClick={() => void forgetHeld()}
-              style={{ color: "var(--danger)", marginTop: "var(--space-3)" }}
-              data-testid="identity-flow.home-forget"
-            >
-              {t("identityFlow.home.forget")}
-            </Button>
+            {forgetOpen ? (
+              <div data-testid="identity-flow.home-forget-confirm" style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                <AckRow
+                  checked={forgetAck}
+                  onToggle={() => setForgetAck((v) => !v)}
+                  testId="identity-flow.home-forget-ack"
+                >
+                  {t("identityFlow.home.forgetCheckbox")}
+                </AckRow>
+                <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+                  <Button
+                    variant="ghost"
+                    disabled={!forgetAck || busy}
+                    onClick={() => void forgetHeld()}
+                    style={{ color: "var(--danger)" }}
+                    data-testid="identity-flow.home-forget"
+                  >
+                    {t("identityFlow.home.forget")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setForgetOpen(false);
+                      setForgetAck(false);
+                    }}
+                    data-testid="identity-flow.home-forget-cancel"
+                  >
+                    {t("identityFlow.forget.cancel")}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button
+                variant="ghost"
+                onClick={() => setForgetOpen(true)}
+                style={{ color: "var(--danger)" }}
+                data-testid="identity-flow.home-forget-open"
+              >
+                {t("identityFlow.home.forget")}
+              </Button>
+            )}
           </div>
         </ScreenScroll>
       </Screen>
@@ -2620,6 +2818,7 @@ export function IdentityFlow({
   return (
     <Screen style={{ padding: 0 }}>
       {step === "gate" && renderGate()}
+      {step === "join-fork" && renderJoinFork()}
       {step === "held" && renderHeld()}
       {step === "create" && renderCreate()}
       {step === "phrase" && renderPhrase()}

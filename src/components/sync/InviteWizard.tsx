@@ -50,6 +50,7 @@ import {
   StepProgress,
 } from "../../screens/vault-creation/step-shell";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import {
   personAcceptInvite,
   personJoinVault,
@@ -101,24 +102,15 @@ function phraseCellHandlers(
         );
       },
     onCellPaste:
-      (index: number) =>
+      () =>
       (event: ClipboardEvent<HTMLInputElement>): void => {
-        const tokens = event.clipboardData
-          .getData("text")
-          .split(/\s+/)
-          .filter((token) => token.length > 0);
+        const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
         // A one-word paste is a paste over one cell; only a multi-word paste is
         // spread across the row, which is why it takes over the event.
         if (tokens.length < 2) return;
         event.preventDefault();
         onEdit();
-        setCells((cells) => {
-          const next = [...cells];
-          for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-            next[index + i] = tokens[i];
-          }
-          return next;
-        });
+        setCells((cells) => applyPastedPhrase(cells, tokens));
       },
   };
 }

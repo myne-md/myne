@@ -36,6 +36,7 @@ import { Input } from "./primitives/Input";
 import { personSetup, personStatus, type PersonAccountState, type PersonSetupView } from "../lib/personAccount";
 import { personLock } from "../lib/invite";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "./PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import { SecretDisplayCaveats } from "./SecretDisplayCaveats";
 import { SecretPhraseReveal, useLocalPhraseReveal } from "./SecretPhraseReveal";
 import { PhraseTypeBack, phraseTypeBackMatches, type TypeBackPositions } from "./PhraseTypeBack";
@@ -449,21 +450,12 @@ export function IdentitySetupPanel({
                     ),
                   );
                 }}
-                onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-                  const tokens = event.clipboardData
-                    .getData("text")
-                    .split(/\s+/)
-                    .filter((token) => token.length > 0);
+                onCellPaste={() => (event: ClipboardEvent<HTMLInputElement>) => {
+                  const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
                   if (tokens.length < 2) return;
                   event.preventDefault();
                   setError(null);
-                  setRecoveryCells((cells) => {
-                    const next = [...cells];
-                    for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-                      next[index + i] = tokens[i];
-                    }
-                    return next;
-                  });
+                  setRecoveryCells((cells) => applyPastedPhrase(cells, tokens));
                 }}
                 gridTestId={testId("phrase-grid")}
                 cellTestId={(index) =>

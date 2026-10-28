@@ -21,6 +21,7 @@ import { useState, type ChangeEvent, type ClipboardEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "./PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import {
   CARD_BODY_STYLE,
   CARD_TITLE_STYLE,
@@ -98,20 +99,11 @@ export function PersonPhraseUnlock({
             ),
           );
         }}
-        onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-          const tokens = event.clipboardData
-            .getData("text")
-            .split(/\s+/)
-            .filter((token) => token.length > 0);
+        onCellPaste={() => (event: ClipboardEvent<HTMLInputElement>) => {
+          const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
           if (tokens.length < 2) return;
           event.preventDefault();
-          setCells((current) => {
-            const next = [...current];
-            for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-              next[index + i] = tokens[i];
-            }
-            return next;
-          });
+          setCells((current) => applyPastedPhrase(current, tokens));
         }}
         gridTestId="unlock.identity-phrase-grid"
         cellTestId={(index) =>

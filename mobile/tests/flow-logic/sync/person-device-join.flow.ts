@@ -24,7 +24,11 @@ const PERSON_ID_HEX = "cd".repeat(16);
 /** Welcome → "Connect to my account" → the scan door. */
 async function openJoinDoor(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("button", { name: "Connect to my account" }).click();
+  await page.getByTestId("welcome.have-identity-cta").click();
+  // The account door is now the first-run fork's third row: the welcome
+  // button opens the identity fork, which offers the phrase, the code and
+  // this account route (myne-md/myne#932).
+  await page.getByTestId("identity-flow.fork-account").click();
   await expect(page.getByTestId("sync.join.scan-qr")).toBeVisible();
 }
 

@@ -601,3 +601,95 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     );
   });
 });
+
+// ── The first-run fork, the forget trigger and the account number ─────────────
+//
+// Three defects found while manually testing the identity surfaces
+// (myne-md/myne#932). Each assertion below fails on the code as it shipped:
+//
+//  1. "I already have an identity" was one level in, behind a button labelled
+//     "Create your identity and vault", so a returning user had to walk into a
+//     create action to find their own identity.
+//  2. The forget-identity acknowledgement rendered permanently on the home step,
+//     with the destructive button merely disabled until it was ticked.
+//  3. The account number rendered as its raw 20-character canonical body, with no
+//     `MY-` prefix and no dash groups.
+
+describe("IdentityFlow first-run fork (myne-md/myne#932)", () => {
+  it("offers both credentials of an identity you already have", () => {
+    const onScanCode = vi.fn();
+    render(
+      <IdentityFlow
+        initialStep="join-fork"
+        onScanCode={onScanCode}
+        onCancel={() => {}}
+        onAccepted={() => {}}
+      />,
+    );
+    try {
+      expect(screen.getByTestId("identity-flow.fork-words")).toBeTruthy();
+      const code = screen.getByTestId("identity-flow.fork-code");
+      fireEvent.click(code);
+      expect(onScanCode).toHaveBeenCalledTimes(1);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("shows the words door even when the shell cannot scan", () => {
+    // The QR door is optional because the scanner is the shell's; the phrase door
+    // is not, and a flow that rendered neither would leave a user with an existing
+    // identity no way in at all.
+    render(<IdentityFlow initialStep="join-fork" onCancel={() => {}} onAccepted={() => {}} />);
+    try {
+      expect(screen.getByTestId("identity-flow.fork-words")).toBeTruthy();
+      expect(screen.queryByTestId("identity-flow.fork-code")).toBeNull();
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe("IdentityFlow identity home (myne-md/myne#932)", () => {
+  it("puts the forget acknowledgement behind its trigger", async () => {
+    render(<IdentityFlow onCancel={() => {}} onAccepted={() => {}} />);
+    try {
+      // The home step is what an enrolled device lands on.
+      const open = await screen.findByTestId("identity-flow.home-forget-open");
+      expect(screen.queryByTestId("identity-flow.home-forget-ack")).toBeNull();
+      expect(screen.queryByTestId("identity-flow.home-forget")).toBeNull();
+
+      fireEvent.click(open);
+
+      expect(screen.getByTestId("identity-flow.home-forget-ack")).toBeTruthy();
+      const destructive = screen.getByTestId("identity-flow.home-forget") as HTMLButtonElement;
+      // Still gated by the acknowledgement, which is the point of the checkbox.
+      expect(destructive.disabled).toBe(true);
+
+      fireEvent.click(screen.getByTestId("identity-flow.home-forget-ack"));
+      expect((screen.getByTestId("identity-flow.home-forget") as HTMLButtonElement).disabled).toBe(
+        false,
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("renders the account number in the MY- display form", async () => {
+    // The command answers the CANONICAL body and leaves the grouping to the
+    // client; the desktop takes it from `@myne/client-core`, and so must this
+    // screen. A canonical fixture (20 chars, no dashes) is what makes the
+    // assertion able to fail.
+    personAccountNumber.mockResolvedValue("0123456789abcdefghij");
+    render(<IdentityFlow onCancel={() => {}} onAccepted={() => {}} />);
+    try {
+      const field = (await screen.findByTestId(
+        "identity-flow.home-account-number",
+      )) as HTMLInputElement;
+      expect(personAccountNumber).toHaveBeenCalled();
+      expect(field.value).toBe("MY-0123-4567-89AB-CDEF-GHIJ");
+    } finally {
+      cleanup();
+    }
+  });
+});

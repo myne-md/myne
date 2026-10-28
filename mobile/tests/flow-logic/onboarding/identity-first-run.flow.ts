@@ -29,9 +29,28 @@ test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
     await expect(
       page.getByRole("button", { name: "Create a local vault instead" }),
     ).toHaveCount(0);
-    // The join door stays: adding this device to an account that already exists is
-    // not a create.
-    await expect(page.getByTestId("welcome.join-cta")).toBeVisible();
+    // The door for an identity you already have stays, and it now SAYS that
+    // (myne-md/myne#932). It used to be labelled "Connect to my account" and open
+    // the QR scanner alone, while the phrase door sat behind the create button: a
+    // returning user had to walk into a create action to find their own identity.
+    await expect(page.getByTestId("welcome.have-identity-cta")).toBeVisible();
+  });
+
+  test("the second door offers both credentials of an identity you already have", async ({
+    page,
+  }) => {
+    await installMockIpc(page, { freshDevice: true });
+    await page.goto("/");
+
+    await page.getByTestId("welcome.have-identity-cta").click();
+
+    // Two ways in, and neither is the create flow: 24 words, or a code from a
+    // device that already has the identity. The desktop answers this fork the same
+    // way with one row per credential (`identitySetup.*`).
+    await expect(page.getByTestId("identity-flow.fork-words")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.fork-code")).toBeVisible();
+    // The create door is NOT on this screen: it is the other first-run button.
+    await expect(page.getByTestId("identity-flow.start")).toHaveCount(0);
   });
 
   test("offline first run: identity with no server step, then the identity home creates the vault", async ({

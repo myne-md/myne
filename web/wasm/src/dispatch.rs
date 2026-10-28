@@ -2797,6 +2797,12 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 .and_then(|v| v.as_str())
                 .unwrap_or_default()
                 .to_owned();
+            let invite_code = args
+                .get("inviteCode")
+                .and_then(|v| v.as_str())
+                .map(str::trim)
+                .filter(|s| !s.is_empty())
+                .map(str::to_string);
             match myne_core::plugins::sync::person_account::person_join_device_from_host(
                 host_ctx(),
                 &person_vault_io(),
@@ -2804,6 +2810,7 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 person_id,
                 endpoint,
                 phrase,
+                invite_code,
             )
             .await
             {

@@ -42,6 +42,8 @@ import { Button } from "../primitives/Button";
 import { Segmented } from "../primitives/Segmented";
 import { PhraseEntryGrid } from "../PhraseEntryGrid";
 import { buildPhraseCredential, PHRASE_CELL_COUNT } from "./phrase-credential";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
+import { personJoinErrorKey } from "@myne/client-core/person-join";
 import { useEnroll } from "../../hooks/useEnroll";
 import { has } from "../../platform/capabilities";
 import { BetaTermsConsent } from "./BetaTermsConsent";
@@ -314,20 +316,11 @@ export function JoinDeviceModal({
     const cleaned = e.target.value.replace(/\s+/g, "");
     setCells((prev) => prev.map((c, i) => (i === index ? cleaned : c)));
   };
-  const handleCellPaste = (index: number) => (e: ClipboardEvent<HTMLInputElement>) => {
-    const tokens = e.clipboardData
-      .getData("text")
-      .split(/\s+/)
-      .filter((w) => w.length > 0);
+  const handleCellPaste = () => (e: ClipboardEvent<HTMLInputElement>) => {
+    const tokens = phrasePasteTokens(e.clipboardData.getData("text"));
     if (tokens.length < 2) return;
     e.preventDefault();
-    setCells((prev) => {
-      const next = [...prev];
-      for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i++) {
-        next[index + i] = tokens[i];
-      }
-      return next;
-    });
+    setCells((prev) => applyPastedPhrase(prev, tokens));
   };
   const clearCells = () => setCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
 
@@ -482,16 +475,12 @@ export function JoinDeviceModal({
         setStep("person-pending");
       })
       .catch((e: unknown) => {
-        const kind = (e as { kind?: string } | null)?.kind;
-        if (kind === "PersonMismatch") {
-          setError(t("sync.join.personMismatch"));
-          return;
-        }
-        if (kind === "TlsFailure") {
-          setError(t("sync.endpoint.tlsFailure"));
-          return;
-        }
-        setError(t("sync.join.errorPhrase"));
+        // The shared mapper, so both clients answer a refusal the same way
+        // (myne-md/myne#932 review). This used to carry its own two-arm copy while
+        // the mobile join carried another, and a server refusal (an invite-code
+        // gate, a device cap, a frozen account) read as "check the phrase" on
+        // both.
+        setError(t(personJoinErrorKey(e)));
       })
       .finally(() => setBusy(false));
   };

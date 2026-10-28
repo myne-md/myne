@@ -161,17 +161,23 @@ describe("a whole phrase can be pasted at once", () => {
     expect(state.cells.slice(0, 5)).toEqual(TWENTY_FOUR.slice(0, 5));
   });
 
-  it("fills forward from the cell pasted into, not always from the first", () => {
+  // **These two used to assert the OPPOSITE, and the reversal is the fix**
+  // (myne-md/myne#932). `recovery-flow.md` §3.2 defines paste-to-distribute as
+  // "paste into the first cell ... populate cells 1 through N", and the
+  // implementation distributed from the cell the paste landed on. Pasted into
+  // cell 5, the first twenty words went into cells 5-24 and the last four were
+  // dropped: a fully populated grid holding a phrase nobody typed, which the
+  // submit gate ("all 24 non-empty") cannot tell from the real one. The user's only
+  // evidence was that the phrase was refused, which reads as "my words are wrong".
+  it("fills from the FIRST cell whatever cell the paste landed in", () => {
     const state = pasteInto(2, "alpha beta gamma");
-    expect(state.cells.slice(0, 5)).toEqual(["", "", "alpha", "beta", "gamma"]);
+    expect(state.cells.slice(0, 5)).toEqual(["alpha", "beta", "gamma", "", ""]);
   });
 
-  it("drops the overflow rather than wrapping round to cell 1", () => {
-    // Wrapping would silently overwrite words the user had already entered.
+  it("drops the tokens past the last cell rather than wrapping round", () => {
     const state = pasteInto(22, "alpha beta gamma delta");
-    expect(state.cells[22]).toBe("alpha");
-    expect(state.cells[23]).toBe("beta");
-    expect(state.cells[0]).toBe("");
+    expect(state.cells.slice(0, 4)).toEqual(["alpha", "beta", "gamma", "delta"]);
+    expect(state.cells[22]).toBe("");
   });
 
   it("lets a SINGLE word fall through to the native paste", () => {

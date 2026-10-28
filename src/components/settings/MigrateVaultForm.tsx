@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { PasswordInput } from "../PasswordInput";
 import { Button } from "../primitives/Button";
 import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
+import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 import {
   isAlreadyMigrated,
   isRecoveryPhraseRequired,
@@ -151,20 +152,11 @@ export function MigrateVaultForm({ onMigrated }: MigrateVaultFormProps = {}): Re
             ),
           );
         }}
-        onCellPaste={(index) => (event: ClipboardEvent<HTMLInputElement>) => {
-          const tokens = event.clipboardData
-            .getData("text")
-            .split(/\s+/)
-            .filter((token) => token.length > 0);
+        onCellPaste={() => (event: ClipboardEvent<HTMLInputElement>) => {
+          const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
           if (tokens.length < 2) return;
           event.preventDefault();
-          setPhraseCells((cells) => {
-            const next = [...cells];
-            for (let i = 0; i < tokens.length && index + i < PHRASE_CELL_COUNT; i += 1) {
-              next[index + i] = tokens[i];
-            }
-            return next;
-          });
+          setPhraseCells((cells) => applyPastedPhrase(cells, tokens));
         }}
         gridTestId="migrate.phrase-grid"
         cellTestId={(index) =>
