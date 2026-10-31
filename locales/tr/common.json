@@ -2917,10 +2917,6 @@
       "writesHeading": "Değiştirebileceği alanlar",
       "writesNote": "Myne her değişikliği bu listeye karşı denetler, yazmadan önce reddeder ve görünüm en son okuduğundan bu yana başka bir yerde değiştirilen bir alanı yazmayı reddeder."
     },
-    "welcome": {
-      "body": "Myne’e hoş geldiniz; düşünmek ve yazmak için özel alanınız.\n\nBurada kaydettiğiniz her şey şifrelenir ve cihazınızda kalır. **Parolanız** ve **kurtarma ifadeniz** bunun tek anahtarıdır, bu yüzden onları güvenli bir yerde saklayın. İkisi de kaybolursa kimse notlarınızı geri getiremez, biz bile.\n\n**Notları birbirine bağlayabilirsiniz.** `[[` yazın; Myne zaten sahip olduğunuz notları önerir, birini seçin ve bağlantıya dönüşür. Bağlantı kurduğunuz not, bağlantının nereden geldiğini kendi geri bağlantılar panelinde gösterir, böylece bir notlar kümesini her iki yönde de takip edebilirsiniz.\n\nBu sıradan bir not, o yüzden onu kendinize göre düzenleyin. Dilediğiniz zaman düzenleyin, yeniden adlandırın veya silin; fikirleriniz büyüdükçe yeni notlar ekleyin.\n\nMyne hakkında daha fazla bilgi için https://myne.md adresini ziyaret edin\n",
-      "title": "Myne’e hoş geldiniz"
-    },
     "workspace": {
       "defaultSlotName": "Varsayılan"
     },
@@ -3136,9 +3132,9 @@
       "legalLabel": "Yasal",
       "legalHelper": "Tarayıcınızda myne.md üzerinde açılır. Arayüz Almancaysa metin de Almanca olur.",
       "legalPrivacy": "Gizlilik politikası",
-      "licenseBody": "Pre-alpha · CC-BY-4.0 belgeler · Faz 1 sürümünde AGPL-3.0 uygulama kodu.",
+      "licenseBody": "CC-BY-4.0 belgeler · AGPL-3.0 uygulama kodu.",
       "licenseLabel": "Lisans",
-      "tagline": "Pre-alpha · Faz 1 masaüstü istemcisi",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Genel tehdit modeli belgesini tarayıcınızda açın.",
       "threatModelLabel": "Tehdit modeli",
       "version": "Sürüm",
@@ -4027,7 +4023,6 @@
       "importLabel": "İçe aktarma",
       "importObsidian": "Notları içe aktar…",
       "locationHelper": "Her kasa, bu yol altında şifreli dosyalardan oluşan bir klasördür. Elle kopyalamak yerine aşağıdaki Yedekle düğmesini tercih edin: yazılan dosyayı doğrular.",
-      "locationLabel": "Kasa konumu",
       "openInFiles": "Dosyalar’da aç",
       "webLocationHelper": "Notlarınız, bu site için bu tarayıcının deposunda durur; bu depoyu tarayıcı yönetir. Açılacak bir klasör yoktur. Bu sitenin verilerini temizlemek yerel kopyayı kaldırır; bu istemci eşitleme yaptığı için yeniden giriş yapmak onu geri indirir.",
       "webLocationLabel": "Notlarınızın saklandığı yer",

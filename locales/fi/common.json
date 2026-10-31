@@ -2917,10 +2917,6 @@
       "writesHeading": "Kentät, joita se voi muuttaa",
       "writesNote": "Myne tarkistaa jokaisen muutoksen tätä luetteloa vasten ennen kuin kirjoittaa sen, ja kieltäytyy muutoksesta kenttään, jota on muokattu muualla sitten näkymän viimeisen lukemisen."
     },
-    "welcome": {
-      "body": "Tervetuloa Myneen, yksityiseen tilaasi ajatella ja kirjoittaa.\n\nKaikki, minkä tähän tallennat, on salattu ja pysyy laitteessasi. **Salasanasi** ja **palautuslauseesi** ovat sen ainoat avaimet, joten säilytä ne turvallisessa paikassa. Jos molemmat katoavat, kukaan ei saa muistiinpanojasi takaisin — emme mekään.\n\n**Voit linkittää muistiinpanoja toisiinsa.** Kirjoita `[[`, niin Myne tarjoaa muistiinpanoja, jotka sinulla jo on; valitse yksi, niin siitä tulee linkki. Muistiinpano, johon linkitit, näyttää omassa paluuviittausten paneelissaan, mistä linkki tuli, joten muistiinpanojoukkoa voi seurata kumpaankin suuntaan.\n\nTämä on tavallinen muistiinpano, joten tee siitä omasi. Muokkaa sitä, nimeä se uudelleen tai poista se milloin haluat, ja lisää uusia muistiinpanoja ideoidesi karttuessa.\n\nLisätietoja Mynestä saat osoitteesta https://myne.md\n",
-      "title": "Tervetuloa Myneen"
-    },
     "workspace": {
       "defaultSlotName": "Oletus"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Juridiset tiedot",
       "legalHelper": "Avautuu osoitteessa myne.md selaimessasi. Saksaksi siellä, missä käyttöliittymä on saksankielinen.",
       "legalPrivacy": "Tietosuojaseloste",
-      "licenseBody": "Esialfa · CC-BY-4.0-asiakirjat · AGPL-3.0-sovelluskoodi vaiheen 1 julkaisussa.",
+      "licenseBody": "CC-BY-4.0-asiakirjat · AGPL-3.0-sovelluskoodi.",
       "licenseLabel": "Lisenssi",
-      "tagline": "Esialfa · Vaiheen 1 työpöytäsovellus",
+      "tagline": "Esialfa",
       "threatModelHelper": "Avaa julkinen uhkamalliasiakirja selaimessasi.",
       "threatModelLabel": "Uhkamalli",
       "version": "Versio",
@@ -4054,7 +4050,6 @@
       "importLabel": "Tuo",
       "importObsidian": "Tuo muistiinpanoja…",
       "locationHelper": "Jokainen holvi on kansio salattuja tiedostoja tämän polun alla. Suosi alla olevaa Varmuuskopioi-painiketta manuaalisten kopioiden sijaan: se tarkistaa kirjoitetun tiedoston.",
-      "locationLabel": "Holvin sijainti",
       "openInFiles": "Avaa Finderissa",
       "webLocationHelper": "Muistiinpanosi sijaitsevat tämän selaimen tälle sivustolle varaamassa tallennustilassa, jota selain hallinnoi. Avattavaa kansiota ei ole. Tämän sivuston tietojen tyhjentäminen poistaa paikallisen kopion; koska tämä asiakasohjelma synkronoi, se latautuu takaisin, kun kirjaudut uudelleen sisään.",
       "webLocationLabel": "Missä muistiinpanosi säilytetään",

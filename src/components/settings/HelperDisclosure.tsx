@@ -144,6 +144,13 @@ interface HelperDisclosureProps {
    * rather than finding the affordance by position.
    */
   testId?: string;
+  /**
+   * Accessible name for the trigger. Defaults to the shared
+   * `settings.helperDisclosureLabel` ("More about this setting"), which is right
+   * on a settings row and wrong in a destructive dialog. That is the only shape
+   * this prop exists for (myne-md/myne#960).
+   */
+  triggerLabel?: string;
 }
 
 interface Anchor {
@@ -156,6 +163,7 @@ export function HelperDisclosure({
   paragraphs,
   descriptionId,
   testId,
+  triggerLabel,
 }: HelperDisclosureProps) {
   const { t } = useTranslation();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -271,7 +279,7 @@ export function HelperDisclosure({
     >
       <IconButton
         icon="circle-help"
-        label={t("settings.helperDisclosureLabel")}
+        label={triggerLabel ?? t("settings.helperDisclosureLabel")}
         expanded={open}
         nativeTitle={false}
         iconSize={14}

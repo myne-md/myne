@@ -37,13 +37,16 @@ import { testIdSelector } from "./support/session";
 /**
  * The controls the desktop Storage panel owns and a page cannot.
  *
- * Two of them are testids this branch added for the desktop scenario
- * (`e2e/storage-panel.e2e.ts`), which is what makes their absence assertable
- * here rather than a claim about copy.
+ * All three are desktop-only ACTIONS rather than copy, which is what makes their
+ * absence assertable here. `storage.vault-path` and `storage.open-in-files` left
+ * this list with myne-md/myne#960: the desktop panel no longer prints a filesystem
+ * path or opens one (a read-only location row that named the `vaults/` root
+ * answered a question only the filesystem can, and the browser's own location row
+ * is a different claim about a different store). Keeping them here would have made
+ * two of the five absences vacuous, which is the failure this list exists to
+ * avoid.
  */
 const DESKTOP_ONLY_CONTROLS = [
-  "storage.vault-path", // a filesystem path OPFS does not have
-  "storage.open-in-files", // an OS file-manager call
   "settings.backup-vault", // the backup pair …
   "settings.restore-backup", // … both halves of it
   "storage.import", // the directory import

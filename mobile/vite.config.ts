@@ -42,10 +42,13 @@ export default defineConfig(async () => ({
       // a phone's kit against a desktop's, and the failure surfaces as "my
       // recovery file does not work", months later, with the file in hand.
       { find: "@myne/recovery-kit", replacement: sib("../src/lib/recovery-kit.ts") },
-      // The shared English catalog (repo-root `locales/en`) - now consumed only
-      // by `src/lib/welcomeNote.ts` for its seed-time welcome-note copy. (The
-      // editor host resolved its labels through this too until MYND-485 moved it
-      // onto the full `@myne/i18n` runtime below.)
+      // The shared English catalog (repo-root `locales/en`) - consumed by the
+      // mobile TESTS, which resolve a key here to prove the real catalog carries
+      // it rather than the key merely being echoed. App code uses the full
+      // `@myne/i18n` runtime below (and used this alias for the seed-time Welcome
+      // note copy until myne-md/myne#960 deleted that note). (The editor host
+      // resolved its labels through this too until MYND-485 moved it onto the
+      // runtime.)
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
       // The shared react-i18next RUNTIME (MYND-485). NOTE - unlike @myne/editor /
       // dialect / copy (extracted top-level workspace packages), this aliases the

@@ -3,9 +3,6 @@
 // Implements design session 2026-04-28-vault-creation-frontend.md Q9:
 //   - No eyebrow (endpoint, not a numbered step).
 //   - Success indicator: circle-check icon, var(--success).
-//   - "Show vault folder" → the platform seam's opener module opens the OS
-//     file manager at app_data_dir/vault/ (built via the seam's path module
-//     `appDataDir()` + `join("vault")`).
 //   - "Done" → calls the `onDone` callback prop. The orchestrator
 //     (<CreateVault>) wires it through to App.tsx, which transitions
 //     the stage to the terminal `editor` screen. Originally this called
@@ -15,11 +12,20 @@
 //     vault-unlock feature — until then, the editor is terminal and
 //     there is no path back to Welcome from inside it.
 //
+// The two local-disk affordances ("Back up now", "Show vault folder") that
+// used to sit under "Done" are gone (myne-md/myne#960), which reverses MYND-56
+// task 7 / B13(b) and is recorded in `design-notes/ui/`. A vault created a
+// second ago has no history to lose, the backup that matters is a standing
+// schedule (`Settings → Storage → Automatic backups`) rather than one taken at
+// the moment of peak reading, and the folder reveal exists for hand-copying the
+// vault directory: the copy path the verified `.myne-backup` write replaces.
+// The web client's substitute module went with them, so the whole substitution
+// edge is gone rather than rendering nothing.
+//
 // Window-close prompt (Task 12) explicitly excludes ReadyStep — vault
 // is committed, no progress to discard.
 
 import { useTranslation } from "react-i18next";
-import { ReadyLocalArtefacts } from "./ReadyLocalArtefacts";
 import { Button } from "../../components/primitives/Button";
 import { Icon } from "../../components/primitives/Icon";
 import { StepHeading, StepLayout } from "./step-shell";
@@ -27,23 +33,15 @@ import { StepHeading, StepLayout } from "./step-shell";
 interface ReadyStepProps {
   onDone: () => void;
   /**
-   * True while the auto-unlock IPC is in flight (PRD Q4(a)). Disables
-   * both buttons and switches the "Done" label to "Decrypting…" so
-   * the user sees that the click registered and Argon2id is running
-   * (~1s baseline). False during the brief window between mount and
-   * "Done" click.
+   * True while the auto-unlock IPC is in flight (PRD Q4(a)). Disables the
+   * button and switches the "Done" label to "Decrypting…" so the user sees
+   * that the click registered and Argon2id is running (~1s baseline). False
+   * during the brief window between mount and "Done" click.
    */
   pending?: boolean;
-  /**
-   * The vault `commit` just wrote (`vaults/<id>/`) — the "Show vault
-   * folder" target (MYND-219 / SYNC-16: the pre-multi-vault `vault/`
-   * path no longer exists). `null` only on the legacy sole-vault path,
-   * where the affordance falls back to the legacy dir.
-   */
-  vaultId?: string | null;
 }
 
-export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStepProps) {
+export function ReadyStep({ onDone, pending = false }: ReadyStepProps) {
   const { t } = useTranslation();
   return (
     <StepLayout align="center">
@@ -76,9 +74,8 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
         {t("vaultCreation.ready.body")}
       </div>
 
-      {/* One way forward, and it is the obvious one. The two local artefacts
-          (a backup file, the folder on disk) are real but optional, so they sit
-          under it as quiet actions rather than beside it as equals. */}
+      {/* One way forward, and it is the only one: the endpoint of a creation
+          flow should not offer branches (myne-md/myne#960). */}
       <Button
         variant="primary"
         onClick={onDone}
@@ -88,17 +85,6 @@ export function ReadyStep({ onDone, pending = false, vaultId = null }: ReadyStep
       >
         {pending ? t("vaultCreation.ready.decrypting") : t("vaultCreation.ready.done")}
       </Button>
-
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          justifyContent: "center",
-          gap: "var(--space-1)",
-        }}
-      >
-        <ReadyLocalArtefacts pending={pending} vaultId={vaultId} />
-      </div>
     </StepLayout>
   );
 }

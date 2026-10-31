@@ -2917,10 +2917,6 @@
       "writesHeading": "Felt den kan endre",
       "writesNote": "Myne sjekker hver endring mot denne listen før den skriver én, og avviser en endring til et felt som ble redigert et annet sted siden visningen sist leste det."
     },
-    "welcome": {
-      "body": "Velkommen til Myne, ditt private rom for å tenke og skrive.\n\nAlt du lagrer her er kryptert og forblir på enheten din. **Passordet** og **gjenopprettingsfrasen** din er de eneste nøklene til det, så oppbevar dem et trygt sted. Hvis begge går tapt, kan ingen hente notatene dine tilbake, ikke engang vi.\n\n**Du kan lenke notater til hverandre.** Skriv `[[` og Myne tilbyr notatene du allerede har; velg ett, og det blir en lenke. Notatet du lenker TIL, viser hvor lenken kom fra, i sitt eget tilbakekoblingspanel, så en samling notater er noe du kan følge i begge retninger.\n\nDette er bare et vanlig notat, så gjør det til ditt eget. Rediger det, gi det nytt navn eller slett det når du vil, og legg til nye notater etter hvert som ideene dine vokser.\n\nFor å lære mer om Myne, besøk https://myne.md\n",
-      "title": "Velkommen til Myne"
-    },
     "workspace": {
       "defaultSlotName": "Standard"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Juridisk",
       "legalHelper": "Åpnes på myne.md i nettleseren din. På tysk der grensesnittet er tysk.",
       "legalPrivacy": "Personvernerklæring",
-      "licenseBody": "Pre-alfa · CC-BY-4.0-dokumentasjon · AGPL-3.0 applikasjonskode ved fase 1-utgivelse.",
+      "licenseBody": "CC-BY-4.0-dokumentasjon · AGPL-3.0 applikasjonskode.",
       "licenseLabel": "Lisens",
-      "tagline": "Pre-alfa · Fase 1 skrivebordsklient",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Åpne det offentlige trusselmodelldokumentet i nettleseren din.",
       "threatModelLabel": "Trusselmodell",
       "version": "Versjon",
@@ -4054,7 +4050,6 @@
       "importLabel": "Importer",
       "importObsidian": "Importer notater…",
       "locationHelper": "Hvert hvelv er en mappe med krypterte filer under denne banen. Bruk heller Sikkerhetskopi-knappen nedenfor enn manuelle kopier: den verifiserer den skrevne filen.",
-      "locationLabel": "Hvelvplassering",
       "openInFiles": "Åpne i Filer",
       "webLocationHelper": "Notatene dine ligger i denne nettleserens lagring for dette nettstedet, styrt av nettleseren. Det finnes ingen mappe å åpne. Sletter du dataene for dette nettstedet, forsvinner den lokale kopien; fordi denne klienten synkroniserer, lastes den ned igjen når du logger inn på nytt.",
       "webLocationLabel": "Hvor notatene dine lagres",

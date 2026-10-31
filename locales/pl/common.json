@@ -3139,10 +3139,6 @@
       "writesHeading": "Pola, które może zmienić",
       "writesNote": "Myne sprawdza każdą zmianę z tą listą przed zapisem i odrzuca zmianę pola, które zostało edytowane gdzie indziej od ostatniego odczytu widoku."
     },
-    "welcome": {
-      "body": "Witamy w Myne, Twojej prywatnej przestrzeni do myślenia i pisania.\n\nWszystko, co tu zapiszesz, jest zaszyfrowane i pozostaje na Twoim urządzeniu. Twoje **hasło** i **fraza odzyskiwania** to jedyne klucze do niego, więc przechowuj je w bezpiecznym miejscu. Jeśli oba kiedykolwiek zaginą, nikt nie odzyska Twoich notatek — nawet my.\n\n**Możesz łączyć notatki ze sobą.** Wpisz `[[`, a Myne zaproponuje notatki, które już masz; wybierz jedną, a stanie się linkiem. Notatka, DO której linkujesz, pokazuje, skąd pochodzi link, we własnym panelu linków zwrotnych, więc zbiór notatek można śledzić w obu kierunkach.\n\nTo zwykła notatka, więc uczyń ją swoją. Edytuj ją, zmień jej nazwę lub usuń, kiedy tylko chcesz, i dodawaj nowe notatki w miarę rozwijania pomysłów.\n\nAby dowiedzieć się więcej o Myne, odwiedź https://myne.md\n",
-      "title": "Witamy w Myne"
-    },
     "workspace": {
       "defaultSlotName": "Domyślny"
     },
@@ -3397,9 +3393,9 @@
       "legalLabel": "Informacje prawne",
       "legalHelper": "Otwiera się na myne.md w Twojej przeglądarce. Po niemiecku, gdy interfejs jest po niemiecku.",
       "legalPrivacy": "Polityka prywatności",
-      "licenseBody": "Pre-alfa · dokumentacja CC-BY-4.0 · kod aplikacji AGPL-3.0 w wydaniu Fazy 1.",
+      "licenseBody": "dokumentacja CC-BY-4.0 · kod aplikacji AGPL-3.0.",
       "licenseLabel": "Licencja",
-      "tagline": "Pre-alfa · klient desktopowy Fazy 1",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Otwórz publiczny dokument modelu zagrożeń w przeglądarce.",
       "threatModelLabel": "Model zagrożeń",
       "version": "Wersja",
@@ -4320,7 +4316,6 @@
       "importLabel": "Import",
       "importObsidian": "Importuj notatki…",
       "locationHelper": "Każdy skarbiec to folder zaszyfrowanych plików pod tą ścieżką. Zamiast ręcznego kopiowania używaj przycisku Kopia zapasowa poniżej: weryfikuje on zapisany plik.",
-      "locationLabel": "Lokalizacja skarbca",
       "openInFiles": "Otwórz w Plikach",
       "webLocationHelper": "Twoje notatki znajdują się w pamięci tej przeglądarki przypisanej do tej witryny, zarządzanej przez przeglądarkę. Nie ma folderu do otwarcia. Wyczyszczenie danych tej witryny usuwa lokalną kopię; ponieważ ten klient się synchronizuje, ponowne zalogowanie pobiera ją z powrotem.",
       "webLocationLabel": "Gdzie przechowywane są Twoje notatki",

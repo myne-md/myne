@@ -387,7 +387,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "AboutPanel",
     state: "default",
     description:
-      "Settings → About: version and build channel (Development or Stable), a link to the threat model, the licence, and the Developer mode toggle that reveals the developer-group panels. Look for the channel matching the build rather than a hardcoded \"Stable\".",
+      "Settings → About: version and update channel (Stable or Beta), a link to the threat model, the licence, and the Developer mode toggle that reveals the developer-group panels. Look for the single channel row, which names the channel this build updates from rather than a hardcoded \"Stable\".",
     tags: ["settings", "about", "version", "channel", "threat-model", "license", "developer-mode"],
     fixture: PREFS_FIXTURE,
     render: () => (
@@ -1445,8 +1445,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "StoragePanel",
     state: "default",
     description:
-      "Settings → Storage: the read-only vaults-location path plus the manual Backup and Restore actions, with the automatic-backup block nested under it in the rail. The path shown is the stable `vaults/` root rather than an opaque per-vault directory name.",
-    tags: ["settings", "storage", "vault-location", "backup", "restore", "path", "manual"],
+      "Settings → Storage: the manual Backup and Restore actions, with the automatic-backup block nested under it in the rail. The vault's on-disk location used to be printed here; it is gone (myne-md/myne#960), because a path a user cannot act on inside the app answers a question only the filesystem can, and two of the three clients have no path to show.",
+    tags: ["settings", "storage", "backup", "restore", "manual"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>

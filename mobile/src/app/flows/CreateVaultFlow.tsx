@@ -26,7 +26,7 @@ import {
   unlockWithPassword,
 } from "../../lib/commands";
 import { HAS_TAURI } from "../../lib/app-window";
-import { seedWelcomeNote } from "../../lib/welcomeNote";
+import { seedExampleVault } from "../../lib/exampleVault";
 import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import {
   copySecretToClipboard,
@@ -593,7 +593,6 @@ const KIT_SECTION_LABEL_STYLE = {
 export function CreateVaultFlow({
   briefing,
   onCancel,
-  onCommitSuccess,
   onAutoUnlockSuccess,
   onAutoUnlockFailed,
 }: CreateVaultFlowProps) {
@@ -803,29 +802,26 @@ export function CreateVaultFlow({
       // The name from the first step becomes the vault's label, and it has to
       // happen HERE: `prefs|vault_set_label` writes under the active vault's
       // `prefs_key`, so it is unlock-gated and the line above is what unlocks.
-      // Best-effort, like `seedWelcomeNote` below and for the same reason — the
+      // Best-effort, like `seedExampleVault` below and for the same reason: the
       // vault is open, so a failed rename must not route a successfully unlocked
       // user to the unlock-failed path. An empty name leaves the picker's neutral
       // fallback, which is the right answer, so nothing is written for one.
       if (HAS_TAURI && vaultName.trim().length > 0) {
         await setVaultLabel(vaultName.trim()).catch(() => {});
       }
-      // MYND-118 mobile mirror — seed the onboarding Welcome note now the
-      // new vault is unlocked (note_create requires an unlocked slot).
-      // Best-effort: seedWelcomeNote never throws, so a failure here can't
+      // Seed the first-run example vault now the new vault is unlocked
+      // (note_create requires an unlocked slot). The note SET comes from the
+      // shared `@myne/dialect/exampleVault` builder, i.e. the same one desktop
+      // seeds, so both clients hand a new user the same first run
+      // (myne-md/myne#960; supersedes the MYND-118 Welcome note).
+      // Best-effort: seedExampleVault never throws, so a failure here can't
       // bounce a successfully-unlocked user to the unlock-failed path.
-      if (HAS_TAURI) await seedWelcomeNote();
+      if (HAS_TAURI) await seedExampleVault();
       onAutoUnlockSuccess(id);
     } catch {
       wipeSecrets();
       onAutoUnlockFailed(id);
     }
-  };
-
-  const backUpNow = () => {
-    const id = vaultIdRef.current ?? undefined;
-    wipeSecrets();
-    onCommitSuccess(id);
   };
 
   // What Save writes and what Copy puts on the clipboard: the same bytes, from
@@ -1293,9 +1289,6 @@ export function CreateVaultFlow({
       </div>
       <div style={{ flex: "none", paddingBottom: 52, width: "100%", display: "flex", flexDirection: "column", gap: 10 }}>
         <Button onClick={() => void openVault()}>{t("createVault.openVault")}</Button>
-        <Button variant="secondary" onClick={backUpNow}>
-          {t("createVault.backUpNow")}
-        </Button>
       </div>
     </Screen>
   );

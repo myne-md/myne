@@ -74,7 +74,7 @@ export const SHARED_WEB_ONLY = sharedWebOnlyScreens();
  * drop that screen out of this guard, which is exactly the class R0.2 fixed.
  * It may rise with the tree; lowering it is the edit that is never routine.
  */
-const SHARED_WEB_ONLY_FLOOR = 4;
+const SHARED_WEB_ONLY_FLOOR = 5;
 
 /**
  * Modules that legitimately render NOTHING, so "at least one testid" cannot
@@ -90,12 +90,15 @@ const SHARED_WEB_ONLY_FLOOR = 4;
  */
 const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "PairingDialog.tsx"),
+  join("web", "src", "components", "sync", "JoinDeviceModal.tsx"),
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
-  // The creation flow's local-disk affordances, substituted away on 2026-08-15:
-  // a native save dialog and an OS file-manager reveal, neither of which this
-  // client has. Renders `null`, so there is nothing for a testid to name.
-  join("web", "src", "screens", "vault-creation", "ReadyLocalArtefacts.tsx"),
+  // The device-attribution panel (myne-md/myne#852 story 11). It renders `null`
+  // by design: the store it reads is `NTV6`-only and group-tier sealed, both of
+  // its commands are `Class::Unsupported` on web, and `memberSharing` is absent
+  // here, so there is no reachable surface for a testid to name. See
+  // `web/vite.config.ts` SUBSTITUTED_MODULES.
+  join("web", "src", "components", "sync", "DeviceAttributionPanel.tsx"),
   // Whole-vault migration is desktop-only, so its phrase credential is absent
   // from the browser bundle rather than merely unreachable.
   join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),
@@ -142,16 +145,6 @@ export const SHARED_PRE_UNLOCK_SCREENS = Object.freeze([
  * screens compose less than they did, which is either a real simplification
  * worth saying out loud or a walk that has stopped finding things.
  *
- * **41 -> 24, `decisions/sync/0767`, and this is the largest drop this number
- * has taken.** The account-number join door was deleted, so `AccountBootstrap`
- * and `AccountNumberEntry` left the tree and with them the roots that pulled
- * `PasswordInput`, `Spinner`, `BetaTermsConsent`, `DestructiveBanner` and the
- * number field into the walk. What replaced them is `PendingApproval`, which
- * composes `CenteredCard`, `DestructiveBanner` and the shared compare hook.
- * Recorded as a real simplification rather than a walk that stopped finding
- * things: the screens that consumed those primitives are gone, and the primitive
- * walk still starts from every derived web-only root.
- *
  * **40 -> 39 -> 41, myne-md/myne#911, and 39 lasted one review.** The browser's
  * own `VaultPicker` substitute was deleted (one origin can hold several
  * containers now) and the note that licensed 39 said the shared
@@ -162,7 +155,18 @@ export const SHARED_PRE_UNLOCK_SCREENS = Object.freeze([
  * roots now, which is 39 + 2 = 41, and the picker's `picker.vault-row` testid
  * is asserted by `e2e-web/multi-vault.e2e.ts`.
  */
-const PRE_UNLOCK_FLOOR = 24;
+const PRE_UNLOCK_FLOOR = 40;
+
+/**
+ * **41 -> 40, myne-md/myne#960, and this one is a deletion rather than a
+ * redefinition.** `web/src/screens/vault-creation/ReadyLocalArtefacts.tsx` was
+ * removed with its desktop counterpart: the ready step's two local-disk
+ * affordances ("Back up now", "Show vault folder") are gone, so the web
+ * substitute that rendered nothing has nothing left to substitute. That is the
+ * "real simplification worth saying out loud" the paragraph above asks for, and
+ * it is why the number moves at all: the previous four moves were all claims
+ * about SCOPE, and three of them were wrong about it.
+ */
 
 export function webModules(dir = WEB_DIR) {
   const out = [];
@@ -445,7 +449,7 @@ export function dynamicDataAttrs(source) {
  * The pre-unlock leak budget's real scope: the screens, plus every module in the
  * SHARED tree they compose, transitively.
  *
- * A screen is not the only file that renders it. `PendingApproval` and
+ * A screen is not the only file that renders it. `AccountNumberEntry` and
  * `WebNoAccount` both render `<CenteredCard>`, which is a shared primitive
  * outside `webModules()` entirely, so an attribute added there landed on both
  * screens with nothing checking it. Following the relative imports is what makes
