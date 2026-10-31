@@ -53,6 +53,25 @@ those files are read only through a skill's standing-obligations block: a sessio
 skill reads none of them, which is exactly the session that then skips them. This file is loaded for
 every session in this tree, so the lane is stated here and the mechanics stay there.
 
+**Three craft rules sit above the lane, and they are not style preferences.** They are why a change
+here is smaller than the same change elsewhere, and each one has already been paid for:
+
+1. **The least code that does the work.** A helper that exists in the tree beats a new one; a
+   library already in `package.json` beats three hundred lines of hand-rolled equivalent; a
+   command that already exists beats a second one beside it. Deleting code is a legitimate
+   outcome of a task and does not need a second task to justify it. Size is not effort, it is
+   surface: every line is something the next reader has to rule out.
+2. **A UI component is written once.** Before a new button, dialog, list, field, toggle or card,
+   find the one that already does it: `src/components/` in the shared tree, the primitives in
+   `docs/design/ui_kits/desktop/`, `client-core`'s policy modules. Reuse it, extend it, or
+   parameterise it; write a near-copy only when the existing one is genuinely the wrong shape,
+   and say in the commit why. A second copy of a control is a second place a design decision has
+   to be made, and the two drift the first time only one of them is touched.
+3. **A comment earns its lines or it goes.** Write the one that says WHY, or what the code cannot
+   say (a load-bearing identifier, an ordering constraint, a measured behaviour of somebody else's
+   system). Do not narrate what the next line plainly does, do not restate the signature, and do
+   not leave a paragraph where a sentence works. The same rule for the reply to the owner.
+
 **The lane spans sessions; starting is not a promise to finish today.** These five obligations are
 on the work, not a single-session checklist. Never refuse, defer, or hand off a job because it looks
 larger than one session: begin the first concrete task. Partial state is legitimate and already has a
