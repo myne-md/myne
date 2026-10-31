@@ -158,13 +158,6 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   // and identity flows, the member-name store and the device-binding store are
   // all registered here.
   memberSharing: true,
-  // The two-sided device admission ceremony (myne-md/myne#938 task 11). Both
-  // halves are mounted here, in `mobile/src/components/SyncSettingsPanels.tsx`:
-  // a phone is usually the JOINING side, and it is also a full peer that can
-  // admit a device into a vault it owns. What mobile does not mount is the
-  // shared `DeviceAdmissionPanel`, because its own settings sheet carries the
-  // ceremony inline; that is a layout difference, not a missing arm.
-  deviceAdmission: true,
   // Opening a note in its own OS window. A phone has no such affordance; the
   // editor is the screen.
   detachedWindows: false,

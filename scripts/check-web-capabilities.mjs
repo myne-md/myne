@@ -267,19 +267,6 @@ const CAPABILITY_BACKING = {
   // code by build-time substitution. The identity setup/status/invite commands
   // (myne-md/myne#711) join them for the same reason; the invite/decode pair
   // needs the held identity to wrap the group key.
-  // myne-md/myne#938 task 11: the two-sided device admission ceremony. Named per
-  // command rather than as the whole `sync` plugin, which ships here and
-  // dispatches most of its surface. The five are refused together because the
-  // ceremony has two sides and only one of them could ever work in a page: the
-  // admitting side signs a group-tier `MYU5` row, which needs a person identity
-  // and a group key a browser does not hold.
-  deviceAdmission: [
-    "plugin:sync|sync_device_admission_start",
-    "plugin:sync|sync_device_admission_confirm",
-    "plugin:sync|sync_device_admission_preview",
-    "plugin:sync|sync_device_admission_accept",
-    "plugin:sync|sync_device_admission_cancel",
-  ],
   memberSharing: [
     "plugin:sync|sync_person_unlock",
     "plugin:sync|sync_person_lock",

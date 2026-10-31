@@ -820,38 +820,16 @@ const PER_COMMAND: &[(&str, Class)] = &[
         "plugin:device-binding|device_bindings_claim",
         Class::Unsupported,
     ),
-    // The two-sided device admission ceremony (myne-md/myne#938 task 11;
-    // `decisions/protocol/0735`). Five commands, ONE refusal, and it is the
-    // admitting side that decides it: `sync_device_admission_accept` writes the
-    // joining device's `MYU5` row, which is group-tier sealed and signed by the
-    // session's person identity, and a page holds neither, the same reason
-    // `device_bindings_claim` is refused two entries up. The joining side would
-    // otherwise be closer to portable (it writes only `person-auth`, and its
-    // device-key store simply reads as rung 4), but a ceremony with one working
-    // side is not a ceremony, and shipping half of it as dispatched would put a
-    // code on screen that no browser could ever have accepted. So the family is
-    // refused together, and the surface that shows it is absent here rather than
-    // present and inert.
-    (
-        "plugin:sync|sync_device_admission_start",
-        Class::Unsupported,
-    ),
-    (
-        "plugin:sync|sync_device_admission_confirm",
-        Class::Unsupported,
-    ),
-    (
-        "plugin:sync|sync_device_admission_preview",
-        Class::Unsupported,
-    ),
-    (
-        "plugin:sync|sync_device_admission_accept",
-        Class::Unsupported,
-    ),
-    (
-        "plugin:sync|sync_device_admission_cancel",
-        Class::Unsupported,
-    ),
+    // **The device-admission ceremony's five commands are GONE from this table,
+    // not reclassified** (myne-md/myne#956, `docs/decisions/protocol/0764`). The
+    // surface was withdrawn on both clients, so the shared tree names none of
+    // `sync_device_admission_{start,confirm,preview,accept,cancel}` any more, and a
+    // classification whose command nothing mentions is a decision with no subject
+    // (`scripts/check-web-command-coverage.mjs` refuses exactly that). They were
+    // five `Class::Unsupported` entries under myne-md/myne#938 task 11 because the
+    // admitting side signs a group-tier `MYU5` row that a page cannot produce; a
+    // revival owes the capability AND these rows back in the same change, which is
+    // the work myne-md/myne#957 describes.
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`
     // 2026-07-26 and are **DISPATCHED** under 2026-08-15, which reverses that
     // rule for display and entry alike. They are listed in `DISPATCHED` rather

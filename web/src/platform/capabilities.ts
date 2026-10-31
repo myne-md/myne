@@ -221,17 +221,6 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // `decisions.md` 2026-10-18, entry 0704). The phrase is not an enrolment
   // credential here.
   "memberSharing",
-  // The two-sided device admission ceremony (myne-md/myne#938 task 11;
-  // `decisions/protocol/0735`). Refused as a WHOLE exchange, and the deciding
-  // half is the admitting one: `sync_device_admission_accept` writes the joining
-  // device's `MYU5` row, which is group-tier sealed and signed by the session's
-  // person identity, the same obstacle that refuses `device_bindings_claim`
-  // above. The joining half would otherwise be portable here (it writes only
-  // `person-auth`, and its device-key store reads as rung 4), which is exactly
-  // why this is stated as a decision: shipping half a ceremony would put a code
-  // on screen that no browser could ever have accepted, so the block is omitted
-  // rather than rendered against five commands that refuse.
-  "deviceAdmission",
   // myne#173. A pop-out is a second host-spawned OS window. A browser page has
   // one tab context and cannot open an OS window a viewer would read as another
   // window of the app; the single-tab OPFS lock is the whole model. Absent by
