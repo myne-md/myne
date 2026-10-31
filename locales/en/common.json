@@ -4607,47 +4607,6 @@
     }
   },
   "sync": {
-    "deviceAdmission": {
-      "aria": "Device admission",
-      "join": {
-        "cta": "Add this device to a vault",
-        "intro": "This device will show an admission code. Paste it into a device that is already in the vault, and check that both screens show the same safety code before either side confirms.",
-        "start": "Show an admission code",
-        "codeLabel": "Admission code",
-        "copy": "Copy the code",
-        "copied": "Copied",
-        "copyFailed": "Could not copy. Select the code and copy it by hand.",
-        "pending": "Waiting for the other device to confirm.",
-        "approved": "That device is approved. This one signs in on its next sync."
-      },
-      "admit": {
-        "cta": "Approve a device on this vault",
-        "intro": "Paste the admission code the other device is showing. Nothing is written until you compare the safety codes and confirm.",
-        "codeLabel": "Admission code from the other device",
-        "codePlaceholder": "MYNE-DEVICE-1:…",
-        "preview": "Check the code",
-        "deviceId": "Device {{id}}",
-        "done": "Device approved, and its binding was written. It can now sign in with its own credential.",
-        "doneNoRow": "The device's credential is installed, but its binding row could not be written. Sync retries the binding on the next roster read."
-      },
-      "sasLabel": "Safety code",
-      "sasHint": "Both screens must show the same eight characters. If they differ, stop: it means the code you were given is not the one that device produced.",
-      "noDeviceKey": "This device has no device key yet, so after it is admitted it signs with your identity phrase instead of a key of its own. The safety code above still decides whether to admit it.",
-      "matchAck": "Both screens show the same eight characters",
-      "confirm": "Confirm",
-      "mismatch": "They do not match",
-      "stopped": "Stopped. The safety codes did not match, so nothing was written. Ask for a fresh admission code rather than confirming this one again.",
-      "cancel": "Cancel",
-      "close": "Close",
-      "error": {
-        "cancelFailed": "That code could not be cancelled on the other side, so it is still valid there. Open the ceremony again once the vault is reachable and cancel it.",
-        "sasMismatch": "The safety codes did not match. Nothing was written.",
-        "noPending": "There is no admission waiting on this device.",
-        "identityRequired": "Unlock your identity phrase first.",
-        "personMismatch": "That code belongs to a different person.",
-        "generic": "That did not work. Nothing was changed."
-      }
-    },
     "betaTerms": {
       "title": "Before you turn on sync",
       "intro": "Sync sends your notes, encrypted, to a server. Four things are worth knowing first.",
