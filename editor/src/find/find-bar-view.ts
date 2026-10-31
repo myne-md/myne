@@ -173,12 +173,15 @@ export function createFindBarView(
   const findRow = document.createElement("div");
   findRow.className = "cm-find-bar-row cm-find-bar-find-row";
 
-  // Replace-row expand/collapse toggle (chevron). Sits at the lead edge so the
-  // two rows align under one disclosure control (Obsidian/VS Code pattern).
+  // Replace-row expand/collapse toggle. A stacked chevron pair rather than a
+  // single chevron (myne#952): a lone glyph next to Previous/Next sat two
+  // identical down-chevrons side by side, one meaning "next match" and one
+  // meaning "show the replace row", which is a coin flip for the reader. It
+  // stays last among the controls so the input still owns the left edge.
   const toggleBtn = makeButton(
     "cm-find-bar-toggle",
     i18n.t("editor.find.toggleReplace"),
-    svgIcon("chevron-right", 16),
+    svgIcon("chevrons-up-down", 16),
     "find.toggle-replace",
   );
 
