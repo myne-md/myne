@@ -122,6 +122,24 @@ describe("the delete-vault promise", () => {
     expectTriggerShowsItsLabel();
   });
 
+  /**
+   * The trigger sits on the HEADING's line, at its trailing edge.
+   *
+   * A labelled button parked under the warning reads as a step in the flow (the
+   * thing to do next) rather than as an annotation on the title, which is the
+   * one thing a question mark means. The assertion is structural on purpose: no
+   * layout runs here, so "is it in the heading row" is the only property jsdom
+   * can honestly hold, and it is the property that decides what the eye reads.
+   */
+  it("puts the disclosure on the heading's own line", () => {
+    renderForm(true);
+    const heading = screen.getByTestId("delete-vault.heading");
+    const trigger = screen.getByRole("button", {
+      name: i18n.t("settings.deleteVault.detailsLabel"),
+    });
+    expect(heading.parentElement?.contains(trigger)).toBe(true);
+  });
+
   it("keeps the desktop copy where it is true", () => {
     renderForm(true);
     const body = document.body.textContent ?? "";

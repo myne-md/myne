@@ -114,7 +114,8 @@ interface DeleteVaultConfirmFormProps {
 const HEADING_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
-  alignItems: "baseline",
+  alignItems: "center",
+  justifyContent: "space-between",
   gap: "var(--space-3)",
 };
 
@@ -142,12 +143,6 @@ const COPY_PRIMARY_STYLE: CSSProperties = {
 };
 
 /** The disclosure trigger's row, on the primary paragraph's left edge. */
-const DISCLOSURE_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  margin: 0,
-};
-
 const INPUT_LABEL_STYLE: CSSProperties = {
   fontSize: 12,
   fontWeight: "var(--weight-semibold)",
@@ -259,6 +254,33 @@ export function DeleteVaultConfirmForm({
         <h3 style={HEADING_STYLE} data-testid="delete-vault.heading">
           {copy.heading}
         </h3>
+        {/* The mechanics, one press away (myne-md/myne#960), on the heading's own
+            line and pushed to its trailing edge: the icon means "more about
+            THIS", so it has to sit beside the title it explains rather than
+            floating below the warning with nothing to attach to.
+
+            Both claims are unchanged and both are still made. The erase
+            destroys the per-vault keychain item on the platforms that have one
+            (myne-md/myne#761, `docs/decisions/security/0709`), and the note is
+            gated on the provider capability rather than on `onlyCopy`: the
+            browser has no per-vault keychain item and its copy is a different
+            claim about a different store, so the sentence is omitted there.
+
+            Absent in the partial-failure branch, where the copy above it is
+            about recovering from a half-finished erase rather than about what
+            the erase destroys. */}
+        {partialFailContext === null && (
+          <HelperDisclosure
+            paragraphs={[
+              t("settings.deleteVault.copySecondary"),
+              ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
+            ]}
+            descriptionId={detailsId}
+            testId="delete-vault.details"
+            triggerLabel={t("settings.deleteVault.detailsLabel")}
+            visibleLabel
+          />
+        )}
       </div>
 
       {partialFailContext === null ? (
@@ -272,30 +294,6 @@ export function DeleteVaultConfirmForm({
           >
             {copy.primary}
           </p>
-          {/* The mechanics, one press away (myne-md/myne#960). These two
-              sentences were two grey paragraphs under the warning, which is the
-              essay-under-a-dialog shape `#885` removed from the settings panels;
-              the same disclosure shape now applies here.
-
-              Both claims are unchanged and both are still made. The erase
-              destroys the per-vault keychain item on the platforms that have one
-              (myne-md/myne#761, `docs/decisions/security/0709`), and the note is
-              gated on the provider capability rather than on `onlyCopy`: the
-              browser has no per-vault keychain item and its copy is a different
-              claim about a different store, so the sentence is omitted there. */}
-          <div style={DISCLOSURE_ROW_STYLE}>
-            <HelperDisclosure
-              paragraphs={[
-                t("settings.deleteVault.copySecondary"),
-                ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
-              ]}
-              descriptionId={detailsId}
-              testId="delete-vault.details"
-              triggerLabel={t("settings.deleteVault.detailsLabel")}
-              visibleLabel
-            />
-          </div>
-
           <div
             style={{
               display: "flex",

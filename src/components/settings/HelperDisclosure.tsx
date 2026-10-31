@@ -84,8 +84,38 @@ const EDGE = 8;
  */
 const MEASURE = 360;
 
+/**
+ * Where the bubble sits for the ONE frame before its width is known.
+ *
+ * Clamped as though it were a full `MEASURE` wide, and that is load-bearing
+ * rather than cosmetic: a `position: fixed` bubble shrink-to-fits against the
+ * space left of the viewport's right edge, so anchoring it provisionally at a
+ * trigger near that edge leaves almost nothing to fit into and the browser
+ * resolves the width to min-content. The measured width is then a narrow column
+ * (122px in the capture that found this), the clamp on the second pass believes
+ * the bubble is that narrow, and a two-paragraph explanation renders as a tall
+ * sliver running off the screen. Reserving `MEASURE` on the provisional pass
+ * gives the bubble room to reach its real width, so the clamp measures something
+ * true.
+ *
+ * Found from a screenshot, not from a test: jsdom computes no layout, so both
+ * passes read zero there.
+ */
+function provisionalLeft(anchorLeft: number): number {
+  if (typeof window === "undefined") return anchorLeft;
+  return Math.max(EDGE, Math.min(anchorLeft, window.innerWidth - EDGE - MEASURE));
+}
+
 const POPOVER_STYLE: CSSProperties = {
   position: "fixed",
+  // A definite width, because the alternative is the browser's shrink-to-fit,
+  // which for a `position: fixed` box resolves against the space between its
+  // provisional `left` and the containing block's right edge. Anchor the trigger
+  // near that edge (the delete dialog puts it at the trailing end of the title
+  // row) and the box collapses to min-content: a two-paragraph explanation
+  // painted 122px wide and 580px tall. `max-content` capped by `MEASURE` is the
+  // readable column the constant was always meant to be.
+  width: "max-content",
   // The canon's own step for "a menu or disclosure anchored to a control"
   // (`client-core/src/tokens.css`). It is inside the modal's stacking context,
   // so this paints above the panel content and never above the modal itself.
@@ -160,6 +190,8 @@ interface HelperDisclosureProps {
    * rides directly after a setting's title, and the icon means "more about THIS";
    * in the destructive dialog there is no such title, so the icon-only shape
    * rendered a lone glyph under the warning with nothing saying what it explains.
+   * A labelled trigger belongs on the heading's own line, at its trailing edge,
+   * where a `?` annotates the title instead of reading as the next step.
    * That is not a contrast or hit-target problem, so no audit would have caught
    * it: it is a control whose subject is only in its accessible name, which is a
    * failure for everybody reading the screen rather than hearing it.
@@ -249,9 +281,25 @@ export function HelperDisclosure({
     const top =
       below + h > window.innerHeight - EDGE && above >= EDGE ? above : below;
     const maxLeft = window.innerWidth - EDGE - w;
+    // `left`/`top` are viewport coordinates ONLY while no ancestor creates a
+    // containing block for `fixed` (a transform, a filter, `contain`). One does
+    // here in the story catalogue, where the preview pane is transformed, and the
+    // bubble painted 300px to the right of the trigger with nothing to correct
+    // it. Read where it ACTUALLY landed and subtract the containing block's
+    // offset, measured as the gap between the painted rect and the CSS value
+    // that asked for it, so the tip is on the trigger either way.
+    let dx = 0;
+    let dy = 0;
+    const bubble = bubbleRef.current;
+    if (bubble !== null) {
+      const rect = bubble.getBoundingClientRect();
+      const asked = getComputedStyle(bubble);
+      dx = rect.left - (Number.parseFloat(asked.left) || 0);
+      dy = rect.top - (Number.parseFloat(asked.top) || 0);
+    }
     setCoords({
-      left: Math.max(EDGE, Math.min(anchor.left, Math.max(EDGE, maxLeft))),
-      top: Math.max(EDGE, Math.min(top, window.innerHeight - EDGE - h)),
+      left: Math.max(EDGE, Math.min(anchor.left, Math.max(EDGE, maxLeft))) - dx,
+      top: Math.max(EDGE, Math.min(top, window.innerHeight - EDGE - h)) - dy,
     });
   }, [open, anchor, paragraphs]);
 
@@ -353,7 +401,7 @@ export function HelperDisclosure({
           open && anchor !== null
             ? {
                 ...POPOVER_STYLE,
-                left: coords?.left ?? anchor.left,
+                left: coords?.left ?? provisionalLeft(anchor.left),
                 top: coords?.top ?? anchor.bottom + GAP,
                 visibility: coords === null ? "hidden" : "visible",
               }
