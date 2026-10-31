@@ -16,6 +16,10 @@
 //! two client shapes share one routing path.
 
 use super::state::LiveSessionRegistry;
+// The ONE definition of "this actor names no device" (myne-md/myne#958), shared with
+// `sync::identity_resolver` so the frame router and the version history cannot drift
+// into two spellings of the same check.
+use crate::plugins::sync::device_actor::actor_is_unset;
 use protocol::awareness_frame::{
     awareness_room_id, awareness_room_id_group, open_awareness_frame, seal_awareness_frame,
     AwarenessFrameError, AwarenessPayload, FrameType, AWARENESS_ROOM_ID_LEN,
@@ -39,7 +43,8 @@ pub enum AwarenessRoute {
     /// diagnostics): the peer is in a room this device is not editing.
     NoRoom,
     /// The frame is this device's OWN, fanned back by the relay (the self-echo
-    /// guard). Distinguished from [`Self::NoRoom`] so a peer leg that delivers
+    /// guard), or it names no device at all (sixteen zero bytes, which cannot be a
+    /// peer). Distinguished from [`Self::NoRoom`] so a peer leg that delivers
     /// nothing is not confused with one that delivers and is dropped.
     SelfEcho,
     /// The frame carried a change for a note with no open session, or one that
@@ -210,7 +215,7 @@ pub fn seal_local_changes(
         if let Ok(frame) = seal_local_frame(
             keys,
             &note_uuid,
-            actor.unwrap_or([0u8; 16]),
+            actor,
             account_number_hash,
             epoch,
             false,
@@ -255,7 +260,7 @@ pub fn seal_local_presence(
         if let Ok(frame) = seal_local_frame(
             keys,
             &note_uuid,
-            actor.unwrap_or([0u8; 16]),
+            actor,
             account_number_hash,
             epoch,
             pending.join,
@@ -415,15 +420,26 @@ pub fn route_awareness_frame(
     let Some(change) = payload.change else {
         // Self-echo guard (`collab-verification` story 18): the relay fans a frame
         // out to its publisher too, so this device receives its OWN presence frame
-        // back. Comparing the frame's actor against the open session's local actor
-        // drops it here, so an editing device never renders a participant row for
-        // itself. The content branch below needs no actor compare: a re-applied
-        // own change moves no text at all, which it treats as a no-op too
-        // (myne-md/myne#857).
+        // back. Two independent reasons drop it here, and neither may be removed in
+        // favour of the other (myne-md/myne#958):
+        //
+        // 1. It names no device at all (sixteen zero bytes). That is what a client
+        //    with no durable id used to seal, so it arrives from older releases, from
+        //    the web client and from mobile as well as from here, and it cannot be
+        //    compared against anything: a roster row keyed by it would be ONE row
+        //    shared by every such device, and the resolver would render it as a
+        //    device named `000000`.
+        // 2. It names THIS device's actor, which is the ordinary echo.
+        //
+        // The identity-free half of the same problem (a frame this connection posted,
+        // recognised by its own bytes rather than by an actor) lives in
+        // `AwarenessSignal::push_incoming` and does not depend on either check.
+        if actor_is_unset(&payload.actor_id) {
+            return Ok(AwarenessRoute::SelfEcho);
+        }
         let note_id = uuid::Uuid::from_bytes(payload.note_id).to_string();
         let is_echo = registry
             .with_note_mut(&note_id, |s| s.actor_id())
-            .flatten()
             .is_some_and(|local| local == payload.actor_id);
         if is_echo {
             return Ok(AwarenessRoute::SelfEcho);

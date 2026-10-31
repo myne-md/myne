@@ -10,6 +10,12 @@ use crate::vault_io::{StdVaultIo, VaultIo};
 
 const IO: StdVaultIo = StdVaultIo;
 
+/// The actor every session in this file opens under. A session always has one now
+/// (myne-md/myne#958), and it must NOT be the all-zero value: that is the value the
+/// presence half used to seal when the vault had no identity, so a fixture built on it
+/// would re-create the defect the reader exists to remove.
+const TEST_ACTOR: [u8; 16] = [0x5Au8; 16];
+
 fn hex_lower(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
@@ -75,9 +81,16 @@ fn a_live_note_is_refused_by_the_batch_writer_but_not_by_the_restore() {
         let notes_dir = tmp.path().join("notes");
         IO.create_dir_all(&notes_dir).await.expect("mkdir");
         let note_id = uuid::Uuid::from_bytes(uuid).to_string();
-        let session =
-            LiveSession::open_from_blob(&base, "v".into(), note_id.clone(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            note_id.clone(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
         let reg = LiveSessionRegistry::new();
         assert!(reg.insert(session), "the session is now open for the note");
         let state = crate::plugins::vault_unlock::state::VaultRuntimeState::default();
@@ -87,6 +100,7 @@ fn a_live_note_is_refused_by_the_batch_writer_but_not_by_the_restore() {
             Zeroizing::new("---\nupdated: 2026-08-11T09:00:00Z\n---\nRENAMED\n".into()),
         )];
         let batch = crate::plugins::notes::commands::note_write_batch_with_dir(
+            &crate::host::NoopHost,
             &IO,
             notes_dir.clone(),
             &state,
@@ -151,7 +165,7 @@ fn a_session_opens_edits_and_flushes_under_the_device_actor() {
             "vault-1".into(),
             "note-1".into(),
             uuid,
-            Some(DEVICE_B),
+            DEVICE_B,
             &ik,
             &ikid,
         )
@@ -226,7 +240,7 @@ fn a_flush_feeds_the_live_indexes_for_every_caller() {
             vault_id.clone(),
             note_id.clone(),
             uuid,
-            None,
+            TEST_ACTOR,
             &ik,
             &ikid,
         )
@@ -412,7 +426,7 @@ fn a_flush_indexes_the_body_that_reached_disk_not_a_later_session_state() {
             vault_id.clone(),
             note_id.clone(),
             uuid,
-            None,
+            TEST_ACTOR,
             &ik,
             &ikid,
         )
@@ -484,7 +498,7 @@ fn the_registry_attaches_instead_of_opening_a_second_session() {
                 "vault-1".into(),
                 "note-1".into(),
                 uuid,
-                None,
+                TEST_ACTOR,
                 &ik,
                 &ikid,
             )
@@ -567,9 +581,16 @@ fn a_local_splice_round_trips_the_markdown_byte_exact() {
         let notes_dir = tmp.path().join("notes");
         IO.create_dir_all(&notes_dir).await.expect("mkdir");
 
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
         // Insert "more " before "body" (UTF-16 offset 0..0) and change "line"->"lines".
         session
             .apply_splices(
@@ -618,7 +639,7 @@ fn note_update_is_refused_while_a_live_session_owns_the_note() {
                 "vault-1".into(),
                 "note-1".into(),
                 uuid,
-                None,
+                TEST_ACTOR,
                 &ik,
                 &ikid,
             )
@@ -685,7 +706,7 @@ fn clear_drops_every_open_session() {
                     "vault-1".into(),
                     note.into(),
                     uuid,
-                    None,
+                    TEST_ACTOR,
                     &ik,
                     &ikid,
                 )
@@ -708,7 +729,7 @@ fn the_session_observes_the_updated_stamp() {
     const NOTE: &str = "---\nupdated: 2026-08-11T09:00:00Z\n---\nX\n";
     let base = encode_note_blob(NOTE, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
     let mut session =
-        LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
+        LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, TEST_ACTOR, &ik, &ikid)
             .expect("open");
 
     assert_eq!(session.durable_updated(), Some("2026-08-11T09:00:00Z"));
@@ -745,9 +766,16 @@ fn the_durable_boundary_stamps_the_max_observed_updated() {
         let tmp = ScopedTempDir::new("live-max-updated").unwrap();
         let notes_dir = tmp.path().join("notes");
         IO.create_dir_all(&notes_dir).await.expect("mkdir");
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
 
         // An incoming patch carrying an EARLIER stamp must not lower the max.
         session
@@ -788,9 +816,16 @@ fn a_later_updated_stamp_advances_the_maximum() {
         let tmp = ScopedTempDir::new("live-max-updated-later").unwrap();
         let notes_dir = tmp.path().join("notes");
         IO.create_dir_all(&notes_dir).await.expect("mkdir");
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
 
         session
             .apply_body_markdown("---\nupdated: 2026-08-11T10:00:00Z\n---\nbody edited\n", 1)
@@ -824,9 +859,16 @@ fn a_small_local_edit_records_a_minimal_change_not_a_whole_body_replace() {
         let original = format!("---\nupdated: 2026-08-11T09:00:00Z\n---\n{body}");
         let base =
             encode_note_blob(&original, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
         // Drop anything the open itself captured, so the next change is the edit.
         let _ = session.take_outgoing_change();
 
@@ -878,9 +920,16 @@ fn merge_pulled_merges_a_peer_revision_into_the_session() {
         const BASE: &str = "---\ntitle: T\n---\nbase\n";
         const PEER: &str = "---\ntitle: T\n---\nbase\npeer\n";
         let base = encode_note_blob(BASE, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
         let peer = crate::plugins::notes::crdt::encode_note_edit(
             &base, PEER, None, &ik, &ikid, &uuid, &host,
         )
@@ -918,9 +967,16 @@ fn merge_pulled_adopts_a_remote_tombstone_verbatim() {
         const BASE: &str = "---\ntitle: T\n---\nbase\n";
         const DELETED: &str = "---\ntitle: T\ndeleted: 2026-08-11T09:00:00Z\n---\nbase\n";
         let base = encode_note_blob(BASE, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
-        let mut session =
-            LiveSession::open_from_blob(&base, "v".into(), "n".into(), uuid, None, &ik, &ikid)
-                .expect("open");
+        let mut session = LiveSession::open_from_blob(
+            &base,
+            "v".into(),
+            "n".into(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid,
+        )
+        .expect("open");
         let peer = crate::plugins::notes::crdt::encode_note_edit(
             &base, DELETED, None, &ik, &ikid, &uuid, &host,
         )
@@ -1002,7 +1058,7 @@ fn a_flushed_tombstone_is_removed_from_search_not_upserted() {
             vault_id.clone(),
             note_id.clone(),
             uuid,
-            None,
+            TEST_ACTOR,
             &ik,
             &ikid,
         )
@@ -1157,7 +1213,7 @@ fn a_flush_that_outlives_a_lock_does_not_reindex_the_note() {
             vault_id.clone(),
             note_id.clone(),
             uuid,
-            None,
+            TEST_ACTOR,
             &ik,
             &ikid,
         )
@@ -1337,8 +1393,16 @@ fn live_session_read_returns_the_session_text_or_not_open() {
     ));
 
     assert!(reg.insert(
-        LiveSession::open_from_blob(&blob, "v".into(), note_id.clone(), uuid, None, &ik, &ikid)
-            .expect("open")
+        LiveSession::open_from_blob(
+            &blob,
+            "v".into(),
+            note_id.clone(),
+            uuid,
+            TEST_ACTOR,
+            &ik,
+            &ikid
+        )
+        .expect("open")
     ));
     assert_eq!(
         live_session_read_from_host(&reg, note_id.clone()).expect("open session"),
@@ -1443,7 +1507,8 @@ fn pending_splices_are_dropped_with_their_session() {
         let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
         let uuid = *uuid::Uuid::parse_str(&id).unwrap().as_bytes();
         let blob = encode_note_blob("body\n", &ik, &ikid, &uuid, &[0xAAu8; 16], &host).unwrap();
-        LiveSession::open_from_blob(&blob, "v".into(), id.clone(), uuid, None, &ik, &ikid).unwrap()
+        LiveSession::open_from_blob(&blob, "v".into(), id.clone(), uuid, TEST_ACTOR, &ik, &ikid)
+            .unwrap()
     };
     assert!(reg.insert(s));
     reg.set_pending_splices(&id, x());
@@ -1465,8 +1530,16 @@ fn session_over(text: &str) -> (LiveSession, String) {
         .as_bytes();
     let note_id = uuid::Uuid::from_bytes(uuid).to_string();
     let blob = encode_note_blob(text, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
-    let s = LiveSession::open_from_blob(&blob, "v".into(), note_id.clone(), uuid, None, &ik, &ikid)
-        .expect("open");
+    let s = LiveSession::open_from_blob(
+        &blob,
+        "v".into(),
+        note_id.clone(),
+        uuid,
+        TEST_ACTOR,
+        &ik,
+        &ikid,
+    )
+    .expect("open");
     (s, note_id)
 }
 
