@@ -400,28 +400,6 @@ export type Capability =
   /** B2B member sharing: person identity, invite, roster, removal. */
   | "memberSharing"
   /**
-   * The two-sided device admission ceremony (myne-md/myne#938 task 11;
-   * `decisions/protocol/0735`): a new device shows a code, an already-admitted
-   * device reads it, both screens show the same short authentication string, and
-   * each side gates its own write behind its own confirmation.
-   *
-   * Its own capability rather than a branch of `memberSharing`, and the
-   * difference is the write it gates: `sync_device_admission_accept` installs a
-   * per-device server credential and writes the joining device's `MYU5` binding
-   * row, which is group-tier sealed and signed by the session's person identity.
-   * A client that can do one of those two things and not the other must be able
-   * to say which, and a shared flag would report the pair as a single answer.
-   *
-   * **Absent on web**, decided rather than owed: the admitting half needs the
-   * group tier and a person identity to sign the row (the same refusal as
-   * `device_bindings_claim`), and a ceremony with one working side is not a
-   * ceremony. The joining half alone would be portable: it writes only
-   * `person-auth` and its device-key store simply reads as rung 4, so the
-   * absence is a decision about the WHOLE exchange, not a claim that no part of
-   * it could be ported.
-   */
-  | "deviceAdmission"
-  /**
    * Desktop pop-out: open a note in its own OS-level window (second monitor;
    * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
    * mobile cannot spawn OS windows, so the affordance is absent there.
@@ -520,7 +498,6 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   torRouting: true,
   accountGrouping: true,
   memberSharing: true,
-  deviceAdmission: true,
   detachedWindows: true,
   plainFile: true,
   selfUpdate: true,

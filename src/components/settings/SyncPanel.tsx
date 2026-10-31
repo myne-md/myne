@@ -19,7 +19,6 @@ import { publishErrorKind, publishVault, readPublishState, type PublishState } f
 import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
-import { DeviceAdmissionPanel } from "../sync/DeviceAdmissionPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
 import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
@@ -1018,17 +1017,14 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
-        {/* Adding a device needs a confirmation on BOTH devices (myne-md/myne#938
-            task 11, `decisions/protocol/0735`). Omitted on a client without the
-            capability, per the absent-not-disabled rule: the admitting side signs
-            a group-tier `MYU5` row, which a page cannot do, and half a ceremony
-            would put a code on screen that nothing could accept. */}
-        {hasCapability("deviceAdmission") ? (
-          <DeviceAdmissionPanel
-            personIdHex={person?.person_id_hex ?? undefined}
-            onSettled={probePerson}
-          />
-        ) : null}
+        {/* The only approval a new device can wait for is reached from the rows
+            below: a device that joined with the identity phrase appears there,
+            and `DeviceManagementPanel` carries the `Approve` action, which a
+            device that HOLDS the identity performs, plus the code compare that
+            follows it. The two-sided admission ceremony stood here until
+            myne-md/myne#956; it was withdrawn because its joining arm needs this
+            device's identity, which only the phrase gives, so it ran after that
+            path rather than replacing it (`decisions/protocol/0764`). */}
         <DeviceManagementPanel hook={devicesHook} plane={plane} />
       </div>
 
