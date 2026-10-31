@@ -5053,7 +5053,7 @@ dependencies = [
 
 [[package]]
 name = "myne-desktop"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -5138,7 +5138,7 @@ dependencies = [
 
 [[package]]
 name = "myne-mobile"
-version = "0.11.1"
+version = "0.11.2"
 dependencies = [
  "async-trait",
  "block2",
