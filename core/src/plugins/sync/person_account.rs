@@ -2012,8 +2012,10 @@ async fn materialize_member_vault(
     // succeeded. Native-only: the family's command core borrows the person account
     // plane's session accessors, which do not exist on `wasm32`.
     #[cfg(not(target_arch = "wasm32"))]
-    crate::plugins::device_binding::commands::claim_own_binding_best_effort(io, state, &vault_dir)
-        .await;
+    crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+        host, io, state, &vault_dir,
+    )
+    .await;
 
     Ok(vault_id)
 }
@@ -5128,8 +5130,11 @@ mod tests {
     /// none. So `device_binding::session_device_id` answered `NoDeviceId`, the claim
     /// wrote no `MYU5` row, and `cycle::head_context` (which needs a device id, a
     /// key at rest and a verified row) kept signing `0x02` heads that need the
-    /// phrase. Removing the seeding write makes the first assertion fail with
-    /// `None`, and the `session_device_id` assertion fail with `NoDeviceId`.
+    /// phrase. The injection was run and says something narrower than "the gate
+    /// fails": deleting the seeding write fails the assertion on the record's own
+    /// device id below (it observes `None`), while the `session_device_id` assertion before the
+    /// adoption KEEPS passing. That indifference is the fix, not an oversight, since
+    /// the reader now answers from the person credential with no adoption at all.
     #[test]
     fn a_person_born_vault_adopts_the_person_planes_device_id() {
         crate::test_support::block_on(async {
@@ -5168,13 +5173,18 @@ mod tests {
                 .await
                 .expect("write sync state");
 
-            // The gate that used to fail, asserted BEFORE the fix runs: this is the
-            // `NoDeviceId` the claim stood down on.
-            assert!(
-                crate::plugins::device_binding::commands::session_device_id(&io, &vault_dir)
-                    .await
-                    .is_err(),
-                "an unseeded vault has no device id, which is the defect"
+            // The gate that used to fail, asserted BEFORE the adoption runs, and the
+            // assertion is now the OPPOSITE of what it was (myne-md/myne#958): the
+            // claim's reader finds the person plane's id even while the vault's own
+            // enrolment record is empty. Before the reader consulted the person
+            // credential this answered `NoDeviceId`, and on a person-born vault it
+            // answered it for ever, which is the loop the adoption exists to break and
+            // the reason this device could not claim its `MYU5` row.
+            assert_eq!(
+                crate::plugins::device_binding::commands::session_device_id(&host, &io, &vault_dir)
+                    .await,
+                Ok(device_id),
+                "the person credential's device id is this device's id, with no adoption"
             );
 
             assert!(
@@ -5191,7 +5201,8 @@ mod tests {
                 "the vault's actor is the person plane's device, not a fresh draw"
             );
             assert_eq!(
-                crate::plugins::device_binding::commands::session_device_id(&io, &vault_dir).await,
+                crate::plugins::device_binding::commands::session_device_id(&host, &io, &vault_dir)
+                    .await,
                 Ok(device_id),
                 "the claim's own id reader must find it, or the row is never written"
             );

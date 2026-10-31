@@ -475,7 +475,8 @@ pub async fn vault_migrate_from_host(
     // note: a revision must be resolvable to the device that made the migration.
     // A vault with no device identity yet falls back to a fresh draw
     // (`note_actor_bytes(None)`), which resolves to `Unknown` downstream.
-    let device_actor = crate::plugins::sync::state::read_device_actor(io, &vault_root).await;
+    let device_actor =
+        crate::plugins::sync::device_actor::durable_device_id(host, io, &vault_root).await;
     let actor = crate::plugins::sync::crdt_doc::note_actor_bytes(device_actor)
         .map_err(|_| VaultMigrateError::Csprng)?;
 

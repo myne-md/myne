@@ -557,6 +557,11 @@ steps:
       # on. Backstop for the pre-commit hook — `--no-verify` must not land a
       # setter whose change the open editor never receives.
       - node scripts/check-prefs-nonce.mjs
+      # Device-actor chokepoint (myne-md/myne#958): ONE reader of the two records
+      # that answer "which device is this", against four subsystems that each read
+      # one of them and disagreed. Both wrong reads compiled and produced no error;
+      # the symptom was a device rendering its own caret as "Device 000000".
+      - node scripts/check-device-actor.mjs
       # Date/time display publisher (myne-md/myne#609): a client tree that reads
       # the shared display store must also write to it. One publisher served
       # three readers, so mobile printed defaults while holding a synced value,

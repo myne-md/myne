@@ -374,24 +374,13 @@ pub async fn read_sync_state(
     }
 }
 
-/// This device's Automerge actor for note authoring (`SYNC-42`): the enrolled
-/// `device_id` bytes (16, `DEVICE_ID_LEN`), or `None` when the vault carries no
-/// device identity.
-///
-/// A single shared read so `note_create`, `note_update` and the batch writer all
-/// derive the actor from the same source, and so `collab-provenance` resolves a
-/// revision's `actor_hex` through the same bytes. `None` covers a never-enrolled
-/// / local-only vault; the caller then falls back to a fresh CSPRNG draw
-/// (`crdt_doc::note_actor_bytes`). The persisted id is hex on disk, so a
-/// malformed value is `None` rather than an error: an unreadable identity is the
-/// same shape as an absent one, no device to attribute to.
-pub async fn read_device_actor(
-    io: &dyn crate::vault_io::VaultIo,
-    vault_root: &Path,
-) -> Option<[u8; crate::plugins::sync::crdt_doc::ACTOR_ID_LEN]> {
-    let st = read_sync_state(io, vault_root).await.ok()?;
-    super::devices::hex16(st.device_id_hex.as_deref()?)
-}
+// This device's identity is NOT read here (myne-md/myne#958).
+//
+// `read_device_actor` used to live in this module and read this record only, while
+// `cycle` read the person credential for the same fact; the two answers diverged and
+// every authoring path silently lost the device's identity. Both reads now live in
+// `super::device_actor`, the only module allowed to name either record's
+// `device_id_hex`, held by `scripts/check-device-actor.mjs`.
 
 /// The device-local record of the `group_key_epoch` the vault's CONTENT blobs
 /// are sealed at (myne-md/myne#797).
@@ -1218,31 +1207,64 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
-    #[test]
-    fn read_device_actor_reads_the_persisted_id_and_malformed_is_none() {
-        // `SYNC-42`: note authoring derives the Automerge actor from this id.
-        let tmp = ScopedTempDir::new("read-device-actor").unwrap();
-        let dir = tmp.path();
-        // Absent (never enrolled) → None, not an error.
-        assert_eq!(rt(super::read_device_actor(&IO, dir)), None);
+    // The actor read's tests moved with the read, to `super::device_actor`'s own
+    // module (myne-md/myne#958): `read_device_actor` no longer exists here, because a
+    // test that exercised only this record would pass while the callers that read the
+    // OTHER record kept answering differently.
 
-        let st = SyncState {
-            device_id_hex: Some("a1".repeat(16)),
-            ..Default::default()
-        };
-        write_sync_state(dir, &st).expect("write");
+    /// **The invariant: neither of two concurrent writers may lose the other's field.**
+    ///
+    /// [`super::write_sync_state`] reads the whole struct, mutates it in memory and writes
+    /// it back, with no lock and no compare-and-swap on the record. Two callers that read
+    /// the same snapshot and each change a different field therefore produce a record
+    /// holding only the second caller's change: the first one is silently gone. `cursor`,
+    /// the per-blob CAS baselines, `meta_baseline_hex` and `owner_member_token_hex` are all
+    /// written by different callers, so all four are exposed.
+    ///
+    /// The test asserts the INVARIANT, not the defect: after both writes land, both
+    /// changes are present. It is ignored because the fix is not in this change (myne-md/myne#964).
+    /// The day the writer merges or locks, the attribute comes off and this goes green with
+    /// no edit to the assertions.
+    #[test]
+    #[ignore = "unfixed: unlocked read-modify-write loses a concurrent write; see myne-md/myne#964"]
+    fn a_concurrent_writer_does_not_lose_the_other_writers_field() {
+        let dir = tmpdir("rmw-lost-update");
+        std::fs::remove_file(dir.join(SYNC_STATE_FILE)).ok();
+        write_sync_state(
+            &dir,
+            &SyncState {
+                cursor: 1,
+                ..SyncState::default()
+            },
+        )
+        .unwrap();
+
+        // Both writers take their copy BEFORE either writes, which is what two callers
+        // in flight do.
+        let first = read_sync_state(&dir).unwrap();
+        let second = read_sync_state(&dir).unwrap();
+
+        write_sync_state(&dir, &SyncState { cursor: 7, ..first }).unwrap();
+        write_sync_state(
+            &dir,
+            &SyncState {
+                meta_baseline_hex: Some("ab".repeat(32)),
+                ..second
+            },
+        )
+        .unwrap();
+
+        let after = read_sync_state(&dir).unwrap();
         assert_eq!(
-            rt(super::read_device_actor(&IO, dir)),
-            Some([0xA1u8; 16]),
-            "the persisted hex id parses to its 16 bytes"
+            after.cursor, 7,
+            "the first writer's cursor must survive the second writer's write"
+        );
+        assert_eq!(
+            after.meta_baseline_hex.as_deref(),
+            Some("ab".repeat(32).as_str()),
+            "the second writer's own field must survive too"
         );
 
-        // A malformed id is None (no device to attribute to), never a panic.
-        let bad = SyncState {
-            device_id_hex: Some("zz".repeat(16)),
-            ..Default::default()
-        };
-        write_sync_state(dir, &bad).expect("write");
-        assert_eq!(rt(super::read_device_actor(&IO, dir)), None);
+        std::fs::remove_dir_all(&dir).ok();
     }
 }

@@ -1,0 +1,206 @@
+{
+  "readers": {
+    "core/src/plugins/sync/corpus.rs": {
+      "Ok(s) if s.device_id_hex.is_none() => CorpusState::NotSynced,": {
+        "count": 1,
+        "reason": "Asks whether this vault ever enrolled on the VAULT plane, which is what that record is; the person plane is a different store and answering it here would claim a server account this vault does not have."
+      }
+    },
+    "core/src/plugins/sync/cycle.rs": {
+      "(st.account_hash_hex.clone(), st.device_id_hex.clone())": {
+        "count": 1,
+        "reason": "The account-enrolment arm of the cycle, read as a pair because both fields are the enrolment's own contents; the person arm directly above it is the only place a person credential is consulted."
+      }
+    },
+    "core/src/plugins/sync/device_actor.rs": {
+      "Ok(st) => match st.device_id_hex.as_deref() {": {
+        "count": 1,
+        "reason": "THE reader, source 1: the vault enrolment record, which wins because its id is the one blobs, heads and version vectors already carry. An absent id falls through to source 2; an unreadable one does not."
+      },
+      "super::devices::hex16(&auth.device_id_hex)": {
+        "count": 1,
+        "reason": "THE reader, source 2: the person credential, consulted only when the enrolment record answered nothing."
+      }
+    },
+    "core/src/plugins/sync/device_admission.rs": {
+      "assert_eq!(preview.device_id_hex, minted.device_id_hex);": {
+        "count": 1,
+        "reason": "Test fixture asserting the admission preview carries the id that was minted; no identity is being decided."
+      },
+      "assert_eq!(stored.device_id_hex, minted.device_id_hex);": {
+        "count": 1,
+        "reason": "Test fixture asserting the stored credential keeps the minted id after admission."
+      },
+      "auth.device_id_hex = hex(&admission.device_id);": {
+        "count": 1,
+        "reason": "WRITE: device admission stores the id the server handed this device, which is the act that creates the record rather than a second reading of it."
+      }
+    },
+    "core/src/plugins/sync/devices.rs": {
+      ".map(|d| d.device_id_hex)": {
+        "count": 1,
+        "reason": "A device ROW id from the server's device list under test, not this device's own id."
+      },
+      "Some(a) => (a.token_hex, Some(a.device_id_hex)),": {
+        "count": 1,
+        "reason": "An account-credential pair: the token and the id the SERVER issued, carried together as one credential."
+      },
+      "assert_eq!(pending[0].device_id_hex, \"02020202020202020202020202020202\");": {
+        "count": 1,
+        "reason": "Test fixture asserting the pending device list reports the row the server returned."
+      },
+      "credential.device_id_hex.as_deref(),": {
+        "count": 1,
+        "reason": "The account credential's server-issued id, passed to the device-list request that marks the current row."
+      },
+      "d.is_current = Some(&d.device_id_hex) == device_id_hex.as_ref();": {
+        "count": 1,
+        "reason": "Marks which device-list ROW is this device, comparing two row ids; the current id arrives as an argument that the caller read through device_actor."
+      },
+      "devices.sort_by(|a, b| a.device_id_hex.cmp(&b.device_id_hex));": {
+        "count": 1,
+        "reason": "Sorts device ROWS by their server-issued ids, which orders a list and names no device as the current one."
+      }
+    },
+    "core/src/plugins/sync/enroll.rs": {
+      "assert_eq!(st.device_id_hex.as_deref(), Some(\"dev\"));": {
+        "count": 2,
+        "reason": "Test fixture asserting enrolment persisted the id it was given."
+      },
+      "st.device_id_hex = Some(device_id_hex.clone());": {
+        "count": 1,
+        "reason": "WRITE: account enrolment seeds the vault record with the device id the server issued for it."
+      },
+      "st.device_id_hex = Some(device_id_hex.to_string());": {
+        "count": 1,
+        "reason": "WRITE: re-enrolment persists the freshly issued id, which is the same act as the line above on the other path."
+      }
+    },
+    "core/src/plugins/sync/identity_resolver.rs": {
+      "assert_eq!(row.device_id_hex, hex(&DEVICE));": {
+        "count": 1,
+        "reason": "Test fixture asserting a device-name row is keyed by the device it names."
+      }
+    },
+    "core/src/plugins/sync/member_removal.rs": {
+      "if state.device_id_hex.is_none() {": {
+        "count": 1,
+        "reason": "Guards THIS record's own sync plane: `state.blobs` is a field of the same file, so an enrolment-less state has no baselines to re-base whatever a person credential says."
+      }
+    },
+    "core/src/plugins/sync/orchestrator.rs": {
+      "seeded.device_id_hex = Some(hex(&dev));": {
+        "count": 1,
+        "reason": "WRITE in a test fixture: seeds the vault record so a cycle has an identity to author under."
+      }
+    },
+    "core/src/plugins/sync/person_account.rs": {
+      ".device_id_hex": {
+        "count": 1,
+        "reason": "Test fixture reading the vault record back to assert the adoption wrote the person's device id into it."
+      },
+      "a.device_id_hex.clear();": {
+        "count": 1,
+        "reason": "WRITE: clears the credential's id as part of replacing it, which is the act that retires the old identity."
+      },
+      "after.device_id_hex.as_deref(),": {
+        "count": 1,
+        "reason": "Test fixture asserting the vault record after adoption carries the person credential's id."
+      },
+      "assert!(st.device_id_hex.is_none(), \"the fixture starts unseeded\");": {
+        "count": 1,
+        "reason": "Test fixture asserting its own starting state: the vault record is empty so the adoption has something to do."
+      },
+      "if st.device_id_hex.is_none() {": {
+        "count": 1,
+        "reason": "The ADOPTION's own precondition: it seeds the vault record only when that record is empty, so asking it through `durable_device_id` (which already sees the person credential) would skip the write it exists to perform."
+      },
+      "let Some(device_id) = super::devices::hex16(auth.device_id_hex.trim()) else {": {
+        "count": 1,
+        "reason": "An authentication flow: the id goes into a request that PROVES this device against the server, so it needs the credential's own string rather than the vault's chosen identity."
+      },
+      "let device_id = super::devices::hex16(&auth.device_id_hex).ok_or(SyncDeviceError::Internal)?;": {
+        "count": 1,
+        "reason": "An authentication flow, as above: the credential's id is what the server is asked to recognise."
+      },
+      "next.device_id_hex = crate::account::person_identity::hex_lower(&outcome.device_id);": {
+        "count": 1,
+        "reason": "WRITE: adoption/renewal stores the id the person plane returned into the credential."
+      },
+      "pinned.device_id_hex = Some(crate::account::person_identity::hex_lower(&other));": {
+        "count": 1,
+        "reason": "WRITE in a test fixture: pins a DIFFERENT id so the test can assert the old one is replaced rather than kept."
+      },
+      "st.device_id_hex = Some(crate::account::person_identity::hex_lower(": {
+        "count": 1,
+        "reason": "WRITE: the person-identity adoption seeds the vault record from the person credential, which is the repair path this whole module exists to make unnecessary."
+      },
+      "st.device_id_hex = Some(crate::account::person_identity::hex_lower(&device_id));": {
+        "count": 1,
+        "reason": "WRITE: same adoption, the other branch, storing the id it just resolved."
+      }
+    },
+    "core/src/plugins/sync/person_auth.rs": {
+      ".field(\"device_id_hex\", &self.device_id_hex)": {
+        "count": 1,
+        "reason": "A `Debug` impl printing the credential's own field; no identity is chosen or compared."
+      }
+    },
+    "core/src/plugins/sync/roster_trust.rs": {
+      "attestation.device_id_hex,": {
+        "count": 1,
+        "reason": "Test fixture: asserts the attestation a person-born vault produces carries the id its binding row was claimed under. It reads the IDENTITY OF THE ROW, not this device's id."
+      }
+    },
+    "core/src/plugins/sync/state.rs": {
+      "assert_eq!(after.device_id_hex, Some(\"ab\".repeat(16)));": {
+        "count": 1,
+        "reason": "Test fixture asserting a round trip persists the id unchanged."
+      },
+      "assert_ne!(enrolled.device_id_hex, defaulted.device_id_hex);": {
+        "count": 1,
+        "reason": "Test fixture asserting two different states are distinguishable, which is the record's own shape rather than an identity question."
+      }
+    },
+    "core/src/plugins/sync/status.rs": {
+      ".is_some_and(|s| s.device_id_hex.is_some());": {
+        "count": 1,
+        "reason": "Reports the PENDING-APPROVAL state of a vault account device: the join persists this id before the token is issued, so identity-without-token is the definition. A published person-born vault is handled explicitly below and does not go through this line."
+      },
+      ".map(|s| s.device_id_hex.is_some())": {
+        "count": 1,
+        "reason": "The same pending-approval question on the other status path, for the same reason."
+      }
+    },
+    "core/src/plugins/sync/unsynced.rs": {
+      "s.device_id_hex = Some(\"0\".repeat(32));": {
+        "count": 1,
+        "reason": "WRITE in a test fixture: marks the state as enrolled so the test exercises the unsynced path."
+      }
+    },
+    "core/src/plugins/vault_migrate/mod.rs": {
+      "after.device_id_hex.as_deref(),": {
+        "count": 1,
+        "reason": "Test fixture asserting the migration left the vault record's device id alone."
+      },
+      "if state.device_id_hex.is_none() {": {
+        "count": 1,
+        "reason": "Guards THIS record's own plane before re-basing its baselines: an enrolment-less state has none, whatever a person credential says."
+      },
+      "state.device_id_hex.is_some() && !state.rekey_rebase_pending": {
+        "count": 1,
+        "reason": "Asks whether this record's v0.2 generation was published: `rekey_rebase_pending` is a field of the same file, so the two are read together as one fact."
+      }
+    },
+    "web/wasm/src/dispatch.rs": {
+      "&a.device_id_hex,": {
+        "count": 2,
+        "reason": "A command ARGUMENT: the id of the device row the user asked to approve or remove, not this device's own id."
+      },
+      "a.device_id_hex,": {
+        "count": 1,
+        "reason": "A command ARGUMENT naming the device row to rename."
+      }
+    }
+  }
+}

@@ -65,20 +65,27 @@ pub async fn session_person_id(
 
 /// This device's enrolled id, the key its binding row is written under.
 ///
-/// From `sync-state.json`'s `device_id_hex`, through the ONE reader note authoring also
-/// uses ([`crate::plugins::sync::state::read_device_actor`]), so the id a note is
-/// authored under and the id a binding is claimed under are the same bytes by
-/// construction rather than by two agreeing hex writers.
+/// From [`crate::plugins::sync::device_actor::durable_device_id`], the ONE reader note
+/// authoring and the head signer also use, so the id a note is authored under and the id
+/// a binding is claimed under are the same bytes by construction rather than by two
+/// agreeing hex writers. That reader consults the vault's enrolment record AND the person
+/// credential (myne-md/myne#958): a person-born vault has no enrolment id at all, and
+/// reading only that record is what left this claim standing down on `NoDeviceId` for
+/// ever on such a vault.
 ///
 /// A never-enrolled vault has no id at all, which is [`DeviceBindingError::NoDeviceId`]
 /// rather than a fresh draw: an id invented at claim time would bind a device the sync
 /// plane has never heard of, and the row would be keyed by something nothing else in the
 /// tree can name.
 pub async fn session_device_id(
+    // The person credential lives under the app's CONFIG dir, which is not derivable
+    // from the vault path (`paths` deliberately keeps app_data and app_config separate),
+    // so the reader is handed the host rather than a guessed path.
+    host: &dyn crate::host::HostCtx,
     io: &dyn VaultIo,
     vault_dir: &Path,
 ) -> Result<[u8; 16], DeviceBindingError> {
-    crate::plugins::sync::state::read_device_actor(io, vault_dir)
+    crate::plugins::sync::device_actor::durable_device_id(host, io, vault_dir)
         .await
         .ok_or(DeviceBindingError::NoDeviceId)
 }
@@ -107,6 +114,7 @@ pub async fn session_device_id(
 /// unverified rather than failing the command
 /// ([`device_attribution_view`]'s own doc states the split).
 pub async fn device_bindings_list_with_dir(
+    host: &dyn crate::host::HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_dir: &Path,
@@ -131,7 +139,7 @@ pub async fn device_bindings_list_with_dir(
     // never-enrolled device simply has no row to mark. Neither absence makes the list wrong,
     // so neither is an error here, unlike in the writer path where both are required.
     let session_person = state.clone_person_identity().await;
-    let device_id = session_device_id(io, vault_dir).await.ok();
+    let device_id = session_device_id(host, io, vault_dir).await.ok();
     Ok(device_attribution_view(
         io,
         vault_dir,
@@ -158,6 +166,7 @@ pub async fn device_bindings_list_with_dir(
 /// phase's own merge of this map, and the shared side of the singleton barrier against a
 /// group rotation's epoch re-seal.
 pub async fn claim_own_binding_with_dir(
+    host: &dyn crate::host::HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_dir: &Path,
@@ -166,7 +175,7 @@ pub async fn claim_own_binding_with_dir(
     let _quiesce = crate::singleton_quiesce::shared().await;
     let resolved = resolve_bindings(io, state, vault_dir).await?;
     let (person, _person_id) = session_person_id(state).await?;
-    let device_id = session_device_id(io, vault_dir).await?;
+    let device_id = session_device_id(host, io, vault_dir).await?;
     // The device key, minted here because this is the ONE moment the person key is in
     // hand: the row's signature is the person's, so creating the key anywhere else would
     // need the phrase again. `load_or_create` is `Unsupported` on a platform with no
@@ -205,12 +214,13 @@ pub async fn claim_own_binding_with_dir(
 /// Claim this device's binding, best effort, from the unlock pipeline and from the
 /// invite-accept tail.
 ///
-/// **Why this is a core call rather than a `VaultLifecycleHooks` method.** The step is
-/// host-independent, `NTV6`-only and needs no platform capability, while a fifth trait
-/// method would owe four implementations plus a `check-lock-teardown` answer on each, for
-/// a step whose whole content is "read the map, maybe write one row". The two hooks that
-/// DO need the trait (attachment refs, the search index) need it because their bodies are
-/// platform-specific. This one is not.
+/// **Why this is a core call rather than a `VaultLifecycleHooks` method.** The step needs
+/// no platform capability: it takes the host only to resolve ONE path (`app_config_dir`,
+/// where the person credential lives, myne-md/myne#958) and everything else it reads is a
+/// vault file or the session. A fifth trait method would owe four implementations plus a
+/// `check-lock-teardown` answer on each, for a step whose whole content is "read the map,
+/// maybe write one row". The two hooks that DO need the trait (attachment refs, the search
+/// index) need it because their bodies are platform-specific. This one is not.
 ///
 /// Best-effort by design: it logs and returns, because a device that failed to record its
 /// binding must still be able to open its vault, and the next unlock retries. It is
@@ -218,11 +228,12 @@ pub async fn claim_own_binding_with_dir(
 /// vault, no device id, no person session), because those are states the two callers
 /// reach routinely and a warning per unlock would be noise rather than signal.
 pub async fn claim_own_binding_best_effort(
+    host: &dyn crate::host::HostCtx,
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_dir: &Path,
 ) {
-    match claim_own_binding_with_dir(io, state, vault_dir).await {
+    match claim_own_binding_with_dir(host, io, state, vault_dir).await {
         Ok((_map, _outcome)) => {}
         Err(DeviceBindingError::SlotNotUnlocked)
         | Err(DeviceBindingError::NotASharedVault)
@@ -265,7 +276,7 @@ pub async fn device_bindings_list<R: tauri::Runtime>(
     let host = crate::host::tauri_host::TauriHost::new(app);
     let io = crate::vault_io::StdVaultIo;
     let dir = active_vault_dir(&host, state.inner()).await?;
-    device_bindings_list_with_dir(&io, state.inner(), &dir).await
+    device_bindings_list_with_dir(&host, &io, state.inner(), &dir).await
 }
 
 /// Register this device's own binding and answer the live, verified device list.
@@ -289,8 +300,8 @@ pub async fn device_bindings_claim<R: tauri::Runtime>(
     let host = crate::host::tauri_host::TauriHost::new(app);
     let io = crate::vault_io::StdVaultIo;
     let dir = active_vault_dir(&host, state.inner()).await?;
-    let (_map, _outcome) = claim_own_binding_with_dir(&io, state.inner(), &dir).await?;
-    device_bindings_list_with_dir(&io, state.inner(), &dir).await
+    let (_map, _outcome) = claim_own_binding_with_dir(&host, &io, state.inner(), &dir).await?;
+    device_bindings_list_with_dir(&host, &io, state.inner(), &dir).await
 }
 
 #[cfg(test)]
@@ -365,7 +376,13 @@ mod tests {
             let state = Arc::new(VaultRuntimeState::default());
             let d = dir();
             assert_holds_the_shared_side("claim_own_binding_with_dir", move || async move {
-                let _ = super::claim_own_binding_with_dir(&StdVaultIo, &state, &d).await;
+                let _ = super::claim_own_binding_with_dir(
+                    &crate::host::NoopHost,
+                    &StdVaultIo,
+                    &state,
+                    &d,
+                )
+                .await;
             })
             .await;
 
@@ -374,7 +391,13 @@ mod tests {
             let state = Arc::new(VaultRuntimeState::default());
             let d = dir();
             assert_holds_the_shared_side("claim_own_binding_best_effort", move || async move {
-                super::claim_own_binding_best_effort(&StdVaultIo, &state, &d).await;
+                super::claim_own_binding_best_effort(
+                    &crate::host::NoopHost,
+                    &StdVaultIo,
+                    &state,
+                    &d,
+                )
+                .await;
             })
             .await;
         });
@@ -408,7 +431,13 @@ mod tests {
             // show an empty device list for a vault the user has open.
             assert!(
                 matches!(
-                    super::device_bindings_list_with_dir(&StdVaultIo, &state, &dir).await,
+                    super::device_bindings_list_with_dir(
+                        &crate::host::NoopHost,
+                        &StdVaultIo,
+                        &state,
+                        &dir
+                    )
+                    .await,
                     Err(super::DeviceBindingError::SlotNotUnlocked)
                 ),
                 "a locked session must be refused, never answered with an empty list"
@@ -427,7 +456,7 @@ mod tests {
             );
             assert!(
                 matches!(
-                    super::session_device_id(&StdVaultIo, &dir).await,
+                    super::session_device_id(&crate::host::NoopHost, &StdVaultIo, &dir).await,
                     Err(super::DeviceBindingError::NoDeviceId)
                 ),
                 "a never-enrolled vault has no device id, and the list must say so"

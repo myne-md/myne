@@ -84,16 +84,20 @@ describe("check-ignored-tests", () => {
   it("passes on the tree as committed, and says what it counted", () => {
     const { code, out } = guard();
     expect(code, out).toBe(0);
-    expect(out).toMatch(/2 deferred #\[ignore]/);
+    expect(out).toMatch(/3 deferred #\[ignore]/);
     // The opt-outs are named in the count's absence: three reasoned #[ignore]s in
-    // core/ are NOT deferrals, and the guard must not claim them.
-    expect(out).not.toMatch(/3 deferred/);
+    // core/ are NOT deferrals, and the guard must not claim them. So the count below is
+    // the roster's size and never the tree's: a reasoned ignore that claims no defect is
+    // simply not in `scripts/ignored-tests.json`.
+    expect(out).not.toMatch(/4 deferred/);
   });
 
-  it("names no tracking issue in the roster for the two real deferrals", () => {
+  it("names a tracking issue in the roster for every real deferral", () => {
     const r = JSON.parse(readFileSync(rosterPath, "utf8"));
     const issues = r.ignored.map((e: { issue: string | null }) => e.issue).sort();
-    expect(issues).toEqual(["759", "760"]);
+    // Written out in full rather than counted: a deferral nobody reviewed is exactly a new
+    // issue number appearing here, and adding one is supposed to make somebody read this.
+    expect(issues).toEqual(["759", "760", "964"]);
   });
 
   it("rule 1: a deferral that names no issue fails", () => {
@@ -139,10 +143,11 @@ describe("check-ignored-tests", () => {
   it("does not govern a reasoned #[ignore] that claims no defect", () => {
     // The tree carries three: a case-table generator, a SOAK, an env-dependent
     // timing report. Demanding an issue of each would demand three fake issues
-    // on the first run, and the rule would be relaxed right after.
+    // on the first run, and the rule would be relaxed right after. So the guard's count
+    // is the ROSTER's, never the tree's, and the two are deliberately different numbers.
     const { code, out } = guard();
     expect(code, out).toBe(0);
-    expect(out).toMatch(/2 deferred/);
+    expect(out).toMatch(/3 deferred/);
   });
 
   it("does not read a NEGATED 'not a known-bug RED' as a claim", () => {

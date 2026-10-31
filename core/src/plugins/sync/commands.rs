@@ -649,6 +649,7 @@ pub async fn sync_person_unlock<R: Runtime>(
             // identity once and the claim happens, and from then on the device signs for
             // itself.
             crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                &host,
                 &crate::vault_io::StdVaultIo,
                 state.inner(),
                 &root,
@@ -1042,6 +1043,7 @@ pub async fn invite_member_from_host(
             super::meta_kind::TailFrame::Ntv6 | super::meta_kind::TailFrame::Ntv8 => None,
         };
         return write_ntv6_invite(
+            host,
             state,
             io,
             &root,
@@ -1258,6 +1260,7 @@ pub async fn create_invite_from_host(
 /// frame is returned in `invite_wire` so the caller can relay it.
 #[allow(clippy::too_many_arguments)]
 async fn write_ntv6_invite(
+    host: &dyn HostCtx,
     state: &VaultRuntimeState,
     io: &dyn crate::vault_io::VaultIo,
     root: &std::path::Path,
@@ -1331,6 +1334,7 @@ async fn write_ntv6_invite(
     // platform with no device-key rung, which keeps the person-key path exactly as it
     // was.
     let own_device_attestation = super::roster_trust::own_device_signing_pair(
+        host,
         io,
         root,
         group_key,

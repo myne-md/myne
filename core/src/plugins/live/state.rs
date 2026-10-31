@@ -297,6 +297,11 @@ pub fn teardown_on_lock(
     }
     if let Some(sig) = signal {
         sig.set_local_label(None);
+        // And the record of what this session posted (myne-md/myne#958): a nonce
+        // names a frame rather than carrying one, and it is cleared on the same rule
+        // the label is, so a locked vault keeps nothing that describes the vault it
+        // left.
+        sig.forget_posted_frames();
     }
 }
 

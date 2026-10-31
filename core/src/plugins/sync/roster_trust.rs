@@ -175,10 +175,17 @@ pub fn trust<'a>(
 /// pair the return type means neither can be shipped alone by accident.
 ///
 /// `None` covers four states, and only the first is a platform limit: no device-key rung,
-/// no `sync-state.json` device id, no binding row for this device, or a row that names a
+/// no durable device id (see [`super::device_actor::durable_device_id`], which is the one
+/// reader of both records), no binding row for this device, or a row that names a
 /// DIFFERENT key than the one that would sign. The last is the one that matters: the
 /// recipient would otherwise resolve a key that never signed anything.
+///
+/// The device id comes from `durable_device_id` and NOT from `sync-state.json` directly:
+/// this used to read only the enrolment record, so on a person-born vault (whose id lives
+/// in the person credential) the owner's device silently produced no attestation and every
+/// invite and rotation fell back to the phrase-signed path (myne-md/myne#958).
 pub async fn own_device_signing_pair(
+    host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     root: &std::path::Path,
     group_key: &[u8; 32],
@@ -192,10 +199,40 @@ pub async fn own_device_signing_pair(
     // No device key means no device signature, so there is nothing to attest.
     let device_key =
         crate::plugins::sync::device_identity::load_for_fallback("device_attestation")?;
-    let sync_state = crate::plugins::sync::state::read_sync_state(io, root)
-        .await
-        .ok()?;
-    let device_id = crate::plugins::sync::devices::hex16(sync_state.device_id_hex.as_deref()?)?;
+    own_device_signing_pair_for_key(
+        host,
+        io,
+        root,
+        group_key,
+        account_number_hash,
+        epoch,
+        owner,
+        device_key,
+    )
+    .await
+}
+
+/// The half below the platform keychain read.
+///
+/// Split out so the part that decides WHICH DEVICE this is and whether a row attests it can
+/// be tested on a person-born vault without a real keychain in the test process (the device
+/// key's storage ladder is process-global and its own tests are the only ones allowed to
+/// touch it). The caller above supplies the key; nothing else here is platform-dependent.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn own_device_signing_pair_for_key(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    root: &std::path::Path,
+    group_key: &[u8; 32],
+    account_number_hash: [u8; 16],
+    epoch: u64,
+    owner: &protocol::person_key::PersonPublicHalf,
+    device_key: protocol::device_key::DeviceKeyPair,
+) -> Option<(
+    protocol::device_key::DeviceKeyPair,
+    protocol::person_invite::OwnerDeviceAttestation,
+)> {
+    let device_id = super::device_actor::durable_device_id(host, io, root).await?;
     let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
         group_key,
         account_number_hash,
@@ -236,6 +273,138 @@ mod tests {
         }
     }
     impl rand_core::TryCryptoRng for Rng {}
+
+    /// **A person-born vault attests this device, and the row has to name THIS key.**
+    ///
+    /// This is the behaviour `myne-md/myne#958` changed on the invite and rotation path: the
+    /// device id used to be read from `sync-state.json` alone, so on a vault whose id lives
+    /// only in the person credential the owner's device produced no attestation and every
+    /// invite fell back to the phrase-signed path. Three states are pinned, and the second and
+    /// third are what keep the change safe:
+    ///
+    /// 1. a readable person-credential id WITH a verified row for it → the pair;
+    /// 2. the same id with NO row → nothing, so the caller keeps the phrase path;
+    /// 3. a row for this id that names a DIFFERENT key → nothing, because the recipient would
+    ///    otherwise resolve a key that never signed anything.
+    ///
+    /// Injection: deleting the `durable_device_id` line in
+    /// `own_device_signing_pair_for_key` fails case 1 with `None`.
+    #[test]
+    fn a_person_born_vault_attests_this_device_only_with_a_row_for_its_own_key() {
+        crate::test_support::block_on(async {
+            use crate::plugins::sync::person_auth::{
+                person_auth_path, write_person_auth, PersonAuth,
+            };
+            use crate::plugins::sync::state::{write_sync_state, SyncState};
+            use crate::test_support::ScopedTempDir;
+            use protocol::device_key::DeviceKeyPair;
+            use protocol::person_key::PersonKeyPair;
+
+            let tmp = ScopedTempDir::new("roster-trust-person-born").expect("temp dir");
+            let root = tmp.path().join("vault");
+            std::fs::create_dir_all(&root).expect("vault dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+
+            let owner = PersonKeyPair::generate_raw(&[0x21; 64], &[0x22; 32], &[0x23; 32]);
+            let owner_public = owner.public_half();
+            let group_key = [0x77u8; 32];
+            let account = [0x88u8; 16];
+            let epoch = 1u64;
+            let device = DeviceKeyPair::generate_raw(&[0x31; 32], &[0x32; 32]);
+            let device_id = [0x44u8; 16];
+
+            // THE person-born shape: the enrolment record exists and carries no id, which is
+            // what the two account-creating writers leave behind, while the person credential
+            // names the device the server already knows.
+            write_sync_state(&io, &root, &SyncState::default())
+                .await
+                .expect("write sync state");
+            let auth_path = person_auth_path(&host, &io).await.expect("auth path");
+            write_person_auth(
+                &io,
+                &auth_path,
+                &PersonAuth {
+                    person_id_hex: "61".repeat(16),
+                    device_id_hex: protocol::hex::encode_lower(&device_id),
+                    registered: true,
+                    token_hex: "aa".repeat(32),
+                    ..PersonAuth::default()
+                },
+            )
+            .await
+            .expect("write person-auth");
+
+            // 2. No row yet, even though the id is now readable: nothing to attest.
+            assert!(
+                own_device_signing_pair_for_key(
+                    &host,
+                    &io,
+                    &root,
+                    &group_key,
+                    account,
+                    epoch,
+                    &owner_public,
+                    device.clone(),
+                )
+                .await
+                .is_none(),
+                "a readable device id with no binding row is not a signer"
+            );
+
+            let bindings =
+                crate::plugins::device_binding::bindings_key_for_group(&group_key, account, epoch);
+            crate::plugins::device_binding::store::claim_self_in_dir(
+                &io,
+                &root,
+                &bindings.borrow(),
+                &owner,
+                &device_id,
+                Some(&device.public_half()),
+                &mut Rng(4),
+            )
+            .await
+            .expect("claim the row");
+
+            // 1. The row exists and names this key: the pair, on a vault whose enrolment record
+            // is empty. This is the line the issue was about.
+            let (key, attestation) = own_device_signing_pair_for_key(
+                &host,
+                &io,
+                &root,
+                &group_key,
+                account,
+                epoch,
+                &owner_public,
+                device.clone(),
+            )
+            .await
+            .expect("a person-born vault must attest this device");
+            assert_eq!(key.public_half(), device.public_half());
+            assert_eq!(
+                attestation.device_id_hex,
+                protocol::hex::encode_lower(&device_id)
+            );
+
+            // 3. The row is this device's, but a DIFFERENT key is asking to sign with it.
+            let other = DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
+            assert!(
+                own_device_signing_pair_for_key(
+                    &host,
+                    &io,
+                    &root,
+                    &group_key,
+                    account,
+                    epoch,
+                    &owner_public,
+                    other,
+                )
+                .await
+                .is_none(),
+                "a row naming another key would have peers verify a signer that never signed"
+            );
+        });
+    }
 
     /// A pinned attestation is used when the owner really signed it, and IGNORED when the
     /// signature does not check out. The second half is the load-bearing one: a tampered

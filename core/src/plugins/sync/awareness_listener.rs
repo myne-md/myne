@@ -47,6 +47,28 @@ pub const AWARENESS_PATH: &str = "/sync/awareness";
 /// supersedes an older, so drop-oldest is not data loss).
 const QUEUE_CAP: usize = 256;
 
+/// Bound on the identity-free echo record (see [`AwarenessSignal::push_outgoing`]).
+/// The same order as [`QUEUE_CAP`] on purpose: a frame comes back within one relay
+/// round trip, so a few dozen entries would do, and this leaves room for a backlog
+/// without the record growing with the session.
+const POSTED_CAP: usize = 256;
+
+/// The per-frame tag used by the identity-free echo filter: the frame's own 24-byte
+/// AEAD nonce, at the fixed offset the header layout gives it
+/// (`room_id (16) || nonce (24) || version (1) || ciphertext`).
+///
+/// A nonce is unique per frame BY CONSTRUCTION (it is drawn from `getrandom` for every
+/// seal, and AEAD security depends on that), so comparing tags is comparing frames
+/// exactly. Using the nonce rather than, say, a hash of the whole frame keeps this
+/// allocation-free and keeps a 24-byte opaque value instead of a second derivation.
+fn frame_tag(frame: &[u8]) -> Option<[u8; protocol::AEAD_NONCE_LEN]> {
+    const START: usize = protocol::awareness_frame::AWARENESS_ROOM_ID_LEN;
+    frame
+        .get(START..START + protocol::AEAD_NONCE_LEN)?
+        .try_into()
+        .ok()
+}
+
 /// Backoff after a 429 on the up-path POST, the `RateLimited` cadence
 /// (`SYNC-22`), not the plain transport ladder.
 const POST_RATE_LIMIT_RETRY_MS: u64 = 60_000;
@@ -108,6 +130,16 @@ struct AwarenessInner {
     /// to its publisher too). Separated from `rx_no_room` so "the peer leg delivered
     /// nothing" is distinguishable from "it delivered and was dropped".
     rx_self_echo: u64,
+    /// The tags (AEAD nonces) of the frames THIS connection has posted, oldest first.
+    ///
+    /// The identity-free half of the self-echo guard (myne-md/myne#958). The other
+    /// half compares the frame's actor against the open session's, which answers
+    /// "ours?" only when this device knows its own id: the reported vault had no id in
+    /// `sync-state.json`, the frame was sealed with sixteen zero bytes, the comparison
+    /// had nothing to compare against, and the device rendered its own caret back to
+    /// itself as "Device 000000". `posted` does not depend on any of that: a frame
+    /// whose bytes this connection sent is its own, whatever it claims to be.
+    posted_tags: Vec<[u8; protocol::AEAD_NONCE_LEN]>,
     /// Inbound frames carrying a change for a note with no open session.
     rx_no_session: u64,
     /// Inbound frames that arrived while NO note had an open session at all.
@@ -260,10 +292,30 @@ impl AwarenessSignal {
     }
 
     /// Queue an outgoing `(room, opaque frame)` for the coalesced POST.
+    ///
+    /// The frame's own nonce is recorded FIRST, as the tag the inbound half compares
+    /// against: this is the one moment the send side knows exactly which bytes it put
+    /// on the wire, and the record has to be in place before the relay can hand them
+    /// back.
     pub fn push_outgoing(&self, room: [u8; 16], frame: Vec<u8>) {
         if let Ok(mut g) = self.0.lock() {
+            if let Some(tag) = frame_tag(&frame) {
+                push_bounded(&mut g.posted_tags, tag, POSTED_CAP);
+            }
             push_bounded(&mut g.outbox, (room, frame), QUEUE_CAP);
             g.last_out_room = Some(room);
+        }
+    }
+
+    /// Forget the record of what this connection posted, on vault lock.
+    ///
+    /// Not payload material (a nonce names a frame, it does not decrypt one), and
+    /// cleared anyway on the same rule that forgets `local_label`: a locked vault holds
+    /// nothing about the vault it left. It also keeps a frame from the previous vault
+    /// from being mistaken for one of this session's.
+    pub fn forget_posted_frames(&self) {
+        if let Ok(mut g) = self.0.lock() {
+            g.posted_tags.clear();
         }
     }
 
@@ -337,6 +389,16 @@ impl AwarenessSignal {
     fn push_incoming(&self, payload: Vec<u8>) {
         if let Ok(mut g) = self.0.lock() {
             g.received += 1;
+            // The identity-free self-echo drop (myne-md/myne#958): a frame carrying a
+            // tag this connection posted IS this connection's own frame, relayed back.
+            // Dropped here rather than in the router because here is where the frame
+            // stops being bytes on a wire, and because this check needs no session, no
+            // key, no host and no device identity, so no later change can make it
+            // vacuous by leaving one of those absent.
+            if frame_tag(&payload).is_some_and(|tag| g.posted_tags.contains(&tag)) {
+                g.rx_self_echo += 1;
+                return;
+            }
             push_bounded(&mut g.inbox, payload, QUEUE_CAP);
         }
     }
@@ -879,6 +941,93 @@ mod tests {
         assert_eq!(out.len(), QUEUE_CAP, "outbox is bounded");
         assert_eq!(out[0].1, vec![10], "drop-oldest keeps the newest");
         assert!(s.take_outgoing().is_empty(), "drain clears");
+    }
+
+    /// A frame with the shape the filter reads: `room_id (16) || nonce (24) || version`.
+    /// Nothing here is ever opened (no key, no AAD), because the filter must not need
+    /// one: it decides on the frame's own bytes.
+    fn sealed_lookalike(nonce: [u8; protocol::AEAD_NONCE_LEN]) -> Vec<u8> {
+        let mut v = vec![0xABu8; protocol::awareness_frame::AWARENESS_ROOM_ID_LEN];
+        v.extend_from_slice(&nonce);
+        v.push(protocol::awareness_frame::AWARENESS_FRAME_VERSION);
+        v.extend_from_slice(b"ciphertext-placeholder");
+        v
+    }
+
+    /// **The identity-free half of the self-echo guard (myne-md/myne#958).**
+    ///
+    /// The other half compares the frame's actor against the open session's, which
+    /// answers "ours?" only if this device knows its own id. The reported device did
+    /// not: its frame was sealed with sixteen zero bytes, the comparison had nothing to
+    /// match, and its own caret came back to it as "Device 000000". This drop needs no
+    /// key, no session, no host and no identity, so nothing can make it vacuous by
+    /// leaving one of those absent.
+    ///
+    /// Reverting the filter makes the first assertion fail: the frame lands in the inbox
+    /// and gets routed as a peer.
+    #[test]
+    fn a_frame_this_connection_posted_never_reaches_the_inbox() {
+        let s = AwarenessSignal::new();
+        let mine = sealed_lookalike([0x33u8; protocol::AEAD_NONCE_LEN]);
+        s.push_outgoing([0xABu8; 16], mine.clone());
+        assert_eq!(s.take_outgoing().len(), 1, "the POST drained the outbox");
+        // …and the relay fans it back to its publisher.
+        s.push_incoming(mine.clone());
+        assert!(
+            s.take_incoming().is_empty(),
+            "this connection's own frame is never queued for routing"
+        );
+        let stats = s.stats();
+        assert_eq!(stats.received, 1, "it did arrive");
+        assert_eq!(
+            stats.rx_self_echo, 1,
+            "…and was counted as this device's echo"
+        );
+
+        // Another device's frame, same shape, a different nonce: queued normally.
+        s.push_incoming(sealed_lookalike([0x44u8; protocol::AEAD_NONCE_LEN]));
+        assert_eq!(s.take_incoming().len(), 1, "a peer frame is still routed");
+        assert_eq!(s.stats().rx_self_echo, 1, "and is not counted as an echo");
+    }
+
+    /// The record is bounded like every other queue here, and it is dropped on vault
+    /// lock. The bound keeps a long session's memory flat; the clear is the teardown
+    /// rule (a locked vault holds nothing describing the vault it left), which is why
+    /// it is wired beside `set_local_label(None)`.
+    #[test]
+    fn the_posted_record_is_bounded_and_forgotten_on_lock() {
+        let s = AwarenessSignal::new();
+        let tag = |i: usize| {
+            let mut n = [0u8; protocol::AEAD_NONCE_LEN];
+            n[0] = (i & 0xff) as u8;
+            n[1] = (i >> 8) as u8;
+            n
+        };
+        // One more than the cap, so the FIRST frame is evicted.
+        for i in 0..=POSTED_CAP {
+            s.push_outgoing([0xABu8; 16], sealed_lookalike(tag(i)));
+        }
+        let _ = s.take_outgoing();
+        s.push_incoming(sealed_lookalike(tag(POSTED_CAP)));
+        assert!(
+            s.take_incoming().is_empty(),
+            "the newest posted frame is still recognised"
+        );
+        s.push_incoming(sealed_lookalike(tag(0)));
+        assert_eq!(
+            s.take_incoming().len(),
+            1,
+            "the oldest was evicted, so it is routed again rather than silently dropped"
+        );
+
+        // Lock: the record is empty, so a frame posted before it is no longer known.
+        let s = AwarenessSignal::new();
+        let mine = sealed_lookalike([0x55u8; protocol::AEAD_NONCE_LEN]);
+        s.push_outgoing([0xABu8; 16], mine.clone());
+        let _ = s.take_outgoing();
+        s.forget_posted_frames();
+        s.push_incoming(mine);
+        assert_eq!(s.take_incoming().len(), 1, "a locked vault keeps no record");
     }
 
     #[test]

@@ -586,7 +586,7 @@ pub(crate) async fn run_post_unlock_pipeline(
             )
             .await;
             crate::plugins::device_binding::commands::claim_own_binding_best_effort(
-                io, state, &vault_dir,
+                host, io, state, &vault_dir,
             )
             .await;
         }

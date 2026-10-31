@@ -1029,14 +1029,14 @@ async fn vault_plane_credential_from_host(
         .await
         .map_err(|_| SyncDeviceError::Internal)?
         .ok_or(SyncDeviceError::NotEnrolled)?;
-    // `.ok()` is deliberate HERE and nowhere else (task 86): nothing is written
-    // back, and the only consequence of not knowing our own `device_id` is that
-    // the roster does not mark which row is this device. A cosmetic degrade on a
-    // read-only path.
-    let device_id_hex = super::state::read_sync_state(io, &dir)
+    // Nothing is written back, and the only consequence of not knowing our own
+    // `device_id` is that the roster does not mark which row is this device: a
+    // cosmetic degrade on a read-only path. Read through the one reader, because
+    // reading only the enrolment record left a person-born vault's row unmarked
+    // on a device that knows perfectly well who it is (myne-md/myne#958).
+    let device_id_hex = super::device_actor::durable_device_id(host, io, &dir)
         .await
-        .ok()
-        .and_then(|st| st.device_id_hex);
+        .map(|id| super::to_hex(&id));
     Ok(AccountPlaneCredential {
         token_hex: super::to_hex(&token),
         device_id_hex,
