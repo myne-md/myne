@@ -292,6 +292,7 @@ export function DeleteVaultConfirmForm({
               descriptionId={detailsId}
               testId="delete-vault.details"
               triggerLabel={t("settings.deleteVault.detailsLabel")}
+              visibleLabel
             />
           </div>
 

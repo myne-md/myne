@@ -66,6 +66,7 @@ import {
 import { useTranslation } from "react-i18next";
 
 import { IconButton } from "../primitives/IconButton";
+import { Button } from "../primitives/Button";
 
 /** Gap between the trigger and the popover. */
 const GAP = 6;
@@ -151,6 +152,19 @@ interface HelperDisclosureProps {
    * this prop exists for (myne-md/myne#960).
    */
   triggerLabel?: string;
+  /**
+   * Paint `triggerLabel` as visible text beside the glyph instead of keeping it
+   * as the accessible name alone.
+   *
+   * **A bare question mark needs a row to sit next to.** In Settings the trigger
+   * rides directly after a setting's title, and the icon means "more about THIS";
+   * in the destructive dialog there is no such title, so the icon-only shape
+   * rendered a lone glyph under the warning with nothing saying what it explains.
+   * That is not a contrast or hit-target problem, so no audit would have caught
+   * it: it is a control whose subject is only in its accessible name, which is a
+   * failure for everybody reading the screen rather than hearing it.
+   */
+  visibleLabel?: boolean;
 }
 
 interface Anchor {
@@ -164,8 +178,10 @@ export function HelperDisclosure({
   descriptionId,
   testId,
   triggerLabel,
+  visibleLabel = false,
 }: HelperDisclosureProps) {
   const { t } = useTranslation();
+  const label = triggerLabel ?? t("settings.helperDisclosureLabel");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const bubbleRef = useRef<HTMLDivElement>(null);
   // Hovering the trigger. Mouse only: on a touch device the pointer's "enter"
@@ -248,6 +264,22 @@ export function HelperDisclosure({
     triggerRef.current?.focus();
   }, []);
 
+  /** One press handler for both trigger shapes.
+   *
+   * **A press that closes also drops the hover peek**, and without that the
+   * click reads as doing nothing. A pointer resting on the trigger has already
+   * opened it through `hovered`, so clearing `pinned` alone leaves `open` true
+   * and the button appears inert: the end-to-end scenario found exactly that,
+   * three runs out of three, on the "second press closes it" step. The pointer
+   * has to LEAVE and come back to reopen it, which is the behaviour a
+   * dismissable hover-popover should have anyway.
+   */
+  const press = useCallback(() => {
+    const next = !pinned;
+    setPinned(next);
+    if (!next) setHovered(false);
+  }, [pinned]);
+
   return (
     <span
       style={TRIGGER_ROW_STYLE}
@@ -277,28 +309,29 @@ export function HelperDisclosure({
         dismiss();
       }}
     >
-      <IconButton
-        icon="circle-help"
-        label={triggerLabel ?? t("settings.helperDisclosureLabel")}
-        expanded={open}
-        nativeTitle={false}
-        iconSize={14}
-        testId={testId === undefined ? undefined : `${testId}-explain`}
-        onClick={() => {
-          const next = !pinned;
-          setPinned(next);
-          // **A press that closes also drops the hover peek**, and without that
-          // the click reads as doing nothing. A pointer resting on the trigger
-          // has already opened it through `hovered`, so clearing `pinned` alone
-          // leaves `open` true and the button appears inert: the end-to-end
-          // scenario found exactly that, three runs out of three, on the
-          // "second press closes it" step. The pointer has to LEAVE and come
-          // back to reopen it, which is the behaviour a dismissable
-          // hover-popover should have anyway.
-          if (!next) setHovered(false);
-        }}
-        ref={triggerRef}
-      />
+      {visibleLabel ? (
+        <Button
+          variant="ghost"
+          icon="circle-help"
+          aria-expanded={open}
+          data-testid={testId === undefined ? undefined : `${testId}-explain`}
+          ref={triggerRef}
+          onClick={press}
+        >
+          {label}
+        </Button>
+      ) : (
+        <IconButton
+          icon="circle-help"
+          label={label}
+          expanded={open}
+          nativeTitle={false}
+          iconSize={14}
+          testId={testId === undefined ? undefined : `${testId}-explain`}
+          onClick={press}
+          ref={triggerRef}
+        />
+      )}
       <div
         id={descriptionId}
         ref={bubbleRef}

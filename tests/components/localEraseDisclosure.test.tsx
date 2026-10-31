@@ -47,6 +47,25 @@ function disclosureText(): string {
   return screen.getByTestId("delete-vault.details-explanation").textContent ?? "";
 }
 
+/**
+ * The label the disclosure's trigger shows, and the assertion that it is
+ * VISIBLE text rather than only the trigger's accessible name.
+ *
+ * A bare question mark is the right shape in Settings, where it rides directly
+ * after a setting's title and the icon means "more about THIS". In this dialog
+ * there is no such title, and the icon-only trigger shipped a lone glyph under
+ * the warning with nothing on screen saying what it explained: a control whose
+ * subject exists only in its accessible name, which no audit catches and which
+ * fails every reader who is looking rather than listening. Found from the
+ * before/after capture on myne-md/myne#960, not by a test.
+ */
+function expectTriggerShowsItsLabel(): void {
+  const trigger = screen.getByRole("button", {
+    name: i18n.t("settings.deleteVault.detailsLabel"),
+  });
+  expect(trigger.textContent).toContain(i18n.t("settings.deleteVault.detailsLabel"));
+}
+
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
 function renderForm(only: boolean, variant?: "owner" | "member", keychain = true) {
   hasMock.mockImplementation((cap: string) => {
@@ -91,6 +110,16 @@ describe("the delete-vault promise", () => {
     expect(screen.getByTestId("delete-vault.eyebrow").textContent).toBe(
       i18n.t("settings.deleteVault.localEraseEyebrow"),
     );
+  });
+
+  /**
+   * The disclosure's trigger says on screen what it is for. Asserted inside a
+   * test that already renders the form, because `visibleLabel` is a property of
+   * the shape this dialog chose, not of the primitive.
+   */
+  it("labels its disclosure trigger on screen, not only for a screen reader", () => {
+    renderForm(true);
+    expectTriggerShowsItsLabel();
   });
 
   it("keeps the desktop copy where it is true", () => {
