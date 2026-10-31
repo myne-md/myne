@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Kasha",
         "data": "Data",
-        "diagnostics": "Uchunguzi"
+        "diagnostics": "Uchunguzi",
+        "extensions": "Viendelezi vya kivinjari"
       },
       "passwordUpdatedToast": "Nenosiri limesasishwa",
       "title": "Mipangilio"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Vifaa, wanachama wa kasha shirikishi na utambulisho wako vinasimamiwa kwenye Sync.",
       "groupingError": "Haikuweza kusoma ugawaji wa akaunti kwenye kifaa hiki. Hakuna kilichobadilika.",
       "sections": {
-        "extensions": "Viendelezi vya kivinjari",
         "grouping": "Akaunti hii"
       }
     },

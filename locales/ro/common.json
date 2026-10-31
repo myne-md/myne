@@ -4151,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Seif",
         "data": "Date",
-        "diagnostics": "Diagnostic"
+        "diagnostics": "Diagnostic",
+        "extensions": "Extensii de browser"
       },
       "passwordUpdatedToast": "Parolă actualizată",
       "title": "Setări"
@@ -4545,7 +4546,6 @@
       "devicesNote": "Dispozitivele, membrii seifurilor partajate și identitatea ta sunt gestionate în Sincronizare.",
       "groupingError": "Gruparea contului nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat.",
       "sections": {
-        "extensions": "Extensii de browser",
         "grouping": "Acest cont"
       },
       "vaultsCount_few": "{{count}} seifuri"

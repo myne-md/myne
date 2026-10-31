@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "保管庫",
         "data": "データ",
-        "diagnostics": "診断"
+        "diagnostics": "診断",
+        "extensions": "ブラウザ拡張機能"
       },
       "passwordUpdatedToast": "パスワードを更新しました",
       "title": "設定"
@@ -4404,7 +4405,6 @@
       "devicesNote": "デバイス、共有保管庫のメンバー、アイデンティティは同期で管理します。",
       "groupingError": "この端末のアカウントグループ化を読み取れませんでした。何も変更されていません。",
       "sections": {
-        "extensions": "ブラウザ拡張機能",
         "grouping": "このアカウント"
       }
     },

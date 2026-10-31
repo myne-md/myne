@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Széf",
         "data": "Adatok",
-        "diagnostics": "Diagnosztika"
+        "diagnostics": "Diagnosztika",
+        "extensions": "Böngészőbővítmények"
       },
       "passwordUpdatedToast": "Jelszó frissítve",
       "title": "Beállítások"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Eszközök, megosztott széf tagok és az identitásod a Szinkronban kezelhető.",
       "groupingError": "Nem sikerült olvasni a fiókcsoportosítást ezen az eszközön. Semmi nem változott.",
       "sections": {
-        "extensions": "Böngészőbővítmények",
         "grouping": "Ez a fiók"
       }
     },

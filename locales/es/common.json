@@ -4151,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Bóveda",
         "data": "Datos",
-        "diagnostics": "Diagnóstico"
+        "diagnostics": "Diagnóstico",
+        "extensions": "Extensiones del navegador"
       },
       "passwordUpdatedToast": "Contraseña actualizada",
       "title": "Ajustes"
@@ -4545,7 +4546,6 @@
       "devicesNote": "Los dispositivos, los miembros de las bóvedas compartidas y tu identidad se gestionan en Sincronización.",
       "groupingError": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
       "sections": {
-        "extensions": "Extensiones del navegador",
         "grouping": "Esta cuenta"
       },
       "vaultsCount_many": "{{count}} bóvedas"

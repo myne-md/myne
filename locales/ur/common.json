@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "والٹ",
         "data": "ڈیٹا",
-        "diagnostics": "تشخیص"
+        "diagnostics": "تشخیص",
+        "extensions": "براؤزر ایکسٹینشنز"
       },
       "passwordUpdatedToast": "پاس ورڈ اپ ڈیٹ ہو گیا",
       "title": "ترتیبات"
@@ -4407,7 +4408,6 @@
       "devicesNote": "آلات، مشترکہ والٹ کے رکن اور آپ کی شناخت Sync میں منیج ہوتے ہیں۔",
       "groupingError": "اس آلے پر اکاؤنٹ گروپنگ پڑھی نہیں جا سکی۔ کچھ نہیں بدلا۔",
       "sections": {
-        "extensions": "براؤزر ایکسٹینشنز",
         "grouping": "یہ اکاؤنٹ"
       }
     },

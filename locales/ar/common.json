@@ -4550,7 +4550,8 @@
         "cli": "CLI",
         "vault": "خزنة",
         "data": "البيانات",
-        "diagnostics": "تشخيص"
+        "diagnostics": "تشخيص",
+        "extensions": "امتدادات المتصفح"
       },
       "passwordUpdatedToast": "تم تحديث كلمة المرور",
       "title": "الإعدادات"
@@ -4959,7 +4960,6 @@
       "devicesNote": "الأجهزة وأعضاء الخزنة المشتركة وهويتك تُدار in المزامنة.",
       "groupingError": "تعذّرت قراءة تجميع الحساب على هذا الجهاز. لم يتغير شيء.",
       "sections": {
-        "extensions": "امتدادات المتصفح",
         "grouping": "هذا الحساب"
       },
       "vaultsCount_zero": "{{count}} خزنة",

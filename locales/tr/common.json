@@ -3991,7 +3991,8 @@
         "cli": "CLI",
         "vault": "Kasa",
         "data": "Veri",
-        "diagnostics": "Tanılama"
+        "diagnostics": "Tanılama",
+        "extensions": "Tarayıcı uzantıları"
       },
       "passwordUpdatedToast": "Parola güncellendi",
       "title": "Ayarlar"
@@ -4381,7 +4382,6 @@
       "openSync": "Eşitleme'yi aç",
       "groupingError": "Bu cihazdaki hesap gruplaması okunamadı. Hiçbir şey değiştirilmedi.",
       "sections": {
-        "extensions": "Tarayıcı uzantıları",
         "grouping": "Bu hesap"
       }
     },

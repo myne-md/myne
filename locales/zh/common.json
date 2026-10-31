@@ -4018,7 +4018,8 @@
         "cli": "命令行",
         "vault": "保险库",
         "data": "数据",
-        "diagnostics": "诊断"
+        "diagnostics": "诊断",
+        "extensions": "浏览器扩展"
       },
       "passwordUpdatedToast": "密码已更新",
       "title": "设置"
@@ -4404,7 +4405,6 @@
       "devicesNote": "设备、共享保险库成员和身份在同步中管理。",
       "groupingError": "无法读取此设备上的账户分组。未更改任何内容。",
       "sections": {
-        "extensions": "浏览器扩展",
         "grouping": "此账户"
       }
     },

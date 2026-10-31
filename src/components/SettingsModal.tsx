@@ -71,6 +71,7 @@ import { livePanelTopics } from "./settings/settingsTopics";
 import { AboutPanel } from "./settings/AboutPanel";
 import { DiagnosticsPanel } from "./settings/DiagnosticsPanel";
 import { AccountPanel } from "./settings/AccountPanel";
+import { BrowserExtensionsPanel } from "./settings/BrowserExtensionsPanel";
 import { VaultPanel } from "./settings/VaultPanel";
 import * as capabilities from "../platform/capabilities";
 import { AiPanel } from "./settings/AiPanel";
@@ -101,6 +102,8 @@ export type PanelId =
   | "vault"
   | "privacy"
   | "sync"
+  // The browser clipper's own surface, split out of Account on myne-md/myne#960.
+  | "extensions"
   | "ai"
   | "network"
   | "cli"
@@ -181,6 +184,16 @@ const PANELS_BASE: readonly PanelMeta[] = [
   { id: "vault", labelKey: "settings.shell.panels.vault", icon: "key-round" },
   { id: "privacy", labelKey: "settings.shell.panels.privacy", icon: "lock" },
   { id: "sync", labelKey: "settings.shell.panels.sync", icon: "refresh-cw" },
+  // The browser clipper, split out of Account (myne-md/myne#960). A capability
+  // gate, not a developer gate: clipping pages is a normal user's feature, and
+  // the web client cannot host a native-messaging endpoint at all, so the rail
+  // omits the door rather than greying it (`decisions.md` 2026-07-26).
+  {
+    id: "extensions",
+    labelKey: "settings.shell.panels.extensions",
+    icon: "link",
+    capability: "clipper",
+  },
   { id: "editor", labelKey: "settings.shell.panels.editor", icon: "pencil" },
   { id: "files", labelKey: "settings.shell.panels.files", icon: "folder" },
   {
@@ -632,6 +645,7 @@ export function SettingsModal({
     vault: null,
     privacy: null,
     sync: null,
+    extensions: null,
     ai: null,
     network: null,
     cli: null,
@@ -828,6 +842,7 @@ export function SettingsModal({
       />
     ),
     privacy: <PrivacyPanel onShowToast={onShowToast} />,
+    extensions: <BrowserExtensionsPanel />,
     sync: (
       <SyncPanel
         vaultId={vaultId}

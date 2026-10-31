@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Boks",
         "data": "Data",
-        "diagnostics": "Diagnostik"
+        "diagnostics": "Diagnostik",
+        "extensions": "Browserudvidelser"
       },
       "passwordUpdatedToast": "Adgangskode opdateret",
       "title": "Indstillinger"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Enheder, delte bokses medlemmer og din identitet administreres i Synk.",
       "groupingError": "Kunne ikke læse konto-grupperingen på denne enhed. Intet blev ændret.",
       "sections": {
-        "extensions": "Browserudvidelser",
         "grouping": "Denne konto"
       }
     },

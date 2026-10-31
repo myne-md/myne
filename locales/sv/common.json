@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Valv",
         "data": "Data",
-        "diagnostics": "Diagnostik"
+        "diagnostics": "Diagnostik",
+        "extensions": "Webbläsartillägg"
       },
       "passwordUpdatedToast": "Lösenord uppdaterat",
       "title": "Inställningar"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Enheter, medlemmar i delade valv och din identitet hanteras under Synkronisering.",
       "groupingError": "Kunde inte läsa kontogrupperingen på den här enheten. Ingenting ändrades.",
       "sections": {
-        "extensions": "Webbläsartillägg",
         "grouping": "Det här kontot"
       }
     },

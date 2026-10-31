@@ -3250,7 +3250,6 @@
     },
     "account": {
       "sections": {
-        "extensions": "Browser extensions",
         "grouping": "This account"
       },
       "vaultsLabel": "Vaults in this account",
@@ -4274,7 +4273,8 @@
         "privacy": "Privacy",
         "storage": "Storage",
         "sync": "Sync",
-        "vault": "Vault"
+        "vault": "Vault",
+        "extensions": "Browser extensions"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"

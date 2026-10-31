@@ -22,6 +22,7 @@ import {
   useDragReorder,
 } from "@app/components/settings/CustomizeList";
 import { AccountPanel } from "@app/components/settings/AccountPanel";
+import { BrowserExtensionsPanel } from "@app/components/settings/BrowserExtensionsPanel";
 import { AiModelCatalogue } from "@app/components/settings/AiModelCatalogue";
 import { VaultPanel } from "@app/components/settings/VaultPanel";
 import { AiOnboardingSurface } from "@app/components/settings/AiOnboardingSurface";
@@ -432,24 +433,37 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
   },
   {
     id: "settings/accountpanel/default",
-    // A `role="switch"` whose value is unresolved: this story does not answer
-    // the command that drives the toggle, so `checked` is not a boolean and
-    // `aria-checked` is missing. The catalogue is showing a frame the app
-    // passes through before its read resolves, never its resting state ,
-    // answering the command in the fixture is the fix (myne-md/myne#845).
-    // The switch is the browser-clipper install toggle, which sits in the
-    // paired-extensions block, which is account-level and therefore here.
-    a11y: "todo",
     group: "settings",
     surface: "AccountPanel",
     state: "default",
     description:
-      "Settings → Account: the person account number, the device-local grouping of vaults, and the paired browser extensions. It is deliberately the account level, not the vault's own label, which lives in the Vault panel.",
-    tags: ["settings", "account", "device-local", "vault-group", "paired-extensions", "account-number"],
+      "Settings → Account: the person account number and the device-local grouping of vaults. It is deliberately the account level, not the vault's own label, which lives in the Vault panel; the browser clipper's pairing surface moved out of here into its own panel (myne-md/myne#960).",
+    tags: ["settings", "account", "device-local", "vault-group", "account-number"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>
         <AccountPanel vaultId={FIXTURE_VAULT_ID} />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/browserextensionspanel/default",
+    // A `role="switch"` whose value is unresolved: this story does not answer
+    // the command that drives the install toggle, so `checked` is not a boolean
+    // and `aria-checked` is missing. The catalogue is showing a frame the app
+    // passes through before its read resolves, never its resting state;
+    // answering the command in the fixture is the fix (myne-md/myne#845).
+    a11y: "todo",
+    group: "settings",
+    surface: "BrowserExtensionsPanel",
+    state: "default",
+    description:
+      "Settings → Browser extensions: its own rail panel since myne-md/myne#960, holding the clipper install toggle and the browsers paired with this account. The rail omits the whole entry on a client that cannot host a native-messaging endpoint, so this panel never appears on web.",
+    tags: ["settings", "browser-extensions", "clipper", "pairing", "revoke", "panel"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <BrowserExtensionsPanel />
       </Frame>
     ),
   },
@@ -778,8 +792,8 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "ConnectedExtensions",
     state: "default",
     description:
-      "Settings → Account's connected-extensions list: the live browser extensions paired with this vault, each with a per-row Revoke. Revoke is durable on the backend (the token is dropped from the encrypted prefs), and a one-line hint says a revoked extension has to pair again.",
-    tags: ["settings", "account", "browser-extensions", "pairing", "revoke", "clipper"],
+      "The connected-extensions list, composed by the Browser extensions panel: the live browser extensions paired with this vault, each with a per-row Revoke. Revoke is durable on the backend (the token is dropped from the encrypted prefs), and a one-line hint says a revoked extension has to pair again.",
+    tags: ["settings", "browser-extensions", "pairing", "revoke", "clipper"],
     fixture: PREFS_FIXTURE,
     render: () => (
       <Frame>

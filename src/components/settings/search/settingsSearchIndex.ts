@@ -234,16 +234,15 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.accountNumber",
   },
   {
-    // Moved here from the Storage section: the control it names
-    // (`settings.clipper-install`, rendered by `ConnectedExtensions`) has lived
-    // in this panel since the 2026-06-21 decision moved it, so the entry was
-    // navigating to a panel that does not render it — the exact failure the
-    // registry's contract exists to prevent, and invisible because the testid
-    // it points at does exist, one panel away.
-    id: "account.extensions",
+    // The clipper's own panel since myne-md/myne#960: it left Account, where it
+    // sat under the account number and read as one more identity control. The
+    // entry follows the control, and the registry's contract is what makes a
+    // stale `panelId` here a test failure rather than a search hit that lands on
+    // a panel which does not render the row.
+    id: "extensions.install",
     agentWritability: WRITABILITY_NONE,
     capability: "clipper",
-    panelId: "account",
+    panelId: "extensions",
     testid: "settings.clipper-install",
     titleKey: "settings.clipperInstall.label",
     descriptionKey: "settings.clipperInstall.helper",

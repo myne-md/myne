@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Kluis",
         "data": "Gegevens",
-        "diagnostics": "Diagnostiek"
+        "diagnostics": "Diagnostiek",
+        "extensions": "Browserextensies"
       },
       "passwordUpdatedToast": "Wachtwoord bijgewerkt",
       "title": "Instellingen"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Apparaten, leden van gedeelde kluizen en je identiteit beheer je bij Synchronisatie.",
       "groupingError": "Kon de accountgroepering op dit apparaat niet lezen. Er is niets gewijzigd.",
       "sections": {
-        "extensions": "Browserextensies",
         "grouping": "Dit account"
       }
     },

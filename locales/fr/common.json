@@ -4151,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Coffre",
         "data": "Données",
-        "diagnostics": "Diagnostic"
+        "diagnostics": "Diagnostic",
+        "extensions": "Extensions de navigateur"
       },
       "passwordUpdatedToast": "Mot de passe mis à jour",
       "title": "Paramètres"
@@ -4545,7 +4546,6 @@
       "devicesNote": "Les appareils, les membres des coffres partagés et votre identité se gèrent dans Synchronisation.",
       "groupingError": "Impossible de lire le regroupement de comptes sur cet appareil. Rien n'a changé.",
       "sections": {
-        "extensions": "Extensions de navigateur",
         "grouping": "Ce compte"
       },
       "vaultsCount_many": "{{count}} coffres"

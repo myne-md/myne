@@ -4151,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Cassaforte",
         "data": "Dati",
-        "diagnostics": "Diagnostica"
+        "diagnostics": "Diagnostica",
+        "extensions": "Estensioni del browser"
       },
       "passwordUpdatedToast": "Password aggiornata",
       "title": "Impostazioni"
@@ -4545,7 +4546,6 @@
       "devicesNote": "Dispositivi, membri delle casseforti condivise e la tua identità sono gestiti in Sincronizzazione.",
       "groupingError": "Impossibile leggere il raggruppamento dell'account su questo dispositivo. Nulla è cambiato.",
       "sections": {
-        "extensions": "Estensioni del browser",
         "grouping": "Questo account"
       },
       "vaultsCount_many": "{{count}} casseforti"
