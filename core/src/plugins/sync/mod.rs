@@ -56,6 +56,22 @@ pub mod conflict;
 pub mod corpus;
 pub mod crdt_doc;
 pub mod device_identity;
+// The two-sided device admission ceremony (`decisions/protocol/0762`).
+//
+// NATIVE-ONLY, and it must stay that way: it borrows
+// `plugins::device_binding::commands`, which is itself
+// `#[cfg(not(target_arch = "wasm32"))]` because the person account plane it reads
+// has no browser meaning. Left ungated, `cargo clippy --target wasm32-unknown-unknown`
+// fails with `cannot find \`commands\` in \`device_binding\`` and the web bundle
+// never builds (myne-md/myne#938 review).
+#[cfg(not(target_arch = "wasm32"))]
+pub mod device_admission;
+// Rung 3 of the device-key storage ladder (`decisions/protocol/0733` decision 4):
+// a `0600` file sealed by a user PIN, for the platforms whose OS store the build
+// does not reach. Kept beside `device_identity` because it is the same key's second
+// resting place, not a second identity. The CODEC ships here; the ceremony that
+// asks for a PIN and calls it does not (see `device_identity`'s header).
+pub mod device_key_pin;
 pub mod devices;
 /// The typed `vault.dictionary` inner payload (`0x02`) and its §10.2.1 merge
 /// (myne-md/myne#640).
@@ -75,6 +91,11 @@ pub mod identity_resolver;
 pub mod integrity;
 pub mod invite;
 pub mod member_removal;
+// "What kind of `vault.meta` is this", answered once for the whole plane: the six
+// raw magic comparisons it replaced each predated `NTV8` and each failed differently
+// (no head context, an `0x01` downgrade, the wrong account token, a re-offered publish,
+// a refused second-device join).
+pub mod meta_kind;
 // The owner-side durable outbox for rotation-package delivery (myne-md/myne#797):
 // the rotation writes the sealed packages here before it touches the network, and
 // every sync cycle / unlock drains it until each recipient's POST has succeeded.
@@ -115,7 +136,6 @@ pub mod stream_supervisor;
 // sealed file through the `VaultIo` seam, so a browser can carry the module; what
 // a browser does not carry is the MEMBER surface that calls two of them, and that
 // refusal lives in the capability table rather than in a cfg.
-pub mod member_key_store;
 pub mod member_unlock_store;
 pub mod person_vault_carrier;
 // The person account, membership and invite plane. UNGATED as of myne-md/myne#911

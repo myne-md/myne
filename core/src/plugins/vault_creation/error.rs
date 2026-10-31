@@ -142,11 +142,11 @@ pub enum AppError {
     /// installed, and a vault is being created for the first time under it
     /// (myne-md/myne#911 task 5).
     ///
-    /// The `NTV7` generation carries a roster the OWNER signs, so creation needs
+    /// The `NTV8` generation carries a roster the OWNER signs, so creation needs
     /// the private half of the identity keypair, not merely its public half.
     /// Refusing is what keeps the promise of one phrase per person: the legacy
-    /// birth would mint a second recovery phrase, and a partial `NTV7` frame
-    /// would seal a vault nobody can recover.
+    /// birth would mint a second recovery phrase, and a partial `NTV8` frame
+    /// would seal a vault whose roster nothing signed.
     ///
     /// The fix the user performs is one thing: unlock the identity (enter its
     /// 24 words) and create the vault again.

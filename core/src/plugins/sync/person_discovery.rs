@@ -30,8 +30,6 @@
 //! finds the container it made the first time instead of minting a duplicate,
 //! and it needs no side table to do it.
 
-use protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC;
-
 use crate::host::HostCtx;
 use crate::plugins::sync::devices::SyncDeviceError;
 use crate::plugins::sync::http_transport::build_transport;
@@ -265,7 +263,11 @@ async fn materialise_vault(
     // the one a second device can hold without any key material, and its password
     // wrap is what later opens it. A legacy frame here would be a server answer
     // this device cannot use, and guessing is worse than saying so.
-    if bytes.get(..4) != Some(VAULT_META_NTV7_MAGIC.as_slice()) {
+    // Both person generations. The server's copy of a person-born vault becomes `NTV8`
+    // as soon as the owner's device syncs its upgraded `vault.meta`, so a magic check for
+    // `NTV7` alone refuses the join on exactly the vaults that have been used since the
+    // upgrade, the second device could never be added again.
+    if !super::meta_kind::is_person_born(&bytes) {
         return Err(SyncDeviceError::BadRequest);
     }
 
@@ -309,18 +311,28 @@ async fn materialise_vault(
     Ok(vault_id)
 }
 
-/// The namespace a person-wrapped container names, read from the frame itself.
+/// The namespace a person-born container names, read from the frame itself.
 ///
 /// The fallback for a lost `sync-state.json`, and deliberately narrow: `None`
-/// unless the frame is `NTV7`, because on every other generation offset 6 is the
-/// account hash the vault's own credential already names, and reading that as a
-/// namespace would move a legacy vault onto the person credential.
+/// unless the frame is a person-born generation, because on `MYV1`, `NTV5` and
+/// `NTV6` offset 6 is the account hash the vault's own credential already names,
+/// and reading that as a namespace would move a legacy vault onto the person
+/// credential.
+///
+/// Both person-born generations answer: `NTV7` and the password-only `NTV8`
+/// (myne-md/myne#938), because the offset-6 rule belongs to a vault BORN under a
+/// person identity and not to the credential side. Answering `None` for `NTV8`
+/// would strand a vault that lost its `sync-state.json`, and the truncation that
+/// produced `NTV8` cannot have touched offset 6.
 pub async fn person_frame_namespace(
     io: &dyn VaultIo,
     vault_root: &std::path::Path,
 ) -> Option<[u8; 16]> {
     let bytes = io.read(&vault_root.join("vault.meta")).await.ok()?;
-    if protocol::vault_meta_generation(&bytes) != protocol::VaultMetaGeneration::Person {
+    if !matches!(
+        protocol::vault_meta_generation(&bytes),
+        protocol::VaultMetaGeneration::Person | protocol::VaultMetaGeneration::PersonNoWrap
+    ) {
         return None;
     }
     let mut ns = [0u8; 16];

@@ -49,6 +49,20 @@ describe("the vault-format upgrade row", () => {
     expect(screen.queryByTestId("settings.vault.format-done")).toBeNull();
   });
 
+  it("is omitted on an NTV8 vault, which has no vault phrase to retire", async () => {
+    // The third answer (myne-md/myne#938, `decisions/protocol/0758`). `null` is
+    // an `NTV8` vault: born without a vault phrase, so the row would offer to
+    // retire a credential that does not exist and its button could only answer
+    // `AlreadyUpgraded`. Before the tri-state this collapsed into `false` and the
+    // row appeared.
+    vaultIsPersonWrapped.mockResolvedValue(null);
+    render(<VaultFormatUpgrade />);
+
+    await waitFor(() => expect(vaultIsPersonWrapped).toHaveBeenCalled());
+    expect(screen.queryByTestId("settings.vault.format-cta")).toBeNull();
+    expect(screen.queryByTestId("settings.vault.format-done")).toBeNull();
+  });
+
   it("is omitted when the probe cannot answer at all", async () => {
     // A client with no person plane: the command refuses, so the row must not
     // be rendered against it.

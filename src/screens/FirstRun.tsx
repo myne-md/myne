@@ -6,8 +6,9 @@
 // The welcome screen used to offer a fork: create an identity, or create a local
 // vault with no identity, and a skip was implied by which row you pressed. That
 // is gone. A person is the thing Myne is organised around, the account number
-// belongs to them rather than to a vault, and one phrase recovers everything they
-// own, so "create" has to mean one thing: the identity, then the vault.
+// belongs to them rather than to a vault, and one phrase recovers THEM on any
+// device (it opens no vault, myne-md/myne#938), so "create" has to mean one
+// thing: the identity, then the vault.
 //
 // A stage rather than a mode inside `welcome` because the two screens answer
 // different questions. Welcome asks "what do you want to do on this device" and
@@ -17,9 +18,13 @@
 //
 // The phrase step IS the recovery kit now: one phrase, one save action, one
 // type-back, and that phrase is the identity's (the vault's own phrase is
-// retired, myne-md/myne#911 task 5). There is deliberately no second kit on the
+// retired, myne-md/myne#911 task 5, and on the `NTV8` generation the vault has no
+// phrase at all, myne-md/myne#938). There is deliberately no second kit on the
 // vault that follows: `CreateVault` skips its kit and type-back when the backend
 // returns no phrase, so the user meets exactly one "keep this forever" moment.
+// What that moment buys is narrower than it reads: the words get the person back
+// on a new device and open no note, and the vault password is the only thing that
+// does.
 //
 // # Abandoning
 //

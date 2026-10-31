@@ -1,17 +1,26 @@
-// myne-md/myne#911 task 10: the explicit upgrade of an existing vault to the
-// person-wrapped (`NTV7`) generation.
+// myne-md/myne#911 task 10, retargeted by myne-md/myne#938: the explicit upgrade
+// of an existing vault to the password-only (`NTV8`) generation.
+//
+// **The endpoint moved, and this file moved with it.** `#911` built this upgrade
+// to end on `NTV7`, where the owner's identity phrase also opened the vault. That
+// second door is exactly what `decisions/protocol/0758` removed: `NTV7` is never
+// written again, and the explicit upgrade now chains the owner B2B migration into
+// a truncation, so the frame it commits is `NTV8`. Leaving the scenario asserting
+// `NTV7` would have been a green-looking claim about a format the product no
+// longer produces.
 //
 // The acceptance line is four claims about ONE vault, in order: before the
 // upgrade it works exactly as it did; the upgrade is explicit and names its two
-// consequences before the button; after it the saved vault phrase no longer
-// opens the vault, the password still does, and the owner's identity phrase
-// does; and the bytes on disk carry the new magic.
+// consequences before the button; after it NEITHER phrase opens the vault and the
+// password still does; and the bytes on disk carry the new magic.
 //
 // **Why the fixture is a SEEDED vault rather than one created in the flow.** A
-// vault created today is born `NTV7` (task 5), so it has nothing to upgrade.
+// vault created today is born `NTV8`, so it has nothing to upgrade.
 // This is the existing-user path, and a seeded pre-upgrade vault is the only way
 // to stand in it. The seed is `NTV5`, which also exercises the chained arm: the
-// upgrade runs the owner B2B migration first, because `NTV7` carries that tail.
+// upgrade runs the owner B2B migration first (which produces an `NTV7` frame),
+// then truncates it, because the group tail is what a password-only vault needs
+// to be shareable.
 //
 // **Why the identity is created from Settings rather than from the first run.**
 // This device already has a vault, so boot lands on Unlock and the first-run
@@ -117,23 +126,8 @@ async function createIdentityFromSettings(session: Session): Promise<string[]> {
   return words;
 }
 
-/** Type a 24-word phrase into the identity-phrase unlock grid. */
-async function enterIdentityPhrase(session: Session, words: string[]): Promise<void> {
-  // The grid's first cell carries its own id and every later cell a numbered
-  // one (`PhraseEntryGrid`'s `cellTestId`), so the loop addresses them the way
-  // the component names them rather than by DOM order.
-  for (let index = 1; index <= 24; index += 1) {
-    const testId =
-      index === 1
-        ? "unlock.identity-phrase-input"
-        : `unlock.identity-phrase-cell-${index}`;
-    const cell = await session.byTestId(testId, { timeoutMs: 10_000 });
-    await cell.sendKeys(words[index - 1]);
-  }
-}
-
-describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", () => {
-  it("retires the vault phrase, keeps the password, and opens with the identity phrase", async () => {
+describeE2E("VA-1 upgrade to a password-only vault (myne-md/myne#911 task 10, myne-md/myne#938)", () => {
+  it("retires the vault phrase, keeps the password, and leaves no phrase door at all", async () => {
     let seeded!: SeededVault;
     await scenario(
       "va1-upgrade",
@@ -161,7 +155,11 @@ describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", ()
         await dismissImporterOffer(session);
 
         // 2. The identity, created after the fact.
-        const identityWords = await createIdentityFromSettings(session);
+        // The words are not needed below any more: no phrase opens this vault
+        // after the upgrade. The ceremony is still driven for real, because the
+        // upgrade needs the identity's KEYPAIR in the session and a mocked one
+        // would prove nothing.
+        await createIdentityFromSettings(session);
 
         // 3. The upgrade, through the Vault panel.
         await openSettings(session, "vault");
@@ -186,7 +184,7 @@ describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", ()
         //    for the sync loop: nothing else would push it, because the upgrade
         //    edits no note and the meta phase only pushes a dirty meta.
         const meta = readFileSync(vaultMetaPath(app.appDataDir, seeded.vaultId));
-        expect(meta.subarray(0, 4).toString("ascii")).toBe("NTV7");
+        expect(meta.subarray(0, 4).toString("ascii")).toBe("NTV8");
         expect(
           existsSync(
             join(app.appDataDir, "vaults", seeded.vaultId, "vault.meta-dirty"),
@@ -199,7 +197,11 @@ describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", ()
           15_000,
         );
         expect(probe.err).toBeUndefined();
-        expect(probe.ok).toBe(true);
+        // `null`, not `true`: the probe answers three states and this one means
+        // "this vault has no second credential". A `true` here would be the
+        // pre-#938 answer, and the Unlock screen keys the whole recovery door off
+        // it (myne-md/myne#938).
+        expect(probe.ok).toBeNull();
 
         await closeSettings(session);
 
@@ -207,23 +209,19 @@ describeE2E("VA-1 upgrade to one-phrase recovery (myne-md/myne#911 task 10)", ()
         await (await session.byTestId("editor.lock-cta")).click();
         await unlockToEditor(session, seeded.password);
 
-        // 6. The saved vault phrase is retired: the unlock screen's escape hatch
-        //    is the identity phrase, not the vault-recovery flow. That the link
-        //    says so is the assertion that the phrase arm is unreachable.
+        // 6. NEITHER phrase is offered, and that is the claim this scenario was
+        //    retargeted to make. The saved vault phrase is retired by the
+        //    upgrade, and the identity phrase never opens an `NTV8` vault, so the
+        //    unlock screen has no recovery link at all: it states the password is
+        //    the only way in. The identity ceremony above is what proves the
+        //    upgrade needed a real identity rather than a mocked one.
         await (await session.byTestId("editor.lock-cta")).click();
-        const link = await session.byTestId("unlock.recovery-link", {
-          timeoutMs: 20_000,
-        });
-        expect(await link.textContent()).toBe(i18n.t("unlock.identityPhraseLink"));
-        await link.click();
-        await session.byTestId("unlock.identity-phrase-grid", { timeoutMs: 10_000 });
-        await enterIdentityPhrase(session, identityWords);
-        await (
-          await session.byTestId("unlock.identity-phrase-submit")
-        ).click();
+        await session.byTestId("unlock.password-only-note", { timeoutMs: 20_000 });
+        expect(await session.byTestIdAll("unlock.recovery-link")).toHaveLength(0);
 
-        // 7. The identity phrase opened it.
-        await session.byTestId("editor.root", { timeoutMs: 45_000 });
+        // 7. And the password still opens it, which is what "the vault is not
+        //    lost" means for this generation.
+        await unlockToEditor(session, seeded.password);
       },
     );
   });

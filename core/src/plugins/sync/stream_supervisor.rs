@@ -156,27 +156,30 @@ pub(crate) async fn gather_snapshot<R: Runtime>(app: &AppHandle<R>) -> Option<Co
         .await
         .ok()
         .flatten();
-    // A person-born (`NTV7`) vault has no per-vault token, exactly as the cycle
-    // says: its credential is the person token. Without this fallback `None` here
-    // reads as "not enrolled", no listener is spawned, and every cross-device
-    // change on a person-born vault waits for the 30 s poll while the web twin
-    // (which got the same fix) pokes on the same edit (myne-md/myne#911 review).
+    // A person-born vault has no per-vault token, exactly as the cycle says: its
+    // credential is the person token. Without this fallback `None` here reads as
+    // "not enrolled", no listener is spawned, and every cross-device change on a
+    // person-born vault waits for the 30 s poll while the web twin (which got the
+    // same fix) pokes on the same edit (myne-md/myne#911 review).
     let token_hex = match token {
         Some(token) => protocol::hex::encode_lower(&token),
-        // Gated the way `cycle.rs` gates the same decision: only a PERSON-wrapped
+        // Gated the way `cycle.rs` gates the same decision: only a person-born
         // vault has no per-vault token and a person token that names it. Without
         // the gate, a legacy or member vault with no stored token (a partial
         // materialisation, an interrupted enrolment) would open a stream under a
         // credential that names a different account instead of reporting "not
         // enrolled" (myne-md/myne#911 review).
-        None if matches!(
-            crate::vault_io::StdVaultIo
-                .read(&dir.join("vault.meta"))
-                .await
-                .ok()
-                .map(|b| protocol::vault_meta_generation(&b)),
-            Some(protocol::VaultMetaGeneration::Person)
-        ) =>
+        //
+        // **Asked through `meta_kind::is_person_born`, not against one magic**
+        // (myne-md/myne#938 review). `NTV8` is person-born and has no per-vault
+        // token either, so a `Person`-only test sent every vault created since the
+        // upgrade down the `None` arm below: the vault works, sync is just always
+        // 30 seconds late, which is the failure this whole arm exists to end.
+        None if crate::vault_io::StdVaultIo
+            .read(&dir.join("vault.meta"))
+            .await
+            .ok()
+            .is_some_and(|b| super::meta_kind::is_person_born(&b)) =>
         {
             let path = super::person_auth::person_auth_path_for_read(
                 &crate::host::tauri_host::TauriHost::new(app.clone()),

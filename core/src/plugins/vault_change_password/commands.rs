@@ -546,6 +546,21 @@ pub(crate) async fn change_password_with_path(
                         &fresh_nonce,
                     )
                 }
+                // `NTV8` retires the person wrap as well, so it needs the same
+                // treatment one generation further on: its own rewrite, which
+                // carries the group tail and leaves the three phrase-wrap
+                // fields zero. The `NTV6` writer would re-serialize as `NTV6`.
+                protocol::VaultMetaGeneration::PersonNoWrap => {
+                    let ntv8 = protocol::parse_vault_meta_ntv8(&bytes)
+                        .map_err(|_| VaultChangePasswordError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv8(
+                        &ntv8,
+                        &root_key_for_seal,
+                        &new_password,
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
                 // A B2B rewrite must carry the tail (owner-wrapped group key,
                 // epoch, sealed roster); the versioned v0.2 rewrite would
                 // re-serialize as `NTV5` and drop it.

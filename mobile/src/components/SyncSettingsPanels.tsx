@@ -11,7 +11,7 @@
 // timestamp. The cert-trust surface never claims "-PLUS"/channel-binding (cbind empty,
 // R3 transport review-debt).
 
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { SyncStatus } from "../lib/use-sync-status";
@@ -31,6 +31,20 @@ import { useHeadFingerprintCompare } from "../hooks/useHeadFingerprintCompare";
 import { useMemberVault } from "../hooks/useMemberVault";
 import { formatBytes } from "../lib/util";
 import { formatAccountNumberInput } from "../lib/account-number-format";
+import { personStatus } from "../lib/personAccount";
+import { copySecretToClipboard } from "../lib/secret-export";
+import type { CancelClear } from "@myne/clipboard";
+import {
+  acceptAdmittingDevice,
+  cancelDeviceAdmission,
+  confirmJoiningDevice,
+  deviceAdmissionErrorKind,
+  previewDeviceAdmission,
+  startDeviceAdmission,
+  type AdmissionConfirmedView,
+  type AdmissionMintedView,
+  type AdmissionPreviewView,
+} from "../lib/deviceAdmission";
 import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 // From the shared tree, not the local twin: `PHRASE_CELL_COUNT` has ONE
 // definition (`src/lib/bip39-normalize.ts`) and the twin is byte-identical to
@@ -49,7 +63,15 @@ import {
   REMOVE_DEVICE_DISCLOSURE,
 } from "../lib/load-bearing-copy";
 import { canAddThisDevice } from "@myne/enroll-gate";
-import { Banner, PhraseEntryGrid, Segmented } from "./index";
+import {
+  Banner,
+  Button,
+  Checkbox,
+  MonoBox,
+  PhraseEntryGrid,
+  Segmented,
+  TextField,
+} from "./index";
 // The host probe has ONE definition (`lib/app-window.ts`), which is also the one
 // file `check-platform-seam.mjs` exempts from the runtime-global rule. This
 // module used to re-spell it inline, and the copy was subtly weaker: no
@@ -197,11 +219,47 @@ function statusView(status: SyncStatus | null, t: TFunction): { color: string; l
     case "syncing":
       return { color: "var(--accent)", label: t("sync.status.syncing") };
     case "error":
-      // A TLS failure is not an offline device: certificate and server-name
-      // validation must be fixed before this client can reconnect.
-      return status.detail === "tls_failure"
-        ? { color: "var(--danger)", label: t("sync.status.errorTls") }
-        : { color: "var(--warning)", label: t("settings.sync.summary.offline") };
+      // Class-scoped details, mirroring the desktop indicator's arms
+      // (`src/components/sync/SyncStatusIndicator.tsx`) because a phone reaches
+      // exactly the same classes out of the same core, and the shared copy
+      // already exists for every one of them (myne-md/myne#938 task 13).
+      //
+      // The rule this replaces: everything but a TLS failure read "Offline", so a
+      // locked identity, a frozen account, a full disk and a removed device all
+      // told the user the same false thing and pointed at a network that was
+      // working. "Offline" now means the one class it names, `sync_failed`, which
+      // is what `FailureClass::Transport` and `Other` both report.
+      switch (status.detail) {
+        case "auth_failed":
+          return { color: "var(--danger)", label: t("sync.status.errorAuth") };
+        case "rate_limited":
+          return { color: "var(--warning)", label: t("sync.status.errorRateLimited") };
+        case "quota_exceeded":
+          return { color: "var(--danger)", label: t("sync.status.errorQuota") };
+        case "payload_too_large":
+          return { color: "var(--danger)", label: t("sync.status.errorTooLarge") };
+        case "frozen":
+          return { color: "var(--danger)", label: t("sync.status.errorFrozen") };
+        // A shared vault refuses to sync until the person identity is unlocked
+        // for this session. Its own copy because the fix is a specific user
+        // action, and "Offline" would send them looking at the network.
+        case "identity_locked":
+          return { color: "var(--warning)", label: t("sync.status.errorIdentityLocked") };
+        case "storage_full":
+          return { color: "var(--warning)", label: t("sync.status.errorStorageFull") };
+        case "device_revoked":
+          return { color: "var(--danger)", label: t("sync.status.errorDeviceRevoked") };
+        // Not an offline device either: certificate and server-name validation
+        // must be fixed before this client can reconnect.
+        case "tls_failure":
+          return { color: "var(--danger)", label: t("sync.status.errorTls") };
+        case "sync_failed":
+          return { color: "var(--warning)", label: t("settings.sync.summary.offline") };
+        // A detail this build does not know (a newer core, a renamed class) is
+        // not evidence of a transport failure, so it gets the generic copy.
+        default:
+          return { color: "var(--danger)", label: t("sync.status.error") };
+      }
     case "conflicts":
       return {
         color: "var(--danger)",
@@ -378,11 +436,13 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
           <RowChevron />
         </Row>
       </Group>
-      {/* What the row is replaced BY while this device waits — stating the
-          situation rather than offering an action, because there is no action
-          to take here: approval happens on another device, and the only button
-          this screen could honestly show would create a second pending record.
-          Desktop renders the same sentence for the same reason (MYND-635).
+      {/* What the row is replaced BY while this device waits. This used to state
+          the situation and offer nothing, on the grounds that approval happens on
+          another device and the only button here would create a second pending
+          record. That is no longer true: myne-md/myne#938 task 11 makes the
+          waiting device's own tap half of the exchange, so the notice is followed
+          by the ceremony (`decisions/protocol/0735`). The notice stays, because
+          "waiting" is still the state until the other side accepts.
 
           `ENROLL_PENDING_NOTICE` verbatim, not an i18n key: the load-bearing
           copy is byte-identical across clients by construction (SYNC-42). */}
@@ -391,9 +451,467 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
           {ENROLL_PENDING_NOTICE}
         </p>
       )}
+      {/* **The ceremony is NOT inside the pending arm** (myne-md/myne#938
+          review). It used to mount only while `status.state === "pending"`, so
+          "approve a device on this vault" was unreachable in every state where it
+          could work: a pending phone has no credential and cannot admit anyone,
+          and a signed-in phone never rendered the block at all. Both arms are real
+          and each gates a different write, which is what the header above claims. */}
+      <DeviceAdmissionBlock />
 
       <p style={{ ...HELP, marginTop: 16 }}>{t("sync.settings.hubHelp")}</p>
     </div>
+  );
+}
+
+// ── The two-sided admission ceremony ─────────────────────────────────────────
+//
+// myne-md/myne#938 task 11 (`decisions/protocol/0735`). A phone is usually the
+// JOINING side (its first run is the join screen), but it is a full peer: it can
+// also read another device's code and accept it. Both arms are here because both
+// gates are real and each gates a DIFFERENT write: the joining arm persists only
+// this device's own secret, the admitting arm installs a server credential and
+// writes the joining device's binding row.
+//
+// Nothing is saved on either arm before its own confirm button, and the confirm
+// button stays disabled until the user has said the two screens show the same
+// eight characters. A mismatch is a stop rather than a retry: the SAS is derived
+// over the whole admission code, so a difference means the code changed in
+// transit, and "try again" would train the user to press through the one signal
+// that catches it.
+//
+// Why the code is a MonoBox and not a QR: it carries a device's Ed25519 and
+// ML-DSA-65 public halves, so it is kilobytes of hex, past what any QR symbol
+// holds. It travels by whatever channel the user has, and the SAS is what makes
+// that channel safe, because a substituted code moves the string the human
+// compares.
+function DeviceAdmissionBlock() {
+  const { t } = useTranslation();
+  const [mode, setMode] = useState(0);
+  const [personId, setPersonId] = useState<string | null>(null);
+  const [minted, setMinted] = useState<AdmissionMintedView | null>(null);
+  const [code, setCode] = useState("");
+  const [preview, setPreview] = useState<AdmissionPreviewView | null>(null);
+  const [accepted, setAccepted] = useState<AdmissionConfirmedView | null>(null);
+  const [ack, setAck] = useState(false);
+  const [outcome, setOutcome] = useState<"pending" | "approved" | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  // A mismatch is a STOP, not a retry: the SAS is derived over the whole code, so
+  // a difference means the code changed in transit. It therefore needs its own
+  // teardown that leaves the stop line standing, because the shared `reset()`
+  // clears every field it would have to render into and the claim "a mismatch
+  // stops both sides" then existed for one frame (myne-md/myne#938 review).
+  const [stopped, setStopped] = useState(false);
+  // Copy feedback, and the pending OS clear so unmount releases the code.
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  const copyCancel = useRef<CancelClear | null>(null);
+  useEffect(
+    () => () => {
+      copyCancel.current?.();
+      copyCancel.current = null;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void personStatus()
+      .then((s) => {
+        if (!cancelled) setPersonId(s.person_id_hex);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const failure = (e: unknown): string => {
+    const kind = deviceAdmissionErrorKind(e);
+    return kind === "SasMismatch"
+      ? t("sync.deviceAdmission.error.sasMismatch")
+      : kind === "NoPendingAdmission"
+        ? t("sync.deviceAdmission.error.noPending")
+        : t("sync.deviceAdmission.error.generic");
+  };
+
+  const onStart = async () => {
+    if (!personId) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      setMinted(await startDeviceAdmission(personId));
+    } catch (e) {
+      setFailed(failure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onConfirmJoin = async () => {
+    if (!minted) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      setOutcome((await confirmJoiningDevice(minted.sas)) ? "approved" : "pending");
+    } catch (e) {
+      setFailed(failure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onPreview = async () => {
+    setBusy(true);
+    setFailed(null);
+    try {
+      setPreview(await previewDeviceAdmission(code.trim()));
+    } catch (e) {
+      setFailed(failure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onAccept = async () => {
+    if (!preview) return;
+    setBusy(true);
+    setFailed(null);
+    try {
+      setAccepted(await acceptAdmittingDevice(code.trim(), preview.sas));
+    } catch (e) {
+      setFailed(failure(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    // A cancel that cannot reach the backend is REPORTED, not swallowed
+    // (myne-md/myne#938 review). The code stays valid on the server, so the local
+    // teardown below is true of this phone and not of the ceremony; saying so is
+    // the difference between a stop and a stop that looks like one.
+    let cancelFailure: string | null = null;
+    try {
+      await cancelDeviceAdmission();
+    } catch (e) {
+      cancelFailure = failure(e);
+    }
+    setMinted(null);
+    setCode("");
+    setPreview(null);
+    setAccepted(null);
+    setAck(false);
+    setOutcome(null);
+    setStopped(false);
+    setCopied(null);
+    setFailed(cancelFailure);
+  };
+
+  // The stop arm. Deliberately NOT `reset()`: that clears `stopped`, which would
+  // reopen the buttons that mint a new code and leave the stop line on screen for
+  // one frame. The backend still has to be cancelled, because a minted admission
+  // is live server state, so the local fields are torn down and `stopped` is left
+  // standing; a cancel that cannot reach the server is reported beside it.
+  const onMismatch = async () => {
+    let cancelFailure: string | null = null;
+    try {
+      await cancelDeviceAdmission();
+    } catch (e) {
+      cancelFailure = failure(e);
+    }
+    setMinted(null);
+    setCode("");
+    setPreview(null);
+    setAccepted(null);
+    setAck(false);
+    setOutcome(null);
+    setCopied(null);
+    setStopped(true);
+    setFailed(cancelFailure);
+  };
+
+  // The code is CREDENTIAL-EQUIVALENT (it carries both SCRAM verifier halves), so
+  // it is copied through the SECRET path, not the plain one, and the OS owns the
+  // expiry window. Without a control here the only way to move it was to select
+  // the MonoBox by hand, which on a phone is not a gesture anyone performs
+  // (myne-md/myne#938 review).
+  const copyCode = () => {
+    void (async () => {
+      const cancel = await copySecretToClipboard(minted?.code ?? "", {
+        onSuccess: { kind: "inline", run: () => setCopied("ok") },
+        onFailure: { kind: "inline", run: () => setCopied("failed") },
+      });
+      if (cancel === null) return;
+      copyCancel.current?.();
+      copyCancel.current = cancel;
+    })();
+  };
+
+  return (
+    <div style={{ marginTop: "var(--space-3)" }} data-testid="sync.device-admission">
+      <Segmented
+        options={[
+          t("sync.deviceAdmission.join.cta"),
+          t("sync.deviceAdmission.admit.cta"),
+        ]}
+        active={mode}
+        onChange={(i: number) => {
+          void reset();
+          setMode(i);
+        }}
+        ariaLabel={t("sync.deviceAdmission.aria")}
+      />
+
+      {mode === 0 ? (
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <p style={HELP}>{t("sync.deviceAdmission.join.intro")}</p>
+          {minted === null ? (
+            <Button
+              variant="secondary"
+              disabled={busy || personId === null}
+              onClick={() => void onStart()}
+              data-testid="sync.device-admission.join-start"
+            >
+              {t("sync.deviceAdmission.join.start")}
+            </Button>
+          ) : (
+            <>
+              <FieldLabel>{t("sync.deviceAdmission.join.codeLabel")}</FieldLabel>
+              <MonoBox value={minted.code} testId="sync.device-admission.code" />
+              <div
+                style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", marginTop: "var(--space-2)" }}
+              >
+                <Button
+                  variant="secondary"
+                  full={false}
+                  onClick={copyCode}
+                  data-testid="sync.device-admission.copy"
+                >
+                  {t("sync.deviceAdmission.join.copy")}
+                </Button>
+                {copied !== null && (
+                  <span
+                    role="status"
+                    data-testid="sync.device-admission.copy-outcome"
+                    style={{ fontSize: "var(--text-xs)", color: copied === "ok" ? "var(--success)" : "var(--danger)" }}
+                  >
+                    {copied === "ok"
+                      ? t("sync.deviceAdmission.join.copied")
+                      : t("sync.deviceAdmission.join.copyFailed")}
+                  </span>
+                )}
+              </div>
+              <FieldLabel>{t("sync.deviceAdmission.sasLabel")}</FieldLabel>
+              <p
+                style={{
+                  margin: "var(--space-1) 0 0",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "var(--text-2xl)",
+                  letterSpacing: "var(--tracking-wide)",
+                  color: "var(--fg-1)",
+                }}
+                data-testid="sync.device-admission.sas"
+              >
+                {minted.sas}
+              </p>
+              <p style={HELP}>{t("sync.deviceAdmission.sasHint")}</p>
+              {!minted.has_device_key && (
+                <p style={HELP}>{t("sync.deviceAdmission.noDeviceKey")}</p>
+              )}
+              <AckRow
+                checked={ack}
+                onToggle={() => setAck(!ack)}
+                label={t("sync.deviceAdmission.matchAck")}
+                testId="sync.device-admission.join-ack"
+              />
+              {outcome === "pending" && (
+                <p style={NOTICE} data-testid="sync.device-admission.join-pending">
+                  {t("sync.deviceAdmission.join.pending")}
+                </p>
+              )}
+              {outcome === "approved" && (
+                <p
+                  style={{ ...NOTICE, color: "var(--success)" }}
+                  data-testid="sync.device-admission.join-approved"
+                >
+                  {t("sync.deviceAdmission.join.approved")}
+                </p>
+              )}
+              <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                <Button
+                  disabled={busy || !ack}
+                  onClick={() => void onConfirmJoin()}
+                  data-testid="sync.device-admission.join-confirm"
+                >
+                  {t("sync.deviceAdmission.confirm")}
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void reset()}
+                  data-testid="sync.device-admission.join-cancel"
+                >
+                  {t("sync.deviceAdmission.cancel")}
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
+      ) : (
+        <div style={{ marginTop: "var(--space-3)" }}>
+          <p style={HELP}>{t("sync.deviceAdmission.admit.intro")}</p>
+          {accepted === null ? (
+            <>
+              <FieldLabel>{t("sync.deviceAdmission.admit.codeLabel")}</FieldLabel>
+              <TextField
+                value={code}
+                onChange={(next) => {
+                  setCode(next);
+                  setPreview(null);
+                  setAck(false);
+                }}
+                label={t("sync.deviceAdmission.admit.codeLabel")}
+                mono
+                testId="sync.device-admission.admit-code"
+              />
+              {preview === null ? (
+                <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                  <Button
+                    variant="secondary"
+                    disabled={busy || code.trim().length === 0}
+                    onClick={() => void onPreview()}
+                    data-testid="sync.device-admission.admit-preview"
+                  >
+                    {t("sync.deviceAdmission.admit.preview")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void reset()}
+                    data-testid="sync.device-admission.admit-cancel"
+                  >
+                    {t("sync.deviceAdmission.cancel")}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <FieldLabel>{t("sync.deviceAdmission.sasLabel")}</FieldLabel>
+                  <p
+                    style={{
+                      margin: "var(--space-1) 0 0",
+                      fontFamily: "var(--font-mono)",
+                      fontSize: "var(--text-2xl)",
+                      letterSpacing: "var(--tracking-wide)",
+                      color: "var(--fg-1)",
+                    }}
+                    data-testid="sync.device-admission.admit-sas"
+                  >
+                    {preview.sas}
+                  </p>
+                  <p style={HELP}>{t("sync.deviceAdmission.sasHint")}</p>
+                  <p style={HELP} data-testid="sync.device-admission.admit-device">
+                    {t("sync.deviceAdmission.admit.deviceId", { id: preview.device_id_hex })}
+                  </p>
+                  {!preview.has_device_key && (
+                    <p style={HELP}>{t("sync.deviceAdmission.noDeviceKey")}</p>
+                  )}
+                  <AckRow
+                    checked={ack}
+                    onToggle={() => setAck(!ack)}
+                    label={t("sync.deviceAdmission.matchAck")}
+                    testId="sync.device-admission.admit-ack"
+                  />
+                  <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-3)" }}>
+                    <Button
+                      disabled={busy || !ack}
+                      onClick={() => void onAccept()}
+                      data-testid="sync.device-admission.admit-accept"
+                    >
+                      {t("sync.deviceAdmission.confirm")}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void onMismatch()}
+                      data-testid="sync.device-admission.admit-mismatch"
+                    >
+                      {t("sync.deviceAdmission.mismatch")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p style={NOTICE} data-testid="sync.device-admission.admit-accepted">
+                {accepted.binding_written
+                  ? t("sync.deviceAdmission.admit.done")
+                  : t("sync.deviceAdmission.admit.doneNoRow")}
+              </p>
+              <Button
+                variant="secondary"
+                onClick={() => void reset()}
+                data-testid="sync.device-admission.admit-close"
+              >
+                {t("sync.deviceAdmission.close")}
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+
+      {stopped && (
+        <p style={NOTICE} data-testid="sync.device-admission.stopped">
+          {t("sync.deviceAdmission.stopped")}
+        </p>
+      )}
+
+      {failed !== null && (
+        <div style={{ marginTop: "var(--space-3)" }} data-testid="sync.device-admission.error">
+          <Banner kind="danger">{failed}</Banner>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The one acknowledgement both arms share: the human says the two screens agree.
+ *  A `button` with `aria-pressed` rather than a styled checkbox, so the announced
+ *  state and the painted state come from the same attribute. */
+function AckRow({
+  checked,
+  onToggle,
+  label,
+  testId,
+}: {
+  checked: boolean;
+  onToggle: () => void;
+  label: string;
+  testId: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={checked}
+      onClick={onToggle}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "var(--space-2)",
+        marginTop: "var(--space-3)",
+        background: "none",
+        border: "none",
+        padding: 0,
+        textAlign: "left",
+        color: "var(--fg-2)",
+        fontSize: "var(--text-base)",
+      }}
+      data-testid={testId}
+    >
+      <Checkbox checked={checked} />
+      {label}
+    </button>
   );
 }
 
@@ -1222,14 +1740,23 @@ export function SyncMembersPanel() {
     <div style={MEMBERS_WRAP}>
       <SectionLabel mt={0}>{t("sync.members.title")}</SectionLabel>
       <Group>
-        <Row first testId="sync.members.authority">
-          <span style={rowLabel}>{t("sync.members.access")}</span>
-          <span style={MEMBERS_VALUE}>
-            {authority === "owner"
-              ? t("sync.memberRoster.ownerBadge")
-              : t("sync.memberRoster.memberBadge")}
-          </span>
-        </Row>
+        {/* Omitted, not guessed, while the role is unknown (myne-md/myne#938 task
+            13). `authority` is `null` until the roster has been read and stays
+            `null` when the read failed, so the absent-not-disabled rule applies to
+            a FACT rather than to a control: a phone that has not learned whether
+            this vault is shared shows no access row at all, and the error row
+            below says why. Rendering "Member" here was the phone asserting a role
+            it had never been told, to the one person it would most mislead. */}
+        {authority !== null ? (
+          <Row first testId="sync.members.authority">
+            <span style={rowLabel}>{t("sync.members.access")}</span>
+            <span style={MEMBERS_VALUE}>
+              {authority === "owner"
+                ? t("sync.memberRoster.ownerBadge")
+                : t("sync.memberRoster.memberBadge")}
+            </span>
+          </Row>
+        ) : null}
         {groupKeyEpoch !== null ? (
           <Row testId="sync.members.epoch">
             <span style={rowLabel}>{t("sync.members.epochLabel")}</span>

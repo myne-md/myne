@@ -53,7 +53,6 @@ permissions = [
     "allow-sync-person-decline-invite",
     "allow-sync-person-accept-invite",
     "allow-sync-member-join-vault",
-    "allow-sync-person-unlock-member-vault",
     "allow-sync-member-vault-status",
     "allow-sync-person-set-member-password",
     "allow-sync-person-unlock-member-vault-with-password",
@@ -68,6 +67,15 @@ permissions = [
     "allow-sync-list-devices",
     "allow-sync-account-status",
     "allow-sync-approve-device",
+    # The two-sided admission ceremony (myne-md/myne#938 task 11). Both arms are
+    # granted because a phone is a full peer: it is usually the joining side, and
+    # it can also accept another device's code. A client holding three of the five
+    # would show a control that fails.
+    "allow-sync-device-admission-start",
+    "allow-sync-device-admission-confirm",
+    "allow-sync-device-admission-preview",
+    "allow-sync-device-admission-accept",
+    "allow-sync-device-admission-cancel",
     "allow-sync-remove-device",
     "allow-sync-pending-conflicts",
     "allow-sync-take-conflict",
@@ -196,11 +204,6 @@ description = "Allow invoking sync:sync_member_join_vault (B2B, member-devices t
 commands.allow = ["sync_member_join_vault"]
 
 [[permission]]
-identifier = "allow-sync-person-unlock-member-vault"
-description = "Allow invoking sync:sync_person_unlock_member_vault (B2B: re-unlock a member vault from the recovery phrase by opening the device-local sealed member-key store and installing the member slot)."
-commands.allow = ["sync_person_unlock_member_vault"]
-
-[[permission]]
 identifier = "allow-sync-member-vault-status"
 description = "Allow invoking sync:sync_member_vault_status (read-only: whether a vault is a member vault, so the Unlock surface asks for the phrase instead of a password)."
 commands.allow = ["sync_member_vault_status"]
@@ -269,6 +272,31 @@ commands.allow = ["sync_account_status"]
 identifier = "allow-sync-approve-device"
 description = "Allow invoking sync:sync_approve_device (authed: approve a pending device, POST /auth/devices/approve)."
 commands.allow = ["sync_approve_device"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-start"
+description = "Allow invoking sync:sync_device_admission_start (JOINING side, step 1 of 2: mint a code + its SAS). Writes no credential and sends nothing; the secret waits in RAM for the user's own confirm (decisions/protocol/0735). It may create this device's own signing key at rest on first use, which every sync action does. No vault access, no network."
+commands.allow = ["sync_device_admission_start"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-confirm"
+description = "Allow invoking sync:sync_device_admission_confirm (JOINING side, step 2 of 2: persist this device's own SCRAM secret, only for the SAS the user confirmed, then attempt its device login). Writes person-auth. No vault content."
+commands.allow = ["sync_device_admission_confirm"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-preview"
+description = "Allow invoking sync:sync_device_admission_preview (ADMITTING side, step 1 of 2: decode a code another device showed and derive its SAS). Read-only by construction: it takes no IO handle."
+commands.allow = ["sync_device_admission_preview"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-accept"
+description = "Allow invoking sync:sync_device_admission_accept (ADMITTING side, step 2 of 2: install the joining device's credential, POST /auth/devices/credential, then write its MYU5 binding row). Refused for any SAS other than the one derived from the code in hand. Requires an unlocked vault and a person session."
+commands.allow = ["sync_device_admission_accept"]
+
+[[permission]]
+identifier = "allow-sync-device-admission-cancel"
+description = "Allow invoking sync:sync_device_admission_cancel (either side: forget the minted admission). Nothing was written before this."
+commands.allow = ["sync_device_admission_cancel"]
 
 [[permission]]
 identifier = "allow-sync-remove-device"

@@ -246,6 +246,61 @@ pub async fn upgrade_vault_to_ntv7(
     })
 }
 
+/// Drop the person wrap the explicit upgrade just wrote, and answer the hash the
+/// runtime's CAS anchor must move to (myne-md/myne#938, `decisions/protocol/0758`).
+///
+/// `NTV7` is never written again as a TERMINAL state, so the frame this command
+/// leaves behind is `NTV8`. Without this step the row would commit an `NTV7`
+/// frame, whose phrase still opens the vault, so the copy above the button would
+/// be wrong from the moment it succeeded until the next unlock truncated it; the
+/// identity-phrase door would also reappear on the unlock screen for that window,
+/// because `vault_is_person_wrapped` answers on the magic.
+///
+/// The truncation is [`super::ntv8::upgrade_vault_to_ntv8`], the same code the
+/// unlock tail runs, so the format move has one implementation. A FAILURE is
+/// swallowed here, deliberately, and it is the opposite call from the
+/// `mark_vault_meta_dirty` one in the caller: a swallowed marker error leaves a
+/// state nothing retries, whereas a swallowed truncation leaves a perfectly good
+/// `NTV7` vault that opens with its password and is upgraded on its next unlock.
+/// The user's request ("retire my vault phrase") is then only partially delivered
+/// for one session, which is worth a warning and not worth failing a command whose
+/// durable work already landed.
+///
+/// The returned hash is the bytes ON DISK after this call in both arms, so the
+/// caller moves the anchor exactly once (`current_hash` to this) instead of twice,
+/// where the first move would land on a hash nothing matches.
+async fn truncate_after_explicit_upgrade(
+    io: &dyn VaultIo,
+    meta_path: &Path,
+    ntv7_hash: [u8; 32],
+) -> [u8; 32] {
+    match super::ntv8::upgrade_vault_to_ntv8(io, meta_path).await {
+        Ok(Some(done)) => {
+            // The same coarse event the unlock tail emits: one trace line per
+            // generation move, whichever path performed it.
+            tracing::info!(
+                event = "vault_meta_upgraded",
+                from = "NTV7",
+                to = "NTV8",
+                group_key_epoch = done.group_key_epoch,
+                "dropped the person wrap of root_key on the explicit upgrade"
+            );
+            done.new_meta_hash
+        }
+        // Unreachable by construction, since the caller just wrote an `NTV7`
+        // frame. A real arm rather than an `expect`, because a panic in a command
+        // that has already written the vault is worse than a stale hash.
+        Ok(None) => ntv7_hash,
+        Err(error) => {
+            tracing::warn!(
+                error = ?error,
+                "the vault phrase was retired but the person wrap was not dropped; the next unlock retries"
+            );
+            ntv7_hash
+        }
+    }
+}
+
 /// **Upgrade the open vault to `NTV7`** (myne-md/myne#911 task 10).
 ///
 /// The only IPC entry point. Desktop-only for now: mobile and web have no person
@@ -414,9 +469,12 @@ pub async fn upgrade_vault_to_ntv7_from_host(
         .map_err(|_| Ntv7UpgradeError::Io)?;
     let current_hash = crate::vault_meta_hash::vault_meta_sha256(&current);
     let out = upgrade_vault_to_ntv7(io, &root, &root_key, &owner_public).await?;
+    let group_key_epoch = out.group_key_epoch;
+    let new_meta_hash = truncate_after_explicit_upgrade(io, &meta_path, out.new_meta_hash).await;
+
     if let Some(id) = vault_id {
         state
-            .refresh_meta_hash_if(id, current_hash, out.new_meta_hash)
+            .refresh_meta_hash_if(id, current_hash, new_meta_hash)
             .await;
         // **Delete the carrier, if one exists (myne-md/myne#911 review).** The
         // chained `NTV5` step above writes one deliberately, and an earlier unlock
@@ -427,7 +485,11 @@ pub async fn upgrade_vault_to_ntv7_from_host(
         // person keypair and from it every other owned vault's `root_key`, offline.
         // `carrier_applies` refuses to USE one for a Person frame, but the file
         // itself is sealed under `root_key` alone, so only deleting it closes the
-        // path for someone reading the disk directly.
+        // path for someone reading the disk directly. It is deleted even though the
+        // command now finishes on `NTV8`, where there is no person wrap to escalate
+        // through: a carrier is a device-local copy of the person keypair that no
+        // generation needs once the vault opens with its password alone, and leaving
+        // one behind would be a copy kept for no reader.
         #[cfg(not(target_arch = "wasm32"))]
         crate::plugins::sync::person_vault_carrier::delete_person_vault_carrier(
             host,
@@ -455,7 +517,7 @@ pub async fn upgrade_vault_to_ntv7_from_host(
         .map_err(|_| Ntv7UpgradeError::Io)?;
     Ok(Ntv7UpgradeView {
         upgraded_from,
-        group_key_epoch: out.group_key_epoch,
+        group_key_epoch,
     })
 }
 
@@ -532,6 +594,86 @@ mod tests {
         )
         .await
         .expect("b2b migration");
+    }
+
+    /// The explicit upgrade's TERMINAL frame is `NTV8`, and the hash it hands the
+    /// CAS anchor is the one on disk (myne-md/myne#938).
+    ///
+    /// Three claims, each a way the chain can be wrong while every other test stays
+    /// green. If the truncation is not chained, the vault keeps a person wrap and
+    /// its phrase still opens it. If the hash returned is the `NTV7` frame's,
+    /// `refresh_meta_hash_if` matches nothing and the runtime pushes a stale
+    /// `vault.meta` on the next cycle. And if a re-run moved the anchor again, a
+    /// caller retrying after a crash would point it at bytes no longer on disk.
+    #[test]
+    fn the_explicit_upgrade_commits_ntv8_and_returns_the_hash_of_what_it_wrote() {
+        block_on(async {
+            let dir = ScopedTempDir::new("ntv7-then-ntv8").expect("tempdir");
+            let root_key = [7u8; 32];
+            let items = [9u8; 32];
+            fixture_ntv6(&dir, &root_key, &items).await;
+
+            // The primitive still writes `NTV7`: it is the intermediate frame, and
+            // the truncation consumes it.
+            let intermediate =
+                upgrade_vault_to_ntv7(&StdVaultIo, dir.path(), &root_key, &owner().public_half())
+                    .await
+                    .expect("upgrade to ntv7");
+            let ntv7_bytes = std::fs::read(dir.path().join("vault.meta")).expect("meta");
+            assert_eq!(&ntv7_bytes[..4], protocol::VAULT_META_NTV7_MAGIC.as_slice());
+            assert_eq!(
+                intermediate.new_meta_hash,
+                <[u8; 32]>::from(Sha256::digest(&ntv7_bytes)),
+                "the intermediate hash must be the intermediate frame's, or the fixture is lying"
+            );
+
+            let meta_path = dir.path().join("vault.meta");
+            let committed = truncate_after_explicit_upgrade(
+                &StdVaultIo,
+                &meta_path,
+                intermediate.new_meta_hash,
+            )
+            .await;
+
+            let after = std::fs::read(&meta_path).expect("meta");
+            assert_eq!(
+                &after[..4],
+                protocol::VAULT_META_NTV8_MAGIC.as_slice(),
+                "the explicit upgrade must not leave an NTV7 frame behind"
+            );
+            assert_eq!(
+                committed,
+                <[u8; 32]>::from(Sha256::digest(&after)),
+                "the hash handed to the CAS anchor must be the bytes on disk"
+            );
+            assert_ne!(
+                committed, intermediate.new_meta_hash,
+                "returning the NTV7 hash would leave the anchor on a frame nothing wrote"
+            );
+
+            // No person wrap, so the phrase has nothing to open: the claim the copy
+            // above the button now makes.
+            let frame = protocol::parse_vault_meta_ntv8(&after).expect("ntv8");
+            let opened = protocol::unlock_root_key_v0_2_password(
+                &frame.base,
+                "password",
+                &frame.base.account_number_hash,
+            )
+            .expect("password unlock");
+            assert_eq!(&*opened, &root_key);
+            assert_eq!(
+                frame.base.enc_root_key_recovery,
+                [0u8; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN]
+            );
+
+            // A second call has nothing to do and must not move the anchor: it
+            // answers the hash it was handed, which is what a retry after a crash
+            // relies on.
+            let again = truncate_after_explicit_upgrade(&StdVaultIo, &meta_path, committed).await;
+            assert_eq!(again, committed);
+            let unchanged = std::fs::read(&meta_path).expect("meta");
+            assert_eq!(unchanged, after, "an already-NTV8 vault is not rewritten");
+        });
     }
 
     #[test]

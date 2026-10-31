@@ -283,11 +283,6 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/person-identity/v0.2/cases.json"),
         ),
         (
-            "person-member-key-store",
-            "v0.2",
-            include_str!("../../myne-test-vectors/vectors/person-member-key-store/v0.2/cases.json"),
-        ),
-        (
             "person-member-unlock-store",
             "v0.2",
             include_str!(
@@ -485,6 +480,11 @@ mod embedded {
             "vault-meta-ntv7",
             "v0.2",
             include_str!("../../myne-test-vectors/vectors/vault-meta-ntv7/v0.2/cases.json"),
+        ),
+        (
+            "vault-meta-ntv8",
+            "v0.2",
+            include_str!("../../myne-test-vectors/vectors/vault-meta-ntv8/v0.2/cases.json"),
         ),
         (
             "vault-prefs",
@@ -2937,6 +2937,415 @@ fn vault_meta_ntv7_vectors() {
     );
 }
 
+/// `vault-meta-ntv8` (myne-md/myne#938): the password-only generation.
+///
+/// Four things are pinned. The FRAME (parse then re-serialize is byte-identical,
+/// with the tail fields read back at their offsets). The CREDENTIAL (the same
+/// password opens it to one root key, which is the half no parse-side case can
+/// see: a drifted salt domain, AAD role or KDF block parses every field
+/// correctly and then fails here). The UPGRADE (an `NTV7` frame becomes this one
+/// by truncation, so the password still opens it). And the STRUCTURAL rejections,
+/// of which the length rule is the load-bearing one: `NTV7` and `NTV8` share
+/// every byte of the tail, so only the magic and 1208 bytes of length separate
+/// them, and a lenient reader would accept an `NTV7` file and then wait for a
+/// credential the user no longer has.
+#[test]
+fn vault_meta_ntv8_vectors() {
+    use protocol::vault_meta_ntv8::{
+        parse_vault_meta_ntv8, serialize_vault_meta_ntv8, NTV8_FIXED_LEN,
+    };
+    use protocol::vault_meta_v0_2::unlock_root_key_v0_2_password;
+
+    let Some(raw) = cases_json_v0_2("vault-meta-ntv8") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[vault-meta-ntv8/v0.2] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "vault-meta-ntv8");
+    assert_eq!(doc["protocol_version"], "v0.2");
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        cases.len() >= 14,
+        "vault-meta-ntv8 must carry at least 14 vectors; found {}",
+        cases.len()
+    );
+    assert_unique_vector_ids("vault-meta-ntv8/v0.2", cases);
+
+    let mut kinds = std::collections::HashSet::new();
+    let mut phrase_wrap_rejects = 0usize;
+    let mut length_reject = false;
+
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        kinds.insert(kind.to_string());
+
+        match kind {
+            "roundtrip" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let expected_blob = hex_decode(
+                    case["expected_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_blob_hex")),
+                );
+                let meta = parse_vault_meta_ntv8(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] NTV8 frame must parse: {e:?}"));
+
+                assert_eq!(
+                    blob.len(),
+                    NTV8_FIXED_LEN + meta.signed_roster_envelope.len(),
+                    "[{id}] the frame is 445 + roster_len and nothing else"
+                );
+                assert_eq!(
+                    meta.group_key_epoch,
+                    case["expected_group_key_epoch"]
+                        .as_u64()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_group_key_epoch")),
+                    "[{id}] group_key_epoch"
+                );
+                assert_eq!(
+                    meta.signed_roster_envelope.len(),
+                    case["expected_signed_roster_len"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_signed_roster_len")
+                        as usize,
+                    "[{id}] signed_roster_len"
+                );
+                assert_eq!(
+                    hex_encode(&meta.base.account_number_hash),
+                    case["expected_base_account_number_hash_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_base_account_number_hash_hex"),
+                    "[{id}] base account_number_hash"
+                );
+                assert_eq!(
+                    hex_encode(&meta.base.items_key_id),
+                    case["expected_base_items_key_id_hex"]
+                        .as_str()
+                        .expect("[{id}] missing expected_base_items_key_id_hex"),
+                    "[{id}] base items_key_id"
+                );
+                // The frame's OWN KDF parameters. A port that ignores them and
+                // applies its own defaults derives a different wrap key while
+                // parsing every byte correctly, and the `password_opens` case is
+                // where that surfaces; pinning them here names which field moved.
+                assert_eq!(
+                    meta.base.kdf_params.m_kib as u64,
+                    case["expected_kdf_m_kib"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_kdf_m_kib"),
+                    "[{id}] kdf m_kib"
+                );
+                assert_eq!(
+                    meta.base.kdf_params.t as u64,
+                    case["expected_kdf_t"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_kdf_t"),
+                    "[{id}] kdf t"
+                );
+                assert_eq!(
+                    meta.base.kdf_params.p as u64,
+                    case["expected_kdf_p"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_kdf_p"),
+                    "[{id}] kdf p"
+                );
+                assert_eq!(
+                    meta.base.kdf_params.argon2_version as u64,
+                    case["expected_kdf_argon2_version"]
+                        .as_u64()
+                        .expect("[{id}] missing expected_kdf_argon2_version"),
+                    "[{id}] argon2_version"
+                );
+                assert_eq!(
+                    case["expected_phrase_wrap_zeroed"].as_bool(),
+                    Some(true),
+                    "[{id}] the retired phrase wrap is structural, not optional"
+                );
+                // Checked field by field rather than through a helper, because
+                // the helper is crate-private and this runner is the OUTSIDE view
+                // a port author has: three explicit zero assertions say what the
+                // rule is without borrowing the implementation's own predicate.
+                assert_eq!(
+                    meta.base.random_salt_recovery,
+                    [0u8; protocol::vault_meta::VAULT_META_SALT_RANDOM_LEN],
+                    "[{id}] the retired recovery salt must be all zero"
+                );
+                assert_eq!(
+                    meta.base.nonce_recovery_wrap,
+                    [0u8; protocol::aead::AEAD_NONCE_LEN],
+                    "[{id}] the retired recovery nonce must be all zero"
+                );
+                assert_eq!(
+                    meta.base.enc_root_key_recovery,
+                    [0u8; protocol::vault_meta::VAULT_META_WRAPPED_ROOT_KEY_LEN],
+                    "[{id}] the retired recovery-wrapped root_key must be all zero"
+                );
+                assert_eq!(
+                    case["expected_person_wrap_absent"].as_bool(),
+                    Some(true),
+                    "[{id}] this generation has no person envelope"
+                );
+
+                // Re-serialization is the half a parse-only case cannot see.
+                let re = serialize_vault_meta_ntv8(&meta)
+                    .unwrap_or_else(|e| panic!("[{id}] re-serialize failed: {e:?}"));
+                assert_eq!(
+                    hex_encode(&re),
+                    hex_encode(&expected_blob),
+                    "[{id}] parse then re-serialize is not byte-identical"
+                );
+
+                // The generation boundary, from the OLD readers' side. An NTV7
+                // reader must refuse the magic rather than read the tail and then
+                // demand 1208 bytes that are not there.
+                assert!(
+                    protocol::vault_meta_ntv7::parse_vault_meta_ntv7(&blob).is_err(),
+                    "[{id}] an NTV7 reader must refuse an NTV8 frame"
+                );
+                assert!(
+                    protocol::parse_vault_meta_ntv6(&blob).is_err(),
+                    "[{id}] an NTV6 reader must refuse an NTV8 frame"
+                );
+                assert!(
+                    protocol::parse_vault_meta_v0_2(&blob).is_err(),
+                    "[{id}] the NTV5 reader must refuse an NTV8 frame"
+                );
+                assert_eq!(
+                    protocol::meta_version_of(&blob),
+                    Some(protocol::MetaVersion::V0_2),
+                    "[{id}] NTV8 is a v0.2 generation, not a sixth client generation"
+                );
+            }
+            "password_opens" | "password_open_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                let password = String::from_utf8(hex_decode(
+                    case["input_password_utf8_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_password_utf8_hex")),
+                ))
+                .unwrap_or_else(|e| panic!("[{id}] password is not UTF-8: {e}"));
+                let meta = parse_vault_meta_ntv8(&blob)
+                    .unwrap_or_else(|e| panic!("[{id}] NTV8 frame must parse: {e:?}"));
+                let opened = unlock_root_key_v0_2_password(
+                    &meta.base,
+                    &password,
+                    &meta.base.account_number_hash,
+                );
+                if kind == "password_opens" {
+                    let expected: [u8; 32] = hex_decode_array(
+                        case["expected_root_key_hex"]
+                            .as_str()
+                            .unwrap_or_else(|| panic!("[{id}] missing expected_root_key_hex")),
+                    );
+                    let opened = opened.unwrap_or_else(|e| {
+                        panic!(
+                            "[{id}] the master password must open the frame: {e:?}. A \
+                             parse-side mismatch would have failed above, so a failure \
+                             here means the salt domain, the AAD role or the KDF block \
+                             diverged."
+                        )
+                    });
+                    assert_eq!(&*opened, &expected, "[{id}] root_key mismatch");
+                } else {
+                    assert_eq!(
+                        case["expected_kind"].as_str(),
+                        Some("aead_fail"),
+                        "[{id}] a refused open is one non-distinguishing result"
+                    );
+                    assert_eq!(
+                        opened.err(),
+                        Some(protocol::ProtocolError::AeadFailure),
+                        "[{id}] must fail closed: {}",
+                        case["informational_reason"].as_str().unwrap_or("")
+                    );
+                }
+            }
+            "upgrade" => {
+                let before = hex_decode(
+                    case["input_ntv7_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_ntv7_blob_hex")),
+                );
+                let expected = hex_decode(
+                    case["expected_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_blob_hex")),
+                );
+                let dropped = case["expected_dropped_person_wrap_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_dropped_person_wrap_len"))
+                    as usize;
+                assert_eq!(
+                    dropped,
+                    protocol::vault_meta_ntv7::PERSON_WRAP_LEN,
+                    "[{id}] the envelope this generation drops is a fixed length"
+                );
+                assert_eq!(
+                    before.len(),
+                    expected.len() + dropped,
+                    "[{id}] the upgrade removes exactly the person envelope"
+                );
+
+                // The step, expressed the way a port implements it: parse the old
+                // generation, move its five tail fields across, serialize.
+                let old = protocol::vault_meta_ntv7::parse_vault_meta_ntv7(&before)
+                    .unwrap_or_else(|e| panic!("[{id}] the NTV7 input must parse: {e:?}"));
+                let upgraded = protocol::vault_meta_ntv8::PasswordOnlyVaultMeta {
+                    base: old.base,
+                    group_key_nonce: old.group_key_nonce,
+                    enc_group_key: old.enc_group_key,
+                    group_key_epoch: old.group_key_epoch,
+                    signed_roster_envelope: old.signed_roster_envelope,
+                };
+                let bytes = serialize_vault_meta_ntv8(&upgraded)
+                    .unwrap_or_else(|e| panic!("[{id}] upgrade serialize failed: {e:?}"));
+                assert_eq!(
+                    hex_encode(&bytes),
+                    hex_encode(&expected),
+                    "[{id}] the upgrade must reproduce these bytes exactly. A port that \
+                     re-derives or re-wraps anything lands elsewhere here."
+                );
+
+                // Truncation, not a re-wrap: every surviving byte after the magic
+                // is identical to the input's. This is the assertion that makes
+                // "the password the user already has still opens the file" a fact
+                // about the bytes rather than a hope.
+                assert_eq!(
+                    &before[4..expected.len()],
+                    &expected[4..],
+                    "[{id}] the upgrade must truncate: every surviving byte after the \
+                     magic identical, so no key was re-wrapped"
+                );
+
+                let password = String::from_utf8(hex_decode(
+                    case["input_password_utf8_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_password_utf8_hex")),
+                ))
+                .unwrap_or_else(|e| panic!("[{id}] password is not UTF-8: {e}"));
+                let expected_root: [u8; 32] = hex_decode_array(
+                    case["expected_root_key_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing expected_root_key_hex")),
+                );
+                for (label, blob) in [("NTV7", &before), ("NTV8", &expected)] {
+                    let meta = if label == "NTV7" {
+                        let m = protocol::vault_meta_ntv7::parse_vault_meta_ntv7(blob)
+                            .expect("NTV7 parses");
+                        protocol::vault_meta_ntv8::PasswordOnlyVaultMeta {
+                            base: m.base,
+                            group_key_nonce: m.group_key_nonce,
+                            enc_group_key: m.enc_group_key,
+                            group_key_epoch: m.group_key_epoch,
+                            signed_roster_envelope: m.signed_roster_envelope,
+                        }
+                    } else {
+                        parse_vault_meta_ntv8(blob).expect("NTV8 parses")
+                    };
+                    let opened = unlock_root_key_v0_2_password(
+                        &meta.base,
+                        &password,
+                        &meta.base.account_number_hash,
+                    )
+                    .unwrap_or_else(|e| {
+                        panic!("[{id}] the same password must open the {label} frame: {e:?}")
+                    });
+                    assert_eq!(
+                        &*opened, &expected_root,
+                        "[{id}] the upgrade must not move the credential: the {label} \
+                         frame opens to the same root_key"
+                    );
+                }
+            }
+            "parse_fail" => {
+                let blob = hex_decode(
+                    case["input_blob_hex"]
+                        .as_str()
+                        .unwrap_or_else(|| panic!("[{id}] missing input_blob_hex")),
+                );
+                assert_eq!(
+                    case["expected_kind"].as_str(),
+                    Some("invalid_meta"),
+                    "[{id}] the family pins ONE non-distinguishing rejection"
+                );
+                assert!(
+                    parse_vault_meta_ntv8(&blob).is_err(),
+                    "[{id}] must be rejected: {}",
+                    case["informational_reason"].as_str().unwrap_or("")
+                );
+                // The phrase-wrap trio is the load-bearing subset of this kind:
+                // those three cases are what make "the generation retired the
+                // phrase wrap" a checked claim rather than a comment.
+                if id.contains("live-recovery") {
+                    phrase_wrap_rejects += 1;
+                }
+                // ...and the length rule is what separates this generation from
+                // the one it upgrades from, since every other byte matches.
+                if id.contains("person-wrap-present") {
+                    length_reject = true;
+                    // The premise, and the reason this case exists at all: the
+                    // fixture has to be a frame the NTV7 parser ACCEPTS. A frame
+                    // assembled by gluing 1208 bytes onto an NTV8 one is rejected
+                    // on its magic instead, so it would pass while proving nothing
+                    // about the length rule.
+                    assert!(
+                        protocol::vault_meta_ntv7::parse_vault_meta_ntv7(&blob).is_ok(),
+                        "[{id}] the fixture must be a VALID NTV7 frame, or the length \
+                         rule is not what rejected it"
+                    );
+                    let roster_len =
+                        u32::from_be_bytes([blob[441], blob[442], blob[443], blob[444]]) as usize;
+                    assert_eq!(
+                        blob.len(),
+                        NTV8_FIXED_LEN + roster_len + protocol::vault_meta_ntv7::PERSON_WRAP_LEN,
+                        "[{id}] the fixture is one person envelope longer than a valid NTV8 \
+                         frame, and nothing else"
+                    );
+                }
+            }
+            other => panic!("[{id}] unknown case_kind {other:?}"),
+        }
+    }
+
+    for required in [
+        "roundtrip",
+        "password_opens",
+        "password_open_fail",
+        "upgrade",
+        "parse_fail",
+    ] {
+        assert!(
+            kinds.contains(required),
+            "vault-meta-ntv8 lost its {required} case kind"
+        );
+    }
+    assert_eq!(
+        phrase_wrap_rejects, 3,
+        "all three retired phrase-wrap fields (salt, nonce, ciphertext) must keep \
+         their own rejection case"
+    );
+    assert!(
+        length_reject,
+        "the family must keep the case where a whole valid NTV7 frame is rejected on \
+         length. Every other byte is identical across the two generations, so that \
+         case is the only thing standing between a lenient reader and a vault whose \
+         credential the user no longer has."
+    );
+}
+
 /// `person-keypair` v0.2: the B2B person-keypair wrap-key derivation under the
 /// `"myne.v0.2 argon2id-person-keypair|"` salt domain (`decisions/protocol/0592`).
 ///
@@ -3115,97 +3524,6 @@ fn person_identity_vectors() {
         assert!(
             seen_kinds.contains(required),
             "person-identity must cover the '{required}' case kind"
-        );
-    }
-}
-
-/// `person-member-key-store` v0.2: the B2B member-vault-key derivation and the
-/// device-local member-key-store AAD (myne-md/myne#711 task 25).
-#[cfg_attr(not(target_arch = "wasm32"), test)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
-fn person_member_key_store_vectors() {
-    use protocol::{
-        aad_person_member_key_store, derive_person_vault_member_key, DEFAULT_V0_1_KDF_PARAMS,
-    };
-
-    let Some(raw) = cases_json_v0_2("person-member-key-store") else {
-        return;
-    };
-    let doc: serde_json::Value = serde_json::from_str(&raw)
-        .unwrap_or_else(|e| panic!("[person-member-key-store/v0.2] parse cases.json: {e}"));
-    assert_eq!(doc["schema"], "person-member-key-store");
-    assert_eq!(doc["protocol_version"], "v0.2");
-    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
-    assert!(!cases.is_empty());
-
-    let mut seen_kinds = std::collections::HashSet::new();
-    for case in cases {
-        let kind = case["case_kind"]
-            .as_str()
-            .expect("case_kind must be a string");
-        seen_kinds.insert(kind.to_string());
-        match kind {
-            "member-key-derivation" => {
-                let phrase = case["input_phrase"]
-                    .as_str()
-                    .unwrap_or_else(|| panic!("[{kind}] missing input_phrase"));
-                let acct: [u8; 16] = hex_decode_array(
-                    case["input_account_number_hash_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| {
-                            panic!("[{kind}] missing input_account_number_hash_hex")
-                        }),
-                );
-                let expected: [u8; 32] = hex_decode_array(
-                    case["expected_member_key_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{kind}] missing expected_member_key_hex")),
-                );
-                let actual =
-                    derive_person_vault_member_key(phrase, &acct, &DEFAULT_V0_1_KDF_PARAMS)
-                        .expect("derive member key");
-                assert_eq!(
-                    actual.as_slice(),
-                    expected.as_slice(),
-                    "[member-key-derivation] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
-                    hex_encode(&expected),
-                    hex_encode(&*actual),
-                );
-            }
-            "member-key-store-aad" => {
-                let vault: [u8; 16] = hex_decode_array(
-                    case["input_vault_id_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{kind}] missing input_vault_id_hex")),
-                );
-                let acct: [u8; 16] = hex_decode_array(
-                    case["input_account_number_hash_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| {
-                            panic!("[{kind}] missing input_account_number_hash_hex")
-                        }),
-                );
-                let expected: [u8; 68] = hex_decode_array(
-                    case["expected_aad_hex"]
-                        .as_str()
-                        .unwrap_or_else(|| panic!("[{kind}] missing expected_aad_hex")),
-                );
-                let actual = aad_person_member_key_store(&vault, &acct);
-                assert_eq!(
-                    actual.as_slice(),
-                    expected.as_slice(),
-                    "[member-key-store-aad] mismatch\n  expected_hex: {}\n  actual_hex:   {}",
-                    hex_encode(&expected),
-                    hex_encode(&actual),
-                );
-            }
-            other => panic!("[{other}] unknown case_kind for person-member-key-store"),
-        }
-    }
-    for required in ["member-key-derivation", "member-key-store-aad"] {
-        assert!(
-            seen_kinds.contains(required),
-            "person-member-key-store must cover the '{required}' case kind"
         );
     }
 }

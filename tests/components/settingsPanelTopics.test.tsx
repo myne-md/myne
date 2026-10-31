@@ -233,7 +233,18 @@ const PANELS: ReadonlyArray<{
     panelId: "vault",
     mount: () => {
       memberVaultFlag.value = false;
-      invokeMock.mockImplementation(() => Promise.resolve(undefined));
+      // The generation probe is answered EXPLICITLY, because the row it gates is
+      // one of this panel's registry entries: `vault_is_person_wrapped` now has
+      // three answers and `undefined` is none of them, so a blanket `undefined`
+      // would hide the row and make the walk below vacuous
+      // (myne-md/myne#938, `decisions/protocol/0758`). `false` is a vault that
+      // still carries its own recovery phrase, which is the state this row
+      // exists for.
+      invokeMock.mockImplementation((cmd: string) =>
+        cmd === "plugin:vault-unlock|vault_is_person_wrapped"
+          ? Promise.resolve(false)
+          : Promise.resolve(undefined),
+      );
       render(
         <VaultPanel
           vaultId={VAULT_ID}

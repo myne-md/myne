@@ -38,6 +38,12 @@ pub use myne_core::{
 // declaratively from the committed `android-widgets` manifest. Declared for both
 // so the setup hook has one unconditional call site.
 mod backup_exclude;
+// The Android Keystore half of the device signing key's storage ladder
+// (`decisions/protocol/0733` decision 4, rung 2 on Android; myne-md/myne#938 task
+// 9). A no-op off Android: `core`'s Apple arm already uses the Keychain.
+mod device_key;
+#[cfg(target_os = "android")]
+mod device_key_keystore;
 mod hooks;
 #[cfg(target_os = "ios")]
 mod ios_chrome;
@@ -133,6 +139,14 @@ pub fn run() {
         // capability entry). On iOS/desktop this registers a no-op; the iOS
         // half lives in `screen_guard` (see the `.setup()` init below).
         .plugin(tauri_plugin_screen_guard::init())
+        // myne-md/myne#938 task 9: the Android Keystore bridge for the DEVICE
+        // SIGNING key (`decisions/protocol/0733` decision 4, rung 2 on Android). Same
+        // shape as the screen-guard bridge: an in-repo Kotlin plugin, Rust-only
+        // surface, no WebView commands, no capability entry. The host installs the
+        // provider in `.setup()` below, so `myne-core` reads and writes the device key
+        // through the Keystore instead of falling to rung 4 and signing `0x02` heads
+        // forever. On iOS/desktop this registers a no-op.
+        .plugin(tauri_plugin_device_key::init())
         // MYND-511: the Android OS-share-sheet (ACTION_SEND / ACTION_SEND_MULTIPLE)
         // receiver for share-import (SF3). An in-repo Kotlin plugin; Rust-only
         // WebView surface — no WebView commands, no capability entry. It reads the
@@ -318,6 +332,12 @@ pub fn run() {
             app.manage::<myne_core::hooks::Hooks>(std::sync::Arc::new(hooks::MobileHooks::new(
                 app.handle().clone(),
             )));
+            // myne-md/myne#938 task 9: hand `myne-core` the Android Keystore store, so
+            // the device signing key rests there rather than not at all. Installed
+            // before any command can run, and only ever once per process: a second
+            // provider would be a second device key, and the device's binding follows
+            // one key.
+            device_key::install(app.handle());
             // MYND-458 task 4 (SYNC-35): app-level `SyncLocalChange` counter. A
             // local note edit bumps it via `MobileHooks::bump_local_change` so the
             // foreground sync loop (below) can open its coalesced-push window.

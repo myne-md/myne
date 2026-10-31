@@ -27,6 +27,7 @@
 pub(crate) mod adopt;
 pub mod b2b;
 pub mod ntv7;
+pub mod ntv8;
 pub mod progress;
 
 use crate::host::HostCtx;

@@ -95,8 +95,9 @@ pub async fn publish_vault(
     let base =
         protocol::parse_vault_meta_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
     let namespace_hex = protocol::hex::encode_lower(&base.account_number_hash);
-    let person_born =
-        meta_bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice());
+    // Both person generations: `NTV8` is the same vault with the person wrap truncated
+    // away, so it authenticates as the PERSON and names its namespace like `NTV7` does.
+    let person_born = super::meta_kind::is_person_born(&meta_bytes);
 
     let cfg = endpoint_config(host, io).await?;
     let url = cfg
@@ -288,9 +289,7 @@ pub async fn published_state(io: &dyn VaultIo, vault_root: &Path) -> PublishStat
         .read(&vault_root.join("vault.meta"))
         .await
         .ok()
-        .and_then(|bytes| bytes.get(..4).map(<[u8]>::to_vec))
-        .map(|magic| magic == protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-        .unwrap_or(false);
+        .is_some_and(|bytes| super::meta_kind::is_person_born(&bytes));
 
     let Ok(state) = read_sync_state(io, vault_root).await else {
         return PublishState {
@@ -451,6 +450,31 @@ mod tests {
                 state.namespace_hex, None,
                 "a legacy vault's namespace is its own account, never recorded separately"
             );
+        });
+    }
+
+    /// **`NTV8` is person-born too**, and reading it as a legacy vault would offer the
+    /// publish action again on a vault that is already published, under the wrong
+    /// credential, since a person-born vault has no vault token to read.
+    ///
+    /// The four magic bytes are the whole input `published_state` takes from the frame
+    /// (`is_person_born` reads the generation, nothing else), so a four-byte fixture is
+    /// the unit here rather than a shortcut: the generation classifier it delegates to is
+    /// driven over real frames of all five generations in `sync::meta_kind`.
+    #[test]
+    fn an_ntv8_vault_is_person_born_for_the_publish_marker() {
+        rt().block_on(async {
+            let tmp = ScopedTempDir::new("publish-state-ntv8").unwrap();
+            seed_meta(
+                tmp.path(),
+                protocol::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice(),
+            );
+            let state = published_state(&StdVaultIo, tmp.path()).await;
+            assert!(
+                state.person_born,
+                "an upgraded person-born vault must keep the person credential"
+            );
+            assert!(!state.published, "not published until the user says so");
         });
     }
 

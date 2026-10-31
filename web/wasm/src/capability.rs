@@ -756,10 +756,6 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ("plugin:sync|sync_person_decline_invite", Class::Unsupported),
     ("plugin:sync|sync_person_accept_invite", Class::Unsupported),
     ("plugin:sync|sync_member_join_vault", Class::Unsupported),
-    (
-        "plugin:sync|sync_person_unlock_member_vault",
-        Class::Unsupported,
-    ),
     ("plugin:sync|sync_member_vault_status", Class::Unsupported),
     (
         "plugin:sync|sync_person_set_member_password",
@@ -822,6 +818,38 @@ const PER_COMMAND: &[(&str, Class)] = &[
     ),
     (
         "plugin:device-binding|device_bindings_claim",
+        Class::Unsupported,
+    ),
+    // The two-sided device admission ceremony (myne-md/myne#938 task 11;
+    // `decisions/protocol/0735`). Five commands, ONE refusal, and it is the
+    // admitting side that decides it: `sync_device_admission_accept` writes the
+    // joining device's `MYU5` row, which is group-tier sealed and signed by the
+    // session's person identity, and a page holds neither, the same reason
+    // `device_bindings_claim` is refused two entries up. The joining side would
+    // otherwise be closer to portable (it writes only `person-auth`, and its
+    // device-key store simply reads as rung 4), but a ceremony with one working
+    // side is not a ceremony, and shipping half of it as dispatched would put a
+    // code on screen that no browser could ever have accepted. So the family is
+    // refused together, and the surface that shows it is absent here rather than
+    // present and inert.
+    (
+        "plugin:sync|sync_device_admission_start",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_device_admission_confirm",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_device_admission_preview",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_device_admission_accept",
+        Class::Unsupported,
+    ),
+    (
+        "plugin:sync|sync_device_admission_cancel",
         Class::Unsupported,
     ),
     // The two phrase-typing entry points were `Unsupported` under `decisions.md`

@@ -60,7 +60,7 @@ test.describe("the enrol gate in the Sync hub", () => {
   test("a failed cycle is not an invitation to register again", async ({ page }) => {
     // `error` still means a token is on disk — the transport failed, the
     // membership did not. Re-enrolling here would add a device, not fix a sync.
-    await installMockIpc(page, { syncStatus: { state: "error", detail: "offline" } });
+    await installMockIpc(page, { syncStatus: { state: "error", detail: "sync_failed" } });
     await openSyncSettings(page);
     await expect(page.getByTestId("sync.settings.add-device")).toHaveCount(0);
   });

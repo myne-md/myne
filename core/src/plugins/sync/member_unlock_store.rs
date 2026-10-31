@@ -2,11 +2,11 @@
 //! Device-local member vault-unlock credential store (`vault.member-unlock`).
 //!
 //! A B2B member holds no vault password: their access is the group key delivered
-//! in the invite's sealed package. Without a fast credential they must re-enter
-//! the 24-word recovery phrase on every launch (the phrase-sealed
-//! `vault.member-key`, `decisions/protocol/0606`). This store removes that
-//! friction with a device-local credential the member chooses: a password, or a
-//! PIN/biometric via the quick-unlock wrap-key providers.
+//! in the invite's sealed package. This store is **the only way in** on a member
+//! device since myne-md/myne#938 task 12 retired `vault.member-key` (the
+//! phrase-sealed sibling, `decisions/protocol/0606`), so it holds a device-local
+//! credential the member chooses: a password, or a PIN/biometric via the
+//! quick-unlock wrap-key providers.
 //!
 //! What is sealed is the whole credential the phrase path installs at once:
 //! `group_key (32) || items_key (32) || items_key_id (16) || group_key_epoch (8)
@@ -33,8 +33,9 @@
 //! the KEK so a store copied to another vault or account does not open.
 //!
 //! Only ONE method is configured at a time: setting a new one replaces the
-//! previous. The phrase store (`vault.member-key`) is untouched and remains the
-//! portable fallback.
+//! previous. There is no second store and no second credential: a member whose
+//! gate is missing (never set, or deliberately cleared) re-joins with a fresh
+//! invite rather than falling back to a phrase unlock.
 //!
 //! **Accepted exposure (same class as the vault-bound identity carrier).** The
 //! credential opens the member's person identity, and because the identity is
@@ -69,6 +70,13 @@ pub struct MemberUnlockCredential {
     pub account_hash: [u8; 16],
     pub person_id: [u8; 16],
     pub pair: protocol::PersonKeyPair,
+    /// The private-profile key for this `(person, vault)`, derived from the
+    /// **gate of this store** rather than from the recovery phrase
+    /// (myne-md/myne#938 task 12). Opening the member credential is the one
+    /// moment the gate exists, so this is where the profile key comes from:
+    /// `derive_person_vault_profile_key_from_gate(wrap_key, profile_id)`.
+    pub profile_id: [u8; 16],
+    pub profile_key: Zeroizing<[u8; 32]>,
 }
 
 /// The public (pre-decrypt) header fields, for the provider paths that need the
@@ -84,6 +92,23 @@ struct MemberUnlockEnvelope {
     vault_id_hex: String,
     account_hash_hex: String,
     method: String,
+    /// The group-key epoch these sealed keys belong to, in the CLEARTEXT header.
+    /// Routing metadata rather than a secret, and the member-side trigger for
+    /// adopting a rotation has to read it without the credential: since
+    /// myne-md/myne#938 task 12 retired `vault.member-key`, this envelope is the
+    /// only place that epoch lives on a member's device.
+    ///
+    /// `Option`, and absent rather than zero, because a store written before this
+    /// field existed must read back as UNKNOWN. With `#[serde(default)]` on a `u64`
+    /// it read back as `Some(0)`, and the reader it replaced answered `None` for a
+    /// missing field: every pre-existing member device would have reported epoch 0
+    /// against a vault at epoch >= 1 and taken the rotation-adoption path on its
+    /// first cycle — a group-package fetch over the network plus a local re-key for
+    /// a device that was not stale. An epoch is a positive `u64` (`protocol.md`
+    /// §9.3.2), so `0` is unambiguously "absent" as well as unset
+    /// (myne-md/myne#938 review).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    group_key_epoch: Option<u64>,
     /// The password's random Argon2id salt, or the PIN provider's `pin_salt`
     /// (all-zero for biometric).
     salt_hex: String,
@@ -143,6 +168,32 @@ pub async fn member_unlock_method(
     }
 }
 
+/// Whether this device holds a member fast-unlock credential at all.
+///
+/// Since myne-md/myne#938 task 12 this is the ONLY thing that makes a vault a
+/// member vault on this device: `vault.member-key` (the phrase-sealed sibling) is
+/// retired, so the discriminator the unlock surface and the boot probe ask for is
+/// "is there a member gate here", not "is there a phrase-sealed key file".
+pub async fn member_unlock_store_exists(io: &dyn VaultIo, vault_root: &std::path::Path) -> bool {
+    member_unlock_method(io, vault_root).await.is_some()
+}
+
+/// The group-key epoch this device's member credential was sealed at, read
+/// WITHOUT the password (the epoch is cleartext routing metadata). `None` on an
+/// absent or unparseable store, and on a store written before the field existed:
+/// "unknown" keeps meaning "assume current", which is what the caller's
+/// `local_epoch` fallback expects and what the reader this replaced answered.
+pub async fn member_unlock_store_epoch(
+    io: &dyn VaultIo,
+    vault_root: &std::path::Path,
+) -> Option<u64> {
+    let env = read_envelope(io, vault_root).await?;
+    if env.version != MEMBER_UNLOCK_STORE_VERSION {
+        return None;
+    }
+    env.group_key_epoch.filter(|epoch| *epoch > 0)
+}
+
 /// The public header for the provider paths, validating the expected vault id.
 pub async fn member_unlock_header(
     io: &dyn VaultIo,
@@ -196,6 +247,7 @@ async fn write_sealed(
         vault_id_hex: hex_lower(vault_id),
         account_hash_hex: hex_lower(account_hash),
         method: method.to_string(),
+        group_key_epoch: Some(group_key_epoch),
         salt_hex: hex_lower(salt),
         nonce_hex: hex_lower(&nonce),
         sealed_hex: hex_lower(&sealed),
@@ -248,6 +300,8 @@ pub async fn read_member_unlock_with_wrap_key(
     let pair = protocol::PersonKeyPair::from_plaintext_bytes(
         <&[u8; protocol::PERSON_PLAINTEXT_LEN]>::try_from(&plaintext[104..]).ok()?,
     );
+    let profile_id = protocol::person_profile_id(&person_id, &account_hash);
+    let profile_key = protocol::derive_person_vault_profile_key_from_gate(wrap_key, &profile_id);
     Some(MemberUnlockCredential {
         group_key,
         items_key,
@@ -256,8 +310,15 @@ pub async fn read_member_unlock_with_wrap_key(
         account_hash,
         person_id,
         pair,
+        profile_id,
+        profile_key,
     })
 }
+
+/// The wrap key this store is sealed under, returned so the caller can derive the
+/// private-profile key from the same gate (myne-md/myne#938 task 12) without a
+/// second Argon2id run.
+pub type MemberUnlockGate = Zeroizing<[u8; 32]>;
 
 /// Seal and write the member credential under a member-chosen **password**.
 /// Best-effort at the caller: the writer is a convenience path.
@@ -275,11 +336,50 @@ pub async fn write_member_unlock_password(
     group_key: &[u8; 32],
     items_key: &[u8; 32],
     pair: &protocol::PersonKeyPair,
-) -> Result<(), ()> {
+) -> Result<MemberUnlockGate, ()> {
     let mut salt = [0u8; 16];
     getrandom::getrandom(&mut salt).map_err(|_| ())?;
+    write_member_unlock_password_with_salt(
+        io,
+        vault_root,
+        vault_id,
+        account_hash,
+        group_key_epoch,
+        items_key_id,
+        person_id,
+        kdf_params,
+        password,
+        &salt,
+        group_key,
+        items_key,
+        pair,
+    )
+    .await
+}
+
+/// The same seal with a **caller-supplied salt**, for a RE-seal of an existing
+/// store. Reusing the stored salt keeps the wrap key, and therefore the
+/// gate-derived profile key, unchanged across a group-key rotation: a fresh salt
+/// would re-key the profile and strand the person-private AI material the member
+/// had already written under the old gate.
+#[allow(clippy::too_many_arguments)]
+pub async fn write_member_unlock_password_with_salt(
+    io: &dyn VaultIo,
+    vault_root: &std::path::Path,
+    vault_id: &[u8; 16],
+    account_hash: &[u8; 16],
+    group_key_epoch: u64,
+    items_key_id: &[u8; 16],
+    person_id: &[u8; 16],
+    kdf_params: &protocol::KdfParams,
+    password: &str,
+    salt: &[u8; 16],
+    group_key: &[u8; 32],
+    items_key: &[u8; 32],
+    pair: &protocol::PersonKeyPair,
+) -> Result<MemberUnlockGate, ()> {
     let key =
-        protocol::derive_person_vault_member_unlock_key(password, &salt, account_hash, kdf_params)
+        protocol::derive_person_vault_member_unlock_key(password, salt, account_hash, kdf_params)
             .map_err(|_| ())?;
     write_sealed(
         io,
@@ -287,7 +387,7 @@ pub async fn write_member_unlock_password(
         vault_id,
         account_hash,
         METHOD_PASSWORD,
-        &salt,
+        salt,
         &key,
         group_key_epoch,
         items_key_id,
@@ -296,7 +396,8 @@ pub async fn write_member_unlock_password(
         items_key,
         pair,
     )
-    .await
+    .await?;
+    Ok(key)
 }
 
 /// Seal and write the member credential under a provider-supplied **wrap key**

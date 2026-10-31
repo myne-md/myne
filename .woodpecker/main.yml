@@ -1572,7 +1572,7 @@ steps:
       CARGO_HOME: /cache/cargo
     commands:
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
+      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
       - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
 
   # ─── Web container check (the deploy half of this chain is gone) ────────────

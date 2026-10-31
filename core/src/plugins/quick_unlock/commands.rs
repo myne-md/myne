@@ -608,6 +608,16 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // must NOT surface as an unlock failure — best-effort; a stale counter
             // only fails safe (fewer future attempts) and recovers on next success.
             attempts.record_success();
+
+            // NO `NTV7` to `NTV8` upgrade on this path, deliberately (myne-md/myne#938
+            // review). The byte range could be dropped here: `root_key` is in hand
+            // and nothing is derived. But a PIN or a biometric proves a device-local
+            // secret, never the vault password, and the person wrap being removed is
+            // the only door left for a user who set quick unlock and then forgot
+            // their password. The upgrade therefore waits for a password unlock
+            // (`vault_migrate::ntv8::UpgradeAuthority::PasswordNotProven`), and a
+            // vault whose user only ever types a PIN stays on the person-wrapped
+            // frame, which costs nothing: it is defence in depth, not correctness.
             if let Err(_e) = persist_attempt_state(dir, &attempts) {
                 tracing::debug!(
                     stage = "persist_attempt_reset",
@@ -1478,6 +1488,271 @@ mod tests {
         );
         assert_eq!(items_key.as_slice(), &ITEMS_KEY);
         assert_eq!(items_key_id, [0x07u8; 16]);
+    }
+
+    /// A quick-unlock of a PASSWORD-ONLY (`NTV8`) vault reaches the group tier
+    /// and the same slot the password path would (myne-md/myne#938).
+    ///
+    /// This is the third generation to pass through this function, and the first
+    /// two each broke it in the same place. `MYQ1` is generation-agnostic by
+    /// design, so the `root_key` redeem always succeeds and the failure lands on
+    /// the `itemsKey` step, which has to know the TIER: `NTV6` moved it to the
+    /// group seal, `NTV7` was classified as "not `NTV6`" and AEAD-failed, and
+    /// `NTV8` would repeat the second failure if the branch were still a magic
+    /// test. The branch asks `has_b2b_tail`, and this test is what holds it:
+    /// reverting that predicate to `magic == NTV6` makes every PIN and biometric
+    /// attempt on a password-only vault fail while enrolment had succeeded.
+    ///
+    /// The fixture is a REAL frame from the app's own person-session builder, so
+    /// the tail is the one creation actually writes rather than a hand-rolled
+    /// shape that could agree with the reader by accident.
+    #[test]
+    fn quick_unlock_opens_a_password_only_vault_through_the_group_tier() {
+        rt().block_on(quick_unlock_on_a_password_only_vault_inner())
+    }
+    async fn quick_unlock_on_a_password_only_vault_inner() {
+        use crate::plugins::vault_creation::commands::{
+            build_and_serialize_person_vault_meta, build_person_session,
+        };
+        use crate::plugins::vault_creation::state::CreationPerson;
+
+        const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
+
+        let tmp = ScopedTempDir::new("qu-ntv8").unwrap();
+        let dir = tmp.path();
+        let person_id = protocol::kdf::person_id_hash(PHRASE);
+        let seed = protocol::kdf::derive_person_identity_seed(
+            PHRASE,
+            &person_id,
+            &crate::test_support::FAST_TEST_KDF,
+        )
+        .expect("identity seed");
+        let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+        let person = CreationPerson {
+            pair: protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa),
+            person_id,
+            number: protocol::account_number_from_person_id(&person_id),
+        };
+        let session = build_person_session(
+            crate::paths::vault_id_from_root(dir),
+            "password-only-pw",
+            crate::test_support::FAST_TEST_KDF,
+            person,
+        )
+        .expect("person session");
+        let (meta_bytes, group_key) =
+            build_and_serialize_person_vault_meta(&session).expect("serialize NTV8");
+        assert_eq!(&meta_bytes[..4], b"NTV8");
+        std::fs::write(dir.join("vault.meta"), &meta_bytes).expect("write meta");
+
+        // What the password path would reach, computed from the same frame, so
+        // the assertion is on the VALUE and not on "unlock succeeded".
+        let tail = protocol::parse_b2b_tail_any(&meta_bytes).expect("parse tail");
+        let expected_items_key =
+            protocol::unlock_items_key_ntv6(&tail, &protocol::GroupKey::new(*group_key))
+                .expect("items key under the group tier");
+        let expected_items_key_id = tail.base.items_key_id;
+
+        // The enrolling session must hold the FRAME's keys, not the module's
+        // `ROOT_KEY`/`ITEMS_KEY` literals: `MYQ1` seals whatever `root_key` the
+        // slot holds, so seeding the fixture constants enrols a key that no
+        // `NTV8` wrap opens and the redeem would fail for a reason that has
+        // nothing to do with the generation under test.
+        let setup_state = unlocked_state();
+        setup_state
+            .set_unlocked(
+                crate::paths::vault_id_from_root(dir),
+                UnlockedVault::owner(
+                    session.root_key.clone(),
+                    Some(group_key.clone()),
+                    expected_items_key.clone(),
+                    expected_items_key_id,
+                    0,
+                    [0u8; 32],
+                ),
+            )
+            .await;
+        let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+        setup_with_dir(dir, &setup_state, provider.clone(), &session.vault_binding)
+            .await
+            .expect("setup on a password-only vault");
+
+        let fresh = unlocked_state();
+        fresh.mark_full_unlock_done();
+        quick_unlock_with_dir(
+            dir,
+            crate::paths::vault_id_from_root(dir),
+            &fresh,
+            provider.clone(),
+            &crate::host::NoopHost,
+            &test_hooks(),
+            &test_io(),
+            &crate::vault_label::key::UnavailableKeychain,
+        )
+        .await
+        .expect("quick unlock on a password-only (NTV8) vault");
+
+        let (items_key, items_key_id, shared) = fresh
+            .peek_unlocked_attachment_material()
+            .await
+            .expect("unlocked");
+        assert_eq!(items_key.as_slice(), expected_items_key.as_slice());
+        assert_eq!(items_key_id, expected_items_key_id);
+        // The group tier is what the running session must carry, since every
+        // shared singleton is sealed under it in this generation.
+        assert!(
+            matches!(
+                shared,
+                crate::plugins::vault_unlock::state::SharedSingletonKey::Group(_)
+            ),
+            "an NTV8 session is group-tier and must carry the group key"
+        );
+        // `shared` carries the GROUP key in this generation, so the owner root
+        // key is asserted on the slot itself: an `NTV8` session holds both, and
+        // the one that decides the tier is the group key.
+        assert!(shared.owner_root_bytes().is_none());
+        assert_eq!(
+            fresh
+                .peek_unlocked_root_key_clone()
+                .await
+                .expect("root key")
+                .as_slice(),
+            session.root_key.as_slice()
+        );
+    }
+
+    /// A PIN unlock does NOT perform the `NTV7` to `NTV8` upgrade, and this is the
+    /// test that holds that (myne-md/myne#938 review, `protocol.md` §10.4.3).
+    ///
+    /// The upgrade drops the person wrap by TRUNCATION, and the person wrap is the
+    /// only door left for a user who opened the vault with their identity phrase
+    /// because they forgot the password. A six-digit PIN proves no password, so
+    /// running the step here would delete that door on the strength of a code, for
+    /// exactly the people least likely to notice. The upgrade waits for
+    /// `UpgradeAuthority::PasswordProven`; the password path performs it, and that
+    /// half is asserted in `vault_migrate::ntv8` and in `vault_unlock::commands`.
+    #[test]
+    fn a_pin_unlock_leaves_the_person_wrap_alone() {
+        rt().block_on(async {
+            use crate::plugins::vault_creation::commands::{
+                build_and_serialize_person_vault_meta, build_person_session,
+            };
+            use crate::plugins::vault_creation::state::CreationPerson;
+
+            const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
+
+            let tmp = ScopedTempDir::new("qu-ntv7-upgrade").unwrap();
+            let dir = tmp.path();
+            let person_id = protocol::kdf::person_id_hash(PHRASE);
+            let seed = protocol::kdf::derive_person_identity_seed(
+                PHRASE,
+                &person_id,
+                &crate::test_support::FAST_TEST_KDF,
+            )
+            .expect("identity seed");
+            let seeds = protocol::kdf::expand_person_identity_key_seeds(&seed);
+            let person = CreationPerson {
+                pair: protocol::PersonKeyPair::generate_raw(
+                    &seeds.kem,
+                    &seeds.ed25519,
+                    &seeds.mldsa,
+                ),
+                person_id,
+                number: protocol::account_number_from_person_id(&person_id),
+            };
+            let owner_public = person.pair.public_half();
+            let session = build_person_session(
+                crate::paths::vault_id_from_root(dir),
+                "pin-upgrade-pw",
+                crate::test_support::FAST_TEST_KDF,
+                person,
+            )
+            .expect("person session");
+            let (ntv8, group_key) =
+                build_and_serialize_person_vault_meta(&session).expect("serialize NTV8");
+            let parsed = protocol::parse_vault_meta_ntv8(&ntv8).expect("parse NTV8");
+            // The frame a client that predates the upgrade wrote: the same tail
+            // plus a real person wrap of the same root key.
+            let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+            let person_wrap = protocol::seal_root_key_to_person_raw(
+                &owner_public,
+                &session.root_key,
+                &parsed.base.items_key_id,
+                &mut rng,
+            )
+            .expect("seal the person wrap");
+            let ntv7 = protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+                base: parsed.base,
+                group_key_nonce: parsed.group_key_nonce,
+                enc_group_key: parsed.enc_group_key,
+                group_key_epoch: parsed.group_key_epoch,
+                signed_roster_envelope: parsed.signed_roster_envelope,
+                person_wrap,
+            })
+            .expect("serialize NTV7");
+            std::fs::write(dir.join("vault.meta"), &ntv7).expect("write NTV7");
+
+            let tail = protocol::parse_b2b_tail_any(&ntv7).expect("parse tail");
+            let items_key = protocol::unlock_items_key_ntv6(&tail, &protocol::GroupKey::new(*group_key))
+                .expect("items key");
+
+            let setup_state = unlocked_state();
+            setup_state
+                .set_unlocked(
+                    crate::paths::vault_id_from_root(dir),
+                    UnlockedVault::owner(
+                        session.root_key.clone(),
+                        Some(group_key.clone()),
+                        items_key.clone(),
+                        tail.base.items_key_id,
+                        0,
+                        [0u8; 32],
+                    ),
+                )
+                .await;
+            let provider = MockProvider::new(PROVIDER_KIND_PIN, 0x11);
+            setup_with_dir(dir, &setup_state, provider.clone(), &session.vault_binding)
+                .await
+                .expect("setup on an NTV7 vault");
+
+            let fresh = unlocked_state();
+            fresh.mark_full_unlock_done();
+            quick_unlock_with_dir(
+                dir,
+                crate::paths::vault_id_from_root(dir),
+                &fresh,
+                provider.clone(),
+                &crate::host::NoopHost,
+                &test_hooks(),
+                &test_io(),
+                &crate::vault_label::key::UnavailableKeychain,
+            )
+            .await
+            .expect("quick unlock on an NTV7 vault");
+
+            // The frame is UNTOUCHED, and that is the contract rather than a gap:
+            // the upgrade truncates the person wrap, and a PIN proves no password.
+            // Running it here would delete the only door left for a user who does
+            // not remember their password, on the strength of a six-digit code
+            // (myne-md/myne#938 review). The password path performs it, asserted in
+            // `vault_migrate::ntv8` and in `vault_unlock::commands`' password case.
+            let after = std::fs::read(dir.join("vault.meta")).expect("read meta");
+            assert_eq!(
+                &after[..4],
+                b"NTV7",
+                "a PIN unlock proves no password, so the person wrap must survive it"
+            );
+            assert_eq!(
+                after, ntv7,
+                "the frame must be byte-identical: no truncation, no rewrite"
+            );
+            // And the session is the one the PIN built, unchanged: same items key.
+            let (redeemed_items, _id, _shared) = fresh
+                .peek_unlocked_attachment_material()
+                .await
+                .expect("unlocked");
+            assert_eq!(redeemed_items.as_slice(), items_key.as_slice());
+        });
     }
 
     // ── myne#378: the credential path joins the single-in-flight discipline ──

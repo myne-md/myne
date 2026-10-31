@@ -5838,6 +5838,7 @@ export const ROSTER = Object.freeze([
       "e2e/invite-code-gate.e2e.ts",
       "e2e/publish-vault.e2e.ts",
       "e2e/person-device-enrolment.e2e.ts",
+      "e2e/device-admission.e2e.ts",
     ],
     manual: [
       {
@@ -6254,7 +6255,7 @@ export const ROSTER = Object.freeze([
     ],
      manual: [
        {
-         see: "Close and reopen the member vault, unlock it with the member phrase, and confirm the vault contents and person identity are available. Then, while the member vault is unlocked, open Settings, Privacy, Shared vault unlock, and in turn set a password, a PIN, and (on macOS/iOS) the device biometric; after each, lock the member vault, reopen it, and confirm it unlocks with that credential (not the phrase), that the wrong credential is refused, that the PIN's five-attempt wipe works, and that sync still runs. Use the on-screen toggle to switch to the recovery phrase and confirm it still opens the same vault, and use Remove to clear the credential and confirm the phrase is then the only fast path. On the phone, confirm the same vault opens from the phrase and from the configured fast credential through the mobile unlock view. Finally, lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
+         see: "Close and reopen the member vault, unlock it with the password you set for this device, and confirm the vault contents and person identity are available. Then, while the member vault is unlocked, open Settings, Privacy, Shared vault unlock, and in turn set a password, a PIN, and (on macOS/iOS) the device biometric; after each, lock the member vault, reopen it, and confirm it unlocks with that credential, that the wrong credential is refused, that the PIN's five-attempt wipe works, and that sync still runs. Confirm the surface offers NO recovery-phrase arm at all: no toggle, no 24-cell grid, and a device that holds no credential shows the sentence naming a fresh invite from the owner as the only way in (myne-md/myne#938 task 12, decisions/protocol/0763). Use Remove to clear the credential and confirm that same no-credential state appears rather than a phrase form. On the phone, confirm the vault opens from the configured fast credential through the mobile unlock view and that the no-credential state renders the same sentence. Finally, lock the member vault, then unlock the owner vault, and confirm the member identity is not carried across the switch.",
          whyNotAutomated: "The Linux E2E lane now drives the accept path end to end over a real relay (e2e/member-onboarding.e2e.ts: the owner's two-step share door, the invite post, the member's out-of-band compare, their own phrase, a password for that device, and the name gate, with the name read back on the OWNER's device). What it cannot reach is the half that starts after the accept: the pass condition is a cross-session handoff into a RE-LAUNCHED member vault, and a device-credential surface whose PIN arm needs five wrong entries across five real lock cycles and whose biometric arm needs a real sensor. Both are session-scoped state no single-session driver can own.",
          clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
          estimateMin: 6,

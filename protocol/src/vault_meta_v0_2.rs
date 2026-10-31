@@ -360,15 +360,34 @@ pub fn parse_vault_meta_v0_2(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
 }
 
 /// Classify a `vault.meta` blob by its magic, `MYV1` to [`MetaVersion::V0_1`],
-/// `NTV5` / `NTV6` / `NTV7` to [`MetaVersion::V0_2`], anything else to `None`.
-/// Every version-aware reader uses this to pick its crypto generation from the
-/// vault it just read.
+/// `NTV5` / `NTV6` / `NTV7` / `NTV8` to [`MetaVersion::V0_2`], anything else to
+/// `None`. Every version-aware reader uses this to pick its crypto generation
+/// from the vault it just read.
+///
+/// **The `NTV8` arm is what keeps every singleton readable on a password-only
+/// vault** (myne-md/myne#938). It is a v0.2 frame in every sense a subkey tier
+/// cares about: the same KDF, the same salt domains, the same AAD role strings,
+/// and the same group-sealed `itemsKey`. Without the arm, `meta_version_of`
+/// answered `None`, which the readers split on and both halves broke: the
+/// `ok_or(InvalidVaultMeta)` callers (prefs, chats, memory, themes, spell) refused
+/// the vault outright, and the `unwrap_or(V0_1)` callers derived a v0.1 subkey and
+/// failed the AEAD tag. A vault the user just created could not read its own
+/// preferences.
+///
+/// Adding it is only safe together with the guards that refuse to RE-SERIALIZE a
+/// tail frame through `serialize_vault_meta_v0_2` (`account::store`'s two stamp
+/// functions, which ask `has_b2b_tail` rather than this): `V0_2` here does not
+/// mean "an `NTV5` frame you may rewrite", and the generation a writer must
+/// preserve is `vault_meta_generation`'s answer, not this one.
 pub fn meta_version_of(bytes: &[u8]) -> Option<MetaVersion> {
     match bytes.get(0..4) {
         Some(m) if m == VAULT_META_MAGIC.as_slice() => Some(MetaVersion::V0_1),
         Some(m) if m == VAULT_META_V0_2_MAGIC.as_slice() => Some(MetaVersion::V0_2),
         Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => Some(MetaVersion::V0_2),
         Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            Some(MetaVersion::V0_2)
+        }
+        Some(m) if m == crate::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice() => {
             Some(MetaVersion::V0_2)
         }
         _ => None,
@@ -403,6 +422,12 @@ pub enum VaultMetaGeneration {
     B2b,
     /// `NTV7`: the B2B tail plus the person wrap, and no recovery wrap.
     Person,
+    /// `NTV8` (myne-md/myne#938): the B2B tail with NO person wrap and no
+    /// recovery wrap. The master password is the only credential; the identity
+    /// phrase names the person and opens nothing on disk. Distinct from `Person`
+    /// because "carries a person wrap" was what `Person` meant, and a consumer
+    /// that needs one must not be handed a frame that has none.
+    PersonNoWrap,
 }
 
 /// Classify a `vault.meta` blob's generation. An unknown magic is `Legacy`,
@@ -410,6 +435,9 @@ pub enum VaultMetaGeneration {
 /// and the readers that accept the bytes decide separately.
 pub fn vault_meta_generation(bytes: &[u8]) -> VaultMetaGeneration {
     match bytes.get(0..4) {
+        Some(m) if m == crate::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice() => {
+            VaultMetaGeneration::PersonNoWrap
+        }
         Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
             VaultMetaGeneration::Person
         }
@@ -424,8 +452,8 @@ pub fn vault_meta_generation(bytes: &[u8]) -> VaultMetaGeneration {
 }
 
 /// Whether the frame carries the B2B tail (owner-wrapped group key, epoch,
-/// signed roster). True for `NTV6` and `NTV7`, which share that tail byte for
-/// byte, and false for `MYV1`/`NTV5`.
+/// signed roster). True for `NTV6`, `NTV7` and `NTV8`, which share that tail byte
+/// for byte, and false for `MYV1`/`NTV5`.
 ///
 /// Use THIS where the question is "is `itemsKey` group-tier sealed and must the
 /// tail survive a rewrite". The magic comparison it replaces was correct for
@@ -455,18 +483,19 @@ fn base_prefix(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
 
 /// Parse a `vault.meta` of ANY generation into its base [`VaultMeta`],
 /// dispatching on the magic: `NTV5` → [`parse_vault_meta_v0_2`], `NTV6` → the
-/// v0.2 base prefix of the B2B frame, `NTV7` → the v0.2 base prefix of the
-/// person-wrapped frame, otherwise the v0.1 [`parse_vault_meta`].
+/// v0.2 base prefix of the B2B frame, `NTV7` and `NTV8` → the v0.2 base prefix of
+/// their frames, otherwise the v0.1 [`parse_vault_meta`].
 /// The extracted fields (`account_number_hash`, `kdf_params`, `items_key_id`,
 /// the wrapped keys) live at identical offsets in every layout, so a caller that
 /// only needs those fields is version-agnostic, which is exactly what lets
 /// every singleton/index/sync reader keep working on a migrated vault without a
 /// bespoke branch.
 ///
-/// An `NTV6` or `NTV7` frame is the v0.2 base (345 bytes) plus a tail, so this
-/// parses the base prefix and ignores the tail; the generation-specific fields
-/// go through [`parse_vault_meta_ntv6`] or
-/// [`crate::vault_meta_ntv7::parse_vault_meta_ntv7`]. This is a READ of the base
+/// An `NTV6`, `NTV7` or `NTV8` frame is the v0.2 base (345 bytes) plus a tail, so
+/// this parses the base prefix and ignores the tail; the generation-specific
+/// fields go through [`parse_vault_meta_ntv6`] or
+/// [`crate::vault_meta_ntv7::parse_vault_meta_ntv7`] or
+/// [`crate::vault_meta_ntv8::parse_vault_meta_ntv8`]. This is a READ of the base
 /// only: it never treats a tail as a base field.
 pub fn parse_vault_meta_any(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
     match bytes.get(0..4) {
@@ -474,6 +503,9 @@ pub fn parse_vault_meta_any(bytes: &[u8]) -> Result<VaultMeta, ProtocolError> {
         Some(m) if m == VAULT_META_MAGIC.as_slice() => parse_vault_meta(bytes),
         Some(m) if m == VAULT_META_NTV6_MAGIC.as_slice() => base_prefix(bytes),
         Some(m) if m == crate::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
+            base_prefix(bytes)
+        }
+        Some(m) if m == crate::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice() => {
             base_prefix(bytes)
         }
         _ => Err(ProtocolError::InvalidVaultMeta),
@@ -1008,6 +1040,181 @@ mod tests {
             group_key_epoch: 1,
             signed_roster_envelope,
         }
+    }
+
+    /// **The one dispatch table, walked over every generation.**
+    ///
+    /// `myne-format`, `myne-decrypt` and the app's singleton readers all answer
+    /// "what is this file?" through the four functions this test drives, never
+    /// through a magic comparison of their own. That is only safe if the table
+    /// covers every generation that can exist on disk, so the coverage is
+    /// measured here rather than assumed: each writer in the crate contributes a
+    /// frame, and the shared classifier must place all five correctly.
+    ///
+    /// It is also the regression for the failure this session hit twice: a new
+    /// generation added to the crate but not to the classifier. The two symptoms
+    /// differ by caller and both are bad: `ok_or(InvalidVaultMeta)` readers
+    /// refuse a vault that is fine, and `unwrap_or(V0_1)` readers derive a v0.1
+    /// subkey and fail the AEAD tag, which surfaces to the user as "corrupted
+    /// vault".
+    #[test]
+    fn every_generation_is_placed_by_the_shared_dispatch() {
+        // MYV1: the NTV5 base with the v0.1 header, which is exactly what the
+        // migration writes and what a pre-v0.2 vault on disk looks like.
+        let mut myv1 = encode().to_vec();
+        myv1[0..4].copy_from_slice(&VAULT_META_MAGIC);
+        myv1[4] = VAULT_META_PROTOCOL_VERSION;
+        myv1[5] = 0x00;
+
+        // NTV5: the same base under the v0.2 header.
+        let ntv5 = encode().to_vec();
+
+        // NTV6: the base plus the group tail.
+        let ntv6 = serialize_vault_meta_ntv6(&ntv6_fixture()).expect("serialize NTV6");
+
+        // NTV7: the NTV6 tail plus a person wrap, with the phrase wrap retired.
+        let mut base_without_phrase_wrap = ntv6_fixture().base;
+        base_without_phrase_wrap.random_salt_recovery =
+            [0u8; crate::vault_meta::VAULT_META_SALT_RANDOM_LEN];
+        base_without_phrase_wrap.nonce_recovery_wrap = [0u8; AEAD_NONCE_LEN];
+        base_without_phrase_wrap.enc_root_key_recovery =
+            [0u8; crate::vault_meta::VAULT_META_WRAPPED_ROOT_KEY_LEN];
+        let owner =
+            crate::person_key::PersonKeyPair::generate_raw(&[0x31; 64], &[0x32; 32], &[0x33; 32]);
+        let ntv7 = crate::vault_meta_ntv7::serialize_vault_meta_ntv7(
+            &crate::vault_meta_ntv7::PersonWrappedVaultMeta {
+                base: base_without_phrase_wrap.clone(),
+                group_key_nonce: [0xA1; AEAD_NONCE_LEN],
+                enc_group_key: [0xB2; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+                group_key_epoch: 1,
+                signed_roster_envelope: ntv6_fixture().signed_roster_envelope,
+                person_wrap: crate::vault_meta_ntv7::seal_root_key_to_person_raw(
+                    &owner.public_half(),
+                    &ROOT,
+                    &ITEMS_ID,
+                    &mut crate::test_vector_fmt::SeededRng::new(3),
+                )
+                .expect("seal root key"),
+            },
+        )
+        .expect("serialize NTV7");
+
+        // NTV8: the NTV7 frame truncated. Derived rather than re-built, so the
+        // test also holds the "the two differ only in length and magic" claim.
+        let ntv8 = crate::vault_meta_ntv8::serialize_vault_meta_ntv8(
+            &crate::vault_meta_ntv8::PasswordOnlyVaultMeta {
+                base: base_without_phrase_wrap,
+                group_key_nonce: [0xA1; AEAD_NONCE_LEN],
+                enc_group_key: [0xB2; VAULT_META_WRAPPED_ITEMS_KEY_LEN],
+                group_key_epoch: 1,
+                signed_roster_envelope: ntv6_fixture().signed_roster_envelope,
+            },
+        )
+        .expect("serialize NTV8");
+        assert_eq!(
+            ntv7.len(),
+            ntv8.len() + crate::vault_meta_ntv7::PERSON_WRAP_LEN,
+            "the two person generations differ by the envelope and nothing else"
+        );
+
+        let cases: [(&str, &[u8], MetaVersion, VaultMetaGeneration, bool); 5] = [
+            (
+                "MYV1",
+                &myv1,
+                MetaVersion::V0_1,
+                VaultMetaGeneration::Legacy,
+                false,
+            ),
+            (
+                "NTV5",
+                &ntv5,
+                MetaVersion::V0_2,
+                VaultMetaGeneration::Legacy,
+                false,
+            ),
+            (
+                "NTV6",
+                &ntv6,
+                MetaVersion::V0_2,
+                VaultMetaGeneration::B2b,
+                true,
+            ),
+            (
+                "NTV7",
+                &ntv7,
+                MetaVersion::V0_2,
+                VaultMetaGeneration::Person,
+                true,
+            ),
+            (
+                "NTV8",
+                &ntv8,
+                MetaVersion::V0_2,
+                VaultMetaGeneration::PersonNoWrap,
+                true,
+            ),
+        ];
+
+        for (name, bytes, version, generation, has_tail) in cases {
+            assert_eq!(
+                meta_version_of(bytes),
+                Some(version),
+                "[{name}] meta_version_of must place this generation. `None` here is \
+                 what makes an `ok_or(InvalidVaultMeta)` reader refuse a healthy \
+                 vault, and an `unwrap_or(V0_1)` reader derive the wrong subkey."
+            );
+            assert_eq!(
+                vault_meta_generation(bytes),
+                generation,
+                "[{name}] vault_meta_generation"
+            );
+            assert_eq!(has_b2b_tail(bytes), has_tail, "[{name}] has_b2b_tail");
+
+            // The base fields sit at identical offsets in every layout, which is
+            // the property that lets a singleton reader stay generation-agnostic.
+            let base = parse_vault_meta_any(bytes)
+                .unwrap_or_else(|e| panic!("[{name}] parse_vault_meta_any: {e:?}"));
+            assert_eq!(
+                base.account_number_hash, ACCT,
+                "[{name}] account_number_hash"
+            );
+            assert_eq!(base.items_key_id, ITEMS_ID, "[{name}] items_key_id");
+            assert_eq!(base.kdf_params, fast_params(), "[{name}] kdf_params");
+
+            // ...and the tail, where there is one, unwraps to the same shape.
+            if has_tail {
+                let tail = crate::vault_meta_ntv7::parse_b2b_tail_any(bytes)
+                    .unwrap_or_else(|e| panic!("[{name}] parse_b2b_tail_any: {e:?}"));
+                assert_eq!(tail.group_key_epoch, 1, "[{name}] group_key_epoch");
+                assert_eq!(
+                    tail.base.items_key_id, ITEMS_ID,
+                    "[{name}] the tail carries the same base"
+                );
+            } else {
+                assert!(
+                    crate::vault_meta_ntv7::parse_b2b_tail_any(bytes).is_err(),
+                    "[{name}] has no tail, and the tail reader must say so rather \
+                     than invent one"
+                );
+            }
+        }
+
+        // A generation nobody here knows. `meta_version_of` answering `None` is
+        // what lets a reader refuse BY NAME (myne-decrypt prints the magic and
+        // the upgrade path) instead of reporting a parse error.
+        let mut future = ntv8.clone();
+        future[0..4].copy_from_slice(b"FUT9");
+        assert_eq!(meta_version_of(&future), None);
+        assert_eq!(
+            parse_vault_meta_any(&future).err(),
+            Some(ProtocolError::InvalidVaultMeta)
+        );
+        assert_eq!(
+            vault_meta_generation(&future),
+            VaultMetaGeneration::Legacy,
+            "an unknown magic classifies as `not one of ours`, which is the safe \
+             answer for a writer comparing generations"
+        );
     }
 
     #[test]

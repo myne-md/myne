@@ -1230,20 +1230,34 @@ pub fn aad_vault_label_blob(vault_id: &[u8; 16]) -> Vec<u8> {
     aad
 }
 
-/// AAD for the device-local member-vault key store (myne-md/myne#711 task 25):
-/// the member's group and items keys sealed at rest. Binds the vault id the
-/// reader expected AND the vault's account-number hash, so a store copied to
-/// another vault name does not open. v0.2 prefix, matching the person plane.
-pub fn aad_person_member_key_store(vault_id: &[u8; 16], account_number_hash: &[u8; 16]) -> Vec<u8> {
-    const ROLE_STR_PERSON_MEMBER_KEY_STORE: &[u8] = b"person-member-key-store";
+/// AAD for the device-local, PIN-sealed device signing key
+/// (`<app_config_dir>/device-key.sealed`, rung 3 of the storage ladder,
+/// `decisions/protocol/0759`).
+///
+/// Binds the envelope version and the whole KDF parameter set. The parameters are
+/// already an input to the Argon2id derivation, so a rewritten `m_kib` derives a
+/// different wrap key and fails the tag on its own; binding them here makes that a
+/// stated property of the frame rather than a consequence of the derivation order,
+/// and it is what "every encrypted blob carries a role AAD" asks for. This store
+/// used to seal with a zero-length AAD, the tree's only production-shaped seal site
+/// that did (myne-md/myne#938 review).
+///
+/// No vault id and no account hash: the file is device-scoped by design and
+/// deliberately outlives every vault on the machine, so binding a vault would make
+/// the one thing it must survive the thing that opens it.
+pub fn aad_device_key_pin_store(envelope_version: u8, params: &crate::KdfParams) -> Vec<u8> {
+    const ROLE_STR_DEVICE_KEY_PIN_STORE: &[u8] = b"device-key-pin-store";
     let mut aad = Vec::with_capacity(
-        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_PERSON_MEMBER_KEY_STORE.len() + 32,
+        AAD_PREFIX_V0_2.len() + 1 + 2 + ROLE_STR_DEVICE_KEY_PIN_STORE.len() + 1 + 4 + 4 + 1 + 1,
     );
     aad.extend_from_slice(AAD_PREFIX_V0_2);
     aad.push(PROTOCOL_VERSION_V0_2);
-    push_length_prefixed_u16_be(&mut aad, ROLE_STR_PERSON_MEMBER_KEY_STORE);
-    aad.extend_from_slice(vault_id);
-    aad.extend_from_slice(account_number_hash);
+    push_length_prefixed_u16_be(&mut aad, ROLE_STR_DEVICE_KEY_PIN_STORE);
+    aad.push(envelope_version);
+    aad.extend_from_slice(&params.m_kib.to_be_bytes());
+    aad.extend_from_slice(&params.t.to_be_bytes());
+    aad.push(params.p);
+    aad.push(params.argon2_version);
     aad
 }
 
@@ -1251,8 +1265,9 @@ pub fn aad_person_member_key_store(vault_id: &[u8; 16], account_number_hash: &[u
 /// (`vault.member-unlock`): the member's group and items keys plus their person
 /// keypair sealed at rest under a member-chosen password, so a member vault
 /// re-unlocks without the 24-word recovery phrase. A distinct device-local role
-/// from `person-member-key-store` (the phrase store). Binds the vault id the
-/// reader expected AND the vault's account-number hash, so a store copied to
+/// of its own (the phrase-sealed `person-member-key-store` sibling it was
+/// originally told apart from is retired, `decisions/protocol/0763`). Binds the
+/// vault id the reader expected AND the vault's account-number hash, so a store copied to
 /// another vault name or re-labelled to another account does not open. v0.2
 /// prefix, matching the person plane.
 pub fn aad_person_member_unlock_store(
@@ -1590,6 +1605,49 @@ mod tests {
     use crate::member_names_blob::MEMBER_NAMES_BLOB_AAD_ROLE;
     use crate::test_vector_fmt::{hex_lower, json_escape};
     use crate::types::DEFAULT_V0_1_KDF_PARAMS;
+
+    /// The rung-3 device-key seal binds its envelope version and every KDF
+    /// parameter, under the v0.2 prefix, and binds NO vault id
+    /// (`decisions/protocol/0759`, spec §5.2).
+    ///
+    /// This site sealed with a zero-length AAD until myne-md/myne#938's review,
+    /// the only production seal site in the tree that did, so the assertion is
+    /// written to fail on a revert to `&[]`: the length is pinned, and every
+    /// component is moved one at a time.
+    #[test]
+    fn the_device_key_pin_aad_binds_version_and_every_kdf_parameter() {
+        let base = DEFAULT_V0_1_KDF_PARAMS;
+        let aad = aad_device_key_pin_store(1, &base);
+
+        // 10 prefix + 1 version + 2 length + 20 role + 1 + 4 + 4 + 1 + 1.
+        assert_eq!(aad.len(), 44);
+        assert_eq!(&aad[..10], b"myne.v0.2|");
+        assert_eq!(aad[10], PROTOCOL_VERSION_V0_2);
+        assert_eq!(u16::from_be_bytes([aad[11], aad[12]]), 20);
+        assert_eq!(&aad[13..33], b"device-key-pin-store");
+        assert_eq!(aad[33], 1);
+        assert_eq!(&aad[34..38], &base.m_kib.to_be_bytes());
+        assert_eq!(&aad[38..42], &base.t.to_be_bytes());
+        assert_eq!(aad[42], base.p);
+        assert_eq!(aad[43], base.argon2_version);
+
+        // Every component is load-bearing: move one and the bytes move. Without
+        // these the layout assertions above would still pass for a builder that
+        // ignored its arguments.
+        assert_ne!(aad, aad_device_key_pin_store(2, &base));
+        let mut moved = base;
+        moved.m_kib += 1;
+        assert_ne!(aad, aad_device_key_pin_store(1, &moved));
+        let mut moved = base;
+        moved.t += 1;
+        assert_ne!(aad, aad_device_key_pin_store(1, &moved));
+        let mut moved = base;
+        moved.p += 1;
+        assert_ne!(aad, aad_device_key_pin_store(1, &moved));
+        let mut moved = base;
+        moved.argon2_version += 1;
+        assert_ne!(aad, aad_device_key_pin_store(1, &moved));
+    }
 
     #[test]
     fn singleton_blob_generic_matches_the_per_family_builders() {

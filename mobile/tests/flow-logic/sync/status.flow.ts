@@ -40,11 +40,29 @@ test.describe("sync status surface (Settings → Sync, MYND-481)", () => {
     await expect(page.getByTestId("sync.settings.status")).toContainText("2 conflicts");
   });
 
+  // "Offline" now names ONE failure class, `sync_failed` (`FailureClass::Transport`
+  // | `Other`). Every other class gets its own copy, which the next test pins.
   test("error → Settings shows the offline state", async ({ page }) => {
-    await installMockIpc(page, { syncStatus: { state: "error", detail: "offline" } });
+    await installMockIpc(page, { syncStatus: { state: "error", detail: "sync_failed" } });
     await page.goto("/");
     await openSyncSettings(page);
     await expect(page.getByTestId("sync.settings.status")).toContainText("Offline");
+  });
+
+  test("a locked identity is not reported as offline", async ({ page }) => {
+    // The defect this pins: everything but a TLS failure used to read
+    // "Offline", so a locked identity sent the user at a network that was
+    // working. The whole point of the class split is that this row says what
+    // the user can actually do.
+    await installMockIpc(page, {
+      syncStatus: { state: "error", detail: "identity_locked" },
+    });
+    await page.goto("/");
+    await openSyncSettings(page);
+    await expect(page.getByTestId("sync.settings.status")).toContainText(
+      "Unlock your identity to sync",
+    );
+    await expect(page.getByTestId("sync.settings.status")).not.toContainText("Offline");
   });
 
   test("not-enrolled → no Force-sync (nothing to sync yet)", async ({ page }) => {

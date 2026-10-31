@@ -104,6 +104,9 @@ pub mod vault_meta;
 /// `NTV7` person-wrapped `vault.meta` (myne-md/myne#911): the `NTV6` tail with
 /// the phrase wrap retired and `root_key` sealed to the owner's person key.
 pub mod vault_meta_ntv7;
+/// `NTV8` password-only `vault.meta` (myne-md/myne#938): the `NTV6` tail with no
+/// person wrap and no recovery wrap, so the password is the only credential.
+pub mod vault_meta_ntv8;
 pub mod vault_meta_v0_2;
 /// The `.myneview` view manifest: one `SavedView` read STRICTLY, for the import
 /// path only (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
@@ -123,12 +126,12 @@ pub use aead::{
     aad_agent_memory_blob, aad_agent_memory_blob_v0_2, aad_agent_memory_catalog,
     aad_agent_personality_blob, aad_attachment_text_blob, aad_awareness_frame, aad_chats_blob,
     aad_chats_blob_v0_2, aad_chats_catalog, aad_custom_themes_blob, aad_device_binding_blob,
-    aad_graph_layout_blob, aad_member_names_blob, aad_membership_blob, aad_membership_roster_blob,
-    aad_note_content_encrypt, aad_note_item_key_wrap, aad_password_wrap, aad_password_wrap_v0_2,
-    aad_person_binding_blob, aad_person_member_key_store, aad_person_member_unlock_store,
-    aad_person_profile_blob, aad_person_vault_carrier, aad_personal_dictionary_blob,
-    aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap, aad_recovery_wrap_v0_2,
-    aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
+    aad_device_key_pin_store, aad_graph_layout_blob, aad_member_names_blob, aad_membership_blob,
+    aad_membership_roster_blob, aad_note_content_encrypt, aad_note_item_key_wrap,
+    aad_password_wrap, aad_password_wrap_v0_2, aad_person_binding_blob,
+    aad_person_member_unlock_store, aad_person_profile_blob, aad_person_vault_carrier,
+    aad_personal_dictionary_blob, aad_prefs_blob, aad_quick_unlock_blob, aad_recovery_wrap,
+    aad_recovery_wrap_v0_2, aad_search_index_blob, aad_singleton_blob, aad_singleton_blob_v0_2,
     aad_vault_group_key_wrap_v0_2, aad_vault_indices_blob, aad_vault_items_key_wrap,
     aad_vault_items_key_wrap_v0_2, aad_workspace_blob, aead_open_ctx, aead_seal_ctx, AEAD_KEY_LEN,
     AEAD_NONCE_LEN, CTX_COMMITMENT_TAG_LEN, GROUP_KEY_WRAP_AAD_ROLE,
@@ -252,15 +255,14 @@ pub use graph_layout_blob::{
 pub use kdf::{
     derive_password_wrap_key, derive_password_wrap_key_v0_2,
     derive_person_keypair_wrap_key_from_normalized, derive_person_server_auth_key,
-    derive_person_server_auth_key_from_normalized, derive_person_vault_member_key,
-    derive_person_vault_member_key_from_normalized, derive_person_vault_member_unlock_key,
-    derive_person_vault_profile_key, derive_person_vault_profile_key_from_normalized,
-    derive_recovery_wrap_key, derive_recovery_wrap_key_from_normalized,
-    derive_recovery_wrap_key_from_normalized_v0_2, derive_recovery_wrap_key_v0_2, person_id_hash,
-    person_profile_id, ARGON2_OUTPUT_LEN, ARGON2_SALT_LEN, PERSON_ID_PREFIX,
-    PERSON_PROFILE_ID_PREFIX, PERSON_SERVER_AUTH_SALT_RANDOM, PERSON_VAULT_MEMBER_SALT_RANDOM,
-    PERSON_VAULT_PROFILE_SALT_RANDOM, SALT_PREFIX_PERSON_SERVER_AUTH_V0_2,
-    SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2, SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2,
+    derive_person_server_auth_key_from_normalized, derive_person_vault_member_unlock_key,
+    derive_person_vault_profile_key, derive_person_vault_profile_key_from_gate,
+    derive_person_vault_profile_key_from_normalized, derive_recovery_wrap_key,
+    derive_recovery_wrap_key_from_normalized, derive_recovery_wrap_key_from_normalized_v0_2,
+    derive_recovery_wrap_key_v0_2, person_id_hash, person_profile_id, ARGON2_OUTPUT_LEN,
+    ARGON2_SALT_LEN, PERSON_ID_PREFIX, PERSON_PROFILE_GATE_CONTEXT, PERSON_PROFILE_ID_PREFIX,
+    PERSON_SERVER_AUTH_SALT_RANDOM, PERSON_VAULT_PROFILE_SALT_RANDOM,
+    SALT_PREFIX_PERSON_SERVER_AUTH_V0_2, SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2,
 };
 pub use manifest::{
     compute_manifest_hash, decode_manifest, encode_manifest, ManifestEntry, ManifestError,
@@ -368,6 +370,10 @@ pub use vault_meta_ntv7::{
     rewrite_vault_meta_password_side_ntv7, seal_root_key_to_person_raw, serialize_vault_meta_ntv7,
     PersonWrap, PersonWrappedVaultMeta, NTV7_FIXED_LEN, PERSON_WRAP_LEN,
     PERSON_WRAP_WRAPPED_ROOT_KEY_LEN, VAULT_META_NTV7_MAGIC, VAULT_META_NTV7_PROTOCOL_VERSION,
+};
+pub use vault_meta_ntv8::{
+    parse_vault_meta_ntv8, rewrite_vault_meta_password_side_ntv8, serialize_vault_meta_ntv8,
+    PasswordOnlyVaultMeta, NTV8_FIXED_LEN, VAULT_META_NTV8_MAGIC, VAULT_META_NTV8_PROTOCOL_VERSION,
 };
 pub use vault_meta_v0_2::{
     derive_items_key_v0_2, derive_items_key_versioned, encode_vault_meta_v0_2_raw, has_b2b_tail,

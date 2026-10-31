@@ -93,7 +93,7 @@ pub async fn person_ai_sync_from_host(
     // An ABSENT cache is the empty state; a PRESENT-but-corrupt one is a
     // refusal, not "empty". Treating corruption as empty would let the next
     // write persist the reduced container over real local data (the
-    // `read_or_empty` shape `member_key_store` fails closed against).
+    // `read_or_empty` shape `member_unlock_store` fails closed against).
     let local = match read_person_ai_cache(io, &vault_root).await {
         None => PersonAiState::empty(),
         Some(sealed) => {

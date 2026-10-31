@@ -29,10 +29,10 @@
 # so it never built outside a `myne` checkout — while resolving its own second
 # `Cargo.lock`, in which 62 of 572 shared crates had drifted from this one
 # (`bip39 -> bitcoin_hashes` among them). One lock is what makes TB9's audit
-# anchor describe the artefact mobile actually ships. The five plugins are listed
-# explicitly rather than left to cargo's automatic path-dependency membership,
-# because this list is the documented source of truth (AGENTS.md).
-members = ["src-tauri", "protocol", "core", "format", "decrypt", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "mcp", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders", "mobile/src-tauri/tauri-plugin-sensitive-clipboard"]
+# anchor describe the artefact mobile actually ships. The in-repo Tauri plugins are
+# listed explicitly rather than left to cargo's automatic path-dependency
+# membership, because this list is the documented source of truth (AGENTS.md).
+members = ["src-tauri", "protocol", "core", "format", "decrypt", "e2e/fixture-gen", "theme-validator", "web/wasm", "web/bench/wasm", "cli", "mcp", "tor-sidecar", "mobile/src-tauri", "mobile/src-tauri/tauri-plugin-screen-guard", "mobile/src-tauri/tauri-plugin-device-key", "mobile/src-tauri/tauri-plugin-share-intent", "mobile/src-tauri/tauri-plugin-qr-scan", "mobile/src-tauri/tauri-plugin-reminders", "mobile/src-tauri/tauri-plugin-sensitive-clipboard"]
 resolver = "2"
 
 # Optimize the on-device AI math crates even in DEV builds. Candle + its `gemm`

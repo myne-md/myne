@@ -135,6 +135,34 @@ fn main() -> ExitCode {
             eprintln!("myne-decrypt: not a valid Myne vault (vault.meta unreadable)");
             return ExitCode::FAILURE;
         }
+        Err(unlock::UnlockError::UnsupportedGeneration(magic)) => {
+            // Named, not a parse error. A user holding a vault a newer Myne wrote
+            // has one action (upgrade this tool) and cannot infer it from
+            // "unreadable"; a user whose file is corrupt needs the opposite
+            // advice, so the two must not read the same.
+            eprintln!("myne-decrypt: this vault.meta is a generation this build does not know");
+            eprintln!(
+                "  found magic {} ({}), expected MYV1, NTV5, NTV6, NTV7 or NTV8",
+                printable_magic(&magic),
+                magic.iter().map(|b| format!("{b:02x}")).collect::<String>()
+            );
+            eprintln!(
+                "  A newer Myne wrote this vault. Upgrade myne-decrypt to a release that \
+                 knows that generation, or open the vault in the app that wrote it."
+            );
+            return ExitCode::FAILURE;
+        }
+        Err(unlock::UnlockError::NotPersonWrapped) => {
+            eprintln!(
+                "myne-decrypt: this vault has no identity wrap, so the identity phrase is \
+                 not a credential for it"
+            );
+            eprintln!(
+                "  Open it with the master password. Since NTV8 the password is the only \
+                 vault credential; the identity phrase names you and opens nothing on disk."
+            );
+            return ExitCode::FAILURE;
+        }
     };
 
     // The export walk. The destination is the new tree directory itself; the
@@ -287,6 +315,23 @@ fn report_unreachable(vault_dir: &std::path::Path) {
 }
 
 /// A human-readable, non-distinguishing message for an export failure.
+/// The four magic bytes as a printable label. A vault from the future carries
+/// ASCII magic, so `FUT9` reads as `FUT9`; a corrupt file may carry anything, so
+/// every non-printable byte becomes `.` and the hex printed beside it stays the
+/// authority.
+fn printable_magic(magic: &[u8; 4]) -> String {
+    magic
+        .iter()
+        .map(|b| {
+            if b.is_ascii_graphic() {
+                (*b as char).to_string()
+            } else {
+                ".".to_string()
+            }
+        })
+        .collect()
+}
+
 fn export_error_message(e: &myne_format::export_error::VaultExportError) -> String {
     use myne_format::export_error::VaultExportError as E;
     match e {

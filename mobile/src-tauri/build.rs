@@ -449,7 +449,6 @@ fn main() {
                     // user: the pinned owner half is read from the person's own
                     // sealed `MYY5` profile, where the accepting device put it.
                     "sync_member_join_vault",
-                    "sync_person_unlock_member_vault",
                     "sync_member_vault_status",
                     "sync_person_set_member_password",
                     "sync_person_unlock_member_vault_with_password",
@@ -464,6 +463,11 @@ fn main() {
                     "sync_list_devices",
                     "sync_account_status",
                     "sync_approve_device",
+                    "sync_device_admission_start",
+                    "sync_device_admission_confirm",
+                    "sync_device_admission_preview",
+                    "sync_device_admission_accept",
+                    "sync_device_admission_cancel",
                     "sync_remove_device",
                     "sync_pending_conflicts",
                     "sync_take_conflict",

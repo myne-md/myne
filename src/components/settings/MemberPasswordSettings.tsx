@@ -182,8 +182,11 @@ export function MemberPasswordSettings() {
       {/* The reminder (task 9), shown only while NO method exists AND the probe has
           answered: `null` is also the value before `memberUnlockStatus` resolves, so
           without the `loaded` gate this flashed on a vault that does have a password.
-          It is copy, not a control; the Set button above is the action, and the
-          recovery phrase still opens the vault meanwhile. */}
+          It is copy, not a control; the Set button above is the action. There is no
+          phrase arm to fall back on: since myne-md/myne#938 task 12
+          (`decisions/protocol/0763`) this device password is the ONLY way into a
+          member vault, so the reminder is a prompt rather than a nudge beside a
+          working alternative. */}
       {loaded && configured === null && !reminderDismissed ? (
         <p data-testid="settings.member-password-reminder" style={REMINDER_STYLE}>
           {t("settings.memberPassword.reminder")}{" "}

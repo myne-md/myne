@@ -280,6 +280,26 @@ windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem"] }
 security-framework = "3"
 security-framework-sys = "2"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+# Rung 2 of the device-key storage ladder (`decisions/protocol/0733` decision 4,
+# landed by `identity-seat-portability` task 8): the Secret Service (GNOME Keyring /
+# KWallet) over the session bus, so a Linux desktop can hold a device signing key
+# instead of falling to rung 4 and signing `0x02` heads forever.
+#
+# `default-features = false` + an explicit runtime/crypto pair is deliberate: the
+# crate's defaults would pull BOTH a runtime and a crypto backend, and the pair
+# chosen here is the pure-Rust one on `async-io`, so no C toolchain and no tokio
+# reactor is implied by a library crate that is also compiled for wasm and mobile.
+#
+# **This is local IPC, not egress.** `secret-service` reaches a unix-socket bus name
+# (`org.freedesktop.secrets`); it opens no TCP connection and has no URL concept,
+# which is why it does not belong in `src-tauri/scripts/ai-no-network-check.sh`'s
+# AI-delta denylist. The dependency is a supply-chain decision recorded in
+# `docs/decisions/protocol/0733`, not a line-item here.
+secret-service = { version = "5.2", default-features = false, features = [
+  "rt-async-io-crypto-rust",
+] }
+
 [features]
 # Default-on. Compiles the `#[tauri::command]` wrappers and the `TauriHost`
 # adapter. A wasm build never enables it (the `tauri` dep is target-gated out

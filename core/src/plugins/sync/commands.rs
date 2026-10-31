@@ -516,6 +516,7 @@ pub async fn sync_verify_hold_end<R: Runtime>(_app: AppHandle<R>) {
 // dev/harness, pinned rustls for https). No root_key needed (device-mgmt is
 // token-authed); enrollment (which needs root_key) is a separate command.
 
+use super::device_admission;
 use super::devices::{self, DeviceEntry};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use tauri::State;
@@ -626,6 +627,15 @@ pub async fn sync_person_unlock<R: Runtime>(
                 &crate::vault_io::StdVaultIo,
                 &root,
                 &view.identity_code,
+            )
+            .await;
+            // Adopt the person plane's device id into this vault's sync state
+            // BEFORE the claim: the claim's own id reader is that field, and on a
+            // person-born vault nothing had ever written it.
+            super::person_account::adopt_person_device_identity_best_effort(
+                &host,
+                &crate::vault_io::StdVaultIo,
+                &root,
             )
             .await;
             // Claim this device in the ACTIVE vault, now that the person key is in hand.
@@ -1003,36 +1013,34 @@ pub async fn invite_member_from_host(
     if meta_bytes.get(..4) == Some(protocol::VAULT_META_V0_2_MAGIC.as_slice()) {
         return Err(SyncDeviceError::MigrationRequired);
     }
-    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) {
-        // The `NTV6` invite writes the owner-signed roster, and the member's
-        // grant is a group-key package rather than an `itemsKey` wrap.
-        return write_ntv6_invite(
-            state,
-            io,
-            &root,
-            &meta_path,
-            &meta_bytes,
-            &owner,
-            member_public,
-            member_person_id_hex,
-            group_key.as_deref(),
-            None,
-            &_permit,
-        )
-        .await;
-    }
-    // A person-born vault (`NTV7`) invites through the SAME writer, because its tail
-    // is `NTV6`'s byte for byte: the roster, the group-key package and the epoch are
-    // the same objects. What differs is the frame it is sealed back into, so the
-    // writer takes the person wrap and re-emits `NTV7` verbatim around the new tail.
+    // **One dispatch for every tail generation, carried rather than re-inferred**
+    // (myne-md/myne#938 review). The arms below used to be a `NTV6` magic test and an
+    // `NTV7`-only generation test, so an `NTV8` vault — every vault created since the
+    // upgrade — fell through to the legacy `write_roster_row`, which is `NTV5`-shaped:
+    // no group-key wrap, no epoch, no signed roster. There the invite is merely
+    // refused (`BadRequest`, because a person-born base carries no `membership`), but
+    // the fall-through is only one `None` away from writing an `NTV5` frame over a
+    // group-sealed `itemsKey`, which no unlock path could open again.
     //
-    // This used to answer a flat `BadRequest` with a warning, because sharing a
-    // person-born vault was out of scope (`decisions/ui/0729`). It is in scope now:
-    // a generation that is born with the group tier and can never be shared is a
-    // vault type the product no longer has.
-    if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
-        let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes)
-            .map_err(|_| SyncDeviceError::BadRequest)?;
+    // A tail generation invites through the SAME writer, because the tail is `NTV6`'s
+    // byte for byte: the roster, the group-key package and the epoch are the same
+    // objects. What differs is the frame it is sealed back into, so the writer takes
+    // the frame it arrived in (and the person wrap, when that frame has one) and
+    // re-emits it verbatim around the new tail.
+    //
+    // Sharing a person-born vault used to be out of scope (`decisions/ui/0729`) and
+    // answered a flat `BadRequest`; it is in scope now, because a generation that is
+    // born with the group tier and can never be shared is a vault type the product no
+    // longer has.
+    if let Some(frame) = super::meta_kind::TailFrame::of(&meta_bytes) {
+        let person_wrap = match frame {
+            super::meta_kind::TailFrame::Ntv7 => Some(
+                protocol::parse_vault_meta_ntv7(&meta_bytes)
+                    .map_err(|_| SyncDeviceError::BadRequest)?
+                    .person_wrap,
+            ),
+            super::meta_kind::TailFrame::Ntv6 | super::meta_kind::TailFrame::Ntv8 => None,
+        };
         return write_ntv6_invite(
             state,
             io,
@@ -1043,7 +1051,8 @@ pub async fn invite_member_from_host(
             member_public,
             member_person_id_hex,
             group_key.as_deref(),
-            Some(parsed.person_wrap),
+            frame,
+            person_wrap,
             &_permit,
         )
         .await;
@@ -1238,11 +1247,12 @@ pub async fn create_invite_from_host(
 /// package's wrap), re-signs and re-seals it at the SAME epoch, and writes
 /// `vault.meta`. The epoch only advances on a removal.
 ///
-/// `person_wrap` is the generation: `None` writes an `NTV6` frame, `Some` writes the
-/// `NTV7` frame with that wrap preserved. `NTV7` keeps the `NTV6` tail byte for byte,
-/// so only the envelope around the new roster differs; a caller that passed `None`
-/// for a person-born vault would silently downgrade it to `NTV6` and retire the very
-/// credential (`root_key` sealed to the owner's person key) the vault was born with.
+/// `frame` is the generation this frame arrived in, and `person_wrap` is carried with
+/// it rather than derived from it: `NTV6` and `NTV8` both have no person wrap, so
+/// `person_wrap.is_some()` cannot tell them apart and an `NTV8` vault would be
+/// re-emitted as `NTV6` — two generations back, retiring the tail the spec says is
+/// never written again (myne-md/myne#938 review). `NTV7` and `NTV8` keep the `NTV6`
+/// tail byte for byte, so only the envelope around the new roster differs.
 ///
 /// The member-accept path and the wire that carries the package are Grill 4; the
 /// frame is returned in `invite_wire` so the caller can relay it.
@@ -1257,6 +1267,7 @@ async fn write_ntv6_invite(
     member_public: &protocol::person_key::PersonPublicHalf,
     member_person_id_hex: Option<&str>,
     group_key: Option<&[u8; 32]>,
+    frame: super::meta_kind::TailFrame,
     person_wrap: Option<protocol::PersonWrap>,
     _permit: &tokio::sync::SemaphorePermit<'_>,
 ) -> Result<InviteCommandView, SyncDeviceError> {
@@ -1400,25 +1411,17 @@ async fn write_ntv6_invite(
         &signed,
     )
     .ok_or(SyncDeviceError::BadRequest)?;
-    let new_meta = match person_wrap {
-        Some(person_wrap) => {
-            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
-                base: b2b.base,
-                group_key_nonce: b2b.group_key_nonce,
-                enc_group_key: b2b.enc_group_key,
-                group_key_epoch: epoch,
-                signed_roster_envelope: sealed,
-                person_wrap,
-            })
-        }
-        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+    let new_meta = super::meta_kind::serialize_tail_frame(
+        frame,
+        protocol::B2bVaultMeta {
             base: b2b.base,
             group_key_nonce: b2b.group_key_nonce,
             enc_group_key: b2b.enc_group_key,
             group_key_epoch: epoch,
             signed_roster_envelope: sealed,
-        }),
-    }
+        },
+        person_wrap,
+    )
     .map_err(|_| SyncDeviceError::BadRequest)?;
 
     let old_hash = crate::vault_meta_hash::vault_meta_sha256(meta_bytes);
@@ -2154,6 +2157,81 @@ fn map_remove_error(e: super::member_removal::MemberRemovalError) -> SyncDeviceE
         E::Busy => SyncDeviceError::Transport,
         E::CannotDecrypt | E::InvalidVaultMeta | E::Io => SyncDeviceError::BadRequest,
     }
+}
+
+// --- The two-sided device admission ceremony (myne-md/myne#938 task 11; 0735) ---
+//
+// Five commands, because the ceremony has five states a screen can be in and each one
+// gates a DIFFERENT write: the joining device mints nothing to disk, its confirm persists
+// its own secret, the admitting device previews nothing, its accept installs the credential
+// and writes the row, and a cancel forgets the RAM copy. Collapsing any two would put two
+// different guarantees behind one call.
+
+/// JOINING device, step 1: mint an admission and show its code and SAS. Writes nothing.
+#[tauri::command]
+pub async fn sync_device_admission_start(
+    state: State<'_, VaultRuntimeState>,
+    person_id_hex: String,
+) -> Result<device_admission::AdmissionMintedView, SyncDeviceError> {
+    device_admission::mint_from_host(state.inner(), &person_id_hex).await
+}
+
+/// JOINING device, step 2: persist this device's own secret, after its own tap.
+///
+/// `Ok(true)` means the admitting device had already accepted, so this device holds a
+/// session; `Ok(false)` is the ordinary pending answer and the screen says "waiting".
+#[tauri::command]
+pub async fn sync_device_admission_confirm<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    confirmed_sas: String,
+) -> Result<bool, SyncDeviceError> {
+    device_admission::confirm_minted_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &confirmed_sas,
+    )
+    .await
+}
+
+/// ADMITTING device, step 1: derive the SAS from a code the user pasted or scanned.
+/// Writes nothing and sends nothing. This is the call whose contract is that it is a read.
+#[tauri::command]
+pub async fn sync_device_admission_preview(
+    state: State<'_, VaultRuntimeState>,
+    code: String,
+) -> Result<device_admission::AdmissionPreviewView, SyncDeviceError> {
+    device_admission::preview_from_host(state.inner(), &code).await
+}
+
+/// ADMITTING device, step 2: install the credential and write the binding row, after its
+/// own tap and only for the SAS the human confirmed.
+#[tauri::command]
+pub async fn sync_device_admission_accept<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    code: String,
+    confirmed_sas: String,
+) -> Result<device_admission::AdmissionConfirmedView, SyncDeviceError> {
+    device_admission::confirm_preview_from_host(
+        &crate::host::tauri_host::TauriHost::new(app.clone()),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+        &code,
+        &confirmed_sas,
+    )
+    .await
+}
+
+/// Either side: discard the exchange. Nothing was written, so there is nothing to undo
+/// beyond the RAM copy of the minted secret.
+#[tauri::command]
+pub async fn sync_device_admission_cancel(
+    state: State<'_, VaultRuntimeState>,
+) -> Result<(), SyncDeviceError> {
+    device_admission::cancel_from_host(state.inner()).await;
+    Ok(())
 }
 
 /// Approve a pending device (the existing unlocked device authorizes it).

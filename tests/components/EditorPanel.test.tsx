@@ -40,7 +40,7 @@
 // no note would, which is the property claim 3 is really about.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render } from "@testing-library/react";
+import { act, cleanup, render, waitFor } from "@testing-library/react";
 
 const invokeMock = vi.fn();
 
@@ -429,10 +429,20 @@ describe("the preview follows the active topic", () => {
       await act(async () => {
         await Promise.resolve();
       });
-      expect(
-        document.querySelector('[data-testid="settings.editor-preview"]'),
-        `topic ${topicId} drew a preview it cannot honestly fill`,
-      ).toBeNull();
+      // Waited rather than read once, because the panel's preview column and the
+      // active topic are two subscriptions and the column only disappears when
+      // the second one has settled. A single microtask flush was enough on a
+      // developer machine and not on the CI runner, where this file failed with
+      // the previous topic's column still mounted (`data-topic="tasks"`) in two
+      // separate pipelines. The claim is unchanged: if the column were drawn for
+      // a topic that cannot fill it, this would never settle and would still
+      // fail, naming the topic.
+      await waitFor(() =>
+        expect(
+          document.querySelector('[data-testid="settings.editor-preview"]'),
+          `topic ${topicId} drew a preview it cannot honestly fill`,
+        ).toBeNull(),
+      );
     }
     // And the counter-case, so the assertion above is about the topic and not
     // about a preview that never renders in this harness.

@@ -479,7 +479,14 @@ export interface RosterListView {
 
 export interface MembersHook {
   members: RosterMemberView[];
-  authority: "owner" | "member";
+  /** The caller's authority, or `null` while it is NOT KNOWN (myne-md/myne#938
+   *  task 13). `null` is a state of its own rather than a fail-closed default:
+   *  this hook feeds a panel that DISPLAYS the role, so `"member"` before the
+   *  roster has been read is the phone asserting something it never learned. The
+   *  desktop hook can default to `member` because it only gates controls on it,
+   *  where a hidden button is the harmless failure; a badge that says "Member" to
+   *  a vault's owner is not. A failed read leaves it `null` for the same reason. */
+  authority: "owner" | "member" | null;
   groupKeyEpoch: number | null;
   error: string | null;
 }
@@ -507,7 +514,7 @@ export function listRoster(): Promise<RosterListView> {
  */
 export function useMembers(): MembersHook {
   const [members, setMembers] = useState<RosterMemberView[]>([]);
-  const [authority, setAuthority] = useState<"owner" | "member">("member");
+  const [authority, setAuthority] = useState<"owner" | "member" | null>(null);
   const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -525,7 +532,9 @@ export function useMembers(): MembersHook {
       .catch((e) => {
         if (!cancelled) {
           setMembers([]);
-          setAuthority("member");
+          // Not `"member"`: the read failed, so no role was learned, and the
+          // panel renders none rather than a plausible guess (task 13).
+          setAuthority(null);
           setGroupKeyEpoch(null);
           setError(errKind(e));
         }

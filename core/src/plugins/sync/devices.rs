@@ -764,6 +764,21 @@ pub enum SyncDeviceError {
     /// home, so joining a vault this device already holds reaches it every time,
     /// whether the vault was accepted here or joined here.
     VaultAlreadyHeld,
+    /// The SAS the human confirmed is not the SAS derived from the code in hand
+    /// (`decisions/protocol/0735` decision 3; myne-md/myne#938 task 11).
+    ///
+    /// Its own variant rather than `BadRequest` because the refusal has a specific meaning
+    /// the surface must word: the code changed between the screen that showed the string and
+    /// the button that accepted it, which is the attack the SAS exists to catch. Nothing was
+    /// written on either side.
+    SasMismatch,
+    /// There is no minted admission waiting to be confirmed: the ceremony was cancelled, or
+    /// the vault locked, and the RAM slot that held the secret is gone.
+    ///
+    /// Its own variant rather than `Internal`: nothing is broken, the user simply has to
+    /// start the exchange again, and the secret is deliberately never on disk before the
+    /// confirm.
+    NoPendingAdmission,
     /// Internal (task join, IO).
     Internal,
 }
@@ -877,13 +892,14 @@ pub async fn account_plane_io_from_host(
     else {
         return AccountPlane::Vault;
     };
+    // Both person generations, through the classifier: an `NTV8` vault is addressed with
+    // the person token and its own selector exactly as `NTV7` is, and reading it as a
+    // vault-account vault sends the request under a credential it does not have.
     let person_born = io
         .read(&root.join("vault.meta"))
         .await
         .ok()
-        .is_some_and(|bytes| {
-            bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-        });
+        .is_some_and(|bytes| super::meta_kind::is_person_born(&bytes));
     if person_born {
         AccountPlane::Person
     } else {
@@ -900,11 +916,13 @@ pub async fn account_plane_io_from_host(
 /// member session is constructed without a root key by definition.
 ///
 /// The Settings panels decide the same thing from disk, through
-/// `sync_member_vault_status` → the device-local member-key store, which is the
-/// predicate `VaultPanel` already uses to hide the owner password section
-/// (`myne-md/myne#858`). The two cannot disagree in practice: a member vault is
-/// materialized with that store or not at all, and a missing store refuses the
-/// materialization rather than producing a half-member session.
+/// `sync_member_vault_status` → the device-local member credential
+/// (`vault.member-unlock`), which is the predicate `VaultPanel` already uses to
+/// hide the owner password section (`myne-md/myne#858`). The two cannot disagree
+/// in practice: a member vault is materialized with that store or not at all, and
+/// a missing store refuses the materialization rather than producing a half-member
+/// session. Since myne-md/myne#938 task 12 it is also the ONLY member store, so
+/// the disk predicate has one candidate rather than two.
 ///
 /// Public because two other callers ask the same question: the member QR command
 /// (`sync_member_join_qr`, which only a member session may render) and this

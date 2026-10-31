@@ -160,7 +160,14 @@ per-vault and unguessable, so the defence is not weaker for being differently
 sourced. And an `NTV7` vault has **no recovery-phrase wrap** (§9.3.5), so
 `random_salt_recovery_16` is written as zeros and takes no part in any
 derivation; the identity phrase opens the vault through the person envelope
-instead, and the password path is byte for byte the one above.
+instead, and the password path is byte for byte the one above. An `NTV8` vault
+(§9.3.6) has neither the phrase wrap nor the person envelope, so
+`random_salt_recovery_16` is zeros there for the same reason and **no second
+credential exists at all**: the password path above is the vault's only door, and
+a client MUST NOT offer a phrase for one (`decisions/protocol/0758`). The salt
+domain `"myne.v0.2 argon2id-recovery|"` therefore stays registered and exercised
+by the vectors without a shipping reader for this generation: it is what a
+`MYV1`/`NTV5`/`NTV6` vault's own phrase still derives.
 
 The Argon2id parameter values themselves live in `vault.meta` (§9.3) and are bound into both wrap AADs (§4.3), so any tampering with the stored parameters invalidates the AEAD tag.
 
@@ -216,6 +223,25 @@ hybrid_wrap_key   = HKDF-SHA-256-Extract(
 
 The three domain strings (`"myne.person-id|"`, `"myne.person-fingerprint v1|"`, `"myne.person-wrap-ss v1|"`) and the invite signature class `"myne.vault-invite v1|"` (`person_invite.rs`) are load-bearing: a change to any of them re-derives every fingerprint, wrap key or signature class. Each is domain-separated from the vault AAD/HKDF registries and from the others.
 
+
+**Device-local and vault-agnostic domains.** Three domains are neither vault credentials nor person credentials: they seal state that sits BESIDE a vault (or outlives it) rather than inside it, and a port that guesses them derives a key that opens nothing.
+
+```
+salt_device_key_pin = SHA-256("myne.v0.2 argon2id-device-key-pin|"
+                              || pin_salt_16)[:16]                 (no account component)
+
+salt_member_unlock  = SHA-256("myne.v0.2 argon2id-person-vault-member-unlock|"
+                              || account_number_hash
+                              || random_salt_member_16)[:16]
+
+profile_gate_info   = "myne.person-vault-profile-gate v1|" || profile_id (16)
+```
+
+`"myne.v0.2 argon2id-device-key-pin|"` seals the **device signing key** in the rung-3 `0600` file on a platform with no OS store (`decisions/protocol/0759`, §5.2 `AAD_device_key_pin_store`). It is bound to **no** `account_number_hash` on purpose: the key is device-scoped and outlives every vault on the machine, so a vault component in the salt would make forgetting a vault destroy a key that was never the vault's. It is deliberately not the quick-unlock PIN domain (§9.14.2), so one PIN cannot derive one key for two purposes. The memory-hard parameter set is the only offline bound on a low-entropy PIN, exactly as in the quick-unlock case.
+
+`"myne.v0.2 argon2id-person-vault-member-unlock|"` seals the device-local member credential store (`vault.member-unlock`, §5.2 `AAD_person_member_unlock_store`, `decisions/protocol/0653`), scoped per `(person, vault)` by the account hash. It is the **only** member credential since `decisions/protocol/0763` retired the phrase-sealed sibling.
+
+`"myne.person-vault-profile-gate v1|"` is an HKDF **context** rather than a salt domain: the private-profile key for `(person, vault)`, expanded from the member-unlock wrap key with `profile_id` in the `info` slot, so the identity phrase is not a permanent requirement on top of the vault password. It is registered here ahead of its first bytes on disk (`decisions/protocol/0763` §4): nothing seals a profile under it yet, and the constant is frozen now so no implementation chooses it ad hoc.
 
 ### 3.2 Subkey derivation (HKDF-SHA-256 with registered context strings)
 
@@ -410,7 +436,7 @@ Approximate cost: ~1 second on a 2024 desktop laptop, ~2–3 seconds on mid-tier
 
 The machine is named deliberately: **the transferable figure is the ratio, not the milliseconds.** Absolute timings scale with whatever hardware the user has, exactly as the native figures above do; the 1.13–1.65× penalty is the part that carries to other machines. Mobile browsers are a separate matter — iOS Safari cannot allocate 256 MiB reliably, and these parameters are AAD-bound and read from `vault.meta`, so they cannot be lowered for a browser — nor by any other device that joins an existing vault (§4.2, §11.2).
 
-These parameters are calibrated to provide **≥ 80 bits of effective security when combined with a password of ≥ 60 bits of entropy**. Users who select weaker passwords are protected primarily by their recovery phrase, which carries 256 bits of entropy independent of password choice. Implementations SHOULD enforce a minimum password strength (e.g., ≥ 12 characters, zxcvbn score ≥ 3, dictionary check) at signup; this is a UX-level responsibility, not a protocol-level mandate.
+These parameters are calibrated to provide **≥ 80 bits of effective security when combined with a password of ≥ 60 bits of entropy**. Implementations SHOULD enforce a minimum password strength (e.g., ≥ 12 characters, zxcvbn score ≥ 3, dictionary check) at signup; this is a UX-level responsibility, not a protocol-level mandate. **On the `NTV8` generation the password is the whole barrier** (§9.3.6, `decisions/protocol/0758`): that frame carries no second credential and no phrase wrap, so a weak password has no safety net behind it, and a client's copy MUST say that rather than imply one. The generations that do carry a recovery wrap (`MYV1`, `NTV5`, `NTV6`, `NTV7`) keep the reading this paragraph had before `NTV8`, where the phrase opened a second, independent copy of `root_key`.
 
 ### 4.2 Parameters stored in `vault.meta`
 
@@ -596,9 +622,11 @@ substituted. Total AAD length: `10 + 1 + 16 + 8 + 16 = 51 bytes`.
 
 `AAD_vault_label_blob` is the AAD bound into the AEAD seal of the sealed label store (`vault.label`, `MYL1`, §9.22). Like `AAD_pending_capture_blob` it binds **neither** `account_number_hash` **nor** `items_key_id`, and it has no `DeriveSubkey` role, because its KEK is a **per-vault** device-local key held in the OS keychain rather than a `root_key` product (§9.22.2), and because the file belongs to a vault *directory* rather than to an account (one account can hold two vault directories on one device). It instead binds the 16-byte `vault_id` after the role string `"vault-label-blob"` (length-prefixed UTF-8: 2-B big-endian length + 16 ASCII bytes). Total AAD length: `10 + 1 + 18 + 16 = 45 bytes`. One property is stronger here than in §9.18/§9.20: the bound `vault_id` is the one the **reader expected**, not merely the one the blob's own header carries, so a sealed file moved between vault directories fails AEAD instead of relying on an implementer's comparison. §9.22.3 states that as a MUST.
 
-`AAD_person_member_key_store` is the AAD bound into the AEAD seal of the device-local member-vault key store (`vault.member-key`, myne-md/myne#711 task 25, `decisions/protocol/0606`). It is the AAD of a **person-plane** device-local store: the KEK is derived from the member's own normalized recovery phrase under the salt domain `"myne.v0.2 argon2id-person-vault-member|"` (the vault's `account_number_hash` in the salt slot), not from `root_key` or `group_key`, so there is no `DeriveSubkey` role. Unlike `AAD_pending_capture_blob` and `AAD_vault_label_blob` it binds both the 16-byte `vault_id` the reader expected **and** the 16-byte `account_number_hash`, after the role string `"person-member-key-store"` (length-prefixed UTF-8: 2-B big-endian length + 23 ASCII bytes), under the **v0.2** AAD prefix (matching the person plane, not the v0.1 device-local stores). Total AAD length: `10 + 1 + 25 + 16 + 16 = 68 bytes`. The two bindings together stop a store copied to another vault directory *or* re-labelled to another account from opening.
+`AAD_person_member_key_store` is **retired** (myne-md/myne#938 task 12, `decisions/protocol/0763`). It was the AAD of the device-local member-vault key store (`vault.member-key`), which sealed a member's `group_key` and `items_key` under a KEK derived from their own recovery phrase, and it bound the 16-byte `vault_id` and the 16-byte `account_number_hash` after the role string `"person-member-key-store"` under the **v0.2** AAD prefix (`10 + 1 + 25 + 16 + 16 = 68 bytes`). A member vault now has exactly one credential, the device-local `vault.member-unlock` store below, so this role, its salt domain and its derivation are gone from the registry rather than left readable: an implementation must not construct it, and the writer that produced `vault.member-key` no longer exists. A `vault.member-key` found on disk is deleted at the next unlock (`decisions/protocol/0763` §3). The role string is recorded here so the 68-byte frame of a legacy store stays identifiable, and for no other purpose.
 
-`AAD_person_member_unlock_store` is the AAD bound into the AEAD seal of the device-local member vault-unlock credential store (`vault.member-unlock`, `decisions/protocol/0653`). It is a **person-plane** device-local store, distinct from `AAD_person_member_key_store`: it seals the member's `group_key`, `items_key` AND person keypair under a KEK derived from a member-chosen password under the salt domain `"myne.v0.2 argon2id-person-vault-member-unlock|"` (a per-device random salt in the salt slot, the vault's `account_number_hash` in the domain scope), not from `root_key`, `group_key` or the recovery phrase, so there is no `DeriveSubkey` role. A member has no vault password of its own; this store is the device-local one that lets the vault re-unlock without retyping the 24-word phrase every session, and bundling the keypair is what makes the unlock install the person session too. It binds the 16-byte `vault_id` the reader expected **and** the 16-byte `account_number_hash`, after the role string `"person-member-unlock-store"` (length-prefixed UTF-8: 2-B big-endian length + 26 ASCII bytes), under the **v0.2** AAD prefix. Total AAD length: `10 + 1 + 28 + 16 + 16 = 71 bytes`. Never synced, never backed up.
+`AAD_person_member_unlock_store` is the AAD bound into the AEAD seal of the device-local member vault-unlock credential store (`vault.member-unlock`, `decisions/protocol/0653`). It is a **person-plane** device-local store, the only member store since `AAD_person_member_key_store` was retired (`decisions/protocol/0763`): it seals the member's `group_key`, `items_key` AND person keypair under a KEK derived from a member-chosen password under the salt domain `"myne.v0.2 argon2id-person-vault-member-unlock|"` (a per-device random salt in the salt slot, the vault's `account_number_hash` in the domain scope), not from `root_key`, `group_key` or the recovery phrase, so there is no `DeriveSubkey` role. A member has no vault password of its own; this store is the device-local one that lets the vault re-unlock without retyping the 24-word phrase every session, and bundling the keypair is what makes the unlock install the person session too. It binds the 16-byte `vault_id` the reader expected **and** the 16-byte `account_number_hash`, after the role string `"person-member-unlock-store"` (length-prefixed UTF-8: 2-B big-endian length + 26 ASCII bytes), under the **v0.2** AAD prefix. Total AAD length: `10 + 1 + 28 + 16 + 16 = 71 bytes`. Never synced, never backed up.
+
+`AAD_device_key_pin_store` is the AAD bound into the AEAD seal of the rung-3 PIN-sealed device signing key (`<app_config_dir>/device-key.sealed`, `decisions/protocol/0759`). It binds **neither** `account_number_hash` **nor** `items_key_id`, and it has no `DeriveSubkey` role: the KEK is Argon2id over a user PIN (salt domain `"myne.v0.2 argon2id-device-key-pin|"`, §3.1), and the file is device-scoped rather than vault-scoped, so it deliberately outlives every vault on the machine. It binds the 1-byte envelope version and the whole 11-byte canonical KDF parameter block (`m_kib` as 4-B BE, `t` as 4-B BE, `p`, `argon2_version`) after the role string `"device-key-pin-store"` (length-prefixed UTF-8: 2-B big-endian length + 20 ASCII bytes), under the **v0.2** AAD prefix. Total AAD length: `10 + 1 + 22 + 1 + 4 + 4 + 1 + 1 = 44 bytes`. The parameters are already an input to the derivation, so a rewritten `m_kib` derives a different wrap key and fails the tag on its own; binding them here makes that a stated property of the frame rather than a consequence of the derivation order. This store sealed with a **zero-length AAD** until myne-md/myne#938's review, the tree's only production seal site that did.
 
 `AAD_person_vault_carrier` is the AAD bound into the AEAD seal of the device-local, vault-bound person-identity carrier (`<app_config_dir>/person-vault-carriers/<vault_id_hex>.json`, myne-md/myne#792). Its KEK is `DeriveSubkey_v0_2(root_key, "person-vault-carrier")` (§3.4), owner-only, so it binds the 16-byte `vault_id` the reader expected **and** the 16-byte `person_id`, after the role string `"person-vault-carrier-blob"` (length-prefixed UTF-8: 2-B big-endian length + 25 ASCII bytes), under the **v0.2** AAD prefix (matching the person plane). Total AAD length: `10 + 1 + 27 + 16 + 16 = 70 bytes`. The `vault_id` binding stops a carrier mislaid under another vault name from opening; the `person_id` binding stops a carrier sealed for a different person from being accepted for this one.
 
@@ -830,6 +858,11 @@ The 24 words are presented to the user via the recovery flow defined in `recover
 
 ### 7.3 Use during recovery
 
+**Generation scope.** This procedure is the vault-recovery path for `MYV1`, `NTV5`, `NTV6` and
+`NTV7`. An `NTV8` vault (§9.3.6) carries no recovery wrap at all, so there is nothing here to run on
+it: the three fields this section decrypts are required to be all zero on that generation, and a
+client MUST NOT offer a phrase prompt for a vault that cannot have one.
+
 ```
 phrase_normalized = normalize_phrase(user_input)                      ← §7.4
 recovery_wrap_key = Argon2id(phrase_normalized, salt_recovery, ...)   ← §3.1
@@ -870,6 +903,10 @@ NFKD is applied so that visually-identical phrases entered with different keyboa
 ### 7.5 What the phrase does NOT do
 
 - The phrase is **not** the encryption key. It derives `recovery_wrap_key`, which encrypts a copy of `root_key`.
+- On an `NTV8` vault (§9.3.6) the phrase is **not a vault credential at all**. It repairs the person's
+  identity (§3.1), and the vault opens with its password or not at all. The bullets below describe
+  the generations that do carry a recovery wrap; on `NTV8` there is no second copy of `root_key` on
+  disk for a phrase to reach, and no client may claim otherwise.
 - The phrase is **not** sent to any server in v0.1.
 - The phrase **cannot** be combined with a server-side service to provide a partial-recovery path. v0.1 is hard zero-knowledge: lose both phrase and password, lose the vault.
 - The phrase **cannot be rotated** in v0.1. No client ships a phrase-rotation command; the change-password flow and the post-recovery password reset both rewrite only the password-side fields of `vault.meta` and preserve the recovery-side bytes verbatim (§7.3). Whoever reads the phrase once therefore holds permanent, unrevocable access to that vault — and, because the recovery-side bytes travel into every backup and every synced copy of `vault.meta`, to those copies too. There is no in-app remedy: the only recourse is to create a new vault and hand-migrate the notes. (`../vision.md` anti-features; `../decisions.md` 2026-07-26.)
@@ -1067,7 +1104,9 @@ already had, because the server's blobs are stored under them: its namespace id 
 account-number hash, and its salts stay bound to that. A reader treats the field as an opaque 16-byte
 binding in every case; only a writer, or a surface that needs to know whether a vault has a separate
 account number, branches on the magic, and the magic does not distinguish a born `NTV7` from an
-upgraded one.
+upgraded one. `NTV8` (§9.3.6) inherits both writers unchanged: born `NTV8` holds the random
+namespace id, and a vault upgraded from `NTV7` to `NTV8` (§10.4.3) keeps the bytes it already had,
+because the truncation that upgrade performs cannot reach offset 6.
 
 The two encrypted root_key copies (`enc_root_key_password`, `enc_root_key_recovery`) hold the same 32-byte plaintext under independent wrap keys. Either is sufficient to unlock the vault. In `NTV7` the recovery copy is absent by construction rather than optional: §9.3.5 requires those three fields to be all zero and the parser refuses a frame that carries a live phrase wrap.
 
@@ -1383,6 +1422,94 @@ prefix, no new `SubkeyRole`, no change to the password wrap's layout, AAD or KDF
 parameters, and no change to the group tier, the group key, the roster or the
 epoch. Notes and attachment content ciphertext are untouched by the generation
 and by the upgrade.
+
+#### 9.3.6 Password-only vault metadata (`NTV8`)
+
+`NTV8` is the password-only `vault.meta` generation (myne-md/myne#938;
+`decisions/protocol/0758`). `NTV7` gave an owner two ways in: the master password,
+and the identity phrase that opened the person wrap. `NTV8` keeps the first and
+removes the second. The phrase still names the person (§3.1, deterministic
+identity), and it opens no vault blob. The password is the only credential that
+recovers `root_key`, so an owner who forgets it has no way back in, and the
+client is required to say so before the vault exists rather than after.
+
+**Frame** (`445 + signed_roster_len` bytes; any other length is invalid):
+
+```
+Offset  Size       Field                         Description
+------  ---------  ----------------------------  -----------------------------------
+0       4          magic                         ASCII "NTV8"
+4       1          protocol_version              0x02
+5       1          reserved                      0x00
+6       339        the §9.3 base layout          magic/version/reserved patched; the
+                                                 three phrase-wrap fields are ZERO
+345     24         group_key_nonce               XChaCha20 nonce, owner-wrapped group key
+369     64         enc_group_key                 32-byte group key ciphertext + CTX tag
+433     8          group_key_epoch               Positive u64; zero is invalid
+441     4          signed_roster_len             u32 byte length, 1..65536
+445     n          signed_roster_envelope        Sealed owner-signed roster (§9.3.3)
+```
+
+The frame ends at `445 + n`.
+
+**The person wrap is removed, not zeroed.** `NTV8` is the `NTV7` frame of §9.3.5
+without its trailing 1208 bytes, and with nothing else changed: for every byte
+offset `i` in `0..445 + n`, byte `i` of an `NTV8` frame equals byte `i` of the
+`NTV7` frame the same vault would have carried. The absence is therefore the
+frame's LENGTH, which every parser compares against, rather than a block of
+zeros that a later writer could relax without anything failing. That property is
+what §10.4.3 rests on: an upgrade from `NTV7` truncates and patches a header, so
+it re-derives no key and cannot lock a user out of a vault they could open a
+moment earlier.
+
+**The base prefix.** Offsets 0 to 344 are the §9.3 layout with three differences:
+the magic, the protocol byte, and the three recovery fields
+(`random_salt_recovery_16` at 49, `nonce_recovery_wrap` at 153,
+`enc_root_key_recovery` at 177) which MUST be all zero. `enc_items_key` is the
+group-tier wrap `NTV6` already defines (`derive_group_subkey_v0_2(group_key,
+GroupRole::ItemsKeyWrap)`), and offset 6 holds the vault's namespace id (§9.3's
+offset-6 note, §3.1). A writer emits the base through the shared §9.3 serializer
+and patches the header afterwards, so no byte past the header can drift from that
+contract.
+
+**The phrase wrap is required to be absent, in both directions,** exactly as on
+`NTV7`: a writer MUST NOT emit a frame carrying a live phrase wrap and a parser
+MUST refuse one, both as the same non-distinguishing invalid-metadata error. The
+rule is structural rather than advisory, because a blob carrying both the retired
+phrase wrap and no credential to replace it would describe a vault whose saved
+phrase may or may not still open it, with nothing on disk saying which.
+
+**The tail.** Offsets 345 to `444 + signed_roster_len` are exactly the `NTV6`
+suffix of §9.3.2, the same objects `NTV7` carries: the owner-wrapped `group_key`, a
+strictly positive `group_key_epoch`, and the sealed owner-signed roster envelope.
+The same refusals apply (zero epoch, empty or over-cap roster, truncation, trailing
+bytes), and a reader that needs the tail reads all three generations through the
+same openers rather than a second implementation of one layout. `NTV8` is
+therefore shareable exactly as `NTV7` is: a member is granted the `group_key` and
+the `itemsKey`, never the root, and the member-writable families (§9.29, §9.30)
+are the same objects on it.
+
+**The credential that opens it.** The master password derives `password_wrap_key`
+exactly as §3.1 does and opens `enc_root_key_password`; that path is unchanged,
+including its AAD and its KDF parameter binding. There is no second door. A
+`NTV8` vault has no recovery phrase of any kind, and an unlock surface MUST NOT
+offer one: the only phrase this product has is the identity phrase, it is not a
+vault credential, and offering it as one would be a promise the frame cannot keep.
+
+**Refusals.** Wrong magic, a `protocol_version` other than `0x02`, a nonzero
+reserved byte, a zero epoch, an empty or oversized roster, a length that is not
+`445 + signed_roster_len`, and any nonzero phrase-wrap byte all fail closed before
+a decrypt operation. A pre-`NTV8` client MUST reject the magic. It MUST NOT parse
+the frame as an `NTV7` whose person wrap was never written, because such a client
+would still unlock with the password and would then wait for a phrase that no
+longer exists.
+
+**What this generation does not change.** No new AAD prefix, no new HKDF context
+prefix, no new `SubkeyRole`, no change to the password wrap's layout, AAD or KDF
+parameters, and no change to the group tier, the group key, the roster or the
+epoch. The two Argon2id salt domains are the v0.2 ones on every vault that
+reaches this generation, and a `NTV7` vault upgraded to `NTV8` keeps the password
+wrap it already had.
 
 ### 9.4 What is in plaintext on disk and why
 
@@ -3803,7 +3930,7 @@ Two consequences are normative and neither is optional:
 1. **A client MUST NOT write a v0.1 blob into a v0.2 vault.** The v0.1 and v0.2 blob families share a byte layout and differ only in magic + AAD + KEK context, and every §10.3 decoder is *magic-detecting* — so a v0.1 blob written into a v0.2 vault decodes correctly, round-trips correctly, and is invisible to every runtime check. A hybrid vault is therefore a defect that only static analysis can catch (`scripts/check-version-routing.mjs` is this repository's).
 2. **The flip is a fleet event, not a client-local choice.** §10.5's anti-downgrade refusal means a client that predates v0.2 read support refuses an `NTV5` vault outright, so a device on an older release cannot open — or be enrolled into — an account created after the flip. A published implementation MUST therefore ship v0.2 *read* support to every client it supports before, or in the same release as, the birth-format change.
 
-**Within v0.2, the vault-metadata frame is `NTV7` whenever the client has a person identity** (`decisions/protocol/0717`, `decisions/storage/0723`). A vault created from an unlocked person session is framed `NTV7` (§9.3.5): it carries the `NTV6` group-key tail with an epoch-1 roster signed by the owner, plus the person wrap that seals `root_key` to the owner's person key, and it carries **no** recovery-phrase wrap. Its two credentials are the master password and the identity phrase, and its creation flow has no phrase screen. The `NTV5` birth this section describes above is the **transitional** case, not a second supported model: a client that cannot create or unlock a person identity still writes it, and `decisions/storage/0723` retires it once every client has the person plane. Neither consequence above moves with that: the v0.2 salt domains, the v0.2 AAD prefix and the `MY?5` singletons are identical in both frames, and a compliant client MUST NOT write a v0.1 blob into either.
+**Within v0.2, the vault-metadata frame is `NTV8` whenever the client has a person identity** (`decisions/protocol/0758`, superseding `0717` and `0723` for the birth frame). A vault created from an unlocked person session is framed `NTV8` (§9.3.6): it carries the `NTV6` group-key tail with an epoch-1 roster signed by the owner, and it carries **neither** a person wrap **nor** a recovery-phrase wrap. Its only credential is the master password; the identity phrase names the person and opens no vault blob, and its creation flow has no phrase screen. `NTV7` (§9.3.5) stays the generation a vault created before this change carries: it remains readable, it is the source of the §10.4.3 upgrade, and no client writes it again. The `NTV5` birth this section describes above is the **transitional** case, not a second supported model: a client that cannot create or unlock a person identity still writes it, and `decisions/storage/0723` retires it once every client has the person plane. Neither consequence above moves with that: the v0.2 salt domains, the v0.2 AAD prefix and the `MY?5` singletons are identical in both frames, and a compliant client MUST NOT write a v0.1 blob into either.
 
 v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` accepts it, the migration reads from it, and vaults created before the flip keep working unmigrated for as long as their owner wants. What ends is its production, not its support.
 
@@ -3839,9 +3966,10 @@ v0.1 remains a fully specified, fully readable format: `parse_vault_meta_any` ac
 | Per-person private AI profile (`profiles/<profile-id>`) | none | `MYY5` (defined, v0.2 B2B) | §9.28 | myne-md/myne#712 |
 | Member display-name map (`vault.member-names`) | none | `MYO5` (allocated, v0.2 B2B) | §9.29 | myne-md/myne#851 |
 | Device-to-person binding map (`vault.device-bindings`) | none | `MYU5` (allocated, v0.2 B2B) | §9.30 | member-devices |
+| B2B password-only vault metadata (`vault.meta`) | none | `NTV8` (allocated, v0.2 B2B) | §9.3.6 | myne-md/myne#938 |
 | CRDT note-type (`.myn`, v0.2) | none | `NC05` (allocated, v0.2) | §10.7 | automerge-sync-migration / #418 |
 
-Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `NTV7`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. `NTV7` is the genotype a vault born under a person identity carries (§9.3.5, §10.3.1) and the target of the explicit upgrade in §10.4.2; it is created by the creation path and by that upgrade rather than by the §10.4.1 cut. `MYO5` is allocated in the same class but is **not** one of the magics that cut writes: the `vault.member-names` family is `NTV6`-only (§9.29.6), so a vault with no `group_key` has nowhere to hold it, and the blob is created by the first `member_names_set_mine` rather than by the §10.4.1
+Section §9.8 (vault indices) **landed with MYND-271** (the persistence the MYND-31 design pre-allocated); §9.7 (workspace) landed with MYND-166, and attachments occupy §9.9/§9.10. The per-note and vault-meta families keep their historical `NT05`/`NTV5` next-major names (`NTV5` is allocated and shipping. What `NT05` now means is deliberately NOT answered here: §10.7 says `NC05` replaces the `MY01` note body under v0.2 and retires nothing, the table above still lists `NT05` as the per-note next-major reservation, and this section is the single source of truth for magic allocation, so a sentence retiring a reserved magic would be an allocation decision and belongs in a decision entry rather than in a clarifying parenthesis. The identical question for `vault.meta` is left open the same way in `docs/glossary.md`); all newer blob families (prefs/search/workspace/indices/attachments/dictionary/attachment-text/head-state/graph-layout/agent-memory/agent-personality) use the `MY?5` next-major convention. The rows marked **(allocated, v0.2)** are shipping: §10.3.1 makes v0.2 the birth format, and §10.4.1 has the migration write all of them, so `NTV5`, `NTV7`, `MYP5`, `MYA5`, `MYC5`, `MYD5`, `MYT5`, `MYM5`, `MYJ5`, `MYN5`, `MYX5` and `MYZ5` name bytes on disk today rather than a reservation. `NTV7` is the genotype a vault born under a person identity carries (§9.3.5, §10.3.1) and the target of the explicit upgrade in §10.4.2; it is created by the creation path and by that upgrade rather than by the §10.4.1 cut. `NTV8` (§9.3.6) supersedes it as the BIRTH genotype (`decisions/protocol/0758`): a vault created today is framed `NTV8`, a vault created before that change stays `NTV7` and is upgraded in place by §10.4.3, and a `NTV8` reader MUST accept both because a sync peer may still hold the older frame. `MYO5` is allocated in the same class but is **not** one of the magics that cut writes: the `vault.member-names` family is `NTV6`-only (§9.29.6), so a vault with no `group_key` has nowhere to hold it, and the blob is created by the first `member_names_set_mine` rather than by the §10.4.1
 migration. It names bytes in every `NTV6` vault, and an absent file reads as the empty
 map. `MYU5` is the same case one section over: the device-to-person binding map (§9.30)
 is `NTV6`-only too, is created by the first claim that writes a row rather than by the
@@ -4004,6 +4132,52 @@ A reader MUST keep accepting `MYV1`, `NTV5` and `NTV6` forever: this procedure
 ends production of the older generations, never their support (§10.3.1). A
 client that predates `NTV7` MUST reject the new magic outright rather than
 parsing the frame and ignoring the person wrap, for the reason §9.3.5 gives.
+
+#### 10.4.3 The `NTV8` upgrade (`NTV7` → `NTV8`): normative contract
+
+The hop from the person-wrapped generation to the password-only one (§9.3.6;
+`decisions/protocol/0758`) is silent, one-way and atomic. It runs on one vault, in
+place, changes only `vault.meta`, and asks the user nothing.
+
+1. **It needs no credential beyond an unlocked vault.** The target frame is the
+   source frame truncated and its magic patched: `root_key` and `items_key` are
+   not re-derived, `enc_root_key_password` keeps its bytes and its AAD, and the
+   group-key tail, the epoch and the roster travel unchanged. A password change
+   is NOT part of this upgrade and the user MUST NOT be asked to retype a
+   password.
+2. **On the first unlock, silently** (`decisions/protocol/0758`). There is no
+   consent screen and no notification, because the user has nothing to decide:
+   nothing they hold stops working, and the one thing that changes is a credential
+   they were never offered on a `NTV7` vault either (its phrase door was already
+   the identity phrase, not a vault phrase). A product that announced "your
+   recovery phrase no longer opens this vault" would be describing a door `NTV7`
+   had already closed (§9.3.5).
+3. **One metadata write, and a failed write leaves the original.** The frame is
+   built in full, then written once. A write failure MUST leave the pre-upgrade
+   `vault.meta` byte-identical and still openable by the password it had, so a
+   failed upgrade is a no-op rather than a half-truncated vault.
+4. **The upgrade MUST mark `vault.meta` dirty.** Nothing else pushes the new
+   frame: the sync loop's meta phase pushes only when a content edit advanced the
+   counter or when the dirty marker is set, and an upgrade edits no note. Without
+   the marker the server keeps the old frame and every other device keeps reading
+   a generation the vault no longer has.
+5. **A member's device may perform it, which `NTV7`'s upgrade could not.** §10.4.2
+   is owner-only because it seals `root_key` to a person the roster must name,
+   which is a new capability rather than a moved byte. §10.4.3 removes a
+   credential for everybody and adds none: the roster is not re-signed, the epoch
+   does not move and the group key is not re-wrapped, so nothing the owner signed
+   is altered and no member gains an ability they did not have. An owner-only gate
+   here would strand every member's vault on a frame that its next release stops
+   writing.
+6. **Nothing else moves.** No note, attachment, singleton or cache changes
+   generation, `items_key_id` and both salts keep their bytes, and the identity
+   phrase continues to name the person exactly as before. The upgrade touches one
+   file.
+
+A client that predates `NTV8` refuses the magic outright (§10.5), so the fleet
+requirement of §10.4.1 point 2 applies here as it does to any generation change: a
+release MUST ship `NTV8` read support before, or in the same release as, the birth
+change that starts writing it.
 
 ### 10.5 Anti-downgrade properties
 

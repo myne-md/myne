@@ -386,6 +386,30 @@ const MIRRORS: Mirror[] = [
 // is what would drift, and the row that compares the row interface is the one
 // that catches it.
 const STRUCT_MIRRORS: StructMirror[] = [
+  // The device-admission ceremony's three views (myne-md/myne#938 task 11). Three
+  // rows because the wire shape is three structs and this case compares field for
+  // field: the code, the preview and the confirmed view each carry a different
+  // subset of `device_id`, `sas`, `person_id_hex` and the credential halves, and a
+  // renamed field arrives as `undefined`, which on this surface renders an empty
+  // SAS beside a live code.
+  {
+    ts: "client-core/src/types/device-admission.ts",
+    tsType: "AdmissionMintedView",
+    rs: "core/src/plugins/sync/device_admission.rs",
+    rsStruct: "AdmissionMintedView",
+  },
+  {
+    ts: "client-core/src/types/device-admission.ts",
+    tsType: "AdmissionPreviewView",
+    rs: "core/src/plugins/sync/device_admission.rs",
+    rsStruct: "AdmissionPreviewView",
+  },
+  {
+    ts: "client-core/src/types/device-admission.ts",
+    tsType: "AdmissionConfirmedView",
+    rs: "core/src/plugins/sync/device_admission.rs",
+    rsStruct: "AdmissionConfirmedView",
+  },
   {
     ts: "client-core/src/types/member-names-map.ts",
     tsType: "MemberNameEntry",

@@ -83,16 +83,31 @@ export async function upgradeVaultToNtv7(): Promise<VaultUpgradeView> {
 }
 
 /**
- * Whether the active vault accepts the owner's identity phrase.
+ * Which second credential this vault has, if any.
  *
- * One bit, read from `vault.meta`'s magic bytes. Read-only and safe before an
- * unlock attempt. This is what decides whether the unlock screen's escape hatch
- * offers the vault recovery phrase or the identity phrase, because the upgrade
- * retires the first. A missing or unreadable vault answers `false` rather than
- * failing.
+ * Read from `vault.meta`'s magic bytes. Read-only and safe before an unlock
+ * attempt. Three answers, and the third is absence (myne-md/myne#938,
+ * `decisions/protocol/0758`):
+ *
+ * - `true`: an `NTV7` vault, whose second credential is the owner's identity
+ *   phrase.
+ * - `false`: `MYV1`/`NTV5`/`NTV6`, whose second credential is the vault's own
+ *   recovery phrase. Also the answer for a missing or unreadable file, because
+ *   the legacy answer keeps a door on screen and a transient read failure must
+ *   not hide one.
+ * - `null`: an `NTV8` vault, which has no second credential at all. The vault
+ *   opens with its password and nothing else, so every surface that would offer
+ *   a phrase MUST render nothing for this state rather than the vault phrase
+ *   grid. Typing 24 words into it cannot succeed, and the backend answers with
+ *   the non-distinguishing "wrong phrase" for words that are right.
+ *
+ * This name is kept rather than renamed: it is the same read, and the wire
+ * command is one the three clients share.
  */
-export async function vaultIsPersonWrapped(vaultId?: string | null): Promise<boolean> {
-  return invoke<boolean>("plugin:vault-unlock|vault_is_person_wrapped", {
+export async function vaultIsPersonWrapped(
+  vaultId?: string | null,
+): Promise<boolean | null> {
+  return invoke<boolean | null>("plugin:vault-unlock|vault_is_person_wrapped", {
     vaultId: vaultId ?? null,
   });
 }

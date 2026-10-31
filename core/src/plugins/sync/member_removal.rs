@@ -794,27 +794,25 @@ pub async fn rotate_group_from_host(
         .map_err(|_| MemberRemovalError::Io)?;
     // Both tail generations rotate the same way: the roster, the group key and the
     // epoch are `NTV6` objects, and `NTV7` only adds the person wrap around them. The
-    // gate therefore admits both, and the wrap is carried to the writer below so the
-    // frame is re-emitted in the generation it arrived in (dropping it would retire
-    // the owner's only phrase-independent credential).
-    if !matches!(
-        protocol::vault_meta_generation(&meta_bytes),
-        protocol::VaultMetaGeneration::B2b | protocol::VaultMetaGeneration::Person
-    ) {
-        return Err(MemberRemovalError::InvalidVaultMeta);
-    }
+    // gate therefore admits every tail generation, and the frame is carried to the
+    // writer below so the meta is re-emitted in the generation it arrived in (dropping
+    // it would retire the owner's only phrase-independent credential, and re-emitting
+    // an `NTV8` vault as `NTV6` would downgrade it by two generations).
+    let source_frame = match super::meta_kind::TailFrame::of(&meta_bytes) {
+        Some(frame) => frame,
+        None => return Err(MemberRemovalError::InvalidVaultMeta),
+    };
     let b2b_meta = protocol::parse_b2b_tail_any(&meta_bytes)
         .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
-    let person_wrap =
-        if protocol::vault_meta_generation(&meta_bytes) == protocol::VaultMetaGeneration::Person {
-            Some(
-                protocol::parse_vault_meta_ntv7(&meta_bytes)
-                    .map_err(|_| MemberRemovalError::InvalidVaultMeta)?
-                    .person_wrap,
-            )
-        } else {
-            None
-        };
+    let person_wrap = if source_frame == super::meta_kind::TailFrame::Ntv7 {
+        Some(
+            protocol::parse_vault_meta_ntv7(&meta_bytes)
+                .map_err(|_| MemberRemovalError::InvalidVaultMeta)?
+                .person_wrap,
+        )
+    } else {
+        None
+    };
     let account_number_hash = b2b_meta.base.account_number_hash;
     // Captured rather than read off `b2b_meta` later: `base` is moved out of it at
     // step (6), while the `vault.member-names` re-seal in between needs the RETIRED
@@ -1163,25 +1161,25 @@ pub async fn rotate_group_from_host(
         &rotated.signed_roster,
     )
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
-    let new_meta_bytes = match person_wrap {
-        Some(person_wrap) => {
-            protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
-                base,
-                group_key_nonce,
-                enc_group_key,
-                group_key_epoch: rotated.new_epoch,
-                signed_roster_envelope,
-                person_wrap,
-            })
-        }
-        None => protocol::serialize_vault_meta_ntv6(&protocol::B2bVaultMeta {
+    // **The frame goes back out in the generation it arrived in** (myne-md/myne#938
+    // review). This used to dispatch on `person_wrap.is_some()`, which is exact for
+    // two tail generations and ambiguous for three: an `NTV8` vault has no person
+    // wrap, so a removal re-emitted it as `NTV6` — two generations back — and the
+    // meta phase then refused to push the downgraded frame and adopted the server's
+    // pre-rotation one instead. The removal was silently undone while the singletons
+    // had already been re-sealed to the new epoch, so `vault.member-names` and
+    // `vault.device-bindings` stopped decoding and the retired group key came back.
+    let new_meta_bytes = super::meta_kind::serialize_tail_frame(
+        source_frame,
+        protocol::B2bVaultMeta {
             base,
             group_key_nonce,
             enc_group_key,
             group_key_epoch: rotated.new_epoch,
             signed_roster_envelope,
-        }),
-    }
+        },
+        person_wrap,
+    )
     .map_err(|_| MemberRemovalError::InvalidVaultMeta)?;
 
     // (6b) Persist the delivery obligations BEFORE the first mutation. This is

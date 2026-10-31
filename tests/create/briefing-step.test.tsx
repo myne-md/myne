@@ -44,7 +44,12 @@ describe("<BriefingStep> — acknowledgement gating", () => {
   it("renders all three statements with their own acknowledgement checkbox", () => {
     render(<BriefingStep onBack={() => {}} onContinue={() => {}} />);
     expect(screen.getByText("Your password unlocks your vault. We don't store it.")).toBeTruthy();
-    expect(screen.getByText("Your recovery phrase is your only backup.")).toBeTruthy();
+    // The phrase statement is generation-honest (myne-md/myne#938 review): a
+    // vault born from an identity has no recovery phrase at all, so a briefing
+    // that promised one was describing the previous birth path.
+    expect(
+      screen.getByText("Keep whatever Myne shows you. Nothing else gets you back in."),
+    ).toBeTruthy();
     expect(screen.getByText("There is no email recovery. There never will be.")).toBeTruthy();
     expect(screen.getAllByTestId("create.briefing-ack")).toHaveLength(3);
   });

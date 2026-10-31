@@ -2,7 +2,6 @@
   "core/src/http/codec.rs::read_chunked_body": "HTTP/1.1 chunk-size parse (RFC 7230 §4.1): an octet count, not an id, so no case policy applies.",
   "core/src/inference/model_download.rs::copy_chunked": "HTTP chunk-size parse for the on-demand model download: an octet count, not an id.",
   "core/src/plugins/sync/enroll.rs::hex_decode": "variable-length SERVER hex (SCRAM salt / enroll token); the canonical decoders are const-width, so no equivalent exists.",
-  "core/src/plugins/sync/member_key_store.rs::hex_n": "variable-length device-local envelope field (nonce / sealed); the const-width canonical decoder cannot take a runtime length.",
   "core/src/plugins/sync/member_unlock_store.rs::hex_n": "variable-length device-local envelope field (salt / nonce / sealed); runtime length, no const-width equivalent.",
   "core/src/plugins/sync/person_account.rs::hex_to_bytes": "variable-length SERVER token hex; the const-width canonical decoder does not fit.",
   "core/src/plugins/sync/person_ai_store.rs::hex_to_vec": "variable-length device-local AI-profile blob hex; runtime length, no const-width equivalent.",

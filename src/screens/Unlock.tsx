@@ -606,18 +606,36 @@ export function Unlock({
   // client without the person plane must not offer it (the `vault-unlock` plugin
   // is `Pending` there, so the call would refuse).
   const [identityPhraseMode, setIdentityPhraseMode] = useState(false);
-  const [personWrapped, setPersonWrapped] = useState(false);
+  // Three answers, and the third is absence (myne-md/myne#938,
+  // `decisions/protocol/0758`). `"identity"` swaps the link for the
+  // identity-phrase sub-view; `"vaultPhrase"` keeps the ordinary recovery link;
+  // `"none"` renders NO link at all, because an `NTV8` vault has no second
+  // credential and a control that can only fail is the form-would-fail shape
+  // this repository refuses elsewhere. Before this tri-state, `null` collapsed
+  // into `false` and an `NTV8` vault offered the vault phrase grid: 24 correct
+  // words, answered "that phrase is wrong", forever.
+  const [recoveryDoor, setRecoveryDoor] = useState<
+    "unknown" | "identity" | "vaultPhrase" | "none"
+  >("unknown");
   // Whether the probe could not be answered. Rendering a failed call as "this
   // vault's phrase is the vault phrase" hands a user whose vault was upgraded a
   // credential that cannot open it (myne-md/myne#911 review): the two states are
   // different, so they are different here.
   const [personWrapProbeFailed, setPersonWrapProbeFailed] = useState(false);
   useEffect(() => {
-    if (!capabilities.has("personVaultCredential")) return;
+    if (!capabilities.has("personVaultCredential")) {
+      // No person plane: the legacy link is the only door this client can offer,
+      // and it is the right one for every vault such a client can open.
+      setRecoveryDoor("vaultPhrase");
+      return;
+    }
     let alive = true;
     vaultIsPersonWrapped(vaultId)
       .then((wrapped) => {
-        if (alive) setPersonWrapped(wrapped);
+        if (!alive) return;
+        setRecoveryDoor(
+          wrapped === null ? "none" : wrapped ? "identity" : "vaultPhrase",
+        );
       })
       .catch(() => {
         if (alive) setPersonWrapProbeFailed(true);
@@ -626,6 +644,7 @@ export function Unlock({
       alive = false;
     };
   }, [vaultId]);
+  const personWrapped = recoveryDoor === "identity";
 
   if (identityPhraseMode) {
     return (
@@ -997,15 +1016,27 @@ export function Unlock({
               {t("unlock.personWrapProbeFailed")}
             </p>
           ) : null}
-          <button
-            type="button"
-            onClick={personWrapped ? () => setIdentityPhraseMode(true) : onStartRecovery}
-            style={RECOVER_LINK_STYLE}
-            className="myne-text-link"
-            data-testid="unlock.recovery-link"
-          >
-            {personWrapped ? t("unlock.identityPhraseLink") : t("unlock.recoveryLink")}
-          </button>
+          {recoveryDoor === "none" ? (
+            // Absence, stated rather than implied: the password is the only way
+            // in and the user should not go looking for a door that was removed
+            // (PRD story 28). No link, because there is nothing to link to.
+            <p
+              data-testid="unlock.password-only-note"
+              style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)", margin: 0 }}
+            >
+              {t("unlock.passwordOnlyNote")}
+            </p>
+          ) : (
+            <button
+              type="button"
+              onClick={personWrapped ? () => setIdentityPhraseMode(true) : onStartRecovery}
+              style={RECOVER_LINK_STYLE}
+              className="myne-text-link"
+              data-testid="unlock.recovery-link"
+            >
+              {personWrapped ? t("unlock.identityPhraseLink") : t("unlock.recoveryLink")}
+            </button>
+          )}
         </div>
       )}
         </>

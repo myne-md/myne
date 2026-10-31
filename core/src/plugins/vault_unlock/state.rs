@@ -237,6 +237,17 @@ struct PersonSession {
     /// exit. A device that is still pending after a restart asks for the phrase
     /// again rather than keeping a credential on disk.
     pending_claim_secret: Option<zeroize::Zeroizing<Vec<u8>>>,
+    /// The admission this device MINTED and has not yet had confirmed
+    /// (myne-md/myne#938 task 11; `decisions/protocol/0735`).
+    ///
+    /// The code and its SAS go to the screen; the secret behind the code waits here so a
+    /// confirm can persist it and a cancel can forget it. It is RAM-only for the reason the
+    /// two-sided rule exists: a minted secret on disk before the human's own tap would be
+    /// exactly the write that rule forbids. Cleared by every path that clears the session.
+    pending_admission: Option<(
+        protocol::device_key::DeviceAdmission,
+        zeroize::Zeroizing<[u8; 32]>,
+    )>,
     generation: u64,
     /// Set by an explicit `sync_person_lock` (not a vault lock or switch). While
     /// true, the vault-bound carrier must NOT auto-reinstall the identity at a
@@ -253,6 +264,7 @@ impl PersonSession {
         self.profile = None;
         self.pending_transition = None;
         self.pending_claim_secret = None;
+        self.pending_admission = None;
         self.identity.take().map(|identity| identity.pair)
     }
 }
@@ -308,6 +320,32 @@ impl VaultRuntimeState {
     /// not outlive it.
     pub async fn clear_pending_claim_secret(&self) {
         self.person_session.write().await.pending_claim_secret = None;
+    }
+
+    /// Remember the admission this device minted, until its own confirm or a cancel
+    /// (myne-md/myne#938 task 11).
+    pub async fn set_pending_admission(
+        &self,
+        admission: protocol::device_key::DeviceAdmission,
+        secret: zeroize::Zeroizing<[u8; 32]>,
+    ) {
+        self.person_session.write().await.pending_admission = Some((admission, secret));
+    }
+
+    /// Take the pending admission. `None` means there is nothing to confirm: it was
+    /// already confirmed, cancelled, or the session was cleared.
+    pub async fn pending_admission(
+        &self,
+    ) -> Option<(
+        protocol::device_key::DeviceAdmission,
+        zeroize::Zeroizing<[u8; 32]>,
+    )> {
+        self.person_session.read().await.pending_admission.clone()
+    }
+
+    /// Drop it, on a confirm that has persisted the secret and on a cancel.
+    pub async fn clear_pending_admission(&self) {
+        self.person_session.write().await.pending_admission = None;
     }
 
     pub async fn set_person_identity(&self, pair: protocol::PersonKeyPair) {

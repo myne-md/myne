@@ -267,6 +267,19 @@ const CAPABILITY_BACKING = {
   // code by build-time substitution. The identity setup/status/invite commands
   // (myne-md/myne#711) join them for the same reason; the invite/decode pair
   // needs the held identity to wrap the group key.
+  // myne-md/myne#938 task 11: the two-sided device admission ceremony. Named per
+  // command rather than as the whole `sync` plugin, which ships here and
+  // dispatches most of its surface. The five are refused together because the
+  // ceremony has two sides and only one of them could ever work in a page: the
+  // admitting side signs a group-tier `MYU5` row, which needs a person identity
+  // and a group key a browser does not hold.
+  deviceAdmission: [
+    "plugin:sync|sync_device_admission_start",
+    "plugin:sync|sync_device_admission_confirm",
+    "plugin:sync|sync_device_admission_preview",
+    "plugin:sync|sync_device_admission_accept",
+    "plugin:sync|sync_device_admission_cancel",
+  ],
   memberSharing: [
     "plugin:sync|sync_person_unlock",
     "plugin:sync|sync_person_lock",
@@ -289,7 +302,11 @@ const CAPABILITY_BACKING = {
     // own sealed profile, so it needs the held person identity for exactly the
     // same reason and the form asks for the phrase for exactly the same reason.
     "plugin:sync|sync_member_join_vault",
-    "plugin:sync|sync_person_unlock_member_vault",
+    // `sync_person_unlock_member_vault` is GONE, not moved: myne-md/myne#938 task
+    // 12 retired the phrase-sealed `vault.member-key`, so a member vault opens
+    // with its own password/PIN/biometric and there is no phrase command left to
+    // classify. The guard's job here is that this list and the dispatcher agree,
+    // and a command listed after it was deleted is the drift it exists to catch.
     "plugin:sync|sync_member_vault_status",
     "plugin:sync|sync_person_set_member_password",
     "plugin:sync|sync_person_unlock_member_vault_with_password",

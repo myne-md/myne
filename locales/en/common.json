@@ -505,7 +505,7 @@
       "cancel": "Cancel",
       "close": "Close",
       "copying": "Copying {{done}} of {{total}}…",
-      "phraseNotSubstitute": "A backup alone will not get you back in if you lose your password.",
+      "phraseNotSubstitute": "A backup alone will not get you back in if you lose your password: the file holds your notes, not your password or your identity phrase.",
       "preparing": "Preparing…",
       "successToast": "Backup verified and saved.",
       "title": "Back up vault",
@@ -2954,7 +2954,7 @@
       "writesNote": "Myne checks every change against this list before it writes one, and refuses a change to a field that was edited elsewhere since the view last read it."
     },
     "welcome": {
-      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** and **recovery phrase** are the only keys to it, so keep them somewhere safe. If both are ever lost, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
+      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** is the only key to it, so keep it somewhere safe. If you ever lose it, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
       "title": "Welcome to Myne"
     },
     "workspace": {
@@ -3196,7 +3196,7 @@
       "tryAnotherFile": "Try another file"
     },
     "pick": {
-      "body": "Pick a <code>.myne-backup</code> file. The backup is verified before anything is restored; the restored vault unlocks with that vault's password or recovery phrase, exactly like unlock.",
+      "body": "Pick a <code>.myne-backup</code> file. The backup is verified before anything is restored; the restored vault unlocks with that vault's password, exactly like unlock.",
       "chooseFile": "Choose backup file…",
       "corruptedSuffix": "Your current vault is not touched: the backup is restored as a separate vault first."
     },
@@ -3325,7 +3325,7 @@
         "weakNewPassword": "New password must be at least 12 characters."
       },
       "changePasswordHeading": "Change password",
-      "changePasswordHelper": "Rotate your master password while keeping the same vault. Recovery phrase stays the same.",
+      "changePasswordHelper": "Rotate your master password while keeping the same vault. Nothing else about the vault changes.",
       "memberVaultNotice": "This is a shared vault. It has no vault password. Use Shared vault unlock in Privacy to add a password or PIN.",
       "dangerZoneHeading": "Danger zone",
       "dangerZoneHelper": "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
@@ -3350,7 +3350,7 @@
       "renameHelper": "Shown in the vault switcher. Stored encrypted inside this vault; leave blank to clear it.",
       "newPasswordPlaceholder": "At least 12 characters",
       "reenterNewPassword": "Re-enter new password",
-      "changePasswordFootnote": "This invalidates quick-unlock. Your recovery phrase is unchanged.",
+      "changePasswordFootnote": "This invalidates quick-unlock. Your identity phrase is unaffected.",
       "changing": "Changing…",
       "topics": {
         "vault": "Vault",
@@ -3361,14 +3361,14 @@
       },
       "format": {
         "heading": "Vault format",
-        "intro": "This vault still uses its own recovery phrase. Upgrading moves it to your identity phrase, so one phrase recovers every vault you own.",
-        "cta": "Upgrade to one-phrase recovery",
-        "confirm": "Retire my vault phrase and upgrade",
-        "cancel": "Keep my vault phrase for now",
+        "intro": "This vault still carries its own recovery phrase. Upgrading retires it, so this vault opens with its password alone. Your identity phrase still recovers who you are on a new device, and it does not open any vault.",
+        "cta": "Retire my vault phrase",
+        "confirm": "Retire the phrase and upgrade",
+        "cancel": "Keep my vault phrase",
         "running": "Upgrading…",
-        "warningPhrase": "Your saved vault recovery phrase will stop opening this vault. Your vault password still works, and your identity phrase becomes the way back in.",
+        "warningPhrase": "Your saved vault recovery phrase will stop opening this vault, and nothing replaces it: from then on the vault opens with its password alone, so a forgotten password means a lost vault.",
         "warningDevices": "Every device you use must be updated first. An older version cannot open this vault once the upgrade syncs.",
-        "done": "This vault now uses your identity phrase (upgraded from {{from}}).",
+        "done": "This vault now opens with its password alone (upgraded from {{from}}). Your saved vault phrase no longer works.",
         "error": {
           "migrationRequired": "This vault is still in the old v0.1 format. Finish the vault upgrade in Sync settings first.",
           "personRequired": "This device has no identity yet. Create your identity first, then come back.",
@@ -3377,7 +3377,7 @@
           "notOwner": "This is a shared vault. Only its owner can change its format.",
           "notUnlocked": "Open the vault before upgrading its format.",
           "inProgress": "Another security operation is running. Try again in a moment.",
-          "alreadyUpgraded": "This vault already uses your identity phrase.",
+          "alreadyUpgraded": "This vault already opens with its password alone.",
           "generic": "The upgrade did not complete. Nothing was changed.",
           "sharedVault": "This vault is shared with someone else. One-phrase recovery is for a vault only you own, because the shared member handling does not support it yet."
         }
@@ -4240,11 +4240,11 @@
       "setupButton": "Set up quick unlock"
     },
     "memberPassword": {
-      "reminder": "You have no fast unlock on this device yet, so this vault asks for your recovery phrase each time.",
+      "reminder": "This shared vault has no password or PIN on this device yet, so it cannot be reopened here without a fresh invite from its owner.",
       "reminderDismiss": "Not now",
       "title": "Shared vault unlock",
       "helperConfigured": "This shared vault opens with {{method}} stored on this device.",
-      "helperNotConfigured": "Set a password or PIN so you don't retype your recovery phrase every time.",
+      "helperNotConfigured": "Set a password or PIN so this device can open the vault again. Without one, reopening it here needs a fresh invite from the owner.",
       "set": "Set",
       "change": "Change",
       "remove": "Remove",
@@ -4256,8 +4256,8 @@
       "useBiometric": "Use Touch ID",
       "pinLabel": "Vault PIN",
       "pinPlaceholder": "PIN, at least {{count}} digits",
-      "setupHelper": "At least {{count}} characters. Stored only on this device; your recovery phrase still opens the vault anywhere.",
-      "pinSetupHelper": "At least {{count}} digits. Stored only on this device; your recovery phrase still opens the vault anywhere.",
+      "setupHelper": "At least {{count}} characters. Stored only on this device. If you forget it, this device needs a fresh invite from the vault owner.",
+      "pinSetupHelper": "At least {{count}} digits. Stored only on this device. If you forget it, this device needs a fresh invite from the vault owner.",
       "errorTooShort": "Use at least {{count}} characters/digits.",
       "errorGeneric": "Couldn't set the credential. Please try again."
     },
@@ -4304,7 +4304,7 @@
       "on": "On"
     },
     "storage": {
-      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password or recovery phrase, exactly like unlock.",
+      "backupHelper": "Backups stay exactly as encrypted as your vault, in a single verified .myne-backup file. Restoring works with that vault's password, exactly like unlock.",
       "backupLabel": "Backup",
       "backUpVault": "Back up vault…",
       "exportAction": "Export…",
@@ -4507,7 +4507,7 @@
         "periodicNotes": "periodic notes weekly monthly week month folder template format",
         "syncMembers": "members, share, invite, team, collaboration, vault",
         "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs",
-        "vaultFormat": "vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",
+        "vaultFormat": "vault format upgrade retire vault recovery phrase password only migrate identity",
         "publishVault": "publish published vault server device only sync",
         "externalAccess": "external access MCP myne-mcp Claude Desktop client connection approve scope revoke"
       },
@@ -4582,6 +4582,47 @@
     }
   },
   "sync": {
+    "deviceAdmission": {
+      "aria": "Device admission",
+      "join": {
+        "cta": "Add this device to a vault",
+        "intro": "This device will show an admission code. Paste it into a device that is already in the vault, and check that both screens show the same safety code before either side confirms.",
+        "start": "Show an admission code",
+        "codeLabel": "Admission code",
+        "copy": "Copy the code",
+        "copied": "Copied",
+        "copyFailed": "Could not copy. Select the code and copy it by hand.",
+        "pending": "Waiting for the other device to confirm.",
+        "approved": "That device is approved. This one signs in on its next sync."
+      },
+      "admit": {
+        "cta": "Approve a device on this vault",
+        "intro": "Paste the admission code the other device is showing. Nothing is written until you compare the safety codes and confirm.",
+        "codeLabel": "Admission code from the other device",
+        "codePlaceholder": "MYNE-DEVICE-1:…",
+        "preview": "Check the code",
+        "deviceId": "Device {{id}}",
+        "done": "Device approved, and its binding was written. It can now sign in with its own credential.",
+        "doneNoRow": "The device's credential is installed, but its binding row could not be written. Sync retries the binding on the next roster read."
+      },
+      "sasLabel": "Safety code",
+      "sasHint": "Both screens must show the same eight characters. If they differ, stop: it means the code you were given is not the one that device produced.",
+      "noDeviceKey": "This device has no device key yet, so after it is admitted it signs with your identity phrase instead of a key of its own. The safety code above still decides whether to admit it.",
+      "matchAck": "Both screens show the same eight characters",
+      "confirm": "Confirm",
+      "mismatch": "They do not match",
+      "stopped": "Stopped. The safety codes did not match, so nothing was written. Ask for a fresh admission code rather than confirming this one again.",
+      "cancel": "Cancel",
+      "close": "Close",
+      "error": {
+        "cancelFailed": "That code could not be cancelled on the other side, so it is still valid there. Open the ceremony again once the vault is reachable and cancel it.",
+        "sasMismatch": "The safety codes did not match. Nothing was written.",
+        "noPending": "There is no admission waiting on this device.",
+        "identityRequired": "Unlock your identity phrase first.",
+        "personMismatch": "That code belongs to a different person.",
+        "generic": "That did not work. Nothing was changed."
+      }
+    },
     "betaTerms": {
       "title": "Before you turn on sync",
       "intro": "Sync sends your notes, encrypted, to a server. Four things are worth knowing first.",
@@ -5254,16 +5295,12 @@
     "backToPicker": "Choose a different vault",
     "continue": "Continue",
     "decrypting": "Decrypting…",
-    "memberHint": "This vault is shared with you. Unlock it with your own recovery phrase.",
     "memberSubtitle": "Open this shared vault.",
-    "memberPhraseLabel": "Recovery phrase",
+    "memberNoCredential": "This shared vault was set up on another device. To open it here, accept a new invite from the vault owner: this device holds no password for it, and the recovery phrase no longer unlocks a shared vault.",
     "memberSubmit": "Unlock",
-    "memberError": "That phrase did not open this shared vault.",
     "memberPasswordHint": "This vault is shared with you. Unlock it with the password you set on this device.",
     "memberPasswordLabel": "Vault password",
     "memberPasswordError": "That password did not open this shared vault.",
-    "memberUsePhrase": "Use recovery phrase instead",
-    "memberUseFast": "Use fast unlock instead",
     "memberPinHint": "This vault is shared with you. Unlock it with the PIN you set on this device.",
     "memberPinLabel": "Vault PIN",
     "memberPinPlaceholder": "Vault PIN (at least {{count}} digits)",
@@ -5336,6 +5373,7 @@
     "restoreCta": "Restore from a backup",
     "ioErrorHint": "Try again, or reopen Myne.",
     "identityPhraseLink": "Use your identity phrase",
+    "passwordOnlyNote": "This vault opens with its password only. There is no recovery phrase for it.",
     "identityPhrase": {
       "title": "Unlock with your identity phrase",
       "body": "This vault opens with its password or with your identity phrase. If you saved a separate vault phrase for it, that one was retired and no longer opens it. Opening it with the 24 words you wrote down for your identity also unlocks your identity for this session, so sync runs without a second prompt.",
@@ -5375,9 +5413,9 @@
           "why": "Your password is the input to the key that decrypts your notes. It never leaves this device, and nothing on our servers can reproduce it. That's what keeps your notes private, and why we can't reset it for you."
         },
         "phrase-backup": {
-          "ackLabel": "I understand my recovery phrase is the only backup.",
-          "statement": "Your recovery phrase is your only backup.",
-          "why": "If you forget your password, the 24-word recovery phrase is the one way back in. {{lostBothSecrets}} Write the phrase down and keep it somewhere safe."
+          "ackLabel": "I understand nothing else gets me back into this vault.",
+          "statement": "Keep whatever Myne shows you. Nothing else gets you back in.",
+          "why": "A vault created while your identity is unlocked opens with its password alone: your identity phrase proves who you are on a new device, and it does not open a vault. A vault created on a device with no identity carries a 24-word recovery phrase instead, and then that phrase is the one way back in. {{lostBothSecrets}} Write down whatever this flow shows you and keep it somewhere safe."
         }
       },
       "why": "Why?"
@@ -5613,7 +5651,7 @@
       "accountInvalid": "Invalid account number. Please check and retry.",
       "accountLabel": "Account number (optional)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (optional)",
-      "body": "Pick the vault you want to recover with your 24-word recovery phrase. You can also type your account number to jump straight to it.",
+      "body": "Pick the vault you want to recover. A vault that still carries its own recovery phrase can be recovered with those 24 words; one that does not says so when you pick it. You can also type your account number to jump straight to it.",
       "cancel": "Cancel",
       "checking": "Checking…",
       "loadFailed": "No vaults could be loaded right now.",
@@ -5847,7 +5885,7 @@
     "join": "Add to this device",
     "joinHint": "This vault is already shared with your identity. Enter your recovery phrase to install it on this device.",
     "joinPhraseLabel": "Your recovery phrase",
-    "joinPasswordNote": "Choose a password for this device. It is separate from the vault owner's password: it unlocks this vault here, and your recovery phrase remains the portable way back in.",
+    "joinPasswordNote": "Choose a password for this device. It is separate from the vault owner's password, and it is the only way into this vault on this device: if you lose it, ask the owner for a fresh invite.",
     "joinSubmit": "Add and unlock",
     "joinError": "The vault could not be added to this device.",
     "joinErrorAlreadyHeld": "This device already holds this vault, so there is nothing to add. Open the vault you already have here.",

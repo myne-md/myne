@@ -50,6 +50,13 @@ export default defineConfig({
       // The shared enrol gate (myne-md/myne-mobile#38) - mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       { find: /^@myne\/enroll-gate$/, replacement: sib("../src/lib/enroll-gate.ts") },
+      // The shared copy-policy chokepoint (myne-md/myne#390). `lib/secret-export.ts`
+      // delegates to it, and the device-admission ceremony reaches that module for
+      // its CREDENTIAL-EQUIVALENT code (myne-md/myne#938 task 11), so without this
+      // line the ceremony's own spec cannot transform and the surface appears in no
+      // count, passing or failing. The module imports nothing host-side, which is
+      // why it can be aliased out of `../src/` at all.
+      { find: /^@myne\/clipboard$/, replacement: sib("../src/lib/clipboard.ts") },
       // The custom-theme syntax derivation (MYND-598) - mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       // The ornament role contract and the measure-token clamp (myne#394) -

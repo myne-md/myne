@@ -2705,12 +2705,15 @@ async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
 ///
 /// The four things the task names, in one linear story:
 ///
-///   (a) a member's SECOND device reaches the same vault from the phrase alone,
-///       with no owner action and no fresh invite;
+///   (a) a member's SECOND device reaches the same vault by re-claiming the
+///       invite it already holds, with no owner action and no fresh invite, and
+///       re-opens it afterwards with its own password (the phrase-sealed
+///       `vault.member-key` was retired in myne-md/myne#938 task 12);
 ///   (b) a wrong phrase installs nothing;
 ///   (c) an owner the pin cannot vouch for is refused;
-///   (d) a package that is not on the server is a typed retry, not a refusal and
-///       not a silent install of keys this device never received.
+///   (d) a package that is not on the server is a typed retry on the PASSWORD
+///       unlock, not a refusal and not a silent install of keys this device never
+///       received.
 ///
 /// The owner is ABSENT throughout the second device's half: nothing in the join
 /// consults the owner's device, and the pin the join verifies against was
@@ -2720,11 +2723,9 @@ async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
 fn member_second_device_joins_from_the_phrase_alone() {
     use crate::plugins::sync::devices::SyncDeviceError;
     use crate::plugins::sync::http_transport::build_transport;
-    use crate::plugins::sync::member_key_store::read_member_key_store;
     use crate::plugins::sync::person_account::{
         accept_invite_from_host, bind_owner_request, member_join_vault_from_host,
         person_list_invites_from_host, person_profile_write_from_host, post_invite_request,
-        unlock_member_vault_from_host,
     };
     use crate::plugins::sync::person_ai_store::{encode_person_ai_state, PersonAiState};
     use crate::vault_io::StdVaultIo;
@@ -2950,15 +2951,35 @@ fn member_second_device_joins_from_the_phrase_alone() {
         )
         .await
         .expect("joined vault dir");
-        let keys = read_member_key_store(
+        // Since myne-md/myne#938 task 12 the join writes ONE store, the member's
+        // password gate, and never the phrase-sealed `vault.member-key`. The keys
+        // are asserted through that gate: the same `itemsKey` and group key must
+        // come out of it, and a phrase cannot open it at all.
+        let keys = crate::plugins::sync::member_unlock_store::read_member_unlock_password(
             &io,
             &joined_dir,
             joined_vault_id.as_uuid().as_bytes(),
             &crate::test_support::FAST_TEST_KDF,
-            &protocol::normalize_user_phrase(MEMBER_PHRASE),
+            MEMBER_PASSWORD,
         )
         .await
-        .expect("the joined vault's member-key store opens with the phrase");
+        .expect("the joined vault's member gate opens with the member's own password");
+        assert!(
+            crate::plugins::sync::member_unlock_store::read_member_unlock_password(
+                &io,
+                &joined_dir,
+                joined_vault_id.as_uuid().as_bytes(),
+                &crate::test_support::FAST_TEST_KDF,
+                MEMBER_PHRASE,
+            )
+            .await
+            .is_none(),
+            "the phrase must not open the member gate: the password is the one way in"
+        );
+        assert!(
+            io.read(&joined_dir.join("vault.member-key")).await.is_err(),
+            "the retired phrase-sealed store is never written"
+        );
         assert_eq!(
             &keys.items_key[..],
             &acct.items_key[..],
@@ -2997,14 +3018,18 @@ fn member_second_device_joins_from_the_phrase_alone() {
         .await
         .expect("the rotated meta lands on the member's device");
 
-        let unlock = unlock_member_vault_from_host(
-            &member_second.host,
-            &io,
-            &member_second.state,
-            joined_vault_id,
-            MEMBER_PHRASE,
-        )
-        .await;
+        // The retry claim is driven through the PASSWORD unlock, which is now the
+        // only member path: a stale epoch with no delivered package is a typed
+        // retry there, and the phrase path it used to travel is gone.
+        let unlock =
+            crate::plugins::sync::person_account::unlock_member_vault_with_password_from_host(
+                &member_second.host,
+                &io,
+                &member_second.state,
+                joined_vault_id,
+                MEMBER_PASSWORD,
+            )
+            .await;
         assert_eq!(
             unlock.unwrap_err(),
             SyncDeviceError::Transport,

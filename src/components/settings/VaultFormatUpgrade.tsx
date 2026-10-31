@@ -108,7 +108,12 @@ export function VaultFormatUpgrade({
     void vaultIsPersonWrapped()
       .then((personWrapped) => {
         if (!live) return;
-        setOffer(personWrapped ? "hidden" : "offer");
+        // `null` is an `NTV8` vault, which has no vault phrase to retire, so the
+        // row offers nothing. Before the tri-state this collapsed into `false`
+        // and the row appeared on a vault whose phrase was already gone, with a
+        // button that could only answer `AlreadyUpgraded`
+        // (myne-md/myne#938, `decisions/protocol/0758`).
+        setOffer(personWrapped === false ? "offer" : "hidden");
       })
       // A probe that cannot answer (a client with no person plane) hides the
       // row: a control whose backend refuses is exactly the offer the capability

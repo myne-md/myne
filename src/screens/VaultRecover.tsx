@@ -218,8 +218,16 @@ export function VaultRecover({
   // Cancel on the identity grid returns to the picker rather than leaving
   // recovery altogether.
   const [personVaultId, setPersonVaultId] = useState<string | null>(null);
+  // The `NTV8` answer: no second credential, so recovery has nothing to offer for
+  // this vault and the picker says so rather than routing into a dead flow.
+  const [passwordOnlyVaultId, setPasswordOnlyVaultId] = useState<string | null>(null);
   const chooseVault = (vaultId: string) => {
     const toPhraseEntry = () => {
+      // The note belongs to the vault it was answered for, so every arm clears it
+      // first: without this, picking a password-only vault and then picking a
+      // person-wrapped one left "this vault has no second credential" standing
+      // under a vault that has one (myne-md/myne#938 review).
+      if (mountedRef.current) setPasswordOnlyVaultId(null);
       if (mountedRef.current) dispatch({ type: "vault-selected", vaultId });
     };
     if (!capabilities.has("personVaultCredential")) {
@@ -228,8 +236,23 @@ export function VaultRecover({
     }
     void vaultIsPersonWrapped(vaultId)
       .then((wrapped) => {
-        if (wrapped && mountedRef.current) setPersonVaultId(vaultId);
-        else toPhraseEntry();
+        if (!mountedRef.current) return;
+        setPasswordOnlyVaultId(null);
+        if (wrapped === true) {
+          setPersonVaultId(vaultId);
+          return;
+        }
+        if (wrapped === null) {
+          // `NTV8`: this vault has no second credential at all, so neither grid
+          // can open it. Sending the user to the phrase grid would end in "that
+          // phrase is wrong" for words that are right, which is the failure this
+          // probe exists to prevent, one generation further on
+          // (myne-md/myne#938, `decisions/protocol/0758`). The note renders in the
+          // picker; there is no sub-step to enter.
+          setPasswordOnlyVaultId(vaultId);
+          return;
+        }
+        toPhraseEntry();
       })
       // A probe that cannot answer falls back to the ordinary phrase-entry path:
       // the failure this closes is a WRONG offer, and guessing a different one
@@ -335,12 +358,27 @@ export function VaultRecover({
         );
       }
       return (
-        <RecoverySelectStep
-          onVaultSelected={chooseVault}
-          // No vault chosen yet on the select step — the post-cancel
-          // unlock falls to the boot-shaped sole/None path.
-          onCancel={() => onCancel(undefined)}
-        />
+        <>
+          {passwordOnlyVaultId !== null ? (
+            // The vault the user picked has no second credential (`NTV8`), so
+            // there is nothing to recover and no grid to enter. Said here, in the
+            // picker, rather than after 24 words
+            // (myne-md/myne#938, `decisions/protocol/0758`).
+            <p
+              role="status"
+              data-testid="recover.password-only-note"
+              style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}
+            >
+              {i18n.t("unlock.passwordOnlyNote")}
+            </p>
+          ) : null}
+          <RecoverySelectStep
+            onVaultSelected={chooseVault}
+            // No vault chosen yet on the select step: the post-cancel
+            // unlock falls to the boot-shaped sole/None path.
+            onCancel={() => onCancel(undefined)}
+          />
+        </>
       );
     case "phrase-entry":
       return (
