@@ -100,7 +100,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "GraphList": { file: "src/notes/components/GraphList.tsx", line: 40 },
   "GraphSettingsPanel": { file: "src/notes/components/GraphSettingsPanel.tsx", line: 157 },
   "GraphView": { file: "src/notes/components/GraphView.tsx", line: 1 },
-  "HelperDisclosure": { file: "src/components/settings/HelperDisclosure.tsx", line: 162 },
+  "HelperDisclosure": { file: "src/components/settings/HelperDisclosure.tsx", line: 176 },
   "HotkeysPanel": { file: "src/components/settings/HotkeysPanel.tsx", line: 184 },
   "Icon": { file: "src/components/primitives/Icon.tsx", line: 71 },
   "IconButton": { file: "src/components/primitives/IconButton.tsx", line: 83 },
