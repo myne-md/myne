@@ -16,7 +16,7 @@ use super::tools::{
 use crate::plugins::agent::tools::SearchHit;
 use crate::plugins::vault_indices::state::NoteRecord;
 use crate::test_support::block_on;
-use protocol::McpConnectionGrant;
+use protocol::{McpConnectionGrant, McpScopeModel};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -31,24 +31,52 @@ fn record(folder: Option<&str>, title: &str) -> NoteRecord {
     }
 }
 
-fn grant(folders: &[&str]) -> McpConnectionGrant {
+/// A grant in the model this build writes: the folders named here are the ones
+/// the connection may NOT read.
+fn grant(excluded: &[&str]) -> McpConnectionGrant {
     McpConnectionGrant {
-        folders: folders.iter().map(|f| f.to_string()).collect(),
+        model: McpScopeModel::Exclude,
+        folders: Vec::new(),
+        excluded_folders: excluded.iter().map(|f| f.to_string()).collect(),
         approved_at: 1_700_000_000,
         last_used_at: None,
+        write_folders: Vec::new(),
     }
 }
 
-fn scope_for(name: &str, folders: &[&str], existing: &[&str]) -> ConnectionScope {
-    let mut map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
-    map.insert(name.to_string(), grant(folders));
-    let existing = existing.iter().map(|f| f.to_string()).collect();
-    resolve_scope(name, &map, &existing)
+/// A grant in the RETIRED allow-list model, as a pre-downgrade build left it on
+/// disk: `folders` is the connection's whole reach.
+fn legacy_grant(folders: &[&str]) -> McpConnectionGrant {
+    McpConnectionGrant {
+        model: McpScopeModel::Folders,
+        folders: folders.iter().map(|f| f.to_string()).collect(),
+        excluded_folders: Vec::new(),
+        approved_at: 1_700_000_000,
+        last_used_at: None,
+        write_folders: Vec::new(),
+    }
 }
 
-/// The scope most tests use: `Projects` readable, `Private` not.
+fn scope_for(name: &str, excluded: &[&str]) -> ConnectionScope {
+    let mut map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
+    map.insert(name.to_string(), grant(excluded));
+    resolve_scope(name, &map)
+}
+
+/// The scope most tests use: everything readable except `Private`.
 fn scope() -> ConnectionScope {
-    scope_for("claude-desktop", &["Projects"], &["projects/", "private/"])
+    scope_for("claude-desktop", &["Private"])
+}
+
+/// The existing folder set the fixtures describe, as the tools receive it.
+fn existing() -> std::collections::BTreeSet<String> {
+    [
+        "".to_string(),
+        "private/".to_string(),
+        "projects/".to_string(),
+    ]
+    .into_iter()
+    .collect()
 }
 
 /// A source over in-memory maps, recording the search limits it was asked for.
@@ -130,8 +158,7 @@ fn every_tool_refuses_a_connection_with_no_grant() {
     // connection, not about an empty vault.
     let mut map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
     map.insert("claude-desktop".into(), grant(&["Projects"]));
-    let existing = ["projects/".to_string()].into_iter().collect();
-    let none = resolve_scope("stranger", &map, &existing);
+    let none = resolve_scope("stranger", &map);
     let source = Source::new(&[("a", Some("Projects"), "body")]);
 
     assert_eq!(
@@ -154,7 +181,7 @@ fn every_tool_refuses_a_connection_with_no_grant() {
         McpToolError::NoGrant
     );
     assert_eq!(
-        block_on(vault_state(&none, &source)).unwrap_err(),
+        block_on(vault_state(&none, &existing(), &source)).unwrap_err(),
         McpToolError::NoGrant
     );
 }
@@ -230,21 +257,32 @@ fn list_names_only_the_folders_in_scope_and_carries_no_note_text() {
 }
 
 #[test]
-fn state_counts_only_the_notes_inside_the_scope_and_reports_the_delta() {
+fn state_counts_only_what_the_scope_covers_and_names_no_excluded_folder() {
     let source = Source::new(&[
         ("a", Some("Projects"), "body"),
         ("b", Some("Private"), "body"),
         ("c", None, "body"),
     ]);
-    let state = block_on(vault_state(&scope(), &source)).unwrap();
-    assert_eq!(state.folder_count, 1);
-    assert_eq!(state.note_count, 1);
+    let state = block_on(vault_state(&scope(), &existing(), &source)).unwrap();
     assert_eq!(
-        state.outside_folder_count, 1,
-        "the Private folder exists and is outside the scope: a count, never a name"
+        state.folder_count, 2,
+        "the root and Projects are readable, Private is not"
     );
-    assert_eq!(state.missing_folder_count, 0);
+    assert_eq!(state.note_count, 2, "the Projects note and the root note");
+    assert_eq!(
+        state.excluded_folder_count, 1,
+        "the Private folder exists and is excluded: a count, never a name"
+    );
+    assert_eq!(state.stale_exclusion_count, 0);
     assert!(state.unlocked && state.external_access);
+
+    // The count is what the caller learns; the excluded folder's NAME is the
+    // user's own text and travels nowhere near this payload.
+    let wire = serde_json::to_value(&state).unwrap();
+    assert!(
+        !wire.to_string().contains("private"),
+        "the state payload must not carry an excluded folder name: {wire}"
+    );
 }
 
 // ── the search bounds ──────────────────────────────────────────────────────
@@ -335,11 +373,9 @@ fn a_folder_argument_narrows_the_scope_and_cannot_widen_it() {
         ("b", Some("Projects/Deep"), "body"),
         ("c", Some("Private"), "body"),
     ]);
-    let scope = scope_for(
-        "a",
-        &["Projects", "Projects/Deep"],
-        &["projects/", "projects/deep/", "private/"],
-    );
+    // The folder argument can only narrow: `Private` is excluded, so asking for
+    // it is refused rather than answered as an empty result.
+    let scope = scope_for("a", &["Private"]);
     let narrowed = block_on(note_search(
         &scope,
         NoteSearchRequest {
@@ -559,6 +595,8 @@ fn inputs<'a>(
         grants,
         deliberate_folders: &[],
         archived_folders: &[],
+        quiet_folders: &[],
+        writer: None,
     }
 }
 
@@ -605,16 +643,13 @@ fn a_connection_with_no_grant_is_refused_before_the_vault_is_read() {
 fn an_unimplemented_verb_is_version_skew_rather_than_a_scope_refusal() {
     let map = grants(&[("claude-desktop", &["Projects"])]);
     let source = Source::new(&[("a", Some("Projects"), "alpha")]);
-    let arguments = json!({ "body": "x" });
-    for tool in [
-        "note_create",
-        "note_append",
-        "note_set_field",
-        "note_move",
-        "note_edit",
-        "delete",
-        "",
-    ] {
+    // A verb the catalog offers and this build does not serve. `note_set_field` is
+    // the only one left: it needs the frontmatter splice, which lives in the
+    // dialect's TypeScript and has no Rust port yet, so reimplementing it here would
+    // be a second opinion about quoting, multi-line values and inline comments
+    // (feature task 16, blocked rather than reimplemented).
+    for tool in ["note_set_field", "delete", ""] {
+        let arguments = json!({ "body": "x" });
         assert_eq!(
             block_on(call_tool(
                 inputs(&map, "claude-desktop", tool, &arguments),
@@ -622,6 +657,20 @@ fn an_unimplemented_verb_is_version_skew_rather_than_a_scope_refusal() {
             )),
             McpCallOutcome::UnknownTool,
             "{tool} was not reported as an unknown verb"
+        );
+    }
+    // And the four that ARE served are not version skew, whatever else they answer:
+    // parse_arguments runs after the verb lookup, so a served verb with wrong
+    // arguments is `Malformed` and never `UnknownTool`.
+    for tool in ["note_create", "note_append", "note_edit", "note_move"] {
+        let arguments = json!({ "body": "x" });
+        assert_eq!(
+            block_on(call_tool(
+                inputs(&map, "claude-desktop", tool, &arguments),
+                &source
+            )),
+            McpCallOutcome::Malformed,
+            "{tool} must be served as malformed rather than as version skew"
         );
     }
 }
@@ -674,7 +723,8 @@ fn malformed_arguments_are_refused_before_the_vault_is_read() {
 
 #[test]
 fn a_search_through_the_call_surface_returns_in_scope_rows_and_excludes_the_rest() {
-    let map = grants(&[("claude-desktop", &["Projects"])]);
+    // Everything readable EXCEPT `Private`: the deny list this build writes.
+    let map = grants(&[("claude-desktop", &["Private"])]);
     let source = Source::new(&[
         ("in", Some("Projects"), "the quarterly alpha report"),
         ("out", Some("Private"), "the alpha plan nobody approved"),
@@ -710,7 +760,8 @@ fn a_search_through_the_call_surface_returns_in_scope_rows_and_excludes_the_rest
 
 #[test]
 fn a_read_through_the_call_surface_hands_the_note_over_as_markdown() {
-    let map = grants(&[("claude-desktop", &["Projects"])]);
+    // Everything readable EXCEPT `Private`: the deny list this build writes.
+    let map = grants(&[("claude-desktop", &["Private"])]);
     let source = Source::new(&[("in", Some("Projects"), "---\nfolder: Projects\n---\nbody")]);
     let arguments = json!({ "note_id": "in" });
 
@@ -729,7 +780,8 @@ fn a_read_through_the_call_surface_hands_the_note_over_as_markdown() {
 
 #[test]
 fn an_out_of_scope_read_is_refused_with_its_reason_and_one_sentence() {
-    let map = grants(&[("claude-desktop", &["Projects"])]);
+    // Everything readable EXCEPT `Private`: the deny list this build writes.
+    let map = grants(&[("claude-desktop", &["Private"])]);
     let source = Source::new(&[("out", Some("Private"), "x")]);
     let arguments = json!({ "note_id": "out" });
 
@@ -746,7 +798,8 @@ fn an_out_of_scope_read_is_refused_with_its_reason_and_one_sentence() {
 
 #[test]
 fn the_two_no_argument_tools_answer_only_the_empty_object() {
-    let map = grants(&[("claude-desktop", &["Projects"])]);
+    // Everything readable EXCEPT `Private`: the deny list this build writes.
+    let map = grants(&[("claude-desktop", &["Private"])]);
     let source = Source::new(&[("a", Some("Projects"), "alpha")]);
     let arguments = json!({});
     // `vault_list` answers with the row array itself and `vault_state` with an
@@ -768,4 +821,45 @@ fn the_two_no_argument_tools_answer_only_the_empty_object() {
     };
     assert_eq!(state["structuredContent"]["noteCount"], 1);
     assert_eq!(state["structuredContent"]["unlocked"], true);
+}
+
+#[test]
+fn a_grant_written_under_the_allow_list_model_is_refused_rather_than_read_as_a_deny_list() {
+    // The failure this prevents is silent and total. A stored allow list of
+    // `["Private"]` means "Private only"; read as a deny list it means
+    // "everything except Private", which is the opposite consent with no visible
+    // sign in the bytes. So the answer is a refusal that says so, on EVERY tool
+    // including the two no-argument ones: a client that called `vault_state`
+    // first must be told to re-approve rather than shown an empty vault it would
+    // report as one the user has nothing in.
+    let mut map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
+    map.insert("claude-desktop".to_string(), legacy_grant(&["Private"]));
+    let source = Source::new(&[
+        ("in", Some("Private"), "secret"),
+        ("out", Some("Projects"), "alpha"),
+    ]);
+
+    for (tool, arguments) in [
+        ("note_read", json!({ "note_id": "in" })),
+        ("note_search", json!({ "query": "alpha" })),
+        ("vault_list", json!({})),
+        ("vault_state", json!({})),
+    ] {
+        let outcome = block_on(call_tool(
+            inputs(&map, "claude-desktop", tool, &arguments),
+            &source,
+        ));
+        let McpCallOutcome::Refused(error) = outcome else {
+            panic!("{tool} served a legacy grant: {outcome:?}");
+        };
+        assert_eq!(
+            error.reason(),
+            "reapproval_required",
+            "{tool} must name the reason a re-approval is needed"
+        );
+        assert!(
+            error.message().contains("Myne"),
+            "{tool}: a sentence a human reads must name the product"
+        );
+    }
 }

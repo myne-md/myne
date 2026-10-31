@@ -5,8 +5,13 @@
 //! The `myne-mcp` sidecar speaks MCP over stdio and forwards every `tools/call`
 //! to the app over the existing local door. This module is the half that decides
 //! what the answer may contain: resolving a declared connection name to its
-//! frozen read scope ([`scope`]), the four read tools, each clamped to that
-//! scope ([`tools`]), and the live-vault plumbing behind them ([`host_adapters`]).
+//! read scope ([`scope`]), the four read tools, each clamped to that scope
+//! ([`tools`]), and the live-vault plumbing behind them ([`host_adapters`]).
+//!
+//! The read scope is a DENY list: everything in the vault except the folders the
+//! user left out on the approval screen. A folder created afterwards is therefore
+//! inside the approval, which is the property the allow-list model this replaced
+//! did not have.
 //!
 //! **One door, two front-ends.** The authority stays behind the same door the
 //! `myne` CLI uses, so scope resolution, the rate limiter, the status marker and
@@ -16,7 +21,7 @@
 //!
 //! **The scope is never taken from the caller.** It is resolved from the stored
 //! grant ([`protocol::PrefsView::mcp_connections`], `DeviceLocal`) by name, so a
-//! client can neither widen its own scope nor name a folder it was not granted.
+//! client can neither widen its own scope nor name a folder the user left out.
 //! The write grant is a separate, narrower set (a later slice) and is not
 //! readable from here at all.
 //!
@@ -32,20 +37,42 @@
 //!
 //! ## What is not here yet
 //!
-//! The five write verbs the compiled catalog offers (`note_create`,
-//! `note_append`, `note_set_field`, `note_move`, `note_edit`) are tasks 13 to 16
-//! of the same feature. Until they land, [`tools::ToolName::from_wire`] answers
-//! `None` for each of them and the door reports version skew. Recording that
-//! here rather than letting a reader infer it: a verb the catalog advertises and
-//! the host refuses looks identical to a scope bug from the client's side.
+//! Three of the five write verbs the compiled catalog offers (`note_set_field`,
+//! `note_move`, `note_edit`) are still tasks 15 and 16 of the same feature.
+//! Until they land, [`tools::ToolName::from_wire`] answers `None` for each of them
+//! and the door reports version skew. Recording that here rather than letting a
+//! reader infer it: a verb the catalog advertises and the host refuses looks
+//! identical to a scope bug from the client's side.
+//!
+//! The write half is an ALLOW list where the read half beside it is a DENY list
+//! ([`write_scope`]), an empty write grant means "nowhere" where an empty exclusion
+//! list means "everything", and every change takes a restore point first
+//! ([`intent`]). A write into a readable folder the user did not name for writing
+//! is queued as a proposal ([`queue`]) rather than refused, because a refusal is
+//! answered by a client retrying.
 
+/// The anchored edit and the move, over the agent path's own `place` and
+/// `move_note`. What is new here is only the write-grant check, the restore point
+/// and the closed reasons: a second anchored-edit implementation is where the
+/// exactly-once rule and the frontmatter clamps would quietly diverge.
+pub mod anchor;
 pub mod error;
+/// The write verbs, as host-validated intents with a restore point taken before
+/// every change. The read tools clamp and answer; these decide, queue or refuse,
+/// and never write without the pre-write bytes having been kept first.
+pub mod intent;
+/// What a connection may write, resolved from the same grant through the
+/// opposite model: an allow list of named folders, where the read scope beside it
+/// is a deny list. Kept a separate type on purpose, because a scope carrying both
+/// halves is the place a caller eventually hands the wrong one to a verb.
+pub mod queue;
 pub mod scope;
 pub mod tools;
 /// What Settings shows: the connection list and the approval preview, both
 /// resolved host-side so the counts on screen are the resolver's rather than a
 /// second opinion about the scope.
 pub mod view;
+pub mod write_scope;
 
 /// The live-vault source and the door's call pipeline. Not part of the wasm
 /// build: the door is a desktop surface, and the web client has no sidecar to
@@ -60,11 +87,17 @@ pub mod host_adapters;
 pub mod commands;
 
 #[cfg(test)]
+mod anchor_test;
+#[cfg(test)]
+mod intent_test;
+#[cfg(test)]
 mod scope_test;
 #[cfg(test)]
 mod tools_test;
 #[cfg(test)]
 mod view_test;
+#[cfg(test)]
+mod write_scope_test;
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod host_adapters_test;

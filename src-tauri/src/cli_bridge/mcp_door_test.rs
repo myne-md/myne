@@ -49,7 +49,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use myne_core::host::test_host::TestHost;
-use myne_core::plugins::mcp::host_adapters::door_call;
+use myne_core::plugins::mcp::host_adapters::{door_call, DoorContext};
 use myne_core::plugins::mcp::tools::WireCall;
 use myne_core::plugins::notes::commands::note_create_with_dir;
 use myne_core::plugins::prefs::commands::set_mcp_connection_grant_from_host;
@@ -75,8 +75,11 @@ use super::socket::{self, ListenerHandle};
 /// grant is written under.
 const CONNECTION: &str = "claude-desktop";
 
-/// The folder inside the grant, and the one outside it. Lower case because the
-/// canonical key form is, and the grant is compared exactly.
+/// The two folders the fixture's vault holds. The grant is a DENY list, so the
+/// connection reads `Projects` by default and `Private` is the folder it leaves
+/// out. Mixed case on purpose: the stored exclusion is canonicalised
+/// (`canonical_input_folder`), so a test that passed the same case through both
+/// sides could not tell the canonicaliser from an exact match.
 const IN_SCOPE_FOLDER: &str = "Projects";
 const OUT_OF_SCOPE_FOLDER: &str = "Private";
 
@@ -141,17 +144,23 @@ struct FixtureDoor {
     indices: Arc<VaultIndicesState>,
     search: Arc<SearchIndexState>,
     hooks: myne_core::hooks::Hooks,
+    /// The live co-editing registry: a write verb refuses a note a session owns,
+    /// so the door cannot answer a write without it.
+    registry: Arc<myne_core::plugins::live::LiveSessionRegistry>,
 }
 
 impl NoteLister for FixtureDoor {
     fn mcp_call(&self, request: McpCallRequest) -> McpCallOutcome {
         block_on(door_call(
-            &*self.host,
-            &self.state,
-            &self.indices,
-            &self.search,
-            &self.hooks,
-            &StdVaultIo,
+            DoorContext {
+                host: &*self.host,
+                state: &self.state,
+                indices: &self.indices,
+                search: &self.search,
+                hooks: &self.hooks,
+                registry: &self.registry,
+                io: &StdVaultIo,
+            },
             WireCall {
                 connection: &request.connection,
                 tool: &request.tool,
@@ -195,15 +204,29 @@ struct Fixture {
     state: Arc<VaultRuntimeState>,
     indices: Arc<VaultIndicesState>,
     search: Arc<SearchIndexState>,
-    /// In scope: `Projects`. Written through the app's own create path.
+    registry: Arc<myne_core::plugins::live::LiveSessionRegistry>,
+    hooks: myne_core::hooks::Hooks,
+    /// `Projects`: readable, because the grant excludes `Private` and not this
+    /// one. Written through the app's own create path.
     in_scope: String,
+    /// `Private`: named in the grant's exclusion list, so every tool must answer
+    /// as though it does not exist.
     out_of_scope: String,
     limiter: Arc<SharedRateLimiter>,
     listener: Option<ListenerHandle>,
 }
 
 impl Fixture {
-    fn new(granted: &[&str]) -> Self {
+    fn new(excluded: &[&str]) -> Self {
+        Self::with_write(excluded, &[])
+    }
+
+    /// The same vault, with `write` named in the grant's write list.
+    ///
+    /// A second constructor rather than a parameter on `new`, because twelve
+    /// fixtures are about the READ gate and an empty write grant is the state every
+    /// connection starts in; spelling `&[]` twelve times would obscure that.
+    fn with_write(excluded: &[&str], write: &[&str]) -> Self {
         let home = ShortDir::new();
         let app_data = data_dir_for_home(home.path()).join("md.myne.desktop");
         std::fs::create_dir_all(&app_data).expect("create app data dir");
@@ -243,14 +266,23 @@ impl Fixture {
             .await
             .expect("create the out-of-scope note");
 
-            // The grant, written by the command the approval screen calls.
-            let folders: Vec<String> = granted.iter().map(|f| format!("{f}/")).collect();
+            // The grant, written by the command the approval screen calls. The
+            // argument is the set of folders the connection may NOT read, so the
+            // fixture names the one folder it wants out of reach rather than the
+            // one it wants in. Under the previous allow-list model the same
+            // array would have meant the opposite.
+            let excluded_folders: Vec<String> = excluded.iter().map(|f| format!("{f}/")).collect();
+            // The write list is empty and says so on purpose: this fixture is
+            // about the READ gate, and an empty write grant is the state every
+            // connection starts in.
+            let write_folders: Vec<String> = write.iter().map(|f| format!("{f}/")).collect();
             let accepted = set_mcp_connection_grant_from_host(
                 &*host,
                 &state,
                 &hooks,
                 CONNECTION.to_string(),
-                folders,
+                excluded_folders,
+                write_folders,
                 &io,
             )
             .await
@@ -299,6 +331,8 @@ impl Fixture {
             state,
             indices,
             search,
+            registry: Arc::new(myne_core::plugins::live::LiveSessionRegistry::new()),
+            hooks: std::sync::Arc::new(myne_core::hooks::NoopHooks),
             in_scope,
             out_of_scope,
             limiter: Arc::new(SharedRateLimiter::new(u32::MAX, Duration::from_secs(60))),
@@ -312,7 +346,8 @@ impl Fixture {
             state: Arc::clone(&self.state),
             indices: Arc::clone(&self.indices),
             search: Arc::clone(&self.search),
-            hooks: std::sync::Arc::new(myne_core::hooks::NoopHooks),
+            hooks: std::sync::Arc::clone(&self.hooks),
+            registry: Arc::clone(&self.registry),
         });
         self.listener = Some(
             socket::spawn(
@@ -539,7 +574,7 @@ fn ask_door(app_data: &Path, body: &[u8]) -> Value {
 
 #[test]
 fn a_real_client_searches_inside_the_grant_and_never_outside_it() {
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
     let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
 
@@ -604,7 +639,7 @@ fn a_real_client_that_names_no_connection_is_refused_with_no_grant() {
     // a grant for a DIFFERENT name, and the call is refused rather than treated
     // as the owner. This is the acceptance criterion that keeps a hand-configured
     // client from arriving with the user's own authority.
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
     let mut session = Session::spawn(fixture.home.path(), None);
 
@@ -634,7 +669,7 @@ fn a_real_client_that_names_no_connection_is_refused_with_no_grant() {
 
 #[test]
 fn a_call_made_while_the_vault_is_locked_answers_vault_locked_and_an_unlock_resumes_the_session() {
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
     let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
 
@@ -698,7 +733,7 @@ fn a_malformed_call_is_answered_with_invalid_request() {
     // test. A field the tool does not know, a missing required field and a
     // non-object arguments value are all refused as malformed rather than
     // silently accepted with the unknown field ignored (`deny_unknown_fields`).
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
 
     for body in [
@@ -717,7 +752,17 @@ fn a_malformed_call_is_answered_with_invalid_request() {
             "tool": "note_search",
             "arguments": {},
         }),
-        // A verb this build does not implement (the write verbs land later).
+        // A verb this build does not implement (`note_set_field` and the two
+        // anchored verbs land as their own tasks).
+        json!({
+            "cmd": "mcp_call",
+            "connection": CONNECTION,
+            "tool": "note_set_field",
+            "arguments": { "note_id": "x", "field": "f", "value": "v" },
+        }),
+        // A WRITE verb this build does implement, missing its required fields:
+        // malformed, not version skew. The two are different answers, and a test
+        // that only carried the unimplemented verb could not tell them apart.
         json!({
             "cmd": "mcp_call",
             "connection": CONNECTION,
@@ -745,7 +790,7 @@ fn a_refused_call_still_costs_a_rate_limiter_token() {
     // BEFORE dispatch, so a call the host then refuses has already been counted.
     // A one-token budget makes that observable: if the refusal had been free, the
     // second request would be served.
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door_with(Arc::new(SharedRateLimiter::new(1, Duration::from_secs(60))));
 
     let refused = ask_door(
@@ -767,7 +812,7 @@ fn a_full_search_round_trip_never_touches_the_auto_lock_idle_clock() {
     // succeeds must not look like user activity to the auto-lock timer either.
     // A background agent polling a tool would otherwise hold the vault open
     // forever, which is the A6 line the CLI door is careful not to cross.
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
     let idle_before = fixture.state.idle_millis(1_000_000);
 
@@ -790,7 +835,7 @@ fn a_served_call_stamps_the_connections_last_use() {
     // nowhere else, so this is the only place the end-to-end claim can be made.
     // Without it the row would report "not used since it was approved" about a
     // client that is working, which is the failure the stamp exists to prevent.
-    let mut fixture = Fixture::new(&[IN_SCOPE_FOLDER]);
+    let mut fixture = Fixture::new(&[OUT_OF_SCOPE_FOLDER]);
     fixture.open_door();
     assert_eq!(
         fixture.stamped_last_used(),
@@ -808,4 +853,301 @@ fn a_served_call_stamps_the_connections_last_use() {
         matches!(fixture.stamped_last_used(), Some(Some(_))),
         "a served call must stamp the connection's last use"
     );
+}
+
+// ── the write half: a real create, a real append, a real restore point ─────
+
+/// The `.myn` bytes of one note, as they are on disk right now.
+///
+/// Reading the blob rather than the plaintext is deliberate: a snapshot is a copy
+/// of THIS, so "the restore returned the prior bytes" is a claim about bytes and
+/// only the file can answer it.
+fn note_blob(fixture: &Fixture, note_id: &str) -> Vec<u8> {
+    let root = myne_core::paths::vault_root_for_id_from_base(&fixture.app_data, test_vault_id());
+    std::fs::read(root.join("notes").join(format!("{note_id}.myn"))).expect("read the note blob")
+}
+
+/// Every note id in the vault, so a test can assert that NOTHING was written
+/// rather than only that one id is unchanged.
+fn note_ids(fixture: &Fixture) -> Vec<String> {
+    let root = myne_core::paths::vault_root_for_id_from_base(&fixture.app_data, test_vault_id());
+    let mut ids: Vec<String> = std::fs::read_dir(root.join("notes"))
+        .expect("list the notes dir")
+        .filter_map(|entry| {
+            let path = entry.ok()?.path();
+            let name = path.file_name()?.to_str()?.to_string();
+            name.strip_suffix(".myn").map(str::to_string)
+        })
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// The queued proposals in the stored prefs, as the review card reads them.
+fn queued_writes(fixture: &Fixture) -> Vec<protocol::McpWriteRequest> {
+    let root = myne_core::paths::vault_root_for_id_from_base(&fixture.app_data, test_vault_id());
+    block_on(myne_core::plugins::prefs::commands::prefs_read_with_dir(
+        &root,
+        &fixture.state,
+        &StdVaultIo,
+    ))
+    .expect("read the stored prefs")
+    .mcp_write_requests
+}
+
+#[test]
+fn a_real_client_creates_a_note_inside_the_write_grant_and_reads_it_back() {
+    // The whole point of the write grant: a folder named for writing accepts a
+    // note, and the caller gets the id back so it can read what it wrote.
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    fixture.open_door();
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_create",
+        json!({
+            "folder": format!("{IN_SCOPE_FOLDER}/"),
+            "title": "Written by a client",
+            "body": "Paragraph one.",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+    let note_id = reply["result"]["structuredContent"]["noteId"]
+        .as_str()
+        .expect("a create answers with the new note's id")
+        .to_string();
+    assert!(
+        note_ids(&fixture).contains(&note_id),
+        "the note must exist on disk: {note_id}"
+    );
+
+    // The fixture's index is HAND-FED, exactly as it is for the two seeded notes
+    // above: in the app the notes plugin owns `VaultIndicesState` and upserts on
+    // create, and here that state is a standalone value the test owns. Sweeping it
+    // would make this test pass while proving nothing about the write.
+    fixture.indices.apply(
+        &note_id,
+        NoteRecord {
+            title: Some("Written by a client".into()),
+            folder: Some(format!("{IN_SCOPE_FOLDER}/")),
+            ..Default::default()
+        },
+    );
+
+    // Read it back through the door, which is the claim the caller cares about.
+    let reply = session.call(2, "note_read", json!({ "note_id": note_id }));
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+    let body = reply["result"]["structuredContent"]["body"]
+        .as_str()
+        .expect("a read answers with the body");
+    assert!(body.contains("Written by a client"), "{body}");
+    assert!(body.contains("Paragraph one."), "{body}");
+    assert!(
+        body.contains(&format!("folder: {IN_SCOPE_FOLDER}/")),
+        "{body}"
+    );
+}
+
+#[test]
+fn a_create_outside_the_write_grant_is_queued_and_nothing_is_written() {
+    // A folder the connection can READ but was not given for writing. The client
+    // is told `write_queued_for_review`, the person gets a row, and the vault is
+    // byte-identical afterwards.
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    fixture.open_door();
+    let before = note_ids(&fixture);
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_create",
+        json!({
+            "folder": "Elsewhere/",
+            "title": "Not written",
+            "body": "Nothing here.",
+        }),
+    );
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "write_queued_for_review",
+        "reply: {reply}"
+    );
+    assert_eq!(
+        note_ids(&fixture),
+        before,
+        "a queued proposal must not create a note"
+    );
+    let queued = queued_writes(&fixture);
+    assert_eq!(queued.len(), 1, "{queued:?}");
+    assert_eq!(queued[0].connection, CONNECTION);
+    assert_eq!(queued[0].folder, "elsewhere/");
+    assert_eq!(queued[0].verb, "note_create");
+    // The summary is what the person reads to decide, so it carries the title.
+    assert!(queued[0].summary.contains("Not written"), "{queued:?}");
+
+    // And a SECOND attempt at the same verb in the same folder costs no extra row:
+    // a retry loop is the case the card has to survive.
+    let reply = session.call(
+        2,
+        "note_create",
+        json!({ "folder": "Elsewhere/", "title": "Again", "body": "x" }),
+    );
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "write_queued_for_review",
+        "reply: {reply}"
+    );
+    assert_eq!(queued_writes(&fixture).len(), 1);
+}
+
+#[test]
+fn an_append_takes_a_restore_point_and_the_restore_returns_the_prior_bytes() {
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    fixture.open_door();
+    // The PLAINTEXT is what a restore is compared against, not the ciphertext: the
+    // restore re-encodes the snapshot under a fresh content nonce (the snapshot IS
+    // the old sealed blob, and reusing its nonce would encrypt two plaintexts under
+    // one key+nonce pair), so identical bytes would be a nonce reuse rather than a
+    // correct restore.
+    let before = block_on(myne_core::plugins::notes::commands::note_read_from_host(
+        &*fixture.host,
+        &fixture.state,
+        fixture.in_scope.clone(),
+        &StdVaultIo,
+    ))
+    .expect("read the note before the append");
+    let blob_before = note_blob(&fixture, &fixture.in_scope);
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_append",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "markdown": "Appended by a client.",
+        }),
+    );
+    assert_eq!(reply["result"]["isError"], false, "reply: {reply}");
+    let appended = reply["result"]["structuredContent"]["appendedBytes"]
+        .as_u64()
+        .expect("an append reports the bytes it added");
+    assert!(appended > 0, "reply: {reply}");
+    assert_ne!(
+        note_blob(&fixture, &fixture.in_scope),
+        blob_before,
+        "the append must have changed the blob"
+    );
+
+    // The restore point: exactly one snapshot for this note, and restoring it
+    // returns the prior bytes byte for byte.
+    let snapshots = block_on(
+        myne_core::plugins::snapshots::commands::snapshot_list_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &StdVaultIo,
+            fixture.in_scope.clone(),
+        ),
+    )
+    .expect("list the note's snapshots");
+    assert_eq!(
+        snapshots.len(),
+        1,
+        "an external append must leave exactly one restore point"
+    );
+    block_on(
+        myne_core::plugins::snapshots::commands::snapshot_restore_from_host(
+            &*fixture.host,
+            &fixture.state,
+            &fixture.hooks,
+            fixture.in_scope.clone(),
+            snapshots[0].snapshot_uuid.clone(),
+            &StdVaultIo,
+            Some(&*fixture.registry),
+        ),
+    )
+    .expect("restore the snapshot");
+    let restored = block_on(myne_core::plugins::notes::commands::note_read_from_host(
+        &*fixture.host,
+        &fixture.state,
+        fixture.in_scope.clone(),
+        &StdVaultIo,
+    ))
+    .expect("read the note after the restore");
+    assert_eq!(
+        restored, before,
+        "restore after an append must return the note to its prior text, byte for byte"
+    );
+}
+
+#[test]
+fn a_restore_point_that_cannot_be_taken_blocks_the_append() {
+    // Injected the only way a snapshot can fail on a real disk: the `snapshots/`
+    // path is a FILE, so the directory cannot be created and the capture reports
+    // `Failed`. The append must then be refused and the note left alone, asserted
+    // by reading the blob rather than only by trusting the reply.
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    let root = myne_core::paths::vault_root_for_id_from_base(&fixture.app_data, test_vault_id());
+    std::fs::write(root.join("snapshots"), b"not a directory").expect("occupy the snapshots path");
+    fixture.open_door();
+    let before = note_blob(&fixture, &fixture.in_scope);
+    let mut session = Session::spawn(fixture.home.path(), Some(CONNECTION));
+
+    let reply = session.call(
+        1,
+        "note_append",
+        json!({
+            "note_id": fixture.in_scope.as_str(),
+            "markdown": "This must not land.",
+        }),
+    );
+    assert_eq!(
+        reply["result"]["structuredContent"]["reason"], "restore_point_failed",
+        "reply: {reply}"
+    );
+    assert_eq!(
+        note_blob(&fixture, &fixture.in_scope),
+        before,
+        "a write whose restore point failed must not have changed a byte"
+    );
+}
+
+#[test]
+fn a_write_loop_is_throttled_by_the_same_limiter_as_a_read() {
+    // Task 14's last criterion, and the one whose absence would be invisible: a
+    // client that appends in a loop is a write amplifier, and the budget it spends
+    // is the SAME one every other door request spends because the limiter is
+    // checked before dispatch, not per verb. A one-token budget makes that
+    // observable: the first write lands and the second answers `rate_limited`.
+    let mut fixture = Fixture::with_write(&[OUT_OF_SCOPE_FOLDER], &[IN_SCOPE_FOLDER]);
+    fixture.open_door_with(Arc::new(SharedRateLimiter::new(1, Duration::from_secs(60))));
+    let note_id = fixture.in_scope.clone();
+
+    let first = ask_door(
+        &fixture.app_data,
+        serde_json::to_vec(&json!({
+            "cmd": "mcp_call",
+            "connection": CONNECTION,
+            "tool": "note_append",
+            "arguments": { "note_id": note_id, "markdown": "First." },
+        }))
+        .expect("request encodes")
+        .as_slice(),
+    );
+    assert_eq!(first["ok"], true, "reply: {first}");
+
+    // The refusal comes from the door's own envelope, before the host is asked, so
+    // it is the `rate_limited` kind rather than any MCP reason: the tool layer is
+    // never reached, which is the whole point of counting there.
+    let second = ask_door(
+        &fixture.app_data,
+        serde_json::to_vec(&json!({
+            "cmd": "mcp_call",
+            "connection": CONNECTION,
+            "tool": "note_append",
+            "arguments": { "note_id": fixture.in_scope.as_str(), "markdown": "Second." },
+        }))
+        .expect("request encodes")
+        .as_slice(),
+    );
+    assert_eq!(second["ok"], false, "reply: {second}");
+    assert_eq!(second["error"]["kind"], "rate_limited", "reply: {second}");
 }

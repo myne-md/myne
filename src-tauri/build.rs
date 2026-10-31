@@ -226,8 +226,13 @@ fn main() {
                 "read_view_manifest",
                 // external-mcp-connection (myne-md/myne#923 task 3): the two
                 // writers over the device-local `mcp_connections` grant map.
+                "rewrite_mcp_folder_paths",
                 "set_mcp_connection_grant",
                 "revoke_mcp_connection",
+                // external-mcp-connection task 13: the queued out-of-scope write
+                // decisions. Both must name the same command as the handler above.
+                "accept_mcp_write_request",
+                "dismiss_mcp_write_request",
             ]),
         )
         .plugin(

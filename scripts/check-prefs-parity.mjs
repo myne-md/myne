@@ -281,8 +281,15 @@ export const FIELD_OVERRIDES = {
   // the saved-views pair above. The command names carry the verb because the
   // host stamps the approval time and normalizes the name, so neither is a
   // plain whole-value write.
+  rewrite_mcp_folder_paths: "mcp_connections",
   set_mcp_connection_grant: "mcp_connections",
   revoke_mcp_connection: "mcp_connections",
+  // task 13: the queued out-of-scope writes. Accept writes `mcp_connections`
+  // (it widens one grant by one folder) AND `mcp_write_requests` (it drops the
+  // row); the parity row names the grant, because that is the field whose value
+  // the user is deciding about, and the row removal is the bookkeeping beside it.
+  accept_mcp_write_request: "mcp_connections",
+  dismiss_mcp_write_request: "mcp_write_requests",
   upsert_saved_view: "saved_views",
   delete_saved_view: "saved_views",
   // view-manifests: the command acts on ONE view's approval, while the field is

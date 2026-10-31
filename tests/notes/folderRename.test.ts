@@ -12,6 +12,7 @@ const noteReadMock = vi.fn();
 const writeBatchMock = vi.fn();
 const reindexMock = vi.fn();
 const setDeliberateFoldersMock = vi.fn();
+const rewriteMcpFolderPathsMock = vi.fn();
 const flushMock = vi.fn();
 const patchLiveMock = vi.fn();
 vi.mock("../../src/notes/renameFlushHook", () => ({
@@ -37,6 +38,7 @@ vi.mock("../../src/notes/vaultIndices", () => ({
 }));
 vi.mock("../../src/lib/prefs", async (importOriginal) => ({
   mutateDeliberateFolders: (...a: unknown[]) => setDeliberateFoldersMock(...a),
+  rewriteMcpFolderPaths: (...a: unknown[]) => rewriteMcpFolderPathsMock(...a),
   // The REAL derivation, not a copy of it. It is what decides whether a
   // stale view can claim a deletion (myne-md/myne#613), so a stub here would
   // test the stub, and a hand-copy would be one more place for the real one
@@ -58,6 +60,8 @@ beforeEach(() => {
   noteReadMock.mockReset();
   writeBatchMock.mockReset();
   reindexMock.mockReset();
+  rewriteMcpFolderPathsMock.mockReset();
+  rewriteMcpFolderPathsMock.mockResolvedValue(undefined);
   setDeliberateFoldersMock.mockReset();
   flushMock.mockReset();
   flushMock.mockResolvedValue(undefined);
@@ -301,6 +305,66 @@ describe("renameFolder — async apply (transactional)", () => {
 
     expect(setDeliberateFoldersMock).not.toHaveBeenCalled();
     expect(result.deliberateWriteFailed).toBe(false);
+  });
+
+  // ── The external MCP grant re-root ───────────────────────────────────────
+  //
+  // A grant's deny list matches on the folder PATH, so an exclusion that does not
+  // move with its folder stops excluding: the notes under it become readable by an
+  // approved external client with no prompt and no notice. The re-root therefore
+  // may not be conditional on anything about `deliberate_folders` (a different
+  // population, and usually empty when the renamed folder is an ordinary one) and
+  // may not ride that write's success.
+  it("re-roots the grants on a rename whose folder is NOT in deliberate_folders", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: Inbox/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("never called"));
+
+    const result = await renameFolder("Inbox/", "Archive/", [{ noteUuid: "n", folder: "Inbox/" }], []);
+
+    // The ordinary case: a folder full of notes that the user never "created on
+    // purpose", so `deliberateRewritten` is 0 and the mutation is skipped.
+    expect(rewriteMcpFolderPathsMock).toHaveBeenCalledWith("inbox/", "Archive/");
+    expect(result.mcpScopeRewriteFailed).toBe(false);
+  });
+
+  it("re-roots the grants even when the deliberate write failed twice", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockRejectedValue(new Error("disk full"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    // Two independent prefs writes, two independent failures to report. A failed
+    // `deliberate_folders` rewrite says nothing about whether the grants can move.
+    expect(result.deliberateWriteFailed).toBe(true);
+    expect(rewriteMcpFolderPathsMock).toHaveBeenCalledWith("p/", "Q/");
+    expect(result.mcpScopeRewriteFailed).toBe(false);
+  });
+
+  it("reports a twice-failed grant re-root rather than swallowing it", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockResolvedValue(undefined);
+    rewriteMcpFolderPathsMock.mockRejectedValue(new Error("prefs busy"));
+
+    const result = await renameFolder("P/", "Q/", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    expect(rewriteMcpFolderPathsMock).toHaveBeenCalledTimes(2);
+    expect(result.mcpScopeRewriteFailed).toBe(true);
+  });
+
+  it("does not re-root the grants on a rename that changes nothing", async () => {
+    noteReadMock.mockResolvedValue("---\nfolder: P/\n---\n\n# B");
+    writeBatchMock.mockResolvedValueOnce(undefined);
+    setDeliberateFoldersMock.mockResolvedValue(undefined);
+
+    await renameFolder("P/", "P", [{ noteUuid: "n", folder: "P/" }], ["P/"]);
+
+    // `normalizeFolderPath` folds the trailing slash, so this pair is one path: the
+    // planner states no `renamePrefix`, and a rewrite keyed off nothing would move
+    // every grant onto a folder that did not move.
+    expect(rewriteMcpFolderPathsMock).not.toHaveBeenCalled();
   });
 
   it("flushes open dirty panes BEFORE reading any body (WL-8 pre-flight)", async () => {

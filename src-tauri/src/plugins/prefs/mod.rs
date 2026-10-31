@@ -184,8 +184,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // revoke one. Each needs a matching allow- entry in
             // permissions/prefs/default.toml and a name in build.rs's inlined
             // command list.
+            commands::rewrite_mcp_folder_paths,
             commands::set_mcp_connection_grant,
             commands::revoke_mcp_connection,
+            // external-mcp-connection task 13: the queued out-of-scope writes a
+            // person accepts (which extends one grant by one folder) or dismisses.
+            commands::accept_mcp_write_request,
+            commands::dismiss_mcp_write_request,
         ])
         .build()
 }

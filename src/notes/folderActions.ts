@@ -13,7 +13,11 @@
 
 import { patchFolderField, patchUpdatedField } from "../dialect";
 import { foldSegment, normalizeFolderPath } from "../dialect/folderPath";
-import { mutateDeliberateFolders, type SetMutation } from "../lib/prefs";
+import {
+  mutateDeliberateFolders,
+  rewriteMcpFolderPaths,
+  type SetMutation,
+} from "../lib/prefs";
 import { isBatchCommitted } from "../types/note-batch-error";
 import { patchLiveNote } from "./liveNote";
 import {
@@ -299,6 +303,16 @@ export type FolderRenameResult = {
    * finishes the re-rooting and reports THIS separately.
    */
   deliberateWriteFailed?: boolean;
+  /**
+   * The external MCP scope rewrite failed, AFTER the rename committed.
+   *
+   * Separate from `deliberateWriteFailed` because the consequence is different and
+   * so is the sentence: a deny list matches on the path, so a stored exclusion that
+   * still names the OLD folder excludes nothing, and the notes under it become
+   * readable by an approved external client. Nothing reconciles it later, so the
+   * caller has to say it out loud rather than let the vault look consistent.
+   */
+  mcpScopeRewriteFailed?: boolean;
 };
 
 /** A note with its decrypted body — the input the transactional rename planner
@@ -569,6 +583,7 @@ export async function renameFolder(
   // `archived_folders` re-rooting, and a throw would skip both while telling the
   // user nothing happened.
   let deliberateWriteFailed = false;
+  let mcpScopeRewritten = true;
   if (plan.deliberateRewritten > 0) {
     // Retried ONCE before it is reported, and the retry is the difference
     // between a recoverable state and a permanent one. A second rename cannot
@@ -599,6 +614,38 @@ export async function renameFolder(
     }
   }
 
+  // An approved external MCP connection's grant paths must move with the folder,
+  // and this is NOT part of the `deliberate_folders` rewrite above.
+  //
+  // The two sets are different populations: `deliberate_folders` holds folders the
+  // user created on purpose, while a grant's exclusions are chosen from every
+  // folder the vault has, including the ordinary note-derived ones. Nesting this
+  // inside `if (plan.deliberateRewritten > 0)` therefore skipped the commonest case
+  // there is, renaming a folder full of notes that was never "deliberate", and the
+  // skip failed OPEN: the grant's deny list matches on the path, so an excluded
+  // folder that moved stopped being excluded and its notes became readable by an
+  // approved client with no prompt and no notice. Nor may it ride the mutation's
+  // success, since a failed `deliberate_folders` write says nothing about whether
+  // the grants can be re-rooted.
+  //
+  // So: keyed on the RENAME (`renamePrefix` is stated whenever the paths differ,
+  // and a no-op rename states nothing), independent of both flags, awaited rather
+  // than fire-and-forget, retried once, and a second failure reported.
+  const reRoot = plan.deliberateMutation.renamePrefix?.[0];
+  if (reRoot !== undefined) {
+    let rewritten = true;
+    try {
+      await rewriteMcpFolderPaths(reRoot.from, reRoot.to);
+    } catch {
+      try {
+        await rewriteMcpFolderPaths(reRoot.from, reRoot.to);
+      } catch {
+        rewritten = false;
+      }
+    }
+    mcpScopeRewritten = rewritten;
+  }
+
   // The folder changed on the moved notes → re-index (live, decrypt-free) so
   // collision-disambiguation tracks the new folder. Best-effort, post-commit.
   const movedSet = new Set(plan.movedIds);
@@ -614,5 +661,6 @@ export async function renameFolder(
     deliberateRewritten: plan.deliberateRewritten,
     nextDeliberate: plan.nextDeliberate,
     deliberateWriteFailed,
+    mcpScopeRewriteFailed: !mcpScopeRewritten,
   };
 }

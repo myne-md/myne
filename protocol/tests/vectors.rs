@@ -412,6 +412,16 @@ mod embedded {
             include_str!("../../myne-test-vectors/vectors/paired-extension/v0.1/cases.json"),
         ),
         (
+            "mcp-connection",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/mcp-connection/v0.1/cases.json"),
+        ),
+        (
+            "mcp-write-request",
+            "v0.1",
+            include_str!("../../myne-test-vectors/vectors/mcp-write-request/v0.1/cases.json"),
+        ),
+        (
             "password-policy",
             "v0.1",
             include_str!("../../myne-test-vectors/vectors/password-policy/v0.1/cases.json"),
@@ -1137,7 +1147,7 @@ fn vault_prefs_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}', which the schema's enum forbids"),
         }
     }
 
@@ -1654,7 +1664,7 @@ fn vault_meta_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -1765,7 +1775,7 @@ fn account_number_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 }
@@ -2043,7 +2053,7 @@ fn myn_blob_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -2056,7 +2066,7 @@ fn myn_blob_vectors() {
     ] {
         assert!(
             seen_kinds.contains(kind),
-            "myn-blob missing every case of case_kind '{kind}' — coverage regression"
+            "myn-blob missing every case of case_kind '{kind}', which is a coverage regression"
         );
     }
 }
@@ -2434,7 +2444,7 @@ fn ctx_aead_vectors() {
 
                 pinned_builders.insert(builder_name.to_string());
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -5975,7 +5985,7 @@ fn vault_search_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -5983,7 +5993,7 @@ fn vault_search_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-search missing every case of case_kind '{kind}' — coverage regression"
+            "vault-search missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -6206,7 +6216,7 @@ fn vault_workspace_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -6214,7 +6224,7 @@ fn vault_workspace_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-workspace missing every case of case_kind '{kind}' — coverage regression"
+            "vault-workspace missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -6429,7 +6439,7 @@ fn graph_layout_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -6437,7 +6447,7 @@ fn graph_layout_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "graph-layout missing every case of case_kind '{kind}' — coverage regression"
+            "graph-layout missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -6656,7 +6666,7 @@ fn vault_indices_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -6664,7 +6674,7 @@ fn vault_indices_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-indices missing every case of case_kind '{kind}' — coverage regression"
+            "vault-indices missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -6887,7 +6897,7 @@ fn vault_dictionary_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -6895,7 +6905,7 @@ fn vault_dictionary_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-dictionary missing every case of case_kind '{kind}' — coverage regression"
+            "vault-dictionary missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -7133,7 +7143,7 @@ fn attachment_text_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -7141,7 +7151,7 @@ fn attachment_text_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "attachment-text missing every case of case_kind '{kind}' — coverage regression"
+            "attachment-text missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -7353,7 +7363,7 @@ fn vault_quickunlock_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -7361,7 +7371,7 @@ fn vault_quickunlock_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-quickunlock missing every case of case_kind '{kind}' — coverage regression"
+            "vault-quickunlock missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -7541,7 +7551,7 @@ fn pending_capture_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -7549,7 +7559,7 @@ fn pending_capture_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "pending-capture missing every case of case_kind '{kind}' — coverage regression"
+            "pending-capture missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 5] = [
@@ -7730,7 +7740,7 @@ fn share_import_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -7738,7 +7748,7 @@ fn share_import_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "share-import missing every case of case_kind '{kind}' — coverage regression"
+            "share-import missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 5] = [
@@ -8275,7 +8285,7 @@ fn attachment_blob_vectors() {
                     "[{id}] compute_attachment_id is not deterministic"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -8289,7 +8299,7 @@ fn attachment_blob_vectors() {
     ] {
         assert!(
             seen_kinds.contains(kind),
-            "attachment-blob missing every case of case_kind '{kind}' — coverage regression"
+            "attachment-blob missing every case of case_kind '{kind}': coverage regression"
         );
     }
 }
@@ -8862,7 +8872,7 @@ fn chats_catalog_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -9158,7 +9168,7 @@ fn chats_blob_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -10218,7 +10228,7 @@ fn crdt_note_blob_vectors() {
     ] {
         assert!(
             seen_kinds.contains(kind),
-            "crdt-note-blob missing every case of case_kind '{kind}' — coverage regression"
+            "crdt-note-blob missing every case of case_kind '{kind}': coverage regression"
         );
     }
 }
@@ -10409,7 +10419,7 @@ fn attachments_catalog_vectors() {
                     "[{id}] aad_attachments_catalog mismatch"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -10422,7 +10432,7 @@ fn attachments_catalog_vectors() {
     ] {
         assert!(
             seen_kinds.contains(kind),
-            "attachments-catalog missing every case of case_kind '{kind}' — coverage regression"
+            "attachments-catalog missing every case of case_kind '{kind}': coverage regression"
         );
     }
     for required in [
@@ -10716,14 +10726,14 @@ fn note_template_vectors() {
                     "[{id}] supported_tokens() order/set mismatch — the registry and the vector must move in lockstep"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
     for kind in ["render", "token_registry"] {
         assert!(
             seen_kinds.contains(kind),
-            "note-template missing every case of case_kind '{kind}' — coverage regression"
+            "note-template missing every case of case_kind '{kind}': coverage regression"
         );
     }
     assert!(
@@ -11300,13 +11310,13 @@ fn saved_view_vectors() {
                     "[{id}] error variant mismatch"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
     for kind in ["parse_ok", "parse_ok_opaque", "parse_fail"] {
         assert!(
             seen.contains(kind),
-            "saved-view missing every case of case_kind '{kind}' — coverage regression"
+            "saved-view missing every case of case_kind '{kind}': coverage regression"
         );
     }
 }
@@ -11376,13 +11386,13 @@ fn color_group_vectors() {
                     "[{id}] error variant mismatch"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
     for kind in ["parse_ok", "parse_fail"] {
         assert!(
             seen.contains(kind),
-            "color-group missing every case of case_kind '{kind}' — coverage regression"
+            "color-group missing every case of case_kind '{kind}': coverage regression"
         );
     }
 }
@@ -11456,15 +11466,209 @@ fn paired_extension_vectors() {
                     "[{id}] error variant mismatch"
                 );
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
     for kind in ["parse_ok", "parse_fail"] {
         assert!(
             seen.contains(kind),
-            "paired-extension missing every case of case_kind '{kind}' — coverage regression"
+            "paired-extension missing every case of case_kind '{kind}': coverage regression"
         );
     }
+}
+
+/// `mcp-connection`: the canonical-JSON decoder for one `mcp_connections`
+/// grant record inside `vault.prefs` (external MCP connection read scope,
+/// myne-md/myne#923).
+///
+/// The rejection half is the reason this family exists: an allow list and a deny
+/// list are both arrays of folder paths, so an implementation that guesses the
+/// model from the shape inverts consent with nothing in the bytes looking wrong.
+/// A port must refuse the exact same inputs, which is a property no round-trip
+/// case can express.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn mcp_connection_vectors() {
+    use protocol::{canonical_encode_mcp_connection_grant, parse_mcp_connection_grant};
+
+    let Some(raw) = cases_json("mcp-connection") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[mcp-connection] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "mcp-connection");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "mcp-connection must have at least one case"
+    );
+    assert_unique_vector_ids("mcp-connection", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (grant, consumed) = parse_mcp_connection_grant(&input)
+                    .unwrap_or_else(|| panic!("[{id}] parse_ok input did not parse"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&canonical_encode_mcp_connection_grant(&grant)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_reject" => {
+                seen.insert("parse_reject");
+                assert!(
+                    parse_mcp_connection_grant(&input).is_none(),
+                    "[{id}] parse_reject input parsed, which means this build reads a grant \
+                     the family says must be refused"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_reject"] {
+        assert!(
+            seen.contains(kind),
+            "mcp-connection missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+}
+
+/// `mcp-write-request`: the external MCP write queue inside `vault.prefs`
+/// (external-mcp-connection task 13; `decisions/ai/0752`).
+///
+/// A queued entry is a PROPOSAL: nothing has been applied, and accepting it
+/// extends one connection's write grant by exactly one folder. So the pins here
+/// are about which proposal a person is shown. A reader that drops a row hides a
+/// decision; one that invents a row spends an approval nobody gave.
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test)]
+fn mcp_write_request_vectors() {
+    use protocol::parse_mcp_write_request;
+
+    let Some(raw) = cases_json("mcp-write-request") else {
+        return;
+    };
+    let doc: serde_json::Value = serde_json::from_str(&raw)
+        .unwrap_or_else(|e| panic!("[mcp-write-request] parse cases.json: {e}"));
+    assert_eq!(doc["schema"], "mcp-write-request");
+    assert_eq!(doc["protocol_version"], "v0.1");
+
+    let cases = doc["cases"].as_array().expect("cases must be a JSON array");
+    assert!(
+        !cases.is_empty(),
+        "mcp-write-request must have at least one case"
+    );
+    assert_unique_vector_ids("mcp-write-request", cases);
+
+    let mut seen = std::collections::HashSet::new();
+    for case in cases {
+        let id = case["vector_id"]
+            .as_str()
+            .expect("vector_id must be a string");
+        let kind = case["case_kind"]
+            .as_str()
+            .unwrap_or_else(|| panic!("[{id}] missing case_kind"));
+        let input = hex_decode(field(case, id, "input_bytes_utf8_hex"));
+        match kind {
+            "parse_ok" => {
+                seen.insert("parse_ok");
+                let (request, consumed) = parse_mcp_write_request(&input)
+                    .unwrap_or_else(|| panic!("[{id}] parse_ok input did not parse"));
+                let want_consumed = case["expected_consumed_len"]
+                    .as_u64()
+                    .unwrap_or_else(|| panic!("[{id}] missing expected_consumed_len"))
+                    as usize;
+                assert_eq!(consumed, want_consumed, "[{id}] consumed-len mismatch");
+                assert_eq!(
+                    hex_encode(&encode_one_request(&request)),
+                    field(case, id, "expected_canonical_utf8_hex"),
+                    "[{id}] canonical re-encoding mismatch"
+                );
+            }
+            "parse_reject" => {
+                seen.insert("parse_reject");
+                assert!(
+                    parse_mcp_write_request(&input).is_none(),
+                    "[{id}] parse_reject input parsed, which means this build reads a proposal \
+                     the family says must be refused"
+                );
+            }
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
+        }
+    }
+    for kind in ["parse_ok", "parse_reject"] {
+        assert!(
+            seen.contains(kind),
+            "mcp-write-request missing every case of case_kind '{kind}': coverage regression"
+        );
+    }
+}
+
+/// The one canonical encoding of a queued request, spelled independently of the
+/// module's own encoder ON PURPOSE.
+///
+/// The crate's `push_mcp_write_requests` emits the array; this writes one object
+/// by hand. If the two disagree the family fails, which is the point: a test that
+/// called the encoder would pin nothing but its own output.
+fn encode_one_request(request: &protocol::McpWriteRequest) -> Vec<u8> {
+    let mut out = String::from("{");
+    out.push_str(&format!(
+        "\"connection\":\"{}\"",
+        escape_json_for_vectors(&request.connection)
+    ));
+    out.push_str(&format!(
+        ",\"folder\":\"{}\"",
+        escape_json_for_vectors(&request.folder)
+    ));
+    out.push_str(&format!(",\"requested_at\":{}", request.requested_at));
+    if !request.summary.is_empty() {
+        out.push_str(&format!(
+            ",\"summary\":\"{}\"",
+            escape_json_for_vectors(&request.summary)
+        ));
+    }
+    out.push_str(&format!(
+        ",\"verb\":\"{}\"",
+        escape_json_for_vectors(&request.verb)
+    ));
+    out.push('}');
+    out.into_bytes()
+}
+
+/// The escape an encoder in this family needs: the standard JSON short forms plus
+/// a `\u00XX` escape for every other control character. Spelled here rather than
+/// shared so the hand-written encoder above has no path to the module's.
+fn escape_json_for_vectors(text: &str) -> String {
+    let mut out = String::new();
+    for ch in text.chars() {
+        match ch {
+            '"' => out.push_str("\\\""),
+            '\\' => out.push_str("\\\\"),
+            '\n' => out.push_str("\\n"),
+            '\r' => out.push_str("\\r"),
+            '\t' => out.push_str("\\t"),
+            c if (c as u32) < 0x20 => out.push_str(&format!("\\u{:04x}", c as u32)),
+            c => out.push(c),
+        }
+    }
+    out
 }
 
 #[cfg_attr(not(target_arch = "wasm32"), test)]
@@ -11663,7 +11867,7 @@ fn vault_themes_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -11671,7 +11875,7 @@ fn vault_themes_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-themes missing every case of case_kind '{kind}' — coverage regression"
+            "vault-themes missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 6] = [
@@ -11972,7 +12176,7 @@ fn vault_head_state_vectors() {
                     ),
                 }
             }
-            other => panic!("[{id}] unknown case_kind '{other}' — schema enforces enum"),
+            other => panic!("[{id}] unknown case_kind '{other}'; schema enforces enum"),
         }
     }
 
@@ -11980,7 +12184,7 @@ fn vault_head_state_vectors() {
     for kind in required_kinds {
         assert!(
             seen_kinds.contains(kind),
-            "vault-head-state missing every case of case_kind '{kind}' — coverage regression"
+            "vault-head-state missing every case of case_kind '{kind}': coverage regression"
         );
     }
     let required_parse_errors: [&str; 4] = [

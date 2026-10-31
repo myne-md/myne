@@ -623,6 +623,14 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // and says removing it is safe, rather than promising a retry that a
         // second rename cannot perform.
         setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
+      } else if (result.mcpScopeRewriteFailed === true) {
+        // A different failure with a different consequence, so it gets its own
+        // sentence rather than sharing the one above: the notes are right and the
+        // deliberate set is right, but an external connection's exclusions still
+        // name the OLD path, which for a deny list means the folder it was kept
+        // out of is now readable. Nothing reconciles it later, so the user is told
+        // where to look instead of being told the rename is done.
+        setBlockNotice(i18n.t("notes.folderManagement.mcpScopeRewriteFailed"));
       }
     },
     [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],

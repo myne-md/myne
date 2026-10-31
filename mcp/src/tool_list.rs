@@ -100,8 +100,8 @@ pub fn catalog() -> Vec<Value> {
         json!({
             "name": "vault_state",
             "description": "Report whether the vault is unlocked, whether external access is \
-                enabled, and how many notes and folders the granted scope covers. Read-only, \
-                and safe to call before any other tool.",
+                enabled, how many notes and folders this connection may read, and how many \
+                folders the user left out. Read-only, and safe to call before any other tool.",
             "inputSchema": {
                 "type": "object",
                 "properties": {},

@@ -6064,11 +6064,14 @@ pub(crate) async fn set_view_approval_with_dir(
 //
 // Three shapes here are decisions rather than conveniences:
 //
-// - **The approval stamp is the HOST's clock.** The caller names the folders; it
-//   does not get to say when the approval happened.
+// - **The approval stamp is the HOST's clock.** The caller names the folders to
+//   LEAVE OUT; it does not get to say when the approval happened.
 // - **The name is NFC-normalized on the way in.** The encoder NFC-normalizes map
 //   keys, so a caller passing a decomposed name would store one key and fail to
 //   find it on revoke, which is a silent failed revocation.
+// - **The folders are canonicalized before they are stored**, by the one folder
+//   key the resolver compares against, so a casing the user typed and a casing
+//   the sidebar shows cannot disagree at call time.
 // - **An addition is refused, not failed.** §9.5.4 requires an over-budget
 //   addition to be declined rather than turning the whole write into an error,
 //   because a full blob that refuses every write also refuses the removals that
@@ -6095,17 +6098,109 @@ fn normalize_connection_name(name: &str) -> Option<String> {
 /// Slot::Unlocked-gated approval (or re-approval) of one external MCP
 /// connection. Returns `false` when the grant did not fit the prefs budget; the
 /// existing grant is then left untouched rather than partially written.
+///
+/// `excluded_folders` is what the connection may NOT read. Re-approving a grant
+/// written under the retired allow-list model rewrites it under this one, which
+/// is the only path that turns a legacy grant back into a servable one.
+///
+/// `write_folders` is what it MAY write in: an allow list, always a subset of the
+/// read scope, and empty means it may write nowhere. A folder named for writing
+/// that the same approval leaves out of the read scope is refused
+/// (`PrefsWriteError::InvalidValue`) rather than dropped, so the screen and the
+/// stored bytes never disagree about the grant.
 pub async fn set_mcp_connection_grant_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     name: String,
-    folders: Vec<String>,
+    excluded_folders: Vec<String>,
+    write_folders: Vec<String>,
     io: &dyn crate::vault_io::VaultIo,
 ) -> Result<bool, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
-    set_mcp_connection_grant_with_dir(&dir, state, hooks, name, folders, io, host).await
+    set_mcp_connection_grant_with_dir(
+        &dir,
+        state,
+        hooks,
+        name,
+        excluded_folders,
+        write_folders,
+        io,
+        host,
+    )
+    .await
+}
+
+/// Accept and dismiss the queued out-of-scope writes (external-mcp-connection
+/// task 13). Both are Slot::Unlocked-gated prefs writers for the reason every other
+/// grant command is: the nonce may only be bumped from this module.
+///
+/// Accept returns whether the WRITE grant changed, which is `false` for a stale row
+/// (its connection revoked, its folder since excluded) as well as for one that did
+/// not fit the budget. The surface re-reads the view either way, so the row
+/// disappearing is the honest signal rather than the boolean.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn accept_mcp_write_request<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    connection: String,
+    folder: String,
+) -> Result<bool, PrefsWriteError> {
+    accept_mcp_write_request_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        connection,
+        folder,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn dismiss_mcp_write_request<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    connection: String,
+    folder: String,
+) -> Result<bool, PrefsWriteError> {
+    dismiss_mcp_write_request_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        connection,
+        folder,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Re-root every folder path an MCP grant holds after a folder rename. See
+/// [`rewrite_mcp_folder_paths_with_dir`] for why a rename of an excluded folder is
+/// a fail-OPEN event for a deny list.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn rewrite_mcp_folder_paths<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    from: String,
+    to: String,
+) -> Result<usize, PrefsWriteError> {
+    rewrite_mcp_folder_paths_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        from,
+        to,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -6115,26 +6210,30 @@ pub async fn set_mcp_connection_grant<R: Runtime>(
     state: State<'_, VaultRuntimeState>,
     hooks: State<'_, crate::hooks::Hooks>,
     name: String,
-    folders: Vec<String>,
+    excluded_folders: Vec<String>,
+    write_folders: Vec<String>,
 ) -> Result<bool, PrefsWriteError> {
     set_mcp_connection_grant_from_host(
         &TauriHost::new(app),
         state.inner(),
         hooks.inner(),
         name,
-        folders,
+        excluded_folders,
+        write_folders,
         &crate::vault_io::StdVaultIo,
     )
     .await
 }
 
 /// Testable core of [`set_mcp_connection_grant`].
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn set_mcp_connection_grant_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     name: String,
-    folders: Vec<String>,
+    excluded_folders: Vec<String>,
+    write_folders: Vec<String>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<bool, PrefsWriteError> {
@@ -6142,7 +6241,54 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
         return Err(PrefsWriteError::InvalidValue);
     };
     let approved_at = host.now_unix_secs();
-    let folder_count = folders.len();
+    // A SET, canonicalized and sorted: the same tick made twice writes the same
+    // bytes, and the resolver's comparison runs against exactly this form.
+    let excluded_set: std::collections::BTreeSet<String> = excluded_folders
+        .iter()
+        .map(|folder| crate::folder_key::canonical_input_folder(folder))
+        .collect();
+    let write_set: std::collections::BTreeSet<String> = write_folders
+        .iter()
+        .map(|folder| crate::folder_key::canonical_input_folder(folder))
+        .collect();
+    // **The write scope is a SUBSET of the read scope, enforced HERE as well as at
+    // call time.** A folder the connection may write but not read is a place it
+    // could put notes it can never find again, and refusing it at approval tells
+    // the person; refusing it only at use tells a client. Refused rather than
+    // silently dropped, because a dropped entry would leave the screen showing a
+    // write grant the stored bytes do not carry (`core/AGENTS.md` on a sink that
+    // resolves on a refused write).
+    //
+    // The read scope being compared against is the EFFECTIVE one, which is this
+    // grant's exclusions UNION the folders the user already left out of Myne's own
+    // AI and of the terminal client (`protocol.md` §9.5.2 makes the union
+    // normative). Comparing against this grant's list alone accepted a write folder
+    // the spec forbids; the call-time check still refused it, so nothing was ever
+    // exposed, but a stored grant carrying what the format forbids is the kind of
+    // divergence the next reader builds on. The union is used HERE and not stored:
+    // folding another surface's exclusions into this grant's bytes would make them
+    // survive the user un-excluding them there.
+    let quiet_union: std::collections::BTreeSet<String> =
+        match prefs_read_with_dir(vault_dir, state, io).await {
+            Ok(view) => crate::plugins::mcp::scope::quiet_folders(&view)
+                .iter()
+                .map(|folder| crate::folder_key::canonical_input_folder(folder))
+                .collect(),
+            // A vault whose prefs cannot be read is not a state to widen a grant in.
+            Err(_) => return Err(PrefsWriteError::InvalidValue),
+        };
+    let effective_excluded: std::collections::BTreeSet<String> =
+        excluded_set.union(&quiet_union).cloned().collect();
+    if write_set
+        .iter()
+        .any(|folder| crate::folder_key::exclusions_cover(&effective_excluded, folder))
+    {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    let folder_count = excluded_set.len();
+    let write_folder_count = write_set.len();
+    let excluded_folders: Vec<String> = excluded_set.into_iter().collect();
+    let write_folders: Vec<String> = write_set.into_iter().collect();
     let mut accepted = false;
 
     update_prefs_with_dir(
@@ -6161,14 +6307,38 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
             candidate.mcp_connections.insert(
                 name.clone(),
                 protocol::McpConnectionGrant {
-                    folders,
+                    // Always this model: the approval screen selects what to leave
+                    // out, and there is no other model to write.
+                    model: protocol::McpScopeModel::Exclude,
+                    // The allow list stays empty. Writing both arrays would make
+                    // the stored grant describe two rules at once, which the
+                    // decoder refuses on the next read.
+                    folders: Vec::new(),
+                    excluded_folders,
                     approved_at,
                     // Re-approval keeps the last-use stamp: the approval changed,
                     // the usage history did not.
                     last_used_at,
+                    // The write allow list, already canonical and sorted above and
+                    // already checked against the exclusions. Empty is stored as
+                    // empty and omitted from the bytes, which the resolver reads as
+                    // "may write nowhere".
+                    write_folders,
                 },
             );
             if mcp_grant_fits(&candidate) {
+                // A re-approval can widen the WRITE scope past a folder that was
+                // waiting for a decision, and a request for a folder the grant now
+                // covers is a decision already made. Dropping it is what keeps the
+                // card from asking about something the person just granted.
+                let granted: std::collections::BTreeSet<String> = candidate
+                    .mcp_connections
+                    .get(&name)
+                    .map(|grant| grant.write_folders.iter().cloned().collect())
+                    .unwrap_or_default();
+                candidate.mcp_write_requests.retain(|request| {
+                    request.connection != name || !granted.contains(&request.folder)
+                });
                 *prefs = candidate;
                 accepted = true;
             }
@@ -6183,9 +6353,352 @@ pub(crate) async fn set_mcp_connection_grant_with_dir(
         event = "prefs_written",
         field = "mcp_connections",
         accepted,
-        folders = folder_count
+        excluded_folders = folder_count,
+        write_folders = write_folder_count
     );
     Ok(accepted)
+}
+
+/// Slot::Unlocked-gated recording of one out-of-scope write (external-mcp-connection
+/// task 13; `decisions/ai/0752`).
+///
+/// Called by the tool layer when a write names a folder the connection may READ
+/// but not WRITE. Nothing is applied: the request waits for a person, and
+/// accepting it extends the grant by exactly that folder.
+///
+/// Returns whether the row is NOW in the queue. `false` covers two outcomes that
+/// the caller must treat the same way, by answering the client with the plain
+/// out-of-scope refusal rather than `write_queued_for_review`: the queue was full
+/// of OTHER connections' rows, or the plaintext budget would not take it. A retry
+/// of a row that is already stored returns `true`, because the row IS there and the
+/// person will be shown it. A row that is not stored is a decision nobody will be
+/// shown, so claiming it waits for review is the lie this return value exists to
+/// prevent.
+///
+/// `summary` is client-authored USER TEXT (AS3-class). It reaches the blob and
+/// never a log line: a note title in a diagnostic log is a title leaving the
+/// envelope.
+#[allow(clippy::too_many_arguments)]
+pub(crate) async fn enqueue_mcp_write_request_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    verb: String,
+    summary: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(connection) = normalize_connection_name(&connection) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let requested_at = host.now_unix_secs();
+    let mut grew = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let mut candidate = prefs.clone();
+            let queued = crate::plugins::mcp::queue::enqueue(
+                &mut candidate.mcp_write_requests,
+                protocol::McpWriteRequest {
+                    connection: connection.clone(),
+                    folder,
+                    requested_at,
+                    summary,
+                    verb,
+                },
+            );
+            grew = queued && mcp_grant_fits(&candidate);
+            if mcp_grant_fits(&candidate) {
+                *prefs = candidate;
+            } else {
+                // Out of budget: the queue keeps what it had. Dropping the row is
+                // the right failure, because a request the person cannot see is
+                // worth no bytes, and `false` is what makes the caller answer with
+                // the plain refusal rather than a queue the row is not in.
+                grew = false;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    // COUNT and a bool only: the folder, the verb and the summary are all user
+    // content, and a note title in a diagnostic log is a title leaving the
+    // envelope.
+    tracing::info!(event = "prefs_written", field = "mcp_write_requests", grew);
+    Ok(grew)
+}
+
+/// Slot::Unlocked-gated ACCEPT of one queued write request: extend that
+/// connection's write grant by exactly the folder it named, and drop the row.
+///
+/// Returns whether the grant changed. `false` covers every case where nothing was
+/// widened: no grant under that name (the row outlived a revocation), a legacy
+/// grant (re-approval is the only thing that rewrites it), or a folder that is no
+/// longer inside the read scope (the person excluded it after the request landed).
+/// In all three the row is dropped as well, because a request that can never be
+/// accepted is a row the card would keep offering.
+pub(crate) async fn accept_mcp_write_request_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(connection) = normalize_connection_name(&connection) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let mut accepted = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let mut candidate = prefs.clone();
+            let Some(request) = crate::plugins::mcp::queue::take(
+                &mut candidate.mcp_write_requests,
+                &connection,
+                &folder,
+            ) else {
+                // Nothing queued for that pair: a stale click. Keeping the row is
+                // not an option because there is none, so this is a no-op.
+                return;
+            };
+            let grant = candidate.mcp_connections.get(&connection);
+            // The read scope as it is NOW, resolved through the same resolver the
+            // tools clamp with: accept widens the write grant, and the write grant
+            // may never exceed the read scope.
+            let readable = grant.map(|_| {
+                crate::plugins::mcp::scope::resolve_scope_with_quiet(
+                    &connection,
+                    &candidate.mcp_connections,
+                    &crate::plugins::mcp::scope::quiet_folders(&candidate),
+                )
+            });
+            let scope_ok = readable
+                .as_ref()
+                .map(|scope| scope.covers_folder(&request.folder))
+                .unwrap_or(false);
+            let target =
+                crate::plugins::mcp::queue::accept_target(grant, &request.folder, |_| scope_ok);
+            if target.is_err() || !scope_ok {
+                // Dropped, not kept: see the doc comment.
+                accepted = false;
+                if mcp_grant_fits(&candidate) {
+                    *prefs = candidate;
+                }
+                return;
+            }
+            if let Some(grant) = candidate.mcp_connections.get_mut(&connection) {
+                if !grant.write_folders.contains(&request.folder) {
+                    grant.write_folders.push(request.folder.clone());
+                    grant.write_folders.sort();
+                    accepted = true;
+                }
+            }
+            if mcp_grant_fits(&candidate) {
+                *prefs = candidate;
+            } else {
+                accepted = false;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    tracing::info!(
+        event = "prefs_written",
+        field = "mcp_connections",
+        accepted,
+        write_scope_extended = accepted
+    );
+    Ok(accepted)
+}
+
+/// Slot::Unlocked-gated DISMISS of one queued write request: drop the row and
+/// change nothing else. The client is not told; its next attempt queues again.
+pub(crate) async fn dismiss_mcp_write_request_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<bool, PrefsWriteError> {
+    let Some(connection) = normalize_connection_name(&connection) else {
+        return Err(PrefsWriteError::InvalidValue);
+    };
+    let mut removed = false;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let mut candidate = prefs.clone();
+            removed = crate::plugins::mcp::queue::take(
+                &mut candidate.mcp_write_requests,
+                &connection,
+                &folder,
+            )
+            .is_some();
+            if removed {
+                *prefs = candidate;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    Ok(removed)
+}
+
+/// Slot::Unlocked-gated REWRITE of every folder path an external MCP grant holds,
+/// after a folder was renamed (external-mcp-connection; the D3 finding of the
+/// 2026-10-30 review).
+///
+/// The read scope is a DENY list, which makes a rename fail OPEN: an excluded
+/// folder renamed to a new key stops matching, and the notes under it become
+/// readable by an approved client with no prompt and no act by the person who
+/// excluded them. The write scope and the queue have the same property, so all
+/// three are re-rooted here, in one atomic write.
+///
+/// This is NOT an approval: `approved_at` and the grant's `model` are untouched,
+/// and no folder is added or removed. Returns how many entries moved, so the
+/// caller can skip a write (and a nonce bump) when the rename touched nothing.
+pub(crate) async fn rewrite_mcp_folder_paths_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    from: String,
+    to: String,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<usize, PrefsWriteError> {
+    let from = crate::folder_key::canonical_input_folder(&from);
+    let to = crate::folder_key::canonical_input_folder(&to);
+    if from == to {
+        return Ok(0);
+    }
+    let mut moved = 0usize;
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| {
+            let mut candidate = prefs.clone();
+            let mut moved_here = 0usize;
+            for grant in candidate.mcp_connections.values_mut() {
+                for folder in grant
+                    .excluded_folders
+                    .iter_mut()
+                    .chain(grant.write_folders.iter_mut())
+                {
+                    let rerooted = crate::folder_key::reroot(folder, &from, &to);
+                    if rerooted != *folder {
+                        *folder = rerooted;
+                        moved_here += 1;
+                    }
+                }
+                // The writer stores these sorted; a rename can break that, and a
+                // byte-identical re-encode is what the format promises.
+                grant.excluded_folders.sort();
+                grant.excluded_folders.dedup();
+                grant.write_folders.sort();
+                grant.write_folders.dedup();
+            }
+            for request in candidate.mcp_write_requests.iter_mut() {
+                let rerooted = crate::folder_key::reroot(&request.folder, &from, &to);
+                if rerooted != request.folder {
+                    request.folder = rerooted;
+                    moved_here += 1;
+                }
+            }
+            moved = moved_here;
+            if moved_here > 0 && mcp_grant_fits(&candidate) {
+                *prefs = candidate;
+            } else {
+                moved = 0;
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+    // COUNT only: a folder path is a vault path and never reaches the log.
+    tracing::info!(
+        event = "prefs_written",
+        field = "mcp_connections",
+        rewritten = moved
+    );
+    Ok(moved)
+}
+
+/// The host-facing wrappers below mirror the grant commands one screen up: the
+/// same three-layer split (`_with_dir` core, `_from_host`, Tauri command), because
+/// these are prefs writers and the nonce may only be bumped from this module.
+#[allow(clippy::too_many_arguments)]
+pub async fn enqueue_mcp_write_request_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    verb: String,
+    summary: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    enqueue_mcp_write_request_with_dir(
+        &dir, state, hooks, connection, folder, verb, summary, io, host,
+    )
+    .await
+}
+
+pub async fn rewrite_mcp_folder_paths_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    from: String,
+    to: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<usize, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    rewrite_mcp_folder_paths_with_dir(&dir, state, hooks, from, to, io, host).await
+}
+
+pub async fn accept_mcp_write_request_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    accept_mcp_write_request_with_dir(&dir, state, hooks, connection, folder, io, host).await
+}
+
+pub async fn dismiss_mcp_write_request_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    connection: String,
+    folder: String,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<bool, PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    dismiss_mcp_write_request_with_dir(&dir, state, hooks, connection, folder, io, host).await
 }
 
 /// Slot::Unlocked-gated revocation of one external MCP connection. Revoking a
@@ -6242,6 +6755,13 @@ pub(crate) async fn revoke_mcp_connection_with_dir(
         hooks,
         |prefs| {
             removed = prefs.mcp_connections.remove(&name).is_some();
+            // Revoking drops that connection's queued requests with it. A row whose
+            // grant is gone cannot be accepted (there is nothing to widen), and a
+            // card that kept offering one would be asking about a connection the
+            // person just closed.
+            prefs
+                .mcp_write_requests
+                .retain(|request| request.connection != name);
         },
         io,
         host,
@@ -7413,6 +7933,7 @@ mod tests {
                     label: None,
                     last_backup_at: None,
                     mcp_connections: Default::default(),
+                    mcp_write_requests: Default::default(),
                     new_note_location: None,
                     new_note_location_folder: None,
                     paired_extensions: Vec::new(),
@@ -10346,6 +10867,7 @@ mod tests {
                 &hooks,
                 String::from("claude-desktop"),
                 vec![String::from("Work/"), String::from("Projects/")],
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -10359,6 +10881,7 @@ mod tests {
                 &hooks,
                 String::from("lm-studio"),
                 vec![String::from("Archive/")],
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -10376,9 +10899,21 @@ mod tests {
                 .get("claude-desktop")
                 .expect("the first grant survives");
             assert_eq!(
-                claude.folders,
-                vec![String::from("Projects/"), String::from("Work/")],
-                "the folder set is canonical: sorted, because it is a set"
+                claude.model,
+                protocol::McpScopeModel::Exclude,
+                "the approval screen selects what to leave out, so this is the \
+                 model every approval writes"
+            );
+            assert_eq!(
+                claude.excluded_folders,
+                vec![String::from("projects/"), String::from("work/")],
+                "the exclusion set is canonical: lower-cased, trailing-slashed, \
+                 sorted, because it is a set"
+            );
+            assert!(
+                claude.folders.is_empty(),
+                "the retired allow list stays empty: two arrays describing two \
+                 rules is a grant the decoder refuses"
             );
             assert_eq!(
                 claude.approved_at, 1_765_432_100,
@@ -10444,6 +10979,7 @@ mod tests {
                 &hooks,
                 decomposed.clone(),
                 vec![String::from("Work/")],
+                Vec::new(),
                 &io,
                 &host,
             )
@@ -10495,6 +11031,7 @@ mod tests {
                     &hooks,
                     String::new(),
                     Vec::new(),
+                    Vec::new(),
                     &io,
                     &host,
                 )
@@ -10513,6 +11050,495 @@ mod tests {
                 .await,
                 Err(PrefsWriteError::InvalidValue)
             ));
+        });
+    }
+
+    /// The write scope is a SUBSET of the read scope, and this is the write half of
+    /// that rule (the resolver's half is `mcp_write_scope_is_bounded_by_the_read_scope`).
+    ///
+    /// Refused rather than dropped: a dropped entry would leave the approval screen
+    /// showing a write grant the stored bytes do not carry, which is the shape
+    /// `core/AGENTS.md` records as a sink that resolves on a refused write. And the
+    /// bug it prevents is a note a client can write but never read back.
+    #[test]
+    fn a_write_folder_outside_the_read_scope_is_refused_at_approval() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3b).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            // Naming a folder for writing that the same approval leaves out is the
+            // contradiction: refused, and nothing is stored.
+            assert!(matches!(
+                set_mcp_connection_grant_with_dir(
+                    tmp.path(),
+                    &state,
+                    &hooks,
+                    String::from("claude-desktop"),
+                    vec![String::from("Projects/")],
+                    vec![String::from("Projects/")],
+                    &io,
+                    &host,
+                )
+                .await,
+                Err(PrefsWriteError::InvalidValue)
+            ));
+            // A parent exclusion takes its subtree out of the READ scope, so a write
+            // grant on a folder underneath it is refused too. Equality alone would
+            // let this one through and serve a write the read beside it refuses.
+            assert!(matches!(
+                set_mcp_connection_grant_with_dir(
+                    tmp.path(),
+                    &state,
+                    &hooks,
+                    String::from("claude-desktop"),
+                    vec![String::from("Projects/")],
+                    vec![String::from("Projects/2026/")],
+                    &io,
+                    &host,
+                )
+                .await,
+                Err(PrefsWriteError::InvalidValue)
+            ));
+            assert!(
+                prefs_read_with_dir(tmp.path(), &state, &io)
+                    .await
+                    .expect("read")
+                    .mcp_connections
+                    .is_empty(),
+                "a refused approval must leave no grant behind"
+            );
+
+            // The subset is accepted when it IS a subset, and both halves survive a
+            // read through the production path.
+            assert!(set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                vec![String::from("Archive/")],
+                vec![String::from("Projects/")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve"));
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after approve");
+            let grant = stored
+                .mcp_connections
+                .get("claude-desktop")
+                .expect("the grant is stored");
+            assert_eq!(grant.excluded_folders, vec![String::from("archive/")]);
+            assert_eq!(grant.write_folders, vec![String::from("projects/")]);
+        });
+    }
+
+    // ---- the out-of-scope write queue (task 13) ----------------------------
+
+    /// End to end: a write into a readable-but-not-writable folder is QUEUED (not
+    /// applied, not dropped), the section's view offers it, and accepting it
+    /// extends the write grant by exactly that folder and nothing else.
+    ///
+    /// This is task 13's acceptance in one test: the route, the persistence, the
+    /// row the person reads, and the widening. The verbs that produce such a write
+    /// are tasks 14 and 15; the mechanism is finished here so that they have
+    /// something to call rather than something to invent.
+    /// The write scope may not name a folder the connection may not READ, and
+    /// "may read" is the effective reach: the grant's own exclusions union the
+    /// folders the user already left out of Myne's own AI and of the terminal
+    /// client (`protocol.md` §9.5.2 makes that union normative). This compared
+    /// against the grant's list alone, so a folder excluded from AI could still be
+    /// stored as writable; the call-time check refused it, which is why nothing was
+    /// ever exposed, but the stored grant then carried what the format forbids.
+    #[test]
+    fn mcp_a_write_folder_excluded_from_ai_is_refused_at_the_writer() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3e).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_200);
+
+            let add_private = || SetMutation {
+                add: vec![String::from("Private")],
+                remove: Vec::new(),
+                add_unless_removed: Vec::new(),
+                remove_prefix: Vec::new(),
+                rename_prefix: Vec::new(),
+            };
+            set_ai_excluded_folders_with_dir(tmp.path(), &state, &hooks, add_private(), &io, &host)
+                .await
+                .expect("exclude a folder from AI");
+
+            // A grant that names NO exclusion of its own: the ONLY thing keeping
+            // `private/` out of reach is the AI list, which is exactly the half this
+            // check used to miss.
+            let refused = set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                Vec::new(),
+                vec![String::from("Private")],
+                &io,
+                &host,
+            )
+            .await;
+
+            assert!(
+                matches!(refused, Err(PrefsWriteError::InvalidValue)),
+                "a write folder the connection cannot read must be refused, not stored: {refused:?}"
+            );
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert!(
+                stored.mcp_connections.is_empty(),
+                "the refused approval must write nothing at all"
+            );
+
+            // And the same folder is legal once the user stops excluding it from AI,
+            // which is what makes this a check on the union rather than on a
+            // permanently forbidden folder list.
+            let remove_private = || SetMutation {
+                add: Vec::new(),
+                remove: vec![String::from("Private")],
+                add_unless_removed: Vec::new(),
+                remove_prefix: Vec::new(),
+                rename_prefix: Vec::new(),
+            };
+            set_ai_excluded_folders_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                remove_private(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("un-exclude");
+            set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                Vec::new(),
+                vec![String::from("Private")],
+                &io,
+                &host,
+            )
+            .await
+            .expect("a readable folder is writable");
+        });
+    }
+
+    /// The D3 finding of the 2026-10-30 review: a deny list fails OPEN on a
+    /// rename, because the exclusion is a path and the notes moved to a new one.
+    /// Every path an MCP grant holds is re-rooted by the rename, in one write,
+    /// without becoming an approval (stamp and model untouched).
+    #[test]
+    fn mcp_grant_folder_paths_are_rerooted_when_a_folder_is_renamed() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3d).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            // Read everything except `private/`; write inside `private/2026/` would
+            // be refused, so the write list stays on a readable folder.
+            set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                vec![String::from("Private"), String::from("Privatestuff")],
+                Vec::new(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve");
+
+            let before = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read")
+                .mcp_connections;
+            let grant_before = before.get("claude-desktop").expect("grant").clone();
+            assert_eq!(
+                grant_before.excluded_folders,
+                vec![String::from("private/"), String::from("privatestuff/")],
+                "stored canonical, sorted"
+            );
+
+            let moved = rewrite_mcp_folder_paths_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("Private"),
+                String::from("Journal"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("reroot");
+            assert_eq!(moved, 1, "only the entry inside the renamed subtree moves");
+
+            let after = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read")
+                .mcp_connections;
+            let grant_after = after.get("claude-desktop").expect("grant").clone();
+            assert_eq!(
+                grant_after.excluded_folders,
+                vec![String::from("journal/"), String::from("privatestuff/")],
+                "renamed folder stays excluded, and its near-name is untouched"
+            );
+            assert_eq!(
+                grant_after.approved_at, grant_before.approved_at,
+                "a rename is not an approval"
+            );
+            assert_eq!(grant_after.model, grant_before.model);
+
+            // A rename that touches nothing writes nothing.
+            let moved_again = rewrite_mcp_folder_paths_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("Unrelated"),
+                String::from("Elsewhere"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("reroot");
+            assert_eq!(moved_again, 0);
+        });
+    }
+
+    #[test]
+    fn mcp_write_queue_queues_then_accepts_and_extends_by_one_folder() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3c).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+
+            // The grant: reads everything, writes nothing.
+            set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                Vec::new(),
+                Vec::new(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve");
+
+            // Make the folder EXIST without inventing an index: `existing_folders`
+            // counts the user's own deliberate folders, so a folder the person
+            // declared is a folder the scope can resolve against. A folder the
+            // vault does not have is not readable in the first place.
+            set_deliberate_folders_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                SetMutation {
+                    add: vec![String::from("Inbox")],
+                    remove: Vec::new(),
+                    add_unless_removed: Vec::new(),
+                    remove_prefix: Vec::new(),
+                    rename_prefix: Vec::new(),
+                },
+                &io,
+                &host,
+            )
+            .await
+            .expect("declare the folder");
+
+            let grew = enqueue_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                String::from("note_create"),
+                String::from("Shopping list"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("queue the request");
+            assert!(grew, "a first request grows the queue");
+
+            // The stored grant is UNCHANGED: a proposal is not a permission.
+            let stored = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            let grant = stored
+                .mcp_connections
+                .get("claude-desktop")
+                .expect("the grant is stored");
+            assert!(
+                grant.write_folders.is_empty(),
+                "queueing a request must not widen the grant by itself"
+            );
+            assert_eq!(stored.mcp_write_requests.len(), 1);
+
+            // The view the section renders offers it, with its origin named.
+            let view = crate::plugins::mcp::view::external_access_view(
+                &stored,
+                &std::collections::BTreeMap::new(),
+            );
+            assert_eq!(view.write_requests.len(), 1);
+            let row = &view.write_requests[0];
+            assert_eq!(row.connection, "claude-desktop");
+            assert_eq!(row.folder, "inbox/");
+            assert_eq!(row.verb, "note_create");
+            assert_eq!(row.summary, "Shopping list");
+
+            // Accept: the grant gains exactly that folder, the row goes.
+            assert!(accept_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("accept"));
+            let after = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after accept");
+            assert_eq!(
+                after
+                    .mcp_connections
+                    .get("claude-desktop")
+                    .expect("grant")
+                    .write_folders,
+                vec![String::from("inbox/")],
+                "accepting widens the write grant by exactly the folder requested"
+            );
+            assert!(after.mcp_write_requests.is_empty());
+        });
+    }
+
+    /// Dismissing removes the row and changes no grant; revoking the connection
+    /// takes its rows with it, because a row whose grant is gone can never be
+    /// accepted and a card that kept offering it would be asking about a
+    /// connection the person just closed.
+    #[test]
+    fn mcp_write_queue_dismiss_and_revoke_leave_no_orphans() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x3d).await;
+            let hooks = noop_hooks();
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            host.set_now(1_765_432_100);
+            set_mcp_connection_grant_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                Vec::new(),
+                Vec::new(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("approve");
+
+            enqueue_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                String::from("note_create"),
+                String::new(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("queue");
+            assert!(dismiss_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("dismiss"));
+            let after_dismiss = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read");
+            assert!(after_dismiss.mcp_write_requests.is_empty());
+            assert!(
+                after_dismiss
+                    .mcp_connections
+                    .get("claude-desktop")
+                    .expect("grant")
+                    .write_folders
+                    .is_empty(),
+                "dismissing changes no grant"
+            );
+            // A second dismiss finds nothing, which is a stale click rather than
+            // an error.
+            assert!(!dismiss_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("dismiss again"));
+
+            enqueue_mcp_write_request_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                String::from("Inbox/"),
+                String::from("note_create"),
+                String::new(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("queue again");
+            revoke_mcp_connection_with_dir(
+                tmp.path(),
+                &state,
+                &hooks,
+                String::from("claude-desktop"),
+                &io,
+                &host,
+            )
+            .await
+            .expect("revoke");
+            let after_revoke = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read after revoke");
+            assert!(
+                after_revoke.mcp_write_requests.is_empty(),
+                "revoking takes the connection's queued requests with it"
+            );
         });
     }
 
@@ -10557,6 +11583,7 @@ mod tests {
                 &hooks,
                 String::from("claude-desktop"),
                 vec![String::from("Work/")],
+                Vec::new(),
                 &io,
                 &host,
             )

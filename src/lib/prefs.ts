@@ -2028,20 +2028,34 @@ export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> 
  * write, so the caller says "this grant would not fit" and the stored grant is
  * left exactly as it was.
  *
- * **The folder list is the whole scope**, so this is the one call that decides
- * what an external program can read. The host canonicalizes and sorts it, stamps
- * `approved_at` from its own clock, keeps a re-approval's `last_used_at`, and
- * refuses an empty name. Nothing here can express "everywhere": a folder the user
- * did not name is not in the set, and a folder created afterwards stays outside
- * it until the user adds it again (the delta row on the section is that prompt).
+ * **The exclusion list is the only thing this call can narrow**, and it is the
+ * one call that decides what an external program can read: everything in the
+ * vault except these folders, with each entry taking its subtree with it. The
+ * host canonicalizes and sorts it, stamps `approved_at` from its own clock, keeps
+ * a re-approval's `last_used_at`, and refuses an empty name. An EMPTY exclusion
+ * list is a real approval (the whole vault), which is why the approval screen
+ * states that in words rather than letting an empty picker read as "share
+ * nothing". `writeFolders` is the opposite sense: an empty list grants no write at
+ * all, and a folder named there that the same approval leaves out of the read
+ * scope is refused by the host rather than silently dropped.
+ *
+ * A grant written under the retired allow-list model cannot be expressed here at
+ * all: the host refuses that one at call time with `reapproval_required`, and
+ * approving it again is what rewrites it under this model.
  */
 export async function setMcpConnectionGrant(
   name: string,
-  folders: readonly string[],
+  excludedFolders: readonly string[],
+  writeFolders: readonly string[],
 ): Promise<boolean> {
   return await writePref<boolean>("plugin:prefs|set_mcp_connection_grant", {
     name,
-    folders: [...folders],
+    excludedFolders: [...excludedFolders],
+    // An ALLOW list, and the opposite sense to the field above: empty here means
+    // "write nowhere", while an empty exclusion list means "read everything".
+    // Always sent, never omitted: an omitted field would read as "write nowhere"
+    // on the host, so a re-approval would silently revoke every write.
+    writeFolders: [...writeFolders],
   });
 }
 
@@ -2055,6 +2069,69 @@ export async function setMcpConnectionGrant(
  */
 export async function revokeMcpConnection(name: string): Promise<boolean> {
   return await writePref<boolean>("plugin:prefs|revoke_mcp_connection", { name });
+}
+
+/**
+ * Accept one queued out-of-scope write (external-mcp-connection task 13): extend
+ * that connection's write grant by EXACTLY the folder it named, and drop the row.
+ *
+ * The folder is the whole decision. There is no "accept and allow everything
+ * under it", because the write grant is an allow list of names, and widening by a
+ * subtree is the surprise the grant exists to prevent.
+ *
+ * Returns whether the WRITE grant changed. `false` covers a stale row (its
+ * connection revoked, or the folder excluded since it was queued) as well as one
+ * that did not fit the prefs budget; the caller re-reads the view, so the row
+ * disappearing is the signal rather than the boolean.
+ */
+export async function acceptMcpWriteRequest(
+  connection: string,
+  folder: string,
+): Promise<boolean> {
+  return await writePref<boolean>("plugin:prefs|accept_mcp_write_request", {
+    connection,
+    folder,
+  });
+}
+
+/**
+ * Re-root every folder path an external MCP grant holds, after a folder rename.
+ *
+ * The read scope is a deny list, and a deny list fails OPEN on a rename: an
+ * excluded folder renamed to a new key stops matching, so the notes under it
+ * become readable by an approved client with no prompt and no act by the person
+ * who excluded them. The write scope and the queued proposals have the same
+ * property. This is the call that closes it, made by the rename transaction
+ * beside the `deliberate_folders` rewrite rather than by anything a client can
+ * reach.
+ *
+ * Not an approval: no stamp, no model and no member changes, and a rename that
+ * touched nothing writes nothing. Resolves with how many entries moved.
+ */
+export async function rewriteMcpFolderPaths(
+  from: string,
+  to: string,
+): Promise<number> {
+  return await writePref<number>("plugin:prefs|rewrite_mcp_folder_paths", {
+    from,
+    to,
+  });
+}
+
+/**
+ * Dismiss one queued out-of-scope write: the row goes and no grant changes. The
+ * client is not told; its next attempt queues again, which is why dismissing
+ * without reading is a way to be asked the same thing twice rather than a way to
+ * silence it.
+ */
+export async function dismissMcpWriteRequest(
+  connection: string,
+  folder: string,
+): Promise<boolean> {
+  return await writePref<boolean>("plugin:prefs|dismiss_mcp_write_request", {
+    connection,
+    folder,
+  });
 }
 
 /**

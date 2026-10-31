@@ -202,16 +202,70 @@ pub struct EditorLayout {
     pub right_collapsed: bool,
 }
 
+/// Which narrowing model a connection's grant was written under.
+///
+/// **The model is a stored discriminator rather than an inferred shape**, and
+/// the reason is the one thing shape-inference cannot do here: an allow list and
+/// a deny list are both arrays of folder paths. Read the wrong way round, an
+/// allow list of `private/` means "everything except `private/`", which is the
+/// exact inverse of the consent the user gave, and nothing in the bytes would
+/// look wrong.
+///
+/// [`McpScopeModel::Folders`] is what the released build minted. It is still
+/// DECODED and preserved verbatim, and it is refused at call time with a named
+/// reason instead of being reinterpreted, because widening a connection's reach
+/// as a side effect of an upgrade is worse than asking the user again.
+/// [`McpScopeModel::Exclude`] is what this build mints: the connection may read
+/// the whole vault except the stored paths.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum McpScopeModel {
+    /// Legacy allow list: [`McpConnectionGrant::folders`], frozen at approval.
+    /// No longer minted; readable so an existing approval is never silently
+    /// dropped or inverted.
+    #[default]
+    Folders,
+    /// Deny list: [`McpConnectionGrant::excluded_folders`]. Every other folder
+    /// in the vault is readable.
+    Exclude,
+}
+
+impl McpScopeModel {
+    /// The canonical JSON token for the model. `Folders` has none: it is the
+    /// default, and the codec omits a default rather than spelling it out, so a
+    /// legacy blob re-encodes byte for byte.
+    pub fn canonical_token(self) -> Option<&'static str> {
+        match self {
+            McpScopeModel::Folders => None,
+            McpScopeModel::Exclude => Some("exclude"),
+        }
+    }
+
+    /// Parse the canonical token. `None` is an unknown model, which the parser
+    /// refuses rather than defaulting: a future model read as `Folders` would be
+    /// served with the legacy semantics it was not written under.
+    pub fn from_canonical_token(token: &str) -> Option<Self> {
+        match token {
+            "folders" => Some(McpScopeModel::Folders),
+            "exclude" => Some(McpScopeModel::Exclude),
+            _ => None,
+        }
+    }
+}
+
 /// One external MCP connection's grant: what a named client may read, when the
 /// user approved it, and when it last ran a tool (external-mcp-connection,
 /// myne-md/myne#923).
 ///
-/// **The frozen unit is the folder-path SET, not a note list.** A connection's
-/// read grant is a folder list, so a note the user later puts in one of those
-/// folders is inside the grant, while a folder created AFTER approval is outside
-/// it. Freezing note ids instead would make the grant decay as the user works,
-/// which teaches them to re-approve without reading. A renamed folder falls out
-/// of the scope for the same reason it was in it: the grant stores paths.
+/// **The narrowing is a folder PATH SET, not a note list.** A note the user
+/// later puts inside a covered folder is covered, because the unit is the path
+/// rather than the note ids; a note-id set would make the grant decay as the
+/// user works, which teaches them to re-approve without reading.
+///
+/// **Which paths are covered is [`McpScopeModel`]'s answer, and the model owns
+/// exactly one of the two arrays.** A grant carrying both is refused by the
+/// decoder rather than resolved by a precedence rule, because a precedence rule
+/// is how one of the two meanings eventually gets read as the other.
 ///
 /// **The name is a label, not a credential.** It distinguishes well-behaved
 /// clients and makes per-connection scope and revocation possible; it stops
@@ -220,19 +274,47 @@ pub struct EditorLayout {
 /// see [`PrefsView::mcp_connections`] for the classification and why it does not
 /// sync.
 ///
-/// **No write scope lives here yet.** The separate, narrower write grant is
-/// task 13 of the same feature and must arrive as an ADDITIVE member of this
-/// object, so a grant written by this build decodes with no write scope rather
-/// than failing. `folders` is therefore the read set and stays named for that.
+/// **The write scope is a separate, narrower ALLOW list on the same record.**
+/// [`write_folders`](Self::write_folders) names the folders a connection may
+/// write in, and it is an allow list while the read scope beside it is a deny
+/// list. The asymmetry is the decision rather than an oversight: reading a folder
+/// the user did not think about is recoverable by revoking, and writing into one
+/// is not. `decisions/ai/0752`.
+///
+/// **An absent write list is not "everywhere".** The member is omitted when no
+/// folder was named, which keeps a grant written before it existed round-tripping
+/// byte for byte, and both the resolver and the empty-list reading agree that an
+/// absent or empty list means the connection may write NOWHERE. That is stated
+/// here rather than left to the call site because "empty means everything" is
+/// exactly the reading a later implementation would reach for by analogy with
+/// [`excluded_folders`](Self::excluded_folders).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct McpConnectionGrant {
-    /// The canonical trailing-slash folder paths this connection may read, as
-    /// the frozen set captured at approval. **Set semantics**: NFC-normalized,
-    /// lexicographically sorted, exact-deduplicated by the encoder (the
-    /// `deliberate_folders` discipline), because the element SET is the value
-    /// and its order is not.
+    /// The model this grant was written under. Omitted from the canonical JSON
+    /// when it is [`McpScopeModel::Folders`], which is what makes a legacy blob
+    /// round-trip byte for byte.
+    #[serde(default)]
+    pub model: McpScopeModel,
+    /// **Legacy, and only meaningful under [`McpScopeModel::Folders`].** The
+    /// canonical trailing-slash folder paths this connection may read: the whole
+    /// of its reach, captured at approval. Never minted by this build; kept so a
+    /// downgrade or a re-encode cannot silently drop an existing approval, and
+    /// refused at call time rather than read as an exclusion list.
+    /// **Set semantics**: NFC-normalized, lexicographically sorted,
+    /// exact-deduplicated by the encoder.
     #[serde(default)]
     pub folders: Vec<alloc::string::String>,
+    /// The canonical folder paths this connection may NOT read. Under
+    /// [`McpScopeModel::Exclude`] the scope is every folder in the vault except
+    /// these, and an entry takes its SUBTREE with it (prefix subtraction):
+    /// excluding `Projects/` while leaving `Projects/2026/` readable would be
+    /// the surprise the exclusion exists to remove.
+    ///
+    /// Empty is a real value under this model, meaning the whole vault, and the
+    /// approval screen is what states that in words. **Set semantics**: NFC,
+    /// sorted, exact-deduped, like every other folder set in this blob.
+    #[serde(default)]
+    pub excluded_folders: Vec<alloc::string::String>,
     /// When the user approved this connection, in Unix epoch **seconds**
     /// (`last_backup_at`'s unit: this is a "when did this happen" stamp shown to
     /// a person, not a last-write-wins clock compared across devices).
@@ -244,6 +326,67 @@ pub struct McpConnectionGrant {
     /// exist yet.
     #[serde(default)]
     pub last_used_at: Option<u64>,
+    /// The canonical folder paths this connection may **write** in: the folders
+    /// the user named at approval for this connection. An **allow list**, and
+    /// strictly narrower than the read scope, because a write into a folder the
+    /// user never pictured is the surprise the whole feature is written against.
+    ///
+    /// **Empty means "nowrite", never "everywhere".** There is no input in
+    /// this surface that can express "everywhere", and the encoder omits the
+    /// member when the list is empty so a grant that predates the write scope
+    /// still re-encodes byte for byte.
+    ///
+    /// **Set semantics**: NFC-normalized, lexicographically sorted,
+    /// exact-deduplicated by the encoder, like every other folder set in this
+    /// blob. Membership is exact-match on the folder key, not by prefix: writing
+    /// into a folder created after the approval is a grant the user did not give,
+    /// which is why the write scope is the one that stays a list of names.
+    #[serde(default)]
+    pub write_folders: Vec<alloc::string::String>,
+}
+
+/// One write a connection attempted into a folder it may READ but not WRITE
+/// (external-mcp-connection, myne-md/myne#923 task 13; `decisions/ai/0752`).
+///
+/// **The request is a proposal, never a pending write.** Nothing here is applied:
+/// accepting one extends the grant by exactly [`folder`](Self::folder), and the
+/// client retries against the wider scope it now holds. That is the whole reason
+/// the record exists. A plain refusal is answered by a client retrying, and a
+/// client retrying is indistinguishable from a client probing.
+///
+/// **`summary` is user text and AS3-class.** It is a title or a first line the
+/// client offered so the person can recognise the write, it stays inside the AEAD
+/// envelope with every other field, and it never reaches a log line. It is omitted
+/// from the canonical JSON when empty, so a request that carries no summary costs
+/// no bytes.
+///
+/// **Bounded by the writer, not by the codec.** The prefs plaintext budget already
+/// caps the whole blob; the queue keeps itself short (`MAX_PENDING_WRITES` in
+/// `core/src/plugins/mcp/queue.rs`) so a client in a retry loop cannot spend that
+/// budget on its own refusals.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct McpWriteRequest {
+    /// The declared connection name the write arrived under. NFC-normalized, like
+    /// the grant map's keys, so the card addresses the same connection the
+    /// approval did.
+    #[serde(default)]
+    pub connection: alloc::string::String,
+    /// The folder the write named, canonical (`projects/`, the root as `""`).
+    #[serde(default)]
+    pub folder: alloc::string::String,
+    /// When the client asked, in Unix epoch **seconds**: a "when did this
+    /// happen" stamp shown to a person, like `approved_at`.
+    #[serde(default)]
+    pub requested_at: u64,
+    /// What the client said it wanted to write, as one line: a title, a first
+    /// sentence, or the field and value. USER TEXT (AS3-class): never logged.
+    /// Omitted from the canonical JSON when empty.
+    #[serde(default)]
+    pub summary: alloc::string::String,
+    /// The verb it called (`note_create`, `note_append`, …), so the card can say
+    /// what was attempted rather than only where.
+    #[serde(default)]
+    pub verb: alloc::string::String,
 }
 
 /// serde-derive default for a `bool` field whose logical default is `true`
@@ -1190,8 +1333,8 @@ pub struct PrefsView {
 
     /// **External MCP connection grants** (external-mcp-connection,
     /// myne-md/myne#923), keyed by the connection name the client declares — one
-    /// [`McpConnectionGrant`] per name, carrying the frozen folder set, the
-    /// approval stamp and the last-use stamp.
+    /// [`McpConnectionGrant`] per name, carrying the folders it may NOT read,
+    /// the approval stamp and the last-use stamp.
     ///
     /// **Device-local, and that is the point rather than a detail.** This is the
     /// consent record for opening the vault to a process Myne does not ship, and
@@ -1199,7 +1342,7 @@ pub struct PrefsView {
     /// gave it. The same bug was found twice in this tree already (the AI provider
     /// consent until myne-md/myne#456, and the plugin feature's post-audit pass),
     /// and a synced grant would also mean something different per device: the
-    /// frozen set names folder paths, and two devices can hold different trees
+    /// exclusions name folder paths, and two devices can hold different trees
     /// after a merge. `sync-protocol.md` §10.2 classifies it `DeviceLocal`, so the
     /// local value always survives the merge and a second device is asked again.
     ///
@@ -1220,6 +1363,27 @@ pub struct PrefsView {
     /// `mcp`) and before `meeting_ai_prompt` (`mc` < `me`).
     #[serde(default)]
     pub mcp_connections: BTreeMap<alloc::string::String, McpConnectionGrant>,
+
+    /// **External MCP write requests** (external-mcp-connection, myne-md/myne#923
+    /// task 13): writes a connection attempted into a folder it may read but not
+    /// write, waiting for a person to accept or dismiss them. Device-local, like
+    /// the grants beside them and for the same reason: the folder paths name one
+    /// device's tree, so a request accepted on another machine would widen a grant
+    /// that machine does not hold.
+    ///
+    /// **A queue of proposals, never a pending write.** Nothing is applied from
+    /// here; accepting a request extends the grant by that one folder and the
+    /// client retries.
+    ///
+    /// **Set semantics**: canonical folder keys and connection names, sorted, with
+    /// one request per `(connection, folder, verb)`, the newest, so a client in a
+    /// retry loop cannot fill the queue with its own duplicates. Omitted entirely
+    /// when empty, so a vault that has never had one is byte-identical to a
+    /// pre-feature `vault.prefs`. Canonical key `mcp_write_requests`, which sorts
+    /// after `mcp_connections` (`mcp_` < `mcpd`) and before `meeting_ai_prompt`
+    /// (`mc` < `me`).
+    #[serde(default)]
+    pub mcp_write_requests: Vec<McpWriteRequest>,
 
     /// **Meeting AI prompt** (meeting-ai): the user's replacement for the meeting AI pass's reduce
     /// instruction. `None` or empty means the built-in default instruction (which carries the
@@ -1545,6 +1709,7 @@ impl Default for PrefsView {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -2229,15 +2394,34 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
 
     // mcp_connections (canonical key 'mcp' — after last_backup_at [las < mcp],
     // before meeting_ai_prompt [mc < me], external-mcp-connection myne#923).
-    // The external MCP connection grants: one frozen folder set + approval and
-    // last-use stamps per declared connection name. Omitted ENTIRELY when the
-    // map is empty, so a vault that never granted a connection is byte-identical
-    // to a pre-feature vault.prefs. Names and folder paths are NFC-normalized;
-    // the map is a BTreeMap so names sort, and each grant object emits its own
-    // keys in canonical order (approved_at < folders < last_used_at).
+    // The external MCP connection grants: the folders a connection may NOT read,
+    // plus approval and last-use stamps, per declared connection name. Omitted
+    // ENTIRELY when the map is empty, so a vault that never granted a connection
+    // is byte-identical to a pre-feature vault.prefs. Names and folder paths are
+    // NFC-normalized; the map is a BTreeMap so names sort, and each grant object
+    // emits its own keys in canonical order (approved_at < excluded_folders <
+    // folders < last_used_at < model). `folders` and `excluded_folders` never
+    // both appear: the two arrays describe opposite rules, and a grant carrying
+    // both is refused by the parser rather than resolved by a precedence rule.
     if !prefs.mcp_connections.is_empty() {
         out.extend_from_slice(b"\"mcp_connections\":");
         push_mcp_connections_map(&mut out, &prefs.mcp_connections);
+        out.push(b',');
+    }
+
+    // mcp_write_requests (canonical key `mcp_write_requests`, after
+    // `mcp_connections` [`mcp_` < `mcpd`], before `meeting_ai_prompt` [`mc` <
+    // `me`], external-mcp-connection task 13). The writes waiting for a person,
+    // omitted ENTIRELY when empty so a vault that has never had one is
+    // byte-identical to a pre-feature vault.prefs.
+    //
+    // One request per (connection, folder, verb), newest first, so a client in a
+    // retry loop cannot fill the queue with its own duplicates. Everything about
+    // the ORDER lives in `push_mcp_write_requests` and nowhere else: a second
+    // sorting rule is a second byte layout for the same field.
+    if !prefs.mcp_write_requests.is_empty() {
+        out.extend_from_slice(b"\"mcp_write_requests\":");
+        push_mcp_write_requests(&mut out, &prefs.mcp_write_requests);
         out.push(b',');
     }
 
@@ -2753,11 +2937,39 @@ fn push_container_keyed_order_map(out: &mut Vec<u8>, map: &BTreeMap<String, Vec<
 /// Emit the `mcp_connections` map (name → grant object) in canonical form.
 ///
 /// Names are NFC-normalized and emitted in `BTreeMap` (lexicographic) order;
-/// each grant object's own keys are emitted in canonical order
-/// (`approved_at` < `folders` < `last_used_at`), `folders` goes through the
-/// canonical set encoding (NFC, sorted, exact-deduped), and `last_used_at` is
-/// omitted entirely when the connection has never run a tool. A second opinion
-/// about any of those rules is a second byte layout for the same field.
+/// each grant object's own keys are emitted in canonical order (`approved_at` <
+/// `excluded_folders` < `folders` < `last_used_at` < `model`), each folder array
+/// goes through the canonical set encoding (NFC, sorted, exact-deduped), and
+/// both `last_used_at` and the model token are omitted when they are the
+/// default. A second opinion about any of those rules is a second byte layout
+/// for the same field.
+///
+/// **Only the array the model owns is written.** A `Folders` grant emits
+/// `folders` (and no `excluded_folders`), an `Exclude` grant emits
+/// `excluded_folders` (and no `folders`), and a grant whose model and arrays
+/// disagree therefore cannot produce bytes the decoder would then refuse: the
+/// model decides, so re-encoding is always a fixed point.
+/// The canonical bytes of ONE grant object, without the map around it.
+///
+/// The unit the vector family pins, and the reason it is exported rather than a
+/// test helper: an independent implementation needs a named encoder to compare
+/// against, and it is the same bytes [`push_mcp_connections_map`] writes inside
+/// the map (this function slices them out of the real encoder instead of
+/// restating the layout, so the two cannot disagree).
+pub fn canonical_encode_mcp_connection_grant(grant: &McpConnectionGrant) -> Vec<u8> {
+    let mut map: BTreeMap<String, McpConnectionGrant> = BTreeMap::new();
+    map.insert(String::from("a"), grant.clone());
+    let mut out = Vec::new();
+    push_mcp_connections_map(&mut out, &map);
+    // `{"a":{…}}` → the inner object, braces included: start after the member
+    // boundary `:{`, drop the map's own closing brace.
+    let boundary = out
+        .windows(2)
+        .position(|pair| pair == b":{")
+        .expect("the map encoder always writes a member boundary");
+    out[boundary + 1..out.len() - 1].to_vec()
+}
+
 fn push_mcp_connections_map(
     out: &mut Vec<u8>,
     map: &BTreeMap<alloc::string::String, McpConnectionGrant>,
@@ -2772,13 +2984,40 @@ fn push_mcp_connections_map(
         out.push(b'{');
         out.extend_from_slice(b"\"approved_at\":");
         push_json_uint64(out, grant.approved_at);
-        out.push(b',');
-        out.extend_from_slice(b"\"folders\":");
-        push_ordered_string_array(out, &canonical_folder_list(&grant.folders));
+        if matches!(grant.model, McpScopeModel::Exclude) {
+            if !grant.excluded_folders.is_empty() {
+                out.push(b',');
+                out.extend_from_slice(b"\"excluded_folders\":");
+                push_ordered_string_array(out, &canonical_folder_list(&grant.excluded_folders));
+            }
+        } else {
+            // Always emitted, even empty: under the legacy model an absent list
+            // and an empty one are different statements ("nothing was captured"
+            // against "nothing is readable"), and the released parser refused
+            // the absent shape for exactly that reason.
+            out.push(b',');
+            out.extend_from_slice(b"\"folders\":");
+            push_ordered_string_array(out, &canonical_folder_list(&grant.folders));
+        }
         if let Some(last_used_at) = grant.last_used_at {
             out.push(b',');
             out.extend_from_slice(b"\"last_used_at\":");
             push_json_uint64(out, last_used_at);
+        }
+        if let Some(token) = grant.model.canonical_token() {
+            out.push(b',');
+            out.extend_from_slice(b"\"model\":");
+            push_json_string(out, token);
+        }
+        // Last in key order (`model` < `write_folders`) and omitted when empty,
+        // which is what makes a grant written before the write scope existed
+        // round-trip byte for byte. Absent and empty are the same reading here
+        // (may write nowhere), unlike the legacy `folders` member where they were
+        // different statements.
+        if !grant.write_folders.is_empty() {
+            out.push(b',');
+            out.extend_from_slice(b"\"write_folders\":");
+            push_ordered_string_array(out, &canonical_folder_list(&grant.write_folders));
         }
         out.push(b'}');
     }
@@ -3242,6 +3481,12 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // connection granted"; present-but-malformed → PlaintextParseFailed.
     let mcp_connections =
         parse_optional_mcp_connections_field(rest, &mut cursor, b"\"mcp_connections\":")?;
+    // mcp_write_requests (key `mcp_write_requests`, after mcp_connections,
+    // before meeting_ai_prompt, external-mcp-connection task 13). An array of
+    // request objects, which is why it has its own parser. Absent → empty, which
+    // is "nothing waiting"; present-but-malformed → PlaintextParseFailed.
+    let mcp_write_requests =
+        parse_optional_mcp_write_requests_field(rest, &mut cursor, b"\"mcp_write_requests\":")?;
     // meeting_ai_prompt (key 'm', after last_backup_at [l < m], before
     // new_note_location [m < n], meeting-ai). Parsed from the same monotonic
     // cursor so a later field's key marker is never matched inside the prompt
@@ -3426,6 +3671,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         cli_excluded_folders,
         cli_rate_limit_disabled,
         mcp_connections,
+        mcp_write_requests,
         color_groups,
         icon,
         item_colors,
@@ -4004,27 +4250,235 @@ fn parse_json_mcp_connections(
     }
 }
 
+/// Emit `mcp_write_requests` in canonical form.
+///
+/// **Order and de-duplication are decided here, once.** A request sorts by
+/// `(connection, folder, verb)` and, within that triple, newest `requested_at`
+/// first; the first of a triple is kept and the rest are dropped, which is what
+/// makes a client in a retry loop cost one row rather than a hundred. Every
+/// string is NFC-normalized like the rest of this blob.
+///
+/// Members are emitted in canonical order (`connection` < `folder` <
+/// `requested_at` < `summary` < `verb`), and `summary` is omitted when empty.
+fn push_mcp_write_requests(out: &mut Vec<u8>, requests: &[McpWriteRequest]) {
+    let mut canonical: Vec<McpWriteRequest> = requests.to_vec();
+    for request in &mut canonical {
+        request.connection = request.connection.nfc().collect();
+        request.folder = request.folder.nfc().collect();
+        // A title or a first line: NFC so the same text never encodes twice.
+        request.summary = request.summary.nfc().collect();
+    }
+    canonical.sort_by(|a, b| {
+        a.connection
+            .cmp(&b.connection)
+            .then(a.folder.cmp(&b.folder))
+            .then(a.verb.cmp(&b.verb))
+            .then(b.requested_at.cmp(&a.requested_at))
+    });
+    canonical.dedup_by(|later, kept| {
+        kept.connection == later.connection
+            && kept.folder == later.folder
+            && kept.verb == later.verb
+    });
+
+    out.push(b'[');
+    for (index, request) in canonical.iter().enumerate() {
+        if index > 0 {
+            out.push(b',');
+        }
+        out.push(b'{');
+        out.extend_from_slice(b"\"connection\":");
+        push_json_string(out, &request.connection);
+        out.push(b',');
+        out.extend_from_slice(b"\"folder\":");
+        push_json_string(out, &request.folder);
+        out.push(b',');
+        out.extend_from_slice(b"\"requested_at\":");
+        push_json_uint64(out, request.requested_at);
+        if !request.summary.is_empty() {
+            out.push(b',');
+            out.extend_from_slice(b"\"summary\":");
+            push_json_string(out, &request.summary);
+        }
+        out.push(b',');
+        out.extend_from_slice(b"\"verb\":");
+        push_json_string(out, &request.verb);
+        out.push(b'}');
+    }
+    out.push(b']');
+}
+
+/// Parse the OPTIONAL `mcp_write_requests` field from the monotonic cursor.
+/// Absent → empty ("nothing waiting"); present-but-malformed →
+/// [`PrefsBlobError::PlaintextParseFailed`], the same contract as every other
+/// optional field.
+fn parse_optional_mcp_write_requests_field(
+    rest: &[u8],
+    cursor: &mut usize,
+    marker: &[u8],
+) -> Result<Vec<McpWriteRequest>, PrefsBlobError> {
+    match find_top_level_marker(rest, *cursor, marker) {
+        Some(rel_idx) => {
+            let arr_start = *cursor + rel_idx + marker.len();
+            let (requests, consumed) = parse_json_mcp_write_requests(&rest[arr_start..])
+                .ok_or(PrefsBlobError::PlaintextParseFailed)?;
+            *cursor = arr_start + consumed;
+            Ok(requests)
+        }
+        None => Ok(Vec::new()),
+    }
+}
+
+/// Parse a JSON array of request objects starting at `bytes[0] == '['`. Returns
+/// the decoded requests + bytes consumed (through the closing `]`), or `None` on
+/// any malformation.
+///
+/// Member order is not enforced here for the same reason it is not enforced for a
+/// grant: the decoder's job is to read what an encoder wrote, and the encoder's
+/// order is pinned by the golden-byte tests. An UNKNOWN member IS refused, again
+/// like a grant: the forward-compatible extension point for this object is a field
+/// a later build adds, and a build that dropped it silently would answer the card
+/// with half a request.
+fn parse_json_mcp_write_requests(bytes: &[u8]) -> Option<(Vec<McpWriteRequest>, usize)> {
+    if bytes.first() != Some(&b'[') {
+        return None;
+    }
+    let mut i = 1;
+    let mut out: Vec<McpWriteRequest> = Vec::new();
+    if bytes.get(i) == Some(&b']') {
+        return Some((out, i + 1));
+    }
+    loop {
+        let (request, consumed) = parse_mcp_write_request(&bytes[i..])?;
+        i += consumed;
+        out.push(request);
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b']') => return Some((out, i + 1)),
+            _ => return None,
+        }
+    }
+}
+
+/// Parse one request object starting at `bytes[0] == '{'`.
+///
+/// A repeated member is refused rather than last-wins, for the same reason a
+/// repeated field is refused everywhere else in this codec: two values for one
+/// key is a blob this build did not write, and picking one of them silently is
+/// how a queue row ends up describing a write nobody made.
+///
+/// **`connection`, `folder`, `requested_at` and `verb` are required**, and a
+/// request missing one is refused. Only `summary` may be absent. A row with no
+/// folder cannot be accepted (there is nothing to extend the grant BY), a row
+/// with no connection cannot be matched to a grant, and a row with no verb cannot
+/// be described to the person deciding: a parser that defaulted them would hand
+/// the card a proposal that cannot be granted, which reads as a Myne bug rather
+/// than as a client's malformed blob.
+pub fn parse_mcp_write_request(bytes: &[u8]) -> Option<(McpWriteRequest, usize)> {
+    if bytes.first() != Some(&b'{') {
+        return None;
+    }
+    let mut i = 1;
+    let mut request = McpWriteRequest::default();
+    let mut seen: [bool; 5] = [false; 5];
+    if bytes.get(i) == Some(&b'}') {
+        return None;
+    }
+    loop {
+        if bytes.get(i) != Some(&b'"') {
+            return None;
+        }
+        let (key, consumed) = parse_json_string(&bytes[i..])?;
+        i += consumed;
+        if bytes.get(i) != Some(&b':') {
+            return None;
+        }
+        i += 1;
+        let slot = match key.as_str() {
+            "connection" => 0,
+            "folder" => 1,
+            "requested_at" => 2,
+            "summary" => 3,
+            "verb" => 4,
+            _ => return None,
+        };
+        if core::mem::replace(&mut seen[slot], true) {
+            return None;
+        }
+        match slot {
+            0 => {
+                let (value, consumed) = parse_json_string(&bytes[i..])?;
+                request.connection = value;
+                i += consumed;
+            }
+            1 => {
+                let (value, consumed) = parse_json_string(&bytes[i..])?;
+                request.folder = value;
+                i += consumed;
+            }
+            2 => {
+                let (value, consumed) = parse_json_uint64(&bytes[i..]).ok()?;
+                request.requested_at = value;
+                i += consumed;
+            }
+            3 => {
+                let (value, consumed) = parse_json_string(&bytes[i..])?;
+                request.summary = value;
+                i += consumed;
+            }
+            _ => {
+                let (value, consumed) = parse_json_string(&bytes[i..])?;
+                request.verb = value;
+                i += consumed;
+            }
+        }
+        match bytes.get(i) {
+            Some(&b',') => {
+                i += 1;
+                continue;
+            }
+            Some(&b'}') => {
+                let required = seen[0] && seen[1] && seen[2] && seen[4];
+                return required.then_some((request, i + 1));
+            }
+            _ => return None,
+        }
+    }
+}
+
 /// Parse one grant object starting at `bytes[0] == '{'`.
 ///
-/// `folders` is canonicalized on read too (NFC, sorted, deduped) rather than
-/// trusted: the value came out of an AEAD-verified blob, so this is not an
-/// attacker boundary, but a grant whose folder set is unsorted would otherwise
+/// Folder arrays are canonicalized on read too (NFC, sorted, deduped) rather
+/// than trusted: the value came out of an AEAD-verified blob, so this is not an
+/// attacker boundary, but a grant whose set is unsorted would otherwise
 /// round-trip to different bytes on the next write, and "read then write is
 /// byte-identical" is a property the vector family pins.
+///
+/// **Model and arrays must agree, and disagreement is a parse failure.** A
+/// `Folders` grant carrying an exclusion list, or an `Exclude` grant carrying an
+/// allow list, is refused rather than resolved by precedence: the two arrays
+/// mean opposite things, and a precedence rule is exactly how one of them ends
+/// up read as the other.
 ///
 /// An UNKNOWN member is refused rather than skipped, unlike a whole unknown
 /// top-level field: the forward-compatible extension point for this object is
 /// the write grant that task 13 adds, and it arrives as a new member this build
 /// must not silently drop. Refusing means an older build reports an unreadable
 /// prefs blob instead of quietly narrowing a grant it cannot represent.
-fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize)> {
+pub fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize)> {
     if bytes.first() != Some(&b'{') {
         return None;
     }
     let mut i = 1;
     let mut grant = McpConnectionGrant::default();
     let mut seen_folders = false;
+    let mut seen_excluded_folders = false;
     let mut seen_approved_at = false;
+    let mut seen_model = false;
+    let mut seen_write_folders = false;
     if bytes.get(i) == Some(&b'}') {
         return None;
     }
@@ -4048,6 +4502,15 @@ fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize
                 grant.approved_at = value;
                 seen_approved_at = true;
             }
+            "excluded_folders" => {
+                if seen_excluded_folders {
+                    return None;
+                }
+                let (folders, consumed) = parse_json_string_array(&bytes[i..])?;
+                i += consumed;
+                grant.excluded_folders = canonical_folder_list(&folders);
+                seen_excluded_folders = true;
+            }
             "folders" => {
                 if seen_folders {
                     return None;
@@ -4065,6 +4528,24 @@ fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize
                 i += consumed;
                 grant.last_used_at = Some(value);
             }
+            "model" => {
+                if seen_model {
+                    return None;
+                }
+                let (token, consumed) = parse_json_string(&bytes[i..])?;
+                i += consumed;
+                grant.model = McpScopeModel::from_canonical_token(&token)?;
+                seen_model = true;
+            }
+            "write_folders" => {
+                if seen_write_folders {
+                    return None;
+                }
+                let (folders, consumed) = parse_json_string_array(&bytes[i..])?;
+                i += consumed;
+                grant.write_folders = canonical_folder_list(&folders);
+                seen_write_folders = true;
+            }
             _ => return None,
         }
         match bytes.get(i) {
@@ -4073,10 +4554,30 @@ fn parse_mcp_connection_grant(bytes: &[u8]) -> Option<(McpConnectionGrant, usize
                 continue;
             }
             Some(&b'}') => {
-                // Both required members must be present; an empty folder set is
-                // a legal grant (it can read nothing), a missing one is not.
-                if !(seen_approved_at && seen_folders) {
+                if !seen_approved_at {
                     return None;
+                }
+                match grant.model {
+                    // The legacy shape: the allow list is REQUIRED there, even
+                    // when empty, because an absent list and "nothing is
+                    // readable" were different statements in the released
+                    // codec and that reading is preserved. A write list on one is
+                    // refused: the grant itself is unreadable to this build, so a
+                    // write scope beside it would be a promise nothing serves.
+                    McpScopeModel::Folders => {
+                        if !seen_folders || seen_excluded_folders || seen_write_folders {
+                            return None;
+                        }
+                    }
+                    // The exclusion shape: no array is a legal, complete grant
+                    // (nothing is excluded, so the whole vault is readable),
+                    // and an allow list alongside it is the inversion this
+                    // parser exists to refuse.
+                    McpScopeModel::Exclude => {
+                        if seen_folders {
+                            return None;
+                        }
+                    }
                 }
                 return Some((grant, i + 1));
             }
@@ -4741,6 +5242,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -4829,6 +5331,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -5312,6 +5815,7 @@ mod tests {
                 label: None,
                 last_backup_at: None,
                 mcp_connections: Default::default(),
+                mcp_write_requests: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -5402,6 +5906,7 @@ mod tests {
                 label: None,
                 last_backup_at: None,
                 mcp_connections: Default::default(),
+                mcp_write_requests: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -5842,6 +6347,7 @@ mod tests {
         let prefs = PrefsView {
             last_backup_at: Some(42),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("current")),
             new_note_location_folder: Some(alloc::string::String::from("Notes/")),
@@ -7093,6 +7599,7 @@ mod tests {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765000000),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -7120,6 +7627,7 @@ mod tests {
         let view = PrefsView {
             last_backup_at: Some(1765000000),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: Some(alloc::string::String::from("Summarize tersely.")),
             new_note_location: Some(alloc::string::String::from("specific")),
             ..PrefsView::default()
@@ -7148,6 +7656,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(1765432100),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -7174,6 +7683,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(u64::from(u32::MAX) + 12345),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -7313,6 +7823,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -7923,6 +8434,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8018,6 +8530,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8111,6 +8624,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8203,6 +8717,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8358,6 +8873,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8481,6 +8997,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8583,6 +9100,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8759,6 +9277,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -8869,6 +9388,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9219,6 +9739,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9311,6 +9832,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9405,6 +9927,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9567,6 +10090,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -9706,6 +10230,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -10035,6 +10560,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -10131,6 +10657,7 @@ mod tests {
             label: None,
             last_backup_at: None,
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: None,
             new_note_location_folder: None,
@@ -10489,6 +11016,7 @@ mod tests {
                 label: None,
                 last_backup_at: None,
                 mcp_connections: Default::default(),
+                mcp_write_requests: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -10578,6 +11106,7 @@ mod tests {
                 label: None,
                 last_backup_at: None,
                 mcp_connections: Default::default(),
+                mcp_write_requests: Default::default(),
                 meeting_ai_prompt: None,
                 new_note_location: None,
                 new_note_location_folder: None,
@@ -10732,6 +11261,7 @@ mod tests {
             label: Some(alloc::string::String::from("Work")),
             last_backup_at: Some(1765432100),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             new_note_location: Some(alloc::string::String::from("specific")),
             new_note_location_folder: Some(alloc::string::String::from("Inbox/")),
@@ -12087,6 +12617,7 @@ mod tests {
             label: Some(String::from("Work")),
             last_backup_at: Some(1765432100),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: Vec::new(),
             periodic_notes: Default::default(),
@@ -13155,6 +13686,7 @@ mod tests {
         let prefs_maip = PrefsView {
             last_backup_at: Some(1765432100),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: Some(String::from("Summarize tersely, decisions first.")),
             new_note_location: Some(String::from("specific")),
             ..PrefsView::default()
@@ -14291,6 +14823,7 @@ mod tests {
         let original = PrefsView {
             last_backup_at: Some(1_700_000_000),
             mcp_connections: Default::default(),
+            mcp_write_requests: Default::default(),
             meeting_ai_prompt: None,
             paired_extensions: alloc::vec![sample_paired("e", "t", false)],
             saved_views: alloc::vec![sample_view("v1", "A")],
@@ -14907,15 +15440,534 @@ mod mcp_connections_tests {
     use super::*;
     use alloc::vec;
 
+    /// A grant in the LEGACY allow-list model: the shape the released build
+    /// minted, which this build still reads and never writes.
     fn grant(folders: &[&str], approved_at: u64, last_used_at: Option<u64>) -> McpConnectionGrant {
         McpConnectionGrant {
+            model: McpScopeModel::Folders,
             folders: folders
+                .iter()
+                .map(|f| alloc::string::String::from(*f))
+                .collect(),
+            excluded_folders: vec![],
+            approved_at,
+            last_used_at,
+            write_folders: vec![],
+        }
+    }
+
+    /// A grant in the exclusion model: the shape this build mints. `excluded` is
+    /// what the connection may NOT read, so an empty slice means the whole vault.
+    fn exclusion_grant(
+        excluded: &[&str],
+        approved_at: u64,
+        last_used_at: Option<u64>,
+    ) -> McpConnectionGrant {
+        McpConnectionGrant {
+            model: McpScopeModel::Exclude,
+            folders: vec![],
+            excluded_folders: excluded
                 .iter()
                 .map(|f| alloc::string::String::from(*f))
                 .collect(),
             approved_at,
             last_used_at,
+            write_folders: vec![],
         }
+    }
+
+    /// A grant in the exclusion model that ALSO names where the connection may
+    /// write: the shape task 13 mints. `write` is a slice of `&str` so a test can
+    /// show the set encoding doing its work on unsorted, duplicated input.
+    fn writable_grant(excluded: &[&str], write: &[&str], approved_at: u64) -> McpConnectionGrant {
+        McpConnectionGrant {
+            model: McpScopeModel::Exclude,
+            folders: vec![],
+            excluded_folders: excluded
+                .iter()
+                .map(|f| alloc::string::String::from(*f))
+                .collect(),
+            approved_at,
+            last_used_at: None,
+            write_folders: write
+                .iter()
+                .map(|f| alloc::string::String::from(*f))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn the_write_grant_is_an_allow_list_and_rides_after_model() {
+        // Key order is the format: `write_folders` sorts last (`model` <
+        // `write_folders`), and the set encoding sorts and dedupes it, which is
+        // what makes two spellings of the same grant one set of bytes. The list
+        // is deliberately an ALLOW list while the read scope beside it is a deny
+        // list: the two arrays mean opposite things in one object, which is why
+        // both carry a distinct member name rather than a shared `folders`.
+        let grant = writable_grant(
+            &["Private/"],
+            &["Projects/", "Areas/", "Projects/"],
+            1765432100,
+        );
+        let text = alloc::string::String::from_utf8(canonical_encode_mcp_connection_grant(&grant))
+            .expect("canonical bytes are UTF-8");
+        assert_eq!(
+            text,
+            "{\"approved_at\":1765432100,\"excluded_folders\":[\"Private/\"],\"model\":\"exclude\",\"write_folders\":[\"Areas/\",\"Projects/\"]}"
+        );
+
+        // And the decoder agrees, including the set normalization on the way in.
+        let (decoded, consumed) =
+            parse_mcp_connection_grant(text.as_bytes()).expect("the grant round-trips");
+        assert_eq!(consumed, text.len());
+        assert_eq!(
+            decoded.write_folders,
+            vec![
+                alloc::string::String::from("Areas/"),
+                alloc::string::String::from("Projects/")
+            ]
+        );
+        assert_eq!(
+            canonical_encode_mcp_connection_grant(&decoded),
+            text.as_bytes().to_vec()
+        );
+    }
+
+    #[test]
+    fn no_write_list_omits_the_member_and_decodes_as_write_nowhere() {
+        // The omission rule is what lets a grant written before the write scope
+        // existed re-encode byte for byte, and it is asserted rather than
+        // described because "absent" and "empty" both read as write-nowhere and a
+        // later implementation could mistake one of them for "everywhere".
+        let grant = exclusion_grant(&[], 1765432100, None);
+        let text = alloc::string::String::from_utf8(canonical_encode_mcp_connection_grant(&grant))
+            .expect("canonical bytes are UTF-8");
+        assert!(
+            !text.contains("write_folders"),
+            "an empty write list must cost no bytes: {text}"
+        );
+        let (decoded, _) = parse_mcp_connection_grant(text.as_bytes()).expect("decodes");
+        assert!(
+            decoded.write_folders.is_empty(),
+            "an absent write list is write-nowhere, not everywhere"
+        );
+    }
+
+    #[test]
+    fn a_legacy_grant_may_not_carry_a_write_list() {
+        // A legacy grant is refused outright at call time, so a write scope beside
+        // it would be a permission nothing serves. Refused at the decoder rather
+        // than ignored, for the same reason two arrays under one model are.
+        let legacy_with_write =
+            b"{\"approved_at\":1765432100,\"folders\":[],\"write_folders\":[\"Projects/\"]}";
+        assert!(parse_mcp_connection_grant(legacy_with_write).is_none());
+
+        // The same grant without it still decodes, so the refusal is about the
+        // disagreement and not about the legacy model.
+        let legacy = b"{\"approved_at\":1765432100,\"folders\":[]}";
+        assert!(parse_mcp_connection_grant(legacy).is_some());
+    }
+
+    #[test]
+    fn a_repeated_write_list_is_refused() {
+        let twice = b"{\"approved_at\":1765432100,\"model\":\"exclude\",\"write_folders\":[\"A/\"],\"write_folders\":[\"B/\"]}";
+        assert!(parse_mcp_connection_grant(twice).is_none());
+    }
+
+    #[test]
+    fn the_exclusion_model_writes_its_own_member_and_no_allow_list() {
+        // The byte layout is pinned here because the discriminator is the whole
+        // defence against reading one model as the other: an `Exclude` grant must
+        // carry `model` and must carry NO `folders` member, or the two arrays sit
+        // in one object with opposite meanings and the next reader guesses.
+        let mut prefs = PrefsView::default();
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("claude-desktop"),
+            exclusion_grant(&["Private/"], 1765432100, None),
+        );
+        let text = alloc::string::String::from_utf8(canonical_json_encode(&prefs)).unwrap();
+        assert_eq!(
+            text,
+            "{\"mcp_connections\":{\"claude-desktop\":{\"approved_at\":1765432100,\"excluded_folders\":[\"Private/\"],\"model\":\"exclude\"}},\"screen_capture_protection\":true}"
+        );
+
+        // And the decode side agrees: the model is read back as `Exclude` with
+        // the canonicalized set, and no allow list appears beside it.
+        let decoded = canonical_json_decode(text.as_bytes()).expect("round trip");
+        let grant = decoded
+            .mcp_connections
+            .get("claude-desktop")
+            .expect("the grant survives");
+        assert_eq!(grant.model, McpScopeModel::Exclude);
+        assert_eq!(
+            grant.excluded_folders,
+            vec![alloc::string::String::from("Private/")]
+        );
+        assert!(grant.folders.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), text.as_bytes().to_vec());
+    }
+
+    /// Encode ONE grant as its canonical object bytes, so an emitter can print
+    /// the exact form a decoder must produce.
+    ///
+    /// Goes through the real map encoder and slices the single member's object
+    /// out of it rather than re-implementing the layout: a second opinion about
+    /// the key order in this file would be the drift the layout doc forbids.
+    fn encode_one_grant(grant: &McpConnectionGrant) -> alloc::vec::Vec<u8> {
+        canonical_encode_mcp_connection_grant(grant)
+    }
+
+    fn hex_of(bytes: &[u8]) -> alloc::string::String {
+        const HEX: &[u8; 16] = b"0123456789abcdef";
+        let mut out = alloc::string::String::new();
+        for byte in bytes {
+            out.push(HEX[(byte >> 4) as usize] as char);
+            out.push(HEX[(byte & 0x0f) as usize] as char);
+        }
+        out
+    }
+
+    fn escape_json(text: &str) -> alloc::string::String {
+        let mut out = alloc::string::String::new();
+        for ch in text.chars() {
+            match ch {
+                '"' => out.push_str("\\\""),
+                '\\' => out.push_str("\\\\"),
+                '\n' => out.push_str("\\n"),
+                c => out.push(c),
+            }
+        }
+        out
+    }
+
+    /// Emit the `mcp-connection` vector family for `myne-test-vectors`.
+    ///
+    /// `cargo test -p protocol --lib emit_mcp_connection_vectors_for_paste -- --ignored`
+    ///
+    /// Pins the `mcp_connections` grant decoder: the canonical-JSON object one,
+    /// not the AEAD envelope around it. Two things are load-bearing enough to be
+    /// vectors rather than only unit tests: the **model discriminator** (an allow
+    /// list and a deny list are both arrays of folder paths, so a reimplementation
+    /// that guesses from the shape inverts consent), and the **refusal set** (a
+    /// grant whose model and arrays disagree, an unknown member, an unknown model
+    /// token). Those refusals are what a second implementation has to reproduce
+    /// exactly, because the alternative is silently reading one meaning as the
+    /// other.
+    #[test]
+    #[ignore]
+    fn emit_mcp_connection_vectors_for_paste() {
+        extern crate std;
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"mcp-connection\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.5.2 (mcp_connections canonical JSON inside vault.prefs)\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::prefs::parse_mcp_connection_grant: the canonical-JSON decoder for one mcp_connections grant record inside vault.prefs (external MCP connection scopes, myne-md/myne#923). parse_ok cases pin the decoded grant as its canonical re-encoding (lexicographic member order approved_at < excluded_folders < folders < last_used_at < model < write_folders, NFC + sorted + deduped folder sets, model emitted only for exclude, write_folders omitted when empty) plus the exact consumed byte count; parse_reject cases pin the inputs a reader MUST refuse rather than reinterpret, which is where a second implementation drifts: a grant carrying both read arrays, a write list beside the retired model, an unknown model token, an unknown member, and a repeated member. The two scopes are deliberately asymmetric: the read scope is a DENY list (an exclusion is reversible by revoking it) and the write scope an ALLOW list (a write into a folder nobody anticipated is the surprise worth preventing), so an empty excluded_folders means the whole vault and an empty write_folders means write nowhere.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let emit_ok = |dump: &mut alloc::string::String,
+                       slug: &str,
+                       desc: &str,
+                       input: &[u8],
+                       trailing: bool| {
+            let (grant, consumed) = parse_mcp_connection_grant(input)
+                .unwrap_or_else(|| panic!("[{slug}] parse_ok input did not parse"));
+            let canonical = encode_one_grant(&grant);
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"mcp-connection/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                escape_json(desc)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_ok\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\",\n",
+                hex_of(input)
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_consumed_len\": {consumed},\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"expected_canonical_utf8_hex\": \"{}\"\n",
+                hex_of(&canonical)
+            ));
+            dump.push_str(if trailing { "    },\n" } else { "    }\n" });
+        };
+
+        let emit_reject = |dump: &mut alloc::string::String,
+                           slug: &str,
+                           desc: &str,
+                           input: &[u8],
+                           trailing: bool| {
+            assert!(
+                parse_mcp_connection_grant(input).is_none(),
+                "[{slug}] parse_reject input parsed Ok"
+            );
+            dump.push_str("    {\n");
+            dump.push_str(&alloc::format!(
+                "      \"vector_id\": \"mcp-connection/v0.1/{slug}\",\n"
+            ));
+            dump.push_str(&alloc::format!(
+                "      \"description\": \"{}\",\n",
+                escape_json(desc)
+            ));
+            dump.push_str("      \"case_kind\": \"parse_reject\",\n");
+            dump.push_str(&alloc::format!(
+                "      \"input_bytes_utf8_hex\": \"{}\"\n",
+                hex_of(input)
+            ));
+            dump.push_str(if trailing { "    },\n" } else { "    }\n" });
+        };
+
+        // ---- parse_ok: the two models ----------------------------------
+        emit_ok(
+            &mut dump,
+            "exclude-model-roundtrip",
+            "An exclusion grant (the model this build writes) round-trips: model is emitted, the set is sorted, and the allow list is absent.",
+            &encode_one_grant(&exclusion_grant(&["Private/"], 1765432100, None)),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "exclude-empty-is-the-whole-vault",
+            "An exclusion grant with no exclusions is a COMPLETE grant meaning the whole vault, and costs no array at all: folded paths are the only thing an empty set omits.",
+            &encode_one_grant(&exclusion_grant(&[], 1765432100, None)),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "legacy-folders-model-roundtrip",
+            "A grant written under the retired allow-list model decodes and re-encodes byte for byte: `folders` is emitted even when empty, and `model` is absent.",
+            &encode_one_grant(&grant(&["Projects/"], 1717000000, None)),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "legacy-folders-empty-array",
+            "The legacy model REQUIRES its array: an empty `folders` is a different statement from an absent one and stays on the wire.",
+            &encode_one_grant(&grant(&[], 1717000000, None)),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "last-used-at-emitted-when-present",
+            "The optional last_used_at is emitted only when the connection has reached the door, and sorts after the folder set.",
+            &encode_one_grant(&exclusion_grant(&["Private/"], 1765432100, Some(1765432999))),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "write-grant-rides-after-model",
+            "A grant that also names where the connection may WRITE: write_folders sorts last, after model, and the set is canonical (sorted, deduped) like every other folder set here. An absent list means write nowhere, which is why it is omitted rather than written empty.",
+            &encode_one_grant(&writable_grant(&["Private/"], &["Archive/", "Archive/", "Work/"], 1765432100)),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "write-grant-empty-list-is-omitted",
+            "An explicitly empty write list decodes to 'write nowhere' and re-encodes WITHOUT the member: the empty case costs no bytes, and a reader must not read its absence as 'everywhere'.",
+            b"{\"approved_at\":1,\"model\":\"exclude\",\"write_folders\":[]}",
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "served-once-a-read-write-grant-records-it",
+            "last_used_at and write_folders together: the door stamps the read once it has served a call, and neither member reorders anything about the other.",
+            "{\"approved_at\":1,\"last_used_at\":2,\"model\":\"exclude\",\"write_folders\":[\"Work/\"]}".as_bytes(),
+            true,
+        );
+
+        emit_ok(
+            &mut dump,
+            "folders-nfc-sorted-deduped",
+            "A folder set is canonicalized as a SET: an NFD sequence folds to NFC, an exact duplicate collapses to one entry, case is PRESERVED (so a differently-cased sibling stays distinct here and is folded only by the resolver, which lowercases), and the order is lexicographic rather than the caller's.",
+            "{\"approved_at\":7,\"excluded_folders\":[\"Work/2026/\",\"Prive\u{301}/\",\"Work/2026/\",\"prive\u{301}/\"],\"model\":\"exclude\"}".as_bytes(),
+            true,
+        );
+
+        let mut trailing = encode_one_grant(&exclusion_grant(&["Private/"], 5, None));
+        trailing.extend_from_slice(b",\"x\"");
+        emit_ok(
+            &mut dump,
+            "consumes-only-the-object-trailing",
+            "Trailing bytes after the grant object are left for the caller: consumed reports only the object length.",
+            &trailing,
+            true,
+        );
+
+        // ---- parse_reject: what a reader MUST refuse -------------------
+        emit_reject(
+            &mut dump,
+            "reject-both-arrays",
+            "A grant carrying BOTH arrays is refused, not resolved by precedence: the two arrays mean opposite things and a precedence rule is how one ends up read as the other.",
+            b"{\"approved_at\":1,\"excluded_folders\":[\"b/\"],\"folders\":[\"a/\"]}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-exclusion-beside-allow-list",
+            "An exclusion list beside no model is refused: without the discriminator the reader would have to guess which meaning the array carries.",
+            b"{\"approved_at\":1,\"excluded_folders\":[\"Private/\"]}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-allow-list-without-array",
+            "The legacy model without its array is refused, because that shape was never written and reading it as empty would claim the connection can read nothing.",
+            b"{\"approved_at\":1,\"model\":\"folders\"}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-unknown-model-token",
+            "An unknown model token is refused rather than defaulted, so a future third model cannot be read as whichever one this build happens to prefer.",
+            b"{\"approved_at\":1,\"model\":\"allow\"}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-unknown-member",
+            "An unknown member is refused rather than dropped: a dropped member would silently narrow what the user approved. write_folders was this case's example until this build learnt it, and the family moved to a member NO build writes, because a fixture that names a member a reader now accepts stops testing the refusal at all.",
+            b"{\"approved_at\":1,\"model\":\"exclude\",\"future_member\":[\"Work/\"]}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-write-list-on-the-retired-model",
+            "A write list beside the retired allow-list read model is refused, not merged: that model's array IS the connection's whole reach, the write grant was introduced with the deny list, and a grant claiming both would have two incompatible readings of one approval.",
+            b"{\"approved_at\":1,\"folders\":[\"Projects/\"],\"write_folders\":[\"Projects/\"]}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-repeated-member",
+            "A repeated member is refused, so a hand-edited blob cannot carry two answers to one question.",
+            b"{\"approved_at\":1,\"approved_at\":2,\"model\":\"exclude\"}",
+            true,
+        );
+
+        emit_reject(
+            &mut dump,
+            "reject-missing-approved-at",
+            "approved_at is required: a grant nobody can date is not an approval, so its absence is refused rather than defaulted to zero.",
+            b"{\"model\":\"exclude\"}",
+            false,
+        );
+
+        dump.push_str("  ]\n}\n");
+
+        std::fs::write("/tmp/myne_mcp_connection_vectors.json", dump.as_bytes())
+            .expect("write mcp-connection vectors dump");
+        std::eprintln!("[ok] wrote /tmp/myne_mcp_connection_vectors.json");
+    }
+
+    #[test]
+    fn an_exclusion_grant_with_no_exclusions_is_the_whole_vault_and_costs_no_array() {
+        // Empty is a VALUE under this model, not an omission: the user approved
+        // a connection that may read everything. The encoder emits no array, so
+        // the grant is three members, and the decoder reads that back as the
+        // whole vault rather than as a legacy grant with nothing readable.
+        let mut prefs = PrefsView::default();
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("lm-studio"),
+            exclusion_grant(&[], 7, Some(9)),
+        );
+        let text = alloc::string::String::from_utf8(canonical_json_encode(&prefs)).unwrap();
+        assert_eq!(
+            text,
+            "{\"mcp_connections\":{\"lm-studio\":{\"approved_at\":7,\"last_used_at\":9,\"model\":\"exclude\"}},\"screen_capture_protection\":true}"
+        );
+        let decoded = canonical_json_decode(text.as_bytes()).expect("round trip");
+        let grant = decoded.mcp_connections.get("lm-studio").expect("survives");
+        assert_eq!(grant.model, McpScopeModel::Exclude);
+        assert!(grant.excluded_folders.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), text.as_bytes().to_vec());
+    }
+
+    #[test]
+    fn a_legacy_grant_is_read_as_the_allow_list_it_was_written_as() {
+        // The released bytes, verbatim: no `model` member, an allow list. It must
+        // decode as `Folders` (so the host can refuse it with a named reason
+        // rather than serve it under the wrong rule) and re-encode to the same
+        // bytes, which is what makes an upgrade a no-op on disk until the user
+        // re-approves.
+        let original = br#"{"mcp_connections":{"claude-desktop":{"approved_at":1,"folders":["Work/"]}},"screen_capture_protection":true}"#;
+        let decoded = canonical_json_decode(original).expect("a legacy blob decodes");
+        let grant = decoded
+            .mcp_connections
+            .get("claude-desktop")
+            .expect("survives");
+        assert_eq!(grant.model, McpScopeModel::Folders);
+        assert_eq!(grant.folders, vec![alloc::string::String::from("Work/")]);
+        assert!(grant.excluded_folders.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), original.to_vec());
+    }
+
+    #[test]
+    fn a_grant_whose_model_and_arrays_disagree_is_refused() {
+        // Every one of these decodes "successfully" under a precedence rule, and
+        // every one of those rules picks a meaning for an array the user was
+        // never shown under that meaning. Refusing is the only answer that cannot
+        // widen a grant quietly.
+        for bad in [
+            // An exclusion model next to an allow list.
+            br#"{"mcp_connections":{"x":{"approved_at":1,"excluded_folders":["Private/"],"folders":["Work/"],"model":"exclude"}},"screen_capture_protection":true}"#.as_slice(),
+            // A legacy model next to an exclusion list.
+            br#"{"mcp_connections":{"x":{"approved_at":1,"excluded_folders":["Private/"],"folders":[]}},"screen_capture_protection":true}"#.as_slice(),
+            // A model member this build does not know: read as `Folders` it
+            // would be served under semantics it was not written under.
+            br#"{"mcp_connections":{"x":{"approved_at":1,"model":"someFutureModel"}},"screen_capture_protection":true}"#.as_slice(),
+            // The same member twice.
+            br#"{"mcp_connections":{"x":{"approved_at":1,"model":"exclude","model":"exclude"}},"screen_capture_protection":true}"#.as_slice(),
+        ] {
+            assert_eq!(
+                canonical_json_decode(bad),
+                Err(PrefsBlobError::PlaintextParseFailed),
+                "accepted {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_exclusion_set_is_nfc_sorted_and_exact_deduped() {
+        // The same canonical SET discipline as `folders`, asserted separately
+        // because a second array is a second chance to skip the encoder: an
+        // exclusion list that round-trips unordered writes different bytes for
+        // the same approval on two devices.
+        let mut prefs = PrefsView::default();
+        prefs.mcp_connections.insert(
+            alloc::string::String::from("claude-desktop"),
+            exclusion_grant(&["b/", "a/", "b/", "A\u{030A}/"], 1, None),
+        );
+        let decoded = canonical_json_decode(&canonical_json_encode(&prefs)).expect("round trip");
+        assert_eq!(
+            &decoded
+                .mcp_connections
+                .get("claude-desktop")
+                .expect("survives")
+                .excluded_folders,
+            &vec![
+                alloc::string::String::from("a/"),
+                alloc::string::String::from("b/"),
+                alloc::string::String::from("\u{00C5}/"),
+            ]
+        );
     }
 
     #[test]
@@ -15109,5 +16161,324 @@ mod mcp_connections_tests {
                 "accepted {bad:?}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod mcp_write_request_tests {
+    //! The external MCP write queue as a `vault.prefs` field
+    //! (external-mcp-connection task 13; `decisions/ai/0752`).
+    //!
+    //! Four properties, each an acceptance criterion rather than a convenience:
+    //! a blob that has never queued a request re-encodes byte for byte (the
+    //! omission rule is real, not a doc comment), a queued request round-trips
+    //! through the canonical encoder unchanged, the ORDER rule collapses a retry
+    //! loop into one row per `(connection, folder, verb)` with the newest stamp
+    //! kept, and the parser refuses what it cannot represent instead of guessing.
+    //!
+    //! The last one is the load-bearing one. This field carries a folder the
+    //! person will be asked to GRANT, so a parser that skipped an unknown member
+    //! would hand the review card half a request, and the half it invented is the
+    //! half the person approves.
+    use super::*;
+    use alloc::vec;
+
+    fn request(
+        connection: &str,
+        folder: &str,
+        verb: &str,
+        summary: &str,
+        requested_at: u64,
+    ) -> McpWriteRequest {
+        McpWriteRequest {
+            connection: alloc::string::String::from(connection),
+            folder: alloc::string::String::from(folder),
+            requested_at,
+            summary: alloc::string::String::from(summary),
+            verb: alloc::string::String::from(verb),
+        }
+    }
+
+    /// The canonical text of a `vault.prefs` holding exactly these requests.
+    fn encode_with(requests: alloc::vec::Vec<McpWriteRequest>) -> alloc::string::String {
+        let prefs = PrefsView {
+            mcp_write_requests: requests,
+            ..PrefsView::default()
+        };
+        alloc::string::String::from_utf8(canonical_json_encode(&prefs)).expect("utf-8")
+    }
+
+    #[test]
+    fn a_vault_that_never_queued_a_request_is_byte_identical() {
+        // The whole reason the field is omitted when empty: a vault that has never
+        // had an out-of-scope write must not gain a member, a byte or a diff on the
+        // next prefs write.
+        let text = encode_with(vec![]);
+        assert!(
+            !text.contains("mcp_write_requests"),
+            "an empty queue must cost no bytes at all: {text}"
+        );
+        let decoded = canonical_json_decode(text.as_bytes()).expect("round trip");
+        assert!(decoded.mcp_write_requests.is_empty());
+        assert_eq!(canonical_json_encode(&decoded), text.as_bytes().to_vec());
+    }
+
+    #[test]
+    fn a_queued_request_round_trips_through_the_canonical_encoder() {
+        let text = encode_with(vec![request(
+            "claude-desktop",
+            "inbox/",
+            "note_create",
+            "Shopping list",
+            1765432100,
+        )]);
+        assert!(
+            text.contains(
+                r#""mcp_write_requests":[{"connection":"claude-desktop","folder":"inbox/","requested_at":1765432100,"summary":"Shopping list","verb":"note_create"}]"#
+            ),
+            "canonical member order (connection < folder < requested_at < summary < verb): {text}"
+        );
+        let decoded = canonical_json_decode(text.as_bytes()).expect("round trip");
+        assert_eq!(
+            decoded.mcp_write_requests,
+            vec![request(
+                "claude-desktop",
+                "inbox/",
+                "note_create",
+                "Shopping list",
+                1765432100
+            )]
+        );
+        assert_eq!(canonical_json_encode(&decoded), text.as_bytes().to_vec());
+    }
+
+    #[test]
+    fn a_retry_loop_collapses_into_one_row_and_sorts() {
+        // The failure this prevents is a client that retries: without the dedupe
+        // the queue spends the prefs budget on one client's refusals and the card
+        // shows the same proposal twenty times, which is how a person learns to
+        // dismiss without reading.
+        let text = encode_with(vec![
+            request("lm-studio", "work/", "note_append", "", 1765432000),
+            request("claude-desktop", "inbox/", "note_create", "first try", 1000),
+            request(
+                "claude-desktop",
+                "inbox/",
+                "note_create",
+                "second try",
+                2000,
+            ),
+            request("claude-desktop", "archive/", "note_create", "another", 1500),
+        ]);
+        let decoded = canonical_json_decode(text.as_bytes()).expect("round trip");
+        let rows: alloc::vec::Vec<(alloc::string::String, alloc::string::String, u64)> = decoded
+            .mcp_write_requests
+            .iter()
+            .map(|r| (r.connection.clone(), r.folder.clone(), r.requested_at))
+            .collect();
+        assert_eq!(
+            rows,
+            vec![
+                (
+                    alloc::string::String::from("claude-desktop"),
+                    alloc::string::String::from("archive/"),
+                    1500
+                ),
+                (
+                    alloc::string::String::from("claude-desktop"),
+                    alloc::string::String::from("inbox/"),
+                    // The NEWEST of the two attempts at the same triple survives:
+                    // the card should show what the client wants now, not its
+                    // first try.
+                    2000
+                ),
+                (
+                    alloc::string::String::from("lm-studio"),
+                    alloc::string::String::from("work/"),
+                    1765432000
+                ),
+            ],
+            "sorted by connection then folder, one row per (connection, folder, verb)"
+        );
+        // An empty summary costs no member at all.
+        assert!(
+            !text.contains(r#""summary":"""#),
+            "no empty summary: {text}"
+        );
+    }
+
+    #[test]
+    fn an_unknown_member_is_refused_rather_than_skipped() {
+        // A later build adds a member; this build must say the blob is unreadable
+        // rather than hand the card a request whose missing half the person then
+        // approves.
+        assert!(parse_mcp_write_request(
+            br#"{"connection":"a","folder":"b/","requested_at":1,"details":"x","verb":"note_create"}"#
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn a_repeated_member_is_refused() {
+        assert!(parse_mcp_write_request(
+            br#"{"connection":"a","connection":"b","folder":"c/","requested_at":1,"verb":"note_create"}"#
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn a_malformed_queue_is_a_parse_failure_not_an_empty_queue() {
+        // "Nothing is waiting" and "this blob is broken" must not be the same
+        // answer: the second one has to reach the degrade-on-read path.
+        let text =
+            r#"{"mcp_write_requests":[{"connection":"a"}],"screen_capture_protection":true}"#;
+        assert!(
+            canonical_json_decode(text.as_bytes()).is_err(),
+            "an incomplete request object is malformed, not empty"
+        );
+        // And the well-formed one beside it still decodes, so the refusal is about
+        // the broken member rather than about the field existing.
+        let good = encode_with(vec![request("a", "b/", "note_create", "", 1)]);
+        assert!(canonical_json_decode(good.as_bytes()).is_ok());
+    }
+
+    /// Emit the `mcp-write-request` vector family for `myne-test-vectors`.
+    ///
+    /// `cargo test -p protocol --lib emit_mcp_write_request_vectors_for_paste -- --ignored`
+    ///
+    /// Same shape as the other families: `parse_ok` pins the decoded request as its
+    /// canonical re-encoding plus the consumed byte count, `parse_reject` pins the
+    /// inputs a reader MUST refuse. The queue is the one prefs field where a reader
+    /// that guesses goes wrong in the direction that spends consent: the canonical
+    /// ORDER and the de-duplication decide which row a person is shown, so it is
+    /// pinned as bytes rather than described.
+    #[test]
+    #[ignore]
+    fn emit_mcp_write_request_vectors_for_paste() {
+        extern crate std;
+
+        // The lowercase-hex encoder the rest of this module's emitters use. Local
+        // because the vectors are write-only output: nothing reads these bytes back.
+        fn hex_of(bytes: &[u8]) -> alloc::string::String {
+            const HEX: &[u8; 16] = b"0123456789abcdef";
+            let mut out = alloc::string::String::new();
+            for byte in bytes {
+                out.push(HEX[(byte >> 4) as usize] as char);
+                out.push(HEX[(byte & 0x0f) as usize] as char);
+            }
+            out
+        }
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("{\n");
+        dump.push_str("  \"schema\": \"mcp-write-request\",\n");
+        dump.push_str("  \"protocol_version\": \"v0.1\",\n");
+        dump.push_str("  \"spec_section\": \"protocol.md §9.5.2 (mcp_write_requests canonical JSON inside vault.prefs)\",\n");
+        dump.push_str("  \"description\": \"Pins protocol::prefs::parse_mcp_write_request, the canonical-JSON decoder for one entry of the mcp_write_requests array inside vault.prefs (external MCP write queue, myne-md/myne#923 task 13, decisions/ai/0752). A queued entry is a PROPOSAL, never a pending write: accepting one extends that connection's write grant by exactly the folder it names. parse_ok cases pin the decoded request as its canonical re-encoding (member order connection < folder < requested_at < summary < verb, summary omitted when empty) plus the exact consumed byte count; parse_reject cases pin the inputs a reader MUST refuse rather than read generously: an unknown member, a repeated member, and a request missing a required member.\",\n");
+        dump.push_str("  \"cases\": [\n");
+
+        let emit_ok = |dump: &mut alloc::string::String, slug: &str, desc: &str, input: &[u8]| {
+            let (parsed, consumed) = parse_mcp_write_request(input)
+                .unwrap_or_else(|| panic!("[{slug}] parse_ok input did not parse"));
+            let mut one = alloc::vec::Vec::new();
+            push_mcp_write_requests(&mut one, &[parsed]);
+            let canonical = &one[1..one.len() - 1];
+            dump.push_str("    {\n");
+            dump.push_str("      \"vector_id\": \"mcp-write-request/v0.1/");
+            dump.push_str(slug);
+            dump.push_str("\",\n      \"description\": \"");
+            dump.push_str(desc);
+            dump.push_str(
+                "\",\n      \"case_kind\": \"parse_ok\",\n      \"input_bytes_utf8_hex\": \"",
+            );
+            dump.push_str(&hex_of(input));
+            dump.push_str("\",\n      \"expected_consumed_len\": ");
+            dump.push_str(&alloc::format!("{consumed}"));
+            dump.push_str(",\n      \"expected_canonical_utf8_hex\": \"");
+            dump.push_str(&hex_of(canonical));
+            dump.push_str("\"\n    },\n");
+        };
+
+        let emit_reject =
+            |dump: &mut alloc::string::String, slug: &str, desc: &str, input: &[u8]| {
+                assert!(
+                    parse_mcp_write_request(input).is_none(),
+                    "[{slug}] parse_reject input parsed, but a reader MUST refuse it"
+                );
+                dump.push_str("    {\n");
+                dump.push_str("      \"vector_id\": \"mcp-write-request/v0.1/");
+                dump.push_str(slug);
+                dump.push_str("\",\n      \"description\": \"");
+                dump.push_str(desc);
+                dump.push_str(
+                "\",\n      \"case_kind\": \"parse_reject\",\n      \"input_bytes_utf8_hex\": \"",
+            );
+                dump.push_str(&hex_of(input));
+                dump.push_str("\"\n    },\n");
+            };
+
+        emit_ok(
+            &mut dump,
+            "create-with-summary",
+            "a create into a readable-but-not-writable folder, carrying the title the client offered",
+            br#"{"connection":"claude-desktop","folder":"inbox/","requested_at":1765432100,"summary":"Shopping list","verb":"note_create"}"#,
+        );
+        emit_ok(
+            &mut dump,
+            "append-without-summary",
+            "an append whose client offered no summary: the member is absent, so the queue costs no bytes for a value that does not exist",
+            br#"{"connection":"lm-studio","folder":"work/","requested_at":1765432000,"verb":"note_append"}"#,
+        );
+        emit_ok(
+            &mut dump,
+            "root-folder",
+            "a write into the vault ROOT, which is a folder key like any other (the empty string) and the one a prefix rule must not swallow",
+            br#"{"connection":"a","folder":"","requested_at":1,"verb":"note_create"}"#,
+        );
+        emit_ok(
+            &mut dump,
+            "member-order-not-enforced",
+            "the decoder reads what an encoder wrote, so a differently ordered object decodes to the same canonical bytes",
+            br#"{"verb":"note_set_field","summary":"due: 2026-11-01","requested_at":7,"folder":"projects/","connection":"a"}"#,
+        );
+        emit_reject(
+            &mut dump,
+            "unknown-member",
+            "a member this build does not know: refusing is what stops the card approving half a request",
+            br#"{"connection":"a","folder":"b/","requested_at":1,"summary":"x","verb":"note_create","width":2}"#,
+        );
+        emit_reject(
+            &mut dump,
+            "repeated-member",
+            "two values for one key: a blob this build did not write, and last-wins would silently pick one",
+            br#"{"connection":"a","connection":"b","folder":"c/","requested_at":1,"verb":"note_create"}"#,
+        );
+        emit_reject(
+            &mut dump,
+            "missing-connection",
+            "no connection name: the row could not be matched to a grant, so there is nothing to accept",
+            br#"{"folder":"c/","requested_at":1,"verb":"note_create"}"#,
+        );
+        emit_reject(
+            &mut dump,
+            "missing-verb",
+            "no verb: the card could not say what was attempted, so there is nothing to describe to the person deciding",
+            br#"{"connection":"a","folder":"b/","requested_at":1}"#,
+        );
+        emit_reject(
+            &mut dump,
+            "non-string-folder",
+            "a folder that is not a string: a path is user text, and a number here is a different shape entirely",
+            br#"{"connection":"a","folder":7,"requested_at":1,"verb":"note_create"}"#,
+        );
+
+        // Drop the trailing comma on the last case so the file is valid JSON.
+        dump.pop();
+        dump.pop();
+        dump.push('\n');
+        dump.push_str("  ]\n}\n");
+
+        std::fs::write("/tmp/myne_mcp_write_request_cases.json", dump.as_bytes())
+            .expect("write mcp-write-request cases dump");
     }
 }

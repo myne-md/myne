@@ -37,7 +37,9 @@
 //! long notes costs the caller a bounded number of bytes per call.
 
 use super::error::McpToolError;
-use super::scope::{existing_folders, folder_key_of, resolve_scope, ConnectionScope, FolderCount};
+use super::scope::{
+    existing_folders, folder_key_of, resolve_scope_with_quiet, ConnectionScope, FolderCount,
+};
 use crate::folder_key::canonical_folder;
 use crate::plugins::agent::frontmatter::folder_of;
 use crate::plugins::agent::tools::SearchHit;
@@ -45,7 +47,7 @@ use crate::plugins::vault_indices::state::NoteRecord;
 use protocol::McpConnectionGrant;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Search results per call when the caller does not ask for a number.
 pub const DEFAULT_SEARCH_LIMIT: usize = 20;
@@ -155,16 +157,18 @@ pub struct VaultState {
     /// True by construction too: the local door exists only while external
     /// access is enabled, so a call that arrives proves the switch is on.
     pub external_access: bool,
-    /// How many folders the granted scope covers right now.
+    /// How many folders of the vault this connection may read right now.
     pub folder_count: usize,
     /// How many live notes those folders hold right now.
     pub note_count: usize,
-    /// How many folders exist that the scope does NOT cover. The count only:
-    /// names of unreadable folders are not the caller's business.
-    pub outside_folder_count: usize,
-    /// How many granted folders no longer exist. A rename shows up here, because
-    /// the grant stores paths.
-    pub missing_folder_count: usize,
+    /// How many of the connection's stored exclusions name a folder that exists
+    /// right now. The count only: the names are the user's own text and not the
+    /// caller's business.
+    pub excluded_folder_count: usize,
+    /// How many stored exclusions name nothing any more (a renamed or deleted
+    /// folder). They exclude nothing and are reported so a caller can tell a
+    /// vault that grew from a grant that went stale.
+    pub stale_exclusion_count: usize,
 }
 
 /// Tool 1: search inside the scope.
@@ -327,21 +331,23 @@ pub async fn vault_list(
 /// grant, never a note body, so it costs one pass and no decryption of content.
 pub async fn vault_state(
     scope: &ConnectionScope,
+    existing: &BTreeSet<String>,
     source: &dyn McpNoteSource,
 ) -> Result<VaultState, McpToolError> {
     scope.require_granted()?;
     let records = source.records().await?;
+    let live_exclusions = scope.live_exclusion_count(existing);
     Ok(VaultState {
         unlocked: true,
         external_access: true,
-        folder_count: scope.folders().len(),
+        folder_count: scope.readable_folder_count(existing),
         note_count: scope.note_count(&records),
-        outside_folder_count: scope.delta().len(),
-        missing_folder_count: scope.missing().len(),
+        excluded_folder_count: live_exclusions,
+        stale_exclusion_count: scope.excluded().len().saturating_sub(live_exclusions),
     })
 }
 
-/// The four verbs this build implements, as a closed set.
+/// The verbs this build implements, as a closed set.
 ///
 /// Declared here rather than imported from the shim's compiled catalog, because
 /// the two crates share no type by design (`mcp/` depends on neither
@@ -356,24 +362,43 @@ pub enum ToolName {
     NoteRead,
     VaultList,
     VaultState,
+    NoteCreate,
+    NoteAppend,
+    NoteEdit,
+    NoteMove,
 }
 
 impl ToolName {
     /// The verb a caller named, or `None` if this build does not implement it.
     ///
-    /// The five write verbs the catalog also offers (`note_create`,
-    /// `note_append`, `note_set_field`, `note_move`, `note_edit`) land here as
-    /// their own tasks. Until then they are `None`, which is the honest answer:
-    /// a shim newer than its host is version skew, not a scope decision, and
-    /// `invalid_request` is the kind this door already uses for version skew.
+    /// `note_set_field` is still `None` here, which is the honest answer: a shim
+    /// newer than its host is version skew, not a scope decision, and
+    /// `invalid_request` is the kind this door already uses for version skew. It
+    /// lands as its own task.
     pub fn from_wire(name: &str) -> Option<Self> {
         match name {
             "note_search" => Some(Self::NoteSearch),
             "note_read" => Some(Self::NoteRead),
             "vault_list" => Some(Self::VaultList),
             "vault_state" => Some(Self::VaultState),
+            "note_create" => Some(Self::NoteCreate),
+            "note_append" => Some(Self::NoteAppend),
+            "note_edit" => Some(Self::NoteEdit),
+            "note_move" => Some(Self::NoteMove),
             _ => None,
         }
+    }
+
+    /// Whether this verb changes the vault.
+    ///
+    /// Read rather than inferred from a match arm at each of the three places
+    /// that care (the grant check, the write scope, the outcome), because the
+    /// failure of getting it wrong is a write served under a read-only path.
+    pub fn is_write(self) -> bool {
+        matches!(
+            self,
+            Self::NoteCreate | Self::NoteAppend | Self::NoteEdit | Self::NoteMove
+        )
     }
 
     /// The wire spelling of this verb.
@@ -383,6 +408,10 @@ impl ToolName {
             Self::NoteRead => "note_read",
             Self::VaultList => "vault_list",
             Self::VaultState => "vault_state",
+            Self::NoteCreate => "note_create",
+            Self::NoteAppend => "note_append",
+            Self::NoteEdit => "note_edit",
+            Self::NoteMove => "note_move",
         }
     }
 }
@@ -405,6 +434,22 @@ pub enum McpCallOutcome {
     Refused(McpToolError),
     /// This build does not implement that verb (version skew).
     UnknownTool,
+    /// A write landed in a folder the connection may READ but not write, so
+    /// nothing was applied and the door must record it as a proposal.
+    ///
+    /// Carried out of [`call_tool`] rather than written there because the queue
+    /// is a `vault.prefs` field and this function holds no host: the door owns the
+    /// write, and answering the caller
+    /// [`McpToolError::WriteQueuedForReview`] is the door's job so that a row is
+    /// never reported as queued and then lost.
+    QueueProposal {
+        /// The verb that was attempted, as the card names it.
+        verb: &'static str,
+        /// The folder it named, canonical.
+        folder: String,
+        /// One line of what it wanted to write. USER TEXT: never logged.
+        summary: String,
+    },
     /// The arguments do not decode against the verb's schema.
     Malformed,
     /// The vault locked between the request arriving and the call running. The
@@ -434,7 +479,7 @@ pub struct WireCall<'a> {
 
 /// Everything [`call_tool`] resolves against: the call, plus the stored grants
 /// and the folder set it is clamped to.
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct CallInputs<'a> {
     /// The call itself.
     pub call: WireCall<'a>,
@@ -444,6 +489,18 @@ pub struct CallInputs<'a> {
     pub deliberate_folders: &'a [String],
     /// `archived_folders`, subtracted by prefix like the sidebar does.
     pub archived_folders: &'a [String],
+    /// `ai_excluded_folders` plus `cli_excluded_folders`: the folders the user has
+    /// already excluded from every OTHER AI surface in this vault, subtracted from
+    /// this connection's reach as well (`decisions/security/0753`). Never from the
+    /// call, and only ever narrowing.
+    pub quiet_folders: &'a [String],
+    /// The host's write surface, or `None` on a caller that can only read.
+    ///
+    /// `None` refuses a WRITE verb as [`McpCallOutcome::Io`] and leaves every read
+    /// verb untouched: the one live caller always supplies it, so absent means a
+    /// host composed without a writer, which is a wiring bug rather than something
+    /// a client can act on.
+    pub writer: Option<&'a dyn super::intent::McpNoteWriter>,
 }
 
 /// One decoded call, kept typed so the dispatch below cannot re-parse.
@@ -452,6 +509,10 @@ enum Parsed {
     Read(NoteReadRequest),
     List,
     State,
+    Create(super::intent::NoteCreateRequest),
+    Append(super::intent::NoteAppendRequest),
+    Edit(super::anchor::NoteEditRequest),
+    Move(super::anchor::NoteMoveRequest),
 }
 
 /// `vault_list` and `vault_state` take no arguments; an object with anything in
@@ -475,6 +536,18 @@ fn parse_arguments(tool: ToolName, arguments: &Value) -> Option<Parsed> {
         ToolName::VaultState => serde_json::from_value::<NoArguments>(arguments.clone())
             .ok()
             .map(|_| Parsed::State),
+        ToolName::NoteCreate => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Create),
+        ToolName::NoteAppend => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Append),
+        ToolName::NoteEdit => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Edit),
+        ToolName::NoteMove => serde_json::from_value(arguments.clone())
+            .ok()
+            .map(Parsed::Move),
     }
 }
 
@@ -520,13 +593,39 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
     };
     let existing = existing_folders(&records, inputs.deliberate_folders, inputs.archived_folders);
     drop(records);
-    let scope = resolve_scope(connection, inputs.grants, &existing);
+    let scope = resolve_scope_with_quiet(connection, inputs.grants, inputs.quiet_folders);
     // `resolve_scope` answered `granted` from the map checked above, so this
     // cannot fail here; the tools call it again per verb, which is the one home
     // of the rule and the reason it is not re-derived.
     if let Err(error) = scope.require_granted() {
         return McpCallOutcome::Refused(error);
     }
+
+    // **A write verb resolves a SECOND scope before it touches anything.** The
+    // read scope above bounds what a connection can see; the write grant beside it
+    // bounds what it can change, and the two are resolved from the same stored
+    // record through opposite models. Resolving it here rather than inside the verb
+    // keeps `resolve_write_scope` off the read path entirely: a read call never
+    // constructs the object that decides where a write may land.
+    let write = if tool.is_write() {
+        Some(super::write_scope::resolve_write_scope(
+            connection,
+            inputs.grants,
+        ))
+    } else {
+        None
+    };
+    let writer: Option<&dyn super::intent::McpNoteWriter> = if tool.is_write() {
+        match inputs.writer {
+            Some(writer) => Some(writer),
+            // A host composed without a write surface. `Io` rather than a refusal:
+            // nothing about the caller's request is wrong, and no verb it could
+            // have called differently would be served either.
+            None => return McpCallOutcome::Io,
+        }
+    } else {
+        None
+    };
 
     let result = match parsed {
         Parsed::Search(request) => note_search(&scope, request, source)
@@ -538,9 +637,100 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
         Parsed::List => vault_list(&scope, source)
             .await
             .map(|folders| to_value(&folders)),
-        Parsed::State => vault_state(&scope, source)
+        Parsed::State => vault_state(&scope, &existing, source)
             .await
             .map(|state| to_value(&state)),
+        Parsed::Create(request) => {
+            let summary = one_line_summary(&request.title);
+            match super::intent::note_create(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(created)) => Ok(to_value(&created)),
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+        Parsed::Append(request) => {
+            let summary = one_line_summary(&request.markdown);
+            match super::intent::note_append(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                source,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(appended)) => Ok(to_value(&appended)),
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+        Parsed::Edit(request) => {
+            let summary = one_line_summary(&request.replacement);
+            match super::anchor::note_edit(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                source,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(edited)) => Ok(to_value(&edited)),
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
+        Parsed::Move(request) => {
+            let folder_named = request.folder.clone();
+            let summary = one_line_summary(&format!("move to {folder_named}"));
+            match super::anchor::note_move(
+                &scope,
+                write.as_ref().expect("resolved for a write verb"),
+                request,
+                source,
+                writer.expect("checked above for a write verb"),
+            )
+            .await
+            {
+                Ok(super::intent::WriteAnswer::Applied(moved)) => Ok(to_value(&moved)),
+                // A move's proposal names the DESTINATION, which is the folder the
+                // client asked for: the source is already inside the grant, so the
+                // decision a person makes is about where the note is going.
+                Ok(super::intent::WriteAnswer::Queued { folder }) => {
+                    return McpCallOutcome::QueueProposal {
+                        verb: tool.wire(),
+                        folder,
+                        summary,
+                    }
+                }
+                Err(error) => Err(error),
+            }
+        }
     };
     match result {
         Ok(Ok(structured)) => McpCallOutcome::Result(call_tool_result(tool, structured)),
@@ -550,6 +740,37 @@ pub async fn call_tool(inputs: CallInputs<'_>, source: &dyn McpNoteSource) -> Mc
         Ok(Err(())) => McpCallOutcome::Io,
         Err(error) => McpCallOutcome::Refused(error),
     }
+}
+
+/// The longest one-line summary a queued proposal carries into the review card.
+///
+/// Bounded because the card is a row in a `vault.prefs` blob with its own
+/// plaintext budget, and a client can send a 16 MiB body: the summary is what the
+/// person reads to decide, and 240 bytes is the whole of a title plus the first
+/// clause of a sentence.
+pub const MAX_SUMMARY_BYTES: usize = 240;
+
+/// One line of a caller's own text, for the review card.
+///
+/// **USER TEXT, never logged** (`src-tauri/AGENTS.md`, the DENY list). Newlines
+/// and tabs become spaces because this string is rendered into a card that has one
+/// line per request, and a newline in it would forge a second row. Truncation is on
+/// a character boundary so a multi-byte character cannot be cut in half and
+/// produce an invalid string.
+pub fn one_line_summary(text: &str) -> String {
+    let flattened: String = text
+        .chars()
+        .map(|c| if c.is_control() { ' ' } else { c })
+        .collect();
+    let trimmed = flattened.trim();
+    if trimmed.len() <= MAX_SUMMARY_BYTES {
+        return trimmed.to_string();
+    }
+    let mut cut = MAX_SUMMARY_BYTES;
+    while cut > 0 && !trimmed.is_char_boundary(cut) {
+        cut -= 1;
+    }
+    format!("{}…", trimmed[..cut].trim_end())
 }
 
 /// Serialize one tool's answer. Split out so the match above stays readable and

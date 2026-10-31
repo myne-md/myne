@@ -190,6 +190,13 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
 
 ## Gotchas
 
+- **A `*_with_dir` function must not reach the host to resolve what it was handed.** The first
+  `touch_…_with_dir` in the MCP door called `prefs_read_from_host`, which resolves the vault from the
+  `AppHandle` and ignored the `vault_dir` argument, so the fixture wrote its stamp somewhere the test
+  never looked while the test passed (myne-md/myne#923). The `_with_dir` seam exists exactly so a core
+  function can be driven with no host: pair every `_with_dir` with the `_with_dir` sibling below it
+  (`prefs_read_with_dir`), and treat a host call inside one as the bug it is.
+
 - **A per-file sync adopt has no self-heal, so a write precondition is part of the sync path and not
   only of the local one.** myne-md/myne#883: the agent-memory entry plane wrote `memories/<id>`
   without creating `memories/`, and `atomic_write` requires its parent to exist, so on every device
@@ -243,6 +250,8 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
   implied Linux with one worked, and mentioned neither Windows nor Android.
 
 - **A breaking change here now fails in the same build, and it did not used to.** Mobile consumed this crate as a path dependency into a *sibling checkout*, so a changed trait method, a changed shared type, or a new `VaultLifecycleHooks` method compiled fine here and broke `MobileHooks` in another repository — which only went red once the change was already on `develop`. The mobile client moved in-repo on 2026-08-13 (`decisions.md`): `mobile/src-tauri` is a workspace member, `cargo clippy --workspace` compiles it, and the `mobile-compile` CI step gates it. No companion PR, no land order, no worktree dance. If you are following an older instruction that mentions any of those, it is stale.
+- **An exclusion that names an ARCHIVED folder still excludes, so every "is this still live" question is judged against the archived-inclusive folder set, never the sidebar's.** Archiving hides a folder from the tree; it does not delete its notes or make them readable again. `scope::existing_folders` subtracts `archived_folders` because the approval PICKER shows what the sidebar shows, and `mcp::view::grant_preview` reused it to filter submitted exclusions, which meant an exclusion naming an archived folder was dropped from the list the dialog writes back on approve while `ConnectionScope::covers_key` kept enforcing it. Approving therefore re-excluded nothing and the reach grew past what the person was shown, and the connection row called a live exclusion "stale" in the same breath. `scope::existing_folders_including_archived` answers the enforcement question; the picker keeps the sidebar's set. Ask which of the two questions a filter is answering before reusing it, and note the mirror-image trap in `plugins/prefs/commands.rs::set_mcp_connection_grant_with_dir`: the write-scope subset check must compare against the EFFECTIVE reach (this grant's exclusions union `scope::quiet_folders`) rather than the grant's own list, or a folder excluded from Myne's own AI can be stored as writable.
+
 - **`../../AGENTS.md` pointers in this crate do not resolve.** Modules that moved here brought their relative pointers along, where `../../AGENTS.md` now names a `core/src/AGENTS.md` that has never existed. Write new pointers **repo-relative** — `src-tauri/AGENTS.md "Secret-handling logging discipline"` — which is what the crate-root modules already do.
 - **Diagnostic targets in this crate are `myne_core::…`, not the `myne::…` product targets the desktop crate uses**, and the reason is testability rather than taste: `tracing-test` filters its capture on the crate name, so a line emitted under `myne::agent` from here is invisible to the test asserting it carries no note content. Today: `myne_core::agent` (the agent loop and the edit-format probe) and `myne_core::http` (response framing and body size). Turn them on with `RUST_LOG=myne_core=debug`. Every field is a count, a duration or a closed-set identifier; `run_loop.rs`'s `the_trail_carries_no_part_of_the_reply_or_the_note` is the behavioural gate on that, and it fails by naming the marker that leaked.
 

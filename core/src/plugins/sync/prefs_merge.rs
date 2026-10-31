@@ -892,6 +892,11 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         // mean something different per device, because the frozen scope names
         // folder paths and two devices can hold different trees after a merge.
         mcp_connections: local.mcp_connections.clone(),
+        // The queued out-of-scope writes (task 13): device-local, beside the
+        // grants they would widen. Accepting one extends a grant that exists only
+        // on this device, so a peer's queue entry would be a proposal nobody here
+        // can act on.
+        mcp_write_requests: local.mcp_write_requests.clone(),
         paired_extensions: local.paired_extensions.clone(),
         right_panel_active_tab: local.right_panel_active_tab.clone(),
         right_panel_hidden_tabs: local.right_panel_hidden_tabs.clone(),
