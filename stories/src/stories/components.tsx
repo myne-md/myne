@@ -40,7 +40,6 @@ import { DeleteAttachmentDialog } from "@app/components/attachments/DeleteAttach
 import { DeleteVaultConfirmForm } from "@app/components/DeleteVaultConfirmForm";
 import { DestructiveBanner } from "@app/components/DestructiveBanner";
 import { DeviceJoinQr } from "@app/components/sync/DeviceJoinQr";
-import { DeviceAdmissionPanel } from "@app/components/sync/DeviceAdmissionPanel";
 import { DeviceAttributionPanel } from "@app/components/sync/DeviceAttributionPanel";
 import { DeviceManagementPanel } from "@app/components/sync/DeviceManagementPanel";
 import { Editor } from "@app/screens/Editor";
@@ -1124,43 +1123,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       "A member's own-device code: no input at all, the code is built from the active session, and the three steps beside it send the other device through the recovery phrase.",
     tags: ["components", "devicejoinqr", "member"],
     render: () => <DeviceJoinQr variant="member" />,
-  },
-  {
-    id: "components/deviceadmissionpanel/default",
-    group: "components",
-    surface: "DeviceAdmissionPanel",
-    state: "default",
-    description:
-      "The two-sided device admission ceremony, at its entry point: two arms, because a device can be either side. “This device is joining” mints a code and shows the eight characters both screens must agree on; “A device is joining” takes the other device's code and shows the same characters. Look for each arm to gate its own write behind its own confirmation. Nothing is saved on either side before that button.",
-    tags: [
-      "components",
-      "sync",
-      "devices",
-      "admission",
-      "sas",
-      "two-sided",
-      "gating",
-    ],
-    fixture: {
-      description:
-        "an identity session with a person id, so the joining arm can mint a code",
-      handlers: {
-        "plugin:sync|sync_person_status": () => ({
-          enrolled: true,
-          identity_unlocked: true,
-          person_id_hex: "22".repeat(16),
-          identity_code: "MYNE-PERSON-1:" + "22".repeat(16),
-          sealed_keypair_present: true,
-        }),
-        "plugin:sync|sync_device_admission_start": () => ({
-          code: "MYNE-DEVICE-1:" + "22".repeat(16) + ":" + "aa".repeat(16),
-          sas: "4f3a-91c2",
-          device_id_hex: "aa".repeat(16),
-          has_device_key: true,
-        }),
-      },
-    },
-    render: () => <DeviceAdmissionPanel personIdHex={"22".repeat(16)} />,
   },
   {
     id: "components/devicemanagementpanel/default",

@@ -61,6 +61,8 @@
     "longDescription": "Myne is a clean, fast markdown notes app. Capture, link, and find your notes across devices — calmly, without lock-in. A markdown editor with [[wikilinks]], backlinks, a graph view, and full-text search; no email to sign up; your notes stay plaintext-readable markdown after decryption.",
     "macOS": {
       "entitlements": "entitlements.plist",
+      "files": { "embedded.provisionprofile": "Myne_Mac_DeveloperID.provisionprofile" },
+      "minimumSystemVersion": "10.15",
       "dmg": {
         "background": "dmg/background.png",
         "windowSize": { "width": 660, "height": 420 },
