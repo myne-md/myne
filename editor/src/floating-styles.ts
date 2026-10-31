@@ -857,16 +857,11 @@ const CSS = `
   line-height: 1.4;
   padding-left: 2px;
 }
-/* The replace row's leading glyph sits in the same lead column as the find
-   row's search icon (the toggle is the first element on the find row; the
-   replace row reuses the lead-icon slot so the two inputs align). */
+/* The replace row's disclosure. It no longer opens the row with a rotation:
+   the glyph is a stacked chevron pair, which says "a second row" on its own and
+   cannot be mistaken for the Previous/Next arrows beside it (myne#952). */
 .cm-find-bar-toggle {
   color: var(--fg-3, #6b6a64);
-  transition: transform var(--duration-fast, 120ms) var(--ease-standard, ease);
-}
-/* Expanded: the disclosure chevron rotates from ▶ to ▼. */
-.cm-find-bar-toggle[aria-expanded="true"] svg {
-  transform: rotate(90deg);
 }
 .cm-find-bar-replace-lead {
   color: var(--fg-3, #6b6a64);
