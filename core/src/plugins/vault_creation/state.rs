@@ -363,11 +363,13 @@ impl VaultCreationState {
 /// The person identity a creation session was opened under (myne-md/myne#911
 /// task 5).
 ///
-/// Present only for a **person-born** vault: the `NTV7` generation, whose
-/// `root_key` is sealed to this person's key and whose recovery phrase is
-/// retired. A session without one is the pre-change path (`NTV5`, a vault
-/// phrase and a recovery wrap), which is what every client that has not yet
-/// shipped an identity-first first run still produces.
+/// Present only for a **person-born** vault: the `NTV8` generation, whose
+/// recovery phrase is retired and whose group tail is the one this person's
+/// signed roster describes (myne-md/myne#938, `decisions/protocol/0758`). The
+/// `root_key` is NOT sealed to this person's key: it is sealed under the vault
+/// password and nothing else. A session without one is the pre-change path
+/// (`NTV5`, a vault phrase and a recovery wrap), which is what every client that
+/// has not yet shipped an identity-first first run still produces.
 ///
 /// The keypair is held here because `commit` runs on the blocking pool with no
 /// access to [`crate::plugins::vault_unlock::state::VaultRuntimeState`], and the
@@ -376,8 +378,8 @@ impl VaultCreationState {
 /// and the phrase.
 #[derive(Clone)]
 pub struct CreationPerson {
-    /// The owner's person keypair: seals the `root_key` wrap and signs the
-    /// roster the `NTV7` tail carries.
+    /// The owner's person keypair: signs the roster the `NTV8` tail carries.
+    /// It seals no `root_key` wrap any more (`decisions/protocol/0758`).
     pub pair: protocol::PersonKeyPair,
     /// The owner's `person_id_hash`, written onto the roster's owner row so the
     /// member list can resolve the owner's own display name.

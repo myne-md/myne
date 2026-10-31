@@ -21,9 +21,16 @@ export type RosterMember = RosterMemberView;
 
 export interface RosterHook {
   members: RosterMember[];
-  /** The caller's vault authority. Defaults to `member` (fail-closed: admin
-   *  controls stay hidden until the backend confirms owner) and upgrades on load. */
-  authority: VaultAuthority;
+  /** The caller's vault authority, or `null` before the roster has loaded.
+   *
+   *  **`null` is a third state and must not collapse into `member`**
+   *  (myne-md/myne#938 review, the same fix mobile took in task 13). The hook
+   *  used to start at `member`, so a panel that rendered an authority row before
+   *  the first fetch answered told the user they were a member of a vault they
+   *  own. Every consumer compares `=== "owner"`, which is already fail-closed, so
+   *  `null` hides the owner controls exactly as `member` did and adds no risk: it
+   *  only stops the surface from ASSERTING a role nobody has read yet. */
+  authority: VaultAuthority | null;
   /** The current group-key epoch on an `NTV6` vault; `null` for a legacy
    *  roster that has no group tier. */
   groupKeyEpoch: number | null;
@@ -73,7 +80,7 @@ export interface RosterHook {
 
 export function useRoster(personReady: boolean): RosterHook {
   const [members, setMembers] = useState<RosterMember[]>([]);
-  const [authority, setAuthority] = useState<VaultAuthority>("member");
+  const [authority, setAuthority] = useState<VaultAuthority | null>(null);
   const [groupKeyEpoch, setGroupKeyEpoch] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +110,11 @@ export function useRoster(personReady: boolean): RosterHook {
       .catch((e) => {
         if (!cancelled) {
           setMembers([]);
-          setAuthority("member");
+          // `null`, not `"member"`: a failed read proves nothing about which side
+          // of the vault this account is on, and every consumer compares
+          // `=== "owner"`, so the fail-closed answer is the unknown one
+          // (myne-md/myne#938 review). Mobile's hook took the same third state.
+          setAuthority(null);
           setGroupKeyEpoch(null);
           setShared(false);
           setError(String(e));

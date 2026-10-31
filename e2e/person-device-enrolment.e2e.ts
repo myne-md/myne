@@ -177,7 +177,12 @@ describeDevice("person-scoped device enrolment (myne-md/myne#911 task 9)", () =>
         const listed = vaultDirs(b.appDataDir);
         expect(listed).toHaveLength(1);
         const frame = readFileSync(join(listed[0], "vault.meta"));
-        expect(frame.subarray(0, 4).toString("latin1")).toBe("NTV7");
+        // `NTV8`: the frame B received from the server is the password-only
+        // generation, which is the point of the join. B holds no phrase for this
+        // vault and needs none: it opens with the vault password, and the
+        // identity phrase it typed above proved WHO it is
+        // (myne-md/myne#938, `decisions/protocol/0758`).
+        expect(frame.subarray(0, 4).toString("latin1")).toBe("NTV8");
         expect(typeof syncState(b.appDataDir)?.namespace_hex).toBe("string");
 
         await (await b.session.byTestId("unlock.password-input")).sendKeys(VAULT_PASSWORD);

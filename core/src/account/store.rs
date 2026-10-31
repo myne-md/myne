@@ -627,15 +627,21 @@ pub fn stamp_membership_field(
     account_number_hash: &[u8; 16],
     meta_bytes: &[u8],
 ) -> Vec<u8> {
-    // The membership field lives ONLY in an `NTV5` frame. An `NTV6` vault
-    // carries its membership through the B2B roster instead, and rewriting the
-    // `NTV6` bytes through the `NTV5` serializer would DROP the B2B tail
+    // The membership field lives ONLY in an `NTV5` frame. A `NTV6`, `NTV7` or
+    // `NTV8` vault carries its membership through the B2B roster instead, and
+    // rewriting those bytes through the `NTV5` serializer would DROP the B2B tail
     // (group-key wrap, epoch, signed roster), leaving a vault whose `items_key`
-    // is group-sealed but whose meta claims the root tier. `meta_version_of`
-    // reports `NTV6` as `V0_2`, so the magic must be checked directly here.
-    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
-        || meta_bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-    {
+    // is group-sealed but whose meta claims the root tier.
+    //
+    // `has_b2b_tail` rather than a list of magics (myne-md/myne#938): the list
+    // this replaced named `NTV6` and `NTV7` and missed `NTV8`, and the miss was
+    // invisible only because `meta_version_of` also did not know the generation.
+    // Teaching that function `NTV8` (which every singleton reader needs) would
+    // have turned this guard into a silent downgrade of every password-only
+    // vault on its first unlock. The predicate is the one question that matters
+    // here, "is there a tail a rewrite would drop", and it is the same one the
+    // rekey recovery and the epoch merge ask.
+    if protocol::has_b2b_tail(meta_bytes) {
         return meta_bytes.to_vec();
     }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
@@ -679,18 +685,19 @@ pub fn stamp_person_binding_field(
 ) -> Vec<u8> {
     // The person-binding field lives ONLY in an `NTV5` frame, and this check is
     // the one that MUST come before the parse: `meta_version_of` reports an
-    // `NTV6` vault as `V0_2` (same generation, different frame), and
-    // `parse_vault_meta_any` reads only the 345-byte base of an `NTV6` blob. So
-    // without this guard, stamping a binding on an `NTV6` vault re-serializes
-    // through `serialize_vault_meta_v0_2` and silently DOWNGRADES it to `NTV5`,
+    // `NTV6`, `NTV7` or `NTV8` vault as `V0_2` (same generation, different frame),
+    // and `parse_vault_meta_any` reads only the 345-byte base of a tail frame. So
+    // without this guard, stamping a binding re-serializes through
+    // `serialize_vault_meta_v0_2` and silently DOWNGRADES the frame to `NTV5`,
     // dropping the B2B tail: the group-key wrap that `enc_items_key` needs. The
     // result is a vault whose `items_key` is group-sealed but whose meta claims
     // the root tier, so no unlock path can open it (`items_key_unwrap` fails and
-    // it reports "corrupted vault"). An `NTV6` vault already binds its owner
-    // through the signed roster, so stamping is a no-op there by design.
-    if meta_bytes.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
-        || meta_bytes.get(..4) == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-    {
+    // it reports "corrupted vault"). Every tail generation already binds its
+    // owner through the signed roster, so stamping is a no-op there by design.
+    //
+    // `has_b2b_tail` rather than a list of magics, for the reason its sibling
+    // above states: the list missed `NTV8`.
+    if protocol::has_b2b_tail(meta_bytes) {
         return meta_bytes.to_vec();
     }
     let Ok(meta) = protocol::parse_vault_meta_any(meta_bytes) else {
@@ -1126,9 +1133,19 @@ mod tests {
 
     /// The third generation, and the one with the most to lose
     /// (myne-md/myne#911 review). Both stamp functions guard against rewriting a
-    /// B2B frame through the `NTV5` serializer; a `NTV7` frame carries the same
-    /// tail PLUS the person wrap, so a stamp that reached the serializer would
-    /// drop the vault's only second credential.
+    /// B2B frame through the `NTV5` serializer; a `NTV8` frame carries the same
+    /// tail as `NTV6` and `NTV7`, so a stamp that reached the serializer would
+    /// drop the group-key wrap and the signed roster, leaving a vault whose
+    /// `itemsKey` is group-sealed behind a frame that claims the root tier, which
+    /// no unlock path can open.
+    ///
+    /// **This test is why the `NTV8` arm in `meta_version_of` is safe.** Teaching
+    /// that function the new generation (every singleton reader needs it) is what
+    /// makes the version check below these guards answer `V0_2` for an `NTV8`
+    /// frame; a guard written as "not `NTV6` and not `NTV7`" would then fall
+    /// through and downgrade every password-only vault on its first unlock. The
+    /// guards ask `has_b2b_tail` instead, and this is the test that fails if
+    /// anybody replaces them with a magic list again.
     ///
     /// The fixture is a REAL frame, minted by the app's own person-session
     /// builder. That matters: the first version of this test used a hand-typed
@@ -1137,7 +1154,7 @@ mod tests {
     /// for the wrong reason. A fixture that cannot reach the defective state is
     /// not a test.
     #[test]
-    fn the_stamp_guards_return_an_ntv7_meta_untouched() {
+    fn the_stamp_guards_return_an_ntv8_meta_untouched() {
         use crate::plugins::vault_creation::commands::{
             build_and_serialize_person_vault_meta, build_person_session,
         };
@@ -1171,14 +1188,21 @@ mod tests {
         )
         .expect("person session");
         let (bytes, _group) =
-            build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
-        assert_eq!(bytes.get(..4), Some(b"NTV7".as_slice()));
+            build_and_serialize_person_vault_meta(&session).expect("serialize NTV8");
+        assert_eq!(bytes.get(..4), Some(b"NTV8".as_slice()));
+        // The premise the guards rest on: this frame is `V0_2` to every
+        // version-aware reader, so only a tail-aware guard can stop a rewrite.
+        assert_eq!(
+            protocol::meta_version_of(&bytes),
+            Some(protocol::MetaVersion::V0_2),
+            "an NTV8 frame is a v0.2 vault; that is what makes the stamp dangerous"
+        );
 
         let stamped_person =
             stamp_person_binding_field(&[0x11; AEAD_KEY_LEN], &[0x51; 16], &[0x44; 16], &bytes);
         assert_eq!(
             stamped_person, bytes,
-            "an NTV7 meta must be returned untouched by the person-binding stamp"
+            "an NTV8 meta must be returned untouched by the person-binding stamp"
         );
         let stamped_membership = stamp_membership_field(
             &[0x11; AEAD_KEY_LEN],
@@ -1188,7 +1212,7 @@ mod tests {
         );
         assert_eq!(
             stamped_membership, bytes,
-            "an NTV7 meta must be returned untouched by the membership stamp"
+            "an NTV8 meta must be returned untouched by the membership stamp"
         );
     }
 }

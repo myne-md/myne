@@ -11,9 +11,7 @@ import {
   Sheet,
   Icon,
   MyneMark,
-  PhraseEntryGrid,
 } from "../../components";
-import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
 import { unlockWithPassword } from "../../lib/commands";
 import { deleteVault } from "../../lib/vault-delete";
@@ -21,7 +19,6 @@ import { soleVaultId } from "../../lib/vault-list";
 import {
   memberUnlockStatus,
   memberVaultStatus,
-  personUnlockMemberVault,
   personUnlockMemberVaultWithBiometric,
   personUnlockMemberVaultWithPassword,
   personUnlockMemberVaultWithPin,
@@ -361,8 +358,9 @@ function messageForUnlockError(e: unknown, t: TFunction): string {
  * fail-closed surface for `Corrupted` / `IoError`. The typed password is held
  * in component-local state + a ref and wiped on every exit path / unmount.
  */
-/** Which member credential the surface is offering (`"phrase"` when none). */
-type MemberUnlockMode = MemberUnlockMethod | "phrase";
+/** Which member credential the surface is offering (`"none"` when this device
+ *  holds no credential at all, which needs a fresh invite rather than a phrase). */
+type MemberUnlockMode = MemberUnlockMethod | "none";
 
 export function UnlockFlow(props: UnlockFlowProps) {
   const { initialStatus, vaultId, suspicionReason, fromPicker, onBackToPicker } = props;
@@ -401,15 +399,19 @@ export function UnlockFlow(props: UnlockFlowProps) {
   const [bioSubmitting, setBioSubmitting] = useState(false);
   const bioAutoTried = useRef(false);
 
-  // B2B member vault: a member has NO vault password, so the boot surface offers
-  // the person recovery phrase plus any device-local fast credential
-  // (`vault.member-unlock`, decisions/protocol/0653). Detected once per mount.
+  // B2B member vault: the boot surface offers the ONE device-local credential the
+  // vault carries (`vault.member-unlock`, decisions/protocol/0653). There is no
+  // recovery-phrase arm: `vault.member-key` is retired (myne-md/myne#938 task 12,
+  // `0763`), so a device with no credential needs a fresh invite and not a phrase.
+  // Detected once per mount.
   const [member, setMember] = useState(false);
-  const [memberMethod, setMemberMethod] = useState<MemberUnlockMethod | null>(null);
-  const [memberMode, setMemberMode] = useState<MemberUnlockMode>("phrase");
-  const [memberPhraseCells, setMemberPhraseCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
+  // `null` means NOT YET KNOWN, and it is a third state on purpose (myne-md/myne#938
+  // review). It used to start at `"none"`, which is the answer for "this device
+  // carries no member credential", so every member device rendered "ask the owner
+  // for a fresh invite" for the length of the probe: a dead end painted over a
+  // device that has a perfectly good password. The probe answers `"none"` on its
+  // own; until it does, nothing is claimed.
+  const [memberMode, setMemberMode] = useState<MemberUnlockMode | null>(null);
   const [memberPassword, setMemberPasswordInput] = useState("");
   const [memberPin, setMemberPinInput] = useState("");
   const [memberBusy, setMemberBusy] = useState(false);
@@ -425,9 +427,11 @@ export function UnlockFlow(props: UnlockFlowProps) {
         void memberUnlockStatus(vaultId)
           .then((m) => {
             if (cancelled) return;
-            setMemberMethod(m ?? null);
-            setMemberMode(m ?? "phrase");
+            setMemberMode(m ?? "none");
           })
+          // A failed probe leaves the answer UNKNOWN rather than claiming there is
+          // no credential: the same collapse the desktop probe was fixed for, and
+          // the failure mode is a user told to throw away a working device.
           .catch(() => {});
       })
       .catch(() => {});
@@ -437,24 +441,22 @@ export function UnlockFlow(props: UnlockFlowProps) {
   }, [vaultId, initialStatus.kind]);
 
   const canMemberSubmit =
-    memberMode === "phrase"
-      ? memberPhraseCells.every((cell) => cell.length > 0)
-      : memberMode === "pin"
-        ? memberPin.length >= 6
-        : memberMode === "biometric"
-          ? true
-          : memberPassword.length > 0;
+    memberMode === "pin"
+      ? memberPin.length >= 6
+      : memberMode === "biometric"
+        ? true
+        : memberMode === "password"
+          ? memberPassword.length > 0
+          : false;
 
   const handleMemberUnlock = useCallback(async () => {
-    if (memberBusy || !vaultId) return;
+    if (memberBusy || !vaultId || memberMode === null) return;
     setMemberError(false);
     setShowSuspicion(false);
     setMemberBusy(true);
     try {
       if (!HAS_TAURI) {
         await new Promise((r) => setTimeout(r, 350));
-      } else if (memberMode === "phrase") {
-        await personUnlockMemberVault(vaultId, memberPhraseCells.join(" "));
       } else if (memberMode === "password") {
         await personUnlockMemberVaultWithPassword(vaultId, memberPassword);
       } else if (memberMode === "pin") {
@@ -462,7 +464,6 @@ export function UnlockFlow(props: UnlockFlowProps) {
       } else {
         await personUnlockMemberVaultWithBiometric(vaultId);
       }
-      setMemberPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
       setMemberPasswordInput("");
       setMemberPinInput("");
       props.onUnlocked();
@@ -473,7 +474,6 @@ export function UnlockFlow(props: UnlockFlowProps) {
   }, [
     memberBusy,
     memberMode,
-    memberPhraseCells,
     memberPassword,
     memberPin,
     vaultId,
@@ -743,32 +743,23 @@ export function UnlockFlow(props: UnlockFlowProps) {
       {member ? (
         <>
           <div style={{ marginTop: showSuspicion && suspicion ? 18 : 30, width: "100%" }}>
-            <FieldLabel>
-              {memberMode === "phrase"
-                ? t("unlock.memberPhraseLabel")
-                : memberMode === "pin"
+            {memberMode === null || memberMode === "none" ? null : (
+              <FieldLabel>
+                {memberMode === "pin"
                   ? t("unlock.memberPinLabel")
                   : t("unlock.memberPasswordLabel")}
-            </FieldLabel>
-            {memberMode === "phrase" ? (
-              // A 24-cell GRID, not a `<textarea>` (Aşama 2a). The textarea was
-              // the shape `recovery-flow.md` §3.2 forbids by name: "Stating it as
-              // a property of the recovery screen alone is what let a second
-              // surface ship a single-line input", and §3.2 binds every surface.
-              // Its gate was "at least 12 whitespace-separated tokens", which is
-              // a count a free-text box has to guess at; the grid knows there are
-              // 24 cells and §3.2's rule is that all of them are non-empty.
-              <PhraseEntryGrid
-                cells={memberPhraseCells}
-                onCells={(next) => {
-                  setMemberError(false);
-                  setMemberPhraseCells(next.map((cell) => cell.replace(/\s+/g, "")));
-                }}
-                testIdPrefix="unlock-member-phrase"
-                columns={2}
-                cellLabel={(index) => t("sync.enroll.wordAria", { number: index + 1 })}
-                style={{ marginTop: "var(--space-2)" }}
-              />
+              </FieldLabel>
+            )}
+            {memberMode === null ? null : memberMode === "none" ? (
+              // No credential on this device. The phrase does not open a shared
+              // vault any more, so a form here would be a dead end and the copy
+              // names the only remedy: a fresh invite from the owner.
+              <div
+                data-testid="unlock-member-no-credential"
+                style={{ marginTop: "var(--space-2)", fontSize: "var(--text-base)", color: "var(--fg-2)" }}
+              >
+                {t("unlock.memberNoCredential")}
+              </div>
             ) : memberMode === "biometric" ? (
               <div style={{ marginTop: "var(--space-2)", fontSize: "var(--text-base)", color: "var(--fg-2)" }}>
                 {t("unlock.memberBiometricHint")}
@@ -788,36 +779,21 @@ export function UnlockFlow(props: UnlockFlowProps) {
             )}
             {memberError && (
               <div data-testid="unlock-member-error" style={{ marginTop: "var(--space-2)" }}>
-                <Banner kind="danger">
-                  {memberMode === "phrase"
-                    ? t("unlock.memberError")
-                    : t("unlock.memberPasswordError")}
-                </Banner>
+                <Banner kind="danger">{t("unlock.memberPasswordError")}</Banner>
               </div>
             )}
           </div>
-          <Button
-            style={{ marginTop: "var(--space-4)" }}
-            disabled={memberBusy || !canMemberSubmit}
-            onClick={() => void handleMemberUnlock()}
-            data-testid="unlock-member-submit"
-          >
-            {memberMode === "biometric"
-              ? t("unlock.memberBiometricSubmit")
-              : t("unlock.memberSubmit")}
-          </Button>
-          {memberMethod != null && (
-            <TextButton
-              height={40}
-              style={{ marginTop: "var(--space-1)" }}
-              onClick={() => {
-                setMemberError(false);
-                setMemberMode((m) => (m === "phrase" ? memberMethod : "phrase"));
-              }}
-              testId="unlock-member-toggle"
+          {memberMode === null || memberMode === "none" ? null : (
+            <Button
+              style={{ marginTop: "var(--space-4)" }}
+              disabled={memberBusy || !canMemberSubmit}
+              onClick={() => void handleMemberUnlock()}
+              data-testid="unlock-member-submit"
             >
-              {memberMode === "phrase" ? t("unlock.memberUseFast") : t("unlock.memberUsePhrase")}
-            </TextButton>
+              {memberMode === "biometric"
+                ? t("unlock.memberBiometricSubmit")
+                : t("unlock.memberSubmit")}
+            </Button>
           )}
         </>
       ) : bioMode && qu?.available ? (

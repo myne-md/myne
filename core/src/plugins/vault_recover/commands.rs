@@ -705,6 +705,21 @@ pub(crate) async fn complete_recovery_with_path(
                         &fresh_nonce,
                     )
                 }
+                // `NTV8` has no recovery wrap either, so this flow cannot have
+                // opened one; it is dispatched explicitly rather than falling
+                // into the versioned arm below, which would re-serialize as
+                // `NTV5` and drop the group tail.
+                protocol::VaultMetaGeneration::PersonNoWrap => {
+                    let ntv8 = protocol::parse_vault_meta_ntv8(&bytes)
+                        .map_err(|_| VaultRecoveryError::InvalidVaultMeta)?;
+                    protocol::rewrite_vault_meta_password_side_ntv8(
+                        &ntv8,
+                        &root_key_snapshot,
+                        new_password.as_str(),
+                        &fresh_salt,
+                        &fresh_nonce,
+                    )
+                }
                 _ => protocol::rewrite_vault_meta_password_side_versioned(
                     version,
                     &parsed,

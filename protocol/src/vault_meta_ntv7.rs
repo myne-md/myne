@@ -141,13 +141,20 @@ impl PersonWrappedVaultMeta {
 
 /// The three fields the phrase wrap occupied, all of which must be zero for a
 /// generation that has retired it.
-fn phrase_wrap_is_absent(base: &VaultMeta) -> bool {
+///
+/// Shared with `NTV8`, which retires the phrase wrap for a different reason (no
+/// second credential at all, rather than a person wrap replacing it). One
+/// predicate, because "the phrase does not open this file" must not be spelled
+/// two ways that could disagree.
+pub(crate) fn phrase_wrap_is_absent(base: &VaultMeta) -> bool {
     base.random_salt_recovery == [0u8; crate::vault_meta::VAULT_META_SALT_RANDOM_LEN]
         && base.nonce_recovery_wrap == [0u8; AEAD_NONCE_LEN]
         && base.enc_root_key_recovery == [0u8; VAULT_META_WRAPPED_ROOT_KEY_LEN]
 }
 
-fn roster_len_is_plausible(len: usize) -> bool {
+/// Whether a `signed_roster_len` is one the `NTV6` tail bounds allow. Shared by
+/// every generation that carries that tail.
+pub(crate) fn roster_len_is_plausible(len: usize) -> bool {
     (crate::person_invite::SEALED_GROUP_ROSTER_MIN_LEN..=B2B_ROSTER_ENVELOPE_CAP).contains(&len)
 }
 
@@ -182,20 +189,25 @@ pub fn serialize_vault_meta_ntv7(meta: &PersonWrappedVaultMeta) -> Result<Vec<u8
     Ok(out)
 }
 
-/// Parse the B2B tail from EITHER generation that carries one (`NTV6` or
-/// `NTV7`), rejecting everything else.
+/// Parse the B2B tail from ANY generation that carries one (`NTV6`, `NTV7` or
+/// `NTV8`), rejecting everything else.
 ///
-/// The two generations share that tail byte for byte (§9.3.2, §9.3.5), so every
+/// The three generations share that tail byte for byte (§9.3.2, §9.3.5), so every
 /// consumer that needs the epoch, the owner-wrapped group key or the roster
-/// asks this one question instead of comparing a magic. `NTV7` goes through its
-/// own strict parser first, which is what enforces the generation's own rules (a
-/// zero recovery wrap, the person envelope's exact length).
+/// asks this one question instead of comparing a magic. `NTV7` and `NTV8` go
+/// through their own strict parsers first, which is what enforces each
+/// generation's own rules (a zero recovery wrap, and on `NTV7` the person
+/// envelope's exact length). A vault born `NTV8` has no person wrap, so a
+/// consumer that needs one asks the magic rather than this function.
 pub fn parse_b2b_tail_any(
     bytes: &[u8],
 ) -> Result<crate::vault_meta_v0_2::B2bVaultMeta, ProtocolError> {
     match crate::vault_meta_v0_2::vault_meta_generation(bytes) {
         crate::vault_meta_v0_2::VaultMetaGeneration::Person => {
             parse_vault_meta_ntv7(bytes).map(|meta| meta.as_ntv6_tail())
+        }
+        crate::vault_meta_v0_2::VaultMetaGeneration::PersonNoWrap => {
+            crate::vault_meta_ntv8::parse_vault_meta_ntv8(bytes).map(|meta| meta.as_ntv6_tail())
         }
         crate::vault_meta_v0_2::VaultMetaGeneration::B2b => {
             crate::vault_meta_v0_2::parse_vault_meta_ntv6(bytes)

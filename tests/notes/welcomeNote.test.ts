@@ -55,7 +55,13 @@ describe("WELCOME_NOTE_MARKDOWN (MYND-118)", () => {
   });
 
   it("keeps the safety reminder and a clickable bare-URL link to the site", () => {
-    expect(WELCOME_NOTE_MARKDOWN).toContain("recovery phrase");
+    // The reminder names the PASSWORD, not a recovery phrase (myne-md/myne#938
+    // review): a vault born from an identity has no recovery phrase, so the first
+    // screen a user reads was promising a credential the product does not issue.
+    // What is true on every birth path is that losing the password loses the notes.
+    expect(WELCOME_NOTE_MARKDOWN).toContain("**password**");
+    expect(WELCOME_NOTE_MARKDOWN).toContain("no one can get your notes back");
+    expect(WELCOME_NOTE_MARKDOWN).not.toContain("recovery phrase");
     // Bare URL (not `[text](url)`) so the editor's autolink makes it
     // click-to-open; clickable links are bare-URL / `<angle>` only.
     expect(WELCOME_NOTE_MARKDOWN).toContain("https://myne.md");

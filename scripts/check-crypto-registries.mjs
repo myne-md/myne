@@ -280,7 +280,7 @@ const KNOWN = [
     // A `VAULT_META_V0_3_MAGIC` or a further NTV generation in a sibling module
     // changes this set and the file starts failing again, which is the property
     // a file-wide entry could not have.
-    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC,VAULT_META_V0_2_MAGIC",
+    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC,VAULT_META_NTV8_MAGIC,VAULT_META_V0_2_MAGIC",
     why:
       "`parse_vault_meta` is deliberately v0.1-only and its single-generation rejection at " +
       "`bytes[0..4] != VAULT_META_MAGIC` is the correct behaviour for it: the version-aware " +
@@ -300,7 +300,7 @@ const KNOWN = [
     rule: "magic-parity",
     file: "core/src/plugins/vault_migrate/mod.rs",
     contains: "VAULT_META_MAGIC",
-    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC",
+    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC,VAULT_META_NTV8_MAGIC",
     why:
       "The v0.1 to v0.2 ON-DISK migration reads a `MYV1` `vault.meta` and writes `NTV5`; an " +
       "`NTV6` (or person-born `NTV7`) vault never reaches it, because the B2B `NTV5` to `NTV6` " +

@@ -655,6 +655,22 @@ const ROSTER = [
       "Build-time ambient globals. Per-client by construction.",
   },
   {
+    a: "src-tauri/src/device_key.rs",
+    b: "mobile/src-tauri/src/device_key.rs",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "The same two-line rung-4 wrapper over `myne-core`'s device-key ladder, one per HOST, and that is the design rather than a copy (myne-md/myne#938 tasks 9 and 10): the ladder's policy (when a key is read, what a refusal means, when the fallback is silent) lives once in `core/src/plugins/sync/device_identity.rs`, and each host supplies the store its platform actually has. Desktop's file is the Windows DPAPI arm (user scope, app entropy, write-then-rename); mobile's installs the Kotlin `KeystoreProvider` over the Android Keystore. Sharing either would mean one client carrying the other's platform code. What must not drift is the provider contract and the fail-closed rule, both of which are in core.",
+  },
+  {
+    a: "src/lib/deviceAdmission.ts",
+    b: "mobile/src/lib/deviceAdmission.ts",
+    verdict: "decision",
+    destination: "stays per-client",
+    reason:
+      "The same five-command client half of the device admission ceremony, one binding file per client (myne-md/myne#938 task 11), because a binding module is where a client's `invoke` shape and its capability gate live: desktop calls through `invoke`, mobile through its own host bridge, and both carry the two-sided guarantee in their header. The ceremony's rules are not duplicated here, they are in `core/src/plugins/sync/device_admission.rs` and `decisions/protocol/0762`; what must not drift is the five commands, the SAS equality check before confirm, and the fact that neither side writes before its own tap.",
+  },
+  {
     a: "src/lib/account-number-format.ts",
     b: "mobile/src/lib/account-number-format.ts",
     verdict: "decision",

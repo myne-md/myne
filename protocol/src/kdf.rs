@@ -100,20 +100,6 @@ pub const SALT_PREFIX_PERSON_VAULT_PROFILE_V0_2: &[u8] =
 /// Domain for deriving a stable per-person, per-vault profile identifier.
 pub const PERSON_PROFILE_ID_PREFIX: &[u8] = b"myne.person-profile-id v1|";
 
-/// Salt domain for the **member vault key store** (myne-md/myne#711 task 25):
-/// the key that seals a member's group and items keys at rest on their device,
-/// so a member vault can be re-unlocked from the recovery phrase alone (a member
-/// has no vault password). Scoped per `(person, vault)` by the account-number
-/// hash in the salt, and distinct from the profile domain so the two secrets are
-/// never the same value.
-pub const SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2: &[u8] = b"myne.v0.2 argon2id-person-vault-member|";
-
-/// The FIXED salt randomizer for the member-vault-key KDF: the key must be
-/// reproducible from the phrase alone on any device (there is no per-device salt
-/// to store), so separation comes from the domain prefix and the vault's
-/// account-number hash. Deliberately not secret.
-pub const PERSON_VAULT_MEMBER_SALT_RANDOM: [u8; 16] = [0u8; 16];
-
 /// The FIXED salt randomizer for the private-profile KDF.
 ///
 /// The profile key must be reproducible from the phrase alone on every client
@@ -281,6 +267,45 @@ pub fn derive_quick_unlock_pin_wrap_key(
     argon2id_derive(pin.as_bytes(), &salt, params)
 }
 
+/// Salt prefix for the **device-key PIN rung** (`decisions/protocol/0733`
+/// decision 4, rung 3; `identity-seat-portability` task 8). The device signing
+/// key is device-scoped and vault-agnostic, so this domain is bound to **no**
+/// `account_number_hash`: the salt is the per-file random value alone, and the
+/// key must survive a vault being forgotten, since the device key outlives it.
+///
+/// Deliberately NOT [`SALT_PREFIX_QUICKUNLOCK_PIN`]: reusing that domain would
+/// make one PIN derive one key for two purposes, so a quick-unlock wrap key
+/// would double as the device key's seal key (and vice versa).
+const SALT_PREFIX_DEVICE_KEY_PIN: &[u8] = b"myne.v0.2 argon2id-device-key-pin|";
+
+/// Derive the 32-byte AEAD wrap key that seals the **device signing key** at
+/// rest on a platform with no OS keychain rung (`decisions/protocol/0733`
+/// decision 4, rung 3).
+///
+/// Salt = SHA-256(`"myne.v0.2 argon2id-device-key-pin|"` || `pin_salt`)[:16],
+/// no account component, because the key is device-scoped and must not become
+/// unopenable when a vault is forgotten.
+///
+/// The memory-hardness of `params` is the **only** offline bound on a
+/// low-entropy PIN, exactly as in [`derive_quick_unlock_pin_wrap_key`]: the
+/// on-disk attempt counter bounds an attacker typing at the keyboard, and an
+/// attacker holding a copy of the file never touches it. Callers therefore pass
+/// the same memory-hard parameter set the vault uses, not a cheaper one.
+///
+pub fn derive_device_key_pin_wrap_key(
+    pin: &str,
+    pin_salt: &[u8; 16],
+    params: &KdfParams,
+) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
+    let mut h = Sha256::new();
+    h.update(SALT_PREFIX_DEVICE_KEY_PIN);
+    h.update(pin_salt);
+    let digest = h.finalize();
+    let mut salt = [0u8; ARGON2_SALT_LEN];
+    salt.copy_from_slice(&digest[..ARGON2_SALT_LEN]);
+    argon2id_derive(pin.as_bytes(), &salt, params)
+}
+
 /// Derive the **v0.2** 32-byte AEAD wrap key for the password-protected copy of
 /// the new `root_key` (`spec/protocol.md` §10.4.1). Byte-for-byte the same
 /// construction as [`derive_password_wrap_key`] — Argon2id over the password
@@ -431,28 +456,55 @@ pub fn derive_person_vault_profile_key(
     )
 }
 
-/// The member-vault-key with the spec's fixed salt, the production entry point.
-/// [`derive_person_vault_member_key_from_normalized`] stays for vector
-/// generation, where the salt is an explicit input.
-pub fn derive_person_vault_member_key(
-    phrase_normalized: &str,
-    account_number_hash: &[u8; 16],
-    params: &KdfParams,
-) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
-    derive_person_vault_member_key_from_normalized(
-        phrase_normalized,
-        &PERSON_VAULT_MEMBER_SALT_RANDOM,
-        account_number_hash,
-        params,
-    )
+/// HKDF context string for the gate-derived private-profile key (myne-md/myne#938
+/// task 12).
+///
+/// A private `MYY5` profile is sealed under a KEK derived from the person's
+/// recovery phrase, which makes the phrase a permanent requirement on top of the
+/// vault's own password. This context derives the same profile key from the
+/// **gate of the vault the profile belongs to** instead: the member-unlock wrap
+/// key (`"myne.v0.2 argon2id-person-vault-member-unlock|"`), already a
+/// vault-scoped, per-person, password-derived secret.
+///
+/// **Nothing seals a profile under this yet, and the reason is structural rather
+/// than pending work** (`decisions/protocol/0763` §4): `MYY5` also carries the
+/// pinned owner identity code a joining device must read BEFORE any gate exists,
+/// so moving the seal without moving that field breaks the second-device join.
+/// The owner chose to leave the lock alone, so the accept path still derives the
+/// profile key from `phrase_normalized` and this function is exercised only by
+/// its own two tests. It ships because the change that moves the pinned code will
+/// need it, and deriving it twice would be the way two domain strings drift.
+///
+/// The wrap key is a strong Argon2id output, so this is a plain HKDF expansion
+/// rather than a second password KDF, and it is domain-separated by this context
+/// string plus the `profile_id` in the `info` slot: two profiles under one gate
+/// derive two keys, and no other use of the wrap key can collide with this one.
+pub const PERSON_PROFILE_GATE_CONTEXT: &[u8] = b"myne.person-vault-profile-gate v1|";
+
+/// Derive a private-profile key from the gate of the vault the profile belongs
+/// to (myne-md/myne#938 task 12). The gate is the member-unlock wrap key; the
+/// caller supplies the profile id, which is
+/// `person_profile_id(person_id, account_number_hash)`.
+pub fn derive_person_vault_profile_key_from_gate(
+    gate: &[u8; 32],
+    profile_id: &[u8; 16],
+) -> Zeroizing<[u8; 32]> {
+    let mut info = [0u8; PERSON_PROFILE_GATE_CONTEXT.len() + 16];
+    info[..PERSON_PROFILE_GATE_CONTEXT.len()].copy_from_slice(PERSON_PROFILE_GATE_CONTEXT);
+    info[PERSON_PROFILE_GATE_CONTEXT.len()..].copy_from_slice(profile_id);
+    let mut out = [0u8; 32];
+    crate::subkey::derive_with_context_into(gate, &info, &mut out);
+    Zeroizing::new(out)
 }
 
 /// Salt domain for the **member vault unlock password** store: the key that
 /// seals a member's group and items keys AND their person keypair at rest under a
 /// member-chosen password, so a member vault re-unlocks without the 24-word
-/// recovery phrase. Distinct from [`SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2`] (the
-/// phrase store) so the two credentials are never the same key, and scoped per
-/// `(person, vault)` by the account-number hash in the salt.
+/// recovery phrase. Scoped per `(person, vault)` by the account-number hash in
+/// the salt. It was originally the SECOND member credential, distinct from the
+/// phrase-sealed `vault.member-key`; that store is retired (myne-md/myne#938 task
+/// 12, `decisions/protocol/0763`) so this is now the only one, and the domain
+/// stays distinct from every other so no key is reused across planes.
 pub const SALT_PREFIX_PERSON_VAULT_MEMBER_UNLOCK_V0_2: &[u8] =
     b"myne.v0.2 argon2id-person-vault-member-unlock|";
 
@@ -473,24 +525,6 @@ pub fn derive_person_vault_member_unlock_key(
         salt_random,
     );
     argon2id_derive(password.as_bytes(), &salt, params)
-}
-
-/// Derive the key that seals one person's member-vault keys for one vault
-/// (myne-md/myne#711 task 25). Scoped per `(person, vault)` by the vault's
-/// account-number hash, so a member's key store for one vault does not open for
-/// another.
-pub fn derive_person_vault_member_key_from_normalized(
-    phrase_normalized: &str,
-    salt_random: &[u8; 16],
-    account_number_hash: &[u8; 16],
-    params: &KdfParams,
-) -> Result<Zeroizing<[u8; 32]>, ProtocolError> {
-    let salt = build_salt(
-        SALT_PREFIX_PERSON_VAULT_MEMBER_V0_2,
-        account_number_hash,
-        salt_random,
-    );
-    argon2id_derive(phrase_normalized.as_bytes(), &salt, params)
 }
 
 /// Derive the deterministic person-identity key seed from the normalized
@@ -724,6 +758,89 @@ mod tests {
         )
         .expect("password key");
         assert_ne!(pin_key.as_slice(), password_key.as_slice());
+    }
+
+    /// The device-key PIN rung's salt derivation is pinned, for the same reason every
+    /// other salt path is: the prefix and the mixing order are load-bearing, and a
+    /// change to either silently re-derives a key no existing file opens.
+    ///
+    /// Hand-derived: SHA-256("myne.v0.2 argon2id-device-key-pin|"
+    ///                    || FIXED_SALT_RANDOM)[:16].
+    #[test]
+    fn build_salt_device_key_pin_path_pinned_hex() {
+        let mut h = Sha256::new();
+        h.update(SALT_PREFIX_DEVICE_KEY_PIN);
+        h.update(FIXED_SALT_RANDOM);
+        let digest = h.finalize();
+        let mut salt = [0u8; ARGON2_SALT_LEN];
+        salt.copy_from_slice(&digest[..ARGON2_SALT_LEN]);
+        let expected: [u8; ARGON2_SALT_LEN] = [
+            0xF9, 0x8C, 0x14, 0x4C, 0x11, 0x77, 0x90, 0x12, 0xF4, 0x89, 0x5F, 0xA3, 0xCE, 0x1A,
+            0x8E, 0xB0,
+        ];
+        assert_eq!(salt, expected);
+    }
+
+    /// The gate-derived profile key is a pure function of `(gate, profile_id)`:
+    /// pinned so a change to the context string or the `info` layout is a red
+    /// test rather than a silent re-key of every member's private AI profile.
+    #[test]
+    fn the_gate_derived_profile_key_is_pinned() {
+        let gate = [0x5Au8; 32];
+        let profile_id = [0x11u8; 16];
+        let key = derive_person_vault_profile_key_from_gate(&gate, &profile_id);
+        assert_eq!(
+            crate::test_vector_fmt::hex_lower(&*key),
+            "252496e48e62df452f0d6661889a10dabaf5313e4ee99513d2591edf70be5fa5"
+        );
+    }
+
+    #[test]
+    fn the_gate_derived_profile_key_is_domain_separated() {
+        let gate = [0x5Au8; 32];
+        let a = derive_person_vault_profile_key_from_gate(&gate, &[0x11u8; 16]);
+        let b = derive_person_vault_profile_key_from_gate(&gate, &[0x22u8; 16]);
+        assert_ne!(*a, *b, "two profiles under one gate must not share a key");
+        // And it is not the phrase path under another name: the whole point is
+        // that the profile stops depending on the phrase.
+        let phrase = derive_person_vault_profile_key(
+            "abandon ability",
+            &[0x11u8; 16],
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("phrase key");
+        assert_ne!(
+            *a, *phrase,
+            "the gate path must not reproduce the phrase path"
+        );
+    }
+
+    #[test]
+    fn device_key_pin_key_is_domain_separated_from_quick_unlock() {
+        // One PIN, one salt: the two purposes must not share a key, or a
+        // quick-unlock wrap key would double as the device key's seal key.
+        let device =
+            derive_device_key_pin_wrap_key("123456", &FIXED_SALT_RANDOM, &FAST_TEST_KDF_PARAMS)
+                .expect("device key");
+        let quick_unlock = derive_quick_unlock_pin_wrap_key(
+            "123456",
+            &FIXED_SALT_RANDOM,
+            &FIXED_ACCOUNT_HASH,
+            &FAST_TEST_KDF_PARAMS,
+        )
+        .expect("quick-unlock key");
+        assert_ne!(device.as_slice(), quick_unlock.as_slice());
+
+        // Deterministic, and it varies with the salt (so a re-sealed file under a
+        // new salt cannot open with the old one).
+        let again =
+            derive_device_key_pin_wrap_key("123456", &FIXED_SALT_RANDOM, &FAST_TEST_KDF_PARAMS)
+                .expect("derive again");
+        assert_eq!(device.as_slice(), again.as_slice());
+        let other_salt =
+            derive_device_key_pin_wrap_key("123456", &[0x77; 16], &FAST_TEST_KDF_PARAMS)
+                .expect("other salt");
+        assert_ne!(device.as_slice(), other_salt.as_slice());
     }
 
     #[test]
@@ -1744,78 +1861,5 @@ mod tests {
             b.fingerprint(),
             "a deterministically derived identity must be stable across calls"
         );
-    }
-    #[test]
-    #[ignore = "vector generator; run explicitly to refresh person-member-key-store cases.json"]
-    fn emit_person_member_key_store_vectors_for_paste() {
-        extern crate std;
-        use crate::test_vector_fmt::{hex_lower, json_escape};
-        use crate::types::DEFAULT_V0_1_KDF_PARAMS;
-
-        let phrase = "abandon abandon abandon abandon abandon abandon abandon abandon \
-                      abandon abandon abandon abandon abandon abandon abandon abandon \
-                      abandon abandon abandon abandon abandon abandon abandon art";
-        let account_hash: [u8; 16] = [0x44; 16];
-        let vault_id: [u8; 16] = [0x77; 16];
-
-        let member_key =
-            derive_person_vault_member_key(phrase, &account_hash, &DEFAULT_V0_1_KDF_PARAMS)
-                .expect("derive member key");
-        let aad = crate::aead::aad_person_member_key_store(&vault_id, &account_hash);
-
-        let mut dump = alloc::string::String::new();
-        dump.push_str("{\n");
-        dump.push_str("  \"schema\": \"person-member-key-store\",\n");
-        dump.push_str("  \"protocol_version\": \"v0.2\",\n");
-        dump.push_str(
-            "  \"spec_section\": \"protocol.md section 9.28 / decisions/protocol/0606\",\n",
-        );
-        dump.push_str("  \"description\": \"Pins the B2B member-vault-key derivation (derive_person_vault_member_key: Argon2id over the normalized phrase under salt domain 'myne.v0.2 argon2id-person-vault-member|' with the vault account_number_hash in the salt slot) and the member-key-store AAD (aad_person_member_key_store: 'person-member-key-store' role, vault_id || account_number_hash, v0.2 prefix). A port that frames either differently derives a key that opens nothing, or an AAD that fails every open. EXPECTED RUNTIME: ~3s (Argon2id at canonical params). Generated by `cargo test -p protocol --lib emit_person_member_key_store_vectors_for_paste -- --ignored`.\",\n");
-        dump.push_str("  \"cases\": [\n");
-        dump.push_str("    {\n");
-        dump.push_str("      \"case_kind\": \"member-key-derivation\",\n");
-        dump.push_str(&alloc::format!(
-            "      \"description\": \"{}\",\n",
-            json_escape("The member-vault key: Argon2id(normalized phrase) under the member salt domain with the vault's account_number_hash in the salt slot. Changing the phrase, the domain prefix, or the account hash changes the key.")
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"input_phrase\": \"{}\",\n",
-            json_escape(phrase)
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"input_account_number_hash_hex\": \"{}\",\n",
-            hex_lower(&account_hash)
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"expected_member_key_hex\": \"{}\"\n",
-            hex_lower(&*member_key)
-        ));
-        dump.push_str("    },\n");
-        dump.push_str("    {\n");
-        dump.push_str("      \"case_kind\": \"member-key-store-aad\",\n");
-        dump.push_str(&alloc::format!(
-            "      \"description\": \"{}\",\n",
-            json_escape("The member-key-store AAD: v0.2 prefix || protocol byte || length-prefixed role 'person-member-key-store' || vault_id || account_number_hash. Binding both stops a store copied to another vault directory or account from opening.")
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"input_vault_id_hex\": \"{}\",\n",
-            hex_lower(&vault_id)
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"input_account_number_hash_hex\": \"{}\",\n",
-            hex_lower(&account_hash)
-        ));
-        dump.push_str(&alloc::format!(
-            "      \"expected_aad_hex\": \"{}\"\n",
-            hex_lower(&aad)
-        ));
-        dump.push_str("    }\n");
-        dump.push_str("  ]\n");
-        dump.push_str("}\n");
-        std::fs::write(
-            "/tmp/myne_person_member_key_store_vectors.json",
-            dump.as_bytes(),
-        )
-        .expect("write person-member-key-store vectors dump");
     }
 }

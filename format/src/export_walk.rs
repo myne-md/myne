@@ -838,3 +838,173 @@ fn export_snapshots(
     }
     Ok((written, failed_names))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const ACCT: [u8; 16] = [0x44; 16];
+    const ITEMS_ID: [u8; 16] = [0x33; 16];
+    const ROOT: [u8; 32] = [0x11; 32];
+    const ITEMS: [u8; 32] = [0x22; 32];
+
+    fn fast_params() -> protocol::KdfParams {
+        protocol::KdfParams {
+            m_kib: protocol::MIN_KDF_M_KIB,
+            t: 1,
+            p: 1,
+            argon2_version: 0x13,
+        }
+    }
+
+    /// The v0.2 credential-side frame, from the crate's own encoder.
+    fn ntv5() -> Vec<u8> {
+        protocol::encode_vault_meta_v0_2_raw(
+            &ROOT,
+            &ITEMS,
+            &ITEMS_ID,
+            "pw",
+            "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+            &ACCT,
+            &fast_params(),
+            &[0x01; 16],
+            &[0x02; 16],
+            &[0x03; 24],
+            &[0x04; 24],
+            &[0x05; 24],
+        )
+        .expect("encode NTV5")
+        .to_vec()
+    }
+
+    /// Every generation that can be on disk, built by the crate that writes it.
+    ///
+    /// `NTV7` is the only frame assembled by hand: the person wrap is a fixed
+    /// block of the right shape, because this reader never opens it (the export
+    /// walk reads the base prefix and nothing else). The other four come from
+    /// their own serializers, and `NTV6`/`NTV8` are derived from the `NTV7`
+    /// frame by truncation, which is exactly how the two differ on disk.
+    fn every_generation() -> Vec<(&'static str, Vec<u8>)> {
+        let mut myv1 = ntv5();
+        myv1[0..4].copy_from_slice(&protocol::VAULT_META_MAGIC);
+        myv1[4] = protocol::VAULT_META_PROTOCOL_VERSION;
+        myv1[5] = 0x00;
+
+        // Both person generations retire the recovery wrap, and the serializer
+        // refuses a frame that still carries one: the vault phrase stops being a
+        // credential at the moment the person wrap arrives, and since `NTV8` the
+        // password is the only one left.
+        let mut base = protocol::parse_vault_meta_v0_2(&ntv5()).expect("parse NTV5");
+        base.random_salt_recovery = [0u8; 16];
+        base.nonce_recovery_wrap = [0u8; 24];
+        base.enc_root_key_recovery = [0u8; 64];
+        let roster = protocol::person_invite::seal_group_roster(
+            &[0x77u8; 32],
+            &ACCT,
+            1,
+            &[0x66u8; 24],
+            &protocol::person_invite::SignedGroupRoster {
+                payload: vec![0xC3; 32],
+                signature: protocol::person_key::PersonSigned {
+                    ed25519_sig: [0xD4; protocol::person_key::PERSON_ED25519_SIG_LEN],
+                    mldsa_sig: vec![0xE5; protocol::person_key::PERSON_MLDSA_SIG_LEN],
+                },
+            },
+        )
+        .expect("sealed roster");
+
+        let ntv7 = protocol::vault_meta_ntv7::serialize_vault_meta_ntv7(
+            &protocol::vault_meta_ntv7::PersonWrappedVaultMeta {
+                base: base.clone(),
+                group_key_nonce: [0xA1; 24],
+                enc_group_key: [0xB2; 64],
+                group_key_epoch: 1,
+                signed_roster_envelope: roster.clone(),
+                person_wrap: protocol::vault_meta_ntv7::PersonWrap {
+                    ml_kem_ct: [0xC1; protocol::PERSON_CT_LEN],
+                    ed_ephemeral_pk: [0xC2; 32],
+                    nonce: [0xC3; 24],
+                    wrapped_root_key: [0xC4;
+                        protocol::vault_meta_ntv7::PERSON_WRAP_WRAPPED_ROOT_KEY_LEN],
+                },
+            },
+        )
+        .expect("serialize NTV7");
+
+        let ntv8 = protocol::vault_meta_ntv8::serialize_vault_meta_ntv8(
+            &protocol::vault_meta_ntv8::PasswordOnlyVaultMeta {
+                base,
+                group_key_nonce: [0xA1; 24],
+                enc_group_key: [0xB2; 64],
+                group_key_epoch: 1,
+                signed_roster_envelope: roster,
+            },
+        )
+        .expect("serialize NTV8");
+
+        // NTV6 is the NTV7 frame with the envelope cut off, under its own magic.
+        let mut ntv6 = ntv7[..ntv7.len() - protocol::vault_meta_ntv7::PERSON_WRAP_LEN].to_vec();
+        ntv6[0..4].copy_from_slice(&protocol::VAULT_META_NTV6_MAGIC);
+        ntv6[4] = protocol::VAULT_META_NTV6_PROTOCOL_VERSION;
+
+        vec![
+            ("MYV1", myv1),
+            ("NTV5", ntv5()),
+            ("NTV6", ntv6),
+            ("NTV7", ntv7),
+            ("NTV8", ntv8),
+        ]
+    }
+
+    fn dir_with_meta(bytes: &[u8]) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "myne-format-meta-{}-{:?}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0)
+        ));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        std::fs::write(dir.join("vault.meta"), bytes).expect("write vault.meta");
+        dir
+    }
+
+    /// **One dispatch table, every generation.**
+    ///
+    /// The export walk is the decrypter's only reader of `vault.meta`, and it
+    /// answers "whose vault is this?" through `parse_vault_meta_any` rather than
+    /// a magic comparison of its own. That is what keeps a new generation from
+    /// needing an edit here, but only while this crate really has no second
+    /// opinion, so the coverage is measured: a generation this reader stopped
+    /// accepting would make every export from that vault report "no account"
+    /// and silently drop the vault-scoped naming, with no error anywhere.
+    #[test]
+    fn the_export_walk_reads_every_generation_of_vault_meta() {
+        for (name, bytes) in every_generation() {
+            let dir = dir_with_meta(&bytes);
+            assert_eq!(
+                read_account_number_hash_blocking(&dir).expect("read vault.meta"),
+                Some(ACCT),
+                "[{name}] the export walk must read this generation's account hash"
+            );
+            std::fs::remove_dir_all(&dir).ok();
+        }
+    }
+
+    /// An unknown magic is `None` here rather than an error, deliberately: an
+    /// absent or foreign `vault.meta` degrades the account-scoped naming instead
+    /// of failing the export (§9.5.5's posture for optional singletons). The
+    /// named refusal lives where a user is present to read it, in `myne-decrypt`.
+    #[test]
+    fn an_unknown_magic_degrades_instead_of_failing_the_export() {
+        let mut future = ntv5();
+        future[0..4].copy_from_slice(b"FUT9");
+        let dir = dir_with_meta(&future);
+        assert_eq!(
+            read_account_number_hash_blocking(&dir).expect("read vault.meta"),
+            None
+        );
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}

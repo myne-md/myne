@@ -1,11 +1,21 @@
 // The identity-phrase door on a person-wrapped vault, in a browser
 // (myne-md/myne#911 task 13).
 //
-// # The gap this closes
+// # The fixture is deliberately an `NTV7` frame, and that is now the point
 //
-// The browser can CREATE a person-born (`NTV7`) vault through the identity
-// ceremony, and that vault's own recovery phrase does not exist: the phrase that
-// opens it is the account's. Both commands behind that door
+// Creation stopped producing `NTV7` on 2026-10-30 (myne-md/myne#938,
+// `decisions/protocol/0758`): a person-born vault is `NTV8`, which carries no
+// person wrap, so the identity phrase opens it nowhere and this door does not
+// render for one. `NTV7` stays READABLE forever, and this scenario is the
+// browser's proof of that: the fixture is a real `NTV7` container and the
+// identity phrase still opens it. The two generations therefore have one
+// scenario each, and neither is satisfied by the other.
+//
+// # The gap this closed, when `NTV7` was the birth format
+//
+// The browser could CREATE a person-born (`NTV7`) vault through the identity
+// ceremony, and that vault's own recovery phrase did not exist: the phrase that
+// opened it was the account's. Both commands behind that door
 // (`vault_is_person_wrapped` and `unlock_with_person_phrase`) existed in core as
 // `*_from_host` functions, but neither was classified in the wasm router, so the
 // `vault-unlock` plugin default (`Pending`) refused them. The visible result: a
@@ -18,8 +28,9 @@
 // 1. Boot reaches `/unlock` for the seeded container, so the probe is reading a
 //    real `vault.meta` through OPFS.
 // 2. `unlock.recovery-link` swaps to the identity sub-view. That swap happens
-//    only when `vault_is_person_wrapped` answered TRUE; a refused command
-//    answers false and the link opens the legacy recovery screen instead, whose
+//    only when `vault_is_person_wrapped` answered TRUE (the tri-state's middle
+//    answer; `null` means an `NTV8` vault and renders no link at all); a refused
+//    command answers false and the link opens the legacy recovery screen instead, whose
 //    first step has no phrase grid. So waiting for the grid is the assertion
 //    that the probe is dispatched rather than Pending.
 // 3. Typing the 24 words and submitting mounts the vault shell, which is the

@@ -147,15 +147,18 @@ describeE2E("VC-1 creation happy path at production KDF (MYND-124 task 1)", () =
       expect(UUID_RE.test(vaultId)).toBe(true);
       const metaPath = join(vaultsDir, vaultId, "vault.meta");
       const metaBytes = readFileSync(metaPath);
-      // `NTV7`, not `NTV5`: a vault created under an identity is the
-      // person-wrapped generation (myne-md/myne#911 tasks 2 and 5). This
-      // assertion IS the birth format's end-to-end proof: it runs against the
-      // production binary through the real creation UI, so nothing about it is
-      // seeded or mocked.
-      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV7");
-      // The frame is `445 + roster_len + 1208`, so it is NOT the 345-byte base.
-      // A length check here would be a second opinion about a number task 2
-      // owns, so the assertion is the inequality the shape implies.
+      // `NTV8`, not `NTV5` and no longer `NTV7`: a vault created under an
+      // identity is the password-only generation (myne-md/myne#938,
+      // `decisions/protocol/0758`). It keeps `NTV7`'s group tail and drops the
+      // 1208-byte person wrap, because the vault password is the only vault
+      // credential and a second sealed copy of `root_key` was the thing that made
+      // "forget the password" survivable. This assertion IS the birth format's
+      // end-to-end proof: it runs against the production binary through the real
+      // creation UI, so nothing about it is seeded or mocked.
+      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV8");
+      // Still not the 345-byte base: the frame is `445 + roster_len`. A length
+      // check here would be a second opinion about a number task 2 owns, so the
+      // assertion is the inequality the shape implies.
       expect(metaBytes.length).toBeGreaterThan(345);
 
       // The two eagerly seeded singletons keep their own generation (`MYP5` /

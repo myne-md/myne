@@ -211,13 +211,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("132 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("132 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -227,7 +227,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("132 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -308,7 +308,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("132 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -496,7 +496,15 @@ describe("check-twin-inventory", () => {
     // two different paths belongs. Kept as a second number on purpose rather than
     // derived, because this one is what fails when an entry is added to the TREE
     // without one being added here.
-    expect(ROSTER.length).toBe(132);
+    //
+    // 132 to 134: the device-key rungs (myne-md/myne#938 tasks 9 and 10) put the same
+    // dispatch file in two hosts and the same ceremony binding in two clients. The
+    // sweep cannot see either pair: `src-tauri/src/device_key.rs` and
+    // `mobile/src-tauri/src/device_key.rs` share a path only below different crate
+    // roots, and `src/lib/deviceAdmission.ts` against `mobile/src/lib/deviceAdmission.ts`
+    // is a cross-path pair like the two above. Both are `stays per-client` rather than
+    // shared code, which is why they are rostered instead of converged.
+    expect(ROSTER.length).toBe(134);
   });
 
   it("keeps `screen` narrow", () => {

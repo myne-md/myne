@@ -242,17 +242,13 @@ export function personJoinVault(
   });
 }
 
-/** Whether this vault is a member vault (unlocked by the person phrase). */
+/** Whether this vault is a member vault on THIS device, i.e. it carries a
+ *  device-local member credential (`vault.member-unlock`). Since
+ *  myne-md/myne#938 task 12 that store is the only member store: the phrase-sealed
+ *  `vault.member-key` is retired, so a member vault is unlocked with its password,
+ *  PIN or biometric and never with the phrase. */
 export function memberVaultStatus(vaultId: string): Promise<boolean> {
   return invoke<boolean>("plugin:sync|sync_member_vault_status", { vaultId });
-}
-
-/** Re-unlock a member vault from the person's own recovery phrase. */
-export function personUnlockMemberVault(vaultId: string, phrase: string): Promise<void> {
-  return invoke<void>("plugin:sync|sync_person_unlock_member_vault", {
-    vaultId,
-    phrase,
-  });
 }
 
 /** The configured member-vault fast-unlock method, or null. */

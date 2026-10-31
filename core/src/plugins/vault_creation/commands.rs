@@ -388,8 +388,8 @@ pub fn build_session(
     })
 }
 
-/// Build a **person-born** creation session: the `NTV7` generation
-/// (myne-md/myne#911 task 5).
+/// Build a **person-born** creation session: the `NTV8` generation
+/// (myne-md/myne#911 task 5, retargeted by myne-md/myne#938).
 ///
 /// Three differences from [`build_session`], and each is a retirement rather
 /// than an addition:
@@ -398,7 +398,9 @@ pub fn build_session(
 ///   wrapped. The person's identity phrase is the single recovery credential and
 ///   it already exists on the device.
 /// - **No recovery salt or wrap key.** Their three §9.3 fields are written as
-///   zeros, which `NTV7`'s writer and parser both enforce structurally.
+///   zeros, which `NTV8`'s writer and parser both enforce structurally.
+/// - **No person wrap either**, so the identity phrase does not open the vault:
+///   the password is the only door (`decisions/protocol/0758`).
 /// - **A random per-vault binding** replaces `account_number_hash` as the salt
 ///   input. The number is a property of the PERSON, so it can no longer
 ///   separate one vault of that person from another, and the generation keeps it
@@ -428,7 +430,7 @@ pub fn build_person_session(
         kdf_params,
         root_key,
         salt_password,
-        // All zero: there is no recovery wrap in this generation, and `NTV7`
+        // All zero: there is no recovery wrap in this generation, and `NTV8`
         // refuses to write a frame where they are anything else.
         salt_recovery: [0u8; ARGON2_SALT_LEN],
         password_wrap_key,
@@ -1082,12 +1084,12 @@ pub fn build_and_serialize_vault_meta_with_membership(
     Ok(protocol::serialize_vault_meta_v0_2(&meta))
 }
 
-/// [`build_and_serialize_vault_meta`] for a PERSON-BORN session: the `NTV7`
-/// frame (myne-md/myne#911 task 5).
+/// [`build_and_serialize_vault_meta`] for a PERSON-BORN session: the `NTV8`
+/// frame (myne-md/myne#911 task 5, retargeted by myne-md/myne#938).
 ///
 /// Separate rather than folded into the function above because that one returns
 /// a fixed 345-byte array, which is exactly what this generation is not
-/// (`445 + roster_len + 1208`). Split on the session's own shape rather than on
+/// (`445 + roster_len`). Split on the session's own shape rather than on
 /// a caller flag, so a caller cannot ask for a generation the session was not
 /// built for.
 pub fn build_and_serialize_person_vault_meta(
@@ -1109,12 +1111,12 @@ type SerializedMeta = (Vec<u8>, Option<Zeroizing<[u8; 32]>>);
 /// commit paths share the write below.
 ///
 /// A person-born session answers differently in two ways, and both are
-/// structural rather than cosmetic. Its frame is `NTV7`, whose length is not a
-/// constant (`445 + roster_len + 1208`). And it carries its membership through
+/// structural rather than cosmetic. Its frame is `NTV8`, whose length is not a
+/// constant (`445 + roster_len`). And it carries its membership through
 /// the signed roster, not through the `NTV5` §9.3.1 field, so an eagerly sealed
-/// membership is DROPPED here rather than passed through: `NTV7`'s writer
-/// refuses a base carrying that field, and writing it anyway would shift every
-/// offset past the base.
+/// membership is DROPPED here rather than passed through: this generation's
+/// writer refuses a base carrying that field, and writing it anyway would shift
+/// every offset past the base.
 ///
 /// The group key comes back with the bytes because the caller's eager singleton
 /// writes have to seal under the GROUP tier for this generation, exactly as the
@@ -1134,16 +1136,18 @@ fn serialize_meta(
     Ok((bytes, None))
 }
 
-/// Build the `NTV7` frame for a person-born session: the `NTV6` tail `NTV7`
-/// extends, a zeroed phrase wrap, and `root_key` sealed to the owner's person
-/// key (myne-md/myne#911 task 5).
+/// Build the `NTV8` frame for a person-born session: the `NTV6` tail it keeps, a
+/// zeroed phrase wrap, and no second credential of any kind (myne-md/myne#938,
+/// `decisions/protocol/0758`).
 ///
 /// The shape mirrors `vault_migrate::b2b`'s owner migration, deliberately: that
 /// function is the worked example of "mint a group key, wrap it under the owner
 /// subkey, seal `items_key` under the group tier, sign a one-row owner roster,
-/// seal the roster". The differences are the ones this generation is FOR: no
-/// phrase wrap at all, and a `root_key` sealed to a person rather than only to a
-/// password.
+/// seal the roster". What is left of the `NTV7` shape is the roster, which is
+/// signed by the person because a signature is identity work and needs no vault
+/// credential. The person wrap is gone: `root_key` is sealed under the password
+/// and nothing else, so the phrase cannot open this vault even with the identity
+/// unlocked.
 ///
 /// Returns the group key alongside the bytes because the caller's eager
 /// `vault.prefs` / `vault.attachments` writes are sealed under the group tier in
@@ -1227,15 +1231,6 @@ fn build_person_vault_meta(
     )
     .ok_or(AppError::Protocol(protocol::ProtocolError::AeadFailure))?;
 
-    // The retirement itself: `root_key` sealed to the owner's person key, in
-    // the same PQ-hybrid envelope the member group-key package uses.
-    let person_wrap = protocol::seal_root_key_to_person_raw(
-        &owner_public,
-        &session.root_key,
-        &items_key_id,
-        &mut rng,
-    )?;
-
     let base = protocol::VaultMeta {
         // The vault's own random namespace id, NOT the person's number hash:
         // this generation keeps the number out of vault cryptography, and the
@@ -1244,7 +1239,7 @@ fn build_person_vault_meta(
         kdf_params: session.kdf_params,
         random_salt_password: session.salt_password,
         // Zeroed, and structurally enforced on both the write and the read
-        // side by `serialize_vault_meta_ntv7` / `parse_vault_meta_ntv7`.
+        // side by `serialize_vault_meta_ntv8` / `parse_vault_meta_ntv8`.
         random_salt_recovery: [0u8; ARGON2_SALT_LEN],
         nonce_password_wrap,
         enc_root_key_password,
@@ -1260,7 +1255,7 @@ fn build_person_vault_meta(
         membership: None,
         person_binding: None,
     };
-    let frame = protocol::PersonWrappedVaultMeta {
+    let frame = protocol::PasswordOnlyVaultMeta {
         base,
         group_key_nonce,
         enc_group_key: enc_group_key
@@ -1268,9 +1263,8 @@ fn build_person_vault_meta(
             .expect("a 32-byte secret seals to 64 bytes"),
         group_key_epoch: epoch,
         signed_roster_envelope,
-        person_wrap,
     };
-    let bytes = protocol::serialize_vault_meta_ntv7(&frame)?;
+    let bytes = protocol::serialize_vault_meta_ntv8(&frame)?;
     Ok((bytes, group_bytes))
 }
 
@@ -1712,15 +1706,19 @@ mod tests {
     }
 
     #[test]
-    fn person_born_meta_is_ntv7_with_a_zeroed_phrase_wrap() {
+    fn person_born_meta_is_ntv8_with_a_zeroed_phrase_wrap() {
         let person = person_fixture(PERSON_PHRASE);
         let session =
             build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
                 .expect("person session");
         let (bytes, _group) =
-            build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
-        assert_eq!(&bytes[..4], &protocol::VAULT_META_NTV7_MAGIC);
-        let parsed = protocol::parse_vault_meta_ntv7(&bytes).expect("parse NTV7");
+            build_and_serialize_person_vault_meta(&session).expect("serialize NTV8");
+        assert_eq!(&bytes[..4], &protocol::VAULT_META_NTV8_MAGIC);
+        assert_eq!(
+            protocol::vault_meta_generation(&bytes),
+            protocol::VaultMetaGeneration::PersonNoWrap
+        );
+        let parsed = protocol::parse_vault_meta_ntv8(&bytes).expect("parse NTV8");
         // The three fields the retired phrase wrap owned, all zero.
         assert_eq!(parsed.base.random_salt_recovery, [0u8; ARGON2_SALT_LEN]);
         assert_eq!(parsed.base.nonce_recovery_wrap, [0u8; AEAD_NONCE_LEN]);
@@ -1732,14 +1730,32 @@ mod tests {
         // field and the salts bind the same value.
         assert_eq!(parsed.base.account_number_hash, session.vault_binding);
         assert_eq!(parsed.group_key_epoch, 1);
+
+        // The structural proof that no person wrap exists: the frame is exactly
+        // the fixed prefix plus the roster, and there is no block after it that a
+        // later writer could fill in. A length is not a convention a writer can
+        // relax the way it could relax a zero-filled field, which is why
+        // `decisions/protocol/0758` chose truncation over zeroing.
+        assert_eq!(
+            bytes.len(),
+            protocol::NTV8_FIXED_LEN + parsed.signed_roster_envelope.len(),
+            "NTV8 is the fixed prefix plus the roster, and nothing else"
+        );
+        // And the two generations differ by exactly that block, which is what
+        // makes the `NTV7` to `NTV8` upgrade a truncation rather than a re-wrap.
+        assert_eq!(
+            protocol::NTV7_FIXED_LEN,
+            protocol::NTV8_FIXED_LEN + protocol::PERSON_WRAP_LEN,
+            "the generations differ by exactly the person wrap"
+        );
     }
 
     #[test]
     fn committing_a_person_born_vault_seals_its_singletons_under_the_group_tier() {
         // Two claims in one end-to-end run, because they are one chain: the
-        // person wrap opens the `root_key`, that `root_key` unwraps the group
-        // key, and the group key is what the eagerly written `vault.prefs` is
-        // sealed under.
+        // PASSWORD opens the `root_key`, that `root_key` unwraps the group key,
+        // and the group key is what the eagerly written `vault.prefs` is sealed
+        // under.
         //
         // The tier is load-bearing. Sealed under the ROOT tier instead, the
         // first unlock would fail to open `vault.prefs` and fall back to
@@ -1752,6 +1768,7 @@ mod tests {
             let session =
                 build_person_session(VaultId::mint(), "person-born-pw", FAST_TEST_KDF, person)
                     .expect("person session");
+            let session_root_key = *session.root_key;
             let state = VaultCreationState::default();
             let token = Uuid::new_v4();
             state
@@ -1764,17 +1781,40 @@ mod tests {
 
             let vault_dir = scratch.path().parent().expect("vault dir");
             let meta = std::fs::read(scratch.path()).expect("vault.meta");
-            assert_eq!(&meta[..4], &protocol::VAULT_META_NTV7_MAGIC);
-            let parsed = protocol::parse_vault_meta_ntv7(&meta).expect("parse NTV7");
+            assert_eq!(&meta[..4], &protocol::VAULT_META_NTV8_MAGIC);
+            let parsed = protocol::parse_vault_meta_ntv8(&meta).expect("parse NTV8");
 
-            // Acceptance 3, at the seam the phrase arm uses: the owner's own
-            // keypair opens the person wrap without the password.
-            let root_key = protocol::open_person_wrapped_root_key(
-                &owner_pair,
-                &parsed.person_wrap,
-                &parsed.base.items_key_id,
+            // The inversion this generation exists for. On `NTV7` the owner's
+            // own keypair opened the person wrap and reached `root_key` without
+            // the password; here there is no person wrap to hand an opener, and
+            // the frame's length is the proof rather than a convention: an
+            // `NTV7` frame with this same tail would be exactly
+            // `PERSON_WRAP_LEN` bytes longer, and those bytes are the ones that
+            // used to open under the identity. The runtime half of the same
+            // claim (a phrase presented to this file refuses) is
+            // `vault_unlock::commands::tests::the_identity_phrase_does_not_open_a_password_only_vault`.
+            assert_eq!(
+                meta.len() + protocol::PERSON_WRAP_LEN,
+                protocol::NTV7_FIXED_LEN + parsed.signed_roster_envelope.len(),
+                "the bytes the owner's keypair used to open are not in this frame"
+            );
+
+            // `root_key` is reachable through the password and through nothing
+            // else, which is what makes the password the only vault credential.
+            let root_key = protocol::unlock_root_key_v0_2_password(
+                &parsed.base,
+                "person-born-pw",
+                &parsed.base.account_number_hash,
             )
-            .expect("the person wrap opens with the owner's identity");
+            .expect("the password opens the root key");
+            assert_eq!(*root_key, session_root_key);
+
+            // A second, weaker control: the identity keypair still exists and is
+            // still what signs the roster, so "no person wrap" is not "no
+            // person". A fixture that lost the pair would pass every assertion
+            // above for the wrong reason.
+            assert_ne!(*owner_pair.public_half().fingerprint(), [0u8; 32]);
+
             let owner_key = protocol::OwnerKey::new(*root_key);
             let group_bytes = protocol::unlock_group_key_ntv6(&parsed.as_ntv6_tail(), &owner_key)
                 .expect("the owner subkey unwraps the group key");

@@ -28,6 +28,13 @@ pub use myne_core::export_naming;
 // Desktop wiring of `myne_core::hooks::VaultLifecycleHooks` — the lifecycle
 // side-effects the shared command cores trigger (search/spell/attachments/
 // pdf/workspace/screen-capture/sync) that do not live in `myne-core`.
+// The Windows half of the device signing key's storage ladder
+// (`decisions/protocol/0733` decision 4, rung 2 on Windows; myne-md/myne#938 task
+// 10): DPAPI, user-scoped, over the `DeviceKeyProvider` seam. A no-op off Windows,
+// where `core`'s Apple and Linux arms already answer.
+mod device_key;
+#[cfg(windows)]
+mod device_key_dpapi;
 mod hooks;
 // myne-md/myne#860: the diagnostic log's runtime. Installed in `Builder::setup`
 // because the file layer needs an `AppHandle` to resolve the platform log
@@ -685,6 +692,12 @@ pub fn run() {
             let hooks: myne_core::hooks::Hooks =
                 std::sync::Arc::new(hooks::DesktopHooks::new(app.handle().clone()));
             app.manage(hooks);
+            // myne-md/myne#938 task 10: hand `myne-core` the Windows DPAPI store, so a
+            // Windows install keeps a device signing key instead of needing the phrase
+            // to sync. Installed before any command can run, and only ever once per
+            // process: a second provider would be a second device key, and the
+            // device's binding follows one key. A no-op off Windows.
+            device_key::install(app.handle());
             // MYND-29: app-level live in-RAM search-index state, updated
             // incrementally by the notes lifecycle (create/update/delete) and
             // queried by the search command; cleared on lock (Task 8).

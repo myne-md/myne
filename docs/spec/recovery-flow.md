@@ -6,19 +6,38 @@
 
 ## 1. Scope
 
-> **Generation-scoped (myne-md/myne#911).** This document specifies the **vault**
-> recovery phrase's ceremony. Since `protocol.md` §9.3.5 a vault born under a
-> person identity has no vault phrase: the recovery wrap is required to be all
-> zero, creation skips §2 entirely (no kit, no type-back), and the second
-> credential is the identity phrase, whose display and type-back live in the
-> identity ceremony (`decisions/protocol/0717`, `decisions/ui/0721`). Everything
-> below remains normative for every vault that carries a vault phrase
-> (`MYV1`/`NTV5`/`NTV6`), which stays readable and recoverable forever.
+> **Generation-scoped twice, and the second scope is the larger one.**
+>
+> **(a) `NTV8`, the birth generation since 2026-10-30 (`decisions/protocol/0758`,
+> myne-md/myne#938): there is no vault-content recovery at all.** An `NTV8` frame
+> seals `root_key` under the password wrap alone. It has no recovery wrap and no
+> person wrap, so §3 (recovery-time UX), §4 (the chained password reset) and §3.7
+> (joining a device with the phrase) describe a procedure with nothing to decrypt
+> on such a vault, and a client MUST NOT offer any of them for one: the unlock
+> surface shows no recovery affordance, and a forgotten password means that vault
+> is gone. §2 is skipped too, exactly as (b) describes, and for the same reason:
+> creation generates no vault phrase. **What survives for an `NTV8` vault is the
+> identity arm**, which is specified in the identity ceremony rather than here:
+> the phrase recovers the person (their keypair, their account number, their vault
+> list on a new device) and opens no note. Read this document as the history of a
+> retired ceremony for those vaults, kept because the frames it describes are on
+> disks today.
+>
+> **(b) `NTV7`, 2026-10-22 to 2026-10-30 (myne-md/myne#911).** A vault born under
+> a person identity has no vault phrase either: the recovery wrap is required to
+> be all zero, creation skips §2 entirely (no kit, no type-back), and the second
+> credential was the identity phrase, whose display and type-back live in the
+> identity ceremony (`decisions/protocol/0717`, `decisions/ui/0721`). Unlike (a),
+> an `NTV7` vault DOES have a content-recovery path, and it is the phrase through
+> the person wrap rather than the procedure below.
+>
+> **(c) Everything below remains normative** for every vault that carries a vault
+> phrase (`MYV1`/`NTV5`/`NTV6`), which stays readable and recoverable forever.
 
 This document covers two halves of the same lifecycle:
 
 1. **Create-time recovery UX** — the screens and rules that present the freshly generated recovery phrase to the user at vault creation and force its confirmation. Already implemented in `src/screens/vault-creation/` (B3a + B3b); this section captures the canonical behavior.
-2. **Recovery-time UX** — the screens and rules for unlocking a vault when the master password has been forgotten, using the 24-word recovery phrase. Forward-design for B4b implementation.
+2. **Recovery-time UX**: the screens and rules for unlocking a vault when the master password has been forgotten, using the 24-word recovery phrase. Forward-design for B4b implementation, and **retired for `NTV8`** by the scope note above: no `NTV8` vault has anything for it to decrypt.
 
 Out of scope:
 
@@ -30,7 +49,7 @@ Out of scope:
 
 ## 2. Create-time recovery UX
 
-> **Generation scope (myne-md/myne#911).** This section applies only to a vault that carries a vault phrase (`MYV1`/`NTV5`/`NTV6`). A vault born under the person plane has no phrase screen and no confirmation step: §2.1 does not generate a vault phrase, §2.2's kit is not shown, and §2.3's type-back is not asked, because the identity ceremony already revealed the identity phrase behind a reveal and passed it through its own four-word challenge before that vault existed (`protocol.md` §7 scope note, `decisions/protocol/0717`, `decisions/ui/0721`). The desktop creation flow goes from the password step straight to writing the vault. Everything in this section stays normative for a vault that has a phrase.
+> **Generation scope (myne-md/myne#911, widened by myne-md/myne#938).** This section applies only to a vault that carries a vault phrase (`MYV1`/`NTV5`/`NTV6`). An `NTV8` vault has none either (`decisions/protocol/0758`), so creation there also skips this section entirely: no kit, no type-back, no phrase screen. The rule for a modern client is therefore "a vault born by this client shows no vault phrase at all", and the ceremony below is what a legacy vault's owner still gets. A vault born under the person plane has no phrase screen and no confirmation step: §2.1 does not generate a vault phrase, §2.2's kit is not shown, and §2.3's type-back is not asked, because the identity ceremony already revealed the identity phrase behind a reveal and passed it through its own four-word challenge before that vault existed (`protocol.md` §7 scope note, `decisions/protocol/0717`, `decisions/ui/0721`). The desktop creation flow goes from the password step straight to writing the vault. Everything in this section stays normative for a vault that has a phrase.
 
 ### 2.1 Phrase generation
 
@@ -83,7 +102,7 @@ The recovery phrase is shown to the user on §2.2 **exactly once**, and never ag
 
 Amended 2026-10-28 (myne-md/myne#935): the read-only verification §3.6 once specified is withdrawn, so this commitment is now unqualified. Nothing in any client accepts the phrase again while the vault is unlocked, and no client MAY add such a surface without a new `decisions.md` entry.
 
-This commitment is **narrow**: it covers the *generated* phrase displayed at vault creation. It does not extend to user-typed input during recovery (§3.2), which is governed separately (§3.5). A future client MUST NOT add a "show me my recovery phrase" affordance under any authenticated condition; the architecture additionally enforces this structurally because the phrase plaintext is zeroized at vault creation and only `enc_root_key_recovery` survives on disk.
+This commitment is **narrow**: it covers the *generated* phrase displayed at vault creation. It does not extend to user-typed input during recovery (§3.2), which is governed separately (§3.5). A future client MUST NOT add a "show me my recovery phrase" affordance under any authenticated condition; the architecture additionally enforces this structurally because the phrase plaintext is zeroized at vault creation and, for a legacy vault, only `enc_root_key_recovery` survives on disk. On an `NTV8` vault the structural half is stronger than this section needs: there is no phrase to re-display, because creation never makes one.
 
 ---
 
@@ -91,7 +110,7 @@ This commitment is **narrow**: it covers the *generated* phrase displayed at vau
 
 ### 3.1 Entry point
 
-The recovery flow MUST be reachable from the vault-unlock screen via an explicit affordance (e.g., a "Recover with phrase" link or button). The visual and interaction design of that affordance is specified by the vault-unlock-screen spec (B4a) and is out of scope here. No other entry points to recovery are defined for v0.1; adding one (command palette, settings menu, deep link) requires a new `decisions.md` entry.
+The recovery flow MUST be reachable from the vault-unlock screen via an explicit affordance (e.g., a "Recover with phrase" link or button) **on a vault that has a recovery wrap**. On an `NTV8` vault the affordance MUST NOT be rendered at all: there is nothing to decrypt, and a control that leads to a guaranteed failure is the form-would-fail shape this repository refuses elsewhere (`decisions/protocol/0758`; §9.3.6 forbids an unlock surface from offering a phrase). The visual and interaction design of that affordance is specified by the vault-unlock-screen spec (B4a) and is out of scope here. No other entry points to recovery are defined for v0.1; adding one (command palette, settings menu, deep link) requires a new `decisions.md` entry.
 
 **A surface that accepts the phrase as a CREDENTIAL is not an entry point to recovery**, and the distinction is what keeps the sentence above true as the product grows. Recovery replaces a forgotten master password: it derives `recovery_wrap_key`, transitions the slot to `Slot::Recovering`, and is not finished until a new password is committed (§4). A credential surface derives a key and stops. Eight non-recovery credential surfaces exist today, and none is reachable from this flow or leads into it: device enrolment (`sync_enroll`, which also accepts account number plus master password), the SOURCE-vault credential of a vault import (`Slot::ImportSource`, myne-md/myne#464), the B2B member-identity unlock (`src/components/sync/PersonIdentityUnlock.tsx`, `myne-md/myne#698`), the B2B member-vault unlock (`myne-md/myne#711`), identity-only recovery (`src/components/IdentitySetupDialog.tsx`), the vault-migration credential (`src/components/settings/MigrateVaultForm.tsx`), person-identity registration from the identity home, and person-identity registration from Settings → Sync (both `src/components/sync/PersonRegisterForm.tsx`). All are subject to §3.2 below, which is where the rules that DO travel are stated.
 
@@ -166,7 +185,7 @@ The section number is kept rather than closed up so that existing references to 
 
 ### 3.7 Joining a new device with the phrase
 
-A device join MAY use the phrase instead of the password (`decisions/sync/0641`, myne-md/myne#468), for a user who has lost every other device and so has nobody to approve a password join.
+A device join MAY use the phrase instead of the password (`decisions/sync/0641`, myne-md/myne#468), for a user who has lost every other device and so has nobody to approve a password join. **On an `NTV8` vault this is the identity half only** (`decisions/protocol/0758`, myne-md/myne#938 task 11): the phrase enrols and self-approves the device as that person, and the device then still needs the vault's password to open it, which is the whole point of separating the two credentials. A join that claimed to open the vault from the phrase would be the second door `0758` removes, and a client MUST NOT offer one.
 
 - **Path.** The enrolment sends the `recovery` path (`server-protocol.md`), which the server self-approves.
 - **Opening the vault** uses the same pipeline as §3.2–§3.4, so the vault is `Recovering` afterwards and the §4 mandatory password reset follows before it can be used.

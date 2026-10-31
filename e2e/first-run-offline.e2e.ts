@@ -95,9 +95,10 @@ describeE2E("first run offline (myne-md/myne#911 task 6)", () => {
       });
       expect(await app.session.byTestIdAll("create.phrase-grid")).toHaveLength(0);
 
-      // The birth format, read off disk. `NTV7` is the person-wrapped
-      // generation: `root_key` sealed to the identity, roster signed, and the
-      // three phrase-wrap fields structurally zero.
+      // The birth format, read off disk. `NTV8` is the password-only generation
+      // (myne-md/myne#938, `decisions/protocol/0758`): the group tail `NTV7`
+      // introduced, no person wrap at all, and the three phrase-wrap fields
+      // structurally zero.
       const vaultsDir = join(app.appDataDir, "vaults");
       // The entry type is named rather than inferred: this tsconfig has no
       // `@types/node`, so an untyped `readdirSync` overload leaves `d` as
@@ -107,10 +108,10 @@ describeE2E("first run offline (myne-md/myne#911 task 6)", () => {
         .map((d: { name: string }) => d.name);
       expect(ids).toHaveLength(1);
       const metaBytes = readFileSync(join(vaultsDir, ids[0], "vault.meta"));
-      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV7");
-      // Not the 345-byte base any more: the frame is
-      // `445 + roster_len + 1208`, so a length check here would be a second
-      // opinion about a number task 2 owns. Assert it is NOT the base instead.
+      expect(metaBytes.subarray(0, 4).toString("latin1")).toBe("NTV8");
+      // Not the 345-byte base any more: the frame is `445 + roster_len`, so a
+      // length check here would be a second opinion about a number task 2 owns.
+      // Assert it is NOT the base instead.
       expect(metaBytes.length).toBeGreaterThan(345);
 
       // Done → auto-unlock chain (production Argon2id again) → editor.

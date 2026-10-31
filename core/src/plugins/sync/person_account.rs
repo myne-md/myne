@@ -709,6 +709,97 @@ pub async fn person_join_device_from_host(
     })
 }
 
+/// Seed the ACTIVE vault's sync state with this device's **person-plane**
+/// identity, then claim the device's binding row.
+///
+/// # Why this exists, and what it fixes
+///
+/// `sync-state.json`'s `device_id_hex` is written by the two enrolment paths that
+/// create a vault SCRAM account: account enrolment and member-vault accept. A
+/// **person-born** vault has no such account at all: it is addressed with the
+/// person token and the `?account=` selector, so a device that joined the person
+/// and opened the vault had no device id in the vault's sync state. Everything
+/// downstream then stood down quietly:
+///
+/// - `device_binding::session_device_id` answered `NoDeviceId`, so
+///   `claim_own_binding_best_effort` wrote nothing and this device had no `MYU5`
+///   row;
+/// - `cycle::head_context` needs a device id, a device key at rest AND a verified
+///   row that publishes that key before it authors a `0x03` head, so the cycle
+///   kept signing `0x02` heads with the person key;
+/// - and an `0x02` head needs the phrase in the session, which is the loop this
+///   feature exists to break.
+///
+/// The id is not invented here. It is the id the person plane already minted for
+/// this device (`person-auth.json`'s `device_id_hex`, from the admission or the
+/// registration), which is why adopting it makes the vault's actor and the
+/// person-plane device the same device rather than two rows nobody can join.
+///
+/// # Why it never overwrites
+///
+/// An EXISTING `device_id_hex` is left alone, and the reason is data loss rather
+/// than tidiness: the id is the Automerge actor note authoring derives from
+/// (`sync::state::read_device_actor`). Replacing it on a vault that already has
+/// notes would make every future edit a new actor's, splitting the CRDT history
+/// of a vault that was working. Only the absent case is seeded.
+///
+/// `own_identity_code` is refreshed from the person plane's public halves for the
+/// same reason the identity-unlock path caches it: it is public material this
+/// device derived itself, and it is what lets a cold start verify an owner-signed
+/// roster without the phrase. Nothing private is read or written here.
+///
+/// Best-effort end to end: every failure leaves the vault exactly as it was, and
+/// the caller falls back to the `0x02` head every peer already accepts.
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn adopt_person_device_identity_best_effort(
+    host: &dyn HostCtx,
+    io: &dyn VaultIo,
+    vault_dir: &std::path::Path,
+) -> bool {
+    let Ok(auth_path) = person_auth_path(host, io).await else {
+        return false;
+    };
+    let Ok(Some(auth)) = read_person_auth(io, &auth_path).await else {
+        return false;
+    };
+    let Some(device_id) = super::devices::hex16(auth.device_id_hex.trim()) else {
+        return false;
+    };
+    let Ok(mut st) = super::state::read_sync_state(io, vault_dir).await else {
+        return false;
+    };
+    let mut dirty = false;
+    if st.device_id_hex.is_none() {
+        st.device_id_hex = Some(crate::account::person_identity::hex_lower(&device_id));
+        dirty = true;
+    }
+    // The code is rebuilt from the halves rather than stored as a blob, so a
+    // person key transition refreshes it instead of pinning the retired key.
+    if let (Some(person_id), Some(public)) = (
+        super::devices::hex16(auth.person_id_hex.trim()),
+        protocol::person_key::PersonPublicHalf::from_parts_hex(
+            &auth.kem_ek_hex,
+            &auth.ed_pk_hex,
+            &auth.mldsa_vk_hex,
+        )
+        .ok(),
+    ) {
+        let code = super::invite::encode_person_identity_code(&person_id, &public);
+        if st.own_identity_code.as_deref() != Some(code.as_str()) {
+            st.own_identity_code = Some(code);
+            dirty = true;
+        }
+    }
+    if dirty
+        && super::state::write_sync_state(io, vault_dir, &st)
+            .await
+            .is_err()
+    {
+        return false;
+    }
+    true
+}
+
 /// Finish a pending device's enrolment once an existing device approved it
 /// (myne-md/myne#911 task 9).
 ///
@@ -1055,6 +1146,25 @@ pub async fn forget_person_from_host(
     // that refuses the delete must not leave the device with an identity it failed
     // to forget.
     super::device_identity::destroy();
+    // And the rung-3 sealed copy, which lives outside any keychain: a PIN-sealed
+    // device key left behind is the same leak the delete above exists to prevent, one
+    // rung down. Best-effort and path-scoped, so a host with no config directory (or a
+    // device that never used rung 3) costs nothing.
+    if let Ok(dir) = host.app_config_dir() {
+        // A failure here is logged rather than returned: the identity is already
+        // gone and this is its last rung, so refusing would hand the caller a
+        // half-forgotten device over a key that no longer belongs to anyone. It is
+        // logged because the `let _ =` this replaced read as success
+        // (myne-md/myne#938 review), and the call is idempotent, so the next
+        // `forget` retries it.
+        if super::device_key_pin::wipe(io, &dir).await.is_err() {
+            tracing::warn!(
+                stage = "device_key_pin_wipe",
+                error_kind = "WipeFailed",
+                "identity forgotten; the PIN-sealed device key could not be removed"
+            );
+        }
+    }
     // Last, and only once the credential is gone: the marker exists to tell a
     // later session that an identity is present but not loaded, so clearing it
     // before the credential would turn a half-forgotten device into one that
@@ -1744,11 +1854,12 @@ pub struct AcceptedInviteView {
 /// Deliberately ONE function rather than two copies. Every line here is
 /// load-bearing for the same reason: the directory is create-only, so a partial
 /// install must remove it rather than leave something the vault list reads as a
-/// real vault; the phrase-sealed `vault.member-key` and the mandatory
-/// `vault.member-unlock` credential are both written BEFORE the slot install,
-/// which consumes the key values; and a failed slot install (`None`, meaning a
-/// busy slot or a changed session) is a retryable `Transport`, not a lockout. A
-/// second copy of that ordering is a second place for it to drift.
+/// real vault; the mandatory `vault.member-unlock` credential is written BEFORE
+/// the slot install, which consumes the key values; and a failed slot install
+/// (`None`, meaning a busy slot or a changed session) is a retryable `Transport`,
+/// not a lockout. A second copy of that ordering is a second place for it to
+/// drift. `vault.member-key` is not written at all since myne-md/myne#938 task
+/// 12: a member's one way in is the password.
 #[allow(clippy::too_many_arguments)]
 #[cfg(not(target_arch = "wasm32"))]
 async fn materialize_member_vault(
@@ -1797,38 +1908,21 @@ async fn materialize_member_vault(
         return Err(e);
     }
 
-    // Persist the member keys, sealed under the member's own phrase, so the
-    // vault can be re-unlocked later without a password (task 25). Written
-    // BEFORE the slot install, which consumes the key values.
-    let member_key_written = super::member_key_store::write_member_key_store(
-        io,
-        &vault_dir,
-        vault_id.as_uuid().as_bytes(),
-        &account_hash,
-        epoch,
-        &items_key_id,
-        &b2b.base.kdf_params,
-        phrase_normalized,
-        &group_key,
-        &items_key,
-    )
-    .await;
-    if member_key_written.is_err() {
-        tracing::warn!(
-            stage = "member_vault_member_key_store",
-            "member vault refused"
-        );
-        let _ = io.remove_dir_all(&vault_dir).await;
-        return Err(SyncDeviceError::Internal);
-    }
+    // `vault.member-key` (the phrase-sealed sibling) is NOT written: since
+    // myne-md/myne#938 task 12 a member has exactly one way in and it is the
+    // password, so the fast credential below is the only store. Keeping both
+    // would leave a phrase-reachable copy of the group key on disk next to a
+    // password-gated one, which is the second path this task retires.
 
     // The REQUIRED fast credential, written as part of installing the member session and
     // BEFORE the slot install, which consumes the key values. An accepted vault that
     // carries no fast credential would make the mandatory password a lie, so a failure
     // here removes the directory this call just created and refuses: an invite that
     // failed to materialize fully is one the user retries, not one they are locked out
-    // of. The phrase-sealed `vault.member-key` above stays the portable fallback.
-    write_accept_fast_credential(
+    // of. There is no fallback: the phrase-sealed `vault.member-key` is retired
+    // (myne-md/myne#938 task 12), so a member device that loses this credential
+    // needs a fresh invite from the owner.
+    let gate = write_accept_fast_credential(
         io,
         &vault_dir,
         &vault_id,
@@ -1862,6 +1956,16 @@ async fn materialize_member_vault(
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
 
+    // The private `MYY5` profile stays sealed under a PHRASE-derived KEK, not the
+    // vault gate (myne-md/myne#938 task 12, `0763`): the same container carries the
+    // PINNED owner identity code, and a second device's join has to read that
+    // before any gate exists, so moving the seal would break the join `#911` task
+    // 7 built. `write_accept_fast_credential` therefore returns the gate key and
+    // nothing here consumes it: it is `dropped` rather than bound, because a
+    // `let _ = &gate` reads as an unfinished migration and the gate-derived key is
+    // exercised where it belongs, by the store's own tests
+    // (`protocol::derive_person_vault_profile_key_from_gate`).
+    drop(gate);
     let profile_id = protocol::person_profile_id(&person_id, &account_hash);
     let profile = protocol::derive_person_vault_profile_key(
         phrase_normalized,
@@ -2095,7 +2199,7 @@ pub async fn accept_invite_from_host(
 ///
 /// Split out of [`accept_invite_from_host`] because every input is a value the accept
 /// has already derived, so this half is testable without a server: the seal is the one
-/// [`super::member_unlock_store::write_member_unlock_password`] writes for the Privacy
+/// [`crate::plugins::sync::member_unlock_store::write_member_unlock_password`] writes for the Privacy
 /// screen and the unlock path, with the accept-time `group_key` / `items_key` /
 /// `items_key_id` / epoch / `person_id` and the same person keypair. There is exactly
 /// one credential format, so "the password set during accept opens the vault next
@@ -2121,8 +2225,8 @@ async fn write_accept_fast_credential(
     group_key: &[u8; 32],
     items_key: &[u8; 32],
     pair: &protocol::PersonKeyPair,
-) -> Result<(), SyncDeviceError> {
-    let written = super::member_unlock_store::write_member_unlock_password(
+) -> Result<crate::plugins::sync::member_unlock_store::MemberUnlockGate, SyncDeviceError> {
+    let written = crate::plugins::sync::member_unlock_store::write_member_unlock_password(
         io,
         vault_dir,
         vault_id.as_uuid().as_bytes(),
@@ -2145,7 +2249,7 @@ async fn write_accept_fast_credential(
         let _ = io.remove_dir_all(vault_dir).await;
         return Err(SyncDeviceError::Internal);
     }
-    Ok(())
+    Ok(written.expect("the error arm returned above"))
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -2571,237 +2675,6 @@ pub async fn sync_member_join_vault<R: tauri::Runtime>(
     Ok(accepted)
 }
 
-/// **Re-unlock a member vault from the recovery phrase** (myne-md/myne#711
-/// task 25). A member has no vault password, so the boot probe routes a member
-/// vault to this instead of the password Unlock: it opens the device-local
-/// sealed member-key store with the phrase, re-derives the person identity, and
-/// installs the member slot.
-#[cfg(not(target_arch = "wasm32"))] // member surface: refused on web (myne-md/myne#911 task 13)
-pub async fn unlock_member_vault_from_host(
-    host: &dyn HostCtx,
-    io: &dyn VaultIo,
-    state: &VaultRuntimeState,
-    vault_id: crate::vault_id::VaultId,
-    phrase: &str,
-) -> Result<(), SyncDeviceError> {
-    let normalized = zeroize::Zeroizing::new(protocol::normalize_user_phrase(phrase));
-    let generation = state.person_session_generation().await;
-    let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    let meta_bytes = io
-        .read(&vault_dir.join("vault.meta"))
-        .await
-        .map_err(|_| SyncDeviceError::BadRequest)?;
-    let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
-    let stored = super::member_key_store::read_member_key_store(
-        io,
-        &vault_dir,
-        vault_id.as_uuid().as_bytes(),
-        &b2b.base.kdf_params,
-        &normalized,
-    )
-    .await;
-
-    let pair = crate::account::person_identity::open_person_identity_without_mutation(
-        host,
-        io,
-        &normalized,
-    )
-    .await
-    .map_err(|_| SyncDeviceError::BadRequest)?;
-
-    // An owner group-key rotation may have advanced `vault.meta` past the epoch
-    // this device's member-key store holds (`collab-b2b-sessions` task 1). Fetch
-    // our delivered package, verify it against the PINNED owner half, unwrap the
-    // new group key, and re-seal the store at the new epoch so a later unlock is
-    // not refused as stale. The re-seal needs the member's phrase, which is
-    // available only here; the running-session path (`member_adopt_rotation_...`)
-    // updates the live slot without it.
-    //
-    // **The offline case this refuses, on purpose.** A store that already holds
-    // the current epoch unlocks offline with no fetch at all. When the keys have to
-    // be fetched there is no offline unlock to fall back on: the re-seal is an
-    // Argon2id over the phrase, so the running-session adoption cannot write it and
-    // the alternative to fetching is using a RETIRED epoch's keys, which is the
-    // silent-loss path this branch exists to prevent. Reachability is therefore a
-    // real availability requirement for that one case, stated rather than implied.
-    //
-    // **Two triggers, one path** (`member-devices` task 7). ABSENT is the case this
-    // device has never held this vault's keys at all, which is a member's SECOND
-    // device: the vault directory and `vault.meta` are already here (the join wrote
-    // them), and the keys arrive over the group-package route. STALE is the rotation
-    // case above. Both are the same fetch, the same verification against the PINNED
-    // owner half, and the same re-seal; only the pin's usual source differs, which
-    // `resolve_member_owner_pin` handles.
-    let needs_package = match &stored {
-        Some(k) => b2b.group_key_epoch > k.group_key_epoch,
-        None => true,
-    };
-    let keys = match stored {
-        Some(k) if !needs_package => k,
-        other => {
-            let owner_code =
-                resolve_member_owner_pin(host, io, &vault_dir, &normalized, &b2b).await?;
-            // The package MUST be obtained before the slot is installed (`collab-verification`
-            // D8): installing keys that do not match the `vault.meta` in hand would seal every
-            // later local write under a key the vault no longer has (silent loss to the member,
-            // unreadable to the owner). So an absent package or an unreachable server REFUSES the
-            // unlock rather than degrading. The typed `Transport` refusal is retryable, which is
-            // the correct posture: the fix is reachability, not re-enrolment. A package that
-            // arrives but does NOT verify is a different answer and stays a refusal (`Err`), so a
-            // tampered package cannot loop the user through an infinite retry.
-            let opened = fetch_and_open_rotation_package(
-                host,
-                io,
-                &b2b,
-                b2b.group_key_epoch,
-                &owner_code,
-                &pair,
-            )
-            .await?;
-            let Some((group_key, items_key)) = opened else {
-                tracing::warn!(
-                    stage = "member_unlock_package_pending",
-                    "refusing to unlock: the group package for this epoch is not reachable"
-                );
-                return Err(SyncDeviceError::Transport);
-            };
-            // The id that belongs to the `vault.meta` just verified. A store that was
-            // present at a retired epoch contributes its own id only when the vault
-            // has no id of its own to give, which it always does.
-            let items_key_id = other
-                .as_ref()
-                .map(|k| k.items_key_id)
-                .unwrap_or(b2b.base.items_key_id);
-            // Re-key this device's LOCAL content from the retired itemsKey to the
-            // new one BEFORE the new keys are installed or the phrase store is
-            // re-sealed (myne-md/myne#797). An unsynced local note is wrapped
-            // under the retired key and has no server copy, so skipping this
-            // makes it unreadable the moment the slot moves: and the store's
-            // epoch advancing past the blobs would remove the trigger that would
-            // otherwise notice. The content-epoch marker makes the step
-            // idempotent across a crash.
-            if let Some(old) = other.as_ref() {
-                // A read failure is a refusal, not a guess: answering the
-                // retired epoch re-runs a re-key that already landed.
-                let content_epoch = crate::plugins::sync::state::read_content_epoch(io, &vault_dir)
-                    .await
-                    .map_err(|_| SyncDeviceError::Internal)?
-                    .unwrap_or(old.group_key_epoch);
-                if content_epoch < b2b.group_key_epoch {
-                    crate::plugins::sync::member_removal::rekey_local_content_for_member(
-                        io,
-                        &vault_dir,
-                        &items_key_id,
-                        &old.items_key,
-                        &items_key,
-                        &meta_bytes,
-                        b2b.group_key_epoch,
-                    )
-                    .await
-                    .map_err(|_| SyncDeviceError::Internal)?;
-                }
-            }
-            super::member_key_store::write_member_key_store(
-                io,
-                &vault_dir,
-                vault_id.as_uuid().as_bytes(),
-                &b2b.base.account_number_hash,
-                b2b.group_key_epoch,
-                &items_key_id,
-                &b2b.base.kdf_params,
-                &normalized,
-                &group_key,
-                &items_key,
-            )
-            .await
-            .map_err(|_| SyncDeviceError::Internal)?;
-            super::member_key_store::MemberKeys {
-                group_key,
-                items_key,
-                group_key_epoch: b2b.group_key_epoch,
-                items_key_id,
-                account_hash: b2b.base.account_number_hash,
-            }
-        }
-    };
-
-    use sha2::Digest as _;
-    let meta_hash: [u8; 32] = sha2::Sha256::digest(&meta_bytes).into();
-    let person_id = protocol::person_id_hash(normalized.as_str());
-    let profile_id = protocol::person_profile_id(&person_id, &b2b.base.account_number_hash);
-    let profile = protocol::derive_person_vault_profile_key(
-        normalized.as_str(),
-        &profile_id,
-        &b2b.base.kdf_params,
-    )
-    .ok()
-    .map(|key| (profile_id, key));
-    let transition = crate::account::person_identity::read_pending_person_key_transition(host, io)
-        .await
-        .map_err(|_| SyncDeviceError::Transport)?;
-    let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
-        pair,
-        person_id,
-        profile,
-        transition,
-    };
-    state
-        .set_unlocked_locking_others_with_person_session(
-            generation,
-            vault_id,
-            crate::plugins::vault_unlock::state::UnlockedVault::member(
-                keys.group_key,
-                keys.items_key,
-                keys.items_key_id,
-                host.now_unix_secs(),
-                meta_hash,
-            ),
-            Some(install),
-        )
-        .await
-        .ok_or(SyncDeviceError::Transport)?;
-    // Deliberately does NOT call `mark_full_unlock_done()`. That flag is a
-    // PROCESS-GLOBAL gate the owner quick-unlock path reads
-    // (`quick_unlock::requires_full_unlock_first`), and its contract is "an owner
-    // vault's master password was entered this process" (MYND-641/A6). A member
-    // credential must not open it: a member unlock would otherwise let a PIN
-    // quick-unlock on a DIFFERENT owner vault in the same process skip that
-    // vault's master password after a restart. The member fast path, when it
-    // lands, needs its own per-vault gate rather than this one.
-    Ok(())
-}
-
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn sync_person_unlock_member_vault<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, VaultRuntimeState>,
-    hooks: tauri::State<'_, crate::hooks::Hooks>,
-    vault_id_hex: String,
-    phrase: String,
-) -> Result<(), SyncDeviceError> {
-    let phrase = zeroize::Zeroizing::new(phrase);
-    let vault_id =
-        crate::vault_id::VaultId::parse(&vault_id_hex).map_err(|_| SyncDeviceError::BadRequest)?;
-    let host = crate::host::tauri_host::TauriHost::new(app.clone());
-    let io = crate::vault_io::StdVaultIo;
-    unlock_member_vault_from_host(&host, &io, state.inner(), vault_id, &phrase).await?;
-    if state.inner().active_vault_id().await != Some(vault_id) {
-        return Err(SyncDeviceError::Transport);
-    }
-    crate::plugins::vault_unlock::commands::run_post_unlock_pipeline(
-        &host,
-        state.inner(),
-        hooks.inner(),
-        &io,
-        crate::vault_label::key::platform_keychain(),
-    )
-    .await;
-    Ok(())
-}
-
 /// The material every member-credential WRITE seals: the active member vault's
 /// keys, its identity, and the vault.meta fields the credential needs.
 struct MemberSealMaterial {
@@ -2902,7 +2775,7 @@ async fn install_member_unlock_credential(
     io: &dyn VaultIo,
     state: &VaultRuntimeState,
     vault_id: crate::vault_id::VaultId,
-    mut cred: super::member_unlock_store::MemberUnlockCredential,
+    mut cred: crate::plugins::sync::member_unlock_store::MemberUnlockCredential,
     meta_bytes: &[u8],
     current_epoch: u64,
     vault_root: &std::path::Path,
@@ -2951,7 +2824,7 @@ async fn install_member_unlock_credential(
         let vault_id_bytes = vault_id.as_uuid().as_bytes();
         let sealed = match secret {
             MemberUnlockSecret::Password(password) => {
-                super::member_unlock_store::write_member_unlock_password(
+                crate::plugins::sync::member_unlock_store::write_member_unlock_password(
                     io,
                     vault_root,
                     vault_id_bytes,
@@ -2966,13 +2839,14 @@ async fn install_member_unlock_credential(
                     &cred.pair,
                 )
                 .await
+                .map(|_gate| ())
             }
             MemberUnlockSecret::Provider {
                 method,
                 salt,
                 wrap_key,
             } => {
-                super::member_unlock_store::write_member_unlock_provider(
+                crate::plugins::sync::member_unlock_store::write_member_unlock_provider(
                     io,
                     vault_root,
                     vault_id_bytes,
@@ -3004,9 +2878,17 @@ async fn install_member_unlock_credential(
     let install = crate::plugins::vault_unlock::state::PersonSessionInstall {
         pair: cred.pair,
         person_id: cred.person_id,
+        // No profile key on a password unlock: `MYY5` stays phrase-sealed (`0763`),
+        // so the person-private AI store opens on a phrase unlock and not here.
         profile: None,
         transition,
     };
+    // The retired phrase-sealed store is DELETED here rather than merely ignored: a
+    // `vault.member-key` written before myne-md/myne#938 task 12 holds the group and
+    // items keys under a phrase-derived KEK, and leaving it next to the gate that
+    // replaced it keeps a second, unrotated copy of the vault's keys on disk with
+    // nothing that reads it. Best-effort: a failure here must not fail the unlock.
+    let _ = io.remove_file(&vault_root.join("vault.member-key")).await;
     state
         .set_unlocked_locking_others_with_person_session(
             generation,
@@ -3074,7 +2956,9 @@ async fn wipe_member_unlock(
     keychain: &dyn crate::plugins::quick_unlock::device_secret::DeviceSecretKeychain,
 ) {
     let _ = io
-        .remove_file(&vault_dir.join(super::member_unlock_store::MEMBER_UNLOCK_STORE_FILE))
+        .remove_file(
+            &vault_dir.join(crate::plugins::sync::member_unlock_store::MEMBER_UNLOCK_STORE_FILE),
+        )
         .await;
     let _ = io.remove_file(&vault_dir.join(MEMBER_ATTEMPT_FILE)).await;
     let _ = erase_member_device_secret_with(io, vault_dir, keychain).await;
@@ -3139,7 +3023,7 @@ pub async fn set_member_password_from_host(
 ) -> Result<(), SyncDeviceError> {
     protocol::validate_min_length(password).map_err(|_| SyncDeviceError::BadRequest)?;
     let m = member_seal_material(host, io, state).await?;
-    super::member_unlock_store::write_member_unlock_password(
+    crate::plugins::sync::member_unlock_store::write_member_unlock_password(
         io,
         &m.vault_dir,
         m.vault_id.as_uuid().as_bytes(),
@@ -3199,7 +3083,7 @@ pub async fn unlock_member_vault_with_password_from_host(
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
     let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
-    let cred = super::member_unlock_store::read_member_unlock_password(
+    let cred = crate::plugins::sync::member_unlock_store::read_member_unlock_password(
         io,
         &vault_dir,
         vault_id.as_uuid().as_bytes(),
@@ -3276,12 +3160,12 @@ pub async fn set_member_pin_from_host(
         .await
         .map_err(|_| SyncDeviceError::Internal)?
         .map_err(|_| SyncDeviceError::Internal)?;
-    super::member_unlock_store::write_member_unlock_provider(
+    crate::plugins::sync::member_unlock_store::write_member_unlock_provider(
         io,
         &m.vault_dir,
         m.vault_id.as_uuid().as_bytes(),
         &m.account_hash,
-        super::member_unlock_store::METHOD_PIN,
+        crate::plugins::sync::member_unlock_store::METHOD_PIN,
         &secret.pin_salt,
         &secret.wrap_key,
         m.group_key_epoch,
@@ -3330,12 +3214,12 @@ pub async fn set_member_biometric_from_host(
             .await
             .map_err(|_| SyncDeviceError::Internal)?
             .map_err(|_| SyncDeviceError::Internal)?;
-        super::member_unlock_store::write_member_unlock_provider(
+        crate::plugins::sync::member_unlock_store::write_member_unlock_provider(
             io,
             &m.vault_dir,
             m.vault_id.as_uuid().as_bytes(),
             &m.account_hash,
-            super::member_unlock_store::METHOD_BIOMETRIC,
+            crate::plugins::sync::member_unlock_store::METHOD_BIOMETRIC,
             &secret.pin_salt,
             &secret.wrap_key,
             m.group_key_epoch,
@@ -3387,14 +3271,14 @@ pub async fn unlock_member_vault_with_pin_from_host(
         .await
         .map_err(|_| SyncDeviceError::BadRequest)?;
     let b2b = protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
-    let header = super::member_unlock_store::member_unlock_header(
+    let header = crate::plugins::sync::member_unlock_store::member_unlock_header(
         io,
         &vault_dir,
         vault_id.as_uuid().as_bytes(),
     )
     .await
     .ok_or(SyncDeviceError::BadRequest)?;
-    if header.method != super::member_unlock_store::METHOD_PIN {
+    if header.method != crate::plugins::sync::member_unlock_store::METHOD_PIN {
         return Err(SyncDeviceError::BadRequest);
     }
     let attempt_path = vault_dir.join(MEMBER_ATTEMPT_FILE);
@@ -3418,7 +3302,7 @@ pub async fn unlock_member_vault_with_pin_from_host(
         .await
         .map_err(|_| SyncDeviceError::Internal)?
         .map_err(|_| SyncDeviceError::BadRequest)?;
-    match super::member_unlock_store::read_member_unlock_with_wrap_key(
+    match crate::plugins::sync::member_unlock_store::read_member_unlock_with_wrap_key(
         io,
         &vault_dir,
         vault_id.as_uuid().as_bytes(),
@@ -3438,7 +3322,7 @@ pub async fn unlock_member_vault_with_pin_from_host(
                 &vault_dir,
                 &b2b,
                 MemberUnlockSecret::Provider {
-                    method: super::member_unlock_store::METHOD_PIN,
+                    method: crate::plugins::sync::member_unlock_store::METHOD_PIN,
                     salt: &salt,
                     wrap_key: &wrap,
                 },
@@ -3509,14 +3393,14 @@ pub async fn unlock_member_vault_with_biometric_from_host(
             .map_err(|_| SyncDeviceError::BadRequest)?;
         let b2b =
             protocol::parse_b2b_tail_any(&meta_bytes).map_err(|_| SyncDeviceError::BadRequest)?;
-        let header = super::member_unlock_store::member_unlock_header(
+        let header = crate::plugins::sync::member_unlock_store::member_unlock_header(
             io,
             &vault_dir,
             vault_id.as_uuid().as_bytes(),
         )
         .await
         .ok_or(SyncDeviceError::BadRequest)?;
-        if header.method != super::member_unlock_store::METHOD_BIOMETRIC {
+        if header.method != crate::plugins::sync::member_unlock_store::METHOD_BIOMETRIC {
             return Err(SyncDeviceError::BadRequest);
         }
         let provider = crate::plugins::quick_unlock::apple::AppleBiometricProvider::new(
@@ -3528,7 +3412,7 @@ pub async fn unlock_member_vault_with_biometric_from_host(
             .await
             .map_err(|_| SyncDeviceError::Internal)?
             .map_err(|_| SyncDeviceError::BadRequest)?;
-        let cred = super::member_unlock_store::read_member_unlock_with_wrap_key(
+        let cred = crate::plugins::sync::member_unlock_store::read_member_unlock_with_wrap_key(
             io,
             &vault_dir,
             vault_id.as_uuid().as_bytes(),
@@ -3547,7 +3431,7 @@ pub async fn unlock_member_vault_with_biometric_from_host(
             &vault_dir,
             &b2b,
             MemberUnlockSecret::Provider {
-                method: super::member_unlock_store::METHOD_BIOMETRIC,
+                method: crate::plugins::sync::member_unlock_store::METHOD_BIOMETRIC,
                 salt: &zero_salt,
                 wrap_key: &wrap,
             },
@@ -3650,7 +3534,7 @@ pub async fn member_unlock_method_from_host(
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    Ok(super::member_unlock_store::member_unlock_method(io, &vault_dir).await)
+    Ok(crate::plugins::sync::member_unlock_store::member_unlock_method(io, &vault_dir).await)
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -3680,7 +3564,11 @@ pub async fn member_vault_status_from_host(
     let vault_dir = crate::paths::vault_dir_for_id_from_host_io(host, io, Some(vault_id))
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    Ok(super::member_key_store::member_key_store_exists(io, &vault_dir).await)
+    // The member GATE, not the retired phrase-sealed key file (myne-md/myne#938
+    // task 12). An owner vault has no `vault.member-unlock` on this device, so the
+    // predicate still separates the two, and it now asks the question the unlock
+    // surface actually needs answered: "which credential does this vault take".
+    Ok(crate::plugins::sync::member_unlock_store::member_unlock_store_exists(io, &vault_dir).await)
 }
 
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -3820,20 +3708,6 @@ pub fn fetch_group_package_request(
         401 | 403 => Err(SyncDeviceError::Unauthenticated),
         _ => Err(SyncDeviceError::Transport),
     }
-}
-
-/// The group-key epoch this vault's device-local member-key store was sealed at,
-/// read WITHOUT the phrase (the epoch is cleartext routing metadata in the
-/// envelope). `None` on an absent or unparseable store. Used to detect that
-/// `vault.meta` has advanced past the keys this device holds, which is the
-/// member-side trigger for adopting a rotation (`collab-b2b-sessions` task 1).
-pub async fn member_key_store_epoch(io: &dyn VaultIo, vault_root: &std::path::Path) -> Option<u64> {
-    let bytes = io
-        .read(&vault_root.join(super::member_key_store::MEMBER_KEY_STORE_FILE))
-        .await
-        .ok()?;
-    let v: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    v.get("group_key_epoch")?.as_u64()
 }
 
 /// After a group rotation, push the rotated `vault.meta` under the owner's
@@ -4087,9 +3961,10 @@ pub async fn member_adopt_rotation_from_host(
     // What the local CONTENT is wrapped at. Absent marker → the keys this device
     // last held (the store's epoch), falling back to the local meta's own epoch
     // for a device that has never held keys (a fresh second device).
-    let store_epoch = member_key_store_epoch(io, &root)
-        .await
-        .unwrap_or(local_epoch);
+    let store_epoch =
+        crate::plugins::sync::member_unlock_store::member_unlock_store_epoch(io, &root)
+            .await
+            .unwrap_or(local_epoch);
     let content_epoch = crate::plugins::sync::state::read_content_epoch(io, &root)
         .await
         .map_err(|_| SyncDeviceError::Internal)?
@@ -5136,6 +5011,46 @@ mod tests {
         });
     }
 
+    /// The rung-3 PIN-sealed device key is the third device-local trace of the
+    /// identity, and it lives outside any keychain, so `device_identity::destroy`
+    /// cannot reach it: the erase has to name the path. This asserts the sealed file
+    /// and its counter are gone, which is the whole reason the wipe was wired in.
+    #[test]
+    fn forgetting_the_held_identity_wipes_the_pin_sealed_device_key() {
+        crate::test_support::block_on(async {
+            let tmp =
+                crate::test_support::ScopedTempDir::new("person-forget-pin").expect("temp dir");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+            let dir = crate::plugins::sync::config::config_path_from_host(&host, &io)
+                .await
+                .expect("app config dir");
+            let dir = dir.parent().expect("config file has a dir").to_path_buf();
+
+            let pair = protocol::device_key::DeviceKeyPair::generate_raw(&[0x91; 32], &[0x92; 32]);
+            let params = protocol::KdfParams {
+                m_kib: protocol::MIN_KDF_M_KIB,
+                t: 1,
+                p: 1,
+                argon2_version: 0x13,
+            };
+            crate::plugins::sync::device_key_pin::seal(&io, &dir, "123456", &params, &pair)
+                .await
+                .expect("seal");
+            assert!(
+                crate::plugins::sync::device_key_pin::is_sealed(&io, &dir).await,
+                "the fixture must reach the sealed state"
+            );
+
+            forget_person_from_host(&host, &io).await.expect("forget");
+
+            assert!(
+                !crate::plugins::sync::device_key_pin::is_sealed(&io, &dir).await,
+                "a forgotten identity must not leave a PIN-sealed signing key behind"
+            );
+        });
+    }
+
     // myne-md/myne#783: an `NTV5` (unshared) vault answers `Ok(None)` — a state,
     // not a failure — even with a HOLDING person identity and a configured
     // endpoint, which is the state the real report was in.
@@ -5201,6 +5116,114 @@ mod tests {
                 out.is_none(),
                 "an NTV5 vault has no roster to list: {:?}",
                 out.map(|v| v.len())
+            );
+        });
+    }
+
+    /// **A person-born vault adopts the person plane's device id, and the claim
+    /// stops standing down on `NoDeviceId`.**
+    ///
+    /// The bug this holds: `sync-state.json`'s `device_id_hex` was written only by
+    /// the two paths that create a vault SCRAM account, and a person-born vault has
+    /// none. So `device_binding::session_device_id` answered `NoDeviceId`, the claim
+    /// wrote no `MYU5` row, and `cycle::head_context` (which needs a device id, a
+    /// key at rest and a verified row) kept signing `0x02` heads that need the
+    /// phrase. Removing the seeding write makes the first assertion fail with
+    /// `None`, and the `session_device_id` assertion fail with `NoDeviceId`.
+    #[test]
+    fn a_person_born_vault_adopts_the_person_planes_device_id() {
+        crate::test_support::block_on(async {
+            let tmp = crate::test_support::ScopedTempDir::new("adopt-person-device").expect("temp");
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            let io = crate::vault_io::StdVaultIo;
+
+            // The person plane's record: a real keypair's halves, and the device id
+            // the admission or the registration minted.
+            let pair = protocol::PersonKeyPair::generate_raw(&[0x51; 64], &[0x52; 32], &[0x53; 32]);
+            let public = pair.public_half();
+            let person_id = [0x61u8; 16];
+            let device_id = [0x71u8; 16];
+            let auth_path = person_auth_path(&host, &io).await.expect("auth path");
+            let auth = PersonAuth {
+                person_id_hex: crate::account::person_identity::hex_lower(&person_id),
+                device_id_hex: crate::account::person_identity::hex_lower(&device_id),
+                registered: true,
+                token_hex: "aa".repeat(32),
+                kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+                ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+                mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+                ..PersonAuth::default()
+            };
+            write_person_auth(&io, &auth_path, &auth)
+                .await
+                .expect("write person-auth");
+
+            // A person-born vault: `sync-state.json` exists but carries no device id,
+            // which is exactly what the accept/enrol-only writers left behind.
+            let vault_dir = tmp.path().join("vault");
+            std::fs::create_dir_all(&vault_dir).expect("vault dir");
+            let st = super::super::state::SyncState::default();
+            assert!(st.device_id_hex.is_none(), "the fixture starts unseeded");
+            super::super::state::write_sync_state(&io, &vault_dir, &st)
+                .await
+                .expect("write sync state");
+
+            // The gate that used to fail, asserted BEFORE the fix runs: this is the
+            // `NoDeviceId` the claim stood down on.
+            assert!(
+                crate::plugins::device_binding::commands::session_device_id(&io, &vault_dir)
+                    .await
+                    .is_err(),
+                "an unseeded vault has no device id, which is the defect"
+            );
+
+            assert!(
+                adopt_person_device_identity_best_effort(&host, &io, &vault_dir).await,
+                "the adoption must succeed with a registered person plane"
+            );
+
+            let after = super::super::state::read_sync_state(&io, &vault_dir)
+                .await
+                .expect("read sync state");
+            assert_eq!(
+                after.device_id_hex.as_deref(),
+                Some(crate::account::person_identity::hex_lower(&device_id).as_str()),
+                "the vault's actor is the person plane's device, not a fresh draw"
+            );
+            assert_eq!(
+                crate::plugins::device_binding::commands::session_device_id(&io, &vault_dir).await,
+                Ok(device_id),
+                "the claim's own id reader must find it, or the row is never written"
+            );
+            // Public material only, and it must name the SAME person: a cold start
+            // verifies an owner-signed roster through this code without the phrase.
+            let code = after
+                .own_identity_code
+                .as_deref()
+                .expect("own identity code");
+            let decoded = super::super::invite::decode_person_identity_code(code)
+                .expect("a well-formed identity code");
+            assert_eq!(decoded.person_id, person_id);
+            assert_eq!(decoded.public.fingerprint(), public.fingerprint());
+
+            // Idempotent, and it never overwrites an EXISTING id: that id is the
+            // Automerge actor note authoring derives from, so replacing it would
+            // split the CRDT history of a vault that was working.
+            let other = [0x81u8; 16];
+            let mut pinned = after.clone();
+            pinned.device_id_hex = Some(crate::account::person_identity::hex_lower(&other));
+            super::super::state::write_sync_state(&io, &vault_dir, &pinned)
+                .await
+                .expect("write pinned state");
+            assert!(adopt_person_device_identity_best_effort(&host, &io, &vault_dir).await);
+            assert_eq!(
+                super::super::state::read_sync_state(&io, &vault_dir)
+                    .await
+                    .expect("read")
+                    .device_id_hex
+                    .as_deref(),
+                Some(crate::account::person_identity::hex_lower(&other).as_str()),
+                "an enrolled vault keeps the actor its notes were authored under"
             );
         });
     }
@@ -5408,31 +5431,50 @@ mod tests {
         );
     }
 
-    // The member-key store's epoch is read WITHOUT the phrase (it is cleartext
-    // routing metadata), which is the trigger for adopting a rotation.
+    // The member credential's epoch is read WITHOUT the password (it is cleartext
+    // routing metadata), which is the trigger for adopting a rotation. Since
+    // myne-md/myne#938 task 12 the member-unlock envelope is the only member store,
+    // so this is the only place that epoch can come from.
+    //
+    // Written through the REAL writer rather than a hand-built JSON envelope: the
+    // claim under test is that the epoch a rotation trigger reads is the epoch the
+    // writer recorded, and a fixture that spells the field itself would keep passing
+    // if the writer stopped writing it.
     #[test]
-    fn member_key_store_epoch_is_readable_without_the_phrase() {
+    fn the_member_unlock_epoch_is_readable_without_the_password() {
         crate::test_support::block_on(async {
             let tmp = crate::test_support::ScopedTempDir::new("member-epoch").expect("temp dir");
             let io = crate::vault_io::StdVaultIo;
             let root = tmp.path().to_path_buf();
-            assert!(member_key_store_epoch(&io, &root).await.is_none());
-            let env = serde_json::json!({
-                "vault_id_hex": "aa".repeat(16),
-                "account_hash_hex": "bb".repeat(16),
-                "group_key_epoch": 7,
-                "items_key_id_hex": "cc".repeat(16),
-                "nonce_hex": "dd".repeat(24),
-                "sealed_hex": "ee",
-            });
-            io.write(
-                &root.join(crate::plugins::sync::member_key_store::MEMBER_KEY_STORE_FILE),
-                &serde_json::to_vec(&env).unwrap(),
-                crate::vault_io::WriteOpts::default(),
+            assert!(
+                crate::plugins::sync::member_unlock_store::member_unlock_store_epoch(&io, &root)
+                    .await
+                    .is_none()
+            );
+            let seeds = protocol::kdf::expand_person_identity_key_seeds(&[7u8; 32]);
+            let pair =
+                protocol::PersonKeyPair::generate_raw(&seeds.kem, &seeds.ed25519, &seeds.mldsa);
+            crate::plugins::sync::member_unlock_store::write_member_unlock_password(
+                &io,
+                &root,
+                &[0xAAu8; 16],
+                &[0xBBu8; 16],
+                7,
+                &[0xCCu8; 16],
+                &[0xDDu8; 16],
+                &crate::test_support::FAST_TEST_KDF,
+                "correct horse battery staple",
+                &[0x11u8; 32],
+                &[0x22u8; 32],
+                &pair,
             )
             .await
-            .expect("write store");
-            assert_eq!(member_key_store_epoch(&io, &root).await, Some(7));
+            .expect("write the member credential");
+            assert_eq!(
+                crate::plugins::sync::member_unlock_store::member_unlock_store_epoch(&io, &root)
+                    .await,
+                Some(7)
+            );
         });
     }
 
@@ -5514,7 +5556,7 @@ mod tests {
             .await
             .expect("the accept credential is written");
 
-            let opened = super::super::member_unlock_store::read_member_unlock_password(
+            let opened = crate::plugins::sync::member_unlock_store::read_member_unlock_password(
                 &io,
                 root,
                 vault_id.as_uuid().as_bytes(),
@@ -5532,7 +5574,7 @@ mod tests {
             // And a wrong password still fails closed, so the credential is not a
             // skeleton key.
             assert!(
-                super::super::member_unlock_store::read_member_unlock_password(
+                crate::plugins::sync::member_unlock_store::read_member_unlock_password(
                     &io,
                     root,
                     vault_id.as_uuid().as_bytes(),
@@ -5644,7 +5686,8 @@ mod tests {
             let vault_dir = tmp.path().join("vault");
             io.create_dir_all(&vault_dir).await.expect("vault dir");
             io.create_dir_all(
-                &vault_dir.join(super::super::member_unlock_store::MEMBER_UNLOCK_STORE_FILE),
+                &vault_dir
+                    .join(crate::plugins::sync::member_unlock_store::MEMBER_UNLOCK_STORE_FILE),
             )
             .await
             .expect("block the store path");
@@ -6057,329 +6100,6 @@ mod tests {
     // ASKED to claim the invite. If the claim moved ahead of the pin read, a
     // server that cannot be trusted to say who the owner is would be the thing that
     // hands out the membership token.
-    #[test]
-    fn a_join_with_no_pinned_owner_code_refuses_before_it_claims_the_invite() {
-        crate::test_support::block_on(async {
-            use std::io::{Read, Write};
-            use std::net::TcpListener;
-            use std::sync::{Arc, Mutex};
-
-            let tmp =
-                crate::test_support::ScopedTempDir::new("join-no-pin-flow").expect("temp dir");
-            let host = crate::host::test_host::TestHost::new(tmp.path());
-            let io = crate::vault_io::StdVaultIo;
-            let state = VaultRuntimeState::default();
-
-            let phrase =
-                "legal winner thank year wave sausage worth useful legal winner thank yellow";
-            let normalized = protocol::normalize_user_phrase(phrase);
-            let person_id = protocol::person_id_hash(normalized.as_str());
-            let account_hash = [0x5Au8; 16];
-            let account_hash_hex = crate::account::person_identity::hex_lower(&account_hash);
-
-            // The server side. Every request line is recorded, so the test can ask
-            // what was NOT sent as well as what was.
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
-            let port = listener.local_addr().expect("addr").port();
-            let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-            let seen_server = Arc::clone(&seen);
-            let meta_bytes = protocol::serialize_vault_meta_ntv6(&test_b2b_meta(account_hash))
-                .expect("serialize NTV6");
-            let _server = std::thread::spawn(move || {
-                listener.set_nonblocking(false).expect("blocking accept");
-                // Bounded so an unexpected extra request cannot hang the suite; the
-                // happy path needs three and a regression needs exactly one more.
-                for _ in 0..6 {
-                    let Ok((mut sock, _)) = listener.accept() else {
-                        return;
-                    };
-                    let mut buf = [0u8; 2048];
-                    let n = sock.read(&mut buf).unwrap_or(0);
-                    let head = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    let line = head.lines().next().unwrap_or_default().to_string();
-                    seen_server.lock().expect("seen").push(line.clone());
-                    let (status, body): (&str, Vec<u8>) = if line.contains("/vault.meta") {
-                        ("200 OK", meta_bytes.clone())
-                    } else if line.contains("/claim") {
-                        // Never reached on a correct build. A 200 here rather than a
-                        // 4xx so that a reordered build FAILS the assertion below
-                        // instead of failing earlier for an unrelated reason.
-                        ("200 OK", b"{\"token_hex\":\"00\"}".to_vec())
-                    } else {
-                        ("404 Not Found", b"{}".to_vec())
-                    };
-                    let resp = format!(
-                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
-                    );
-                    let _ = sock.write_all(resp.as_bytes());
-                    let _ = sock.write_all(&body);
-                }
-            });
-
-            // Point the device at that server.
-            let cfg_path = crate::plugins::sync::config::config_path_from_host(&host, &io)
-                .await
-                .expect("config path");
-            crate::plugins::sync::config::write_config(
-                &io,
-                &cfg_path,
-                &crate::plugins::sync::config::SyncEndpointConfig {
-                    endpoint_url: Some(format!("http://127.0.0.1:{port}")),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("write config");
-
-            // This person, on this device.
-            let auth_path = person_auth_path(&host, &io)
-                .await
-                .expect("person auth path");
-            write_person_auth(
-                &io,
-                &auth_path,
-                &PersonAuth {
-                    person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-                    device_id_hex: "66".repeat(16),
-                    registered: false,
-                    token_hex: "77".repeat(32),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("write person credential");
-
-            let err = member_join_vault_from_host(
-                &host,
-                &io,
-                &state,
-                &"88".repeat(16),
-                &account_hash_hex,
-                phrase,
-                "correct horse battery staple",
-            )
-            .await
-            .unwrap_err();
-            assert_eq!(err, SyncDeviceError::BadRequest);
-
-            let requests = seen.lock().expect("seen").clone();
-            assert!(
-                requests.iter().any(|l| l.contains("/vault.meta")),
-                "the join must fetch the vault meta; saw {requests:?}"
-            );
-            assert!(
-                !requests.iter().any(|l| l.contains("/claim")),
-                "the invite must NOT be claimed before the pinned owner code is read; saw {requests:?}"
-            );
-
-            // And nothing was created: a refusal that left a vault directory behind
-            // would be read as a real vault by the picker on the next launch.
-            let base = host.app_data_dir().expect("app data dir");
-            assert_eq!(
-                crate::vault_registry::discover_vaults(&base).len(),
-                0,
-                "a refused join materializes nothing"
-            );
-        });
-    }
-
-    // member-devices task 7, item 5: a member device whose `vault.member-key` store is
-    // ABSENT (not merely stale) is the SECOND device, and the keys arrive over the
-    // group-package route. This drives `unlock_member_vault_from_host` through the real
-    // `_from_host` entry against a loopback server, with a genuinely sealed person
-    // keypair on disk and a genuinely sealed `MYY5` profile carrying the pin, so the
-    // branch is reached the way production reaches it rather than by stubbing.
-    //
-    // The assertion is the acceptance criterion "an unreachable package reports a typed
-    // retry": the server answers the profile and 404s the package, and the answer is
-    // `Transport` (retryable) rather than `BadRequest` (a permanent refusal) or an
-    // install of keys this device never received.
-    #[test]
-    fn an_absent_member_key_fetches_the_package_and_reports_a_typed_retry_when_it_is_missing() {
-        crate::test_support::block_on(async {
-            use std::io::{Read, Write};
-            use std::net::TcpListener;
-            use std::sync::{Arc, Mutex};
-
-            let tmp =
-                crate::test_support::ScopedTempDir::new("member-unlock-absent").expect("temp dir");
-            let host = crate::host::test_host::TestHost::new(tmp.path());
-            let io = crate::vault_io::StdVaultIo;
-            let state = VaultRuntimeState::default();
-
-            let phrase =
-                "legal winner thank year wave sausage worth useful legal winner thank yellow";
-            let normalized = protocol::normalize_user_phrase(phrase);
-            let person_id = protocol::person_id_hash(normalized.as_str());
-            let person_id_hex = crate::account::person_identity::hex_lower(&person_id);
-            let account_hash = [0x5Au8; 16];
-            let b2b = test_b2b_meta(account_hash);
-
-            // The OWNER's half, as the first device recorded it out of band. The pin is
-            // a real code because `fetch_and_open_rotation_package` decodes it before it
-            // fetches, so a stand-in string would fail one step early and this test would
-            // never reach the branch it exists to pin.
-            let owner_pair =
-                protocol::PersonKeyPair::generate_raw(&[0x31; 64], &[0x32; 32], &[0x33; 32]);
-            let owner_id = [0x41u8; 16];
-            let pin = crate::plugins::sync::invite::encode_person_identity_code(
-                &owner_id,
-                &owner_pair.public_half(),
-            );
-
-            // The sealed `MYY5` profile carrying that pin, under the key this phrase
-            // derives for this `(person, vault)`. Sealed here rather than stubbed so the
-            // read under test is the real one.
-            let profile_id = protocol::person_profile_id(&person_id, &account_hash);
-            let profile_key = protocol::derive_person_vault_profile_key(
-                normalized.as_str(),
-                &profile_id,
-                &b2b.base.kdf_params,
-            )
-            .expect("profile key");
-            let mut profile_state = super::super::person_ai_store::PersonAiState::empty();
-            profile_state.set_owner_identity_code(Some(&pin));
-            let profile_plaintext =
-                super::super::person_ai_store::encode_person_ai_state(&profile_state)
-                    .expect("encode profile");
-            let sealed_profile = protocol::encode_person_profile_blob(
-                &profile_key,
-                &profile_id,
-                &account_hash,
-                &profile_plaintext,
-            )
-            .expect("seal profile");
-
-            // The loopback server: the profile, and a 404 for everything else (which is
-            // the group package, the one request this test is about).
-            let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback");
-            let port = listener.local_addr().expect("addr").port();
-            let seen: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
-            let seen_server = Arc::clone(&seen);
-            let _server = std::thread::spawn(move || {
-                for _ in 0..6 {
-                    let Ok((mut sock, _)) = listener.accept() else {
-                        return;
-                    };
-                    let mut buf = [0u8; 4096];
-                    let n = sock.read(&mut buf).unwrap_or(0);
-                    let head = String::from_utf8_lossy(&buf[..n]).into_owned();
-                    let line = head.lines().next().unwrap_or_default().to_string();
-                    seen_server.lock().expect("seen").push(line.clone());
-                    let (status, body): (&str, Vec<u8>) = if line.contains("/profiles/") {
-                        ("200 OK", sealed_profile.clone())
-                    } else {
-                        ("404 Not Found", b"{}".to_vec())
-                    };
-                    let resp = format!(
-                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
-                        body.len()
-                    );
-                    let _ = sock.write_all(resp.as_bytes());
-                    let _ = sock.write_all(&body);
-                }
-            });
-
-            // The sealed person keypair, in the exact frame `seal_pair_to_file` writes
-            // (salt, canonical kdf params, nonce, sealed pair). `FAST_TEST_KDF` rides the
-            // frame, which is what the reader honours, so the Argon2id here is the cheap
-            // one rather than the production 256 MiB.
-            let pair = protocol::PersonKeyPair::generate_raw(&[0x51; 64], &[0x52; 32], &[0x53; 32]);
-            let salt = [0x61u8; 16];
-            let params = crate::test_support::FAST_TEST_KDF;
-            let wrap_key = protocol::derive_person_keypair_wrap_key_from_normalized(
-                normalized.as_str(),
-                &salt,
-                &person_id,
-                &params,
-            )
-            .expect("wrap key");
-            let (nonce, ct) = pair.seal(&wrap_key).expect("seal pair");
-            let mut frame = Vec::new();
-            frame.extend_from_slice(&salt);
-            frame.extend_from_slice(&protocol::serialize_kdf_params(&params));
-            frame.extend_from_slice(&nonce[..]);
-            frame.extend_from_slice(&ct);
-            let config_dir = host.app_config_dir().expect("config dir");
-            io.create_dir_all(&config_dir).await.expect("config dir");
-            io.write(
-                &config_dir.join(crate::account::person_identity::PERSON_KEYPAIR_FILE),
-                &frame,
-                crate::vault_io::WriteOpts::default(),
-            )
-            .await
-            .expect("write sealed keypair");
-
-            // The member vault directory, carrying `vault.meta` and NO `vault.member-key`.
-            let base = host.app_data_dir().expect("app data dir");
-            let vault_id = crate::vault_registry::mint_unique_vault_id(&base);
-            let vault_dir = base
-                .join(crate::paths::VAULTS_DIR_NAME)
-                .join(vault_id.to_string());
-            io.create_dir_all(&vault_dir).await.expect("vault dir");
-            io.write(
-                &vault_dir.join("vault.meta"),
-                &protocol::serialize_vault_meta_ntv6(&b2b).expect("serialize NTV6"),
-                crate::vault_io::WriteOpts::default(),
-            )
-            .await
-            .expect("write vault.meta");
-
-            // The person credential and the endpoint.
-            let auth_path = person_auth_path(&host, &io)
-                .await
-                .expect("person auth path");
-            write_person_auth(
-                &io,
-                &auth_path,
-                &PersonAuth {
-                    person_id_hex: person_id_hex.clone(),
-                    device_id_hex: "99".repeat(16),
-                    registered: false,
-                    token_hex: "aa".repeat(32),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("write person credential");
-            let cfg_path = crate::plugins::sync::config::config_path_from_host(&host, &io)
-                .await
-                .expect("config path");
-            crate::plugins::sync::config::write_config(
-                &io,
-                &cfg_path,
-                &crate::plugins::sync::config::SyncEndpointConfig {
-                    endpoint_url: Some(format!("http://127.0.0.1:{port}")),
-                    ..Default::default()
-                },
-            )
-            .await
-            .expect("write config");
-
-            let err = unlock_member_vault_from_host(&host, &io, &state, vault_id, phrase)
-                .await
-                .unwrap_err();
-            assert_eq!(
-                err,
-                SyncDeviceError::Transport,
-                "an absent package on a reachable server is a typed RETRY, not a refusal"
-            );
-
-            let requests = seen.lock().expect("seen").clone();
-            assert!(
-                requests
-                    .iter()
-                    .any(|l| l.contains(&format!("/group-packages/{person_id_hex}"))),
-                "the absent store must reach the group-package route; saw {requests:?}"
-            );
-            // And nothing was installed: a refused unlock leaves no member slot behind.
-            assert!(
-                state.active_vault_id().await.is_none(),
-                "a refused unlock must not install the member slot"
-            );
-        });
-    }
 }
 
 #[cfg(test)]

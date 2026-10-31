@@ -6,7 +6,7 @@
 //  1. A vault born under an identity publishes, and the metadata really lands in
 //     the namespace the client recorded. Asserted from BOTH ends: the panel reads
 //     "published" out of its own durable record, and an unauthenticated GET of
-//     `/vault.meta?account=<namespace>` returns that vault's `NTV7` frame. The
+//     `/vault.meta?account=<namespace>` returns that vault's `NTV8` frame. The
 //     server binding the owner on its first write is what makes the second one
 //     possible, so the fetch is the end-to-end proof rather than a second read of
 //     local state.
@@ -203,12 +203,14 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
           expect(recorded.published_at_ms).toBeTypeOf("number");
 
           // The server end: an unauthenticated fetch of that namespace answers
-          // with this vault's frame. `NTV7` pins that what was uploaded is the
-          // person-wrapped generation rather than a legacy meta blob.
+          // with this vault's frame. `NTV8` pins that what was uploaded is the
+          // password-only B2B generation rather than a legacy meta blob, and that
+          // the published frame is the one creation wrote (myne-md/myne#938,
+          // `decisions/protocol/0758`).
           const resp = await fetch(`${srv.url}/vault.meta?account=${String(namespace)}`);
           expect(resp.status).toBe(200);
           const body = new Uint8Array(await resp.arrayBuffer());
-          expect(Buffer.from(body.subarray(0, 4)).toString("latin1")).toBe("NTV7");
+          expect(Buffer.from(body.subarray(0, 4)).toString("latin1")).toBe("NTV8");
 
           // The engine half. A published person-born vault must actually run a
           // cycle: it has no enrolment record, so the pre-fix cycle refused it at

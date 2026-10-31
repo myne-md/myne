@@ -358,15 +358,12 @@ async fn signed_head_ctx(
     // Reading only `NTV6` here would have authored an HMAC (`0x01`) head for every
     // vault born under an identity, i.e. a downgrade the `NTV6` guard below
     // already refuses and no compiler can see (myne-md/myne#911 task 8).
-    let b2b = match bytes.get(..4) {
-        Some(magic) if magic == protocol::VAULT_META_NTV6_MAGIC.as_slice() => {
-            protocol::parse_vault_meta_ntv6(&bytes).ok()?
-        }
-        Some(magic) if magic == protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice() => {
-            protocol::parse_vault_meta_ntv7(&bytes).ok()?.as_ntv6_tail()
-        }
-        _ => return None,
-    };
+    // EVERY generation that carries the tail, asked through the classifier rather than
+    // by magic. This match listed `NTV6` and `NTV7` by hand, so an `NTV8` vault, which
+    // every person-born vault becomes on its first unlock since myne-md/myne#938, fell
+    // into the `_` arm and got NO head context at all: the cycle stopped authoring heads
+    // instead of signing them. `parse_b2b_tail_any` is the same tail for all three.
+    let b2b = super::meta_kind::b2b_tail(&bytes)?;
     let group_key = shared.group_bytes()?;
     let envelope = protocol::person_invite::open_group_roster(
         &group_key,
@@ -469,18 +466,8 @@ async fn signed_head_ctx(
     // that would leave the phrase path in place for ever with one trace line as the
     // only clue. It is still not fatal here: sync must run, and a `0x02` head is a
     // head every peer accepts.
-    let device_key = match super::device_identity::load() {
-        Ok(Some(key)) => key,
-        Ok(None) => return Some(ctx),
-        Err(super::device_identity::DeviceKeyStoreError::Unsupported) => return Some(ctx),
-        Err(err) => {
-            tracing::warn!(
-                stage = "sync_head_device_key",
-                error = ?err,
-                "device key could not be read; authoring a person-signed head"
-            );
-            return Some(ctx);
-        }
+    let Some(device_key) = device_key_for_signing(super::device_identity::load()) else {
+        return Some(ctx);
     };
     let signers =
         verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
@@ -500,6 +487,36 @@ async fn signed_head_ctx(
         },
         signers,
     ))
+}
+
+/// The device key this cycle may sign a `0x03` head with, or `None` for the person
+/// path (`0x02`), which every peer already accepts.
+///
+/// The three states are told apart on purpose and this is the one place that does it.
+/// `Ok(None)` is first run; `Unsupported` is rung 4 of the storage ladder (no key store
+/// on this platform), which is the ordinary state on everything but Apple and is NOT a
+/// fault. Anything else is: a key store that refused or an item that would not decode is
+/// not "this device has no key", and reading it as that would leave the phrase path in
+/// place for ever with one trace line as the only clue. It is still not fatal: sync must
+/// run, and a `0x02` head is a head every peer accepts.
+fn device_key_for_signing(
+    load: Result<
+        Option<protocol::device_key::DeviceKeyPair>,
+        super::device_identity::DeviceKeyStoreError,
+    >,
+) -> Option<protocol::device_key::DeviceKeyPair> {
+    match load {
+        Ok(key) => key,
+        Err(super::device_identity::DeviceKeyStoreError::Unsupported) => None,
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_device_key",
+                error = ?err,
+                "device key could not be read; authoring a person-signed head"
+            );
+            None
+        }
+    }
 }
 
 /// The device public halves a `0x03` head may be verified against: the LIVE,
@@ -867,11 +884,10 @@ pub async fn run_active_cycle_from_host(
         // one, and checking one magic would let the newer generation author the
         // downgraded head this guard exists to refuse (myne-md/myne#911 task 8).
         let needs_signed_head = match io.read(&dir.join("vault.meta")).await {
-            Ok(b) => {
-                let magic = b.get(..4);
-                magic == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice())
-                    || magic == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice())
-            }
+            // Through the classifier, not a magic list: `NTV8` carries the same tail and
+            // needs the same refusal, and a list that named only the older two let the
+            // newest generation author the downgraded head this guard exists to prevent.
+            Ok(b) => super::meta_kind::carries_b2b_tail(&b),
             // An ABSENT meta is not a B2B vault, and that is the only read failure
             // that means so. Collapsing every error into `false` was a default-on-
             // error feeding a write: a transient IO failure made an `NTV7` vault look
@@ -1251,7 +1267,7 @@ pub async fn run_active_cycle_from_host(
 
     // A member's adoption of an owner group-key rotation (`collab-b2b-sessions`
     // task 1). Best-effort and member-only: the function is a no-op unless
-    // `vault.meta` has advanced past the epoch this device's member-key store
+    // `vault.meta` has advanced past the epoch this device's member credential
     // holds, in which case it fetches the member's delivered package, verifies
     // it against the pinned owner half, and installs the new group + items keys on
     // the live slot so this session re-keys. Runs after the content cycle so a
@@ -1479,6 +1495,43 @@ mod tests {
 
     use super::*;
     use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
+
+    /// **A device with no key store keeps signing `0x02`**, and every other reason the
+    /// key is unavailable does too, which is the whole point of the three-state split.
+    ///
+    /// `Unsupported` is rung 4 of the ladder and the ordinary state on every platform
+    /// but Apple; `Ok(None)` is a first run; `Backend`/`Corrupt` are faults that must
+    /// still fall back rather than strand a device whose key store is merely locked. The
+    /// risk this task introduced is specific: the person-plane device id is now adopted
+    /// into every person-born vault's sync state, so a device WITHOUT a key store reaches
+    /// this branch instead of returning before it. Reading `Unsupported` as "no device"
+    /// is right; reading `Backend` as "no device" is the silent degradation this arm
+    /// warns about.
+    #[test]
+    fn a_device_without_a_key_store_signs_with_the_person_key() {
+        use crate::plugins::sync::device_identity::DeviceKeyStoreError;
+        assert!(
+            device_key_for_signing(Err(DeviceKeyStoreError::Unsupported)).is_none(),
+            "rung 4 must fall back to the person key, silently"
+        );
+        assert!(
+            device_key_for_signing(Ok(None)).is_none(),
+            "a first run has no key yet and must not block sync"
+        );
+        assert!(
+            device_key_for_signing(Err(DeviceKeyStoreError::Backend)).is_none(),
+            "a refused key store still falls back: refusing outright would strand a \
+             device whose store is merely locked"
+        );
+        assert!(
+            device_key_for_signing(Err(DeviceKeyStoreError::Corrupt)).is_none(),
+            "a corrupt item is re-created on the next claim, not signed with"
+        );
+        let pair = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
+        let expected = pair.public_half();
+        let got = device_key_for_signing(Ok(Some(pair))).expect("a key at rest is a signer");
+        assert_eq!(got.public_half(), expected);
+    }
     // Method resolution for `IO`'s inherent-looking calls (`create_dir_all`,
     // `write`): the trait is the only place they exist.
     use crate::vault_io::VaultIo as _;

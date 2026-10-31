@@ -283,22 +283,14 @@ export async function personJoinVault(
   });
 }
 
-/** Whether a vault is a member vault (has a device-local member-key store), so
- *  the Unlock surface asks for the recovery phrase instead of a password. */
+/** Whether a vault is a member vault on THIS device, i.e. it carries a
+ *  device-local member credential (`vault.member-unlock`). Since
+ *  myne-md/myne#938 task 12 that store is the only member store: the phrase-sealed
+ *  `vault.member-key` is retired, so a member vault is unlocked with its password,
+ *  PIN or biometric and never with the phrase. */
 export async function memberVaultStatus(vaultIdHex: string): Promise<boolean> {
   return invoke<boolean>("plugin:sync|sync_member_vault_status", {
     vaultIdHex,
-  });
-}
-
-/** Re-unlock a member vault from the recovery phrase. */
-export async function personUnlockMemberVault(
-  vaultIdHex: string,
-  phrase: string,
-): Promise<void> {
-  return invoke("plugin:sync|sync_person_unlock_member_vault", {
-    vaultIdHex,
-    phrase,
   });
 }
 

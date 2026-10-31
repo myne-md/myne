@@ -68,6 +68,14 @@ enum VaultMetaPreview {
     /// exactly as `Ntv6` does; what it adds is a `root_key` sealed to the owner's
     /// person key, which is the arm an identity phrase opens.
     Ntv7(Box<protocol::PersonWrappedVaultMeta>),
+    /// `NTV8`: the password-only generation (myne-md/myne#938,
+    /// `decisions/protocol/0758`). Its credential side is `NTV6`'s: `root_key`
+    /// comes out of the password wrap, and `itemsKey` is sealed under the GROUP
+    /// tier. It carries the same tail, so it is held here as that tail and
+    /// derives through the same helper. What it does not have is the person wrap,
+    /// which is why there is no identity-phrase arm for it: on this generation
+    /// the phrase names a person and opens nothing.
+    Ntv8(protocol::B2bVaultMeta),
 }
 
 /// Resolve `<app_data_dir>/vault/vault.meta` for the running app.
@@ -307,6 +315,14 @@ async fn unlock_from_host_credential(
         // myne#679: destroy vault A's detached (pop-out) note windows before
         // vault B hydrates: its plaintext must not survive the switch.
         hooks.detached_windows_teardown_on_lock();
+        // The device signing key's RAM copy goes with the vault it was unlocked
+        // for. It is not vault plaintext, so it is not one of the hooks above; but
+        // a rung-3 PIN session key that outlives a lock is a decrypted signing key
+        // sitting in a process that has told the user it is locked, and the next
+        // unlock re-reads it from the OS store (asking for the PIN again if that is
+        // what the store needs). Same site as the slot drop, by the same rule
+        // `scripts/check-lock-teardown.mjs` states for every other surface.
+        crate::plugins::sync::device_identity::clear_session_key();
         hooks.zeroize_vault_indices();
         hooks.zeroize_attachment_refs();
         // MYND-259: abort any in-progress voice recording so the mic + RAM
@@ -559,6 +575,16 @@ pub(crate) async fn run_post_unlock_pipeline(
     if let Some(active) = state.active_vault_id().await {
         if let Ok(base) = host.app_data_dir() {
             let vault_dir = crate::paths::vault_root_for_id_from_base(&base, active);
+            // A person-born vault has no vault SCRAM account, so nothing wrote this
+            // vault's `device_id_hex` and the claim below would stand down on
+            // `NoDeviceId` for ever. Adopting the id the PERSON plane already minted
+            // is what makes the claim possible, and the claim is what lets the cycle
+            // author a `0x03` head instead of needing the phrase. Ordered first
+            // because the claim reads the id this writes.
+            crate::plugins::sync::person_account::adopt_person_device_identity_best_effort(
+                host, io, &vault_dir,
+            )
+            .await;
             crate::plugins::device_binding::commands::claim_own_binding_best_effort(
                 io, state, &vault_dir,
             )
@@ -1028,22 +1054,20 @@ pub(crate) async fn recover_pending_rekey_on_unlock(
             };
             let version =
                 protocol::meta_version_of(&new_meta).unwrap_or(protocol::MetaVersion::V0_1);
-            // `NTV7` keeps `NTV6`'s tail byte for byte, so the group-tier arm
-            // below serves both: its `itemsKey` is group-sealed exactly the same
-            // way, and reading it through the root tier would install a key that
-            // opens nothing.
-            let is_ntv7 = new_meta.get(..4)
-                == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice());
-            if new_meta.get(..4) == Some(protocol::VAULT_META_NTV6_MAGIC.as_slice()) || is_ntv7 {
+            // `NTV6`, `NTV7` and `NTV8` share that tail byte for byte, so the
+            // group-tier arm below serves all three: their `itemsKey` is
+            // group-sealed exactly the same way, and reading it through the root
+            // tier would install a key that opens nothing. The question is asked
+            // with `has_b2b_tail` and the tail opened with `parse_b2b_tail_any`
+            // rather than with one magic comparison per generation: the two
+            // flags this used to carry were already the wrong shape, and adding
+            // a third for `NTV8` would have been a fourth place to forget.
+            if protocol::has_b2b_tail(&new_meta) {
                 // A group rotation wrote this journal: the committed meta is
                 // `NTV6`, whose `itemsKey` is group-sealed. Derive the group key
                 // first and install BOTH tiers, or the session keeps the retired
                 // keys and cannot read any note or shared singleton.
-                let Ok(b2b) = (if is_ntv7 {
-                    protocol::parse_vault_meta_ntv7(&new_meta).map(|m| m.as_ntv6_tail())
-                } else {
-                    protocol::parse_vault_meta_ntv6(&new_meta)
-                }) else {
+                let Ok(b2b) = protocol::parse_b2b_tail_any(&new_meta) else {
                     return;
                 };
                 let Ok(group) =
@@ -1137,6 +1161,16 @@ async fn unlock_with_credential(
     // Both arms already hold `Zeroizing`, so every early-return path
     // (VaultAlreadyUnlocked, UnlockInProgress, IO failure, parse failure) drops
     // the wrapper and zeroes the bytes.
+    //
+    // Which credential opened the vault decides whether the `NTV7` to `NTV8`
+    // upgrade may run at the tail (myne-md/myne#938 review): the phrase is the door
+    // of a user who has lost the password, so it must never be the unlock that
+    // removes it. Read here, before the derivation match consumes `credential`.
+    let upgrade_authority = if matches!(&credential, UnlockCredential::Password(_)) {
+        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordProven
+    } else {
+        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordNotProven
+    };
 
     // Host clock, not `Instant::now()`: the latter PANICS on
     // `wasm32-unknown-unknown` (std falls to its `unsupported` time backend).
@@ -1276,6 +1310,15 @@ async fn unlock_with_credential(
             protocol::parse_vault_meta_ntv7(candidate)
                 .map(|meta| VaultMetaPreview::Ntv7(Box::new(meta)))
                 .map(|meta| (meta, candidate.to_vec()))
+        } else if candidate.get(..4)
+            == Some(protocol::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice())
+        {
+            // Same reason as the `NTV7` arm, one generation on: the any-parser
+            // reads only the 345-byte base, and the derivation has to know that
+            // this frame's `itemsKey` is group-sealed rather than root-sealed.
+            protocol::parse_vault_meta_ntv8(candidate)
+                .map(|meta| VaultMetaPreview::Ntv8(meta.as_ntv6_tail()))
+                .map(|meta| (meta, candidate.to_vec()))
         } else {
             protocol::parse_vault_meta_any(candidate)
                 .map(VaultMetaPreview::Legacy)
@@ -1350,15 +1393,37 @@ async fn unlock_with_credential(
                     // one, so the derivation is dispatched on its OWN magic rather
                     // than on the local preview's type. A staged `NTV7` opened with
                     // the legacy arm would parse as a bare base and fail on the
-                    // group-sealed `items_key`.
+                    // group-sealed `items_key`, and a staged `NTV8` would be refused
+                    // outright by the legacy arm's magic check — so a peer staged on
+                    // the password-only generation could never promote it
+                    // (myne-md/myne#938 review).
                     let staged_is_ntv7 = candidate.get(..4)
                         == Some(protocol::vault_meta_ntv7::VAULT_META_NTV7_MAGIC.as_slice());
+                    let staged_is_ntv8 = candidate.get(..4)
+                        == Some(protocol::vault_meta_ntv8::VAULT_META_NTV8_MAGIC.as_slice());
                     let staged_result = if staged_is_ntv7 {
                         match protocol::parse_vault_meta_ntv7(&candidate) {
                             Ok(meta) => {
                                 derive_keys_from_ntv7_candidate(
                                     host,
                                     &meta,
+                                    candidate.clone(),
+                                    staged_password(&credential),
+                                )
+                                .await
+                            }
+                            Err(_) => Err(VaultUnlockError::InvalidVaultMeta),
+                        }
+                    } else if staged_is_ntv8 {
+                        // The `NTV6` password path, one generation on: the password
+                        // wrap, its AAD and the group-tier `itemsKey` are the same
+                        // objects, and what `NTV8` dropped is a credential nothing
+                        // here asks for.
+                        match protocol::parse_vault_meta_ntv8(&candidate) {
+                            Ok(meta) => {
+                                derive_keys_from_ntv6_candidate(
+                                    host,
+                                    &meta.as_ntv6_tail(),
                                     candidate.clone(),
                                     staged_password(&credential),
                                 )
@@ -1425,6 +1490,13 @@ async fn unlock_with_credential(
             }
             (UnlockCredential::Password(pw), VaultMetaPreview::Ntv7(meta)) => {
                 derive_keys_from_ntv7_candidate(host, meta, bytes, pw.clone()).await?
+            }
+            // `NTV8` takes the `NTV6` password path unchanged: the password wrap,
+            // its AAD and the group-tier `itemsKey` are the same objects, and the
+            // only thing this generation dropped is a credential nothing here
+            // asks for.
+            (UnlockCredential::Password(pw), VaultMetaPreview::Ntv8(meta)) => {
+                derive_keys_from_ntv6_candidate(host, meta, bytes, pw.clone()).await?
             }
             (UnlockCredential::PersonPhrase(phrase), VaultMetaPreview::Ntv7(meta)) => {
                 derive_keys_from_person_phrase(host, meta, bytes, phrase.clone()).await?
@@ -1517,6 +1589,34 @@ async fn unlock_with_credential(
         duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "vault unlocked successfully"
     );
+
+    // myne-md/myne#938, `protocol.md` §10.4.3: an `NTV7` vault drops the person
+    // wrap of `root_key` on the unlock that opens it, silently and atomically.
+    //
+    // HERE rather than in the command wrapper, because this is the one tail every
+    // unlocking credential shares: the password path and the identity-phrase path
+    // both land on it, and so does every client (the wrapper is `tauri-ipc`-gated
+    // and the web client never calls it). A failure is swallowed by
+    // `upgrade_on_unlock`: the vault is open either way and the next unlock
+    // retries, so no unlock can fail because a rewrite could not land.
+    //
+    // The credential decides whether it runs at all. The person wrap is the only
+    // door for a user who opened this vault with their phrase because they no
+    // longer know the password, so truncating it on THAT unlock would destroy the
+    // credential they just used. `PasswordNotProven` leaves the frame alone and the
+    // next password unlock performs the upgrade.
+    //
+    // The identity session installed above is deliberately NOT touched: this
+    // rewrite removes a credential from the file, and the person session is what
+    // lets the user keep syncing without typing the phrase again.
+    crate::plugins::vault_migrate::ntv8::upgrade_on_unlock(
+        io,
+        vault_path,
+        state,
+        vault_id,
+        upgrade_authority,
+    )
+    .await;
 
     Ok(())
 }
@@ -1764,6 +1864,10 @@ pub async fn lock_from_host(
     // manual-lock path: a detached window is a second plaintext-bearing WebView,
     // so locking means locked for it too, not just "main".
     hooks.detached_windows_teardown_on_lock();
+    // The device signing key's RAM copy, on the same rule as the switch branch
+    // above: a lock means locked, and this key is re-read (or re-asked for) on the
+    // next unlock rather than kept through it.
+    crate::plugins::sync::device_identity::clear_session_key();
 
     // ---- MYND-31: wipe the plaintext-derived VaultIndices ---------------
     //
@@ -1958,6 +2062,15 @@ pub(crate) async fn lock_with_state(state: &VaultRuntimeState) -> Result<(), Vau
             Slot::Empty
         }
     };
+    // **A pending device admission does not outlive the lock** (myne-md/myne#938
+    // review). `set_pending_admission` holds a minted `MYNE-DEVICE-1` code's SCRAM
+    // secret, which the identifier table calls CREDENTIAL-EQUIVALENT, and the
+    // module's own header promises it is "cleared by a vault lock". It was not:
+    // `clear_person_session` runs only in the `None` arm above, i.e. when no vault
+    // was open, so locking an OPEN vault left the code and its secret resident for
+    // the life of the process. Cleared here rather than inside the arm because both
+    // arms must clear it: the ceremony is bound to a session, and a lock ends it.
+    state.clear_pending_admission().await;
     let from_slot_kind: &'static str = match &prior {
         Slot::Empty => "empty",
         Slot::Recovering { .. } => "recovering",
@@ -2164,8 +2277,8 @@ pub(crate) async fn vault_status_with_path(
         }
     };
     // A present vault is v0.1 (`MYV1`), a migrated v0.2 (`NTV5`), a B2B-migrated
-    // v0.2 (`NTV6`), or a person-born `NTV7`. All of them are well-formed,
-    // unlockable vaults, the boot probe
+    // v0.2 (`NTV6`), a person-wrapped `NTV7`, or the password-only `NTV8`. All of
+    // them are well-formed, unlockable vaults, and the boot probe
     // must report `Exists` for the later two, not `Corrupted`, or a just-migrated
     // vault strands the user at the corrupted-recovery surface (§10.4.1;
     // automerge-sync-migration #420). Try the v0.1 parser first (the common case),
@@ -2177,6 +2290,7 @@ pub(crate) async fn vault_status_with_path(
             if protocol::parse_vault_meta_v0_2(&bytes).is_ok()
                 || protocol::parse_vault_meta_ntv6(&bytes).is_ok()
                 || protocol::parse_vault_meta_ntv7(&bytes).is_ok()
+                || protocol::parse_vault_meta_ntv8(&bytes).is_ok()
             {
                 return Ok(VaultStatus::Exists);
             }
@@ -2240,16 +2354,24 @@ pub(crate) async fn vault_is_unlocked_with_state(
     Ok(state.active_vault_id().await.is_some())
 }
 
-/// Whether the active vault carries the `NTV7` person wrap, i.e. whether the
-/// owner's identity phrase is a credential for it (myne-md/myne#911 task 10).
+/// **Which second credential this vault has, if any**: `Some(true)` when the
+/// `NTV7` person wrap is there (the owner's identity phrase opens it),
+/// `Some(false)` when there is no person wrap but a vault recovery wrap
+/// (`MYV1`/`NTV5`/`NTV6`), and `None` when there is **no second credential at
+/// all** (`NTV8`, myne-md/myne#938, `decisions/protocol/0758`).
 ///
-/// **One bit, no generation vocabulary.** The unlock screen needs exactly one
-/// fact to decide what its recovery escape hatch says: after the explicit
-/// `NTV7` upgrade the saved vault phrase is retired, so offering "unlock with
-/// your vault recovery phrase" would point at a credential the upgrade deleted.
-/// A full generation enum here would leak a format taxonomy into the UI for a
-/// boolean question, and the two surfaces that already need generations (the
-/// upgrade form, the publish row) read them from their own commands.
+/// **Why three answers and not one bit.** The unlock screen's recovery escape
+/// hatch has three honest forms, and the third is absence. A `bool` collapsed
+/// `NTV8` into `false`, so a vault with nothing to recover offered the vault
+/// phrase grid: 24 words typed into a flow whose AEAD cannot succeed, answered
+/// with the non-distinguishing "wrong phrase" for words that are right. The
+/// same bit decided the Settings row, which then offered to retire a phrase the
+/// vault never had. `None` is the state that makes both surfaces say nothing.
+///
+/// It stays one probe rather than a generation enum because the question the UI
+/// asks is "what do I offer", not "which codec is this"; the surfaces that need
+/// generations (the upgrade form's `from`, the publish row) read them from their
+/// own commands.
 ///
 /// Not a secret: the magic is the first four bytes of `vault.meta` and any
 /// reader of the directory already has it. Read-only, no permit, no Argon2id,
@@ -2259,7 +2381,7 @@ pub async fn vault_is_person_wrapped_from_host(
     host: &dyn HostCtx,
     state: &VaultRuntimeState,
     io: &dyn VaultIo,
-) -> Result<bool, VaultStatusError> {
+) -> Result<Option<bool>, VaultStatusError> {
     // Resolve the target the way an unlock does: the active vault, else the
     // host's SOLE vault id, and only then the transitional disk scan.
     //
@@ -2284,14 +2406,28 @@ pub async fn vault_is_person_wrapped_from_host(
     let path = vault_meta_path(host, vault_id).map_err(|_| VaultStatusError::IoError {
         io_error_kind: IoFailureKind::Other,
     })?;
-    // A missing or unreadable file is `false`, not an error: the question is
-    // "does this vault accept the identity phrase", and a vault that is not
-    // there does not. The boot probe already decides missing-vs-corrupted.
+    // A missing or unreadable file is `Some(false)`, not an error and not
+    // `None`: the question is "what does this vault offer", and a vault that is
+    // not there offers the legacy answer rather than the strongest one. The boot
+    // probe already decides missing-vs-corrupted. Answering `None` here would
+    // silently hide the recovery hatch on every transient read failure, which is
+    // the worse mistake in the direction that loses a user's only way back in.
     let bytes = match io.read(&path).await {
         Ok(bytes) => bytes,
-        Err(_) => return Ok(false),
+        Err(_) => return Ok(Some(false)),
     };
-    Ok(bytes.get(..4) == Some(protocol::VAULT_META_NTV7_MAGIC.as_slice()))
+    match protocol::vault_meta_generation(&bytes) {
+        protocol::VaultMetaGeneration::Person => Ok(Some(true)),
+        // No wrap of any kind: `NTV8` has no recovery wrap AND no person wrap, so
+        // there is no phrase to offer and no grid to render.
+        protocol::VaultMetaGeneration::PersonNoWrap => Ok(None),
+        // `MYV1`, `NTV5`, `NTV6`, and anything unrecognised: the vault's own
+        // phrase is the second credential. Unrecognised answers `Some(false)`
+        // rather than `None` because a format this build does not know is far more
+        // likely to be an older vault than a newer one, and the legacy answer is
+        // the one that keeps a door on screen.
+        _ => Ok(Some(false)),
+    }
 }
 
 /// IPC wrapper. Delegates; the command name and payload the frontend sends are
@@ -2302,7 +2438,7 @@ pub async fn vault_is_person_wrapped<R: Runtime>(
     vault_id: Option<String>,
     state: State<'_, VaultRuntimeState>,
     app: AppHandle<R>,
-) -> Result<bool, VaultStatusError> {
+) -> Result<Option<bool>, VaultStatusError> {
     vault_is_person_wrapped_from_host(
         vault_id,
         &TauriHost::new(app),
@@ -3306,8 +3442,8 @@ mod tests {
          absurd abuse access accident account accuse achieve acid acoustic acquire across act \
          action actor actress actual";
 
-    /// Build a person-born vault on disk: the `NTV7` frame plus the session's
-    /// own keys, so both credential arms can be checked against one root key.
+    /// Build a person-born vault on disk: the `NTV8` frame plus the session's
+    /// own keys, so the password arm can be checked against one root key.
     fn seed_person_vault(
         password: &str,
     ) -> (
@@ -3341,8 +3477,44 @@ mod tests {
             crate::plugins::vault_creation::commands::build_and_serialize_person_vault_meta(
                 &session,
             )
-            .expect("serialize NTV7");
+            .expect("serialize NTV8");
         (bytes, root_key, pair, person_id)
+    }
+
+    /// The same vault as [`seed_person_vault`], written in the generation `NTV8`
+    /// supersedes: the identical base and group-key tail, plus a real person wrap
+    /// of the same `root_key`.
+    ///
+    /// This is the frame a client that predates myne-md/myne#938 writes, and it is
+    /// the only thing that makes "the phrase is not a vault credential" a claim
+    /// about a generation rather than a claim about the phrase. Built from the
+    /// production creator's own frame rather than hand-assembled, so the base, the
+    /// roster and its signature are the real ones and only the person wrap is
+    /// added.
+    fn seed_person_vault_ntv7(
+        password: &str,
+    ) -> (Vec<u8>, [u8; AEAD_KEY_LEN], protocol::PersonKeyPair) {
+        let (ntv8, root_key, pair, _person_id) = seed_person_vault(password);
+        let parsed = protocol::parse_vault_meta_ntv8(&ntv8).expect("parse NTV8");
+        let tail = parsed.as_ntv6_tail();
+        let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
+        let person_wrap = protocol::seal_root_key_to_person_raw(
+            &pair.public_half(),
+            &root_key,
+            &tail.base.items_key_id,
+            &mut rng,
+        )
+        .expect("seal root_key to the owner's identity");
+        let bytes = protocol::serialize_vault_meta_ntv7(&protocol::PersonWrappedVaultMeta {
+            base: tail.base,
+            group_key_nonce: tail.group_key_nonce,
+            enc_group_key: tail.enc_group_key,
+            group_key_epoch: tail.group_key_epoch,
+            signed_roster_envelope: tail.signed_roster_envelope,
+            person_wrap,
+        })
+        .expect("serialize NTV7");
+        (bytes, root_key, pair)
     }
 
     #[test]
@@ -3362,13 +3534,13 @@ mod tests {
                 &crate::host::NoopHost,
             )
             .await
-            .expect("the password unlocks an NTV7 vault");
+            .expect("the password unlocks an NTV8 vault");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
-            let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
-            let derived = derive_keys_from_ntv7_candidate(
+            let parsed = protocol::parse_vault_meta_ntv8(&meta_bytes).expect("parse NTV8");
+            let derived = derive_keys_from_ntv6_candidate(
                 &crate::host::NoopHost,
-                &parsed,
+                &parsed.as_ntv6_tail(),
                 meta_bytes.clone(),
                 Zeroizing::new("person-born-pw".to_string()),
             )
@@ -3377,15 +3549,75 @@ mod tests {
             assert_eq!(*derived.root_key, root_key);
             assert!(
                 derived.group_key.is_some(),
-                "an NTV7 session always carries the group tier"
+                "an NTV8 session always carries the group tier"
             );
         });
     }
 
+    /// The retirement, stated as an assertion rather than as an absence.
+    ///
+    /// A password-only vault does not accept the identity phrase, and it refuses
+    /// it with the SAME error a wrong password gets, so nothing about the reply
+    /// says whether a second credential ever existed (§6.4). The companion test
+    /// below proves the phrase has not stopped working in general: it is not a
+    /// vault credential on THIS generation, and it still is on the one this
+    /// generation upgrades from.
     #[test]
-    fn the_identity_phrase_opens_a_person_born_vault() {
+    fn the_identity_phrase_does_not_open_a_password_only_vault() {
         rt().block_on(async {
-            let (meta_bytes, root_key, _pair, _person_id) = seed_person_vault("person-born-pw");
+            let (meta_bytes, _root_key, _pair, _person_id) = seed_person_vault("person-born-pw");
+            let scratch = scratch_vault();
+            scratch.write_meta(&meta_bytes);
+
+            let state = VaultRuntimeState::default();
+            let refused = unlock_with_credential(
+                UnlockCredential::PersonPhrase(Zeroizing::new(PERSON_PHRASE.to_string())),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await;
+            assert!(
+                matches!(refused, Err(VaultUnlockError::InvalidCredentialOrVault)),
+                "the phrase must be refused exactly as a wrong password is, got {refused:?}"
+            );
+            assert_eq!(
+                state.slot_kind(test_vault_id()).await,
+                SlotKind::Empty,
+                "a refused credential leaves no half-open slot"
+            );
+
+            // The password is unaffected: the same file, the other credential.
+            unlock_with_path(
+                "person-born-pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("the password still opens the vault the phrase was refused for");
+        });
+    }
+
+    /// The companion to the refusal above: on the generation this one supersedes,
+    /// the phrase is still a vault credential, and it still derives the SAME root
+    /// key the password does. Without this, the test above would read as "the
+    /// phrase broke" instead of "the phrase is no longer a vault credential on
+    /// this generation".
+    ///
+    /// This unlock also UPGRADES the vault (myne-md/myne#938, `protocol.md`
+    /// §10.4.3), so the assertion below is on the in-memory frame this test built
+    /// rather than on the file: the file is `NTV8` by the time this returns, which
+    /// is what [`the_first_unlock_drops_the_person_wrap_and_keeps_the_session`]
+    /// pins.
+    #[test]
+    fn the_identity_phrase_still_opens_an_ntv7_vault_and_keeps_its_person_wrap() {
+        rt().block_on(async {
+            let (meta_bytes, root_key, _pair) = seed_person_vault_ntv7("person-born-pw");
             let scratch = scratch_vault();
             scratch.write_meta(&meta_bytes);
 
@@ -3399,7 +3631,7 @@ mod tests {
                 &crate::host::NoopHost,
             )
             .await
-            .expect("the identity phrase unlocks its own vault");
+            .expect("the identity phrase unlocks its own NTV7 vault");
             assert_eq!(state.slot_kind(test_vault_id()).await, SlotKind::Unlocked);
 
             let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
@@ -3412,23 +3644,45 @@ mod tests {
             .await
             .expect("phrase arm");
             assert_eq!(*derived.root_key, root_key);
+
+            // And the frame on disk is STILL `NTV7`, because this unlock did not
+            // prove the password. The upgrade truncates the person wrap, which is the
+            // only door for a user who opened the vault with their phrase because
+            // they forgot their password: running it here would destroy the very
+            // credential that just worked, in the same act. The password path does
+            // perform it, and that is asserted in `vault_migrate::ntv8` and in
+            // `unlock_with_credential`'s own password case (myne-md/myne#938 review).
+            let after = std::fs::read(scratch.path()).expect("read the frame");
+            assert_eq!(
+                &after[..4],
+                b"NTV7",
+                "a phrase unlock proves no password, so the person wrap must survive it"
+            );
         });
     }
 
     #[test]
     fn a_wrong_phrase_and_a_legacy_vault_both_refuse_without_saying_which() {
         rt().block_on(async {
-            // (a) A different phrase against an NTV7 vault.
+            // (a) A different phrase against a password-only vault. Driven through
+            // the unlock seam rather than through `derive_keys_from_person_phrase`,
+            // because the dispatch never reaches that function for `NTV8`: a
+            // derive-level test would be exercising a function this credential can
+            // no longer be routed to.
             let (meta_bytes, _root, _pair, _id) = seed_person_vault("person-born-pw");
-            let parsed = protocol::parse_vault_meta_ntv7(&meta_bytes).expect("parse NTV7");
-            let wrong = derive_keys_from_person_phrase(
-                &crate::host::NoopHost,
-                &parsed,
-                meta_bytes.clone(),
-                Zeroizing::new(
+            let scratch = scratch_vault();
+            scratch.write_meta(&meta_bytes);
+            let state = VaultRuntimeState::default();
+            let wrong = unlock_with_credential(
+                UnlockCredential::PersonPhrase(Zeroizing::new(
                     "legal winner thank year wave sausage worth useful legal winner thank yellow"
                         .to_string(),
-                ),
+                )),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
             )
             .await;
             assert!(
@@ -3829,6 +4083,77 @@ mod tests {
                 root.join("notes/a.myn").exists(),
                 "promotion must not delete note blobs; the pull replaces them, and \
                  removing them here discards content before its replacement lands"
+            );
+        });
+    }
+
+    /// The first unlock of an `NTV7` vault drops the person wrap, moves the CAS
+    /// anchor to the bytes it wrote, and keeps everything the session needs
+    /// (myne-md/myne#938, `protocol.md` §10.4.3).
+    ///
+    /// Three separate things are asserted because three separate things can be
+    /// got wrong here, and each of them fails silently:
+    ///
+    /// 1. **The file.** A generation claim with nothing behind it would be the
+    ///    worst shape: the frame must be the `NTV7` one truncated, carrying the
+    ///    same group tail and no person wrap.
+    /// 2. **The anchor.** The unlock captured the hash of the bytes it READ, so a
+    ///    rewrite that does not move `vault_meta_bytes_hash` makes the next
+    ///    `change_password` fail `VaultMetaChangedExternally`, a user whose
+    ///    password change reports tampering because the app upgraded its own file.
+    /// 3. **The session.** The upgrade removes a credential from disk; it must not
+    ///    touch the group tier or the person session, or the user loses sync
+    ///    (the exact symptom myne-md/myne#938 was filed for) by upgrading.
+    #[test]
+    fn the_first_unlock_drops_the_person_wrap_and_keeps_the_session() {
+        rt().block_on(async {
+            let (meta_bytes, root_key, _pair) = seed_person_vault_ntv7("person-born-pw");
+            let scratch = scratch_vault();
+            scratch.write_meta(&meta_bytes);
+            let before = std::fs::read(scratch.path()).expect("read NTV7");
+
+            let state = VaultRuntimeState::default();
+            unlock_with_path(
+                "person-born-pw".to_string(),
+                None,
+                scratch.path(),
+                &state,
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("the password opens the NTV7 vault");
+
+            // 1. The file is the truncated frame, and it is a real frame.
+            let after = std::fs::read(scratch.path()).expect("read NTV8");
+            assert_eq!(&after[..4], b"NTV8", "the unlock must upgrade the frame");
+            assert_eq!(
+                after.len() + protocol::PERSON_WRAP_LEN,
+                before.len(),
+                "the person wrap is gone and nothing else moved"
+            );
+            assert_eq!(&after[6..], &before[6..after.len()]);
+            assert!(protocol::has_b2b_tail(&after));
+
+            // 2. The anchor follows the bytes on disk, not the bytes read.
+            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
+            assert_eq!(
+                unlocked.vault_meta_bytes_hash,
+                crate::vault_meta_hash::vault_meta_sha256(after.as_slice()),
+                "the CAS anchor must move with the upgrade or change-password reports tampering"
+            );
+            // 3. The session is intact: same root key (nothing was re-derived),
+            //    and still group-tier (every shared singleton is sealed under it).
+            assert_eq!(
+                unlocked.owner_root_key().expect("root key").as_slice(),
+                root_key.as_slice()
+            );
+            assert!(
+                matches!(
+                    unlocked.shared_singleton_key(),
+                    crate::plugins::vault_unlock::state::SharedSingletonKey::Group(_)
+                ),
+                "the upgrade must not drop the group tier"
             );
         });
     }
@@ -5567,6 +5892,89 @@ mod tests {
 
             let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
             assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    /// The `NTV6` fixture re-framed as `NTV8`: same base, same group-key tail,
+    /// the phrase-wrap fields zeroed, and no person wrap (myne-md/myne#938).
+    ///
+    /// This is the frame a vault created today carries, and also what a `NTV7`
+    /// vault becomes under the §10.4.3 truncation, so a test over these bytes
+    /// covers both paths without a second fixture.
+    #[allow(clippy::type_complexity)]
+    fn ntv8_meta_fixture() -> (
+        protocol::B2bVaultMeta,
+        Vec<u8>,
+        [u8; AEAD_KEY_LEN],
+        [u8; AEAD_KEY_LEN],
+        [u8; 16],
+    ) {
+        let (ntv6, _, root_key, items_key, items_key_id) = ntv6_meta_fixture();
+        let mut base = ntv6.base.clone();
+        base.random_salt_recovery = [0u8; protocol::ARGON2_SALT_LEN];
+        base.nonce_recovery_wrap = [0u8; protocol::AEAD_NONCE_LEN];
+        base.enc_root_key_recovery = [0u8; protocol::VAULT_META_WRAPPED_ROOT_KEY_LEN];
+        let bytes = protocol::serialize_vault_meta_ntv8(&protocol::PasswordOnlyVaultMeta {
+            base,
+            group_key_nonce: ntv6.group_key_nonce,
+            enc_group_key: ntv6.enc_group_key,
+            group_key_epoch: ntv6.group_key_epoch,
+            signed_roster_envelope: ntv6.signed_roster_envelope.clone(),
+        })
+        .expect("serialize NTV8");
+        assert_eq!(&bytes[..4], b"NTV8");
+        (ntv6, bytes, root_key, items_key, items_key_id)
+    }
+
+    #[test]
+    fn vault_status_returns_exists_for_a_password_only_ntv8_meta() {
+        // The generation a vault is born with today. The v0.1, `NTV5`, `NTV6`
+        // and `NTV7` parsers all reject this magic, so without its own arm the
+        // boot probe reports `Corrupted` on every freshly created vault and the
+        // user lands on the corrupted-recovery surface holding a healthy vault.
+        rt().block_on(async {
+            let (_, bytes, _, _, _) = ntv8_meta_fixture();
+            let scratch = ScratchVault::new("vault_status_ntv8_exists");
+            scratch.write_meta(&bytes);
+
+            let result = vault_status_with_path(&crate::vault_io::StdVaultIo, scratch.path()).await;
+            assert_eq!(result, Ok(VaultStatus::Exists));
+        });
+    }
+
+    #[test]
+    fn owner_password_opens_an_ntv8_vault_through_the_group_key() {
+        // The whole point of the generation: the password is the only credential,
+        // and it must still reach the group-tier `itemsKey` unchanged. If this
+        // ever returns the root-tier derivation instead, the exported `itemsKey`
+        // opens nothing.
+        rt().block_on(async {
+            let (meta, bytes, root_key, items_key, items_key_id) = ntv8_meta_fixture();
+            let ntv8_bytes = bytes.clone();
+            let temp = crate::test_support::ScopedTempDir::new("ntv8_password_reopen")
+                .expect("create temporary vault root");
+            let host = crate::host::test_host::TestHost::new(temp.path());
+
+            let derived = derive_keys_from_ntv6_candidate(
+                &host,
+                &meta,
+                bytes,
+                Zeroizing::new("pw".to_owned()),
+            )
+            .await
+            .expect("password opens NTV8");
+
+            assert_eq!(*derived.root_key, root_key);
+            assert_eq!(*derived.items_key, items_key);
+            assert_eq!(derived.items_key_id, items_key_id);
+            // And the frame is classified as its own generation rather than as a
+            // legacy one, which is the bit the unlock dispatch branches on: a
+            // `Legacy` verdict would take the root-tier `itemsKey` path and
+            // install a key that opens nothing.
+            assert_eq!(
+                protocol::vault_meta_generation(&ntv8_bytes),
+                protocol::VaultMetaGeneration::PersonNoWrap
+            );
         });
     }
 

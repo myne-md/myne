@@ -249,6 +249,15 @@ fn main() {
 
 /// Emit a PERSON-WRAPPED (`NTV7`) vault (myne-md/myne#911 task 13).
 ///
+/// **The fixture pins `NTV7` on purpose, and creation no longer produces it.** A
+/// person-born vault is `NTV8` since myne-md/myne#938 (`decisions/protocol/0758`):
+/// the person wrap is gone, so no phrase opens it and the identity door does not
+/// render for one. `NTV7` stays READABLE forever, and the browser lane's
+/// identity-phrase scenario is that promise's only proof, so the bytes are built
+/// by taking creation's own `NTV8` frame and re-sealing the person wrap onto it
+/// with the SAME `seal_root_key_to_person_raw` the `NTV7` migration uses. A
+/// hand-assembled frame would encode a second opinion about the 1208-byte tail.
+///
 /// Drives the same creation path the app does, with an identity derived from
 /// [`PERSON_PHRASE`], so the browser lane can prove that a page offers the
 /// identity-phrase door and that it opens the vault. Two parameters are pinned
@@ -288,14 +297,42 @@ fn emit_person_fixture() {
         myne_core::paths::web_single_vault_id(),
         PASSWORD,
         protocol::DEFAULT_V0_1_KDF_PARAMS,
-        person,
+        // Cloned because the wrap below needs the owner's public half and the
+        // session owns the keypair.
+        person.clone(),
     )
     .expect("build person-born creation session");
-    let (meta, _group_key) =
+    let (password_only_bytes, _group_key) =
         myne_core::plugins::vault_creation::commands::build_and_serialize_person_vault_meta(
             &session,
         )
-        .expect("serialize person-wrapped vault.meta");
+        .expect("serialize password-only vault.meta");
+
+    // Re-seal the person wrap that `NTV8` deliberately omits. `root_key` is the
+    // session's own, the `items_key_id` comes from the frame creation just built,
+    // and the sealing call is the one the `NTV7` migration uses, so the tail is
+    // the real one rather than a reimplementation.
+    let owner_public = person.pair.public_half();
+    let password_only = protocol::parse_vault_meta_ntv8(&password_only_bytes)
+        .expect("re-parse the frame creation wrote");
+    let mut rng = rand_core::UnwrapErr(myne_core::rng::OsRng);
+    let person_wrap = protocol::seal_root_key_to_person_raw(
+        &owner_public,
+        &session.root_key,
+        &password_only.base.items_key_id,
+        &mut rng,
+    )
+    .expect("seal root_key to the owner's person key");
+    let frame = protocol::PersonWrappedVaultMeta {
+        base: password_only.base,
+        group_key_nonce: password_only.group_key_nonce,
+        enc_group_key: password_only.enc_group_key,
+        group_key_epoch: password_only.group_key_epoch,
+        signed_roster_envelope: password_only.signed_roster_envelope,
+        person_wrap,
+    };
+    let meta = protocol::serialize_vault_meta_ntv7(&frame)
+        .expect("serialize the NTV7 frame the browser lane reads");
 
     block_on(async {
         let io = ContainerVaultIo;

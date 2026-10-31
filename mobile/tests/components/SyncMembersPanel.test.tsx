@@ -38,7 +38,7 @@ vi.mock("react-i18next", async (importOriginal) => {
 // The roster per test. `useMembers` is the panel's only data dependency, so
 // mocking it is the whole fixture: no IPC, no host, no backend.
 let mockMembers: RosterMemberView[] = [];
-let mockAuthority: "owner" | "member" = "member";
+let mockAuthority: "owner" | "member" | null = "member";
 let mockGroupKeyEpoch: number | null = 1;
 let mockError: string | null = null;
 
@@ -234,6 +234,32 @@ describe("SyncMembersPanel states", () => {
     expect(screen.getByTestId("sync.members.authority").textContent).toContain(
       "sync.memberRoster.ownerBadge",
     );
+  });
+
+  it("shows no role at all until the roster has been read", () => {
+    // myne-md/myne#938 task 13. The hook's authority is `null` until a read
+    // answers, and `null` is a third state rather than a fail-closed default: a
+    // badge saying "Member" is a CLAIM to the user, and to a vault's owner it is
+    // the wrong one. The absent-not-disabled rule applies to a fact here, not to
+    // a control, which is why the row is omitted rather than greyed.
+    mockAuthority = null;
+    render(<SyncMembersPanel />);
+    expect(screen.queryByTestId("sync.members.authority")).toBeNull();
+    // Nothing else may claim a role either: the badge copy must be absent from
+    // the whole panel, not just from that row.
+    expect(screen.queryByText("sync.memberRoster.memberBadge")).toBeNull();
+    expect(screen.queryByText("sync.memberRoster.ownerBadge")).toBeNull();
+  });
+
+  it("leaves the role unknown when the roster read failed", () => {
+    // The failure arm is the one that used to assert "member": a read that never
+    // answered is the last state in which a role can be inferred, so the error row
+    // says what happened and no role is shown beside it.
+    mockAuthority = null;
+    mockError = "NotUnlocked";
+    render(<SyncMembersPanel />);
+    expect(screen.queryByTestId("sync.members.authority")).toBeNull();
+    expect(screen.getByTestId("sync.members.error")).toBeDefined();
   });
 
   it("renders an unreadable roster as an error, not as an empty one", () => {

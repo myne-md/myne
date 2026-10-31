@@ -380,3 +380,26 @@ lane builds for iOS or Android.
 | 13.7 | **Lock.** Lock the vault on one device | its peers are dropped and the roster empties. A peer that survives a lock is other people's names resident in a locked vault's memory |
 | 13.8 | **Three surfaces at once.** Desktop plus two phones, one shared vault, the same note open on all three | each surface shows the other two, and an edit made on any of them lands on the other two. This is the SYNC-51 "all three clients" claim observed rather than assumed |
 | 13.9 | **No artefacts.** After a session with peers present, lock the vault and inspect the phone's storage | no awareness file is written: the awareness plane is RAM-only and never at rest (`sync-protocol.md` §10.1) |
+
+## 14. Device signing key storage checklist (myne-md/myne#938, task 9)
+
+The phone's rung on the device signing key's storage ladder (`decisions/protocol/0733`
+decision 4, filled in for Android by `0760`). The Rust half is verified as far as a
+host can verify it: the plugin crate and the mobile host compile and pass clippy for
+`aarch64-linux-android` with the Android `cfg` active, and `myne-core`'s provider seam
+is exercised through a fake provider in unit tests. **No tier in this tree can run the
+Kotlin**, and no CI lane builds Android Kotlin, so the rows below are the whole
+verification of the Keystore behaviour.
+
+> **Not run as of 2026-10-30.** Recorded rather than implied by the table's existence:
+> nothing schedules this checklist, so it verifies nothing until somebody runs it and
+> writes the result (device model, OS build) below.
+
+| # | Scenario | Expected |
+|---|---|---|
+| 14.1 | **A person-born vault mints and keeps a key.** Join a person-born vault on a phone, then `adb shell run-as md.myne.mobile ls shared_prefs` | `md.myne.devicekey.xml` exists and carries one base64 `sealed-device-key` value. No file anywhere under the app's dirs holds the 64-byte plaintext: `grep -r` for its hex across `files/`, `shared_prefs/` and the external dir finds nothing |
+| 14.2 | **The head is `0x03` with no prompt.** With sync connected, watch the pushed head | the head carries `head_format_version` `0x03` (device-signed), and no biometric or PIN dialog appeared during the cycle. A prompt here means `setUserAuthenticationRequired` was flipped on |
+| 14.3 | **It survives a restart.** Force-stop the app, relaunch, unlock, wait one cycle | the same device id keeps signing `0x03`, and the server's device-binding row for it does not change. A NEW key (a new binding row, or the old one tombstoned) means the Keystore read failed and the rung re-minted |
+| 14.4 | **A Keystore reset falls back, and says so.** Change the device lock screen (which drops the Keystore alias on some OEM builds), relaunch, unlock | the cycle logs the device-key fallback warning once, the head goes to `0x02` signed by the person key, sync continues, and the sealed blob is gone from `shared_prefs` afterwards (the read clears an undecryptable blob rather than warning forever) |
+| 14.5 | **A restore does not carry the blob.** `adb shell bmgr backupnow md.myne.mobile`, then inspect the transported set | `md.myne.devicekey.xml` is absent, as are `Documents/` and `person-auth.json`. Present means an exclusion in `myne_backup_rules.xml` stopped applying |
+| 14.6 | **The WebView cannot reach the store.** From the devtools console, `window.__TAURI__.core.invoke('plugin:device-key|open')` | rejected by the ACL: the plugin has no permission file and no capability grant, so no WebView command resolves. A resolved value means the bridge grew a WebView surface |

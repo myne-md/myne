@@ -279,9 +279,8 @@ const ALLOWED = new Map([
   ["core/src/plugins/vault_migrate/ntv7.rs#ntv6", [1, "the upgrade reads the OLD `NTV6` frame it is about to replace"]],
   ["core/src/plugins/vault_migrate/b2b.rs#ntv6", [1, "the NTV5→NTV6 migration validates the frame it just produced"]],
   ["core/src/plugins/sync/commands.rs#ntv6", [1, "the `AlreadyMigrated` arm reports the epoch of the NTV6 frame that vault already is"]],
-  ["core/src/plugins/sync/cycle.rs#ntv6", [1, "the `NTV6` arm of the head-format dispatch (its `NTV7` arm sits beside it)"]],
   ["core/src/plugins/vault_change_password/commands.rs#ntv6", [1, "the `VaultMetaGeneration::B2b` arm of an explicit match (the `Person` arm sits beside it)"]],
-  ["core/src/plugins/vault_unlock/commands.rs#ntv6", [3, "the `NTV6` arms of explicit generation branches: the preview's magic dispatch, the re-key recovery's `is_ntv7` else-arm, and the status probe's `||` chain that already names `NTV7`"]],
+  ["core/src/plugins/vault_unlock/commands.rs#ntv6", [2, "the `NTV6` arms of explicit generation branches: the preview's magic dispatch and the re-key recovery's `is_ntv7` else-arm. The status probe used to be the third, and it left this budget when it became `has_b2b_tail` (myne-md/myne#938): the predicate that survives a new generation cannot be a list of magics"]],
   // A TEST FIXTURE, and recorded rather than skipped because the region tracker
   // loses `mod tests` in this file part-way through (a brace inside the module's
   // own string literals closes the region early). The count is what keeps this

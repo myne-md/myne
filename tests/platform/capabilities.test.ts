@@ -225,6 +225,13 @@ describe("capability descriptor", () => {
       // Settings > AI > External access section is omitted and the whole `mcp`
       // namespace answers `Unsupported` in the dispatcher.
       "externalMcp",
+      // The two-sided device admission ceremony (myne-md/myne#938 task 11). The
+      // admitting half signs a group-tier `MYU5` row and needs a person identity
+      // the browser cannot hold, exactly as `memberSharing` and
+      // `liveCollabMultiUser`. The joining half alone would be portable, and
+      // shipping it by itself would put a code on screen that no browser could
+      // accept, so the whole exchange is absent rather than half-present.
+      "deviceAdmission",
     ];
     const actualAbsent = desktop.ALL_CAPABILITIES.filter((c) => !web.has(c));
     expect([...actualAbsent].sort()).toEqual([...expectedAbsent].sort());

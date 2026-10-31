@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 
-import {
-  useEffect,
-  useState,
-  type ChangeEvent,
-  type ClipboardEvent,
-  type CSSProperties,
-  type FormEvent,
-} from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
@@ -15,7 +8,6 @@ import { ctaInteraction, ctaStyle } from "../primitives/CenteredCard";
 import {
   memberUnlockStatus,
   personStatus,
-  personUnlockMemberVault,
   personUnlockMemberVaultWithBiometric,
   personUnlockMemberVaultWithPassword,
   personUnlockMemberVaultWithPin,
@@ -23,8 +15,6 @@ import {
 } from "../../lib/personAccount";
 import type { VaultId } from "../../lib/stage";
 import { setPersonIdentityState } from "./personIdentityState";
-import { PhraseEntryGrid, PHRASE_CELL_COUNT } from "../PhraseEntryGrid";
-import { applyPastedPhrase, phrasePasteTokens } from "@myne/client-core/phrase-cells";
 
 /** Minimum PIN length, mirroring the Rust `pin::MIN_PIN_LEN`. */
 const MIN_PIN_LEN = 6;
@@ -37,25 +27,16 @@ const MEMBER_FORM: CSSProperties = {
   marginTop: "var(--space-4)",
 };
 
-/** The credential swap, at the same rank as the owner screen0027s `unlock.alt-row`. */
-const ALT_LINK_STYLE: CSSProperties = {
-  alignSelf: "center",
-  background: "none",
-  border: 0,
-  padding: 0,
-  cursor: "pointer",
-  color: "var(--fg-2)",
-  fontFamily: "var(--font-sans)",
-  fontSize: "var(--text-sm)",
-};
-
 /**
- * The unlock surface for a B2B member vault. A member holds no vault password:
- * their portable credential is their own recovery phrase (`vault.member-key`,
- * decisions/protocol/0606), and they may set a device-local fast credential
- * (`vault.member-unlock`, decisions/protocol/0653): a password, a PIN, or a
- * biometric. This card offers whichever is configured, with the recovery phrase
- * always one click away as the fallback.
+ * The unlock surface for a B2B member vault. A member vault carries ONE
+ * device-local credential (`vault.member-unlock`, decisions/protocol/0653): a
+ * password, a PIN, or a biometric, and this card offers whichever is configured.
+ *
+ * **There is no recovery-phrase arm, and that is deliberate** (myne-md/myne#938
+ * task 12, `0763`). `vault.member-key`, the phrase-sealed sibling that made the
+ * phrase a second way in, is retired, so a member has exactly one way in. A
+ * device with no credential is therefore not "waiting for the phrase": it needs a
+ * fresh invite, and the card says so instead of offering a form that would fail.
  *
  * **It is a BODY, not a screen** (Aşama 2b). It used to draw its own
  * `CenteredCard` and be returned EARLY from `Unlock.tsx`, so a member vault got a
@@ -74,13 +55,9 @@ export function MemberVaultUnlockCard({
   onUnlocked: () => void;
 }) {
   const { t } = useTranslation();
-  // `undefined` = probe in flight (render neither credential, so a configured
-  // method never flashes the phrase grid); `null` = no fast credential.
+  // `undefined` = probe in flight (render no credential, so a configured method
+  // never flashes the wrong form); `null` = no credential on this device at all.
   const [method, setMethod] = useState<MemberUnlockMethod | null | undefined>(undefined);
-  const [usePhrase, setUsePhrase] = useState(false);
-  const [phraseCells, setPhraseCells] = useState<string[]>(() =>
-    Array.from({ length: PHRASE_CELL_COUNT }, () => ""),
-  );
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [pin, setPin] = useState("");
@@ -90,7 +67,6 @@ export function MemberVaultUnlockCard({
   useEffect(() => {
     let cancelled = false;
     setMethod(undefined);
-    setUsePhrase(false);
     void Promise.resolve(memberUnlockStatus(vaultId)).then(
       (m) => {
         if (!cancelled) setMethod(m ?? null);
@@ -104,18 +80,14 @@ export function MemberVaultUnlockCard({
     };
   }, [vaultId]);
 
-  const surface: "pending" | MemberUnlockMethod | "phrase" =
-    method === undefined ? "pending" : method !== null && !usePhrase ? method : "phrase";
+  const surface: "pending" | MemberUnlockMethod | "none" =
+    method === undefined ? "pending" : method === null ? "none" : method;
   const canSubmit =
     surface === "password"
       ? password.length > 0
       : surface === "pin"
         ? pin.length >= MIN_PIN_LEN
-        : surface === "biometric"
-          ? true
-          : surface === "phrase"
-            ? phraseCells.every((cell) => cell.length > 0)
-            : false;
+        : surface === "biometric";
 
   const finish = async () => {
     try {
@@ -144,9 +116,6 @@ export function MemberVaultUnlockCard({
         setPin("");
       } else if (surface === "biometric") {
         await personUnlockMemberVaultWithBiometric(vaultId);
-      } else {
-        await personUnlockMemberVault(vaultId, phraseCells.join(" "));
-        setPhraseCells(Array.from({ length: PHRASE_CELL_COUNT }, () => ""));
       }
       await finish();
     } catch {
@@ -155,20 +124,35 @@ export function MemberVaultUnlockCard({
     }
   };
 
-  const hint =
-    surface === "password"
-      ? t("unlock.memberPasswordHint")
-      : surface === "pin"
-        ? t("unlock.memberPinHint")
-        : surface === "biometric"
-          ? t("unlock.memberBiometricHint")
-          : t("unlock.memberHint");
+  // A `switch` rather than a ternary chain, because the chain ended on
+  // `memberBiometricHint` and so answered it for `pending` AND `none`: a device
+  // with no credential at all was told to approve with a fingerprint it does not
+  // have, directly above the paragraph that says to ask the owner for an invite
+  // (myne-md/myne#938 review). A surface with no control above it has no hint.
+  const hint: string | null = (() => {
+    switch (surface) {
+      case "password":
+        return t("unlock.memberPasswordHint");
+      case "pin":
+        return t("unlock.memberPinHint");
+      case "biometric":
+        return t("unlock.memberBiometricHint");
+      case "pending":
+      case "none":
+        return null;
+    }
+  })();
 
   return (
     <form onSubmit={submit} data-testid="unlock.member-form" style={MEMBER_FORM}>
-      <p style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
-        {hint}
-      </p>
+      {hint === null ? null : (
+        <p
+          data-testid="unlock.member-hint"
+          style={{ fontFamily: "var(--font-sans)", fontSize: "var(--text-sm)", color: "var(--fg-2)" }}
+        >
+          {hint}
+        </p>
+      )}
         {surface === "pending" ? null : surface === "password" ? (
           <PasswordInput
             label={t("unlock.memberPasswordLabel")}
@@ -197,63 +181,35 @@ export function MemberVaultUnlockCard({
             disabled={busy}
             data-testid="unlock.member-pin"
           />
-        ) : surface === "biometric" ? null : (
-          <PhraseEntryGrid
-            baseId="unlock-member"
-            label={t("unlock.memberPhraseLabel")}
-            disabled={busy}
-            cells={phraseCells}
-            onCellChange={(index) => (event: ChangeEvent<HTMLInputElement>) => {
-              setError(false);
-              setPhraseCells((cells) =>
-                cells.map((cell, cellIndex) =>
-                  cellIndex === index ? event.target.value.replace(/\s+/g, "") : cell,
-                ),
-              );
+        ) : surface === "biometric" ? null : surface === "none" ? (
+          // No credential on this device. A form here would be a dead end: the
+          // phrase does not open a shared vault any more, so the only remedy is a
+          // fresh invite, and the copy names it.
+          <p
+            data-testid="unlock.member-no-credential"
+            style={{
+              fontFamily: "var(--font-sans)",
+              fontSize: "var(--text-sm)",
+              color: "var(--fg-2)",
             }}
-            onCellPaste={() => (event: ClipboardEvent<HTMLInputElement>) => {
-              const tokens = phrasePasteTokens(event.clipboardData.getData("text"));
-              if (tokens.length < 2) return;
-              event.preventDefault();
-              setError(false);
-              setPhraseCells((cells) => applyPastedPhrase(cells, tokens));
-            }}
-            gridTestId="unlock.member-phrase-grid"
-            cellTestId={(index) =>
-              index === 0 ? "unlock.member-phrase" : `unlock.member-phrase-cell-${index + 1}`
-            }
-          />
-        )}
-        <button
-          type="submit"
-          data-testid="unlock.member-submit"
-          disabled={busy || !canSubmit}
-          style={ctaStyle(busy || !canSubmit)}
-          {...ctaInteraction(busy || !canSubmit)}
-        >
-          {surface === "biometric" ? t("unlock.memberBiometricSubmit") : t("unlock.memberSubmit")}
-        </button>
-        {method != null ? (
-          // A text link rather than a ghost `Button` (Aşama 2b): it is a
-          // credential SWAP on one screen, the same rank as the owner's
-          // "use your password instead" link, and a bordered button made it look
-          // like a second way to submit. `unlock.alt-row`'s idiom.
-          <button
-            type="button"
-            onClick={() => {
-              setError(false);
-              setUsePhrase((v) => !v);
-            }}
-            data-testid="unlock.member-toggle-credential"
-            style={ALT_LINK_STYLE}
-            className="myne-text-link"
           >
-            {surface === "phrase" ? t("unlock.memberUseFast") : t("unlock.memberUsePhrase")}
-          </button>
+            {t("unlock.memberNoCredential")}
+          </p>
         ) : null}
+        {surface === "none" ? null : (
+          <button
+            type="submit"
+            data-testid="unlock.member-submit"
+            disabled={busy || !canSubmit}
+            style={ctaStyle(busy || !canSubmit)}
+            {...ctaInteraction(busy || !canSubmit)}
+          >
+            {surface === "biometric" ? t("unlock.memberBiometricSubmit") : t("unlock.memberSubmit")}
+          </button>
+        )}
         {error ? (
           <p data-testid="unlock.member-error" style={{ color: "var(--danger)", fontFamily: "var(--font-sans)" }}>
-            {surface === "phrase" ? t("unlock.memberError") : t("unlock.memberPasswordError")}
+            {t("unlock.memberPasswordError")}
           </p>
         ) : null}
       </form>

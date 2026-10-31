@@ -4587,7 +4587,8 @@ pub(crate) async fn sync_meta_phase(
                     return MetaPhaseOutcome::Skipped;
                 }
             }
-            // **A `NTV7` frame is STAGED, never adopted verbatim (myne-md/myne#911
+            // **A newer person generation is STAGED, never adopted verbatim
+            // (myne-md/myne#911 review; extended to `NTV8` by the myne-md/myne#938
             // review).** `sync-protocol.md` §10 already requires it: a device that
             // sees a newer server generation MUST persist it as
             // `vault.meta.incoming` and leave `vault.meta` byte-identical, then
@@ -4601,7 +4602,15 @@ pub(crate) async fn sync_meta_phase(
             // now dead, silently, on every device that adopts it. Staging costs a
             // peer one unlock before it leaves the old generation, which is the
             // trade §10 chose.
-            if server_generation == protocol::VaultMetaGeneration::Person {
+            //
+            // `>=` rather than `==`: an `NTV8` frame is the SAME move from this
+            // device's side (the person wrap goes away) and the adopt arm below
+            // would write it with no local password proven, which is exactly what
+            // `vault_migrate::ntv8`'s `UpgradeAuthority::PasswordProven` exists to
+            // forbid. The staged copy is only ever tried by a password unlock
+            // (`vault_unlock`'s candidate order), so staging is what keeps the two
+            // paths agreeing about when the wrap may move.
+            if server_generation >= protocol::VaultMetaGeneration::Person {
                 crate::plugins::vault_migrate::adopt::stage_incoming_meta(
                     io,
                     vault_root,
@@ -12676,7 +12685,7 @@ mod tests {
 
         const PHRASE: &str = "abandon ability able about above absent absorb abstract absurd abuse access accident account accuse achieve acid acoustic acquire across act action actor actress actual";
 
-        /// A real `NTV7` frame plus the root key its group wrap opens under, and
+        /// A real `NTV8` frame plus the root key its group wrap opens under, and
         /// the `NTV6` frame the SAME tail serializes to. The pair is what a
         /// server that has not upgraded yet serves beside an upgraded device.
         fn frames() -> (Vec<u8>, Vec<u8>, zeroize::Zeroizing<[u8; 32]>) {
@@ -12700,12 +12709,12 @@ mod tests {
                 person,
             )
             .expect("person session");
-            let (ntv7, _group) =
-                build_and_serialize_person_vault_meta(&session).expect("serialize NTV7");
-            let parsed = protocol::parse_vault_meta_ntv7(&ntv7).expect("parse NTV7");
+            let (ntv8, _group) =
+                build_and_serialize_person_vault_meta(&session).expect("serialize NTV8");
+            let parsed = protocol::parse_vault_meta_ntv8(&ntv8).expect("parse NTV8");
             let ntv6 = protocol::serialize_vault_meta_ntv6(&parsed.as_ntv6_tail())
                 .expect("the same tail as an NTV6 frame");
-            (ntv7, ntv6, session.root_key.clone())
+            (ntv8, ntv6, session.root_key.clone())
         }
 
         fn scratch(tag: &str) -> std::path::PathBuf {
@@ -12719,7 +12728,7 @@ mod tests {
         }
 
         #[test]
-        fn refuses_to_adopt_an_ntv6_server_frame_over_a_local_ntv7_frame() {
+        fn refuses_to_adopt_an_ntv6_server_frame_over_a_local_ntv8_frame() {
             let (local, server, root_key) = frames();
             let dir = scratch("older-server");
             std::fs::write(dir.join("vault.meta"), &local).unwrap();
@@ -12751,16 +12760,16 @@ mod tests {
             assert_eq!(
                 std::fs::read(dir.join("vault.meta")).unwrap(),
                 local,
-                "the person wrap must survive a server that has not upgraded yet"
+                "the group tail must survive a server that has not upgraded yet"
             );
             std::fs::remove_dir_all(&dir).ok();
         }
 
         #[test]
         fn the_two_helpers_order_and_classify_every_generation() {
-            let (ntv7, ntv6, _root) = frames();
+            let (ntv8, ntv6, _root) = frames();
             let legacy = protocol::serialize_vault_meta(
-                &protocol::parse_vault_meta_ntv7(&ntv7).expect("parse").base,
+                &protocol::parse_vault_meta_ntv8(&ntv8).expect("parse").base,
             );
 
             assert_eq!(
@@ -12772,14 +12781,32 @@ mod tests {
                 protocol::VaultMetaGeneration::B2b
             );
             assert_eq!(
-                protocol::vault_meta_generation(&ntv7),
-                protocol::VaultMetaGeneration::Person
+                protocol::vault_meta_generation(&ntv8),
+                protocol::VaultMetaGeneration::PersonNoWrap
+            );
+            // The ordering is what stops an older server frame from replacing a
+            // newer local one, so the new generation has to sort ABOVE the one it
+            // succeeds: `NTV8` is what an `NTV7` device upgrades into, and the
+            // device that has upgraded must never be handed the wrap back.
+            assert!(
+                protocol::VaultMetaGeneration::PersonNoWrap > protocol::VaultMetaGeneration::Person
             );
             assert!(protocol::VaultMetaGeneration::Person > protocol::VaultMetaGeneration::B2b);
             assert!(protocol::VaultMetaGeneration::B2b > protocol::VaultMetaGeneration::Legacy);
             assert!(protocol::has_b2b_tail(&ntv6));
-            assert!(protocol::has_b2b_tail(&ntv7));
+            assert!(protocol::has_b2b_tail(&ntv8));
             assert!(!protocol::has_b2b_tail(&legacy));
+            // And the tail survives a round trip through the `NTV6` view, which is
+            // what makes "the same tail in both frames" true for the test above.
+            assert_eq!(
+                protocol::parse_vault_meta_ntv8(&ntv8)
+                    .expect("parse")
+                    .as_ntv6_tail()
+                    .signed_roster_envelope,
+                protocol::parse_vault_meta_ntv6(&ntv6)
+                    .expect("parse NTV6")
+                    .signed_roster_envelope
+            );
         }
     }
 
