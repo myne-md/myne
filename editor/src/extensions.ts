@@ -397,10 +397,11 @@ export function myneExtensions(opts?: {
     // config (`completion.ts`) so they coexist.
     completionExtension(),
     // Heading-section + nested-list folding (MYND-300): mounts codeFolding() +
-    // a hover-reveal foldGutter() + the custom list-fold service. Heading-section
-    // fold ranges come free from lang-markdown's headerIndent foldService;
-    // mounting the gutter surfaces them. Fold state is EPHEMERAL (no persistence)
-    // — CM6 drops it on unmount, which is the note-switch / lock / quit reset.
+    // the inline hover-reveal fold markers + the custom list-fold service.
+    // Heading-section fold ranges come free from lang-markdown's headerIndent
+    // foldService; mounting the markers surfaces them. Fold state is EPHEMERAL
+    // (no persistence) — CM6 drops it on unmount, which is the note-switch /
+    // lock / quit reset.
     myneFolding(),
     // Collapse the spurious tiny selection a plain click makes when the
     // cursor-aware reveal reflows the clicked line (e.g. an H1 re-showing `# `).

@@ -5,8 +5,8 @@
 //
 // Heading-section fold ranges already exist in editor state — lang-markdown's
 // `markdown()` composes a `headerIndent` foldService — so mounting
-// `codeFolding()` + `foldGutter()` (in `myneFolding()`) SURFACES them; we write
-// no custom heading fold service. These tests assert:
+// `codeFolding()` + the inline fold markers (in `myneFolding()`) SURFACES them;
+// we write no custom heading fold service. These tests assert:
 //   - a heading line reports a foldable range running to the next same-or-higher
 //     heading (so folding an H1 SUBSUMES the nested H2/H3 — story 7);
 //   - `foldAll` / `unfoldAll` round-trip the fold state on a multi-heading doc;

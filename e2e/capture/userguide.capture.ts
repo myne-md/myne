@@ -658,8 +658,8 @@ runner(
       });
 
       // ---- Frame: folding (a folded heading section) ----
-      // heading-list-folding.e2e.ts: hover the editor to reveal the gutter
-      // fold markers, click one, wait for the fold placeholder.
+      // heading-list-folding.e2e.ts: hover the editor to reveal the inline fold
+      // markers, click one, wait for the fold placeholder.
       await frame(
         s,
         "folding",
@@ -672,8 +672,8 @@ runner(
           await settle(s, 600);
           // Fold via the palette action (heading-list-folding.e2e.ts hlf2) —
           // robust and coordinate-free. The prior synthetic `.click()` fired at
-          // (0,0), which CM6's foldGutter mapped to the non-foldable frontmatter
-          // line, so nothing folded and the placeholder never appeared (ok:false).
+          // (0,0), which mapped to the non-foldable frontmatter line, so nothing
+          // folded and the placeholder never appeared (ok:false).
           await runPaletteAction(s, "editor.fold-all", "Fold all");
           await s.byTestId("editor.fold-placeholder", { timeoutMs: 8000 });
           await settle(s, 400);

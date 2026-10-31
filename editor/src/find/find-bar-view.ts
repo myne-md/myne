@@ -134,6 +134,25 @@ function makeDivider(): HTMLSpanElement {
 }
 
 /**
+ * A field: the input plus its decorative lead icon, which is positioned INSIDE
+ * the input's own box rather than in a column beside it (myne#952).
+ *
+ * Why the wrapper rather than a sibling: the bar's row starts at its left edge
+ * with the input, so an icon in front of it would be the one thing standing
+ * between the reader and the field. Inside the field the glyph survives, the
+ * input still owns the edge, and both rows (find and replace) put their text at
+ * the same x, which is what made the old two-row alignment arithmetic
+ * ("the toggle column plus the replace glyph line up") necessary in the first
+ * place.
+ */
+function field(input: HTMLInputElement, icon: HTMLSpanElement): HTMLSpanElement {
+  const wrap = document.createElement("span");
+  wrap.className = "cm-find-bar-field";
+  wrap.append(icon, input);
+  return wrap;
+}
+
+/**
  * Build the find-bar view. Presentational only — no engine, no match-finding.
  * The caller supplies the current `initial` state and the intent `handlers`.
  */
@@ -163,7 +182,10 @@ export function createFindBarView(
     "find.toggle-replace",
   );
 
-  // Lead search icon.
+  // Lead search icon, INSIDE the field (myne#952). The bar reads left to right
+  // from the input now, so a standalone icon column in front of it pushed the
+  // input off the edge the reader starts from. As a positioned prefix it still
+  // says "this is a search box" without owning a column of its own.
   const lead = document.createElement("span");
   lead.className = "cm-find-bar-lead";
   lead.setAttribute("aria-hidden", "true");
@@ -208,14 +230,18 @@ export function createFindBarView(
   live.setAttribute("aria-atomic", "true");
 
   findRow.append(
-    toggleBtn,
-    lead,
-    input,
+    field(input, lead),
     status,
     makeDivider(),
     caseBtn,
     prevBtn,
     nextBtn,
+    // The replace row's disclosure sits with the other controls rather than at
+    // the lead edge (myne#952): the input owns the left edge, so a disclosure
+    // glyph in front of it would be the one thing between the reader and the
+    // field they opened the bar for. It still reads as a control pair with the
+    // close button, which stays last.
+    toggleBtn,
     makeDivider(),
     closeBtn,
     live,
@@ -279,7 +305,16 @@ export function createFindBarView(
 
   // A spacer keeps the replace input aligned with the find input above (no lead
   // search-icon slot on the replace row; the toggle column + replace glyph do).
-  replaceRow.append(replaceLead, replaceInput, replaceOneBtn, replaceAllBtn);
+  replaceRow.append(field(replaceInput, replaceLead), replaceOneBtn, replaceAllBtn);
+  // Mounted ONCE, always, and animated between open and closed (myne#952). It
+  // used to be appended on expand and removed on collapse, which cannot be
+  // animated: a removed element has nothing to transition from. What the removal
+  // was really buying was "the collapsed row is unreachable", and `inert` says
+  // exactly that — out of the tab order and out of the accessibility tree —
+  // while the element keeps a box the stylesheet can animate. The initial state
+  // is collapsed until the first `render` says otherwise.
+  replaceRow.dataset.expanded = "false";
+  replaceRow.setAttribute("inert", "");
 
   dom.append(findRow);
   // Attached here, once. The notice is a live region, so it must be present
@@ -288,6 +323,7 @@ export function createFindBarView(
   // the replace row, so the explanation for the disabled Replace buttons is
   // directly above them.
   dom.append(fallbackRow);
+  dom.append(replaceRow);
 
   function render(state: FindBarState): void {
     if (input.value !== state.query) input.value = state.query;
@@ -342,13 +378,20 @@ export function createFindBarView(
     if (fallbackRow.textContent !== fallbackText) fallbackRow.textContent = fallbackText;
     fallbackRow.hidden = !onFallback;
 
-    // Replace row (MYND-302). Attach/detach on the expand toggle so the DOM
-    // reflects the state exactly (no hidden-but-present row), and reflect the
-    // disclosure on the toggle itself.
+    // Replace row (MYND-302). The row is mounted for the panel's lifetime and
+    // its open/closed state lives in two attributes: `data-expanded`, which the
+    // stylesheet animates between zero and full height, and `inert`, which is
+    // what "unreachable while closed" means now that the element is not removed
+    // (see the note where the row is appended). The toggle carries the same
+    // disclosure for assistive tech.
     toggleBtn.classList.toggle("cm-find-bar-btn-active", state.expanded);
     toggleBtn.setAttribute("aria-expanded", String(state.expanded));
+    if (replaceRow.dataset.expanded !== String(state.expanded)) {
+      replaceRow.dataset.expanded = String(state.expanded);
+      if (state.expanded) replaceRow.removeAttribute("inert");
+      else replaceRow.setAttribute("inert", "");
+    }
     if (state.expanded) {
-      if (replaceRow.parentNode === null) dom.append(replaceRow);
       if (replaceInput.value !== state.replace) replaceInput.value = state.replace;
 
       // Count-aware "Replace all (N)" — reuses the SAME live match total the find
@@ -375,8 +418,9 @@ export function createFindBarView(
         if (onFallback) btn.setAttribute("aria-describedby", FALLBACK_ROW_ID);
         else btn.removeAttribute("aria-describedby");
       }
-    } else if (replaceRow.parentNode !== null) {
-      replaceRow.remove();
+    } else {
+      // Nothing to remove and nothing to disable by hand: the row collapses to
+      // zero height through the stylesheet and is already `inert` above.
     }
   }
 

@@ -109,9 +109,14 @@ describe("find+replace extension: toggle reveals the replace row", () => {
   it("the toggle in the docked panel expands the replace input", () => {
     m = mount("alpha beta alpha");
     openSearchPanel(m.view);
-    expect(byTestId(m, "find.replace-input")).toBeNull();
+    // Collapsed the row is mounted but INERT (myne#952: it stays in the DOM so
+    // its height can animate, and `inert` is what keeps it out of the tab order
+    // and the accessibility tree). Unreachable is the property under test, not
+    // absent from the document.
+    expect(byTestId(m, "find.replace-input")?.closest("[inert]")).not.toBeNull();
     click(byTestId(m, "find.toggle-replace"));
     expect(byTestId(m, "find.replace-input")).not.toBeNull();
+    expect(byTestId(m, "find.replace-input")?.closest("[inert]")).toBeNull();
   });
 });
 
