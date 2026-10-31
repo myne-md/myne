@@ -936,6 +936,7 @@ pub async fn rotate_group_from_host(
     // check that used to be rebuilt here by hand, and the both-or-neither rule with it).
     let (rotation_device, rotation_attestation) =
         match super::roster_trust::own_device_signing_pair(
+            host,
             io,
             &vault_root,
             &old_group_key,

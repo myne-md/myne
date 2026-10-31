@@ -345,6 +345,11 @@ async fn index_fallback_written_note(
 /// owner's public half: the owner holds it as their identity, a member holds only
 /// the out-of-band identity code recorded at accept (`owner_identity_code`).
 async fn signed_head_ctx(
+    // The device id is read through `sync::device_actor`, which needs the host for the
+    // person credential's path (myne-md/myne#958). Before that reader, this function
+    // consulted the vault's enrolment record ONLY and bailed to the `0x02` phrase path
+    // on a person-born vault, where that record is legitimately empty.
+    host: &dyn crate::host::HostCtx,
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &std::path::Path,
     state: &VaultRuntimeState,
@@ -449,14 +454,7 @@ async fn signed_head_ctx(
     // VERIFIED binding row for this device that publishes the same public half. Either
     // half missing means the phrase path (`0x02`), which every peer already accepts, so
     // a half-finished rollout never authors a head its peers cannot resolve.
-    let Some(device_id_hex) = super::state::read_sync_state(io, vault_dir)
-        .await
-        .ok()
-        .and_then(|st| st.device_id_hex)
-    else {
-        return Some(ctx);
-    };
-    let Some(device_id) = super::devices::hex16(&device_id_hex) else {
+    let Some(device_id) = super::device_actor::durable_device_id(host, io, vault_dir).await else {
         return Some(ctx);
     };
     // Three states, told apart on purpose. `Ok(None)` is first run; `Unsupported` is
@@ -471,10 +469,7 @@ async fn signed_head_ctx(
     };
     let signers =
         verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
-    let own_bound = signers
-        .iter()
-        .any(|s| s.device_id == device_id && s.public == device_key.public_half());
-    if !own_bound {
+    if !own_device_is_a_signer(&signers, device_id, &device_key.public_half()) {
         // A device key with no verified binding row is not a signer: peers would answer
         // `AuthorUnknown` for its heads, and a head nobody can verify is worse than an
         // `0x02` one everybody can.
@@ -487,6 +482,28 @@ async fn signed_head_ctx(
         },
         signers,
     ))
+}
+
+/// Whether this device may author a `0x03` head: a VERIFIED binding row must name THIS
+/// device id AND carry the SAME public half the loaded key has.
+///
+/// Both clauses are load-bearing and they fail differently. A row for another device would
+/// let this device sign under an id peers resolve to somebody else; a row for this device
+/// that publishes a different key would make peers verify a signer that never signed
+/// anything. Either way the head is unverifiable, so the phrase path (`0x02`, which every
+/// peer already accepts) is the correct answer rather than a partial rollout.
+///
+/// Split from [`signed_head_ctx`] so the rule can be asserted without a full `vault.meta`,
+/// a group roster and a keychain: the device id it is handed comes from
+/// `device_actor::durable_device_id`, which is pinned in that module and in `roster_trust`.
+fn own_device_is_a_signer(
+    signers: &[protocol::vault_head::DeviceHeadSigner],
+    device_id: [u8; 16],
+    public: &protocol::device_key::DevicePublicHalf,
+) -> bool {
+    signers
+        .iter()
+        .any(|s| s.device_id == device_id && &s.public == public)
 }
 
 /// The device key this cycle may sign a `0x03` head with, or `None` for the person
@@ -612,15 +629,20 @@ async fn person_token_bytes(
 /// is: re-enrolment rotates it, and a cached copy would outlive the credential it
 /// names. `None` on an absent file or an unparseable id, which parks the cycle
 /// rather than authoring a head under a made-up actor.
+///
+/// **Why not [`super::device_actor::durable_device_id`], which reads this same record
+/// first?** Because the version vector is the PERSON plane's statement, signed with the
+/// person session's token, so it names the person credential's device and nothing else.
+/// The merged reader answers with the vault's enrolled id when one exists, and swapping
+/// a long-lived version vector's device id mid-life would present this device to the
+/// server as a new one (the same class of change `state.rs` refuses for the actor). The
+/// READ still lives in `device_actor`, so anything about how the credential is parsed or
+/// where it lives is decided in one place.
 async fn person_device_id(
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Option<[u8; 16]> {
-    let path = super::person_auth::person_auth_path_for_read(host).ok()?;
-    let auth = super::person_auth::read_person_auth(io, &path)
-        .await
-        .ok()??;
-    hex16(&auth.device_id_hex)
+    super::device_actor::from_person_auth(host, io).await
 }
 
 pub async fn run_active_cycle_from_host(
@@ -873,7 +895,7 @@ pub async fn run_active_cycle_from_host(
     // Signed `0x02` head authority for an `NTV6` vault (`None` keeps the `NTV5`
     // HMAC head). Built before the blocking closure so the person keypair and the
     // roster are gathered on the executor, not the blocking thread.
-    let signed_ctx = signed_head_ctx(io, &dir, state, &shared, is_owner).await;
+    let signed_ctx = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
     // An `NTV6` vault's head is signature-authenticated. If no person identity is
     // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
@@ -1531,6 +1553,49 @@ mod tests {
         let expected = pair.public_half();
         let got = device_key_for_signing(Ok(Some(pair))).expect("a key at rest is a signer");
         assert_eq!(got.public_half(), expected);
+    }
+
+    /// A `0x03` head needs BOTH halves: this device's id on the row, and this key's public
+    /// half on it. Each clause is pinned separately because each fails toward a head peers
+    /// cannot verify, and the pre-existing code path had neither a test nor a name.
+    #[test]
+    fn a_device_signed_head_needs_a_row_naming_both_this_device_and_this_key() {
+        let key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
+        let other_key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x51; 32], &[0x52; 32]);
+        let device_id = [0x33u8; 16];
+        let row = |device_id: [u8; 16], public: protocol::device_key::DevicePublicHalf| {
+            protocol::vault_head::DeviceHeadSigner { device_id, public }
+        };
+
+        assert!(
+            !own_device_is_a_signer(&[], device_id, &key.public_half()),
+            "a key with no verified row signs `0x02`, not a head nobody can resolve"
+        );
+        assert!(
+            own_device_is_a_signer(
+                &[row(device_id, key.public_half())],
+                device_id,
+                &key.public_half()
+            ),
+            "this device, this key: the one case that may author a `0x03` head"
+        );
+        assert!(
+            !own_device_is_a_signer(
+                &[row(device_id, other_key.public_half())],
+                device_id,
+                &key.public_half()
+            ),
+            "a row for this device naming ANOTHER key would have peers verify a signer that \
+             never signed"
+        );
+        assert!(
+            !own_device_is_a_signer(
+                &[row([0x99; 16], key.public_half())],
+                device_id,
+                &key.public_half()
+            ),
+            "a row for another device publishing this key is not this device's binding"
+        );
     }
     // Method resolution for `IO`'s inherent-looking calls (`create_dir_all`,
     // `write`): the trait is the only place they exist.

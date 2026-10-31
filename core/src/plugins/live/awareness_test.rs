@@ -7,6 +7,11 @@ use protocol::awareness_frame::{seal_awareness_frame_raw, AwarenessPayload, Fram
 
 const NOTE: [u8; 16] = [0x11u8; 16];
 
+/// The opening session's actor. A live session can no longer be opened without one
+/// (myne-md/myne#958); this file used to pass `None` in three places, which is how the
+/// defect below shipped green.
+const TEST_ACTOR: [u8; 16] = [0x5Au8; 16];
+
 fn payload(change: Option<Vec<u8>>) -> AwarenessPayload {
     AwarenessPayload {
         frame_type: FrameType::Presence,
@@ -121,20 +126,24 @@ fn open_session(reg: &LiveSessionRegistry, uuid: [u8; 16]) {
     let blob = encode_note_blob("body\n", &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
     let note_id = uuid::Uuid::from_bytes(uuid).to_string();
     assert!(reg.insert(
-        LiveSession::open_from_blob(&blob, "v".into(), note_id, uuid, None, &ik, &ikid)
+        LiveSession::open_from_blob(&blob, "v".into(), note_id, uuid, TEST_ACTOR, &ik, &ikid)
             .expect("open")
     ));
 }
 
 /// Open a session under a KNOWN device actor, so the self-echo guard has something
-/// to compare against (production always passes `note_actor_bytes`).
+/// to compare against. Production resolves it through
+/// `sync::device_actor::actor_for_authoring` (the vault's enrolment id, else the person
+/// credential's, else a fresh draw), and a session cannot be opened without one
+/// (myne-md/myne#958); the comment here used to claim production always passed
+/// `note_actor_bytes`, which was true of the SIGNATURE and false of the value.
 fn open_session_with_actor(reg: &LiveSessionRegistry, uuid: [u8; 16], actor: [u8; 16]) {
     let host = TestHost::new("/base");
     let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
     let blob = encode_note_blob("body\n", &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
     let note_id = uuid::Uuid::from_bytes(uuid).to_string();
     assert!(reg.insert(
-        LiveSession::open_from_blob(&blob, "v".into(), note_id, uuid, Some(actor), &ik, &ikid)
+        LiveSession::open_from_blob(&blob, "v".into(), note_id, uuid, actor, &ik, &ikid)
             .expect("open")
     ));
 }
@@ -440,6 +449,50 @@ fn a_devices_own_presence_frame_is_dropped_as_self_echo() {
     ));
 }
 
+/// **A presence frame carrying the all-zero actor is never a peer (myne-md/myne#958).**
+///
+/// Sixteen zero bytes is what a client seals when it has no device id, so this frame
+/// arrives from an older release, from the web client and from mobile as well as from
+/// local code. Nothing can attribute it, and the roster keys participants BY actor: one
+/// such row would merge every such device into a single participant, and the identity
+/// resolver rendered it as a device named `000000`, which is the row the reported user
+/// saw for their own device.
+///
+/// The session here holds a REAL actor (LOCAL), so the identity comparison cannot be
+/// what drops the frame: reverting the zero check alone makes this assertion fail with
+/// `Presence`, which is the defect.
+#[test]
+fn a_zero_actor_frame_is_never_a_peer() {
+    const LOCAL: [u8; 16] = [0xDDu8; 16];
+    let reg = LiveSessionRegistry::new();
+    let uuid = [0xABu8; 16];
+    open_session_with_actor(&reg, uuid, LOCAL);
+    let keys = owner_keys();
+    let acct = [0x55u8; 16];
+
+    let zero = seal_local_frame(
+        &keys,
+        &uuid,
+        [0u8; 16],
+        &acct,
+        None,
+        false,
+        0,
+        Some(0),
+        None,
+        None,
+        None,
+    )
+    .expect("seal an unattributable presence");
+    assert!(
+        matches!(
+            route_incoming_frame(&reg, &keys, &acct, None, &zero),
+            Ok(AwarenessRoute::SelfEcho)
+        ),
+        "a frame that names no device must reach no roster"
+    );
+}
+
 /// `collab-b2b-sessions` task 2: the awareness room/tier selection. Both the OWNER
 /// and a MEMBER of one `NTV6` vault hold the SAME `group_key`, so `AwarenessKeypair`
 /// built from that key derives an identical room id and seal key for the same note;
@@ -528,7 +581,7 @@ fn open_shared(reg: &LiveSessionRegistry, blob: &[u8], uuid: [u8; 16], actor: [u
     let (ik, ikid) = ([0x11u8; 32], [0x22u8; 16]);
     let note_id = uuid::Uuid::from_bytes(uuid).to_string();
     assert!(reg.insert(
-        LiveSession::open_from_blob(blob, "v".into(), note_id, uuid, Some(actor), &ik, &ikid)
+        LiveSession::open_from_blob(blob, "v".into(), note_id, uuid, actor, &ik, &ikid)
             .expect("open")
     ));
 }
