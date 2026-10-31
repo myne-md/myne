@@ -190,8 +190,12 @@ pub fn clear_session_key() {
     }
 }
 
-/// Read the device key, without creating one. `Ok(None)` when the item is absent,
+/// Read the device key, without minting one. `Ok(None)` when the item is absent,
 /// which is the ordinary first-run state.
+///
+/// It is not side-effect free on macOS: an item a pre-#959 build left in the file-based
+/// keychain is MOVED across on the way, so this read can write, and a refused move is
+/// the one write failure it can report (myne-md/myne#959).
 ///
 /// A rung-3 unlock that already happened in this process answers first: the key is
 /// then in RAM and no store is consulted.
@@ -297,7 +301,7 @@ mod imp {
     };
     use security_framework::access_control::{ProtectionMode, SecAccessControl};
     use security_framework::passwords::{
-        delete_generic_password, get_generic_password, set_generic_password_options,
+        delete_generic_password_options, generic_password, set_generic_password_options,
     };
     use security_framework::passwords_options::PasswordOptions;
     use zeroize::Zeroizing;
@@ -305,17 +309,182 @@ mod imp {
     /// `errSecItemNotFound`: the item is absent (never created, or wiped).
     const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
 
+    /// The query every operation on the device-key item uses.
+    ///
+    /// **`use_protected_keychain()` is the whole reason this function exists.** Without
+    /// it the query targets the FILE-BASED keychain, where `kSecAttrAccessControl` is not
+    /// a supported attribute, so the write was refused and `load_or_create` fell back to
+    /// the person key with nothing but a warn to say so (myne-md/myne#959). The data
+    /// protection keychain is also the only one whose items are excluded from Time
+    /// Machine and Migration Assistant, which is exactly what the
+    /// `WhenUnlockedThisDeviceOnly` access control in [`store`] claims, and what the
+    /// comment there promised while the item was being written to the keychain that DOES
+    /// travel in a backup.
+    ///
+    /// This keychain additionally needs an application identity: a process without
+    /// `com.apple.application-identifier` is answered `errSecMissingEntitlement`
+    /// (-34018) for any item carrying an access control, on this keychain and on the
+    /// classic one alike. `src-tauri/entitlements.plist` carries that key and the bundle
+    /// embeds the provisioning profile that authorizes it.
+    ///
+    /// Deliberately no `kSecAttrAccessGroup`: claiming a group needs the restricted
+    /// `keychain-access-groups` entitlement, which buys nothing here, and the default
+    /// group is this app's own application identifier.
+    fn query_options() -> PasswordOptions {
+        let mut options =
+            PasswordOptions::new_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT);
+        options.use_protected_keychain();
+        options
+    }
+
+    /// The same query WITHOUT the data protection flag, so it addresses the file-based
+    /// keychain. Three call sites: the migration read below, the migration's own delete
+    /// of the moved copy, and the erase.
+    ///
+    /// On iOS this addresses the SAME item as [`query_options`], because iOS has no
+    /// file-based keychain and ignores the flag. That is why every caller is gated on
+    /// [`HAS_SEPARATE_FILE_KEYCHAIN`]: a "delete the legacy copy" that ran on iOS would
+    /// delete the key it was called for.
+    fn file_keychain_options() -> PasswordOptions {
+        PasswordOptions::new_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT)
+    }
+
+    /// macOS keeps a file-based keychain BESIDE the data protection one. iOS has only the
+    /// latter and ignores the flag, so there the two option sets address the SAME item,
+    /// which makes every "delete the legacy copy" below a delete of the key it was called
+    /// for. Everything that names the file-based keychain is therefore macOS-only, and
+    /// this constant is the one place that says so.
+    const HAS_SEPARATE_FILE_KEYCHAIN: bool = cfg!(target_os = "macos");
+
+    /// Delete the file-based copy, if any, and say so when the delete is REFUSED.
+    ///
+    /// Every caller is a cleanup whose failure leaves the device signing key in the one
+    /// keychain that travels in Time Machine and Migration Assistant, so a refusal is
+    /// logged at `error` rather than `warn`: nothing else in the tree will ever notice,
+    /// and the next `load()` retries it.
+    fn discard_file_keychain_copy(op: &'static str) {
+        if !HAS_SEPARATE_FILE_KEYCHAIN {
+            return;
+        }
+        if let Err(e) = delete_generic_password_options(file_keychain_options()) {
+            if e.code() != ERR_SEC_ITEM_NOT_FOUND {
+                tracing::error!(
+                    stage = "device_key_keychain",
+                    event = "device_key_legacy_delete_failed",
+                    op,
+                    status = e.code(),
+                    "the file-based copy of the device key could not be deleted; it is \
+                     still in the keychain that backups carry, and the next read retries"
+                );
+            }
+        }
+    }
+
     pub fn load() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
         // `Zeroizing` on the returned Vec ITSELF, before any arm inspects it: the
         // buffer holds both private seeds, and the corrupt-length arm would otherwise
         // leave the allocation intact.
-        match get_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT)
-            .map(Zeroizing::new)
-        {
-            Ok(bytes) => from_item_bytes(&bytes).map(Some),
-            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => Ok(None),
+        match generic_password(query_options()).map(Zeroizing::new) {
+            Ok(bytes) => {
+                // A copy that outlived a refused delete, or that a migration never got to
+                // remove, is still in the keychain that travels in backups. One syscall on
+                // the ordinary path, and the cleanup is self-healing rather than depending
+                // on one migration attempt having succeeded.
+                discard_file_keychain_copy("cleanup");
+                from_item_bytes(&bytes).map(Some)
+            }
+            // Absent here is the ordinary first-run state, and it is also where a
+            // pre-#959 build's item would NOT be found. The migration read is what tells
+            // those two apart, and it is why this arm is not simply `Ok(None)`.
+            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => migrate_from_file_keychain(),
             Err(e) => {
                 log_keychain_err("get", &e);
+                Err(DeviceKeyStoreError::Backend)
+            }
+        }
+    }
+
+    /// What a file-based keychain item means to the caller.
+    ///
+    /// A pure decision rather than an inline `match`, for two reasons. It can be tested
+    /// without a keychain, which the rest of this migration cannot. And the two outcomes
+    /// are not symmetric: `Key` must be KEPT and re-stored, while `Unusable` must let the
+    /// caller mint, because propagating `Corrupt` out of here would make one bad byte
+    /// permanent: `load` re-reads the same item on every call.
+    pub(super) enum LegacyItem {
+        Key(Box<DeviceKeyPair>),
+        Unusable,
+    }
+
+    pub(super) fn classify_legacy_item(bytes: &[u8]) -> LegacyItem {
+        match from_item_bytes(bytes) {
+            Ok(pair) => LegacyItem::Key(Box::new(pair)),
+            Err(err) => {
+                tracing::warn!(
+                    stage = "device_key_keychain",
+                    event = "legacy_device_key_corrupt",
+                    reason = ?err,
+                    "the file-based device-key item does not decode, so it is ignored and a \
+                     replacement may be minted"
+                );
+                LegacyItem::Unusable
+            }
+        }
+    }
+
+    /// Move a device key that an earlier build wrote to the FILE-BASED keychain into the
+    /// data protection keychain, once.
+    ///
+    /// Not politeness: a `MYU5` `format_version 0x02` row on disk publishes the public
+    /// halves of the key it was signed with, so minting a replacement instead of moving
+    /// the old key re-binds the device and leaves heads that peers verified under a key no
+    /// row carries any more. An absent legacy item is the ordinary state and answers
+    /// `None`, which is what lets `load_or_create` mint.
+    ///
+    /// **No released build can have produced a legacy item**, and the arm is kept anyway:
+    /// `store` has set an access control since this file's first commit, and an ACL write
+    /// with no application identity is refused on BOTH keychains (measured, myne#959), so
+    /// the only tree that can leave one is a build carrying the entitlement before it
+    /// carries `use_protected_keychain`. That is a window this branch itself passed
+    /// through. Deleting the arm instead would strand the key of anyone who ran such a
+    /// build, which is the failure it exists to avoid.
+    fn migrate_from_file_keychain() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
+        // On iOS the two option sets address the same item, so this is not a migration
+        // there: it is a second read of the same place, and the write it would do is a
+        // rewrite of the item that is already there.
+        if !HAS_SEPARATE_FILE_KEYCHAIN {
+            return Ok(None);
+        }
+        match generic_password(file_keychain_options()).map(Zeroizing::new) {
+            Ok(bytes) => {
+                // An item that does not DECODE is not a reason to disable the device: the
+                // caller may mint a replacement (see `classify_legacy_item`).
+                let pair = match classify_legacy_item(&bytes) {
+                    LegacyItem::Key(pair) => *pair,
+                    LegacyItem::Unusable => return Ok(None),
+                };
+                // A REFUSED write must not discard a key the device already holds. This is
+                // the ordinary state of an unsigned `tauri dev` run and of a bundle with no
+                // embedded profile: it can read the legacy item and cannot write the
+                // protected one. The legacy item is still where it was, so the next build
+                // that can write migrates it then, and until then the device keeps signing
+                // with a key it already had.
+                match store(&pair) {
+                    Ok(()) => discard_file_keychain_copy("migrate_delete"),
+                    Err(err) => tracing::warn!(
+                        stage = "device_key_keychain",
+                        event = "device_key_migration_write_failed",
+                        reason = ?err,
+                        "the device key could not be moved into the data protection keychain; \
+                         the file-based copy is still in place and is used until a build \
+                         that can write moves it"
+                    ),
+                }
+                Ok(Some(pair))
+            }
+            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => Ok(None),
+            Err(e) => {
+                log_keychain_err("migrate_get", &e);
                 Err(DeviceKeyStoreError::Backend)
             }
         }
@@ -325,7 +494,8 @@ mod imp {
         // No access-control flags (0): no biometric / user-presence gate, because a
         // head is authored on a background cycle. `WhenUnlockedThisDeviceOnly`: the
         // item is never exported, never synced, never in a backup, and reachable only
-        // while the device is unlocked.
+        // while the device is unlocked. That claim is TRUE only in the data protection
+        // keychain, which is what `query_options` selects.
         let access_control = SecAccessControl::create_with_protection(
             Some(ProtectionMode::AccessibleWhenUnlockedThisDeviceOnly),
             0,
@@ -334,8 +504,7 @@ mod imp {
             log_keychain_err("access_control_create", &e);
             DeviceKeyStoreError::Backend
         })?;
-        let mut options =
-            PasswordOptions::new_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT);
+        let mut options = query_options();
         options.set_access_control(access_control);
         let bytes = to_item_bytes(pair);
         set_generic_password_options(bytes.as_slice(), options).map_err(|e| {
@@ -345,7 +514,14 @@ mod imp {
     }
 
     pub fn destroy() {
-        if let Err(e) = delete_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT) {
+        // The FILE-BASED copy goes FIRST, and the order is the whole point: `load`
+        // migrates on its item-not-found arm, so a legacy item that outlived the erase
+        // would be moved back into the protected keychain by the next unlock and handed to
+        // a device that no longer claims that person (`0733` decision 4). Erasing in the
+        // other order leaves that resurrection reachable whenever the legacy delete is
+        // refused.
+        discard_file_keychain_copy("delete_file_keychain");
+        if let Err(e) = delete_generic_password_options(query_options()) {
             if e.code() != ERR_SEC_ITEM_NOT_FOUND {
                 log_keychain_err("delete", &e);
             }
@@ -566,6 +742,27 @@ mod tests {
     /// test rather than as shared state. Taken by `a_rung_three_unlock_...` and
     /// `a_host_registered_store_...`, which are the only two.
     static SLOT_LOCK: Mutex<()> = Mutex::new(());
+
+    #[test]
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
+    fn a_legacy_item_that_does_not_decode_is_unusable_rather_than_fatal() {
+        use imp::{classify_legacy_item, LegacyItem};
+        // The decision the migration read depends on, tested without a keychain: a corrupt
+        // legacy item must NOT be reported as an error, because that would make one bad
+        // byte permanent (`load` re-reads it every time and the device never gets a key).
+        assert!(matches!(
+            classify_legacy_item(&[0x00; 8]),
+            LegacyItem::Unusable
+        ));
+
+        // And a VALID one must be kept, not discarded: re-binding the device orphans every
+        // head a peer verified under the public halves a `0x02` row publishes.
+        let pair = DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
+        match classify_legacy_item(&to_item_bytes(&pair)) {
+            LegacyItem::Key(back) => assert_eq!(back.public_half(), pair.public_half()),
+            LegacyItem::Unusable => panic!("a valid legacy item must be kept, not discarded"),
+        }
+    }
 
     #[test]
     fn the_item_codec_round_trips_and_refuses_a_foreign_length() {
