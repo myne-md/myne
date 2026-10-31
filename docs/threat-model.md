@@ -333,14 +333,29 @@ new at-rest secret rather than a new use of an old one** (`core/src/plugins/sync
 the signing key sits in the OS keychain under service `md.myne.devicekey`, account
 `device-signing-key`, with `WhenUnlockedThisDeviceOnly` accessibility and no biometric gate, so it is
 readable while the app runs and the vault is unlocked, it is not exportable, and it is excluded from
-platform backup by the accessibility class rather than by a policy flag. **The ladder now has four rungs and three of them hold the key at rest, so this is
+platform backup by the accessibility class rather than by a policy flag. **On macOS that sentence
+holds only inside the data protection keychain**, which is what `decisions/security/0764`
+(myne-md/myne#959) makes reachable and what the rung 1 bullet below spells out: the same item in the
+file-based keychain declares the same class and still travels in a backup. **The ladder now has four rungs and three of them hold the key at rest, so this is
 no longer an Apple-only exposure** (myne-md/myne#938, `decisions/protocol/0759`, `0760`, `0761`).
 Each rung stores the SAME signing key; what differs is what an attacker with the disk must
 also have:
 
 - **Rung 1, Apple (macOS, iOS):** the OS keychain, service `md.myne.devicekey`, account
   `device-signing-key`, `WhenUnlockedThisDeviceOnly`, no biometric gate. Excluded from backup by
-  the accessibility class. Unchanged by this generation.
+  the accessibility class, and **on macOS that exclusion is a property of WHICH keychain the item
+  is in**, which is why the next sentence exists. Since myne-md/myne#959 the item is addressed
+  with `kSecUseDataProtectionKeychain`: the file-based keychain it used to reach carries its items
+  into Time Machine and Migration Assistant whatever accessibility class they declare. Reaching
+  the data protection keychain is itself conditional on the bundle carrying
+  `com.apple.application-identifier` **and** an embedded provisioning profile that authorizes it
+  (`decisions/security/0764`), so a macOS build missing either half does not fall to a weaker
+  rung. The keychain write is refused `errSecMissingEntitlement` (-34018), no device key is
+  stored, and the client keeps the person key, which asks for the identity phrase on every lock.
+  That is a liveness failure and not a confidentiality one, and it is stated here because it is
+  silent: `codesign --verify` passes in both broken shapes. `scripts/build-macos-dmg.mjs`
+  therefore refuses to produce a DMG whose signed app lacks either half. Rung 1 is otherwise
+  unchanged by this generation.
 - **Rung 2, Linux:** the Secret Service over the session bus, under the same service and account
   names. A locked or absent collection is reported UNAVAILABLE and the client falls to rung 3 or 4;
   it never calls `item.unlock()`, so the client cannot prompt its way past a locked session.
