@@ -113,6 +113,49 @@ try {
   if (existsSync(join(mountPoint, appName))) ok(`${appName} at the volume root`);
   else fail(`${appName} missing from the volume root`);
 
+  // 1b. What the payload is SIGNED with, and whether Apple has seen it.
+  //
+  // Why this is a chrome check and not a separate tool: a DMG that opens
+  // beautifully and refuses to launch is the exact shape this repository
+  // shipped twice. An Apple Development certificate cannot be notarized, so it
+  // downloads as "Apple could not verify" on every machine but the one that
+  // built it; a missing ticket means the same thing even with the right
+  // certificate. Both are fatal here, because this runs against the artefact
+  // that is about to be uploaded, not against a build in progress.
+  const mountedApp = join(mountPoint, appName);
+  if (existsSync(mountedApp)) {
+    const dv = runTool(["/usr/bin/codesign", "-dvvv", mountedApp], {
+      onToolFailure: "empty",
+      reason: "an unsigned payload has no signing information to read",
+      maxBuffer: 1 << 20,
+    }) ?? {};
+    const authority = (dv.stderr ?? "").match(/^Authority=(.+)$/m)?.[1] ?? "";
+    if (authority.startsWith("Developer ID Application")) {
+      ok(`payload signed by ${authority}`);
+    } else if (!authority) {
+      fail("payload carries no code signature at all");
+    } else {
+      fail(
+        `payload is signed by \`${authority}\`, which Apple does not notarize. ` +
+          "Sign with the Developer ID Application identity (scripts/build-macos-dmg.mjs " +
+          "pins it); this is how a release ships that every user has to right-click Open.",
+      );
+    }
+    if (!/^Timestamp=/m.test(dv.stderr ?? "")) {
+      fail("payload signature carries no secure timestamp, which notarization rejects");
+    }
+    const staple = runTool(["/usr/bin/xcrun", "stapler", "validate", mountedApp], {
+      onToolFailure: "empty",
+      reason: "stapler reports a missing ticket on stderr with a non-zero exit",
+      maxBuffer: 1 << 20,
+    }) ?? {};
+    if (/validate action worked/i.test(`${staple.stdout ?? ""}${staple.stderr ?? ""}`)) {
+      ok("payload carries a stapled notarization ticket");
+    } else {
+      fail("payload has no stapled notarization ticket (notarize, then staple it)");
+    }
+  }
+
   // 2. The drag target — plain `ln -s`, so its absence means the volume was
   //    never staged (the `hdiutil -srcfolder <app>` shape), not that Finder
   //    scripting failed.
