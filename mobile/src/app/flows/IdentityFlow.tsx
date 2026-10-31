@@ -1398,7 +1398,7 @@ export function IdentityFlow({
 
   const renderHeld = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.held.title")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.held.title")}</Title>
         <Lead>{t("identityFlow.held.lead")}</Lead>
@@ -1430,7 +1430,7 @@ export function IdentityFlow({
    */
   const renderJoinFork = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.fork.title")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.fork.title")}</Title>
         <Lead>{t("identityFlow.fork.lead")}</Lead>
@@ -1477,7 +1477,7 @@ export function IdentityFlow({
 
   const renderGate = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.title")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.title")}</Title>
         <Lead>{t("identityFlow.lead")}</Lead>
@@ -1510,7 +1510,7 @@ export function IdentityFlow({
 
   const renderCreate = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.create.title")} onBack={() => setStep("gate")} />
+      <FlowHeader onBack={() => setStep("gate")} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.create.title")}</Title>
         <Lead>{t("identityFlow.create.lead")}</Lead>
@@ -1545,7 +1545,7 @@ export function IdentityFlow({
    */
   const renderRegisterServer = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.register.title")} onBack={() => setStep("home")} />
+      <FlowHeader onBack={() => setStep("home")} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.register.title")}</Title>
         <div style={{ marginTop: "var(--space-4)" }}>
@@ -1614,7 +1614,6 @@ export function IdentityFlow({
   const renderRegisterPhrase = () => (
     <Screen>
       <FlowHeader
-        label={t("identityFlow.register.title")}
         onBack={() => {
           setError(null);
           setStep("register");
@@ -1633,6 +1632,7 @@ export function IdentityFlow({
               setError(null);
               setRegisterWords(next.map((w) => w.replace(/\s+/g, "")));
             }}
+            layout="field"
             testIdPrefix="identity-flow.register"
             cellTestId={(i) =>
               i === 0 ? "identity-flow.register-cell" : `identity-flow.register-cell-${i + 1}`
@@ -1681,7 +1681,7 @@ export function IdentityFlow({
    */
   const renderPersonPhrase = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.personJoin.title")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.personJoin.title")}</Title>
         <Lead>{t("identityFlow.personJoin.lead")}</Lead>
@@ -1711,13 +1711,13 @@ export function IdentityFlow({
             {t("identityFlow.personJoin.phraseLabel")}
           </FieldLabel>
         </div>
-        <div style={HINT_STYLE}>{t("identityFlow.personJoin.phraseHint")}</div>
         <PhraseEntryGrid
           cells={personWords}
           onCells={(next) => {
             setPersonError(null);
             setPersonWords(next.map((w) => w.replace(/\s+/g, "")));
           }}
+          layout="field"
           testIdPrefix="identity-flow.person-join"
           cellTestId={(i) =>
             i === 0 ? "identity-flow.person-join-cell" : `identity-flow.person-join-cell-${i + 1}`
@@ -1754,7 +1754,7 @@ export function IdentityFlow({
    */
   const renderPersonPending = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.personJoin.pendingTitle")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.personJoin.pendingTitle")}</Title>
         <Lead>{t("identityFlow.personJoin.pendingLead")}</Lead>
@@ -1797,7 +1797,7 @@ export function IdentityFlow({
    */
   const renderPersonFinishing = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.personJoin.finishingTitle")} onBack={onCancel} />
+      <FlowHeader onBack={onCancel} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.personJoin.finishingTitle")}</Title>
         <Lead>{t("identityFlow.personJoin.finishingLead")}</Lead>
@@ -1839,7 +1839,7 @@ export function IdentityFlow({
     const phrase = (result?.phrase ?? "").split(" ");
     return (
       <Screen>
-        <FlowHeader label={t("identityFlow.phrase.title")} />
+        <FlowHeader />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.phrase.title")}</Title>
           <Lead>{t("identityFlow.phrase.warning")}</Lead>
@@ -1881,7 +1881,7 @@ export function IdentityFlow({
     const { matches: corrects, allCorrect } = phraseTypeBackMatches(phrase, challenge, answers);
     return (
       <Screen>
-        <FlowHeader label={t("identityFlow.typeback.title")} onBack={() => setStep("phrase")} />
+        <FlowHeader onBack={() => setStep("phrase")} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.typeback.title")}</Title>
           <Lead>{t("identityFlow.phrase.typebackLead")}</Lead>
@@ -1940,7 +1940,7 @@ export function IdentityFlow({
    */
   const renderRecover = () => (
     <Screen>
-      <FlowHeader label={t("identityFlow.recover.title")} onBack={leaveRecover} />
+      <FlowHeader onBack={leaveRecover} />
       <ScreenScroll style={{ padding: "18px 22px 0" }}>
         <Title>{t("identityFlow.recover.title")}</Title>
         <Lead>{t("identityFlow.recover.lead")}</Lead>
@@ -2008,7 +2008,6 @@ export function IdentityFlow({
   const renderUnlockIdentity = () => (
     <Screen>
       <FlowHeader
-        label={t("identityFlow.unlock.title")}
         onBack={() => {
           setError(null);
           setUnlockWords(Array(PHRASE_WORDS).fill(""));
@@ -2078,7 +2077,7 @@ export function IdentityFlow({
     const claimed = (invites ?? []).filter((i) => i.claimed);
     return (
       <Screen>
-        <FlowHeader label={t("identityFlow.home.title")} onBack={onCancel} />
+        <FlowHeader onBack={onCancel} />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.home.title")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
@@ -2768,7 +2767,7 @@ export function IdentityFlow({
     const ready = !nameBusy && nameDraft.trim() !== "";
     return (
       <Screen>
-        <FlowHeader label={t("sync.nameGate.title")} />
+        <FlowHeader />
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("sync.nameGate.title")}</Title>
           <Lead>{t("sync.nameGate.body")}</Lead>

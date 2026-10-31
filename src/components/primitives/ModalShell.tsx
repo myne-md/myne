@@ -81,6 +81,18 @@ interface ModalShellProps {
    * the keyboard.
    */
   zIndex?: number;
+  /**
+   * Drop the body's own inset so a dialog can draw edge-to-edge bands (a
+   * toolbar with a `border-bottom`, a scroll region beside a fixed footer).
+   *
+   * The inset itself is the DEFAULT, because the alternative (every caller
+   * supplying its own) is what produced the same bug four times: the header is
+   * inset, the body was not, and content sat flush against the card edge
+   * (myne-md/myne#843, #847, and the display-name dialog in #945). Opting out
+   * is now a visible decision at the call site rather than an omission nobody
+   * notices until a screenshot is taken.
+   */
+  bodyBleed?: boolean;
   children: ReactNode;
 }
 
@@ -99,6 +111,7 @@ export function ModalShell({
   zIndex,
   testId,
   canDismiss,
+  bodyBleed = false,
   children,
 }: ModalShellProps) {
   useEffect(() => {
@@ -192,7 +205,13 @@ export function ModalShell({
             </button>
           )}
         </div>
-        <div className="myne-modal-body">{children}</div>
+        <div
+          className={
+            bodyBleed ? "myne-modal-body myne-modal-body--bleed" : "myne-modal-body"
+          }
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

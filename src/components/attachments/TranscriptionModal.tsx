@@ -22,7 +22,6 @@ const BODY_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-3)",
-  padding: "var(--space-5)",
 };
 
 const FILENAME_STYLE: CSSProperties = {

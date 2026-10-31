@@ -244,7 +244,6 @@ import { settleFrontmatterWrite as settleFrontmatterWriteFor } from "../notes/se
 import { sidebarCommands } from "../notes/sidebarCommands";
 import { setMeetingSidebarSurface } from "../notes/meetingSession";
 import type { SaveStatus as SaveStatusValue } from "../notes/useAutosave";
-import { getCurrentWebviewWindow } from "../platform/webviewWindow";
 import { listen } from "../platform/event";
 import { useActivityHeartbeat } from "../hooks/useActivityHeartbeat";
 import { useBackupScheduler } from "../hooks/useBackupScheduler";
@@ -262,6 +261,7 @@ import i18n from "../i18n";
 import { useIdleAutoLock } from "../hooks/useIdleAutoLock";
 import { effectiveAutoLockSecs } from "@myne/client-core";
 import { runFlushChain } from "../lib/flush-chain";
+import { registerCloseGuard } from "../lib/close-request";
 import {
   ContextMenu,
   type ContextMenuItem,
@@ -2139,61 +2139,35 @@ function EditorChrome({
     return () => clearInterval(id);
   }, [restoreSettled, persistWorkspace]);
 
-  // T28 - Tauri close-intercept. Block window close until pending saves
-  // flush (every pane), then persist the workspace descriptor. Safe to
-  // no-op when running outside Tauri (browser dev fallback).
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const w = getCurrentWebviewWindow();
-        const fn = await w.onCloseRequested(async (event) => {
-          if (cancelled) return;
-          // Stop the default close; we terminate manually after the flush.
-          event.preventDefault();
-          // The chain, not a bare await sequence, and for the same reason the
-          // lock CTA below uses it (task 93): one writer's rejection must not
-          // take the rest of the chain with it, and here it must not take
-          // `w.destroy()` either. `flushAll` rejects when a pane fails to settle
-          // (myne-md/myne#520), and the default close is ALREADY cancelled at
-          // this point, so a bare await would wedge the window unclosable
-          // exactly when a save is failing. On Windows the title-bar X is the
-          // only quit affordance, so that is the whole quit path.
+  // T28 - close-intercept. Block window close until pending saves flush (every
+  // pane), then persist the workspace descriptor.
+  //
+  // A GUARD, not a listener (myne-md/myne#945 item 05). The `tauri://close-requested`
+  // listener now lives in `src/lib/close-request.ts` for the life of the process,
+  // and this effect contributes only what the editor owes the close: the flush
+  // chain. The asynchronous-registration leak the old comment here described at
+  // length is structurally gone rather than guarded against, because unmounting a
+  // guard is a Set deletion - it cannot arrive after the cleanup that was meant
+  // to remove it, and a guard left behind by a gone screen answers nothing and
+  // cannot take the native close button away from the screen that replaced it.
+  //
+  // The chain, not a bare await sequence, and for the same reason the lock CTA
+  // below uses it (task 93): one writer's rejection must not take the rest of the
+  // chain with it. `flushAll` rejects when a pane fails to settle
+  // (myne-md/myne#520), and with the default close ALREADY cancelled at this
+  // point a bare await would wedge the window unclosable exactly when a save is
+  // failing.
+  useEffect(
+    () =>
+      registerCloseGuard({
+        id: "editor",
+        onCloseRequest: async () => {
           await runFlushChain(flushSteps, "closing");
-          // `destroy()`, NOT `close()`: the capability ACL grants
-          // `core:window:allow-destroy` but deliberately NOT `allow-close`
-          // (TB6 surface - see lib/app-window.ts). `close()` rejects under the
-          // permission system, so the window would never close. On Windows the
-          // title-bar X is the only quit affordance (no macOS Cmd+Q →
-          // RunEvent::ExitRequested path), so that left the app unclosable while
-          // unlocked. `destroy()` is non-cancellable and won't re-fire this
-          // handler; destroying the last window still raises ExitRequested, so
-          // the Rust-side search-index persist on exit still runs.
-          await w.destroy();
-        });
-        // `onCloseRequested` registers asynchronously: the component can
-        // unmount (e.g. lock → Unlock screen) while this await is still in
-        // flight. Without re-checking `cancelled` here the listener attaches
-        // AFTER cleanup ran and is never removed - a leak that follows onto
-        // later screens. Its mere presence makes Tauri `prevent_close()` the
-        // native title-bar X (manager/window.rs `has_js_listener`), so on
-        // Windows - where the X is the only quit affordance - the app can wedge
-        // unclosable. Mirror the vault-lock-imminent effect below +
-        // CreateVault's registration guard.
-        if (cancelled) fn();
-        else unlisten = fn;
-      } catch {
-        // Not running inside Tauri (e.g., `pnpm dev` browser shim) →
-        // close-intercept is a no-op. Tests + vite dev mode hit this
-        // path; no error surfaced.
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (unlisten !== undefined) unlisten();
-    };
-  }, [flushSteps]);
+          return true;
+        },
+      }),
+    [flushSteps],
+  );
 
   // Web graceful exit (MYND-574 task 93). The Tauri close-intercept above is a
   // no-op in a browser - its own catch says so - which meant every tab close

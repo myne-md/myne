@@ -1378,6 +1378,7 @@ export function ConversationSurface({
           width={420}
           closeLabel={t("common.close")}
           testId="ai.revert-confirm"
+          bodyBleed
         >
           <div
             style={{

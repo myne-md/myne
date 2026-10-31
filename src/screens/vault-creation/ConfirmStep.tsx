@@ -36,6 +36,7 @@ import { Spinner } from "../../components/Spinner";
 import { ErrorBanner } from "../../components/ErrorBanner";
 import { StepCard, StepCounter, StepHeading, StepLayout } from "./step-shell";
 import { normalizeWord, type Action, type ErrorState } from "./reducer";
+import { distributePhrasePaste } from "../../components/PhraseTypeBack";
 
 interface ConfirmStepProps {
   phrase: string[];
@@ -130,6 +131,26 @@ export function ConfirmStep({
                     value: e.target.value,
                   })
                 }
+                // A whole phrase pasted into one box lands in the four boxes it
+                // belongs to, by position (myne-md/myne#945 item 04). The
+                // identity ceremony's challenge shares the rule through
+                // `distributePhrasePaste`, so the two ceremonies cannot disagree
+                // about what a paste means.
+                onPaste={(e) => {
+                  const distributed = distributePhrasePaste(
+                    e.clipboardData.getData("text"),
+                    positions,
+                  );
+                  if (distributed === null) return;
+                  e.preventDefault();
+                  for (const [position, word] of distributed) {
+                    dispatch({
+                      type: "CONFIRM_INPUT_CHANGED",
+                      position,
+                      value: word,
+                    });
+                  }
+                }}
                 invalid={invalid}
                 autoComplete="off"
                 spellCheck={false}

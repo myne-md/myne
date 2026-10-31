@@ -207,7 +207,7 @@ function MeetingAiDialogInner({
   // last option. One gap for every child is what makes the spacing uniform
   // instead of a mix of default margins and nothing (myne-md/myne#845).
   const BODY_STYLE: CSSProperties = {
-    padding: "var(--space-5)",
+    // No inset: `ModalShell` supplies it (myne-md/myne#945).
     display: "flex",
     flexDirection: "column",
     gap: "var(--space-4)",

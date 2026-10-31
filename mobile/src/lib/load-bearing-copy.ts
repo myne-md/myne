@@ -84,10 +84,8 @@ export {
   CLIP_NOTICE_VIEW_ACTION,
   clipOmittedTallyLine,
   CONNECTED_EXTENSIONS_TITLE,
-  CONNECTED_EXTENSIONS_HELPER,
   CONNECTED_EXTENSIONS_EMPTY,
   CONNECTED_EXTENSIONS_REVOKE_LABEL,
-  CONNECTED_EXTENSIONS_REPAIR_HINT,
   // What removing a SHARED (member) vault from this device means (audit K2-i,
   // 2026-10-19). The phone renders the OWNER's destructive copy to a member today
   // ("Delete this vault?", the lost-both-secrets sentence), which is false twice

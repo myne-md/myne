@@ -25,9 +25,9 @@ import { StatusMark } from "../components/Spinner";
 import { MIN_TARGET } from "../components/primitives/targetSize";
 import { ImportPlainFileButton } from "../components/plain/ImportPlainFileButton";
 import { confirm as dialogConfirm } from "../platform/dialog";
-import { getCurrentWebviewWindow } from "../platform/webviewWindow";
 import { OpenFileButton } from "./OpenFileButton";
 import { setPlainSurfaceActive } from "./surfaceMode";
+import { registerCloseGuard } from "../lib/close-request";
 import {
   close,
   edit,
@@ -40,6 +40,27 @@ import {
   unsettledTabs,
   usePlainFileState,
 } from "./store";
+
+/** The close path's question, kept at module scope so the guard registration has
+ *  no dependency to resubscribe on: "may the window close with these tabs
+ *  unsettled?". Nothing unsettled is a plain `true`, so the common path asks
+ *  nothing.
+ *
+ *  A conflicted or errored tab holds the only copy of text that never landed.
+ *  `close` refuses to drop it, so closing the window would drop it silently: ask,
+ *  and keep the window (and the banner) open on a refusal or a failed prompt. */
+async function confirmDropUnsettledTabs(): Promise<boolean> {
+  if (unsettledTabs().length === 0) return true;
+  try {
+    return await dialogConfirm(i18n.t("plainFile.closePending.message"), {
+      title: i18n.t("plainFile.closePending.title"),
+      okLabel: i18n.t("plainFile.closePending.okLabel"),
+      cancelLabel: i18n.t("plainFile.closePending.cancelLabel"),
+    });
+  } catch {
+    return false;
+  }
+}
 
 /** The conflict banner's copy arm: busy + failure state around the store call. */
 function ConflictCopyButton({ handle }: { handle: number }) {
@@ -115,62 +136,37 @@ export function PlainFileScreen() {
     return () => window.removeEventListener("pagehide", onPageHide);
   }, []);
 
-  // The plain surface's own exit intercept (myne-md/myne#788). `Editor.tsx`
-  // has the desktop's real close-intercept, but it lives on the editor screen
-  // and the editor screen is NOT mounted while this surface is up (`App.tsx`
-  // renders one or the other), so its `onCloseRequested` never sees a close
-  // from here. `beforeunload` is not a substitute: the platform seam records
-  // it as a WARNING with no async guarantee (`src/platform/exit-signals.ts`),
-  // so a flush started there is killed halfway.
+  // The plain surface's contribution to the exit intercept (myne-md/myne#788),
+  // as a GUARD rather than a listener (myne-md/myne#945 item 05): the one
+  // `tauri://close-requested` listener lives in `src/lib/close-request.ts` for
+  // the life of the process.
   //
-  // Mirrors `Editor.tsx`'s handler deliberately: preventDefault, flush, then
-  // destroy (`destroy()`, not `close()`: the capability ACL grants
-  // `core:window:allow-destroy` and not `allow-close`). It cannot double-fire
-  // with Editor's, because the two components are never mounted together.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const w = getCurrentWebviewWindow();
-        const fn = await w.onCloseRequested(async (event) => {
-          if (cancelled) return;
-          event.preventDefault();
+  // It used to register its own, because `Editor.tsx`'s handler lives on the
+  // editor screen and the editor screen is NOT mounted while this surface is up
+  // (`App.tsx` renders one or the other), so its `onCloseRequested` never saw a
+  // close from here. A guard removes that coupling: the surface that is mounted
+  // is the surface that contributes, whatever else is not. `beforeunload` is
+  // still not a substitute: the platform seam records it as a WARNING with no
+  // async guarantee (`src/platform/exit-signals.ts`), so a flush started there is
+  // killed halfway.
+  useEffect(
+    () =>
+      registerCloseGuard({
+        id: "plain-file",
+        onCloseRequest: async () => {
+          // Asked BEFORE the flush, and again after it (myne-md/myne#945 review,
+          // D8). Before: `flushAll` can hang on a lock the lock task holds, and a
+          // guard that never answers is answered by nothing, so a confirmation
+          // placed only after it is exactly the arm a hang skips, taking the
+          // "only copy of text that never landed" with it. After: the flush may
+          // itself leave a tab unsettled, which is a second chance to ask.
+          if (!(await confirmDropUnsettledTabs())) return false;
           await flushAll();
-          if (unsettledTabs().length > 0) {
-            // A conflicted or errored tab holds the only copy of text that
-            // never landed. `close` refuses to drop it, so destroying the
-            // window here would drop it silently; ask, and keep the window
-            // (and the banner) open on a refusal or a failed prompt.
-            let proceed: boolean;
-            try {
-              proceed = await dialogConfirm(i18n.t("plainFile.closePending.message"), {
-                title: i18n.t("plainFile.closePending.title"),
-                okLabel: i18n.t("plainFile.closePending.okLabel"),
-                cancelLabel: i18n.t("plainFile.closePending.cancelLabel"),
-              });
-            } catch {
-              return;
-            }
-            if (!proceed) return;
-          }
-          await w.destroy();
-        });
-        // `onCloseRequested` registers asynchronously and this surface can
-        // unmount while the await is in flight; without re-checking here the
-        // listener attaches after cleanup and leaks onto later screens.
-        if (cancelled) fn();
-        else unlisten = fn;
-      } catch {
-        // Not running inside Tauri (browser dev) or the seam lacks the
-        // intercept: the unmount flush below is then all there is.
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (unlisten !== undefined) unlisten();
-    };
-  }, []);
+          return await confirmDropUnsettledTabs();
+        },
+      }),
+    [],
+  );
 
   return (
     <div

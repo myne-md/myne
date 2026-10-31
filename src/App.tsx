@@ -61,6 +61,7 @@ import { prefsRead } from "./lib/prefs";
 import { applyTheme, applyCustomTheme } from "./lib/theme";
 import { applyAccent, readAccent } from "./lib/accentColor";
 import { useStageRoute } from "./lib/routing";
+import { installCloseInterceptor } from "./lib/close-request";
 import { useUpdateAvailable } from "./hooks/useUpdateAvailable";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
@@ -325,6 +326,19 @@ function App() {
   // lands between the verdict being asked for and coming back leaves `prev` on
   // some other stage, and `transition` rejects the action rather than dragging
   // the user back out of it.
+  // The app's ONE close path (myne-md/myne#945 item 05). Installed here rather
+  // than by the screen that flushes something, because the failure it fixes is
+  // per-screen: Tauri `prevent_close()`s the native control the moment any JS
+  // listener exists for `tauri://close-requested`, so a listener that belonged to
+  // a screen which is no longer mounted left the window unclosable, measured on
+  // the quick-unlock screen, which registers no listener of its own and so has no
+  // way to finish a close another screen started. A listener that lives exactly
+  // as long as the process has no such state to lose, and screens contribute
+  // guards instead (see `src/lib/close-request.ts`).
+  useEffect(() => {
+    installCloseInterceptor();
+  }, []);
+
   useEffect(() => {
     if (stage?.name !== "editor") return;
     let cancelled = false;

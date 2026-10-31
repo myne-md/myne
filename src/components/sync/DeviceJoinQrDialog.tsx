@@ -12,7 +12,7 @@ import { ModalShell } from "../primitives/ModalShell";
 import { DeviceJoinQr, type DeviceJoinQrVariant } from "./DeviceJoinQr";
 
 const BODY_STYLE: CSSProperties = {
-  padding: "var(--space-5)",
+  // No inset: `ModalShell` supplies it (myne-md/myne#945).
   overflowY: "auto",
 };
 

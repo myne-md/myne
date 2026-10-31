@@ -79,18 +79,27 @@ export function Eyebrow({ children, style }: { children: ReactNode; style?: CSSP
  *
  *  The chevron renders only when `onBack` is given, which is why it is optional
  *  rather than required. It used to render unconditionally, with `onClick={undefined}`
- *  on the callers that pass nothing: a chevron that is plainly tappable and does
+ *  on the callers that pass nothing: a chevron that is plainly tappable and
+ *  does
  *  nothing. Two steps are deliberately forward-only and both were carrying one: the
  *  recovery-phrase reveal, which has nothing to go back to once the phrase is on
  *  screen, and the post-accept name step, whose whole design is that an accepted vault
  *  cannot reach the editor unnamed (`sync.nameGate.*`, myne-md/myne#851 task 15). A
- *  header cannot promise an exit the step refuses to take. */
+ *  header cannot promise an exit the step refuses to take.
+ *
+ *  `label` is optional for the same reason, one step further (myne-md/myne#945
+ *  item 02). Every step of the identity flow passed its OWN screen title here and
+ *  then rendered that title again as the `Title` immediately below, so the top of
+ *  the screen said "Add this phone to your account" twice in two sizes. A header
+ *  that dates the flow ("Create a vault · 2 of 5") earns its line; one that
+ *  repeats the heading under it is noise, and the fix belongs here rather than in
+ *  each caller's copy. */
 export function FlowHeader({
   label,
   onBack,
   style,
 }: {
-  label: ReactNode;
+  label?: ReactNode;
   onBack?: () => void;
   style?: CSSProperties;
 }) {
@@ -115,7 +124,7 @@ export function FlowHeader({
           <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
         </button>
       ) : null}
-      <Eyebrow>{label}</Eyebrow>
+      {label !== undefined ? <Eyebrow>{label}</Eyebrow> : null}
     </div>
   );
 }

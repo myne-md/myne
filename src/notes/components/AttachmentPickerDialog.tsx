@@ -110,6 +110,7 @@ export function AttachmentPickerDialog({
       width={520}
       closeLabel={t("common.close")}
       testId="ai.attachment-picker"
+      bodyBleed
     >
       <div
         data-testid="ai.attachment-picker-body"

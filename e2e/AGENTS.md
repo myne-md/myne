@@ -624,3 +624,41 @@ The reason all three are worth writing down is the shape they share: each
 failure wears the look of a product bug. Every other assertion in the scenario
 is green, the element is present and focusable, and the only tell is a detail
 nobody thinks to read.
+
+## Four more premises, measured on myne-md/myne#945
+
+Same shape as the three above, same reason for living here: each one fails in a
+way that reads as a product bug, and each cost a container run to find.
+
+- **`element.click()` clicks the CENTRE of the element's box.** A target that
+  merely CONTAINS the thing you meant to focus silently retargets as soon as a
+  child grows. `typeIntoEditor` used to click `.cm-content`; when the note title
+  became a wrapping `<textarea>` (#945 item 01) that field could cover the
+  centre of a short note, so the click focused the TITLE, `sendKeys` typed the
+  payload into the note's name, and the failure surfaced one step later as
+  `waitUntil(keystroke pipeline established) timed out`. Click the last
+  `.cm-line` instead: body by construction, because the frontmatter above it is
+  a widget and not a line.
+- **A click target and a `sendKeys` target are different elements.** `.cm-line`
+  is where you can point; `.cm-content` is what is focusable. Clicking one and
+  sending keys to it fails with `element not interactable` / "Element is not
+  focusable", which reads like the app refusing focus.
+- **A wait that returns a boolean its caller drops asserts nothing.**
+  `AppSession.waitForExit` polled the DRIVER's port, which `tauri-driver` keeps
+  answering after the window it drove is destroyed, and its `Promise<void>`
+  meant two scenarios passed against a close handler replaced by a bare
+  `return`. Measure the claim: `waitForAppProcessGone(pid)` in
+  `e2e/support/xwindow.ts` polls the pid that owns the window.
+- **A JS setter taken from the wrong prototype throws `Illegal invocation`, and
+  a `.catch(() => false)` turns that into a silently skipped path.**
+  `nameNewNote`'s atomic DOM-set fallback reached for
+  `HTMLInputElement.prototype`'s `value` setter, which is illegal on the
+  `<textarea>` the title became. Follow the element
+  (`el instanceof HTMLTextAreaElement ? … : …`) and never let a catch-all make a
+  broken path look untaken.
+
+The generalisation, since these will not be the last four: when a scenario fails
+one step AFTER the step you changed, suspect the harness's assumptions about
+pixels and element identity before suspecting the app. Measured the same day:
+`editor-scroll-slack` fails in this container with and without #945's changes,
+so it is neither evidence for nor against them.

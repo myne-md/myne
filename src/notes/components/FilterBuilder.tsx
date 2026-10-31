@@ -329,6 +329,7 @@ export function FilterBuilder({
       width={580}
       height={560}
       closeLabel={t("notes.filterBuilder.cancel")}
+      bodyBleed
     >
       <div data-testid="view-filter.modal" style={BODY_STYLE}>
         {!editable && (

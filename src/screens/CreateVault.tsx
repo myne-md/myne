@@ -23,8 +23,8 @@
 
 import { useEffect, useReducer, useRef, useState } from "react";
 import { invoke } from "../platform/core";
-import { getCurrentWindow } from "../platform/window";
 import { confirm as dialogConfirm } from "../platform/dialog";
+import { registerCloseGuard } from "../lib/close-request";
 import i18n from "../i18n";
 import { HAS_TAURI } from "../lib/app-window";
 import { has } from "../platform/capabilities";
@@ -228,27 +228,23 @@ export function CreateVault({
     };
   }, []);
 
+  // The creation ceremony's contribution to the close intercept, as a GUARD
+  // (myne-md/myne#945 item 05): the one `tauri://close-requested` listener lives
+  // in `src/lib/close-request.ts` for the life of the process, and this surface
+  // answers what it owns - the plan is sensitive until it stops being.
+  //
+  // The plan's answer is a confirmation prompt on every SENSITIVE step (kit and
+  // confirm): leaving there destroys the only copy of a recovery phrase, and the
+  // step is read LIVE from `stepRef` because the guard is registered once and the
+  // step changes underneath it.
   useEffect(() => {
     if (!HAS_TAURI) return;
-    let cancelled = false;
-    let unlisten: (() => void) | null = null;
-    const win = getCurrentWindow();
-    win
-      .onCloseRequested(async (event) => {
-        // Tauri `prevent_close()`s the native X the moment a listener exists
-        // (manager/window.rs `has_js_listener`), so the window only closes if
-        // WE call `destroy()` — never rely on the JS wrapper's version-dependent
-        // "auto-destroy when preventDefault wasn't called". Take control up
-        // front, then destroy() on the close-intended paths. `destroy()` force-
-        // closes WITHOUT re-firing onCloseRequested (so no recursion).
-        event.preventDefault();
-        if (!isSensitiveStep(stepRef.current)) {
-          await win.destroy();
-          return;
-        }
-        let proceed: boolean;
+    return registerCloseGuard({
+      id: "create-vault",
+      onCloseRequest: async () => {
+        if (!isSensitiveStep(stepRef.current)) return true;
         try {
-          proceed = await dialogConfirm(
+          return await dialogConfirm(
             i18n.t("vaultCreation.orchestrator.closePrompt.message"),
             {
               title: i18n.t("vaultCreation.orchestrator.closePrompt.title"),
@@ -260,19 +256,10 @@ export function CreateVault({
           );
         } catch (e) {
           logErrorKind(e, "close-confirm-failed");
-          return; // keep the window open if the confirm prompt failed
+          return false; // keep the window open if the confirm prompt failed
         }
-        if (proceed) await win.destroy();
-      })
-      .then((fn) => {
-        if (cancelled) fn();
-        else unlisten = fn;
-      })
-      .catch((e: unknown) => logErrorKind(e, "close-listener-failed"));
-    return () => {
-      cancelled = true;
-      if (unlisten) unlisten();
-    };
+      },
+    });
   }, []);
 
   // Lifetime: PasswordStep submit → auto-unlock resolve. Wiped on every

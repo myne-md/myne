@@ -158,6 +158,16 @@ export interface AppSession {
    * the opposite of asking it to leave. `teardown` afterwards is still correct
    * and still cheap — it finds the session gone and reaps a dead group.
    *
+   * **It is NOT proof that the app exited, and this was measured rather than
+   * reasoned.** What it waits for is the DRIVER's port going quiet, and that port
+   * is released by the harness, not by the app: `tauri-driver` is a server that
+   * outlives the window it drove, so this call spends its whole budget on a
+   * close that worked and returns exactly what it returns for a close that did
+   * not. Two scenarios (wc1, wc2) asserted the exit through it and both passed
+   * against a close handler replaced by a bare `return` (myne-md/myne#945). Use
+   * `waitForAppProcessGone` from `e2e/support/xwindow.ts` when the exit IS the
+   * claim: it polls the pid that owns the window.
+   *
    * The session object is dead once this resolves; every call on it will throw.
    */
   waitForExit(timeoutMs?: number): Promise<void>;

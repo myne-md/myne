@@ -156,6 +156,7 @@ export function SettingsSection({
   title,
   testId,
   tone = "default",
+  action,
   children,
 }: {
   title: string;
@@ -169,6 +170,16 @@ export function SettingsSection({
    * without the colour, so the tone is reinforcement and not the only signal.
    */
   tone?: "default" | "danger";
+  /**
+   * One control, at the far end of the seam, acting on what the section holds
+   * (myne-md/myne#945). A section-level action belongs on the seam rather than
+   * in the body because the body is a vertical run of blocks: a button inside
+   * it competes with the first row for the eye, and a button ABOVE the rows
+   * pushed them down by a control's height to say something the heading can
+   * say in the corner. One action only: a second means the section is two
+   * concerns.
+   */
+  action?: ReactNode;
   children: ReactNode;
 }) {
   const counter = useContext(SectionCountContext);
@@ -185,12 +196,21 @@ export function SettingsSection({
       aria-label={title}
       data-section-alone={alone ? "true" : undefined}
     >
-      {!alone && (
+      {(!alone || action !== undefined) && (
         <div style={HEADER_STYLE}>
-          <h3 style={tone === "danger" ? TITLE_DANGER_STYLE : TITLE_STYLE}>
-            {title}
-          </h3>
-          <span style={RULE_STYLE} aria-hidden="true" />
+          {!alone && (
+            <h3 style={tone === "danger" ? TITLE_DANGER_STYLE : TITLE_STYLE}>
+              {title}
+            </h3>
+          )}
+          {!alone && <span style={RULE_STYLE} aria-hidden="true" />}
+          {/* `marginInlineStart: auto` is what puts the action at the far end
+              when the rule is absent, which is the "alone in its topic" case,
+              where the heading is gone and the rule with it. Without it the
+              action would slide to the left edge and read as the first row. */}
+          {action !== undefined && (
+            <div style={{ marginInlineStart: "auto", display: "flex" }}>{action}</div>
+          )}
         </div>
       )}
       <div style={BODY_STYLE}>{children}</div>

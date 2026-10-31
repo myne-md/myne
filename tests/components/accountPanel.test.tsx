@@ -15,7 +15,7 @@
 // the truth is unknown).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 // ── Mock the IPC-boundary lib wrappers, keeping the pure helpers real ──────
 const listAccounts = vi.fn();

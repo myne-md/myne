@@ -283,6 +283,7 @@ export function ViewSettings({
       onClose={onCancel}
       width={480}
       closeLabel={t("notes.viewSettings.cancel")}
+      bodyBleed
     >
       <div data-testid="view-settings.modal" style={BODY_STYLE}>
         {/* View type -------------------------------------------------------- */}

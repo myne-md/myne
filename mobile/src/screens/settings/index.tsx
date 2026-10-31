@@ -703,10 +703,6 @@ function About() {
             <RowChevron />
           </Row>
           <Row>
-            <span style={{ fontSize: 16 }}>Changelog</span>
-            <RowChevron />
-          </Row>
-          <Row>
             <span style={{ fontSize: 16 }}>License</span>
             <span style={{ fontSize: 15, color: "var(--fg-3)" }}>AGPL-3.0</span>
           </Row>

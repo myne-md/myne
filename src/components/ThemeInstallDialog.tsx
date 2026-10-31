@@ -58,7 +58,6 @@ import { activateCustomTheme } from "../lib/theme";
 import { describeImportError } from "../lib/theme-errors";
 
 const BODY_STYLE: CSSProperties = {
-  padding: "var(--space-5)",
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",

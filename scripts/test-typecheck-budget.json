@@ -14,7 +14,6 @@
     "tests/clip/buildClipNotice.test.ts": 1,
     "tests/clip/clipDispatchReply.test.ts": 2,
     "tests/clip/composeBookmarkPlaintext.test.ts": 3,
-    "tests/clip/composeClipPlaintext.test.ts": 3,
     "tests/clip/validateClipEnvelope.test.ts": 23,
     "tests/commands/actions.test.ts": 1,
     "tests/commands/command-palette.test.tsx": 7,
@@ -80,5 +79,5 @@
     "tests/web/opfs-error-classification.test.ts": 1,
     "tests/web/wasm-boundary.test.ts": 2
   },
-  "total": 203
+  "total": 200
 }

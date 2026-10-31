@@ -173,6 +173,28 @@ export const IDENTITY_SETUP_RESULT = {
 };
 
 /**
+ * Fill a `layout="field"` phrase entry (myne-md/myne#945 item 02) with the whole
+ * phrase in one go.
+ *
+ * The two identity-entry steps take the phrase as ONE textarea rather than 24
+ * cells, because the phrase arrives as a string from another device or a password
+ * manager. So a spec fills one element, and the `-cell-N` testids the grid mints
+ * are gone from those steps. Selecting `input[...]` to assert the field's absence
+ * finds nothing whether it is there or not (the element is a `textarea`), so an
+ * absence assertion must key on the testid alone.
+ *
+ * `testId` is the field's own testid, which is what the caller passed as
+ * `cellTestId(0)` (`identity-flow.register-cell`, `identity-flow.person-join-cell`).
+ */
+export async function fillPhraseField(
+  page: Page,
+  testId: string,
+  word: string = IDENTITY_WORD,
+): Promise<void> {
+  await page.getByTestId(testId).fill(Array.from({ length: 24 }, () => word).join(" "));
+}
+
+/**
  * Welcome → the identity ceremony → the identity home
  * (myne-md/myne#911 task 12).
  *

@@ -21,7 +21,6 @@ import { ModalShell, UNSOLICITED_MODAL_Z } from "../components/primitives/ModalS
 import { plainFileOpenConfirmed } from "../platform/plainFile";
 
 const BODY_STYLE: CSSProperties = {
-  padding: "var(--space-5)",
   display: "flex",
   flexDirection: "column",
   gap: "var(--space-4)",

@@ -42,6 +42,7 @@ const CREDENTIAL_SURFACES: ReadonlyArray<[path: string, what: string]> = [
   ["src/screens/vault-creation/PasswordStep.tsx", "the password being chosen"],
   ["src/screens/vault-creation/KitStep.tsx", "the recovery kit: phrase + account number, shown once"],
   ["src/screens/vault-creation/ConfirmStep.tsx", "four words of the phrase, re-entered"],
+  ["src/components/PhraseTypeBack.tsx", "four words of the phrase, re-entered (identity)"],
   ["src/screens/vault-recover/PhraseEntryStep.tsx", "the 24-word recovery grid"],
   ["src/components/PhraseEntryGrid.tsx", "a phrase grid, device enrolment"],
   ["src/components/sync/MemberVaultUnlockCard.tsx", "a shared vault's password, PIN or phrase"],
@@ -66,9 +67,31 @@ describe("no credential field blocks paste", () => {
   it.each(CREDENTIAL_SURFACES)("%s (%s) suppresses no clipboard event", (path) => {
     const src = code(path);
     // The shapes a "paste is insecure" edit actually takes.
-    expect(src, "a paste handler that cancels the paste").not.toMatch(
-      /onPaste=\{[^}]*preventDefault/,
-    );
+    //
+    // ONE exemption, and it is not a comment: a handler that CONSUMES a pasted
+    // phrase to spread it over several fields has to cancel the browser's
+    // default, because the alternative is the phrase landing twice - once
+    // distributed, once whole in the field it was pasted into
+    // (myne-md/myne#945 item 04). The exemption is keyed on the file importing
+    // the ONE shared distributor, so an edit that really did block paste has
+    // nothing to import and fails the line below. The rule this test exists for
+    // is untouched: paste must LAND somewhere.
+    // Imported by the callers, DEFINED by `PhraseTypeBack.tsx` (the module that
+    // owns the rule), which is why both forms count as the same evidence.
+    const distributes =
+      /import[\s\S]*?distributePhrasePaste[\s\S]*?from/.test(src) ||
+      /export function distributePhrasePaste/.test(src);
+    if (distributes) {
+      // And the exemption has to be earned: the distributor must be reached
+      // FROM a paste arm, not merely imported.
+      expect(src, "the distributor the exemption is granted for is never called from onPaste").toMatch(
+        /onPaste=\{[\s\S]{0,400}?distributePhrasePaste\(/,
+      );
+    } else {
+      expect(src, "a paste handler that cancels the paste").not.toMatch(
+        /onPaste=\{[^}]*preventDefault/,
+      );
+    }
     expect(src, "a paste handler that swallows the paste").not.toMatch(
       /onPaste=\{\s*\(\)?\s*=>\s*(false|undefined|\{\s*\})/,
     );

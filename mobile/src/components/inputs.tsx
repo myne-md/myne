@@ -776,6 +776,7 @@ export function PhraseEntryGrid({
   labelledBy,
   disabled = false,
   onCellEdited,
+  layout = "grid",
   style,
 }: {
   cells: readonly string[];
@@ -793,10 +794,51 @@ export function PhraseEntryGrid({
   labelledBy?: string;
   disabled?: boolean;
   onCellEdited?: () => void;
+  /**
+   * `grid` (24 boxes) or `field` (one wrapping box, myne-md/myne#945 item 02).
+   *
+   * The grid is the right shape when the words are being CHECKED against a
+   * written copy, one at a time. It is the wrong shape for entering a phrase the
+   * user already holds as a string: 24 boxes on a phone means scrolling a
+   * screen and a half to reach word 14, and it invites the user to retype
+   * something they could paste. `field` is one box that takes the whole phrase,
+   * splits it on whitespace and shows how many words it has.
+   *
+   * The default stays `grid`, and the rule that decides which callers pass
+   * `field` is where the phrase COMES FROM:
+   *
+   *   * `field` - the phrase arrives as a string from another device or a
+   *     password manager and the user pastes or thumbs it in wholesale. Today
+   *     that is the two identity-entry steps (create, join).
+   *   * `grid` - the user is checking word 3 and word 17 against a written
+   *     copy, one at a time, and the numbered cells are what lets them keep
+   *     their place. The recover, sync-enroll and sync-join screens are this
+   *     case, and they already carry their own paste-to-distribute (the grid
+   *     accepts a whole phrase, `phrasePasteTokens`), so a field there would
+   *     trade a working affordance for a counter.
+   */
+  layout?: "grid" | "field";
   /** Merged onto the grid element, for the per-screen top margin the callers
    *  each had. */
   style?: CSSProperties;
 }) {
+  if (layout === "field") {
+    return (
+      <PhraseWordField
+        cells={cells}
+        onCells={onCells}
+        testIdPrefix={testIdPrefix}
+        cellLabel={cellLabel}
+        cellTestId={cellTestId}
+        count={count}
+        labelledBy={labelledBy}
+        disabled={disabled}
+        onCellEdited={onCellEdited}
+        style={style}
+      />
+    );
+  }
+
   const setCell = (index: number, value: string): void => {
     onCellEdited?.();
     const next = [...cells];
@@ -851,6 +893,139 @@ export function PhraseEntryGrid({
           />
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The single-field shape of a phrase entry (myne-md/myne#945 item 02).
+ *
+ * One box that takes the whole phrase, splits it on whitespace and counts the
+ * words back to the user. See `PhraseEntryGrid`'s `layout` prop for why the grid
+ * is the wrong shape when the phrase arrives from another device.
+ *
+ * # Why it holds the raw text as state instead of deriving it from `cells`
+ *
+ * A derived value cannot keep the SPACE between two words. The caller stores
+ * words, so the text "ribbon " (the user has typed a space and is reaching for
+ * the next word) and "ribbon" are the same cells - and rendering the cells back
+ * deletes the separator on every keystroke, so the second word concatenates onto
+ * the first ("ribbonkernel"). So the field owns what is in the box and reports
+ * UP; when the caller replaces the cells from outside (a step re-entry, an error
+ * reset) the two stop agreeing, and the field adopts the caller's value.
+ *
+ * # The caller echoes
+ *
+ * Both callers store the words in state and pass them straight back
+ * (`setPersonWords`), which is what the grid expected too. What the field adds is
+ * a way to tell an ECHO from a REPLACEMENT: it remembers the words it last
+ * reported, and adopts the caller's words only when they are something else
+ * (a step re-entry, an error reset). Without that distinction the trailing space
+ * and the outside reset are the same event, and one of them has to be wrong.
+ *
+ * # Why a textarea and not `TextField`
+ *
+ * `TextField` is one line by construction. 24 words do not fit on one line of a
+ * phone, and a field that scrolls a phrase sideways shows the user nothing about
+ * how much of it landed.
+ */
+function PhraseWordField({
+  cells,
+  onCells,
+  testIdPrefix,
+  cellLabel,
+  cellTestId,
+  count,
+  labelledBy,
+  disabled,
+  onCellEdited,
+  style,
+}: {
+  cells: readonly string[];
+  onCells: (next: string[]) => void;
+  testIdPrefix: string;
+  cellLabel: (index: number) => string;
+  cellTestId?: (index: number) => string;
+  count: number;
+  labelledBy?: string;
+  disabled: boolean;
+  onCellEdited?: () => void;
+  style?: CSSProperties;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState(() =>
+    cells.slice(0, count).filter((w) => w.length > 0).join(" "),
+  );
+  // The words this field last REPORTED, as one string. Comparing the caller's
+  // current words against it is what separates "the caller is echoing what I
+  // just typed" from "the caller replaced the words from outside".
+  const reported = useRef<string>(
+    cells.slice(0, count).filter((w) => w.length > 0).join(" "),
+  );
+
+  const cellTokens = cells.slice(0, count).filter((w) => w.length > 0);
+  const cellsKey = cellTokens.join(" ");
+  const inSync = cellsKey === reported.current;
+  const filled = inSync ? phrasePasteTokens(text).length : cellTokens.length;
+  const value = inSync ? text : cellsKey;
+
+  const countId = `${testIdPrefix}-count`;
+  const fieldTestId = cellTestId ? cellTestId(0) : `${testIdPrefix}-cell`;
+
+  const change = (next: string): void => {
+    setText(next);
+    const tokens = phrasePasteTokens(next).slice(0, count);
+    reported.current = tokens.join(" ");
+    onCellEdited?.();
+    onCells(Array.from({ length: count }, (_, i) => tokens[i] ?? ""));
+  };
+
+  return (
+    <div dir="ltr" data-testid={`${testIdPrefix}-grid`} style={style}>
+      <textarea
+        dir="ltr"
+        value={value}
+        onChange={(e) => change(e.target.value)}
+        disabled={disabled}
+        data-testid={fieldTestId}
+        aria-label={labelledBy === undefined ? cellLabel(0) : undefined}
+        aria-labelledby={labelledBy}
+        aria-describedby={countId}
+        // The same three attributes as the grid's cells, for the same reason
+        // (myne-md/myne#932): `spellCheck` alone does not stop iOS autocorrect
+        // substituting a word of a secret, and a capitalised first letter would
+        // change the phrase itself.
+        autoCorrect="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        autoComplete="off"
+        style={{
+          display: "block",
+          width: "100%",
+          minHeight: 108,
+          padding: "var(--space-3)",
+          border: "1.5px solid var(--line-2)",
+          borderRadius: "var(--radius-2)",
+          background: "var(--bg-1)",
+          color: "var(--fg-1)",
+          fontFamily: "var(--font-mono)",
+          fontSize: "var(--text-base)",
+          lineHeight: 1.6,
+          resize: "none",
+        }}
+      />
+      <div
+        id={countId}
+        data-testid={countId}
+        style={{
+          marginTop: "var(--space-2)",
+          fontSize: "var(--text-xs)",
+          color: filled === count ? "var(--fg-2)" : "var(--fg-3)",
+          textAlign: "end",
+        }}
+      >
+        {t("common.phraseWordsProgress", { filled, total: count })}
+      </div>
     </div>
   );
 }

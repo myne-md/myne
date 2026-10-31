@@ -677,27 +677,23 @@ function pluraliseOmittedNoun(noun: string): string {
  * MYND-443) ------------------------------------------------------------------
  *
  * Settings → Account lists the live (non-revoked) paired browser extensions
- * with a per-row Revoke. Revoke is desktop-authoritative, immediate + durable —
- * the re-pair hint states the consequence plainly (the extension must pair
- * again to reconnect). E2E asserts these literals by full equality, so they live
- * here as the single source.
+ * with a per-row Revoke. Revoke is desktop-authoritative, immediate + durable.
+ * E2E asserts these literals by full equality, so they live here as the single
+ * source.
+ *
+ * **Two sentences left this block on 2026-10-29** (owner request: "too much
+ * writing, no simplicity"). `CONNECTED_EXTENSIONS_HELPER` restated what the
+ * surrounding section title and the rows already say, and
+ * `CONNECTED_EXTENSIONS_REPAIR_HINT` restated the consequence of the button
+ * beside it. Deleting the exports rather than only their render sites is
+ * deliberate: a literal kept "just in case" is the shape that grows back.
  */
 
 /** Section title for the connected-extensions list (Settings → Account). */
 export const CONNECTED_EXTENSIONS_TITLE = "Connected extensions";
-
-/** Helper line under the section title — what a paired extension is. */
-export const CONNECTED_EXTENSIONS_HELPER =
-  "Browser extensions you have paired with this vault. Revoking one disconnects it immediately.";
 
 /** Empty state — no extension has been paired yet (the start-empty case). */
 export const CONNECTED_EXTENSIONS_EMPTY = "No connected extensions.";
 
 /** The per-row Revoke action label. */
 export const CONNECTED_EXTENSIONS_REVOKE_LABEL = "Revoke";
-
-/** The one-line consequence hint shown after the list — revoke is durable and
- *  the extension must pair again to reconnect (the re-pair itself is the
- *  extension's side, out of scope for this UI). */
-export const CONNECTED_EXTENSIONS_REPAIR_HINT =
-  "A revoked extension must pair again to reconnect.";

@@ -202,6 +202,7 @@ export function NewNoteFromTemplateModal({
       onClose={onClose}
       labelId="new-from-template-title"
       width={480}
+      bodyBleed
     >
       {templates === null ? (
         <div style={LOADING_STYLE}>{t("notes.newFromTemplate.loading")}</div>

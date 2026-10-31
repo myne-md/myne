@@ -106,7 +106,7 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
-import { closeAppWindow } from "./support/xwindow";
+import { appPid, closeAppWindow, waitForAppProcessGone } from "./support/xwindow";
 
 /** Saved the ordinary way, so the note exists on disk before the interesting
  *  part. Single lowercase token, tokenizer-survivable, in-source constant. */
@@ -198,6 +198,11 @@ describeE2E("wc1 closing the window flushes unsaved work (myne-md/myne#555)", ()
             `scenario would pass on any build. The typing did not land.`,
         ).toBe(true);
 
+        // The pid that owns the window IS the thing being asked to leave, so it
+        // is read before the close.
+        const pid = appPid(app.driverPid);
+        expect(pid, "the app window has no _NET_WM_PID, so its exit cannot be measured").not.toBeNull();
+
         // The real thing: WM_DELETE_WINDOW to the toplevel, exactly what a
         // title-bar X sends. Not `teardown` and not a signal — both of those
         // kill the app, which is the opposite of asking it to leave, and the
@@ -208,8 +213,15 @@ describeE2E("wc1 closing the window flushes unsaved work (myne-md/myne#555)", ()
         // destroys the window only after flushAll + persistWorkspace +
         // persistVaultIndices + flushGraphLayoutNow have resolved. Returning
         // before this would let teardown SIGTERM the app mid-flush and then
-        // measure a disk this scenario had itself truncated.
-        await app.waitForExit();
+        // measure a disk this scenario had itself truncated. Measured against
+        // the PROCESS, not through `waitForExit`: that one polls the driver's
+        // port, the driver keeps answering after its window is gone, and with it
+        // standing in here the scenario passed against a close handler replaced
+        // by a bare `return` (myne-md/myne#945).
+        expect(
+          await waitForAppProcessGone(pid!),
+          "the app process never exited after WM_DELETE_WINDOW was sent to it",
+        ).toBe(true);
       },
     );
 

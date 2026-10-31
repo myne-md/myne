@@ -18,6 +18,7 @@
 
 import { test, expect } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
+import { fillPhraseField } from "../helpers";
 
 const PERSON_ID_HEX = "cd".repeat(16);
 
@@ -70,11 +71,9 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
     await openJoinDoor(page);
     await page.getByTestId("sync.join.scan-qr").click();
 
-    const cells = page.locator('input[data-testid^="identity-flow.person-join-cell"]');
-    await expect(cells).toHaveCount(24);
-    for (let i = 0; i < 24; i += 1) {
-      await cells.nth(i).fill("ribbon");
-    }
+    // One field holding the whole phrase (myne-md/myne#945 item 02): the step takes
+    // the phrase as a string because it arrives from the other device.
+    await fillPhraseField(page, "identity-flow.person-join-cell");
     await page.getByTestId("identity-flow.person-join-submit").click();
 
     // The phrase crossed IPC once, with the person the code named.
@@ -112,11 +111,7 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
     await openJoinDoor(page);
     await page.getByTestId("sync.join.scan-qr").click();
 
-    const cells = page.locator('input[data-testid^="identity-flow.person-join-cell"]');
-    await expect(cells).toHaveCount(24);
-    for (let i = 0; i < 24; i += 1) {
-      await cells.nth(i).fill("ribbon");
-    }
+    await fillPhraseField(page, "identity-flow.person-join-cell");
     await page.getByTestId("identity-flow.person-join-submit").click();
 
     // The join listed the account's vaults, so the shell's re-probe is what decides

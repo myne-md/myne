@@ -212,3 +212,46 @@ export function closeAppWindow(driverPid?: number): string {
   }
   return id;
 }
+
+/**
+ * The pid that owns the app's toplevel right now, read off `_NET_WM_PID`.
+ *
+ * This is the process a close scenario is asking to leave, so it is what
+ * "the app exited" has to be measured against. Take it BEFORE sending the
+ * close: once the window is destroyed there is nothing left to ask.
+ */
+export function appPid(driverPid?: number): number | null {
+  return windowPid(appWindowId(driverPid));
+}
+
+/**
+ * Wait until `pid` is gone, the way `AppSession.waitForExit` reads as if it did.
+ *
+ * It does not: that one polls the DRIVER's port, which `tauri-driver` keeps
+ * answering after the window it drove is destroyed, so it returns the same
+ * answer for a close that worked and one that never happened. Measured on
+ * myne-md/myne#945: a close handler replaced by a bare `return` still passed
+ * the two scenarios that used it. `process.kill(pid, 0)` throws `ESRCH` exactly
+ * when the process is gone, which is the claim these scenarios actually make.
+ *
+ * A pid can be recycled, so this is a bounded wait (default 30 s, which is well
+ * inside any pid-reuse window in a container) and callers assert the boolean.
+ */
+export async function waitForAppProcessGone(
+  pid: number,
+  timeoutMs = 30_000,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    let alive: boolean;
+    try {
+      process.kill(pid, 0);
+      alive = true;
+    } catch {
+      alive = false;
+    }
+    if (!alive) return true;
+    if (Date.now() >= deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+}
