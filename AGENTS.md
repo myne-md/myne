@@ -343,6 +343,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-web-command-coverage.mjs` | every `plugin:<x>\|<y>` literal in the shared tree is classified in… | `pre-commit` + CI `pnpm-build` |
 | `check-web-capabilities.mjs` | the UI's capability descriptor and the dispatcher's refusal table agree (disagreement is… | `pre-commit` + CI `pnpm-build` |
 | `check-prefs-nonce.mjs` | every `vault.prefs` write goes through `writePref` (the one path that bumps the prefs… | `pre-commit` + CI `pnpm-build` |
+| `check-device-actor.mjs` | ONE reader of "which device is this": the two records that answer it (`sync-state.json`, `person-auth.json`) are read only in `core/src/plugins/sync/device_actor.rs`, and every other `.device_id_hex` site is recorded with a reason, so a second reader fails the commit | `pre-commit` + CI `pnpm-build` |
 | `check-unwired.mjs` | ratchet: every module under `web/src`, `src/lib`, `src/hooks`, `src/notes`… | `pre-commit` + CI `pnpm-build` |
 | `check-lock-teardown.mjs` | a client that HOLDS a plaintext-derived RAM state for the process lifetime may not leave… | `pre-commit` + CI `pnpm-build` |
 | `check-ipc-binding-callers.mjs` | ratchet: every exported TypeScript binding that wraps a `plugin:<x>\|<y>` invoke has a… | `pre-commit` + CI `pnpm-build` |

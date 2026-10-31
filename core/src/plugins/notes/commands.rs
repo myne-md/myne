@@ -228,7 +228,10 @@ pub async fn note_create_with_dir(
     let actor = if is_v0_2 {
         let device_id = match notes_dir.parent() {
             Some(vault_root) => {
-                crate::plugins::sync::state::read_device_actor(io, vault_root).await
+                // The ONE device-actor read (myne-md/myne#958): the vault's enrolment
+                // id, else the person credential's, so a person-born vault attributes
+                // its notes instead of drawing a new actor for every save.
+                crate::plugins::sync::device_actor::durable_device_id(host, io, vault_root).await
             }
             None => None,
         };
@@ -1066,7 +1069,7 @@ pub async fn note_update_with_dir(
     // blocking closure below is `'static` and cannot borrow `io`. `None` (no
     // device identity) keeps the edited document's inherited actor.
     let device_actor = match vault_root.as_deref() {
-        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        Some(root) => crate::plugins::sync::device_actor::durable_device_id(host, io, root).await,
         None => None,
     };
     // The snapshot-capture side-effect rides the hooks seam (desktop wires the
@@ -1674,7 +1677,7 @@ pub async fn note_set_field_with_dir(
     let now_ms = host.now_unix_millis();
     let note_uuid_str = note_id.as_uuid().to_string();
     let device_actor = match vault_root.as_deref() {
-        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        Some(root) => crate::plugins::sync::device_actor::durable_device_id(host, io, root).await,
         None => None,
     };
     let is_crdt = super::crdt::is_nc05_blob(&blob);
@@ -1991,6 +1994,7 @@ pub async fn note_write_batch_transactional_from_host(
         })?;
 
     note_write_batch_with_dir(
+        host,
         io,
         notes_dir,
         state,
@@ -2055,6 +2059,10 @@ pub async fn note_write_batch_transactional<R: Runtime>(
 /// `ScopedTempDir` without a Tauri runtime. Mirror of
 /// [`note_update_with_dir`], generalized to N notes under one transaction.
 pub async fn note_write_batch_with_dir(
+    // The device-actor read needs the app's config dir for the person credential
+    // (myne-md/myne#958), which is NOT derivable from the vault path, so the host is
+    // threaded here rather than guessed.
+    host: &dyn HostCtx,
     io: &dyn VaultIo,
     notes_dir: PathBuf,
     state: &VaultRuntimeState,
@@ -2086,7 +2094,7 @@ pub async fn note_write_batch_with_dir(
     // resolved before the `'static` closure (which cannot borrow `io`). `None`
     // keeps the edited documents' inherited actor.
     let device_actor = match notes_dir.parent() {
-        Some(root) => crate::plugins::sync::state::read_device_actor(io, root).await,
+        Some(root) => crate::plugins::sync::device_actor::durable_device_id(host, io, root).await,
         None => None,
     };
 
@@ -3758,6 +3766,7 @@ mod tests {
             let blocked = tokio::time::timeout(
                 std::time::Duration::from_millis(250),
                 super::note_write_batch_with_dir(
+                    &crate::host::NoopHost,
                     &crate::vault_io::StdVaultIo,
                     notes_dir.clone(),
                     &state,
@@ -3789,6 +3798,7 @@ mod tests {
             // refusal.
             drop(held);
             super::note_write_batch_with_dir(
+                &crate::host::NoopHost,
                 &crate::vault_io::StdVaultIo,
                 notes_dir.clone(),
                 &state,

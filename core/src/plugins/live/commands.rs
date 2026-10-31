@@ -206,7 +206,13 @@ pub async fn live_session_open_from_host(
                 io_error_kind: other,
             },
         })?;
-    let actor = crate::plugins::sync::state::read_device_actor(io, &vault_root).await;
+    // The session's actor, resolved through the ONE device-actor reader
+    // (myne-md/myne#958): the durable id, else a fresh draw. A session CANNOT open
+    // without one, which is what stops the presence send half from sealing sixteen
+    // zero bytes when the vault's identity record is empty (`LiveSession::actor`).
+    let actor = crate::plugins::sync::device_actor::actor_for_authoring(host, io, &vault_root)
+        .await
+        .map_err(|_| LiveSessionCommandError::Csprng)?;
     let session = LiveSession::open_from_blob(
         &blob,
         vault_id,

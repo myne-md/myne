@@ -1902,6 +1902,7 @@ mod tests {
                 ),
             ];
             note_write_batch_with_dir(
+                &myne_core::host::NoopHost,
                 &myne_core::vault_io::StdVaultIo,
                 notes_dir.clone(),
                 &state,
@@ -1964,6 +1965,7 @@ mod tests {
                 (phantom, Zeroizing::new("ghost".into())),
             ];
             let err = note_write_batch_with_dir(
+                &myne_core::host::NoopHost,
                 &myne_core::vault_io::StdVaultIo,
                 notes_dir.clone(),
                 &state,
@@ -2108,6 +2110,7 @@ mod tests {
                 )
                 .await;
             note_write_batch_with_dir(
+                &myne_core::host::NoopHost,
                 &myne_core::vault_io::StdVaultIo,
                 notes_dir,
                 &state,
@@ -2132,6 +2135,7 @@ mod tests {
                 Zeroizing::new("x".into()),
             )];
             let err = note_write_batch_with_dir(
+                &myne_core::host::NoopHost,
                 &myne_core::vault_io::StdVaultIo,
                 notes_dir,
                 &state,

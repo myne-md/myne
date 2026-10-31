@@ -132,7 +132,15 @@ pub struct LiveSession {
     max_updated: Option<String>,
     /// This device's Automerge actor (`SYNC-42`), re-applied after a pulled merge
     /// reloads the document so subsequent edits stay attributable to this device.
-    actor: Option<[u8; 16]>,
+    ///
+    /// NOT optional (myne-md/myne#958). An `Option` here is what let the send half
+    /// seal `actor.unwrap_or([0u8; 16])` when the vault's identity record was empty,
+    /// and a frame carrying sixteen zero bytes is a frame the receiving half cannot
+    /// recognise as its own, so this device rendered its own caret as a peer named
+    /// `Device 000000`. The caller resolves the actor before opening the session
+    /// (`sync::device_actor::actor_for_authoring`), which draws one when the device has
+    /// no durable id, so there is no "no actor" state left to spell.
+    actor: [u8; 16],
     /// The last LOCAL change not yet announced on the live channel
     /// (`collab-editor-bridge` task 7, the send half). Captured after a local apply;
     /// the transport seals it into an awareness frame and POSTs it. A peer change
@@ -191,21 +199,21 @@ impl std::fmt::Debug for LiveSession {
 impl LiveSession {
     /// Open a session by loading the durable `NC05` blob under this device's
     /// actor (`SYNC-42`). `actor` is the device's 16-byte actor
-    /// (`crdt_doc::note_actor_bytes`); `None` leaves the document's loaded actor.
+    /// (`sync::device_actor::actor_for_authoring`: the durable id, or a fresh draw when
+    /// the device has none), always applied so a peer-created note's next edit is
+    /// authored by THIS device.
     pub fn open_from_blob(
         blob: &[u8],
         vault_id: String,
         note_id: String,
         note_uuid: [u8; 16],
-        actor: Option<[u8; 16]>,
+        actor: [u8; 16],
         items_key: &[u8; 32],
         items_key_id: &[u8; 16],
     ) -> Result<Self, LiveSessionError> {
         let save = decode_crdt_note_blob(blob, &note_uuid, items_key, items_key_id)?;
         let mut doc = AutoCommit::load(&save).map_err(|_| LiveSessionError::Malformed)?;
-        if let Some(a) = actor {
-            doc.set_actor(ActorId::from(&a[..]));
-        }
+        doc.set_actor(ActorId::from(&actor[..]));
         let last_durable_heads = doc_heads_hex(&mut doc);
         let max_updated = crate::plugins::notes::crdt::note_text_id(&doc)
             .ok()
@@ -360,9 +368,7 @@ impl LiveSession {
         .map_err(|_| LiveSessionError::Malformed)?;
         let save = decode_crdt_note_blob(&merge.blob, &self.note_uuid, items_key, items_key_id)?;
         let mut merged = AutoCommit::load(&save).map_err(|_| LiveSessionError::Malformed)?;
-        if let Some(a) = self.actor {
-            merged.set_actor(ActorId::from(&a[..]));
-        }
+        merged.set_actor(ActorId::from(&self.actor[..]));
         self.doc = merged;
         let after = self
             .current_text()
@@ -408,9 +414,12 @@ impl LiveSession {
         self.outgoing_change.take()
     }
 
-    /// This device's Automerge actor (`SYNC-42`), if set, the frame's `actor_id`.
+    /// This device's Automerge actor (`SYNC-42`), the frame's `actor_id`.
+    ///
+    /// Never `None`: a session always has an actor, so the presence and content send
+    /// halves cannot seal a frame without one (myne-md/myne#958).
     #[must_use]
-    pub fn actor_id(&self) -> Option<[u8; 16]> {
+    pub fn actor_id(&self) -> [u8; 16] {
         self.actor
     }
 

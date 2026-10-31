@@ -42,6 +42,21 @@
 // is a security decision here (AGENTS.md), so it is a decision to take
 // deliberately rather than a side effect of landing this guard.
 //
+// RUN IT FROM A TOP-LEVEL CHECKOUT, NOT FROM A WORKTREE, and the reason is
+// measured rather than tidiness. TypeScript resolves module specifiers by
+// walking UP the directory chain, so a checkout at `.opencode/worktrees/<name>/`
+// finds `.opencode/node_modules/@types/node`, a dependency of the agent
+// tooling, not of this project, and `@types/node` is the one package whose
+// PRESENCE changes these counts. With it visible, the three `Buffer` shape
+// errors in `tests/scripts/fdroidMetadata.test.ts`'s fixtures resolve (TS2345)
+// and are reported; from the repository root the same file yields TS2591, which
+// the filter above deliberately drops, so the budget reads clean. Nothing is
+// wrong with the branch in that state: the guard is answering a question about
+// the directory it was run in. `compilerOptions.types: []` does NOT fix it, and
+// that is worth knowing before trying: that option governs AMBIENT inclusion,
+// while `import ... from "node:fs"` resolves through node_modules regardless.
+// CI clones to a top-level path, so the lane is unaffected.
+//
 // Usage:
 //   node scripts/check-test-typecheck.mjs            # check against the budget
 //   node scripts/check-test-typecheck.mjs --record   # re-record the budget

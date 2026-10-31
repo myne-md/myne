@@ -197,6 +197,19 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
   function can be driven with no host: pair every `_with_dir` with the `_with_dir` sibling below it
   (`prefs_read_with_dir`), and treat a host call inside one as the bug it is.
 
+  **One recorded exception, and it is not the same bug: `host` is threaded through for the DEVICE
+  ID, not for the vault path.** `durable_device_id(host, io, vault_root)` (`plugins/sync/device_actor.rs`)
+  reads the person credential, whose file lives under `host.app_config_dir()`, a root that is
+  genuinely NOT derivable from the vault path (on Linux they are different roots). That is the
+  opposite of the failure above: the function is handed both roots and uses each for what it is.
+  So `_with_dir` functions that need this device's identity take a host
+  (`note_write_batch_with_dir`, `device_bindings_list_with_dir`, `claim_own_binding_with_dir`,
+  `session_device_id`) and their tests pass the host too, for real where the case is the person
+  credential (`device_actor`'s own tests) and `NoopHost` where only the enrolment record matters
+  (`NoopHost::app_config_dir` is an `Err`, so the person arm is simply not reached). What must
+  never happen is the shape the bullet above describes: a `_with_dir` function resolving its
+  `vault_dir` argument from the host instead of using it. See `decisions/sync/0766`.
+
 - **A per-file sync adopt has no self-heal, so a write precondition is part of the sync path and not
   only of the local one.** myne-md/myne#883: the agent-memory entry plane wrote `memories/<id>`
   without creating `memories/`, and `atomic_write` requires its parent to exist, so on every device

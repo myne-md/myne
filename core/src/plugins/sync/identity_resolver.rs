@@ -182,12 +182,21 @@ pub fn device_code(actor: &[u8; 16]) -> String {
 /// revision's or presence frame's Automerge actor; `None` (an `MY01` snapshot, or a
 /// revision with no actor) resolves to [`ResolvedIdentity::Unknown`].
 ///
+/// So does an all-zero actor: sixteen zero bytes is what a client with no device id
+/// seals a presence frame with, and it names no device at all. Resolving it like any
+/// other value produced `Device { code: "000000" }`, so a device with no identity saw
+/// ITSELF in the participant roster as "Device 000000" (myne-md/myne#958). A device
+/// code is only meaningful for an actor some device actually committed under.
+///
 /// The order is the module doc's, and this is the ONLY place it is applied.
 #[must_use]
 pub fn resolve_revision_author(index: &IdentityIndex, actor: Option<[u8; 16]>) -> ResolvedIdentity {
     let Some(a) = actor else {
         return ResolvedIdentity::Unknown;
     };
+    if crate::plugins::sync::device_actor::actor_is_unset(&a) {
+        return ResolvedIdentity::Unknown;
+    }
     let code = device_code(&a);
     let hex = actor_hex(&a);
     if let Some(name) = index.durable.name_for(&hex) {
@@ -820,6 +829,31 @@ mod tests {
         assert_eq!(
             resolve_revision_author(&index, None),
             ResolvedIdentity::Unknown
+        );
+    }
+
+    /// **An all-zero actor names no device, so it resolves to `Unknown` (myne-md/myne#958).**
+    ///
+    /// Sixteen zero bytes is the actor a client with no device id seals its presence with.
+    /// Resolved like any other value it became `Device { name: None, code: "000000" }`, so
+    /// the device that sealed it saw itself in the participant roster as "Device 000000",
+    /// and every id-less device in the vault shared that one row because the roster keys
+    /// participants by actor. The code is the first six hex characters, and `000000` is
+    /// not a device code: it is the absence of one.
+    ///
+    /// The zero form is asserted at `resolve_revision_author`, which is the ONLY entry point
+    /// here that takes an actor (`device_code` is its helper and has no other caller), so one
+    /// assertion covers every caller: the revision attribution in `snapshots::commands`.
+    #[test]
+    fn an_all_zero_actor_names_no_device() {
+        let index = IdentityIndex::new(
+            names(&[(A_HEX, "Ada's Laptop")]),
+            durable(&[(A_HEX, "Ada")]),
+        );
+        assert_eq!(
+            resolve_revision_author(&index, Some([0u8; 16])),
+            ResolvedIdentity::Unknown,
+            "zero is the absence of a device code, not the code \"000000\""
         );
     }
 

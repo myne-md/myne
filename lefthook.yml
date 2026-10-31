@@ -143,6 +143,21 @@ pre-commit:
       # prefs write", which a new file elsewhere can break.
       run: node scripts/check-prefs-nonce.mjs
 
+    device-actor:
+      # myne-md/myne#958: "which device is this" is answered by two records
+      # (`sync-state.json`'s `device_id_hex` and `person-auth.json`'s), and four
+      # subsystems each read one of them. On a person-born vault the first is
+      # written LAST, so the same device was `fe073b33…` in its version vector and
+      # absent everywhere else: note edits committed under a fresh random actor,
+      # no `MYU5` binding row, no device-signed head, and a live-session actor of
+      # sixteen zero bytes that the resolver rendered as a device named `000000`
+      # in its own roster. Both wrong reads COMPILED and logged nothing, so the
+      # sites are recorded: one reader, every other one argued for in
+      # scripts/device-actor-readers.json. Whole-tree by construction, not
+      # staged-files scoped: the guard prints the count it measured, and no
+      # number is written here by hand (AGENTS.md "Repo guards").
+      run: node scripts/check-device-actor.mjs
+
     datetime-display-publisher:
       # myne-md/myne#609: the shared date/time display store had exactly ONE
       # publisher in the whole tree while three clients read it. The mobile

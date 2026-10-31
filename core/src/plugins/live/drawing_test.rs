@@ -4,6 +4,9 @@
 
 use super::commands::live_session_applies;
 use super::session::LiveSession;
+
+/// A session always opens under a real actor now (myne-md/myne#958); never the zero one.
+const TEST_ACTOR: [u8; 16] = [0x5Au8; 16];
 use crate::host::test_host::TestHost;
 use crate::plugins::live::commands::LiveSessionCommandError;
 use crate::plugins::notes::crdt::encode_note_blob;
@@ -15,7 +18,7 @@ fn open(text: &str) -> LiveSession {
     let host = TestHost::new("/base");
     let (ik, ikid, uuid) = ([0x11u8; 32], [0x22u8; 16], [0x33u8; 16]);
     let blob = encode_note_blob(text, &ik, &ikid, &uuid, &[0xAAu8; 16], &host).expect("seal");
-    LiveSession::open_from_blob(&blob, "v".into(), "n".into(), uuid, None, &ik, &ikid)
+    LiveSession::open_from_blob(&blob, "v".into(), "n".into(), uuid, TEST_ACTOR, &ik, &ikid)
         .expect("open")
 }
 

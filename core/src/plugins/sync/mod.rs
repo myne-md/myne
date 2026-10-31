@@ -55,6 +55,11 @@ pub mod config;
 pub mod conflict;
 pub mod corpus;
 pub mod crdt_doc;
+/// This device's 16-byte id, read in exactly one place (myne-md/myne#958). The
+/// ONLY module that may read `sync-state.json`'s or `person-auth.json`'s
+/// `device_id_hex`; `scripts/check-device-actor.mjs` holds that, because two
+/// readers of "which device is this" had already diverged twice.
+pub mod device_actor;
 pub mod device_identity;
 // The two-sided device admission ceremony (`decisions/protocol/0762`).
 //
