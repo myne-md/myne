@@ -2917,10 +2917,6 @@
       "writesHeading": "Sehemu zinazoweza kubadilishwa",
       "writesNote": "Myne inakagua kila mabadiliko dhidi ya orodha hii kabla ya kuandika moja, na inakataa mabadiliko kwenye sehemu iliyohaririwa kwingineko tangu mtazamo huu uliposomwa."
     },
-    "welcome": {
-      "body": "Karibu Myne, nafasi yako ya faragha ya kufikiri na kuandika.\n\nKila kitu unachohifadhi hapa kimesimbwa kwa njia fiche na kinabaki kwenye kifaa chako. **Nenosiri** lako na **kifungu chako cha urejeshaji** ndivyo vifunguo pekee vya kufikia, hivyo vihifadhi mahali salama. Vikipotea vyote viwili, hakuna anayeweza kurudisha madokezo yako, hata sisi.\n\n**Unaweza kuunganisha madokezo.** Andika `[[` na Myne itakupendekeza madokezo uliyo nayo; chagua moja nayo iwe kiungo. Dokezo ulilounganisha KWENDA kwalo linaonyesha kiungo kilitokea wapi, kwenye paneli yake ya viungo rejeshi, hivyo seti ya madokezo ni kitu unachoweza kufuata kwa pande zote mbili.\n\nHili ni dokezo la kawaida tu, hivyo lifanye lako. Lihariri, libadilishe jina, au lifute wakati wowote, na uongeze madokezo mapya kadiri mawazo yako yanavyokua.\n\nIli kujifunza zaidi kuhusu Myne, tembelea https://myne.md\n",
-      "title": "Karibu Myne"
-    },
     "workspace": {
       "defaultSlotName": "Chaguomsingi"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Kisheria",
       "legalHelper": "Hufunguka kwenye myne.md katika kivinjari chako. Kwa Kijerumani pale kiolesura kilipo Kijerumani.",
       "legalPrivacy": "Sera ya faragha",
-      "licenseBody": "Pre-alpha · nyaraka za CC-BY-4.0 · msimbo wa programu wa AGPL-3.0 katika toleo la Awamu ya 1.",
+      "licenseBody": "nyaraka za CC-BY-4.0 · msimbo wa programu wa AGPL-3.0.",
       "licenseLabel": "Leseni",
-      "tagline": "Pre-alpha · kiteja cha kompyuta cha Awamu ya 1",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Fungua hati ya wazi ya mfumo wa vitisho kwenye kivinjari chako.",
       "threatModelLabel": "Mfumo wa vitisho",
       "version": "Toleo",
@@ -4054,7 +4050,6 @@
       "importLabel": "Ingiza",
       "importObsidian": "Ingiza madokezo…",
       "locationHelper": "Kila kasha ni folda ya mafaili yaliyosimbwa chini ya njia hii. Pendelea kitufe cha Hifadhi rudufu kilicho hapa chini kuliko nakala za mkono: kinathibitisha faili lililoandikwa.",
-      "locationLabel": "Mahali pa kasha",
       "openInFiles": "Fungua katika Mafaili",
       "webLocationHelper": "Madokezo yako yanakaa kwenye hifadhi ya kivinjari hiki kwa tovuti hii, ikisimamiwa na kivinjari. Hakuna folda ya kufungua. Kufuta data ya tovuti hii kunaondoa nakala ya ndani; kwa kuwa kiteja hiki husawazisha, kuingia tena kunaipakua tena.",
       "webLocationLabel": "Mahali madokezo yako yanapohifadhiwa",

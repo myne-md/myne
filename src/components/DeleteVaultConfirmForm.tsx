@@ -37,10 +37,11 @@
 // irreversible thing the web erase does — and the last sentence of the
 // disclosure is exactly that sentence.
 
-import { useState, type CSSProperties } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
+import { HelperDisclosure } from "./settings/HelperDisclosure";
 import { DestructiveBanner } from "./DestructiveBanner";
 import { has } from "../platform/capabilities";
 import {
@@ -140,10 +141,10 @@ const COPY_PRIMARY_STYLE: CSSProperties = {
   margin: 0,
 };
 
-const COPY_SECONDARY_STYLE: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--fg-3)",
+/** The disclosure trigger's row, on the primary paragraph's left edge. */
+const DISCLOSURE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
   margin: 0,
 };
 
@@ -187,6 +188,7 @@ export function DeleteVaultConfirmForm({
   variant = "owner",
 }: DeleteVaultConfirmFormProps) {
   const { t } = useTranslation();
+  const detailsId = useId();
   const [typed, setTyped] = useState("");
   const submitReady = typed === CONFIRM_PHRASE && !inFlight;
   // Read once per render, not memoised: the seam is a synchronous constant
@@ -270,26 +272,28 @@ export function DeleteVaultConfirmForm({
           >
             {copy.primary}
           </p>
-          <p style={COPY_SECONDARY_STYLE}>
-            {t("settings.deleteVault.copySecondary")}
-          </p>
+          {/* The mechanics, one press away (myne-md/myne#960). These two
+              sentences were two grey paragraphs under the warning, which is the
+              essay-under-a-dialog shape `#885` removed from the settings panels;
+              the same disclosure shape now applies here.
 
-          {/* myne-md/myne#761: the erase destroys the per-vault keychain item on
-              the platforms that have one, and there is no such item on the
-              others. Saying so here rather than implying a cleanup that cannot
-              happen is the non-Apple half of the class rule
-              (`docs/decisions/security/0709`). Gated on the provider capability
-              rather than on `onlyCopy`: the browser has no per-vault keychain
-              item and its copy is a different claim about a different store, so
-              the line is omitted there. */}
-          {hasKeychainItem && (
-            <p
-              style={COPY_SECONDARY_STYLE}
-              data-testid="delete-vault.keychain-note"
-            >
-              {t("settings.deleteVault.keychainNote")}
-            </p>
-          )}
+              Both claims are unchanged and both are still made. The erase
+              destroys the per-vault keychain item on the platforms that have one
+              (myne-md/myne#761, `docs/decisions/security/0709`), and the note is
+              gated on the provider capability rather than on `onlyCopy`: the
+              browser has no per-vault keychain item and its copy is a different
+              claim about a different store, so the sentence is omitted there. */}
+          <div style={DISCLOSURE_ROW_STYLE}>
+            <HelperDisclosure
+              paragraphs={[
+                t("settings.deleteVault.copySecondary"),
+                ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
+              ]}
+              descriptionId={detailsId}
+              testId="delete-vault.details"
+              triggerLabel={t("settings.deleteVault.detailsLabel")}
+            />
+          </div>
 
           <div
             style={{
@@ -315,6 +319,7 @@ export function DeleteVaultConfirmForm({
               onChange={(e) => setTyped(e.target.value)}
               disabled={inFlight}
               autoFocus
+              aria-describedby={detailsId}
               data-testid="delete-vault.confirm-input"
             />
             <div style={INPUT_HINT_STYLE}>

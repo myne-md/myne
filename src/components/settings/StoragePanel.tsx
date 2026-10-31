@@ -1,68 +1,23 @@
-// Settings → Storage panel: read-only vaults-location path display +
-// Backup/Restore actions (MYND-56; engines MYND-32/MYND-218).
+// Settings → Storage panel: Backup/Restore actions plus import and export
+// (MYND-56; engines MYND-32/MYND-218).
 //
-// Path resolution mirrors `core/src/paths.rs` post-MYND-165:
-// vaults live under `appDataDir()/vaults/<id>/`; the panel shows the
-// `vaults/` root (the per-id directory name is an opaque UUID — showing
-// the root is the useful, stable path). No new IPC, no capability ACL
-// change. The promise is module-cached so switching rail items doesn't
-// re-fire two Tauri IPCs per visit.
-//
-// Penpot canon: `🔴 screen------settings--storage` (frame id
-// `9fb59646-2811-8082-8007-fd43bc128f9a`).
+// The vault-location section is gone (myne-md/myne#960). It printed
+// `appDataDir()/vaults` and offered "Open in Files". Two reasons it went: the
+// path is an implementation detail the user cannot act on (a manual copy of that
+// directory is exactly what the adjacent Backup control exists to replace, and it
+// is the one copy path that is not verified after writing), and the panel's first
+// section was an essay about a path in front of the actions people open this
+// panel for. Web's Settings → Storage always showed its own browser-storage row
+// and is untouched.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import type { CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import { appDataDir, join } from "../../platform/path";
-import { openPath } from "../../platform/opener";
 import { Button } from "../primitives/Button";
 import { AutomaticBackupBlock } from "./AutomaticBackupBlock";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
 import { SettingsSection } from "./SettingsSection";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
-
-// Module-scope memoized resolution. The vault path doesn't change
-// during a process lifetime; one IPC pair per app session is enough.
-let vaultPathPromise: Promise<string> | null = null;
-function resolveVaultPath(): Promise<string> {
-  if (!vaultPathPromise) {
-    vaultPathPromise = (async () => {
-      const base = await appDataDir();
-      return join(base, "vaults");
-    })();
-  }
-  return vaultPathPromise;
-}
-
-// Internal sentinel values held in `vaultPath` state — NOT user copy. `"…"` is
-// the locale-neutral loading glyph; `PATH_UNAVAILABLE_SENTINEL` flags the
-// resolution-failed state and is rendered through `t(...)` at display time so
-// the user-facing words are translated while the gating comparison stays stable.
-const PATH_LOADING_SENTINEL = "…";
-const PATH_UNAVAILABLE_SENTINEL = "\u0000path-unavailable";
-
-const PATH_ROW_STYLE: CSSProperties = {
-  display: "flex",
-  flexDirection: "row",
-  alignItems: "stretch",
-  gap: "var(--space-2)",
-};
-
-const PATH_DISPLAY_STYLE: CSSProperties = {
-  flex: 1,
-  display: "block",
-  background: "var(--paper-2)",
-  border: "1px solid var(--line-1)",
-  borderRadius: "var(--radius-2)",
-  padding: "8px 12px",
-  fontFamily: "var(--font-mono)",
-  fontSize: "var(--text-sm)",
-  color: "var(--fg-1)",
-  userSelect: "text",
-  WebkitUserSelect: "text",
-  wordBreak: "break-all",
-};
 
 // Export block (MYND-211): row body + right-aligned action, per the
 // Penpot frame `section------export — settings storage block (MYND-211)`.
@@ -110,64 +65,12 @@ export function StoragePanel({
   onShowToast,
 }: StoragePanelProps) {
   const { t } = useTranslation();
-  const [vaultPath, setVaultPath] = useState<string>(PATH_LOADING_SENTINEL);
-
-  useEffect(() => {
-    let cancelled = false;
-    resolveVaultPath()
-      .then((dir) => {
-        if (!cancelled) setVaultPath(dir);
-      })
-      .catch(() => {
-        if (!cancelled) setVaultPath(PATH_UNAVAILABLE_SENTINEL);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const pathPending =
-    vaultPath === PATH_LOADING_SENTINEL ||
-    vaultPath === PATH_UNAVAILABLE_SENTINEL;
-  const displayPath =
-    vaultPath === PATH_UNAVAILABLE_SENTINEL
-      ? t("settings.storage.pathUnavailable")
-      : vaultPath;
 
   return (
     <div style={PANEL_ROOT_STYLE}>
-      {/* Three sections, and the grouping moves the import row down beside the
-          export block (myne-md/myne#885): both are "move notes across the
-          boundary", while backup is about this vault's own encrypted copies.
-          The order is the only thing the grouping changed. */}
-      <SettingsSection title={t("settings.storage.sections.location")}>
-        <ControlBlock
-          anchorId="storage.location"
-          label={t("settings.storage.locationLabel")}
-          helper={t("settings.storage.locationHelper")}
-          control={
-            <div style={PATH_ROW_STYLE}>
-              <code style={PATH_DISPLAY_STYLE} data-testid="storage.vault-path">
-                {displayPath}
-              </code>
-              <Button
-                variant="secondary"
-                data-testid="storage.open-in-files"
-                onClick={() => {
-                  if (pathPending) return;
-                  void openPath(vaultPath).catch(() => {
-                    /* opener-plugin failure is non-fatal: the path is
-                     * already shown for manual copy/paste. */
-                  });
-                }}
-                disabled={pathPending}
-              >
-                {t("settings.storage.openInFiles")}
-              </Button>
-            </div>
-          }
-        />
-      </SettingsSection>
+      {/* Two sections (myne-md/myne#885, #960). The grouping puts the import row
+          down beside the export block: both are "move notes across the
+          boundary", while backup is about this vault's own encrypted copies. */}
 
       <SettingsSection title={t("settings.storage.sections.backup")}>
         <SettingRow

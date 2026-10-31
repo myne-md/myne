@@ -40,6 +40,13 @@ afterEach(() => {
   hasMock.mockReset();
 });
 
+/** The delete disclosure's own text: the mechanics that moved behind the
+ *  question mark with myne-md/myne#960. Present while collapsed, which is what
+ *  lets a claim about the copy be asserted without opening anything. */
+function disclosureText(): string {
+  return screen.getByTestId("delete-vault.details-explanation").textContent ?? "";
+}
+
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
 function renderForm(only: boolean, variant?: "owner" | "member", keychain = true) {
   hasMock.mockImplementation((cap: string) => {
@@ -121,16 +128,25 @@ describe("the delete-vault promise", () => {
     // The Tauri client: it HAS the provider and therefore an item to erase. The
     // gate is the capability, not `localOnlyVault`: asserting this on the web arm
     // is what certified the inversion this test now guards against.
+    //
+    // The sentence moved into the disclosure's description element with
+    // myne-md/myne#960 (it was a standing grey paragraph). The CLAIM is
+    // unchanged, so the assertion reads the description element rather than a
+    // paragraph testid of its own, and the description element is in the
+    // document while collapsed, which is `HelperDisclosure`'s contract, and the
+    // reason this still works without opening anything.
     renderForm(true);
-    expect(screen.getByTestId("delete-vault.keychain-note").textContent).toBe(
-      i18n.t("settings.deleteVault.keychainNote"),
-    );
+    expect(disclosureText()).toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 
   it("does not claim a keychain cleanup on a client that has no keychain", () => {
-    // The browser: no provider, no item, no sentence.
+    // The browser: no provider, no item, no sentence. The zeroization sentence
+    // it DOES carry is asserted alongside, so a disclosure that rendered nothing
+    // at all could not pass this by being empty.
     renderForm(false, undefined, false);
-    expect(screen.queryByTestId("delete-vault.keychain-note")).toBeNull();
+    const text = disclosureText();
+    expect(text).toContain(i18n.t("settings.deleteVault.copySecondary"));
+    expect(text).not.toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 
   it("answers the gate with the capability, not with `onlyCopy`", () => {
@@ -140,7 +156,7 @@ describe("the delete-vault promise", () => {
     // them green. This case is the disagreement: a copy that is NOT the only one,
     // on a client that still has a keychain item to erase.
     renderForm(false, undefined, true);
-    expect(screen.getByTestId("delete-vault.keychain-note")).toBeTruthy();
+    expect(disclosureText()).toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 });
 

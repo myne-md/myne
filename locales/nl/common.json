@@ -2917,10 +2917,6 @@
       "writesHeading": "Velden die hij kan wijzigen",
       "writesNote": "Myne controleert elke wijziging tegen deze lijst voordat hij er een schrijft, en weigert een wijziging van een veld dat elders is bewerkt sinds de weergave het voor het laatst las."
     },
-    "welcome": {
-      "body": "Welkom bij Myne, je privéruimte om te denken en te schrijven.\n\nAlles wat je hier opslaat is versleuteld en blijft op je apparaat. Je **wachtwoord** en **herstelzin** zijn de enige sleutels ertoe, dus bewaar ze op een veilige plek. Als je beide ooit verliest, kan niemand je notities nog terugkrijgen, wij ook niet.\n\n**Je kunt notities aan elkaar koppelen.** Typ `[[` en Myne biedt de notities die je al hebt; kies er een en die wordt een link. De notitie waarnaar je hebt gelinkt, toont in zijn eigen backlinks-paneel waar de link vandaan kwam, dus een reeks notities kun je in beide richtingen volgen.\n\nDit is gewoon een normale notitie, dus maak hem helemaal van jezelf. Bewerk, hernoem of verwijder hem wanneer je maar wilt, en voeg nieuwe notities toe naarmate je ideeën groeien.\n\nVoor meer informatie over Myne ga je naar https://myne.md\n",
-      "title": "Welkom bij Myne"
-    },
     "workspace": {
       "defaultSlotName": "Standaard"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Juridisch",
       "legalHelper": "Opent op myne.md in je browser. Duits waar de interface Duits is.",
       "legalPrivacy": "Privacybeleid",
-      "licenseBody": "Pre-alpha · CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode bij de release van fase 1.",
+      "licenseBody": "CC-BY-4.0-documentatie · AGPL-3.0-toepassingscode.",
       "licenseLabel": "Licentie",
-      "tagline": "Pre-alpha · Desktopclient fase 1",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Open het openbare dreigingsmodeldocument in je browser.",
       "threatModelLabel": "Dreigingsmodel",
       "version": "Versie",
@@ -4054,7 +4050,6 @@
       "importLabel": "Importeren",
       "importObsidian": "Notities importeren…",
       "locationHelper": "Elke kluis is een map met versleutelde bestanden onder dit pad. Gebruik liever de knop Back-up hieronder dan handmatige kopieën. Die verifieert het geschreven bestand.",
-      "locationLabel": "Kluislocatie",
       "openInFiles": "Openen in Bestanden",
       "webLocationHelper": "Je notities staan in de opslag die deze browser voor deze site bijhoudt en die de browser zelf beheert. Er is geen map om te openen. Als je de gegevens van deze site wist, verdwijnt de lokale kopie; omdat deze client synchroniseert, wordt die bij opnieuw aanmelden weer gedownload.",
       "webLocationLabel": "Waar je notities worden opgeslagen",

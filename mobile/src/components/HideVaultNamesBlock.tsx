@@ -18,17 +18,19 @@
 // the one who sets it BEFORE a first unlock ever writes a name. A control behind
 // Developer mode cannot be found by that person.
 //
-// ── The two bounds are on screen, always ───────────────────────────────────
+// ── One sentence on the row, the rest one tap away ─────────────────────────
 //
-// Two sentences, never behind a disclosure toggle, which is the one place the
-// desktop's markup is followed rather than mobile's. Mobile's compact idiom
-// would put a caveat behind a chevron or shorten it into a 12px subtitle; both
-// were rejected here. Writing "erases" and letting the reader supply their own
-// idea of how far it reaches is the failure this block exists to prevent, and a
-// bound the reader has to tap for is a bound most readers never see. They are
-// the same two sentences the desktop shows, from the same locale keys, so the
-// two clients cannot come to disagree about what is private. Bounded by
-// `docs/threat-model.md` § 7 and `docs/decisions/security/0491-…`.
+// The destructive sentence stays ON the row, beside the switch that does it. The
+// three explanatory paragraphs used to sit under the row as three grey
+// paragraphs, which on a phone is most of a screen spent on prose above the next
+// setting (myne-md/myne#960); they now open in a sheet through `InfoNote`, the
+// same disclosure the desktop keeps behind its question mark since #885.
+//
+// What must not change with the shape: the COPY. It is the same three sentences
+// the desktop shows, from the same locale keys, so the two clients cannot come to
+// disagree about what is private, and `mobile/tests/hide-vault-names.test.ts`
+// holds the key sets equal. Bounded by `docs/threat-model.md` § 7 and
+// `docs/decisions/security/0491-…`.
 //
 // ── `unavailable` is a live state here, not an exotic one ──────────────────
 //
@@ -57,6 +59,7 @@ import {
   type KeychainStatus,
 } from "../lib/vault-label";
 import { Switch } from "./inputs";
+import { InfoNote } from "./InfoNote";
 
 const rowLabel: CSSProperties = { fontSize: "var(--text-md)", color: "var(--fg-1)" };
 
@@ -65,6 +68,13 @@ const helper: CSSProperties = {
   lineHeight: "var(--leading-normal)",
   color: "var(--fg-3)",
   margin: "var(--space-2) var(--space-1) 0",
+};
+
+/** Holds the info trigger under the row, on the same left edge as the subtitle. */
+const INFO_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  margin: "var(--space-1) var(--space-4) 0",
 };
 
 /** The row's own subtitle, tighter than the block-level helper below it. */
@@ -224,15 +234,16 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
         </div>
       </Group>
 
-      <p style={helper} data-testid="settings.hide-vault-names-helper">
-        {t("settings.privacy.hideVaultNamesHelper")}
-      </p>
-      <p style={helper} data-testid="settings.hide-vault-names-erases">
-        {t("settings.privacy.hideVaultNamesErases")}
-      </p>
-      <p style={helper} data-testid="settings.hide-vault-names-residue">
-        {t("settings.privacy.hideVaultNamesResidue")}
-      </p>
+      <div style={INFO_ROW_STYLE}>
+        <InfoNote
+          testId="settings.hide-vault-names"
+          paragraphs={[
+            t("settings.privacy.hideVaultNamesHelper"),
+            t("settings.privacy.hideVaultNamesErases"),
+            t("settings.privacy.hideVaultNamesResidue"),
+          ]}
+        />
+      </div>
 
       {keychain === "unavailable" && (
         <p style={helper} data-testid="settings.hide-vault-names-unavailable">

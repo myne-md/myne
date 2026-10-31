@@ -226,8 +226,8 @@ const V = {
   "src/components/settings/StartupOpenSettings.tsx": ["ported", "Prefs-backed."],
   "src/components/settings/StoragePanel.tsx": [
     "excluded",
-    "Four wrong controls: a filesystem path OPFS does not have, an OS file-manager call, the backup pair, and a directory import task 71 owns.",
-    "settings.storage.openInFiles",
+    "Three wrong controls: the backup pair and a directory import task 71 owns. The filesystem-path row and its OS file-manager call were the other two until myne-md/myne#960 removed them from DESKTOP as well, and the absence marker moved to `settings.backup-vault` in the same change, because a marker for a string that exists in no client passes its grep without proving anything.",
+    "settings.backup-vault",
   ],
   "src/components/settings/SyncPanel.tsx": ["ported", "Sync is required on web, so this panel is more load-bearing here than on desktop."],
   "src/components/settings/ToolbarCustomizeSettings.tsx": ["ported", "Prefs-backed."],
@@ -689,6 +689,36 @@ export function surfaceFiles(dirs = DIRS) {
   return walkFiles(dirs, { extensions: TS_FILES });
 }
 
+/** The only verdicts this roster may carry, and the list is closed on purpose.
+ *
+ * **An unknown string used to be counted NOWHERE and left the run green.**
+ * Every total below is `Object.values(V).filter((v) => v[0] === k).length`, so a
+ * typo or a hand-written `"nonsense-verdict"` silently dropped the file out of
+ * the exit line rather than failing anything. Measured while reviewing
+ * myne-md/myne#960, on this guard's own edited StoragePanel entry: the entry was
+ * changed to `"nonsense-verdict"`, the run still printed `ok`, and the only
+ * difference was 12 excluded instead of 13. A roster whose verdict can be any
+ * word is not a roster, and the failure mode is the one this repository keeps
+ * finding: a gate that is green because it stopped reading its own input. */
+export const SURFACE_VERDICTS = Object.freeze([
+  "ported",
+  "adapted",
+  "excluded",
+  // The fourth one, and the one the exit line used not to count: a module that
+  // SHIPS but is unreachable, because its whole capability class is refused on
+  // web (`web/wasm/src/capability.rs`) and the invoke answers a typed refusal
+  // rather than dispatching. Listed here because leaving it out would make the
+  // check fire on seventeen correct entries.
+  "typed-unsupported",
+]);
+
+/** Entries whose verdict is outside `SURFACE_VERDICTS`, keyed by path. */
+export function verdictGaps(verdicts = V) {
+  return Object.entries(verdicts)
+    .filter(([, v]) => !SURFACE_VERDICTS.includes(v[0]))
+    .map(([f]) => f);
+}
+
 export function rosterGaps(files, verdicts = V) {
   const named = new Set(Object.keys(verdicts));
   return {
@@ -763,6 +793,18 @@ function main() {
     failed = true;
   }
 
+  const unknownVerdicts = verdictGaps();
+  if (unknownVerdicts.length > 0) {
+    console.error(
+      `web surfaces: ${unknownVerdicts.length} verdict(s) are outside the vocabulary ` +
+        `(${SURFACE_VERDICTS.join(" / ")}):\n` +
+        unknownVerdicts.map((f) => `    ${f}`).join("\n") +
+        "\n  An unrecognised verdict counts in none of the totals below, so the file drops " +
+        "out of the exit line and the run stays green.",
+    );
+    failed = true;
+  }
+
   const markers = Object.entries(V).filter(([, v]) => v[2] !== undefined);
   if (!existsSync(join(DIST, "index.html"))) {
     console.warn(
@@ -787,7 +829,8 @@ function main() {
   const by = (k) => Object.values(V).filter((v) => v[0] === k).length;
   console.log(
     `web surfaces: ok (${files.length} file(s): ${by("ported")} ported, ${by("adapted")} adapted, ` +
-      `${by("excluded")} excluded; ${markers.length} absence marker(s) checked)`,
+      `${by("excluded")} excluded, ${by("typed-unsupported")} typed-unsupported; ` +
+      `${markers.length} absence marker(s) checked)`,
   );
 }
 

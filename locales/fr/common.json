@@ -3028,10 +3028,6 @@
       "writesHeading": "Champs qu'elle peut modifier",
       "writesNote": "Myne vérifie chaque modification contre cette liste avant d'en écrire une, et refuse une modification d'un champ qui a été modifié ailleurs depuis la dernière lecture de la vue."
     },
-    "welcome": {
-      "body": "Bienvenue dans Myne, votre espace privé pour réfléchir et écrire.\n\nTout ce que vous enregistrez ici est chiffré et reste sur votre appareil. Votre **mot de passe** et votre **phrase de récupération** en sont les seules clés, alors gardez-les en lieu sûr. Si les deux venaient à être perdus, personne ne pourrait récupérer vos notes, pas même nous.\n\n**Vous pouvez lier des notes entre elles.** Tapez `[[` et Myne vous propose les notes que vous avez déjà ; choisissez-en une et elle devient un lien. La note vers laquelle vous avez créé un lien indique d'où vient ce lien, dans son propre panneau de liens entrants, si bien qu'un ensemble de notes peut se parcourir dans les deux sens.\n\nCeci n'est qu'une note ordinaire, alors faites-en ce que vous voulez. Modifiez-la, renommez-la ou supprimez-la quand bon vous semble, et ajoutez de nouvelles notes au fil de vos idées.\n\nPour en savoir plus sur Myne, rendez-vous sur https://myne.md\n",
-      "title": "Bienvenue dans Myne"
-    },
     "workspace": {
       "defaultSlotName": "Par défaut"
     },
@@ -3280,9 +3276,9 @@
       "legalLabel": "Mentions légales",
       "legalHelper": "S'ouvre sur myne.md dans votre navigateur. En allemand lorsque l'interface est en allemand.",
       "legalPrivacy": "Politique de confidentialité",
-      "licenseBody": "Pré-alpha · docs CC-BY-4.0 · code applicatif AGPL-3.0 à la sortie de la phase 1.",
+      "licenseBody": "docs CC-BY-4.0 · code applicatif AGPL-3.0.",
       "licenseLabel": "Licence",
-      "tagline": "Pré-alpha · client de bureau de la phase 1",
+      "tagline": "Pré-alpha",
       "threatModelHelper": "Ouvrir le document public du modèle de menace dans votre navigateur.",
       "threatModelLabel": "Modèle de menace",
       "version": "Version",
@@ -4187,7 +4183,6 @@
       "importLabel": "Importer",
       "importObsidian": "Importer des notes…",
       "locationHelper": "Chaque coffre-fort est un dossier de fichiers chiffrés sous ce chemin. Préférez le bouton Sauvegarde ci-dessous aux copies manuelles : il vérifie le fichier écrit.",
-      "locationLabel": "Emplacement du coffre-fort",
       "openInFiles": "Ouvrir dans le Finder",
       "webLocationHelper": "Vos notes sont conservées dans le stockage que ce navigateur réserve à ce site, géré par le navigateur. Il n'y a pas de dossier à ouvrir. Effacer les données de ce site supprime la copie locale ; comme ce client se synchronise, une nouvelle connexion la retélécharge.",
       "webLocationLabel": "Où vos notes sont stockées",

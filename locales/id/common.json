@@ -2917,10 +2917,6 @@
       "writesHeading": "Bidang yang dapat diubahnya",
       "writesNote": "Myne memeriksa setiap perubahan terhadap daftar ini sebelum menulis satu, dan menolak perubahan pada bidang yang disunting di tempat lain sejak tampilan ini terakhir dibaca."
     },
-    "welcome": {
-      "body": "Selamat datang di Myne, ruang pribadi Anda untuk berpikir dan menulis.\n\nSemua yang Anda simpan di sini dienkripsi dan tetap berada di perangkat Anda. **Kata sandi** dan **frasa pemulihan** Anda adalah satu-satunya kunci untuk membukanya, jadi simpanlah di tempat yang aman. Jika keduanya hilang, tidak seorang pun dapat mengembalikan catatan Anda, bahkan kami.\n\n**Anda dapat menautkan catatan satu sama lain.** Ketik `[[` dan Myne akan menawarkan catatan yang sudah Anda miliki; pilih satu dan catatan itu menjadi tautan. Catatan yang Anda TAUTKAN akan menunjukkan dari mana tautan itu berasal, di panel backlink-nya sendiri, sehingga kumpulan catatan dapat Anda telusuri dari kedua arah.\n\nIni hanyalah catatan biasa, jadi jadikan milik Anda. Sunting, ganti nama, atau hapus kapan pun Anda suka, dan tambahkan catatan baru seiring berkembangnya ide Anda.\n\nUntuk mempelajari lebih lanjut tentang Myne, kunjungi https://myne.md\n",
-      "title": "Selamat datang di Myne"
-    },
     "workspace": {
       "defaultSlotName": "Default"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Hukum",
       "legalHelper": "Terbuka di myne.md pada peramban Anda. Berbahasa Jerman jika antarmukanya berbahasa Jerman.",
       "legalPrivacy": "Kebijakan privasi",
-      "licenseBody": "Pra-alfa · Dokumen CC-BY-4.0 · Kode aplikasi AGPL-3.0 pada rilis Fase 1.",
+      "licenseBody": "Dokumen CC-BY-4.0 · Kode aplikasi AGPL-3.0.",
       "licenseLabel": "Lisensi",
-      "tagline": "Pra-alfa · Klien desktop Fase 1",
+      "tagline": "Pra-alfa",
       "threatModelHelper": "Buka dokumen model ancaman publik di peramban Anda.",
       "threatModelLabel": "Model ancaman",
       "version": "Versi",
@@ -4054,7 +4050,6 @@
       "importLabel": "Impor",
       "importObsidian": "Impor catatan…",
       "locationHelper": "Setiap brankas adalah folder berisi berkas terenkripsi di bawah jalur ini. Lebih baik gunakan tombol Cadangan di bawah daripada menyalinnya secara manual: tombol itu memverifikasi berkas yang ditulis.",
-      "locationLabel": "Lokasi brankas",
       "openInFiles": "Buka di Files",
       "webLocationHelper": "Catatan Anda berada di penyimpanan peramban ini untuk situs ini, yang dikelola oleh peramban. Tidak ada folder yang bisa dibuka. Membersihkan data situs ini menghapus salinan lokalnya; karena klien ini menyinkronkan, masuk kembali akan mengunduhnya lagi.",
       "webLocationLabel": "Tempat catatan Anda disimpan",

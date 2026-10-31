@@ -3028,10 +3028,6 @@
       "writesHeading": "Campos que pode alterar",
       "writesNote": "O Myne verifica cada alteração contra esta lista antes de escrever uma, e recusa uma alteração a um campo que tenha sido editado noutro sítio desde a última leitura da vista."
     },
-    "welcome": {
-      "body": "Bem-vindo ao Myne, o seu espaço privado para pensar e escrever.\n\nTudo o que guarda aqui é encriptado e permanece no seu dispositivo. A sua **palavra-passe** e a sua **frase de recuperação** são as únicas chaves para o aceder, por isso guarde-as num local seguro. Se ambas se perderem, ninguém conseguirá recuperar as suas notas, nem mesmo nós.\n\n**Pode ligar notas umas às outras.** Escreva `[[` e o Myne sugere as notas que já tem; escolha uma e ela torna-se uma ligação. A nota PARA a qual ligou mostra de onde veio a ligação, no seu próprio painel de backlinks, por isso um conjunto de notas é algo que pode seguir nos dois sentidos.\n\nEsta é apenas uma nota normal, por isso faça dela a sua. Edite-a, mude-lhe o nome ou apague-a sempre que quiser, e adicione novas notas à medida que as suas ideias crescem.\n\nPara saber mais sobre o Myne, visite https://myne.md\n",
-      "title": "Bem-vindo ao Myne"
-    },
     "workspace": {
       "defaultSlotName": "Predefinida"
     },
@@ -3280,9 +3276,9 @@
       "legalLabel": "Informação legal",
       "legalHelper": "Abre em myne.md no seu navegador. Em alemão quando a interface está em alemão.",
       "legalPrivacy": "Política de privacidade",
-      "licenseBody": "Pré-alfa · documentação CC-BY-4.0 · código da aplicação AGPL-3.0 no lançamento da Fase 1.",
+      "licenseBody": "documentação CC-BY-4.0 · código da aplicação AGPL-3.0.",
       "licenseLabel": "Licença",
-      "tagline": "Pré-alfa · cliente de ambiente de trabalho da Fase 1",
+      "tagline": "Pré-alfa",
       "threatModelHelper": "Abra o documento público do modelo de ameaças no seu navegador.",
       "threatModelLabel": "Modelo de ameaças",
       "version": "Versão",
@@ -4187,7 +4183,6 @@
       "importLabel": "Importar",
       "importObsidian": "Importar notas…",
       "locationHelper": "Cada cofre é uma pasta de ficheiros encriptados dentro deste caminho. Prefira o botão Cópia de segurança abaixo em vez de cópias manuais: ele verifica o ficheiro gravado.",
-      "locationLabel": "Localização do cofre",
       "openInFiles": "Abrir nos Ficheiros",
       "webLocationHelper": "As suas notas ficam no armazenamento que este navegador reserva para este site, gerido pelo navegador. Não há nenhuma pasta para abrir. Limpar os dados deste site remove a cópia local; como este cliente sincroniza, iniciar sessão novamente volta a transferi-la.",
       "webLocationLabel": "Onde as suas notas são armazenadas",

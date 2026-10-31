@@ -52,8 +52,11 @@ const MUST_BE_ABSENT: readonly [string, string][] = [
   // anyway is the regression.
   ["sync.enroll.phrase-cell", "the phrase as a DEVICE-ENROLMENT credential — refused as an offer, while the module ships (decisions.md 2026-10-18, entry 0704)"],
   ["member-roster", "the B2B member surface: `memberSharing` is absent (web has no keychain-style carrier and the panel's phrase prompt is substituted out of the bundle, not merely gated)"],
-  ["create.ready-backup-now", "the encrypted-backup export; `backup` and `nativeSaveAs` are both absent here"],
-  ["create.ready-show-folder", "revealing a vault directory in an OS file manager; OPFS has no path to reveal"],
+  // The creation flow's two disk affordances (`create.ready-backup-now`,
+  // `create.ready-show-folder`) left this list with myne-md/myne#960: the
+  // controls were deleted on BOTH clients, so asserting their absence here
+  // would be the "name nothing renders" shape this list's own comment warns
+  // about. What remains absent is `backup` on the panel it still reaches.
 ];
 
 describeE2E("capability gating renders as absence", () => {

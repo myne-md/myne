@@ -975,14 +975,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.import",
   },
   {
-    id: "storage.location",
-    agentWritability: WRITABILITY_NONE,
-    capability: "nativeSaveAs",
-    panelId: "storage",
-    titleKey: "settings.storage.locationLabel",
-    keywordsKey: "settings.search.keywords.vaultLocation",
-  },
-  {
     id: "storage.auto-backup",
     agentWritability: WRITABILITY_NONE,
     capability: "backup",
@@ -993,13 +985,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.autoBackup",
   },
   // ── About ──────────────────────────────────────────────────────────────────
-  {
-    id: "about.build-channel",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "about",
-    titleKey: "settings.about.buildChannelLabel",
-    keywordsKey: "settings.search.keywords.buildChannel",
-  },
   {
     id: "about.update-channel",
     agentWritability: WRITABILITY_NONE,

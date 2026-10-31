@@ -2917,10 +2917,6 @@
       "writesHeading": "Felter den kan ændre",
       "writesNote": "Myne tjekker hver ændring mod denne liste, før den skriver en, og nægter en ændring til et felt, der blev redigeret et andet sted, siden visningen sidst læste det."
     },
-    "welcome": {
-      "body": "Velkommen til Myne, dit private sted til at tænke og skrive.\n\nAlt, du gemmer her, er krypteret og bliver på din enhed. Din **adgangskode** og **gendannelsessætning** er de eneste nøgler til det, så opbevar dem et sikkert sted. Hvis begge går tabt, kan ingen få dine noter tilbage — heller ikke os.\n\n**Du kan linke noter til hinanden.** Skriv `[[`, og Myne foreslår de noter, du allerede har; vælg en, og den bliver et link. Den note, du linkede TIL, viser i sit eget tilbagelinkspanel, hvor linket kom fra, så et sæt noter er noget, du kan følge i begge retninger.\n\nDette er bare en helt almindelig note, så gør den til din egen. Redigér den, omdøb den eller slet den, når du vil, og tilføj nye noter, efterhånden som dine idéer vokser.\n\nBesøg https://myne.md for at lære mere om Myne.\n",
-      "title": "Velkommen til Myne"
-    },
     "workspace": {
       "defaultSlotName": "Standard"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Juridisk",
       "legalHelper": "Åbner på myne.md i din browser. Tysk, hvor grænsefladen er tysk.",
       "legalPrivacy": "Privatlivspolitik",
-      "licenseBody": "Pre-alfa · CC-BY-4.0-dokumenter · AGPL-3.0-programkode ved fase 1-udgivelse.",
+      "licenseBody": "CC-BY-4.0-dokumenter · AGPL-3.0-programkode.",
       "licenseLabel": "Licens",
-      "tagline": "Pre-alfa · Fase 1 desktopklient",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Åbn det offentlige trusselsmodel-dokument i din browser.",
       "threatModelLabel": "Trusselsmodel",
       "version": "Version",
@@ -4054,7 +4050,6 @@
       "importLabel": "Import",
       "importObsidian": "Importér noter…",
       "locationHelper": "Hver boks er en mappe med krypterede filer under denne sti. Brug hellere knappen Sikkerhedskopi nedenfor end manuelle kopier: den verificerer den skrevne fil.",
-      "locationLabel": "Boksens placering",
       "openInFiles": "Åbn i Finder",
       "webLocationHelper": "Dine noter ligger i denne browsers lager for dette websted, styret af browseren. Der er ingen mappe at åbne. Rydder du dette websteds data, fjernes den lokale kopi; da denne klient synkroniserer, hentes den ned igen, når du logger ind på ny.",
       "webLocationLabel": "Hvor dine noter gemmes",

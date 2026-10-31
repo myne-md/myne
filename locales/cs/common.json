@@ -3139,10 +3139,6 @@
       "writesHeading": "Pole, která může změnit",
       "writesNote": "Myne zkontroluje každou změnu proti tomuto seznamu před zápisem a odmítne změnu pole, které bylo jinde upraveno od posledního čtení pohledu."
     },
-    "welcome": {
-      "body": "Vítejte v Myne, vašem soukromém prostoru pro přemýšlení a psaní.\n\nVšechno, co sem uložíte, je zašifrované a zůstává na vašem zařízení. Vaše **heslo** a **fráze pro obnovení** jsou jediné klíče k němu, takže je uchovejte na bezpečném místě. Pokud se obojí někdy ztratí, nikdo vám poznámky nevrátí, ani my.\n\n**Poznámky můžete vzájemně propojovat.** Napište `[[` a Myne nabídne poznámky, které už máte; vyberte jednu a stane se odkazem. Poznámka, na kterou jste odkázali, ukazuje ve svém vlastním panelu zpětných odkazů, odkud odkaz přišel, takže se po sadě poznámek můžete vydat oběma směry.\n\nToto je jen běžná poznámka, tak si ji upravte k obrazu svému. Upravte ji, přejmenujte nebo smažte, kdykoli budete chtít, a přidávejte nové poznámky, jak vaše nápady porostou.\n\nChcete-li se o Myne dozvědět více, navštivte https://myne.md\n",
-      "title": "Vítejte v Myne"
-    },
     "workspace": {
       "defaultSlotName": "Výchozí"
     },
@@ -3397,9 +3393,9 @@
       "legalLabel": "Právní informace",
       "legalHelper": "Otevře se na myne.md ve vašem prohlížeči. Německy tam, kde je rozhraní německé.",
       "legalPrivacy": "Zásady ochrany osobních údajů",
-      "licenseBody": "Pre-alfa · dokumentace CC-BY-4.0 · kód aplikace AGPL-3.0 při vydání 1. fáze.",
+      "licenseBody": "dokumentace CC-BY-4.0 · kód aplikace AGPL-3.0.",
       "licenseLabel": "Licence",
-      "tagline": "Pre-alfa · desktopový klient 1. fáze",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Otevřete veřejný dokument modelu hrozeb ve svém prohlížeči.",
       "threatModelLabel": "Model hrozeb",
       "version": "Verze",
@@ -4320,7 +4316,6 @@
       "importLabel": "Import",
       "importObsidian": "Importovat poznámky…",
       "locationHelper": "Každý trezor je složka zašifrovaných souborů pod touto cestou. Dejte přednost tlačítku Záloha níže před ručními kopiemi: ověřuje zapsaný soubor.",
-      "locationLabel": "Umístění trezoru",
       "openInFiles": "Otevřít v souborech",
       "webLocationHelper": "Vaše poznámky jsou v úložišti tohoto prohlížeče pro tento web, které spravuje prohlížeč. Není zde žádná složka k otevření. Vymazáním dat tohoto webu se místní kopie odstraní; protože tento klient synchronizuje, opětovným přihlášením se stáhne zpět.",
       "webLocationLabel": "Kde jsou uloženy vaše poznámky",

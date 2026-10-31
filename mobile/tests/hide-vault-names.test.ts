@@ -18,9 +18,15 @@
 //     fallback would later hide behind. `"unavailable"` is a live state here
 //     (every Android device is in it today), which is exactly why the third
 //     value has to stay distinct from it.
-//  3. **The two bounds are on screen unconditionally.** They are the
-//     disclosure, not decoration: "erases" read alone means more than it does.
-//     A render with nothing resolved and nothing tapped must already show both.
+//  3. **The destructive sentence is on the row; both bounds are one press away.**
+//     They are the disclosure, not decoration: "erases" read alone means more
+//     than it does. Until myne-md/myne#960 that meant all three paragraphs sat
+//     under the row, unconditionally. The owner's decision is now the desktop's
+//     shape (#885): the sentence that says what the switch does stays beside it,
+//     the mechanics and both bounds open in an info sheet. What this file still
+//     pins, and must keep pinning, is that the sheet really carries all three
+//     sentences. A trigger that opened nothing would otherwise pass, which is
+//     exactly the vacuous shape this repository keeps finding.
 //
 // A component render via react-dom with `react-i18next` mocked to echo keys.
 // mobile's convention (`tests/markdown-image-lightbox.test.ts`), no
@@ -204,17 +210,36 @@ async function click(el: HTMLElement): Promise<void> {
   });
 }
 
-describe("the Privacy row states its bounds without being asked", () => {
-  it("shows BOTH bound sentences on a first render, with nothing tapped", () => {
-    // Not behind a chevron, not shortened into the subtitle. The whole reason
-    // the disclosure exists is that "erases" read alone means more than it does,
-    // and a bound the reader has to tap for is one most readers never see.
+describe("the Privacy row states its bounds, one press away", () => {
+  it("keeps the destructive sentence on the row and puts all three in the sheet", async () => {
+    // The row sentence is the one a reader cannot miss, and it is the reason the
+    // switch can be understood without opening anything. The three explanatory
+    // sentences are NOT deleted: they are the bounds, and both of them have to
+    // survive the move: "erases" read alone means more than it does.
     invoke.mockResolvedValue({ hidden: false, available: true });
-    const container = renderBlock();
-    expect(container.querySelector('[data-testid="settings.hide-vault-names-erases"]')?.textContent)
-      .toBe("settings.privacy.hideVaultNamesErases");
-    expect(container.querySelector('[data-testid="settings.hide-vault-names-residue"]')?.textContent)
-      .toBe("settings.privacy.hideVaultNamesResidue");
+    const container = await renderBlockAsync();
+
+    // On the row, unconditionally: the destructive sentence.
+    expect(rowEl(container).textContent).toContain("settings.privacy.hideVaultNamesInline");
+
+    // Not painted anywhere before the press: no standing grey paragraphs.
+    expect(container.querySelector('[data-testid="settings.hide-vault-names-erases"]')).toBeNull();
+    expect(container.querySelector('[data-testid="settings.hide-vault-names-residue"]')).toBeNull();
+
+    const trigger = container.querySelector(
+      '[data-testid="settings.hide-vault-names-trigger"]',
+    ) as HTMLElement;
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-label")).toBe("settings.helperDisclosureLabel");
+
+    await click(trigger);
+
+    const sheet = container.querySelector(
+      '[data-testid="settings.hide-vault-names-sheet"]',
+    ) as HTMLElement;
+    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesHelper");
+    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesErases");
+    expect(sheet.textContent).toContain("settings.privacy.hideVaultNamesResidue");
   });
 
   it("carries exactly the desktop row's nine locale keys, and invents none", () => {

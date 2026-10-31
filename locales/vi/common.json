@@ -2917,10 +2917,6 @@
       "writesHeading": "Trường nó có thể thay đổi",
       "writesNote": "Myne kiểm tra mọi thay đổi theo danh sách này trước khi ghi một thay đổi, và từ chối thay đổi trường đã được sửa ở nơi khác từ lần khung nhìn đọc cuối."
     },
-    "welcome": {
-      "body": "Chào mừng bạn đến với Myne, không gian riêng tư để bạn suy nghĩ và viết.\n\nMọi thứ bạn lưu ở đây đều được mã hóa và nằm trên thiết bị của bạn. **Mật khẩu** và **cụm từ khôi phục** là chìa khóa duy nhất để mở chúng, nên hãy giữ chúng ở nơi an toàn. Nếu mất cả hai, không ai có thể lấy lại ghi chú của bạn, kể cả chúng tôi.\n\n**Bạn có thể liên kết các ghi chú với nhau.** Gõ `[[` và Myne sẽ gợi ý những ghi chú bạn đã có; chọn một ghi chú và nó trở thành một liên kết. Ghi chú mà bạn trỏ liên kết TỚI sẽ hiển thị liên kết đó đến từ đâu, trong bảng liên kết ngược của chính nó, nên một tập ghi chú là thứ bạn có thể theo dõi theo cả hai chiều.\n\nĐây chỉ là một ghi chú thông thường, nên hãy biến nó thành của riêng bạn. Chỉnh sửa, đổi tên hay xóa nó bất cứ khi nào bạn muốn, và thêm ghi chú mới khi ý tưởng của bạn lớn dần lên.\n\nĐể tìm hiểu thêm về Myne, hãy truy cập https://myne.md\n",
-      "title": "Chào mừng đến với Myne"
-    },
     "workspace": {
       "defaultSlotName": "Mặc định"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Pháp lý",
       "legalHelper": "Mở tại myne.md trong trình duyệt của bạn. Bằng tiếng Đức nếu giao diện là tiếng Đức.",
       "legalPrivacy": "Chính sách quyền riêng tư",
-      "licenseBody": "Tiền alpha · Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0 khi phát hành Giai đoạn 1.",
+      "licenseBody": "Tài liệu CC-BY-4.0 · Mã ứng dụng AGPL-3.0.",
       "licenseLabel": "Giấy phép",
-      "tagline": "Tiền alpha · Trình khách máy tính Giai đoạn 1",
+      "tagline": "Tiền alpha",
       "threatModelHelper": "Mở tài liệu mô hình mối đe dọa công khai trong trình duyệt của bạn.",
       "threatModelLabel": "Mô hình mối đe dọa",
       "version": "Phiên bản",
@@ -4054,7 +4050,6 @@
       "importLabel": "Nhập",
       "importObsidian": "Nhập ghi chú…",
       "locationHelper": "Mỗi kho là một thư mục chứa các tệp đã mã hóa nằm dưới đường dẫn này. Hãy ưu tiên nút Sao lưu bên dưới thay vì sao chép thủ công: nó xác minh tệp đã ghi.",
-      "locationLabel": "Vị trí kho",
       "openInFiles": "Mở trong trình quản lý tệp",
       "webLocationHelper": "Ghi chú của bạn nằm trong vùng lưu trữ mà trình duyệt này dành cho trang này, do trình duyệt quản lý. Không có thư mục nào để mở. Xóa dữ liệu của trang này sẽ gỡ bản sao cục bộ; vì trình khách này có đồng bộ, đăng nhập lại sẽ tải nó về.",
       "webLocationLabel": "Nơi ghi chú của bạn được lưu",
