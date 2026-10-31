@@ -5840,7 +5840,6 @@ export const ROSTER = Object.freeze([
       "e2e/invite-code-gate.e2e.ts",
       "e2e/publish-vault.e2e.ts",
       "e2e/person-device-enrolment.e2e.ts",
-      "e2e/device-admission.e2e.ts",
     ],
     manual: [
       {

@@ -82,7 +82,6 @@
   "components/deviceattributionpanel/default": "9febcfb5ad49a0a9",
   "components/devicejoinqr/default": "44f0e0b4c0f76e08",
   "components/devicejoinqr/member": "57c0143c50ecfbda",
-  "components/deviceadmissionpanel/default": "d77746b3ec6dc846",
   "components/devicemanagementpanel/default": "46a5b3ae36e75a5a",
   "components/devicemanagementpanel/member-vault": "46a5b3ae36e75a5a",
   "components/endpointconfig/default": "2fd314015d90110c",

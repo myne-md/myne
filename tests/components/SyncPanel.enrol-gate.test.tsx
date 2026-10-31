@@ -31,6 +31,8 @@
 // `SyncPanel` had NO test of any kind before this. The gate shipped, was wrong,
 // and nothing anywhere would have said so.
 
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 
@@ -283,5 +285,46 @@ describe("the members section, per client", () => {
     } finally {
       absentCaps.clear();
     }
+  });
+});
+
+/**
+ * The two-sided admission ceremony is GONE from this panel (myne-md/myne#956,
+ * `design-notes/protocol/0764`), and this is the half that would notice it
+ * coming back without a decision.
+ *
+ * A deletion is the one change whose regression is invisible: the test that
+ * used to render the surface left with it, no compiler notices an extra button,
+ * and the screen quietly grows a third and fourth "add" control again. So the
+ * assertion is the negative one, and it is paired with a positive control in the
+ * same render: the section that carries the two remaining doors is still there,
+ * which is what keeps a broken fixture from reading as a clean removal.
+ */
+describe("the device-admission ceremony, withdrawn", () => {
+  it("renders no ceremony control and keeps the section that replaced it", async () => {
+    selectTopic("devices");
+    mountWith("idle");
+    await waitFor(() =>
+      expect(
+        document.querySelector('section[aria-label="Devices on your account"]'),
+      ).not.toBeNull(),
+    );
+
+    // Any state of the ceremony, not only its entry point: `sync.device-admission`
+    // prefixes the root, the four buttons, the code field, the SAS and the stop line.
+    expect(document.querySelector('[data-testid^="sync.device-admission"]')).toBeNull();
+    // And the copy, from the catalog rather than from the DOM. Asking the screen
+    // for the two old strings would assert nothing at all: they left the catalog
+    // with the surface, so `queryByText` could not match them if it wanted to.
+    // The catalog is the input that CAN be wrong, because a revival usually adds
+    // its strings before its component, and the panel would then be one paste
+    // away from rendering a control nobody decided on.
+    const en = JSON.parse(
+      readFileSync(resolve(process.cwd(), "locales/en/common.json"), "utf8"),
+    ) as Record<string, unknown>;
+    expect(
+      Object.keys(en).filter((k) => k.startsWith("sync.deviceAdmission")),
+      "the ceremony's copy came back without the decision that withdrew it",
+    ).toEqual([]);
   });
 });
