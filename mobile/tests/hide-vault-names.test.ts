@@ -232,6 +232,14 @@ describe("the Privacy row states its bounds, one press away", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
     expect(trigger.getAttribute("aria-label")).toBe("settings.helperDisclosureLabel");
 
+    // On the TITLE line, not under the card. A bare `?` annotates the thing it
+    // sits beside, and parked below the card it read as belonging to whatever
+    // followed it (found in the myne-md/myne#960 capture, not by a test).
+    expect(rowEl(container).contains(trigger)).toBe(true);
+    const titleLine = trigger.parentElement as HTMLElement;
+    expect(titleLine.textContent).toContain("settings.privacy.hideVaultNamesLabel");
+    expect(titleLine.textContent).not.toContain("settings.privacy.hideVaultNamesInline");
+
     await click(trigger);
 
     const sheet = container.querySelector(

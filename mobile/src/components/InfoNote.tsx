@@ -24,7 +24,7 @@
 // sentences rendered on a first paint with nothing tapped, on the argument that
 // a bound the reader has to tap for is one most readers never see. That argument
 // lost to the one above (myne-md/myne#960): the copy is unchanged and reachable,
-// the trigger sits inline with the switch it explains, and desktop has put the
+// the trigger sits on the title line of the row it explains, and desktop has put the
 // same two sentences behind a question mark since #885, so the two clients now
 // present the same disclosure the same way. The COPY is still byte-identical
 // across clients, which is the invariant that matters and the one the test keeps.

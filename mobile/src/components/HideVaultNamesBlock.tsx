@@ -70,11 +70,12 @@ const helper: CSSProperties = {
   margin: "var(--space-2) var(--space-1) 0",
 };
 
-/** Holds the info trigger under the row, on the same left edge as the subtitle. */
-const INFO_ROW_STYLE: CSSProperties = {
+/** The block's title line: the label, and the info trigger that annotates it. */
+const TITLE_ROW_STYLE: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  margin: "var(--space-1) var(--space-4) 0",
+  gap: "var(--space-1)",
+  minWidth: 0,
 };
 
 /** The row's own subtitle, tighter than the block-level helper below it. */
@@ -207,7 +208,22 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
+            {/* The trigger rides on the title line, not under the row.
+                A bare `?` needs the thing it annotates beside it, the way the
+                desktop settings rows place theirs directly after the setting's
+                title; parked under the card it read as belonging to whatever sat
+                below it instead. */}
+            <div style={TITLE_ROW_STYLE}>
+              <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
+              <InfoNote
+                testId="settings.hide-vault-names"
+                paragraphs={[
+                  t("settings.privacy.hideVaultNamesHelper"),
+                  t("settings.privacy.hideVaultNamesErases"),
+                  t("settings.privacy.hideVaultNamesResidue"),
+                ]}
+              />
+            </div>
             {/* The critical sentence, and only it, on the row (myne-md/myne#885).
                 Desktop split this row's 776 characters across four paragraphs:
                 the destructive sentence stays beside the switch and the detail
@@ -233,17 +249,6 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
           />
         </div>
       </Group>
-
-      <div style={INFO_ROW_STYLE}>
-        <InfoNote
-          testId="settings.hide-vault-names"
-          paragraphs={[
-            t("settings.privacy.hideVaultNamesHelper"),
-            t("settings.privacy.hideVaultNamesErases"),
-            t("settings.privacy.hideVaultNamesResidue"),
-          ]}
-        />
-      </div>
 
       {keychain === "unavailable" && (
         <p style={helper} data-testid="settings.hide-vault-names-unavailable">
