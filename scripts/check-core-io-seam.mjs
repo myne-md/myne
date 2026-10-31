@@ -92,6 +92,13 @@ const ALLOWED = new Map([
   // because it started reading the disk: it did the same thing in `src-tauri/`,
   // where this guard does not look.
   ["core/src/plugins/agent/host_adapters.rs", "host-only (cfg tauri-ipc + not wasm32)"],
+  // The MCP door's write side (external-mcp-connection, myne-md/myne#923): the
+  // restore point reads the note blob and hands it to `snapshot_store`, which is
+  // `std::fs` by construction, so the read cannot be routed through `VaultIo`
+  // without splitting one atomic capture across two layers. Gated `not(target_arch
+  // = "wasm32")` at the `mod.rs` declaration, and it takes `&dyn HostCtx` rather
+  // than an `AppHandle`, so there is no browser variant to owe a port to.
+  ["core/src/plugins/mcp/host_adapters.rs", "host-only (not wasm32): restore-point capture is snapshot_store's fs"],
   ["core/src/plugins/captures/commands.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/meeting_manifest.rs", "host-only (cfg tauri-ipc + not wasm32)"],
   ["core/src/plugins/captures/queue.rs", "host-only (cfg tauri-ipc + not wasm32)"],

@@ -20,8 +20,9 @@
 //! sentence, and the client's session survives all three.
 //!
 //! What this binary still does NOT do is the part that needs a vault: resolve a
-//! connection's frozen scope, clamp a read to it, take a snapshot before a write
-//! or refuse a write outside its grant. Those live host-side, behind the same
+//! connection's read scope against the store of folders the user left out, clamp
+//! a read to it, take a snapshot before a write or refuse a write outside its
+//! grant. Those live host-side, behind the same
 //! door the CLI uses, so one implementation is the authority for both
 //! front-ends. That ordering is also what lets a client be configured and
 //! discover the surface while the vault is locked, before anything can read it.

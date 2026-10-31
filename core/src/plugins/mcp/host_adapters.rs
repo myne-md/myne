@@ -162,15 +162,35 @@ impl McpNoteSource for VaultNoteSource<'_> {
 /// unlocked, and torn down the instant either stops holding — so re-checking the
 /// flag would be a second opinion about the same fact, and the one that can be
 /// wrong during the one-tick window before teardown.
-pub async fn door_call(
-    host: &dyn HostCtx,
-    state: &VaultRuntimeState,
-    indices: &VaultIndicesState,
-    search: &SearchIndexState,
-    hooks: &crate::hooks::Hooks,
-    io: &dyn VaultIo,
-    call: WireCall<'_>,
-) -> McpCallOutcome {
+/// The app's own state, as one `mcp_call` needs it.
+///
+/// A struct rather than seven parameters: the door reads all of it and decides
+/// nothing about any of it, and three of the seven were added one review at a time
+/// (the registry with the write verbs, the io seam with the wasm build), which is
+/// how a signature grows past what a caller can pass correctly.
+pub struct DoorContext<'a> {
+    pub host: &'a dyn HostCtx,
+    pub state: &'a VaultRuntimeState,
+    /// The sidebar's index (`MYI1`), for the note records every scope check reads.
+    pub indices: &'a VaultIndicesState,
+    /// The desktop search index (`MYS1`). Scope-blind by design.
+    pub search: &'a SearchIndexState,
+    pub hooks: &'a crate::hooks::Hooks,
+    /// The live co-editing registry: a write refuses a note a session owns.
+    pub registry: &'a crate::plugins::live::LiveSessionRegistry,
+    pub io: &'a dyn VaultIo,
+}
+
+pub async fn door_call(app: DoorContext<'_>, call: WireCall<'_>) -> McpCallOutcome {
+    let DoorContext {
+        host,
+        state,
+        indices,
+        search,
+        hooks,
+        registry,
+        io,
+    } = app;
     if !matches!(state.slot_kind_active().await, SlotKind::Unlocked) {
         return McpCallOutcome::VaultLocked;
     }
@@ -186,6 +206,7 @@ pub async fn door_call(
         }
     };
     let granted = prefs.mcp_connections.contains_key(call.connection);
+    let quiet = crate::plugins::mcp::scope::quiet_folders(&prefs);
     let source = VaultNoteSource {
         host,
         state,
@@ -193,16 +214,59 @@ pub async fn door_call(
         search,
         io,
     };
+    let writer = VaultNoteWriter {
+        host,
+        state,
+        hooks,
+        io,
+        registry,
+    };
     let outcome = call_tool(
         CallInputs {
             call,
             grants: &prefs.mcp_connections,
             deliberate_folders: &prefs.deliberate_folders,
             archived_folders: &prefs.archived_folders,
+            quiet_folders: &quiet,
+            writer: Some(&writer),
         },
         &source,
     )
     .await;
+    // **A queued proposal is written HERE, and the caller is told which of the two
+    // answers it got.** `call_tool` decided the route; this is the only place with
+    // the host and the prefs writer, so it is the only place a row can be stored.
+    // The order is: store the row, then answer. A row that could not be stored (the
+    // queue is full of OTHER connections' rows) is answered as the plain
+    // out-of-scope refusal instead, because telling a client "queued for review"
+    // about a decision nobody will ever be shown is the one lie this path must not
+    // tell.
+    let outcome = match outcome {
+        McpCallOutcome::QueueProposal {
+            verb,
+            folder,
+            summary,
+        } => {
+            let stored = crate::plugins::prefs::commands::enqueue_mcp_write_request_from_host(
+                host,
+                state,
+                hooks,
+                call.connection.trim().to_string(),
+                folder.clone(),
+                verb.to_string(),
+                summary,
+                io,
+            )
+            .await
+            .unwrap_or(false);
+            McpCallOutcome::Refused(if stored {
+                McpToolError::WriteQueuedForReview { folder }
+            } else {
+                McpToolError::OutOfScopeFolder { folder }
+            })
+        }
+        other => other,
+    };
     // **The Settings row's "last used" is written here, and nowhere else.** The
     // approval records a name and a folder set; nothing else in the tree knows a
     // connection is alive, so a row that never moved would say "not used since
@@ -225,4 +289,164 @@ pub async fn door_call(
         .await;
     }
     outcome
+}
+
+/// The live vault as a WRITE surface: the restore point, the create and the
+/// guarded overwrite the write verbs need (external-mcp-connection task 14).
+///
+/// Every method here is a call into the notes plugin's existing path, and none of
+/// them is a second write path: [`crate::plugins::notes::commands::note_create_from_host`]
+/// is the door the CLI's `new` uses, and
+/// [`crate::plugins::notes::commands::note_update_from_host`] is the guarded save
+/// the editor uses. What this adapter adds is only the mapping from those errors to
+/// the closed reasons an external caller can act on, and the snapshot taken before
+/// the first byte changes.
+///
+/// **The registry is a field rather than a lookup.** `HostCtx` deliberately has no
+/// `app()` (`core/src/host.rs`), so the live-session registry cannot be reached
+/// from a `&dyn HostCtx`; the door's Tauri wrapper resolves it from managed state
+/// and hands it here, which is also what lets a test drive this against a real
+/// registry instead of a stub.
+pub struct VaultNoteWriter<'a> {
+    pub host: &'a dyn HostCtx,
+    pub state: &'a VaultRuntimeState,
+    pub hooks: &'a crate::hooks::Hooks,
+    pub io: &'a dyn VaultIo,
+    pub registry: &'a crate::plugins::live::LiveSessionRegistry,
+}
+
+impl VaultNoteWriter<'_> {
+    /// Refuse a value this verb cannot write faithfully.
+    ///
+    /// Delegated to the agent's own frontmatter scalar writer rather than
+    /// reimplemented: the app reads these fields with js-yaml, and two notions of
+    /// "needs quoting" is how a title that looks fine in the file reads back as a
+    /// different string in the sidebar.
+    fn scalar(value: &str) -> Result<String, McpToolError> {
+        crate::plugins::agent::edit::yaml_folder_scalar(value)
+            .map_err(|_| McpToolError::UnwritableTitle)
+    }
+}
+
+#[async_trait]
+impl super::intent::McpNoteWriter for VaultNoteWriter<'_> {
+    async fn capture_restore_point(
+        &self,
+        note: &str,
+    ) -> Result<super::intent::RestorePoint, McpToolError> {
+        use crate::snapshot_store::{capture_snapshot_reporting_uuid, CaptureOutcome};
+        let active = self.state.active_vault_id().await;
+        let vault_root = crate::paths::active_vault_root_from_host(self.host, active)
+            .map_err(|_| McpToolError::VaultUnavailable)?;
+        let now_ms = self.host.now_unix_millis();
+        let note_id = note.to_string();
+        // One `spawn_blocking` for the read, the directory list, the blob write and
+        // the prune scan, exactly as the agent adapter does it: this is file IO on
+        // an executor thread otherwise.
+        crate::task::run_blocking(move || {
+            let path = vault_root.join("notes").join(format!("{note_id}.myn"));
+            let blob = match std::fs::read(&path) {
+                Ok(blob) => blob,
+                // The note is gone. Reported as a distinct outcome rather than as a
+                // failure, because a create has nothing to restore and a missing
+                // note is not an IO error; the verbs decide what it means for them.
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    return Ok(super::intent::RestorePoint::NothingToRestore)
+                }
+                Err(_) => return Err(McpToolError::RestorePointFailed),
+            };
+            // `force = true`: an external agent's write may not be coalesced away by
+            // the snapshot window. The interface tells the user an external write is
+            // undoable, and a skipped capture would make that false.
+            match capture_snapshot_reporting_uuid(&vault_root, &note_id, &blob, now_ms, true) {
+                CaptureOutcome::Captured(uuid) => Ok(super::intent::RestorePoint::Captured(uuid)),
+                // `Coalesced` cannot happen under `force`, so both arms are the same
+                // refusal, and it is the refusal the whole contract exists for.
+                CaptureOutcome::Coalesced | CaptureOutcome::Failed => {
+                    Err(McpToolError::RestorePointFailed)
+                }
+            }
+        })
+        .await
+        .map_err(|_| McpToolError::RestorePointFailed)?
+    }
+
+    async fn create_note(
+        &self,
+        folder: &str,
+        title: &str,
+        body: &str,
+    ) -> Result<String, McpToolError> {
+        let folder_scalar = Self::scalar(folder)?;
+        let title_scalar = Self::scalar(title)?;
+        // The ordinary frontmatter a hand-typed note carries, in the app's own key
+        // order: no new on-disk shape, and nothing here that the notes plugin would
+        // treat differently from a note the person created.
+        let mut plaintext = String::from("---\n");
+        plaintext.push_str(&format!("title: {title_scalar}\n"));
+        if !folder.trim().is_empty() {
+            plaintext.push_str(&format!("folder: {folder_scalar}\n"));
+        }
+        plaintext.push_str("---\n\n");
+        plaintext.push_str(body);
+        crate::plugins::notes::commands::note_create_from_host(
+            self.host, self.state, self.hooks, plaintext, self.io,
+        )
+        .await
+        .map_err(|error| {
+            tracing::warn!(
+                target: "myne_core::mcp",
+                event = "mcp_create_refused",
+                error_kind = crate::plugins::notes::commands::note_create_error_kind(&error)
+            );
+            McpToolError::VaultUnavailable
+        })
+    }
+
+    async fn overwrite_note(
+        &self,
+        note: &str,
+        plaintext: &str,
+        expected_base_hash_hex: &str,
+    ) -> Result<(), McpToolError> {
+        use crate::plugins::notes::error::NoteUpdateError;
+        match crate::plugins::notes::commands::note_update_from_host(
+            self.host,
+            self.state,
+            self.hooks,
+            note.to_string(),
+            plaintext.to_string(),
+            Some(expected_base_hash_hex.to_string()),
+            self.io,
+            self.registry,
+        )
+        .await
+        {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                tracing::warn!(
+                    target: "myne_core::mcp",
+                    event = "mcp_write_refused",
+                    error_kind = crate::plugins::notes::commands::note_update_error_kind(&error)
+                );
+                Err(match error {
+                    // The read-then-write race, answered without new machinery: the
+                    // anchor is the note's own bytes, so a note that moved on cannot
+                    // be appended to from stale text.
+                    NoteUpdateError::BaseMismatch => McpToolError::NoteChanged {
+                        note_id: note.to_string(),
+                    },
+                    NoteUpdateError::LiveSessionOpen => McpToolError::NoteOpenInEditor {
+                        note_id: note.to_string(),
+                    },
+                    NoteUpdateError::NoteNotFound | NoteUpdateError::InvalidNoteId => {
+                        McpToolError::UnknownNote {
+                            note_id: note.to_string(),
+                        }
+                    }
+                    _ => McpToolError::VaultUnavailable,
+                })
+            }
+        }
+    }
 }

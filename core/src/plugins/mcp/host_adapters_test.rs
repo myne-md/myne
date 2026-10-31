@@ -14,7 +14,7 @@
 //! hold two documents for the same note FIRST, so a fixture that could not reach
 //! the duplicated state would fail here rather than pass and prove nothing.
 
-use super::host_adapters::{door_call, VaultNoteSource};
+use super::host_adapters::{door_call, DoorContext, VaultNoteSource};
 use super::tools::{McpCallOutcome, McpNoteSource};
 use crate::host::test_host::TestHost;
 use crate::plugins::vault_indices::state::NoteRecord;
@@ -207,13 +207,17 @@ fn door_call_answers_vault_locked_before_it_touches_prefs() {
     let arguments = json!({ "query": "alpha" });
 
     rt.block_on(async {
+        let registry = crate::plugins::live::LiveSessionRegistry::new();
         let outcome = door_call(
-            &host,
-            &state,
-            &indices,
-            &search,
-            &hooks,
-            &StdVaultIo,
+            DoorContext {
+                host: &host,
+                state: &state,
+                indices: &indices,
+                search: &search,
+                hooks: &hooks,
+                registry: &registry,
+                io: &StdVaultIo,
+            },
             super::tools::WireCall {
                 connection: "claude-desktop",
                 tool: "note_search",

@@ -47,7 +47,11 @@ describe("story drift", () => {
     expect(STORIES.length).toBeGreaterThan(0);
   });
 
-  it(RECORD ? "records every story hash" : "warns on drift, fails on an unmeasured story", async () => {
+  // The loop renders EVERY story, so its cost is the catalogue's size rather
+  // than one component, and the default 5 s is a bound on a loaded machine
+  // rather than on the work. It timed out on CI on a commit that changed no
+  // story, which is a red that says nothing about the tree.
+  it(RECORD ? "records every story hash" : "warns on drift, fails on an unmeasured story", { timeout: 120_000 }, async () => {
     const measured: Record<string, string> = {};
     for (const story of STORIES) {
       setStoryFixture(resolveFixture(story.fixture));

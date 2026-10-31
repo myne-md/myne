@@ -18,16 +18,21 @@
 // opinion about scope, and the screen would go on describing a grant the tools do
 // not enforce the first time either changed.
 //
-// # Freezing, and why the exclusions are applied now rather than later
+// # What the approval actually stores, and why the copy is blunt about it
 //
-// The stored grant is the explicit folder set this preview describes, so the
-// moment the user approves, the set stops following the vault: a folder created
-// afterwards is outside it and the section's delta row reports it. Excluding a
-// folder is the opposite act and is applied ONCE, at approval, subtrees included
-// (the host defines that rule in `core/src/plugins/mcp/view.rs`, and it is the
-// intuitive meaning of "do not share this folder" rather than the exact-path rule
-// the grant itself uses, because a grant that grew by prefix would cover a folder
-// nobody was asked about).
+// The stored grant is the list of folders to LEAVE OUT, so an approval with an
+// empty list shares the whole vault and a folder created afterwards is covered
+// without being asked about. That is the opposite of the model this screen first
+// shipped with, so the sentence that used to promise a frozen set now says the
+// plain truth: you are choosing what to leave out, everything else is shared, and
+// leaving a folder out takes everything inside it too (the host defines that rule
+// in `core/src/plugins/mcp/view.rs`, so the count the user reads and the bytes
+// written are the same decision).
+//
+// The dialog must never let an empty picker read as "share nothing": that is the
+// one misreading this model makes possible, and two lines state it in words at
+// the moment the decision is made, `excludeHelper` and `firstGrantHelper` beside
+// the picker and `frozenNotice` under the counts.
 //
 // # Not a credential
 //
@@ -103,8 +108,19 @@ const ERROR_STYLE: CSSProperties = {
 export interface McpGrantConnection {
   /** The declared name, already approved once. */
   name: string;
-  /** The folders it holds now, so an extension keeps what it had. */
-  folders: string[];
+  /**
+   * The folders it already leaves out, so a re-approval starts from what is
+   * stored rather than from an empty picker that would silently widen the grant
+   * to the whole vault on one click.
+   */
+  excludedFolders: string[];
+  /**
+   * The folders it may already write in, for the same reason and one consequence
+   * worse: a re-approval that started from an empty picker would silently REVOKE
+   * every write the connection had, and nobody notices that until a client's write
+   * starts landing in the review card instead.
+   */
+  writeFolders: string[];
 }
 
 export interface McpGrantDialogProps {
@@ -119,10 +135,15 @@ export interface McpGrantDialogProps {
   /** Every folder that exists now, canonical, the root as `""`. */
   folders: string[];
   /**
-   * Approve, with the EXACT folder set to store. Async so the caller can report a
-   * refusal; resolving `false` keeps the dialog open with the reason.
+   * Approve, with the EXACT exclusion set and write allow list to store. Async so
+   * the caller can report a refusal; resolving `false` keeps the dialog open with
+   * the reason.
    */
-  onApprove: (name: string, folders: string[]) => Promise<boolean>;
+  onApprove: (
+    name: string,
+    excludedFolders: string[],
+    writeFolders: string[],
+  ) => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -136,6 +157,7 @@ export function McpGrantDialog({
   const { t } = useTranslation();
   const [nameDraft, setNameDraft] = useState("");
   const [excluded, setExcluded] = useState<string[]>([]);
+  const [writable, setWritable] = useState<string[]>([]);
   const [preview, setPreview] = useState<McpGrantPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,7 +167,8 @@ export function McpGrantDialog({
   useEffect(() => {
     if (!open) return;
     setNameDraft(connection?.name ?? "");
-    setExcluded([]);
+    setExcluded(connection?.excludedFolders ?? []);
+    setWritable(connection?.writeFolders ?? []);
     setPreview(null);
     setError(null);
     setBusy(false);
@@ -170,6 +193,20 @@ export function McpGrantDialog({
     };
   }, [open, excluded]);
 
+  // The write selection is pruned against the READABLE set the host returns, not
+  // against a prefix test here: excluding a folder takes its subtree out of the
+  // read scope too, so a write grant underneath it must go with it, and that rule
+  // lives in the host. Without this the user could tick a folder for writing and
+  // then learn at Approve time that the same screen had just excluded it.
+  useEffect(() => {
+    if (preview === null) return;
+    const readable = preview.folders;
+    setWritable((current) => {
+      const next = current.filter((folder) => readable.includes(folder));
+      return next.length === current.length ? current : next;
+    });
+  }, [preview]);
+
   const name = (connection?.name ?? nameDraft).trim();
   const nameRefused =
     name.length === 0 || RESERVED_NAMES.includes(name);
@@ -180,15 +217,29 @@ export function McpGrantDialog({
     label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
   }));
 
+  // The WRITE candidates are the readable set under the CURRENT exclusion
+  // selection, so an excluded folder is never offered and the two pickers cannot
+  // disagree about what may be read.
+  const writeOptions: SelectOption<string>[] = (preview?.folders ?? []).map(
+    (folder) => ({
+      value: folder,
+      label: folder === "" ? t("settings.ai.externalAccess.rootFolder") : folder,
+    }),
+  );
+
   const approve = async () => {
-    // The folder set comes back FROM the preview, not from a subtraction done
-    // here: the host owns the exclusion rule (a folder takes its subtree with it,
-    // the root takes only itself), so the count the user read and the set that is
-    // written are the same decision rather than two implementations of it.
+    // The exclusion set comes back FROM the preview, not from the picker: the host
+    // owns the rule (a folder takes its subtree with it, the root takes only
+    // itself, an entry naming nothing is dropped), so the count the user read and
+    // the bytes written are the same decision rather than two implementations.
     if (preview === null) return;
     setBusy(true);
     setError(null);
-    const accepted = await onApprove(name, preview.folders);
+    // Sent as it stands: the prune above already removed anything this approval
+    // took out of the read scope, and the writer refuses a non-subset as the
+    // backstop. A second filter here would be a guard no test could distinguish
+    // from the prune, which is how a safeguard stops being one.
+    const accepted = await onApprove(name, preview.excludedFolders, writable);
     setBusy(false);
     if (!accepted) {
       setError(t("settings.ai.externalAccess.grantRefused"));
@@ -236,9 +287,7 @@ export function McpGrantDialog({
           </div>
         ) : (
           <p style={HELPER_STYLE} data-testid="settings.mcp-grant-approved-at">
-            {connection.folders.length > 0
-              ? t("settings.ai.externalAccess.reextendHelper")
-              : t("settings.ai.externalAccess.firstGrantHelper")}
+            {t("settings.ai.externalAccess.reextendHelper")}
           </p>
         )}
 
@@ -287,11 +336,44 @@ export function McpGrantDialog({
           <p style={HELPER_STYLE}>
             {t("settings.ai.externalAccess.excludeHelper")}
           </p>
+          {excluded.length === 0 && (
+            // The hazard stated AT the control, not only in the counts under it.
+            // An empty exclusion list is the one approval that hands over the
+            // whole vault, and a person who reads one line under the picker does
+            // not necessarily read the sentence under the counts.
+            <p style={HELPER_STYLE}>
+              {t("settings.ai.externalAccess.firstGrantHelper")}
+            </p>
+          )}
         </div>
 
-        {/* The two bounds, always visible and never behind a disclosure: a limit
-            the reader has to click for is a limit most readers never see. */}
-        <p style={HELPER_STYLE} data-testid="settings.mcp-grant-frozen">
+        <div style={FIELD_ROW_STYLE}>
+          <span style={LABEL_STYLE}>
+            {t("settings.ai.externalAccess.writeLabel")}
+          </span>
+          <div style={CONTROL_SLOT_STYLE}>
+            <SearchableSelect
+              multiple
+              options={writeOptions}
+              selected={writable}
+              onChange={setWritable}
+              aria-label={t("settings.ai.externalAccess.writeLabel")}
+              placeholder={t("settings.ai.externalAccess.writePlaceholder")}
+              searchPlaceholder={t("settings.ai.externalAccess.excludeSearch")}
+              emptyText={t("settings.ai.externalAccess.excludeEmpty")}
+              testId="settings.mcp-grant-write"
+            />
+          </div>
+          <p style={HELPER_STYLE} data-testid="settings.mcp-grant-write-helper">
+            {t("settings.ai.externalAccess.writeHelper")}
+          </p>
+        </div>
+
+        {/* The two bounds, always visible and never behind a disclosure: a rule
+            the reader has to click for is a rule most readers never see. The first
+            is the one this model makes possible to misread, so it says the plain
+            version: what you create later is shared. */}
+        <p style={HELPER_STYLE} data-testid="settings.mcp-grant-later-folders">
           {t("settings.ai.externalAccess.frozenNotice")}
         </p>
         <p style={HELPER_STYLE} data-testid="settings.mcp-grant-outside-myne">

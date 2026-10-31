@@ -52,10 +52,10 @@ pub mod graph_layout;
 /// The live co-editing session core (epic live-collab, `collab-editor-bridge`).
 pub mod live;
 /// The external MCP connection's host-side policy (external-mcp-connection,
-/// myne-md/myne#923): resolving a declared connection name to its frozen folder
-/// set, the folders-that-appeared-since delta, and the four read tools clamped
-/// per tool. No commands of its own: the `myne-mcp` sidecar's calls arrive over
-/// the CLI door, so the authority stays in one place for both front-ends.
+/// myne-md/myne#923): resolving a declared connection name to the folders it may
+/// NOT read, the four read tools clamped per tool, and the two Settings reads.
+/// No tool commands of its own: the `myne-mcp` sidecar's calls arrive over the
+/// CLI door, so the authority stays in one place for both front-ends.
 pub mod mcp;
 pub mod member_names;
 pub mod memory;

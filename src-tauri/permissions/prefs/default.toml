@@ -105,7 +105,10 @@ permissions = [
   # external-mcp-connection (myne-md/myne#923 task 3): the device-local
   # `mcp_connections` grant map's two writers.
   "allow-set-mcp-connection-grant",
+  "allow-rewrite-mcp-folder-paths",
   "allow-revoke-mcp-connection",
+  "allow-accept-mcp-write-request",
+  "allow-dismiss-mcp-write-request",
 ]
 
 [[permission]]
@@ -711,7 +714,7 @@ commands.allow = ["read_view_manifest"]
 # a folder path (AS3-class user text).
 [[permission]]
 identifier = "allow-set-mcp-connection-grant"
-description = "Allow invoking prefs:set_mcp_connection_grant (Slot::Unlocked-gated approval/re-approval of one external MCP connection's frozen read scope; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2 — an approval given on one device must never be inherited by another; returns false when the grant did not fit the prefs plaintext budget, leaving the stored grant untouched)."
+description = "Allow invoking prefs:set_mcp_connection_grant (Slot::Unlocked-gated approval/re-approval of one external MCP connection's read scope (a list of folders it may NOT read, so a folder created later is covered); atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2, because an approval given on one device must never be inherited by another; returns false when the grant did not fit the prefs plaintext budget, leaving the stored grant untouched)."
 commands.allow = ["set_mcp_connection_grant"]
 
 # external-mcp-connection (myne-md/myne#923 task 3): revoke one named connection.
@@ -721,3 +724,28 @@ commands.allow = ["set_mcp_connection_grant"]
 identifier = "allow-revoke-mcp-connection"
 description = "Allow invoking prefs:revoke_mcp_connection (Slot::Unlocked-gated revocation of one external MCP connection's grant; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; revoking an absent name is a successful no-op, and the other connections are untouched)."
 commands.allow = ["revoke_mcp_connection"]
+
+# external-mcp-connection (myne-md/myne#923 task 13): the queued out-of-scope
+# writes. Accepting one widens ONE connection's write grant by exactly the folder
+# it named (and never past the read scope), and dismissing one changes nothing but
+# the queue. Both are prefs writers with no native side-effect, class DeviceLocal.
+# Declared ONCE each: a repeated identifier in this file leaves the effective grant
+# to whichever copy the ACL collector keeps, which is not a property to infer.
+# A folder RENAME re-roots every path an MCP grant holds. Without this the read
+# deny list fails OPEN: an excluded folder renamed to a new key stops matching and
+# the notes under it become readable with no prompt, which is the D3 finding of the
+# 2026-10-30 review. Not an approval: the stamp and the model are untouched.
+[[permission]]
+identifier = "allow-rewrite-mcp-folder-paths"
+description = "Allow invoking prefs:rewrite_mcp_folder_paths (Slot::Unlocked-gated re-rooting of every folder path an external MCP grant or queued write holds after a folder rename, so an exclusion cannot stop matching by moving; rewrites excluded_folders, write_folders and mcp_write_requests[].folder in ONE atomic write, keeps them sorted and de-duplicated, and changes no approval stamp, no model and no member; returns how many entries moved, so a rename that touched nothing writes nothing; class DeviceLocal per sync-protocol.md §10.2)."
+commands.allow = ["rewrite_mcp_folder_paths"]
+
+[[permission]]
+identifier = "allow-accept-mcp-write-request"
+description = "Allow invoking prefs:accept_mcp_write_request (Slot::Unlocked-gated accept of one queued out-of-scope external MCP write: extends that connection's write grant by exactly the folder it named, refuses to go past the read scope, drops the row; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; returns false when nothing was widened, which is what a stale row reports)."
+commands.allow = ["accept_mcp_write_request"]
+
+[[permission]]
+identifier = "allow-dismiss-mcp-write-request"
+description = "Allow invoking prefs:dismiss_mcp_write_request (Slot::Unlocked-gated dismissal of one queued out-of-scope external MCP write: removes the row and changes no grant; atomic-writes vault.prefs with no native side-effect; class DeviceLocal per sync-protocol.md §10.2; returns whether a row was actually removed)."
+commands.allow = ["dismiss_mcp_write_request"]

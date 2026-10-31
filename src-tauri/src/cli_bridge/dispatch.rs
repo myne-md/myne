@@ -386,6 +386,13 @@ fn handle_request(lister: &dyn NoteLister, request_body: &[u8]) -> Vec<u8> {
             McpCallOutcome::UnknownTool => {
                 encode_err("invalid_request", "this app does not know that tool")
             }
+            // **Never reachable through the door.** `door_call` turns a queued
+            // proposal into the stored row plus a `WriteQueuedForReview` refusal
+            // before answering, because it is the only layer that holds the prefs
+            // writer. A proposal arriving here means a caller skipped that step,
+            // and `io` is the honest answer: nothing about the client's request is
+            // wrong and no retry of it would change anything.
+            McpCallOutcome::QueueProposal { .. } => encode_err("io", "an internal error occurred"),
             McpCallOutcome::Malformed => encode_err("invalid_request", "malformed request"),
             McpCallOutcome::VaultLocked => {
                 encode_err("vault_locked", "the vault locked during this request")
@@ -901,7 +908,7 @@ mod app_seam {
         /// from the connection thread the CLI door already owns, after the
         /// shared limiter has already counted the request.
         fn mcp_call(&self, request: McpCallRequest) -> McpCallOutcome {
-            use myne_core::plugins::mcp::host_adapters::door_call;
+            use myne_core::plugins::mcp::host_adapters::{door_call, DoorContext};
             use myne_core::plugins::mcp::tools::WireCall;
             use myne_core::plugins::vault_indices::VaultIndicesState;
             use myne_core::search::SearchIndexState;
@@ -921,15 +928,28 @@ mod app_seam {
             let Some(hooks) = self.app.try_state::<myne_core::hooks::Hooks>() else {
                 return McpCallOutcome::Io;
             };
+            // The write verbs refuse a note a live co-editing session owns
+            // (`SYNC-33`), which needs the registry the notes plugin manages. A
+            // process composed without it cannot answer a write at all, so the
+            // lookup is a refusal of the whole call rather than of one verb.
+            let Some(registry) = self
+                .app
+                .try_state::<myne_core::plugins::live::LiveSessionRegistry>()
+            else {
+                return McpCallOutcome::Io;
+            };
             let host = myne_core::host::tauri_host::TauriHost::new(self.app.clone());
             let io = myne_core::vault_io::StdVaultIo;
             tauri::async_runtime::block_on(door_call(
-                &host,
-                state.inner(),
-                indices.inner(),
-                search.inner(),
-                hooks.inner(),
-                &io,
+                DoorContext {
+                    host: &host,
+                    state: state.inner(),
+                    indices: indices.inner(),
+                    search: search.inner(),
+                    hooks: hooks.inner(),
+                    registry: registry.inner(),
+                    io: &io,
+                },
                 WireCall {
                     connection: &request.connection,
                     tool: &request.tool,

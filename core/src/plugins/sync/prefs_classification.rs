@@ -342,6 +342,12 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
     // names folder paths, and two devices can hold different trees after a
     // merge. The local value always survives; a second device is asked again.
     ("mcp_connections", PrefClass::DeviceLocal),
+    // Device-local for the same reason and one step further (external-mcp-connection
+    // task 13). A queued request is a write WAITING for this device's person to
+    // accept it, and accepting widens a grant that only exists on this device: a
+    // synced queue would let a peer's request be accepted here against a grant this
+    // device does not hold, and the folder paths it names describe one device's tree.
+    ("mcp_write_requests", PrefClass::DeviceLocal),
     // Shared / ScalarLww (meeting-ai). The user's custom meeting-AI instruction
     // is vault content they want on every device, so it travels; last-writer-wins
     // is the right merge for a single text value.
@@ -547,6 +553,7 @@ mod tests {
             label: _,
             last_backup_at: _,
             mcp_connections: _,
+            mcp_write_requests: _,
             meeting_ai_prompt: _,
             new_note_location: _,
             new_note_location_folder: _,
@@ -635,6 +642,7 @@ mod tests {
             "label",
             "last_backup_at",
             "mcp_connections",
+            "mcp_write_requests",
             "meeting_ai_prompt",
             "new_note_location",
             "new_note_location_folder",
@@ -712,9 +720,12 @@ mod tests {
         remote.mcp_connections.insert(
             "claude-desktop".to_string(),
             McpConnectionGrant {
-                folders: vec!["Work/".to_string()],
+                model: protocol::McpScopeModel::Exclude,
+                folders: Vec::new(),
+                excluded_folders: vec!["Work/".to_string()],
                 approved_at: 1_765_432_100,
                 last_used_at: None,
+                write_folders: Vec::new(),
             },
         );
         assert_eq!(
@@ -733,9 +744,12 @@ mod tests {
         local.mcp_connections.insert(
             "lm-studio".to_string(),
             McpConnectionGrant {
-                folders: vec!["Archive/".to_string()],
+                model: protocol::McpScopeModel::Exclude,
+                folders: Vec::new(),
+                excluded_folders: vec!["Archive/".to_string()],
                 approved_at: 1_765_432_150,
                 last_used_at: Some(1_765_432_200),
+                write_folders: Vec::new(),
             },
         );
         let merged = merge_prefs(&local, &PrefsView::default());

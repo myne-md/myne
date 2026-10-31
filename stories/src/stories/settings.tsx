@@ -243,33 +243,64 @@ const MCP_FIXTURE: Fixture = {
       connections: [
         {
           name: "claude-desktop",
-          readFolders: ["Projects/", "Work/"],
-          missingFolders: [],
-          writeFolders: [],
+          legacy: false,
+          legacyFolders: [],
+          excludedFolders: ["Private/"],
+          staleExcludedFolders: [],
+          writeFolders: ["Projects/"],
           approvedAt: 1_761_000_000,
           lastUsedAt: 1_761_000_600,
           noteCount: 412,
-          deltaFolders: ["Projects/New/"],
+          folderCount: 4,
         },
         {
           name: "lm-studio",
-          readFolders: ["Archive/"],
-          missingFolders: ["Old/"],
+          legacy: false,
+          legacyFolders: [],
+          excludedFolders: ["Archive/", "Old/"],
+          staleExcludedFolders: ["Old/"],
           writeFolders: [],
           approvedAt: 1_759_000_000,
           lastUsedAt: null,
           noteCount: 7,
-          deltaFolders: [],
+          folderCount: 4,
+        },
+        {
+          name: "editor-plugin",
+          legacy: true,
+          legacyFolders: ["Projects/"],
+          excludedFolders: [],
+          staleExcludedFolders: [],
+          writeFolders: [],
+          approvedAt: 1_758_000_000,
+          lastUsedAt: null,
+          noteCount: 0,
+          folderCount: 0,
         },
       ],
       folders: ["", "Archive/", "Projects/", "Projects/Deep/", "Work/"],
       noteCount: 512,
+      // One write the host refused and kept: the card above the connection list
+      // is the state this story exists to show, because it is the one thing on
+      // this surface that is waiting for the person.
+      writeRequests: [
+        {
+          connection: "claude-desktop",
+          folder: "inbox/",
+          requestedAt: 1_761_000_900,
+          summary: "Shopping list",
+          verb: "note_create",
+        },
+      ],
     }),
     "plugin:mcp|mcp_grant_preview": () => ({
       noteCount: 512,
-      folderCount: 5,
-      excludedCount: 0,
-      folders: ["", "Archive/", "Projects/", "Projects/Deep/", "Projects/New/", "Work/"],
+      folderCount: 4,
+      excludedCount: 1,
+      excludedFolders: ["Archive/"],
+      // What the write picker offers: the readable set under these exclusions, so
+      // `Archive/` is absent and nothing the writer would refuse is selectable.
+      folders: ["", "Projects/", "Projects/Deep/", "Work/"],
     }),
   },
 };
@@ -616,7 +647,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "McpSection",
     state: "default",
     description:
-      "The external-access section under Settings → AI → Limits: the master switch for the myne-mcp door, two approved connections with what each may read and when it was last used, and per-connection Revoke plus the setup snippet a client's config pastes. A connection's name is a label rather than a credential, and the section states plainly what Myne does not control about what a connected tool does with what it reads.",
+      "The external-access section under Settings → AI → Limits: the master switch for the myne-mcp door, one queued write a connection attempted outside its write scope (a proposal, with Accept widening exactly that one grant by exactly that one folder), three approved connections with what each may read, what it may write and when it was last used, and per-connection Revoke plus the setup snippet a client's config pastes. A connection's name is a label rather than a credential, and the section states plainly what Myne does not control about what a connected tool does with what it reads.",
     tags: [
       "settings",
       "ai",
@@ -644,7 +675,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     surface: "McpGrantDialog",
     state: "default",
     description:
-      "The one-time approval screen for an external MCP connection: the counts the host resolved (notes, folders, exclusions) rather than a description of the rule, the folder exclusions chosen before approving, and the two bounds stated plainly. The set is frozen at approval, so a folder created later starts outside it; what the connected tool does with what it reads is outside Myne.",
+      "The one-time approval screen for an external MCP connection: the counts the host resolved (notes, folders, exclusions) rather than a description of the rule, the folder exclusions chosen before approving, the folders it may write in (an allow list, offered only from what stays readable), and the two bounds stated plainly. The read set is a deny list, so a folder created later is already inside the approval; the write set is the opposite, an allow list where a folder created later is not writable until it is named. What the connected tool does with what it reads is outside Myne.",
     tags: [
       "settings",
       "ai",
@@ -661,6 +692,39 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
         <McpGrantDialog
           open
           connection={null}
+          folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
+          onApprove={async () => true}
+          onClose={action("onClose")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/mcpgrantdialog/with-write-scope",
+    group: "settings",
+    surface: "McpGrantDialog",
+    state: "with-write-scope",
+    description:
+      "The same approval screen re-opened for a connection that already holds a write grant: the allowed folders start from what is stored rather than from an empty picker, because an empty write picker on a re-approval would silently revoke every write the connection had. The write picker offers only folders the connection may also read, and its helper says that an empty selection means reading without changing anything.",
+    tags: [
+      "settings",
+      "ai",
+      "mcp",
+      "external-access",
+      "write-scope",
+      "allow-list",
+      "re-approval",
+    ],
+    fixture: MCP_FIXTURE,
+    render: () => (
+      <Frame>
+        <McpGrantDialog
+          open
+          connection={{
+            name: "claude-desktop",
+            excludedFolders: ["Archive/"],
+            writeFolders: ["Projects/", "Work/"],
+          }}
           folders={["", "Archive/", "Projects/", "Projects/Deep/", "Work/"]}
           onApprove={async () => true}
           onClose={action("onClose")}

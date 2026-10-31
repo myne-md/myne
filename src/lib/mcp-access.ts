@@ -9,10 +9,10 @@
 //
 // # Why the counts come over IPC instead of being derived here
 //
-// The section states "412 notes in 38 folders" and "3 folders created since you
-// approved this are not shared". Each is a statement about SCOPE, and the scope
-// is the host's: `core/src/plugins/mcp/scope.rs` resolves a stored grant against
-// the folder set the sidebar shows, and the same resolver clamps every tool call.
+// The section states "may read 412 notes in 38 folders" and "leaves out
+// private/". Each is a statement about SCOPE, and the scope is the host's:
+// `core/src/plugins/mcp/scope.rs` resolves a stored exclusion list against the
+// folder set the sidebar shows, and the same resolver clamps every tool call.
 // A renderer that summed a folder list itself would be a second opinion about the
 // same permission, and the first time either changed the screen would describe a
 // grant the tools do not enforce.
@@ -30,26 +30,39 @@ import { invoke } from "../platform/core";
 export interface McpConnectionView {
   /** The declared name the client announces. A LABEL, not a credential. */
   name: string;
-  /** The granted folder paths that still exist, canonical (`Projects/`). */
-  readFolders: string[];
-  /** Granted paths that no longer exist, because the folder was renamed or deleted. */
-  missingFolders: string[];
   /**
-   * The folders this connection may write to.
+   * Approved under the retired allow-list model, so this build reads nothing for
+   * it until the user approves it again. The row states that instead of showing
+   * counts from a rule the tools do not enforce.
+   */
+  legacy: boolean;
+  /** What the retired grant named, so a re-approval starts from something visible. */
+  legacyFolders: string[];
+  /** The folders this connection may NOT read, canonical (`Private/`), sorted. */
+  excludedFolders: string[];
+  /**
+   * Exclusions that name a folder which no longer exists. They take nothing out,
+   * and the row reports them so the count it shows is a count of what the
+   * exclusions actually do.
+   */
+  staleExcludedFolders: string[];
+  /**
+   * The folders this connection may write to, canonical and sorted, resolved the
+   * way a write is served: a legacy grant writes nowhere, and a folder named for
+   * writing but left out of the read scope is dropped rather than shown.
    *
-   * Always empty in this build: the write grant is a later slice of the same
-   * feature, and the row says "nothing" rather than implying a scope the host
-   * does not enforce.
+   * Empty is the ordinary case and means **write nowhere**, never "everywhere"
+   * (the inversion that makes this the opposite of an empty `excludedFolders`).
    */
   writeFolders: string[];
   /** Unix epoch seconds the host stamped at approval. */
   approvedAt: number;
   /** Unix epoch seconds of the last call that reached the door, or `null`. */
   lastUsedAt: number | null;
-  /** Live notes inside the readable folders right now. */
+  /** Live notes the scope covers right now. */
   noteCount: number;
-  /** Folders that exist now and are outside the frozen set, sorted. The delta row. */
-  deltaFolders: string[];
+  /** Folders of the vault the scope covers right now. */
+  folderCount: number;
 }
 
 /** The section's whole payload. Mirrors `McpExternalAccessView`. */
@@ -59,27 +72,65 @@ export interface McpExternalAccessView {
   folders: string[];
   /** Live notes in the vault, for the "N of M" framing. */
   noteCount: number;
+  /**
+   * Writes waiting for a decision, newest first, already filtered by the host to
+   * the ones it can accept right now.
+   */
+  writeRequests: McpWriteRequestView[];
 }
 
-/** What a candidate grant would cover. Mirrors `McpGrantPreview`. */
+/** What a candidate exclusion list would leave readable. Mirrors `McpGrantPreview`. */
 export interface McpGrantPreview {
   noteCount: number;
   folderCount: number;
-  /**
-   * The candidate set itself, canonical and sorted: what the two counts describe
-   * and what the approval writes.
-   *
-   * It travels with the counts so the exclusion rule has ONE implementation (the
-   * host's): re-deriving the set here would be a second opinion about scope, and
-   * the number the user approves would eventually stop being the number counted.
-   */
-  folders: string[];
   /**
    * Exclusions that named a folder the vault actually has. An exclusion naming
    * nothing changes nothing, so counting it would claim a decision the user did
    * not make.
    */
   excludedCount: number;
+  /**
+   * The exclusion set itself, canonical and sorted: what the counts describe and
+   * what the approval writes.
+   *
+   * It travels with the counts so the rule has ONE implementation (the host's):
+   * re-deriving the set here would be a second opinion about scope, and the
+   * number the user approves would eventually stop being the number counted.
+   */
+  excludedFolders: string[];
+  /**
+   * The folders this exclusion set still leaves readable, canonical and sorted:
+   * the candidates the write picker offers.
+   *
+   * They come from the host for the same reason the set above does. A write grant
+   * must name a folder the connection may also READ, so a picker built from the
+   * vault's whole folder list would offer folders the writer refuses, and the
+   * refusal would reach the user as an unexplained failed approval.
+   */
+  folders: string[];
+}
+
+/**
+ * One queued out-of-scope write, as the card renders it
+ * (external-mcp-connection task 13).
+ *
+ * It is a PROPOSAL, never a pending write: nothing has been applied, and
+ * accepting it extends that connection's write grant by exactly `folder`.
+ */
+export interface McpWriteRequestView {
+  /** The connection that attempted it. Its grant is what accepting widens. */
+  connection: string;
+  /** The folder it named, canonical. */
+  folder: string;
+  /** When it asked, Unix epoch seconds. */
+  requestedAt: number;
+  /**
+   * What it said it wanted to write. CLIENT-AUTHORED USER TEXT: rendered, never
+   * logged, and the reason this surface has no diagnostics panel.
+   */
+  summary: string;
+  /** The verb it called. */
+  verb: string;
 }
 
 /**
@@ -94,6 +145,7 @@ export const EMPTY_MCP_ACCESS: McpExternalAccessView = {
   connections: [],
   folders: [],
   noteCount: 0,
+  writeRequests: [],
 };
 
 /** The connection list, with per-connection scope and last use. */
@@ -104,16 +156,28 @@ export async function readMcpExternalAccess(): Promise<McpExternalAccessView> {
   return {
     connections: (wire?.connections ?? []).map((row) => ({
       name: row.name,
-      readFolders: row.readFolders ?? [],
-      missingFolders: row.missingFolders ?? [],
+      legacy: row.legacy ?? false,
+      legacyFolders: row.legacyFolders ?? [],
+      excludedFolders: row.excludedFolders ?? [],
+      staleExcludedFolders: row.staleExcludedFolders ?? [],
       writeFolders: row.writeFolders ?? [],
       approvedAt: row.approvedAt ?? 0,
       lastUsedAt: row.lastUsedAt ?? null,
       noteCount: row.noteCount ?? 0,
-      deltaFolders: row.deltaFolders ?? [],
+      folderCount: row.folderCount ?? 0,
     })),
     folders: wire?.folders ?? [],
     noteCount: wire?.noteCount ?? 0,
+    // Only the requests the host can still accept: a row whose grant is gone, or
+    // whose folder has been excluded since, is not a decision this surface can
+    // offer, and the host filters it out before it gets here.
+    writeRequests: (wire?.writeRequests ?? []).map((row) => ({
+      connection: row.connection ?? "",
+      folder: row.folder ?? "",
+      requestedAt: row.requestedAt ?? 0,
+      summary: row.summary ?? "",
+      verb: row.verb ?? "",
+    })),
   };
 }
 
@@ -136,6 +200,7 @@ export async function readMcpGrantPreview(
     noteCount: wire?.noteCount ?? 0,
     folderCount: wire?.folderCount ?? 0,
     excludedCount: wire?.excludedCount ?? 0,
+    excludedFolders: wire?.excludedFolders ?? [],
     folders: wire?.folders ?? [],
   };
 }
