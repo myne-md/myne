@@ -15,7 +15,7 @@
   # against Myne-initiated downloads: Nix is not a Myne client, an AppImage is
   # not a model, and the fetch happens because the user ran `nix run`.
   #
-  # Updated to v0.9.0 on 2026-10-03; both arches ship an AppImage again, so both
+  # Updated to v0.11.2 on 2026-10-31; both arches ship an AppImage again, so both
   # arms move together.
   description = "Myne — calm, end-to-end-encrypted markdown notes";
 
@@ -28,12 +28,12 @@
       srcFor = system: pkgs:
         {
           "x86_64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.9.0/Myne_0.9.0_amd64.AppImage";
-            sha256 = "sha256-Rt7U3pidUDGwibbVLGrVE484TREeHHPTDxK1jrie7ws=";
+            url = "https://downloads.myne.md/releases/v0.11.2/Myne_0.11.2_amd64.AppImage";
+            sha256 = "sha256-HhbSboCr8TWpvadEC3+sL2s0uqMtC9pCktraikDRI6k=";
           };
           "aarch64-linux" = pkgs.fetchurl {
-            url = "https://downloads.myne.md/releases/v0.9.0/Myne_0.9.0_aarch64.AppImage";
-            sha256 = "sha256-Dy5SFhFz5LN4LDPhFG1fQ0PrfpXhmUyfVz0jOPtVjvw=";
+            url = "https://downloads.myne.md/releases/v0.11.2/Myne_0.11.2_aarch64.AppImage";
+            sha256 = "sha256-DEp05JVmIzzXIIe+kv223F/HZHlol2XLyGSI4Kxek4U=";
           };
         }.${system};
     in {
@@ -42,7 +42,7 @@
           pkgs = nixpkgs.legacyPackages.${system};
           myne = pkgs.appimageTools.wrapType2 {
             pname = "myne";
-            version = "0.9.0";
+            version = "0.11.2";
             src = srcFor system pkgs;
           };
         in { default = myne; myne = myne; });
