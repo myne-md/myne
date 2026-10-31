@@ -26,508 +26,508 @@
   ],
   "verified": {
     "a11y.wcag22-manual": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "ai.agent-hub": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "ai.agent-mode": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "ai.chat": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "ai.on-device-transcription": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "ai.summarize-and-ask": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "app.crash-recovery": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "app.language-and-i18n": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "app.reminders": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "app.self-update": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "app.window-chrome": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "attachments.uri-scheme-playback": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "backup.automatic-schedule": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "backup.manual-export": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "backup.restore": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "clipper.connected-extensions": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "clipper.locked-or-closed": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "clipper.pairing": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "editor.detached-window-pop-out": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "editor.tasks-inline": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "editor.text-editing": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "editor.transcription": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "editor.voice-recording": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "export.backup-exclusion": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "export.share-destination": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "identity.first-run": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "import.myne-vault": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "input.keybindings": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "install.desktop-artefacts": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "install.store-distribution-and-update": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "keyboard.ime-and-accessory-bar": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "layout.size-classes": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "lifecycle.background-grace-lock": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "lifecycle.sync-suspend-resume": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "links.backlinks-and-mentions": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "meeting.notes": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "navigation.back-gesture": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "network.ai-egress-gate": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "network.tor-routing": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "procedures.clipboard-sensitivity": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "reminders.android-delivery": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "reminders.ios-delivery": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "reminders.tap-landing": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "security.keychain-device-binding": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.ai-provider": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.datetime-display": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.hide-vault-names": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.new-note-location": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.screen-capture-protection.android": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.screen-capture-protection.ios": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.screen-capture-protection.linux": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.block.screen-capture-protection.macos": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.panel.privacy": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.panel.storage": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "settings.panel.sync": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "share-import.android-intent": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "share-import.ios-extension": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "sidebar.notes-and-folders": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "sync.conflicts": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "sync.cross-version": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "sync.device-join": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "sync.status-and-banners": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "unlock.argon2id-budget": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.auto-lock": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.change-password": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.creation": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.delete": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.migration-and-repair": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.picker-and-switcher": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.quick-unlock": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "vault.recover-from-phrase": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "watch.capture-drain": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "watch.meeting-capture": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.clipboard.write-per-engine": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.deploy.headers-and-isolation": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.opfs.double-buffer-crash": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.phrase.creation-and-recovery-in-a-page": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.storage.eviction-rebootstrap": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.storage.private-browsing": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.storage.quota-exhaustion": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "web.tab.single-tab-lock-lifecycle": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "webview.navigation-policy": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "widgets.deep-link-launchers": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     },
     "workspace.navigation-history": {
-      "version": "v0.10.1",
-      "date": "2026-10-24",
+      "version": "v0.11.2",
+      "date": "2026-10-31",
       "verdict": "override",
-      "reason": "Demo release ahead of the first alpha: every surface ships from the start to prove the whole release path, and no row was walked by a person."
+      "reason": "OWNER OVERRIDE 2026-10-31: the owner directed that v0.11.2 ship immediately with the manual roster and the E2E gate skipped; no row of this plan was walked on any client."
     }
   }
 }
