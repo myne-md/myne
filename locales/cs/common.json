@@ -4284,7 +4284,8 @@
         "cli": "CLI",
         "vault": "Trezor",
         "data": "Data",
-        "diagnostics": "Diagnostika"
+        "diagnostics": "Diagnostika",
+        "extensions": "Rozšíření prohlížeče"
       },
       "passwordUpdatedToast": "Heslo aktualizováno",
       "title": "Nastavení"
@@ -4683,7 +4684,6 @@
       "devicesNote": "Zařízení, členové sdílených trezorů a vaše identita se spravují v Synchronizaci.",
       "groupingError": "Seskupení účtů se na tomto zařízení nepodařilo přečíst. Nic se nezměnilo.",
       "sections": {
-        "extensions": "Rozšíření prohlížeče",
         "grouping": "Tento účet"
       },
       "vaultsCount_few": "{{count}} trezorů",

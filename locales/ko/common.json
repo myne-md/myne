@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "보관함",
         "data": "데이터",
-        "diagnostics": "진단"
+        "diagnostics": "진단",
+        "extensions": "브라우저 확장 프로그램"
       },
       "passwordUpdatedToast": "비밀번호가 업데이트되었습니다",
       "title": "설정"
@@ -4404,7 +4405,6 @@
       "devicesNote": "기기, 공유 보관함 구성원, 정체성은 동기화에서 관리합니다.",
       "groupingError": "이 기기의 계정 그룹핑을 읽지 못했습니다. 아무것도 바뀌지 않았습니다.",
       "sections": {
-        "extensions": "브라우저 확장 프로그램",
         "grouping": "이 계정"
       }
     },

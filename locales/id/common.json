@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Brankas",
         "data": "Data",
-        "diagnostics": "Diagnostik"
+        "diagnostics": "Diagnostik",
+        "extensions": "Ekstensi peramban"
       },
       "passwordUpdatedToast": "Kata sandi diperbarui",
       "title": "Pengaturan"
@@ -4404,7 +4405,6 @@
       "devicesNote": "Perangkat, anggota brankas bersama dan identitas Anda dikelola di Sinkronisasi.",
       "groupingError": "Tidak dapat membaca pengelompokan akun di perangkat ini. Tidak ada yang berubah.",
       "sections": {
-        "extensions": "Ekstensi peramban",
         "grouping": "Akun ini"
       }
     },

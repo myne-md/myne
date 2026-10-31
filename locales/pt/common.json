@@ -4151,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Cofre",
         "data": "Dados",
-        "diagnostics": "Diagnóstico"
+        "diagnostics": "Diagnóstico",
+        "extensions": "Extensões do navegador"
       },
       "passwordUpdatedToast": "Palavra-passe atualizada",
       "title": "Definições"
@@ -4545,7 +4546,6 @@
       "devicesNote": "Dispositivos, membros de cofres partilhados e a sua identidade são geridos em Sincronização.",
       "groupingError": "Não foi possível ler o agrupamento de contas neste dispositivo. Nada foi alterado.",
       "sections": {
-        "extensions": "Extensões do navegador",
         "grouping": "Esta conta"
       },
       "vaultsCount_many": "{{count}} cofres"

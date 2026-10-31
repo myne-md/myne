@@ -4284,7 +4284,8 @@
         "cli": "CLI",
         "vault": "Skarbiec",
         "data": "Dane",
-        "diagnostics": "Diagnostyka"
+        "diagnostics": "Diagnostyka",
+        "extensions": "Rozszerzenia przeglądarki"
       },
       "passwordUpdatedToast": "Hasło zaktualizowane",
       "title": "Ustawienia"
@@ -4683,7 +4684,6 @@
       "devicesNote": "Urządzenia, członkowie skarbca współdzielonego i Twoja tożsamość są zarządzane w Synchronizacji.",
       "groupingError": "Nie udało się odczytać grupowania kont na tym urządzeniu. Nic się nie zmieniło.",
       "sections": {
-        "extensions": "Rozszerzenia przeglądarki",
         "grouping": "To konto"
       },
       "vaultsCount_few": "{{count}} skarbców",

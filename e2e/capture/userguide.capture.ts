@@ -1981,15 +1981,16 @@ runner(
       );
 
       // ---- Frame: connected extensions (browser-clipper pairings) ----
-      // Lives in the Account panel; the capture vault has none paired, so the
-      // empty state (settings.connected-extensions-empty) shows.
+      // Lives in the Browser extensions panel since myne-md/myne#960, where the
+      // clipper left Account; the capture vault has none paired, so the empty
+      // state (settings.connected-extensions-empty) shows.
       await frame(
         s,
         "connected-extensions",
         "attachments-and-import/browser-clipper",
-        "The Connected extensions section of the Account settings, where browsers paired with the clipper are listed and can be revoked.",
+        "The Connected extensions section of the Browser extensions settings, where browsers paired with the clipper are listed and can be revoked.",
         async () => {
-          await (await s.byTestId("settings.tab-account")).click();
+          await (await s.byTestId("settings.tab-extensions")).click();
           const ext = await s.byTestId("settings.connected-extensions", { timeoutMs: 6000 });
           await safe("scroll connected-extensions into view", async () => {
             await s.execute(

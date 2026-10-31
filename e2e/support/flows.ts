@@ -483,6 +483,7 @@ export type SettingsTab =
   | "vault"
   | "privacy"
   | "sync"
+  | "extensions"
   | "editor"
   | "files"
   | "hotkeys"

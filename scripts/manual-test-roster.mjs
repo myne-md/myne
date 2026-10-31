@@ -1633,6 +1633,7 @@ export const ROSTER = Object.freeze([
     id: "clipper.connected-extensions",
     title: "Connected extensions list, revoke and host install",
     paths: [
+      "src/components/settings/BrowserExtensionsPanel.tsx",
       "src/components/settings/ConnectedExtensions.tsx",
       "src/components/settings/browser-icons.tsx",
       "web/src/components/settings/ConnectedExtensions.tsx",

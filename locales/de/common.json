@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Tresor",
         "data": "Daten",
-        "diagnostics": "Diagnose"
+        "diagnostics": "Diagnose",
+        "extensions": "Browser-Erweiterungen"
       },
       "passwordUpdatedToast": "Passwort aktualisiert",
       "title": "Einstellungen"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Geräte, Mitglieder gemeinsamer Tresore und Ihre Identität werden unter Synchronisierung verwaltet.",
       "groupingError": "Die Kontogruppierung auf diesem Gerät konnte nicht gelesen werden. Es wurde nichts geändert.",
       "sections": {
-        "extensions": "Browser-Erweiterungen",
         "grouping": "Dieses Konto"
       }
     },

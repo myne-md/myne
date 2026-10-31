@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Hvelv",
         "data": "Data",
-        "diagnostics": "Diagnostikk"
+        "diagnostics": "Diagnostikk",
+        "extensions": "Nettleserutvidelser"
       },
       "passwordUpdatedToast": "Passord oppdatert",
       "title": "Innstillinger"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Enheter, delte hvelvmedlemmer og identiteten din administreres i Synk.",
       "groupingError": "Kunne ikke lese konto-grupperingen på denne enheten. Ingenting ble endret.",
       "sections": {
-        "extensions": "Nettleserutvidelser",
         "grouping": "Denne kontoen"
       }
     },

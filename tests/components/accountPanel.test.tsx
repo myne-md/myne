@@ -44,11 +44,6 @@ vi.mock("../../src/lib/vault-list", async (importOriginal) => ({
 vi.mock("../../src/platform/capabilities", () => ({
   has: () => true,
 }));
-// The paired-extensions block does its own IPC on mount; it has its own suite
-// (`tests/components/connectedExtensions.test.tsx`), so it is a marker here.
-vi.mock("../../src/components/settings/ConnectedExtensions", () => ({
-  ConnectedExtensions: () => <div data-testid="ce" />,
-}));
 
 import { AccountPanel } from "../../src/components/settings/AccountPanel";
 
@@ -117,9 +112,18 @@ describe("AccountPanel — the account this vault belongs to", () => {
     expect(rows[1]!.getAttribute("data-current")).toBe("false");
   });
 
-  it("renders the paired-extensions block, which is account-level", () => {
+  /**
+   * The browser clipper used to sit here as the panel's last section, on the
+   * argument that a pairing token is account-scoped. The scope was right and the
+   * panel was wrong (`design-notes/ui/0767`, myne-md/myne#960): Account answers
+   * "who am I on this device", and a browser the user connected is software. The
+   * panel owns that surface now (`browserExtensionsPanel.test.tsx`), so what this
+   * suite holds is the ABSENCE, which is the half a move can silently undo.
+   */
+  it("no longer hosts the browser clipper", () => {
     renderPanel();
-    expect(screen.getByTestId("ce")).toBeTruthy();
+    expect(screen.queryByTestId("settings.browser-extensions")).toBeNull();
+    expect(screen.queryByText("settings.account.sections.extensions")).toBeNull();
   });
 });
 

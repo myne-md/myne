@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Holvi",
         "data": "Tiedot",
-        "diagnostics": "Diagnostiikka"
+        "diagnostics": "Diagnostiikka",
+        "extensions": "Selainlaajennukset"
       },
       "passwordUpdatedToast": "Salasana päivitetty",
       "title": "Asetukset"
@@ -4407,7 +4408,6 @@
       "devicesNote": "Laitteita, jaetun holvin jäseniä ja identiteettiä hallinnoidaan kohdassa Synkronointi.",
       "groupingError": "Tilin ryhmittelyä ei voitu lukea tällä laitteella. Mitään ei muuttunut.",
       "sections": {
-        "extensions": "Selainlaajennukset",
         "grouping": "Tämä tili"
       }
     },

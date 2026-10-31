@@ -60,8 +60,6 @@ import { useTranslation } from "react-i18next";
 import { IconButton } from "../primitives/IconButton";
 import { Input } from "../primitives/Input";
 import { VISUALLY_HIDDEN } from "../primitives/visuallyHidden";
-import * as capabilities from "../../platform/capabilities";
-import { ConnectedExtensions } from "./ConnectedExtensions";
 import { SettingsSection, SettingsSectionCounter } from "./SettingsSection";
 import { ControlBlock } from "./ControlBlock";
 import { SettingRow } from "./SettingRow";
@@ -508,21 +506,10 @@ export function AccountPanel({ vaultId }: AccountPanelProps) {
         </SettingsSection>
       )}
 
-      {/* Browser clipper: absent on web (MYND-574 task 27). A page cannot be a
-          native-messaging host, so the extension talks to the desktop app or to
-          nothing — there is no degraded mode to offer. Omitted rather than
-          disabled: `decisions.md` 2026-07-26 makes that normative.
-
-          These are the account's paired devices rather than the vault's: the
-          pairing token is bound to the account, which is why they sit here and
-          not under Sync. */}
-      {capabilities.has("clipper") && (
-        <SettingsSection title={t("settings.account.sections.extensions")}>
-          <div data-testid="settings.account-extensions">
-            <ConnectedExtensions />
-          </div>
-        </SettingsSection>
-      )}
+      {/* The browser clipper used to live here, as an inline section: it is now
+          its own rail panel (`BrowserExtensionsPanel`, myne-md/myne#960). Account
+          answers "who am I on this device"; a pairing with a browser is software
+          the user connects, so it stopped being a subsection of identity. */}
     </div>
     </SettingsSectionCounter>
   );

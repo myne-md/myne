@@ -49,7 +49,11 @@ const V = {
   ],
   "src/components/settings/AccountPanel.tsx": [
     "adapted",
-    "Ships; the clipper block is capability-gated AND its module is substituted. Holds the account grouping (a device-local record behind the OS keychain, so on web it answers empty and the panel shows its standalone state) and the paired-extension list. The vault controls it used to carry moved to VaultPanel.",
+    "Ships; holds the account number and the device-local vault grouping (a record behind the OS keychain, so on web it answers empty and the panel shows its standalone state). The vault controls it used to carry moved to VaultPanel, and the paired-extension list moved to its own panel (myne-md/myne#960).",
+  ],
+  "src/components/settings/BrowserExtensionsPanel.tsx": [
+    "adapted",
+    "Never mounted: the `extensions` rail entry is filtered out where `clipper` is absent, so the panel is unreachable on web rather than rendered empty, and the block it hosts (`ConnectedExtensions`) is substituted anyway. Split out of AccountPanel on myne-md/myne#960; the verdict is unchanged in kind, because it is the same content behind the same gate.",
   ],
   "src/components/settings/AiPanel.tsx": [
     "adapted",

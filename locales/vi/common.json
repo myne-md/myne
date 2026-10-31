@@ -4018,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Kho lưu trữ",
         "data": "Dữ liệu",
-        "diagnostics": "Chẩn đoán"
+        "diagnostics": "Chẩn đoán",
+        "extensions": "Tiện ích mở rộng trình duyệt"
       },
       "passwordUpdatedToast": "Đã cập nhật mật khẩu",
       "title": "Cài đặt"
@@ -4404,7 +4405,6 @@
       "devicesNote": "Thiết bị, thành viên kho dùng chung và danh tính được quản lý trong Đồng bộ.",
       "groupingError": "Không đọc được nhóm tài khoản trên thiết bị này. Không có gì thay đổi.",
       "sections": {
-        "extensions": "Tiện ích mở rộng trình duyệt",
         "grouping": "Tài khoản này"
       }
     },
