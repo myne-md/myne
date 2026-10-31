@@ -48,6 +48,31 @@ export function phraseTypeBackMatches(
   return { matches, allMatch: matches.every((m) => m === true) };
 }
 
+/**
+ * Spread a pasted phrase across the challenge's positions.
+ *
+ * The type-back asks for four words by NUMBER, and the phrase the user is
+ * holding is one ordered block of 24: copying it out of a password manager and
+ * pasting it into the first field used to put all 24 words into one box and
+ * leave the other three empty (myne-md/myne#945 item 04). The words are the
+ * SAME words, in the same order, so the positions are a lookup rather than a
+ * puzzle: `words[pos - 1]` is what belongs in the field labelled `Word #pos`.
+ *
+ * Returns `null` when the paste is not a whole phrase (fewer words than the
+ * highest position asked for), which is the ordinary single-word paste and must
+ * keep its default behaviour: inserting where the caret is.
+ */
+export function distributePhrasePaste(
+  text: string,
+  positions: readonly number[],
+): Array<readonly [number, string]> | null {
+  const words = text.trim().split(/\s+/).filter((w) => w.length > 0);
+  if (words.length === 0) return null;
+  const highest = Math.max(...positions);
+  if (words.length < highest) return null;
+  return positions.map((pos) => [pos, words[pos - 1] ?? ""] as const);
+}
+
 export interface PhraseTypeBackProps {
   /** The 24 words, already split. */
   phrase: readonly string[];
@@ -110,6 +135,19 @@ export function PhraseTypeBack({
               type="text"
               value={value}
               onChange={(e) => onChange(pos, e.target.value)}
+              onPaste={(e) => {
+                const distributed = distributePhrasePaste(
+                  e.clipboardData.getData("text"),
+                  positions,
+                );
+                if (distributed === null) return;
+                // `preventDefault` rather than letting the paste land first:
+                // the whole point is that the four fields, not one, receive it.
+                e.preventDefault();
+                for (const [position, word] of distributed) {
+                  onChange(position, word);
+                }
+              }}
               invalid={invalid}
               autoComplete="off"
               spellCheck={false}

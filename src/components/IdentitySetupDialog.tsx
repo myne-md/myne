@@ -125,10 +125,10 @@ export function IdentitySetupDialog({ open, onClose, onCreated }: IdentitySetupD
       testId="identity-setup.root"
       canDismiss={canDismiss}
     >
-      {/* The modal body carries no padding of its own (Settings fills it edge
-          to edge), so a dialog that wants an inset supplies it. This one did
-          not, and its copy ran into the frame. */}
-      <div style={{ padding: "var(--space-5)", overflowY: "auto", minHeight: 0 }}>
+      {/* The body's inset is `ModalShell`'s now (myne-md/myne#945): this
+          wrapper used to supply `var(--space-5)` itself, which is the same
+          number the primitive applies, so nothing moved when it came off. */}
+      <div style={{ overflowY: "auto", minHeight: 0 }}>
         <IdentitySetupPanel
           // The re-probe is deferred to the Done CTA (not fired from the
           // panel's own create), because the generated recovery phrase is shown

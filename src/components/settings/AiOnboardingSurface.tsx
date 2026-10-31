@@ -193,11 +193,6 @@ export function AiOnboardingSurface({
           display: "flex",
           flexDirection: "column",
           gap: "var(--space-3)",
-          // `ModalShell`'s body carries no padding of its own: every caller
-          // supplies its own, and this surface was one of the two that did not,
-          // so its content sat flush against the card edges (myne-md/myne#847).
-          // The same fix `MeetingAiDialog` needed (myne-md/myne#843).
-          padding: "var(--space-5)",
         }}
       >
       <p data-testid="aiOnboarding.intro" style={CARD_BODY_STYLE}>

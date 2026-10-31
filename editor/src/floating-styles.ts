@@ -464,6 +464,17 @@ const CSS = `
      of .cm-fm-properties-name-row above, so without this the title row alone can
      be wider than a phone (myne-md/myne#630). */
   min-width: 0;
+  /* A one-row textarea (myne-md/myne#945 item 01): the title wraps onto two and
+     then three lines instead of scrolling inside a single-line input. The
+     HEIGHT is set from scrollHeight in the widget, so overflow must stay
+     hidden and the box must not be resizable by the user - the grow is the
+     content's, not a drag handle's. box-sizing: border-box because the measured
+     scrollHeight is then exactly the height to set back. */
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   appearance: none;
   -webkit-appearance: none;
   border: 0;

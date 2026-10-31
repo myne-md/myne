@@ -114,6 +114,7 @@ export function AiProviderConsent({
       closeLabel={t("common.close")}
       width={560}
       testId="ai-consent.screen"
+      bodyBleed
       // No `zIndex` override: this opens from inside the Settings modal, whose
       // own fixed backdrop is a stacking context, so the dialog already paints
       // above it. The raised level is for surfaces that arrive UNSOLICITED.

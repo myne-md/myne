@@ -197,7 +197,13 @@ describe("composeClipPlaintext — provenance frontmatter composition", () => {
     const env = envelope({ markdownBody: "" });
     const out = composeClipPlaintext(env, "", "Example Page");
 
-    let expected = enc.encode(buildInitialPlaintext(null));
+    // Annotated rather than inferred (myne-md/myne#945): TS 6 types `Uint8Array`
+    // by its buffer, `enc.encode` answers `Uint8Array<ArrayBuffer>` and the
+    // frontmatter patchers answer `Uint8Array<ArrayBufferLike>`, so the inferred
+    // variable type is the narrower one and each reassignment is a variance
+    // error. The bytes are the same bytes; the annotation is what the ratchet in
+    // `scripts/check-test-typecheck.mjs` was reporting.
+    let expected: Uint8Array = enc.encode(buildInitialPlaintext(null));
     expected = patchTitleField(expected, "Example Page");
     expected = patchFrontmatterField(expected, "source", env.sourceUrl);
     expected = patchFrontmatterField(expected, "url", env.sourceUrl);

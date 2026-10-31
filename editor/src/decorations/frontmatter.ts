@@ -419,8 +419,19 @@ class PropertiesWidget extends WidgetType {
     const displayValue =
       titleProp === undefined ? "" : displayYamlScalar(titleProp.value);
 
-    const input = document.createElement("input");
-    input.type = "text";
+    // A `<textarea>`, not an `<input>`, because a title does not fit on one line
+    // and an input CANNOT wrap: myne-md/myne#945 item 01 showed a real title
+    // ("Software Testing HW - Nature-Inspired Algorithms - For Wee…") cut off
+    // at the pane edge with the rest unreachable, so the field scrolled instead of
+    // growing. A one-row textarea that grows to its own `scrollHeight` flows
+    // onto two and then three lines and only then scrolls, which is the
+    // behaviour the surface always implied.
+    //
+    // The single-line SEMANTICS are kept by hand: Enter never inserts a newline
+    // (it blurs, which is what commits), and `white-space: pre-wrap` in the
+    // stylesheet keeps a pasted line break from being silently swallowed.
+    const input = document.createElement("textarea");
+    input.rows = 1;
     input.className = "cm-fm-properties-name";
     input.value = displayValue;
     input.placeholder = i18n.t("editor.frontmatter.titlePlaceholder");
@@ -432,6 +443,18 @@ class PropertiesWidget extends WidgetType {
     // suite had nothing to type into (`src/AGENTS.md`: "A screen without
     // testids is invisible to E2E").
     input.setAttribute("data-testid", TITLE_FIELD_TESTID);
+
+    // Grow to fit the wrapped title. `height: auto` first, because `scrollHeight`
+    // of a box that already has a height is that height, so shrinking back after
+    // a deletion would otherwise never happen.
+    const autosize = () => {
+      input.style.height = "auto";
+      input.style.height = `${input.scrollHeight}px`;
+    };
+    input.addEventListener("input", autosize);
+    // `toDOM` has not been inserted yet, and `scrollHeight` of a detached element
+    // is 0, which would collapse the field to its padding.
+    queueMicrotask(autosize);
 
     input.addEventListener("change", () => {
       this.commitTitle(view, input, displayValue);
@@ -942,7 +965,7 @@ class PropertiesWidget extends WidgetType {
    */
   private commitTitle(
     view: EditorView,
-    input: HTMLInputElement,
+    input: HTMLTextAreaElement,
     prevDisplay: string,
   ): void {
     const next = input.value.replace(/[\r\n]+/g, " ").trim();

@@ -1927,7 +1927,14 @@ export async function nameNewNote(session: Session, title: string): Promise<void
         .execute<boolean>(
           "var el=document.querySelector(arguments[0]); if(!el) return false;" +
             "el.focus();" +
-            "var d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');" +
+            // The promoted title is a `<textarea>` since myne-md/myne#945
+            // (`frontmatter.ts`), and `HTMLInputElement.prototype`'s value setter
+            // throws `Illegal invocation` on one, so the constructor has to follow
+            // the element. Without this the whole fallback arm died silently: the
+            // `.catch(() => false)` below turned the TypeError into "the DOM set
+            // did not happen" and the keystroke path ran instead.
+            "var proto=(el instanceof HTMLTextAreaElement)?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;" +
+            "var d=Object.getOwnPropertyDescriptor(proto,'value');" +
             "d.set.call(el, arguments[1]);" +
             "el.dispatchEvent(new Event('input',{bubbles:true}));" +
             "return true;",
@@ -2172,12 +2179,32 @@ export async function typeIntoEditor(
   // node (waitUntil only treats stale as transient when the predicate RE-QUERIES,
   // see its header). Re-locate INSIDE the poll (raw clickOnce, no nested retry)
   // so a replaced node is simply the next iteration's fresh handle.
+  //
+  // The click lands on the LAST LINE rather than on the content box, and that is
+  // not cosmetic. WebDriver clicks the CENTRE of the element it is given, and
+  // since myne-md/myne#945 the promoted title is a `<textarea>` that grows to
+  // the wrapped title, so on a short note (a freshly created one, or a two-line
+  // note) the centre of `.cm-content` falls INSIDE the title field: the click
+  // focuses the title, `sendKeys` types the payload into the note's NAME, and the
+  // probe below times out with "keystroke pipeline established" while the app is
+  // doing exactly what it was told. Measured on
+  // `e2e/window-close-flush.e2e.ts` after item 01 landed: the app was fine and
+  // the harness was clicking the wrong pixel. The last line is body by
+  // construction, because the frontmatter block above it is a widget and not a
+  // line.
   const content = await session.waitUntil(
     async () => {
-      const [el] = await session.findElements(CM_CONTENT);
-      if (!el) return null;
+      // Click a BODY line; type into the CONTENT. The two are different elements
+      // and separating them is what makes this work: a `.cm-line` is the only
+      // thing whose box is body by construction, but it is a plain div and
+      // `sendKeys` on it fails with "Element is not focusable". `.cm-content` is
+      // the focusable one and keeps the caret the click placed.
+      const target =
+        (await session.findElements(`${CM_CONTENT} .cm-line`)).at(-1) ??
+        (await session.findElements(CM_CONTENT))[0];
+      if (!target) return null;
       try {
-        await el.clickOnce();
+        await target.clickOnce();
       } catch (e) {
         if (
           e instanceof WebDriverError &&
@@ -2189,7 +2216,9 @@ export async function typeIntoEditor(
         }
         throw e;
       }
-      return el;
+      // Re-found, not reused: the click can replace the content node (see the
+      // header), and `sendKeys` needs the live one.
+      return (await session.findElements(CM_CONTENT))[0] ?? null;
     },
     { label: "editor located + focused", timeoutMs: 10_000 },
   );

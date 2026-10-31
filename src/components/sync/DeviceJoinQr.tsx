@@ -278,15 +278,21 @@ export function DeviceJoinQr({
           )}
         </div>
       ) : null}
-      <div style={HINT}>
-        {t(
-          isMember
-            ? "sync.memberJoinQr.hint"
-            : isPerson
-              ? "sync.personJoinQr.hint"
+      {/* The person variant carries NO paragraph here: its four steps below say
+          the same thing in order (paste the code, type your 24 words, approve
+          here, the vaults appear), and the paragraph restated all four in one
+          breath above them (myne-md/myne#945 item 03, owner report: "the text
+          repeats itself"). The member variant keeps its line, which carries a
+          claim the steps do not make: what the code does and does not contain. */}
+      {isPerson ? null : (
+        <div style={HINT}>
+          {t(
+            isMember
+              ? "sync.memberJoinQr.hint"
               : "sync.deviceJoinQr.hint",
-        )}
-      </div>
+          )}
+        </div>
+      )}
       {noInput ? (
         // The path the code shortcuts, spelled out. Two DIFFERENT paths share
         // this arm, so they cannot share one list: a member's second device

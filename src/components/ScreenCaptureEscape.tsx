@@ -274,6 +274,7 @@ export function ScreenCaptureEscape() {
         labelId="screen-capture-escape-title"
         testId="screen-capture-escape.dialog"
         width={520}
+        bodyBleed
       >
         <div style={SCROLL_STYLE}>
           {!savedForNextLaunch &&

@@ -148,10 +148,8 @@ describe("the real tree", () => {
       "CLIP_NOTICE_VIEW_ACTION",
       "clipOmittedTallyLine",
       "CONNECTED_EXTENSIONS_TITLE",
-      "CONNECTED_EXTENSIONS_HELPER",
       "CONNECTED_EXTENSIONS_EMPTY",
       "CONNECTED_EXTENSIONS_REVOKE_LABEL",
-      "CONNECTED_EXTENSIONS_REPAIR_HINT",
     ]) {
       expect(names.has(name), `${name} is not exported by @myne/copy`).toBe(true);
     }

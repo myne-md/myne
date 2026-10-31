@@ -99,6 +99,7 @@ export function DeleteAttachmentDialog({
       labelId="delete-attachment-title"
       width={460}
       closeLabel={t("attachments.deleteDialog.cancel")}
+      bodyBleed
     >
       <div style={BODY_STYLE}>
         <div>{t("attachments.deleteDialog.confirmPrompt")}</div>

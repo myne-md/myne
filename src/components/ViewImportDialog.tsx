@@ -383,6 +383,7 @@ export function ViewImportDialog({ open, onClose }: ViewImportDialogProps) {
       width={520}
       closeLabel={t("notes.views.import.close")}
       testId="view-import.modal"
+      bodyBleed
     >
       <div data-testid="view-import.body" style={BODY_STYLE}>
         {renderBody()}

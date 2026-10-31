@@ -5,8 +5,15 @@
 // offers a per-row Revoke. Revoke is desktop-authoritative — immediate +
 // durable on the Rust side (the token is dropped from the encrypted prefs
 // blob). This UI only surfaces the list + the revoke gesture; the extension's
-// re-pair prompt is its own side (out of scope here), so the section carries a
-// one-line hint that a revoked extension must pair again.
+// re-pair prompt is its own side (out of scope here).
+//
+// **Two explanatory sentences were removed 2026-10-29** (owner request: "too
+// much writing, no simplicity"). One described what the list already is
+// ("Browser extensions you have paired with this vault") and the other stated
+// the consequence of the button beside it ("A revoked extension must pair again
+// to reconnect"). Both were load-bearing copy until then, and both are gone
+// from `@myne/copy` rather than merely unrendered, so the two clients cannot
+// drift back apart about a sentence neither shows.
 //
 // Account is its home (decisions.md 2026-06-21, moved from Privacy): connected
 // extensions are account-level paired devices, sitting alongside the vault label,
@@ -27,8 +34,6 @@ import {
 } from "../../lib/clipper-pairing";
 import {
   CONNECTED_EXTENSIONS_EMPTY,
-  CONNECTED_EXTENSIONS_HELPER,
-  CONNECTED_EXTENSIONS_REPAIR_HINT,
   CONNECTED_EXTENSIONS_REVOKE_LABEL,
   CONNECTED_EXTENSIONS_TITLE,
 } from "../../lib/load-bearing-copy";
@@ -37,7 +42,7 @@ import { Button } from "../primitives/Button";
 import { Switch } from "../primitives/Switch";
 import { EmptyState } from "../primitives/EmptyState";
 import { SettingRow } from "./SettingRow";
-import { BLOCK_STYLE, HELPER_STYLE, LABEL_STYLE } from "./panel-styles";
+import { BLOCK_STYLE, LABEL_STYLE } from "./panel-styles";
 import { BrowserIcon, browserLabel } from "./browser-icons";
 import i18n from "../../i18n";
 
@@ -198,7 +203,6 @@ export function ConnectedExtensions() {
 
       <div style={BLOCK_STYLE} data-testid="settings.connected-extensions">
         <span style={LABEL_STYLE}>{CONNECTED_EXTENSIONS_TITLE}</span>
-        <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_HELPER}</p>
 
       {paired.length === 0 ? (
         <EmptyState
@@ -250,7 +254,6 @@ export function ConnectedExtensions() {
               </div>
             ))}
           </div>
-          <p style={HELPER_STYLE}>{CONNECTED_EXTENSIONS_REPAIR_HINT}</p>
         </>
       )}
       </div>

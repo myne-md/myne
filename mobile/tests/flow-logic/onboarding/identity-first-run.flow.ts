@@ -15,7 +15,12 @@
 
 import { test, expect } from "@playwright/test";
 import { installMockIpc } from "../mock-ipc";
-import { createIdentityToHome, startVaultFromIdentityHome, IDENTITY_SETUP_RESULT } from "../helpers";
+import {
+  createIdentityToHome,
+  fillPhraseField,
+  startVaultFromIdentityHome,
+  IDENTITY_SETUP_RESULT,
+} from "../helpers";
 
 test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
   test("welcome offers ONE create action, and the local-vault fork is gone", async ({ page }) => {
@@ -99,19 +104,19 @@ test.describe("mobile one-door first run (myne-md/myne#911 task 12)", () => {
     await expect(server).toBeVisible();
     await expect(server).toHaveValue("");
 
-    // No address, no way forward, and the phrase is not on this step at all.
+    // No address, no way forward, and the phrase is not on this step at all. The
+    // testid alone, with no element name: the field is a `textarea` since
+    // myne-md/myne#945 item 02, and an `input[...]` selector would find zero
+    // elements whether the field were there or not.
     await expect(page.getByTestId("identity-flow.register-continue")).toBeDisabled();
-    await expect(page.locator('input[data-testid^="identity-flow.register-cell"]')).toHaveCount(0);
+    await expect(page.locator('[data-testid^="identity-flow.register-cell"]')).toHaveCount(0);
 
     await server.fill("https://sync.example");
     await page.getByTestId("identity-flow.register-continue").click();
 
-    // Step two is the phrase.
-    const cells = page.locator('input[data-testid^="identity-flow.register-cell"]');
-    await expect(cells).toHaveCount(24);
-    for (let i = 0; i < 24; i += 1) {
-      await cells.nth(i).fill("ribbon");
-    }
+    // Step two is the phrase, as one field holding all 24 words.
+    await expect(page.locator('[data-testid^="identity-flow.register-cell"]')).toHaveCount(1);
+    await fillPhraseField(page, "identity-flow.register-cell");
     await page.getByTestId("identity-flow.register-submit").click();
 
     // The address went first, then the phrase crossed IPC once as the proof of

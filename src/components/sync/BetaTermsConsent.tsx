@@ -118,6 +118,7 @@ export function BetaTermsConsent({
       closeLabel={t("common.close")}
       width={560}
       testId={testId}
+      bodyBleed
     >
       <div style={SCROLL_STYLE}>
         <p style={HELPER_STYLE}>{t("sync.betaTerms.intro")}</p>

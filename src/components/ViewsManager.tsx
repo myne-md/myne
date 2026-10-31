@@ -202,6 +202,7 @@ export function ViewsManager({ open, onClose }: ViewsManagerProps) {
       width={520}
       closeLabel={t("notes.views.manager.close")}
       testId="views-manager.modal"
+      bodyBleed
     >
       <div data-testid="views-manager.root" style={ROOT_STYLE}>
         <div style={TOOLBAR_STYLE}>

@@ -910,6 +910,7 @@ export const ROSTER = Object.freeze([
     paths: [
       "src/screens/titlebar.ts",
       "src/lib/app-window.ts",
+      "src/lib/close-request.ts",
       "src/hooks/useIsFullscreen.ts",
       "src/platform/window.ts",
       "src/platform/webviewWindow.ts",
@@ -922,6 +923,7 @@ export const ROSTER = Object.freeze([
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
       "e2e/window-close-flush.e2e.ts",
+      "e2e/window-close-unlock.e2e.ts",
       "e2e/workspace-state.e2e.ts",
       "e2e/plaintext-residue.e2e.ts",
       "e2e/tab-switch-flush.e2e.ts",
@@ -5491,7 +5493,7 @@ export const ROSTER = Object.freeze([
   },
   {
     id: "settings.panel.about",
-    title: "About panel: version, build, threat model, legal, changelog",
+    title: "About panel: version, build, threat model, legal",
     paths: [
       "src/components/settings/AboutPanel.tsx",
       "src/platform/build-info.ts",

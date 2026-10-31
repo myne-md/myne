@@ -906,7 +906,48 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       {/* Two sections (myne-md/myne#885): the devices on this account (adding
           one, the roster, the member each device is claimed by) against the
           people the vault is shared with. */}
-      <SettingsSection title={t("sync.panel.sections.devices")}>
+      <SettingsSection
+        title={t("sync.panel.sections.devices")}
+        // The device-join action is an icon-only `+` on the section seam, which
+        // REVERSES the 2026-10-25 decision recorded here before ("it looks as if
+        // a vault is being added"). The owner asked for the icon back on
+        // 2026-10-29, and the two reports are answered by WHERE it sits rather
+        // than by labelling it: on the seam, beside "Devices on your account",
+        // the `+` is scoped by the heading immediately to its left, which is
+        // exactly what a plus floating over the first row could not do. The
+        // earlier objection ("it had to be hovered to learn what it added") is
+        // met without hover: `aria-label` names it, `tooltip` shows the same
+        // words on hover or keyboard focus, and `bordered` makes it read as a
+        // control rather than a decoration. The heading above the old labelled
+        // button already said "devices", so the word beside the button was the
+        // duplication (myne-md/myne#945 item 06).
+        action={
+          enrolledHere ? (
+            // The owner arm needs an ENROLLED device to show a code for another
+            // one; the member arm needs the member plane. The two never render
+            // together, so one slot carries one action.
+            <IconButton
+              icon="plus"
+              label={t("sync.deviceJoinQr.title")}
+              tooltip
+              bordered
+              onClick={() => setQrOpen(true)}
+              testId="sync.device-join-qr.open"
+            />
+          ) : plane === "member" ? (
+            // A member's own-device QR: no pasted account number, because it
+            // describes the shared vault this device is already a member of.
+            <IconButton
+              icon="plus"
+              label={t("sync.memberJoinQr.title")}
+              tooltip
+              bordered
+              onClick={() => setMemberQrOpen(true)}
+              testId="sync.member-join-qr.open"
+            />
+          ) : undefined
+        }
+      >
       {/* The ACCOUNT model in one sentence, above the controls that act on it.
           Without it the section reads as a list of vault participants: the reader
           has to infer whether a device is added to this vault or to the person.
@@ -976,53 +1017,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.devices" data-setting-row="true">
-        {/* The device-join action is a LABELLED button, not a bare `+`
-            (2026-10-25 owner report: "it looks as if a vault is being added").
-            An icon-only plus beside a "Devices" sub-heading had to be hovered to
-            learn what it added, and the answer differs by identity plane: on an
-            owner it signs ANOTHER device in to the account, on a member it signs
-            their own second device in to THIS vault. One word beside the control
-            says which, and the pair never renders together (`enrolledHere` is
-            owner-only, the member arm is the other plane), so the two never
-            compete for one slot.
-
-            The redundant "Devices" sub-heading is gone with it: the section above
-            is already titled "Devices on your account", and "devices" twice in a
-            row is the vocabulary this change exists to fix. */}
-        {(enrolledHere || plane === "member") && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: "var(--space-3)",
-            }}
-          >
-            {/* The owner arm needs an ENROLLED device to show a code for another
-                one; the member arm needs the member plane. The two never render
-                together, so one slot carries one action and one label. */}
-            {enrolledHere ? (
-              <Button
-                variant="secondary"
-                onClick={() => setQrOpen(true)}
-                data-testid="sync.device-join-qr.open"
-              >
-                {t("sync.deviceJoinQr.title")}
-              </Button>
-            ) : null}
-            {/* A member's own-device QR: no pasted account number, because it
-                describes the shared vault this device is already a member of. */}
-            {plane === "member" ? (
-              <Button
-                variant="secondary"
-                onClick={() => setMemberQrOpen(true)}
-                data-testid="sync.member-join-qr.open"
-              >
-                {t("sync.memberJoinQr.title")}
-              </Button>
-            ) : null}
-          </div>
-        )}
         <DeviceManagementPanel hook={devicesHook} plane={plane} />
       </div>
 

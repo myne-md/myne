@@ -1089,14 +1089,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     capability: "diagnosticLog",
   },
   {
-    id: "about.changelog",
-    agentWritability: WRITABILITY_NONE,
-    panelId: "about",
-    titleKey: "settings.about.changelogLabel",
-    descriptionKey: "settings.about.changelogHelper",
-    keywordsKey: "settings.search.keywords.changelog",
-  },
-  {
     id: "about.legal",
     agentWritability: WRITABILITY_NONE,
     panelId: "about",

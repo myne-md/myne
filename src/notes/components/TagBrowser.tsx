@@ -176,6 +176,7 @@ export function TagBrowser({
       onClose={onClose}
       width={width}
       height={height}
+      bodyBleed
     >
       <div
         data-testid="tags.modal"

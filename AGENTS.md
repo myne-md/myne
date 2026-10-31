@@ -548,6 +548,9 @@ revert-and-run that STILL passes is the finding, not a formality to tick.
   unhandled rejection). And a surface that keeps a local copy of remote state owes it a way to learn
   that the write did not land, or it will report a value nobody can find on disk.
 
+- **`lefthook run pre-commit` must be run on a FULLY staged tree, because it builds a patch with `git diff --output <file> --` and that invocation fails on the git shipped by this Mac's CLT.** With a partially staged tree the command exits 128 with `Not a git repository`, lefthook reports it as a hook failure, and the message names neither git nor the staging state, so it reads as a lint bug in whichever hook happened to print last (myne-md/myne#945 spent a turn on it). Stage everything first (`git add -A`, then unstage anything that must not be committed) or run the individual guards by hand. The commit itself is unaffected: `pre-commit` runs against the index, so a partial commit still checks the right files.
+- **`vitest run --root mobile` is not the mobile test lane.** `mobile/` is a pnpm workspace member with its own `vitest.config.ts`, and `--root` makes Vitest resolve the ROOT config instead, so environment, setup files and aliases all come from the wrong place: five suites fail on `document is not defined` and on unresolvable `@myne/*` imports, which reads as broken tests rather than a broken invocation. Use `pnpm --filter myne-mobile test` (the `mobile:test` script does the same thing) and treat any `--root` spelling as the bug.
+
 - **Tauri lib must keep `_lib` suffix** (`myne_desktop_lib`) to avoid Windows lib-vs-bin collision (rust-lang/cargo#8519). See `src-tauri/AGENTS.md`.
 
 ## Cryptographically load-bearing identifiers

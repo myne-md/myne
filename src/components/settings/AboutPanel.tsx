@@ -3,8 +3,13 @@
 // build channel (Development / Stable from `import.meta.env.MODE`) +
 // threat-model link (opens `https://myne.md/threat-model` via
 // `opener:default`'s `allow-open-url` for https) + license + the
-// Developer mode toggle (developer-mode feature, MYND-593) + disabled
-// "View changelog…" (enables with MYND-119).
+// Developer mode toggle (developer-mode feature, MYND-593).
+//
+// **The changelog block is gone** (2026-10-29 owner request: "remove the
+// changelog"). It was a permanently disabled button under a sentence promising
+// notes "when MYND-119 lands", so the only thing it ever did was take a row on
+// the panel the build's identity lives on. A dead control is not a placeholder
+// a user can act on; when per-version notes exist they earn their own door.
 //
 // The Developer mode toggle is the first interactive control this panel has
 // ever had — placed beside the build/license/threat-model claims because
@@ -23,8 +28,8 @@
 //
 // **The diagnostics section left this panel on 2026-10-25** (owner request: "move
 // the diagnostic part of About to a tab of its own"). What remains is what this
-// build IS: version, channel, commit, hash, updates, developer mode, changelog,
-// licence. What is going WRONG is `DiagnosticsPanel`, which is a different question
+// build IS: version, channel, commit, hash, updates, developer mode, licence.
+// What is going WRONG is `DiagnosticsPanel`, which is a different question
 // asked at a different moment, and four blocks of it used to sit under a version
 // string.
 
@@ -480,16 +485,6 @@ export function AboutPanel() {
             />
           )}
         />
-
-        <Block data-setting-anchor="about.changelog" data-setting-row="true">
-          <span style={LABEL_STYLE}>{t("settings.about.changelogLabel")}</span>
-          <div>
-            <Button variant="secondary" disabled>
-              {t("settings.about.changelogButton")}
-            </Button>
-          </div>
-          <p style={HELPER_STYLE}>{t("settings.about.changelogHelper")}</p>
-        </Block>
       </SettingsSection>
     </div>
   );

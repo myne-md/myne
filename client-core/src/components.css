@@ -843,6 +843,21 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* The body is inset HERE, once, because `every caller supplies its own` produced the
+     same defect three separate times: the header is inset by `var(--space-5)` and the
+     body was not, so a dialog's content sat flush against the card edge while its
+     title did not (myne-md/myne#843, #847, #945). The horizontal value matches the
+     header's own inset so the two line up; the vertical one is the shared space
+     step the header height already implies. */
+  padding: var(--space-5);
+}
+
+/* Edge-to-edge opt-out for a body that draws its own bands: a scroll region
+   beside a fixed footer with a top border, or a toolbar with a bottom one. Those
+   callers keep supplying their inset, and opting OUT is a prop at the call site
+   (`ModalShell`'s `bodyBleed`) rather than a silent omission. */
+.myne-modal-body--bleed {
+  padding: 0;
 }
 
 

@@ -277,6 +277,10 @@ const V = {
       "Typed rather than excluded because nothing substitutes the module out of the bundle.",
   ],
   "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
+  "src/lib/close-request.ts": [
+    "adapted",
+    "The app's ONE window-close path (myne-md/myne#945 item 05). On web it installs nothing, and that is the correct answer rather than a gap: a browser tab has no close request to intercept, so the presence check on the substituted handle fails and the module returns. `adapted` rather than `ported` because the desktop half - the single listener, the guard registry, the deadline and the `destroy()` - has no browser equivalent to run, and `excluded` would be wrong twice over: the module ships in the bundle and `App`'s boot effect calls it on every client.",
+  ],
   "src/lib/detachedWindow.ts": [
     "typed-unsupported",
     "The pop-out spawn binding (myne#173). The `detached-window` plugin is `Class::Unsupported` in web/wasm/src/capability.rs (a browser page cannot open an OS window), so its one command answers the typed unsupported refusal; the affordance is also gated off, since `detachedWindows` is absent on web.",
