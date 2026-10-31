@@ -2211,7 +2211,7 @@ Used in: `docs/decisions/protocol/0607-member-removal-roster-person-id-and-revok
 
 ### **member vault key store** &nbsp; 🗝️ *Key/identifier*
 
-**Retired** (myne-md/myne#938 task 12, `decisions/protocol/0763`). It was the device-local `vault.member-key` file that let a B2B member re-unlock a shared vault with their recovery phrase instead of a password (myne-md/myne#711 task 25, `decisions/protocol/0606`): the member's `group_key` and `itemsKey` (64 bytes) AEAD-sealed under a KEK derived from the member's own normalized phrase under the salt domain `"myne.v0.2 argon2id-person-vault-member|"`, with AAD `aad_person_member_key_store(vault_id, account_number_hash)`. Two credentials for one vault meant the weaker gate decided, and that gate was the phrase, which is also the member's identity root, so unlocking the vault and proving the person were the same act. The salt domain, the AAD role `"person-member-key-store"` and the derivation are gone from the registry; a file found on disk is deleted at the next member unlock. A member's second device uses a fresh invite or the device admission ceremony, not the phrase.
+**Retired** (myne-md/myne#938 task 12, `decisions/protocol/0763`). It was the device-local `vault.member-key` file that let a B2B member re-unlock a shared vault with their recovery phrase instead of a password (myne-md/myne#711 task 25, `decisions/protocol/0606`): the member's `group_key` and `itemsKey` (64 bytes) AEAD-sealed under a KEK derived from the member's own normalized phrase under the salt domain `"myne.v0.2 argon2id-person-vault-member|"`, with AAD `aad_person_member_key_store(vault_id, account_number_hash)`. Two credentials for one vault meant the weaker gate decided, and that gate was the phrase, which is also the member's identity root, so unlocking the vault and proving the person were the same act. The salt domain, the AAD role `"person-member-key-store"` and the derivation are gone from the registry; a file found on disk is deleted at the next member unlock. A member's second device uses a fresh invite, not the phrase: the device-admission ceremony was the other door until `decisions/protocol/0764` withdrew its surface on 2026-10-31.
 
 Used in: `docs/decisions/protocol/0606-member-vault-key-store.md`; `docs/decisions/protocol/0763-a-member-vault-has-one-way-in.md`; `docs/spec/protocol.md` §5.2; `myne-md/myne#711`; `myne-md/myne#938`.
 
@@ -2705,7 +2705,11 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
-**device admission.** The act of adding a device to a person account without typing the recovery phrase
+**device admission.** **Surface withdrawn** on 2026-10-31 (`decisions/protocol/0764`, myne-md/myne#956): the
+codec, the SAS class, the five `myne-core` commands and `POST /auth/devices/credential` all remain, and no client
+mounts a control for them, so the definition below is what the protocol does rather than what a user can reach
+today. The revival is myne-md/myne#957, which folds the per-device credential into the ordinary **Approve**
+action. The act itself: adding a device to a person account without typing the recovery phrase
 (`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
 has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
 them, compares a short authentication string between the two screens, and installs the credential

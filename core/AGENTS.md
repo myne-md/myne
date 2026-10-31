@@ -208,7 +208,7 @@ CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`n
   credential (`device_actor`'s own tests) and `NoopHost` where only the enrolment record matters
   (`NoopHost::app_config_dir` is an `Err`, so the person arm is simply not reached). What must
   never happen is the shape the bullet above describes: a `_with_dir` function resolving its
-  `vault_dir` argument from the host instead of using it. See `decisions/sync/0764`.
+  `vault_dir` argument from the host instead of using it. See `decisions/sync/0766`.
 
 - **A per-file sync adopt has no self-heal, so a write precondition is part of the sync path and not
   only of the local one.** myne-md/myne#883: the agent-memory entry plane wrote `memories/<id>`

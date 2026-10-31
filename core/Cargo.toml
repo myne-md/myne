@@ -277,7 +277,13 @@ windows-sys = { version = "0.60", features = ["Win32_Storage_FileSystem"] }
 # is hardware-gated and pending biometric-device + primitive-level review
 # before it is trusted.
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-security-framework = "3"
+# `OSX_10_15` is what exposes `PasswordOptions::use_protected_keychain`, and the device
+# signing key needs it: an item carrying an access control is only written when the
+# query targets the DATA PROTECTION keychain, and without this flag the query goes to
+# the file-based one, where the write is refused and the key is never stored at all
+# (myne-md/myne#959). The feature gates one constant in `security-framework-sys` and
+# pulls no crate.
+security-framework = { version = "3", features = ["OSX_10_15"] }
 security-framework-sys = "2"
 
 [target.'cfg(target_os = "linux")'.dependencies]
