@@ -2,7 +2,8 @@
 // 1/2/4/5/6/8).
 //
 // Drives folding through the production binary: a note with headings + a nested
-// list gets a hover-reveal fold gutter (data-testid="editor.fold-gutter-marker").
+// list gets hover-reveal fold MARKERS that sit inline at the start of each
+// foldable line (data-testid="editor.fold-marker").
 // Clicking a heading's marker collapses the section to an inline placeholder
 // (data-testid="editor.fold-placeholder"); clicking the placeholder unfolds it.
 // fold-all / unfold-all run from the command palette. Folds are EPHEMERAL —
@@ -35,7 +36,7 @@ import {
 import { testIdSelector, type Session } from "./support/webdriver";
 
 const CM_EDITOR = testIdSelector("editor.content") + " .cm-editor";
-const FOLD_MARKER = testIdSelector("editor.fold-gutter-marker");
+const FOLD_MARKER = testIdSelector("editor.fold-marker");
 const FOLD_PLACEHOLDER = testIdSelector("editor.fold-placeholder");
 
 // A doc with two H1 sections and a nested list under the first. The unique
@@ -53,8 +54,8 @@ const DOC = [
   "beta body",
 ].join("\n");
 
-/** Hover the editor so the hover-reveal gutter shows its fold markers, then
- *  return all currently-rendered fold-gutter markers. */
+/** Hover the editor so the hover-reveal markers show, then return all
+ *  currently-rendered fold markers. */
 async function revealAndGetMarkers(s: Session) {
   const editor = await s.waitForElement(CM_EDITOR);
   await editor.hover();
@@ -63,7 +64,7 @@ async function revealAndGetMarkers(s: Session) {
       const markers = await s.findElements(FOLD_MARKER);
       return markers.length > 0 ? markers : null;
     },
-    { label: "fold-gutter markers revealed on hover", timeoutMs: 10_000 },
+    { label: "fold markers revealed on hover", timeoutMs: 10_000 },
   );
 }
 

@@ -61,7 +61,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "ConfirmStep": { file: "src/screens/vault-creation/ConfirmStep.tsx", line: 58 },
   "ConflictsView": { file: "src/notes/components/ConflictsView.tsx", line: 310 },
   "ConnectedExtensions": { file: "src/components/settings/ConnectedExtensions.tsx", line: 112 },
-  "ContextMenu": { file: "src/notes/components/ContextMenu.tsx", line: 171 },
+  "ContextMenu": { file: "src/notes/components/ContextMenu.tsx", line: 254 },
   "ControlBlock": { file: "src/components/settings/ControlBlock.tsx", line: 32 },
   "CoverPicker": { file: "src/components/attachments/CoverPicker.tsx", line: 141 },
   "CreateVault": { file: "src/screens/CreateVault.tsx", line: 114 },

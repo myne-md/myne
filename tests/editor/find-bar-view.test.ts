@@ -188,3 +188,62 @@ describe("find-bar view: intent handlers", () => {
     expect(h.onQueryChange).not.toHaveBeenCalled();
   });
 });
+
+// Reading order (myne#952).
+//
+// The bar was three different shapes in one release: full width with the input
+// stretched across the note, then compact and pushed to the right edge, then
+// this. The owner's correction was about WHERE the reader starts, which no
+// render-state test above can see — they all query by class. So this group pins
+// the DOM ORDER itself, and the two things that order depends on: the input
+// leading its row, both rows wrapping their input in a field (that is what puts
+// the two inputs' text at the same x), and the close button staying last.
+describe("find-bar view: reading order", () => {
+  it("puts the query field first in the find row", () => {
+    bar = createFindBarView(IDLE, noopHandlers());
+    const row = bar.dom.querySelector(".cm-find-bar-find-row") as HTMLElement;
+    const first = row.firstElementChild as HTMLElement;
+    expect(first.className).toContain("cm-find-bar-field");
+    // The FIELD leads the row, not a control or an icon column: the input is
+    // what the bar exists for.
+    expect(first.firstElementChild?.classList.contains("cm-find-bar-lead")).toBe(
+      true,
+    );
+    expect(first.querySelector("input")).toBe(bar.input);
+  });
+
+  it("orders the controls after the field, with close last", () => {
+    bar = createFindBarView(IDLE, noopHandlers());
+    const row = bar.dom.querySelector(".cm-find-bar-find-row") as HTMLElement;
+    // Spelled out in full rather than compared pairwise: a pairwise check with
+    // `indexOf` reads -1 for a row that is MISSING, and -1 is less than every
+    // real index, so deleting the field outright passes every comparison
+    // (measured — that is how this test was first written). The whole sequence
+    // also forces the next person who adds a control to say where it goes.
+    const order = Array.from(row.children)
+      .map((el) => el.className)
+      .filter((c) => !c.includes("cm-find-bar-divider"));
+    expect(order).toEqual([
+      "cm-find-bar-field",
+      "cm-find-bar-status cm-find-bar-status--hidden",
+      "cm-find-bar-btn cm-find-bar-case",
+      "cm-find-bar-btn cm-find-bar-prev",
+      "cm-find-bar-btn cm-find-bar-next",
+      "cm-find-bar-btn cm-find-bar-toggle",
+      "cm-find-bar-btn cm-find-bar-close",
+      "cm-find-bar-a11y",
+    ]);
+  });
+
+  it("wraps the replace input in a field too, so both rows start at one x", () => {
+    const h = noopHandlers();
+    bar = createFindBarView({ ...IDLE, expanded: true }, h);
+    bar.update({ ...IDLE, expanded: true });
+    const replaceRow = bar.dom.querySelector(
+      ".cm-find-bar-replace-row",
+    ) as HTMLElement;
+    const first = replaceRow.firstElementChild as HTMLElement;
+    expect(first.className).toContain("cm-find-bar-field");
+    expect(first.querySelector(".cm-find-bar-replace-input")).not.toBeNull();
+  });
+});
