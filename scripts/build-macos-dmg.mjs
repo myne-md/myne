@@ -3,11 +3,18 @@
 //
 // Why this exists: Tauri signs every sign target, the Frameworks, the `externalBin`
 // sidecars and the app itself, with the SAME `bundle.macOS.entitlements`. The app
-// needs the restricted `keychain-access-groups` entitlement for Touch ID quick-unlock,
-// but a nested binary that carries a restricted entitlement is SIGKILLed by AMFI
-// (exit 137): the entitlement is authorized by the app's embedded provisioning
-// profile and a sidecar has none. Stripping the entitlement from the sidecars fixes
-// them and re-signing the app re-seals the bundle.
+// needs the restricted `com.apple.application-identifier` entitlement: every keychain
+// write that carries an access control is refused `errSecMissingEntitlement` (-34018)
+// without it, which is how the device signing key went a week without ever being
+// stored (myne-md/myne#959). But a nested binary that carries a restricted
+// entitlement is SIGKILLed by AMFI (exit 137), because the entitlement is authorized
+// by the app's embedded provisioning profile and a sidecar has none. Stripping the
+// entitlement from the sidecars fixes them, and re-signing the app re-seals the bundle.
+//
+// The app is re-signed WITH `src-tauri/entitlements.plist`, and that is the half a
+// bare `codesign --force` silently drops: entitlements live inside the signature, so
+// a re-sign that omits the flag ships an app that launches and then fails every ACL
+// keychain write. Pass the file, and keep `bundle.macOS.files`' embedded profile.
 //
 // So the flow is: let Tauri produce the DMG scaffolding (`bundle_dmg.sh` + support/),
 // produce the app, re-sign the sidecars without entitlements, re-sign the app with
@@ -25,7 +32,7 @@
 // existed. MYNE_ALLOW_DEV_SIGNING=1 is the deliberate escape for a local test
 // build that is never uploaded.
 
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -114,8 +121,17 @@ function notarize(path) {
   console.log(`notarized: ${path} (id ${res.id})`);
 }
 
-const codesign = (path) =>
-  run("codesign", ["--force", "--options", "runtime", "--timestamp", "--sign", ID, path]);
+const codesign = (path, entitlements) =>
+  run("codesign", [
+    "--force",
+    "--options",
+    "runtime",
+    "--timestamp",
+    "--sign",
+    ID,
+    ...(entitlements ? ["--entitlements", entitlements] : []),
+    path,
+  ]);
 
 const run = (cmd, args, opts = {}) =>
   execFileSync(cmd, args, { stdio: "inherit", cwd: ROOT, ...opts });
@@ -189,18 +205,81 @@ for (const bin of sidecars) {
   }
   codesign(path);
 }
-// The app is signed WITHOUT `src-tauri/entitlements.plist`, which is now an
-// empty dict on purpose. That file used to carry `keychain-access-groups`, and on
-// macOS 26 that restricted entitlement made the app unlaunchable
-// (`Launchd job spawn failed`, NSPOSIXErrorDomain 163) even with an embedded
-// development profile, a matching certificate and the profile's own
-// application-identifier entitlement. It granted nothing: the Touch ID provider
-// sets no access group, so its items already live in the default group, which is
-// the identifier the entitlement named. Reintroducing it needs a Developer ID
-// provisioning profile with Keychain Sharing, not another entitlement edit.
-codesign(APP);
+// The app is signed WITH `src-tauri/entitlements.plist`: `com.apple.application-identifier`
+// is what authorizes a keychain write that carries an access control, and macOS honors
+// it only because `bundle.macOS.files` embeds the Developer ID provisioning profile
+// that names it. The sidecars above are signed WITHOUT it for the reason in the
+// header: AMFI SIGKILLs a nested binary carrying a restricted entitlement that has no
+// profile of its own, and the symptom is a dead terminal client and dead Tor routing
+// while the app itself launches.
+//
+// Measured, both directions (myne-md/myne#959): entitlement without the embedded
+// profile and the app cannot launch (`Launchd job spawn failed`, NSPOSIXErrorDomain
+// 163, while `codesign` verification still passes); profile embedded and entitlement
+// absent and every ACL write returns -34018 with the UI falling back silently.
+// A dev-signed build is the documented local escape (`MYNE_ALLOW_DEV_SIGNING=1`), and the
+// embedded profile lists only the Developer ID certificate, so applying the restricted
+// entitlement under a development signature is a bundle nothing authorizes. It stores no
+// device key, which is the honest outcome for a build nobody should ship.
+const devSigned =
+  process.env.MYNE_ALLOW_DEV_SIGNING === "1" || ID_NAME.includes("Apple Development");
+const appEntitlements = devSigned
+  ? undefined
+  : join(ROOT, "src-tauri", CONF.bundle.macOS.entitlements);
+codesign(APP, appEntitlements);
 
 run("codesign", ["--verify", "--verbose=2", "--deep", APP]);
+
+// `codesign --verify` passes in BOTH broken states this change documents, so it is not
+// evidence about either. Ask the signature itself, and ask the bundle for the profile that
+// authorizes what it finds: the entitlement without a profile cannot launch at all
+// (NSPOSIXErrorDomain 163), the profile without the entitlement silently stores no device
+// key (-34018, so every head stays `0x02` and the phrase prompt returns), and an AMFI
+// parser error makes `codesign` sign with NEITHER while still exiting 0.
+if (!devSigned) {
+  // `codesign -d` writes to stderr, so both streams are read.
+  const probe = spawnSync("codesign", ["-d", "--entitlements", "-", APP], { encoding: "utf8" });
+  const shown = `${probe.stdout ?? ""}${probe.stderr ?? ""}`;
+  if (!shown.includes("com.apple.application-identifier")) {
+    console.error(
+      "the signed app carries no com.apple.application-identifier, so every keychain write\n" +
+        "that carries an access control is refused (-34018) and no device signing key is\n" +
+        "ever stored. Run `plutil -lint src-tauri/entitlements.plist` AND check that no XML\n" +
+        "comment in it contains a double hyphen: AMFI rejects the file, `codesign` prints\n" +
+        "AMFIUnserializeXML and signs without the entitlement anyway.",
+    );
+    process.exit(1);
+  }
+  if (!existsSync(join(APP, "Contents/embedded.provisionprofile"))) {
+    console.error(
+      "the app bundle carries no Contents/embedded.provisionprofile, so the restricted\n" +
+        "entitlement is unauthorized and the app cannot launch at all\n" +
+        "(Launchd job spawn failed, NSPOSIXErrorDomain 163). Check bundle.macOS.files.",
+    );
+    process.exit(1);
+  }
+}
+
+// The updater payload was archived BEFORE the repair above, so the app inside it carries
+// the restricted entitlement on its sidecars and no embedded profile: an in-place update
+// would install a SIGKILLed CLI, MCP front-end and Tor sidecar while the app itself
+// launched. Re-archive from the repaired bundle, and remove the now-stale signature rather
+// than leave one that no longer matches these bytes.
+const tarball = join(BUNDLE, "macos", `${CONF.productName}.app.tar.gz`);
+if (existsSync(tarball)) {
+  rmSync(tarball, { force: true });
+  run("tar", ["-czf", tarball, "-C", join(BUNDLE, "macos"), `${CONF.productName}.app`]);
+  rmSync(`${tarball}.sig`, { force: true });
+  if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
+    run("pnpm", ["tauri", "signer", "sign", tarball]);
+  } else {
+    console.error(
+      "\nWARNING: the updater archive was rebuilt from the repaired app, so its previous\n" +
+        "signature was REMOVED and no new one could be made (no TAURI_SIGNING_PRIVATE_KEY).\n" +
+        "Do not publish the auto-update manifest from this build.",
+    );
+  }
+}
 
 // 4. Rebuild the DMG from the fixed app using Tauri's own script (the chrome, the
 //    background art and the Finder layout come from there, not from hdiutil).

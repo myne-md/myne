@@ -3,30 +3,46 @@
 <plist version="1.0">
 <dict>
   <!--
-    EMPTY ON PURPOSE, and the reasoning is load-bearing (2026-10-26).
+    ONE KEY, AND A PROVISIONING PROFILE THAT AUTHORIZES IT. Both halves are required
+    and neither is obvious, which is how this file spent a week empty while the device
+    signing key was never stored at all (myne-md/myne#959).
 
-    This file carried `keychain-access-groups = D8UWYY2KY7.md.myne.desktop` for
-    the MYND-329 quick-unlock Touch ID provider. That value is the app's DEFAULT
-    access group under a `D8UWYY2KY7.md.myne.desktop` signature, and the provider
-    never asks for a group (`core/src/plugins/quick_unlock/apple.rs` sets only
-    `kSecAccessControlBiometryCurrentSet` and `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`,
-    with no `kSecAttrAccessGroup`), so the entitlement granted nothing the app did
-    not already have.
+    `com.apple.application-identifier` is the app's identity, and every keychain write
+    that carries an access control needs one. Without it macOS answers
+    `errSecMissingEntitlement` (-34018) and the item is not written: the device key fell
+    back to the person key, every signed head was format `0x02`, and sync demanded the
+    identity phrase again after each unlock with nothing but a prompt to say so.
+    Measured on macOS 26 with a Developer ID signature and no profile: both the data
+    protection keychain AND the classic one refuse the ACL write, and neither
+    `com.apple.developer.team-identifier` nor `keychain-access-groups` changes that.
+    With this one key and a profile embedded, the same write succeeds and the item
+    reports `kSecAttrAccessibleWhenUnlockedThisDeviceOnly`, which is what
+    `core/src/plugins/sync/device_identity.rs` asks for.
 
-    What it did cost was the launch. On macOS 26 a restricted entitlement is only
-    honored with a provisioning profile that authorizes it, and with the profile
-    embedded and matching the certificate the spawn was still refused
-    (`Launchd job spawn failed`, NSPOSIXErrorDomain 163). Signed without the
-    entitlement, the same bundle launches, and `security-framework`'s macOS
-    SecItem path uses the classic keychain with the default group.
+    `com.apple.developer.team-identifier` is deliberately absent: measured alongside,
+    it changes nothing once the application identifier is present.
 
-    The earlier note here said the entitlement was required or biometric writes
-    return errSecMissingEntitlement (-34018); that is true of the DATA PROTECTION
-    keychain, which this code does not opt into on macOS.
+    `keychain-access-groups` is deliberately absent too. It was the only key here
+    before 2026-10-26 and it was removed because it granted nothing: it is the app's
+    default group, and the quick-unlock provider never asks for a group. The removal
+    was still wrong, because it took the application identifier with it and that one
+    is load-bearing. Do not re-add the group; do not remove the key above.
 
-    If biometric quick-unlock ever fails with -34018 on a real device, the answer
-    is a Developer ID provisioning profile with Keychain Sharing plus this key
-    back, not a wider entitlement: `myne-ops/runbooks/local-multiplatform-build.md`.
+    On macOS 26 a restricted entitlement is honored ONLY when the bundle embeds a
+    provisioning profile that authorizes it, so `src-tauri/tauri.conf.json` must keep
+    `bundle.macOS.files` pointing at that profile. The two failure modes are a trap and
+    each looks like something else: entitlement without an embedded profile and the app
+    cannot launch at all (`Launchd job spawn failed`, NSPOSIXErrorDomain 163, while a
+    `codesign` verification still passes), profile embedded and entitlement absent and every
+    ACL write returns -34018 with the UI silently falling back. Procedure and the
+    profile's own generation steps: `myne-ops/runbooks/local-multiplatform-build.md`.
+
+    Never write a double hyphen inside this comment: an XML comment may not contain one,
+    `plutil -lint` accepts it anyway, and AMFI's parser does not, so `codesign` reports
+    `AMFIUnserializeXML: syntax error` and then signs WITHOUT the entitlement while still
+    exiting 0. The symptom is the -34018 above, which is why this cost a round.
   -->
+  <key>com.apple.application-identifier</key>
+  <string>D8UWYY2KY7.md.myne.desktop</string>
 </dict>
 </plist>
