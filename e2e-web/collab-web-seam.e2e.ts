@@ -169,7 +169,7 @@ describeE2E("web awareness seam (SYNC-49)", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
 
         // 2b. The policy does not merely NAME the origin: a fetch-streamed
         //     request from the app origin to the awareness origin CONNECTS under

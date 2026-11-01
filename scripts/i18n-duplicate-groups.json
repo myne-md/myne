@@ -1,23 +1,5 @@
 [
   {
-    "value": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
-    "keys": [
-      "accountBootstrap.verifyChanged",
-      "join.verifyChanged",
-      "sync.devices.verifyChanged",
-      "sync.join.verifyChanged"
-    ],
-    "reason": "Same mid-verification change warning on all four bootstrap/join/device-verify screens; one product fact."
-  },
-  {
-    "value": "Enter your account number",
-    "keys": [
-      "accountEntry.title",
-      "recover.accountTitle"
-    ],
-    "reason": "Same step title on account entry and recover; one step, two flows."
-  },
-  {
     "value": "{{count}} setting put back.",
     "keys": [
       "agent.review.undoReportSettings",
@@ -352,22 +334,13 @@
     "reason": "Same backend-busy error on quick-unlock and vault creation; one error, two call sites."
   },
   {
-    "value": "Add this device to an account",
+    "value": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "keys": [
-      "sync.join.title",
-      "vaultPicker.joinDevice",
-      "vaultSwitcher.joinDevice",
-      "welcome.joinTitle"
+      "approvalWait.verifyChanged",
+      "join.verifyChanged",
+      "sync.devices.verifyChanged"
     ],
-    "reason": "Same join-device CTA on sync join, picker, switcher and welcome; one action, four surfaces."
-  },
-  {
-    "value": "Double-check this number. It doesn't look right.",
-    "keys": [
-      "join.accountHint",
-      "sync.settings.accountNumberHint"
-    ],
-    "reason": "Same account-number hint on join and sync settings; one hint, two entry points."
+    "reason": "One sentence for one situation: the head moved between the read that drew the compare code and the read that follows it. The two live sites are the approving side's device list and the phone's approval wait, and both must say the same thing because the user is looking at two screens at once and a rewording on either turns a matched pair into an apparent mismatch. The browser's site joined them as `approvalWait.verifyChanged` when its bootstrap screen became the approval wait (`decisions/sync/0767`); `sync.join.verifyChanged` left with the account-number join form, and the English did not move either time, only the namespaces did."
   },
   {
     "value": "Forget this identity on this device",
@@ -427,20 +400,20 @@
     "reason": "The vault picker and the Settings Account panel report the same fact when this device's account grouping cannot be read; one failure, two surfaces."
   },
   {
-    "value": "Enter these four words from the identity phrase you just saved.",
-    "keys": [
-      "identityFlow.phrase.typebackLead",
-      "identitySetup.typeBackLead"
-    ],
-    "reason": "The desktop identity-setup dialog and the mobile identity flow run the SAME phrase-typeback step, so the question a user must answer is one sentence. Rewording per client would let the two clients ask a different question about the same phrase."
-  },
-  {
     "value": "Save your identity phrase",
     "keys": [
       "identityFlow.phrase.title",
       "identitySetup.phraseTitle"
     ],
     "reason": "The phrase step of the identity ceremony is one screen on both clients (myne-md/myne#869 split it off the type-back step), so its title is the same title; two wordings would name the same step differently on the phone and on the desktop."
+  },
+  {
+    "value": "Enter these four words from the identity phrase you just saved.",
+    "keys": [
+      "identityFlow.phrase.typebackLead",
+      "identitySetup.typeBackLead"
+    ],
+    "reason": "The desktop identity-setup dialog and the mobile identity flow run the SAME phrase-typeback step, so the question a user must answer is one sentence. Rewording per client would let the two clients ask a different question about the same phrase."
   },
   {
     "value": "That does not match word #{{pos}}.",

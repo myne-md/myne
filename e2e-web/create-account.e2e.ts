@@ -146,8 +146,8 @@ describeE2E("web account creation", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
-        const door = await browser.session.byTestIdAll("account-entry.create-account");
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
+        const door = await browser.session.byTestIdAll("welcome.create-cta");
         expect(door.length, "the entry screen must offer account creation").toBe(1);
       } finally {
         await browser.teardown();
@@ -171,8 +171,8 @@ describeE2E("web account creation", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
-        await (await browser.session.byTestId("account-entry.create-account")).click();
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
+        await (await browser.session.byTestId("welcome.create-cta")).click();
 
         // Briefing (first-run only, and owed to a browser user exactly as much
         // as to a desktop one), then the vault name, then the password.
@@ -235,8 +235,8 @@ describeE2E("web account creation", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
-        await (await browser.session.byTestId("account-entry.create-account")).click();
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
+        await (await browser.session.byTestId("welcome.create-cta")).click();
         await reachPasswordStep(browser.session);
         await (
           await browser.session.byTestId("create.password-input", { timeoutMs: 30_000 })

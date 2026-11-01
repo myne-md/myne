@@ -173,7 +173,7 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       );
 
       // …and the account form is what is behind it.
-      await session.waitForElement(testIdSelector("account-entry.input"), {
+      await session.waitForElement(testIdSelector("welcome.root"), {
         timeoutMs: 30_000,
       });
 

@@ -66,7 +66,7 @@ export function syncSetEndpoint(
  *
  *  - `account` — the owner's device-join under the RETIRED account-number model.
  *    Nothing can use it any more: the form that collected the password is gone
- *    (`decisions/sync/0765`), so the scanner refuses the code with a message and
+ *    (`decisions/sync/0767`), so the scanner refuses the code with a message and
  *    the way in is to ask the vault's owner for an invite. Kept in the type
  *    because the server still mints these codes and a client that cannot name one
  *    would report a bad payload instead of a retired door.

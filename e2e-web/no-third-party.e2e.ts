@@ -50,7 +50,7 @@ describeE2E("no third-party origin is contacted, and no CSP rule is violated", (
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
 
         // Every subresource the browser requested, as the browser recorded it.
         const origins = await browser.session.execute<string[]>(
@@ -90,7 +90,7 @@ describeE2E("no third-party origin is contacted, and no CSP rule is violated", (
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
         // Reports are POSTed asynchronously; give the browser a beat to flush
         // any it queued during boot before reading.
         await new Promise((r) => setTimeout(r, 750));

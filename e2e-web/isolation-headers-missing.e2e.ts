@@ -122,7 +122,7 @@ describeE2E("a deployment without the isolation headers", () => {
       const appSurfaces =
         (await session.execute<number>(
           "return document.querySelectorAll(" +
-            "'[data-testid=\"unlock.password-input\"],[data-testid=\"account-entry.input\"],[data-testid=\"editor.bottom-bar\"]'" +
+            "'[data-testid=\"unlock.password-input\"],[data-testid=\"welcome.root\"],[data-testid=\"editor.bottom-bar\"]'" +
             ").length;",
         )) ?? 0;
       expect(

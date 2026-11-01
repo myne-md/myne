@@ -38,7 +38,7 @@ describeE2E("single-tab vault lock", () => {
       try {
         // Tab one boots normally and takes the lock.
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
 
         const first = await browser.session.windowHandle();
 
@@ -71,7 +71,7 @@ describeE2E("single-tab vault lock", () => {
         // The first tab must be unaffected — the refusal is the second tab's
         // outcome, never a takeover that would strand the tab holding the lock.
         await browser.session.switchToWindow(first);
-        const stillThere = await browser.session.byTestIdAll("account-entry.input");
+        const stillThere = await browser.session.byTestIdAll("welcome.root");
         expect(stillThere.length, "the holding tab keeps working").toBeGreaterThan(0);
       } finally {
         await browser.teardown();

@@ -21,7 +21,7 @@
 //
 // # Why a seam member rather than a web-only import
 //
-// `AccountBootstrap` is shared code. It already asks the core for the
+// The browser's entry path is shared code. It already asks the core for the
 // configured endpoint and treats `null` as a deployment fault; what it needs is
 // a second place to look that is EMPTY on desktop, and that is exactly what the
 // seam is for. Desktop's answer is `null` by construction — a desktop install

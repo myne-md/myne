@@ -202,7 +202,7 @@ describeE2E("the browser history carries nothing decrypted", () => {
         async () =>
           (await session.execute<number>(
             "return document.querySelectorAll(" +
-              "'[data-testid=\"editor.bottom-bar\"],[data-testid=\"unlock.password-input\"],[data-testid=\"account-entry.input\"],[data-testid=\"bootstrap.beta-terms\"]'" +
+              "'[data-testid=\"editor.bottom-bar\"],[data-testid=\"unlock.password-input\"],[data-testid=\"welcome.root\"],[data-testid=\"bootstrap.beta-terms\"]'" +
               ").length;",
           )) ?? 0
             ? true

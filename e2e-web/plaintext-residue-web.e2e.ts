@@ -17,13 +17,21 @@
 // # What runs without a sync server, and why that half is worth having
 //
 // The web client is sync-required, so a note needs a server before it can
-// exist. The credentials do not: a user types an account number and a master
-// password into a first-run browser before any of that, and the question "did
-// the browser write them down" is fully answerable there. Autofill heuristics,
-// form-restore state, crash-recovery blobs and the session-restore file are all
-// written by the browser itself, on its own schedule, from fields the app never
-// asked it to remember — which is exactly the class this scan exists to catch,
-// and exactly the class no unit test can see.
+// exist. The credentials do not: the first-run identity ceremony derives a
+// person keypair from a 24-word phrase and SHOWS that phrase in a browser before
+// any of that, and the question "did the browser write it down" is fully
+// answerable there. Autofill heuristics, form-restore state, crash-recovery
+// blobs and the session-restore file are all written by the browser itself, on
+// its own schedule, from text the app never asked it to remember. That is
+// exactly the class this scan exists to catch, and exactly the class no unit
+// test can see.
+//
+// The credential used to be an account number and a master password typed into
+// the front door's sign-in form. That door is gone (`decisions/sync/0767`: a
+// vault arrives by invitation), so the needle is now the phrase the ceremony
+// itself renders, which is the stronger version of the same assertion, because
+// a phrase the app GENERATED has more ways to leak (a copy button, a reveal
+// toggle, a session notice) than a field the user filled in.
 //
 // The note-content and attachment half needs a server and says so, rather than
 // pretending to cover ground it does not.
@@ -42,7 +50,7 @@ import { expect, it } from "vitest";
 import { describeE2E } from "./support/scenario";
 import { startBundleServer } from "./support/server";
 import { newBrowserSession } from "./support/session";
-import { openApp, enterAccountNumber } from "./support/flows";
+import { openApp } from "./support/flows";
 import { DRIVER_PORT } from "./support/worker-ports";
 import type { SupportedBrowser } from "./support/harness";
 import { scanForPlaintext, waitForFsQuiescence } from "../e2e/support/plaintext-scan";
@@ -51,28 +59,26 @@ const BUNDLE_DIR = process.env.MYNE_WEB_E2E_BUNDLE_DIR ?? "web/dist";
 const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrowser;
 const SYNC_ORIGIN = "https://sync.example.test";
 
-/** A valid-checksum account number from the protocol test corpus — not an
- *  account that exists anywhere. Valid so the entry screen accepts it and the
- *  browser sees a completed field; non-existent so nothing is reached. */
-const ACCOUNT_NUMBER = "MY-934G-2V6A-P76G-CNKM-A4X3";
-
-/** ≥24 chars, all-lowercase alphanumeric: survives the tokenizer verbatim, so a
- *  hypothetical plaintext index would contain it intact rather than in pieces. */
+/** The negative probe's plant. ≥24 chars, all-lowercase alphanumeric: survives
+ *  the scanner's tokenizer verbatim, so a hit is unambiguous. */
 // secret-scan:allow — scenario constant, not a credential
-const PASSWORD = "residuescanmasterpassword7x3k9q";
+const PROBE_SECRET = "residuescanmasterpassword7x3k9q";
 
 /** Needle order is the failure vocabulary: a hit reports this index, never the
- *  string. Keep the array and this comment in step. */
-const NEEDLES = [PASSWORD, ACCOUNT_NUMBER];
-const NEEDLE_NAMES = ["master password", "account-number display form"];
+ *  string. Index 0 is the phrase the ceremony rendered, which is the needle the
+ *  positive case scans for. */
+const NEEDLE_NAMES = ["identity phrase"];
 
 /** Report hits without reproducing a credential: counts, indices and the file
  *  they were found in. The needle text never reaches the output. */
-function describeHits(hits: ReturnType<typeof scanForPlaintext>): string {
+function describeHits(
+  hits: ReturnType<typeof scanForPlaintext>,
+  names: string[] = NEEDLE_NAMES,
+): string {
   const byNeedle = new Map<number, number>();
   for (const h of hits) byNeedle.set(h.needleIndex, (byNeedle.get(h.needleIndex) ?? 0) + 1);
   const summary = [...byNeedle.entries()]
-    .map(([i, n]) => `needle[${i}] (${NEEDLE_NAMES[i] ?? "?"}) ×${n}`)
+    .map(([i, n]) => `needle[${i}] (${names[i] ?? "?"}) ×${n}`)
     .join(", ");
   const files = [...new Set(hits.map((h) => h.file))].slice(0, 10).join("\n  ");
   return `${hits.length} hit(s): ${summary}\nfiles:\n  ${files}`;
@@ -112,20 +118,48 @@ async function withBrowser(
   }
 }
 
-describeE2E("credentials typed into a first-run browser leave nothing at rest", () => {
-  it("writes neither the password nor the account number into any profile bucket", async () => {
+describeE2E("credentials shown to a first-run browser leave nothing at rest", () => {
+  it("writes the identity phrase into no profile bucket", async () => {
     await withBrowser(async (browser, origin) => {
       const { session } = browser;
       await openApp(session, origin);
 
-      // Type BOTH credentials, the way a user reaching this screen does. The
-      // account number is entered and submitted; the password is typed into the
-      // field that follows it. The sign-in itself cannot succeed without a
-      // server, and that is fine — the browser has already seen both values,
-      // which is the only precondition this scan needs.
-      await enterAccountNumber(session, ACCOUNT_NUMBER);
-      const pw = await session.findElement('input[type="password"]');
-      await pw.sendKeys(PASSWORD);
+      // Run the ceremony far enough that the phrase is on screen and revealed.
+      // The derivation is network-free (myne-md/myne#911 task 6), so this needs
+      // no server, which is the whole reason this half of the property is
+      // answerable in a lane that has none.
+      const create = await session.byTestId("welcome.create-cta");
+      await create.scrollIntoView();
+      await create.click();
+      const createCta = await session.byTestId("first-run.identity.create-cta", {
+        timeoutMs: 30_000,
+      });
+      await createCta.click();
+      await session.byTestId("first-run.identity.phrase", { timeoutMs: 60_000 });
+      const reveal = await session.byTestId("first-run.identity.phrase-reveal");
+      await reveal.click();
+
+      // The needle is the space-joined phrase itself: the whole-credential form
+      // `plaintext-scan.ts` asks for. Read from the DOM rather than invented,
+      // because a phrase the app GENERATED is the credential that actually
+      // exists on this screen.
+      //
+      // Read from the WORD chips, not from the grid container. The container's
+      // text is the chips' text concatenated with their index numbers, so a
+      // container read produces a needle no bucket could ever contain and the
+      // scan below would pass by searching for the wrong string. The chip's
+      // last element child is the word itself; its first is the position.
+      const words =
+        (await session.execute<string[]>(
+          "return Array.from(document.querySelectorAll('[data-testid=\"first-run.identity.phrase-word\"]'))" +
+            ".map((el) => ((el.lastElementChild && el.lastElementChild.textContent) || '').trim());",
+        )) ?? [];
+      expect(
+        words.length,
+        "the phrase grid must carry the 24 word chips, or the needle is not a credential",
+      ).toBe(24);
+      const phrase = words.join(" ").toLowerCase();
+      const NEEDLES = [phrase];
 
       // In-page buckets, asserted BEFORE teardown because after it there is no
       // page to ask. `localStorage`/`sessionStorage` are enumerable directly;
@@ -184,15 +218,15 @@ describeE2E("credentials typed into a first-run browser leave nothing at rest", 
     await withBrowser(async (browser, origin) => {
       await openApp(browser.session, origin);
       await browser.session.execute(`localStorage.setItem("residue-probe", arguments[0]);`, [
-        PASSWORD,
+        PROBE_SECRET,
       ]);
       await browser.teardown({ keepProfile: true });
       await waitForFsQuiescence(browser.profileDir);
 
-      const hits = scanForPlaintext(browser.profileDir, NEEDLES);
+      const hits = scanForPlaintext(browser.profileDir, [PROBE_SECRET]);
       expect(
         hits.some((h) => h.needleIndex === 0),
-        "a password planted in localStorage was NOT found — the scan is not looking where it claims to",
+        "a secret planted in localStorage was NOT found: the scan is not looking where it claims to",
       ).toBe(true);
     });
   });

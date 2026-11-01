@@ -29,14 +29,14 @@ const UNLOCK_TIMEOUT_MS = 60_000;
 
 /** Navigate to the app origin and wait for the boot probe to render something.
  *
- *  The BETA-TERMS gate is part of "something". `AccountBootstrap` renders it
- *  ahead of the account-entry step whenever consent is missing (myne-ops#15),
- *  and a fresh browser profile has no consent — so on the web client it is the
- *  FIRST screen, every time. This helper used to wait only for the three
- *  admitted surfaces, none of which exists behind the gate, and every scenario
- *  in the lane died in `openApp` with a boot timeout, all with the same message,
- *  which reads like the bundle failing to start rather than
- *  like one screen that was added in front of it.
+ *  The BETA-TERMS gate used to be part of "something": `AccountBootstrap`
+ *  rendered it ahead of the account-number step whenever consent was missing
+ *  (myne-ops#15). That screen is gone (`decisions/sync/0767`), and the gate
+ *  moved with the network it guards: the browser's front door is the identity
+ *  ceremony, which registers nothing, and registration on the identity home is
+ *  where `PersonRegisterForm` asks for consent. The probe keeps the gate as a
+ *  candidate so a hang still reports which surface never appeared; on a fresh
+ *  profile today it simply never matches.
  *
  *  The desktop lane was given a consent seed (`multi-device.ts`'s
  *  `legalConsentSeed`) in the same change; the web lane has no config dir to
@@ -47,7 +47,7 @@ export async function openApp(session: Session, origin: string): Promise<void> {
   // appeared rather than timing out on three that cannot appear.
   const seen = await waitForAnyTestId(
     session,
-    ["bootstrap.beta-terms", "account-entry.input", "unlock.password-input", "editor.root"],
+    ["bootstrap.beta-terms", "welcome.root", "unlock.password-input", "editor.root"],
     BOOT_TIMEOUT_MS,
   );
   if (seen === "bootstrap.beta-terms") {
@@ -77,45 +77,10 @@ export async function openApp(session: Session, origin: string): Promise<void> {
     await accept.click();
     await waitForAnyTestId(
       session,
-      ["account-entry.input", "unlock.password-input", "editor.root"],
+      ["welcome.root", "unlock.password-input", "editor.root"],
       BOOT_TIMEOUT_MS,
     );
   }
-}
-
-/** The first-run identity step: type an account number and continue. */
-export async function enterAccountNumber(session: Session, accountNumber: string): Promise<void> {
-  const input = await session.byTestId("account-entry.input", { timeoutMs: BOOT_TIMEOUT_MS });
-  await input.sendKeys(accountNumber);
-  await (await session.byTestId("account-entry.submit")).click();
-  // The password step of the bootstrap, NOT the unlock screen: on a first run
-  // there is no local vault to unlock yet.
-  await session.byTestId("account-bootstrap.password", { timeoutMs: BOOT_TIMEOUT_MS });
-}
-
-/**
- * The whole first run: account number, password, and whatever the join returns.
- *
- * Returns which door it landed on rather than asserting one, because BOTH are
- * correct outcomes and which one you get depends on the account's device roster
- * — a browser enrolling on the password path lands `pending` until an existing
- * device approves it (`server-protocol.md` §3.1), and task 92 leaves a browser no
- * other path. A helper that assumed "approved" would fail on the ordinary case.
- */
-export async function bootstrapAccount(
-  session: Session,
-  accountNumber: string,
-  password: string,
-): Promise<"approved" | "pending"> {
-  await enterAccountNumber(session, accountNumber);
-  await (await session.byTestId("account-bootstrap.password")).sendKeys(password);
-  await (await session.byTestId("account-bootstrap.submit")).click();
-  const landed = await waitForAnyTestId(
-    session,
-    ["account-bootstrap.pending-notice", "unlock.password-input", "editor.root"],
-    UNLOCK_TIMEOUT_MS,
-  );
-  return landed === "account-bootstrap.pending-notice" ? "pending" : "approved";
 }
 
 /** Type the master password on the unlock screen and wait for the editor. */

@@ -39,7 +39,7 @@ const BROWSER = (process.env.MYNE_WEB_E2E_BROWSER ?? "chrome") as SupportedBrows
 const SYNC_ORIGIN = "https://sync.example.test";
 
 describeE2E("accessibility on the web-only screens", () => {
-  it("axe (incl. contrast) is clean on the first-run identity step", async () => {
+  it("axe (incl. contrast) is clean on the browser's front door", async () => {
     const server = await startBundleServer({ root: BUNDLE_DIR, syncOrigin: SYNC_ORIGIN });
     try {
       const browser = await newBrowserSession({
@@ -48,7 +48,7 @@ describeE2E("accessibility on the web-only screens", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
         const violations = await runAxeInPage(browser.session);
         expect(violations.length, formatAxe(violations)).toBe(0);
       } finally {
@@ -59,35 +59,4 @@ describeE2E("accessibility on the web-only screens", () => {
     }
   });
 
-  it("axe is clean with the account-number field in its INVALID state", async () => {
-    // The error state is a separate render with separate colours, and it is the
-    // one a user is looking at while already frustrated. A check-digit failure
-    // is reachable with no server: the validation is local (Damm-32).
-    const server = await startBundleServer({ root: BUNDLE_DIR, syncOrigin: SYNC_ORIGIN });
-    try {
-      const browser = await newBrowserSession({
-        baseUrl: `http://127.0.0.1:${DRIVER_PORT}`,
-        browser: BROWSER,
-      });
-      try {
-        await openApp(browser.session, server.origin);
-        const input = await browser.session.byTestId("account-entry.input", {
-          timeoutMs: 30_000,
-        });
-        // A well-formed 20-character Crockford string whose check character is
-        // wrong — so it fails the Damm-32 step rather than the length or
-        // alphabet one, which is the error a real mistyping produces.
-        await input.sendKeys("MY4K7P9QRS2TVWXYZ012");
-        await (await browser.session.byTestId("account-entry.submit")).click();
-        // Whatever the error surface is called, it renders in the same document;
-        // run axe over the whole page rather than guessing its testid.
-        const violations = await runAxeInPage(browser.session);
-        expect(violations.length, formatAxe(violations)).toBe(0);
-      } finally {
-        await browser.teardown();
-      }
-    } finally {
-      await server.close();
-    }
-  });
 });

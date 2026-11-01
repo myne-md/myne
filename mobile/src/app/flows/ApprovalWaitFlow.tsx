@@ -3,7 +3,7 @@
 //
 // It is the ONLY join surface left on this client. The account-number door
 // (`sync_join_account`, a password or a 24-word phrase typed into a form) is gone
-// everywhere as of `decisions/sync/0765`: joining a vault means joining a person,
+// everywhere as of `decisions/sync/0767`: joining a vault means joining a person,
 // and a person's vault arrives by invite, not by an account number. So this flow
 // no longer collects a credential, scans a QR or writes `vault.meta` — the
 // identity flow does that, and this screen is what it hands off to.

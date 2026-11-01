@@ -229,10 +229,9 @@ export function ScreenCaptureEscape() {
         // Stays reachable while an overlay owns the page (myne-md/myne#728).
         // This button is a SIBLING of every overlay `App.tsx` mounts, so the
         // inert owner would otherwise take it out of the tab order and the
-        // accessibility tree whenever one opened - including the PRE-UNLOCK
-        // `JoinDeviceModal`, which is one of the three surfaces the comment
-        // above this component cites as sitting behind a black rectangle on
-        // Windows. `threat-model.md` section 6 makes the reachability
+        // accessibility tree whenever one opened - including a PRE-UNLOCK
+        // overlay, which is the kind of surface the comment above this
+        // component cites as sitting behind a black rectangle on Windows. `threat-model.md` section 6 makes the reachability
         // normative: "reachable from a keyboard-focusable control on every
         // pre-unlock screen".
         {...{ [KEEP_REACHABLE_ATTR]: "" }}

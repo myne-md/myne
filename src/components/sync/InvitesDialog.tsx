@@ -47,7 +47,8 @@ interface InvitesDialogProps {
   /** Retry the list after a failed read. */
   onRetry: () => void;
   /** An invitation was accepted or a shared vault was installed here. */
-  onAccepted: () => void;
+  /** `vaultId` is the vault the accept just installed, when the caller can use it. */
+  onAccepted: (vaultId?: string) => void;
 }
 
 const BODY_STYLE: CSSProperties = {

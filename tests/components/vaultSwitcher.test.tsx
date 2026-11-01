@@ -277,19 +277,16 @@ describe("VaultSwitcher — dropdown", () => {
     expect(props.onCreateAnother).toHaveBeenCalledTimes(1);
   });
 
-  // myne#221 — the device-join door. It was mounted on the welcome screen
-  // alone, which boot routing reaches only at ZERO vaults, so the switcher is
-  // one of the two surfaces that had no way back to it.
-  it("the join-device footer fires onJoinDevice and closes the dropdown", async () => {
-    const onJoinDevice = vi.fn();
-    renderSwitcher(TWO, { onJoinDevice });
+  // myne#221's join-device footer is GONE (`decisions/sync/0767`). Asserted as
+  // an absence rather than deleted silently: a second way into a vault is
+  // exactly what came back the last time this block was tidied, and the
+  // invitations row above is the one door that installs a vault now.
+  it("offers no join-device footer", async () => {
+    renderSwitcher(TWO);
     await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
     fireEvent.click(screen.getByTestId("switcher.chip"));
-    fireEvent.click(await screen.findByTestId("switcher.join-cta"));
-    expect(onJoinDevice).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.queryByTestId("switcher.join-cta")).toBeNull(), {
-      timeout: 1000,
-    });
+    await screen.findByTestId("switcher.create-cta");
+    expect(screen.queryByTestId("switcher.join-cta")).toBeNull();
   });
 
   // Absent, not disabled: a client that cannot hold a second vault container

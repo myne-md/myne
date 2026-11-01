@@ -11,7 +11,7 @@
 // the web client never renders `welcome` at zero vaults).
 //
 // Laid out on the shared `CenteredCard` envelope. It uses the same card as the
-// other pre-unlock surfaces (`Unlock`, `AccountNumberEntry`, `FailClosedError`)
+// other pre-unlock surfaces (`Unlock`, `PendingApproval`, `FailClosedError`)
 // rather than the bare column it shipped with, so the invite list scrolls
 // inside a bounded card instead of pushing the create-vault and forget actions
 // off the bottom of the window.
@@ -216,7 +216,15 @@ interface IdentityHomeProps {
   onCreateVault: () => void;
   /** Called after an invite is accepted and a shared vault is unlocked, so the
    *  app re-probes into the editor. */
-  onAccepted: () => void;
+  /**
+   * An invitation was accepted and a vault arrived on this device.
+   *
+   * `vaultId` is that vault. The caller holds the device on the approval wait
+   * with it: a freshly accepted member vault is PENDING until an existing device
+   * compares the head fingerprint (`sync-protocol.md` §6.3), and the vault is
+   * empty until then.
+   */
+  onAccepted: (vaultId?: string) => void;
   /** Called after this device's identity is forgotten, so the app re-probes to
    *  the Welcome screen (myne-md/myne#782). */
   onForgotten: () => void;
@@ -291,6 +299,9 @@ export function IdentityHome({
   // vault cannot reach the editor unnamed. Quitting here leaves the vault exactly as
   // the accept left it, openable and unnamed, which is story 7's "not a lockout".
   const [nameGateOpen, setNameGateOpen] = useState(false);
+  // The vault the accept just installed, held across the name gate so the
+  // landing can route it to the approval wait instead of the editor.
+  const acceptedVaultId = useRef<string | null>(null);
   // Registration (myne-md/myne#911). The host owns one boolean; the dialog owns
   // the phrase, the address, the admission code and the beta-terms gate, so two
   // surfaces cannot drift about any of them (2026-10-23 review). It is a DIALOG
@@ -423,7 +434,9 @@ export function IdentityHome({
       <MemberNameGate
         onDone={() => {
           setNameGateOpen(false);
-          onAccepted();
+          // The gate sits between the accept and the landing, so the vault the
+          // accept installed is carried across it rather than dropped here.
+          onAccepted(acceptedVaultId.current ?? undefined);
         }}
       />
     );
@@ -440,7 +453,8 @@ export function IdentityHome({
         key={acceptingInvite.invite_id_hex}
         invite={acceptingInvite}
         onCancel={() => setAcceptingInvite(null)}
-        onAccepted={() => {
+        onAccepted={(vaultId) => {
+          acceptedVaultId.current = vaultId ?? null;
           setAcceptingInvite(null);
           setNameGateOpen(true);
         }}

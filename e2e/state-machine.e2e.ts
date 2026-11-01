@@ -12,7 +12,6 @@ import { expect, it } from "vitest";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describeE2E, scenario } from "./support/scenario";
-import { legalConsentSeed } from "./support/multi-device";
 import {
   dismissImporterOffer,
   enterRecoveryPhrase,
@@ -228,40 +227,6 @@ describeE2E("picker boot routing (MYND-127 task 2, ≥2 vaults)", () => {
         // (`reducer.ts` `initialState.step = "name"`, `NUMBERED_STEPS`). Waiting
         // on `create.password-input` here waits for step 2.
         await app.session.byTestId("create.name-input", { timeoutMs: 10_000 });
-      },
-    );
-  });
-
-  it("2 vaults: picker's Add-this-device opens the join modal", async () => {
-    // Vault-count precondition: 2. The regression guard for myne#221 — the
-    // join modal used to be mounted on the welcome screen alone, which boot
-    // routing reaches ONLY at zero vaults. So from the moment this screen can
-    // appear at all, joining an existing account had no route: the workaround
-    // was deleting every vault on the machine.
-    await scenario(
-      "sm-picker-join-entry",
-      {
-        seed: (appDataDir) => {
-          seedVault(appDataDir, { password: PASSWORD_A });
-          seedVault(appDataDir, { password: PASSWORD_B });
-        },
-        // The beta-terms gate stands in front of the join form (myne-ops#15),
-        // and this scenario is about picker ROUTING — that the Add-this-device
-        // CTA reaches the join modal at all — not about the terms. Arriving
-        // with consent already given keeps it that way; without it the spec
-        // waits out its budget on `join.account-input`, which renders behind
-        // the gate, and reports a routing failure that is really a screen the
-        // routing correctly reached.
-        seedConfig: legalConsentSeed(),
-      },
-      async (app) => {
-        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
-        await (await app.session.byTestId("picker.join-cta")).click();
-        // Nothing is unlocked on the picker, so the modal opens over it
-        // directly — no teardown hop (contrast the switcher entry below).
-        await app.session.byTestId("join.modal", { timeoutMs: 10_000 });
-        await app.session.byTestId("join.account-input");
-        await app.session.byTestId("picker.root");
       },
     );
   });
@@ -600,46 +565,23 @@ describeE2E("in-app switcher transitions (MYND-127 task 5)", () => {
     );
   });
 
-  it("editor → account-chip Add-this-device locks the vault, then opens the join modal", async () => {
-    // Vault-count precondition: 2 (any unlocked editor). The second half of
-    // myne#221, and the teardown is the part worth pinning: `sync_join_account`
-    // bootstraps AND unlocks a DIFFERENT vault, and SYNC-1 zeroizes the active
-    // one on the way — so the modal must not open over a mounted editor, which
-    // would leave it sitting on plaintext whose keys are gone for the whole
-    // `join.pending` wait. The entry therefore flushes + `vault_lock()`s and
-    // routes to the just-locked vault's unlock screen first.
-    let a!: SeededVault;
-    await scenario(
-      "sm-switcher-join-entry",
-      {
-        // Same reason as the picker entry above: this scenario is about the
-        // switcher's teardown hop — lock, then open the join modal — not about
-        // the beta-terms gate that now stands in front of the join form.
-        seedConfig: legalConsentSeed(),
-        seed: (appDataDir) => {
-          a = seedVault(appDataDir, { password: PASSWORD_A });
-          seedVault(appDataDir, { password: PASSWORD_B });
-        },
-      },
-      async (app) => {
-        await app.session.byTestId("picker.root", { timeoutMs: 20_000 });
-        await selectPickerRow(app.session, a.vaultId);
-        await unlockToEditor(app.session, PASSWORD_A);
-        await dismissImporterOffer(app.session);
-
-        await (await app.session.byTestId("switcher.chip")).click();
-        await (await app.session.byTestId("switcher.join-cta")).click();
-
-        // The editor is gone and A is locked: its unlock form is what the
-        // modal sits over, still vault-addressed so cancelling lands the user
-        // somewhere they can simply retype the password.
-        const form = await app.session.byTestId("unlock.form", { timeoutMs: 15_000 });
-        expect(await form.attribute("data-vault-id")).toBe(a.vaultId);
-        await app.session.byTestId("unlock.password-input");
-        await app.session.byTestId("join.modal", { timeoutMs: 10_000 });
-      },
-    );
-  });
+  // TWO SCENARIOS LEFT THIS FILE with `decisions/sync/0767`.
+  //
+  // `sm-picker-join-entry` and `sm-switcher-join-entry` pinned the two
+  // "Add this device to an account" doors: that the picker's CTA and the
+  // account-chip footer reached the join modal, and that the switcher entry
+  // locked the open vault before opening it. The doors are deleted with the
+  // account-number join, so both scenarios would have waited out their budget on
+  // a modal that no longer exists.
+  //
+  // The teardown property they pinned is not gone, it MOVED: the invitation
+  // dialog is the one surface that installs and unlocks a different vault from
+  // inside an open editor, and `onInvitesFromEditor` runs the same
+  // flush + `vault_lock` + `editor.lock` before opening it. What does not exist
+  // yet is an assertion at THIS level for it. The row and its door are unit
+  // tested (`tests/components/vaultSwitcher.test.tsx`), the App-level lock hop is
+  // not. Recorded here rather than silently dropped, because a scenario deleted
+  // for a good reason and a property quietly unverified look identical in a diff.
 });
 
 describeE2E("SM-12 no stage shortcut (MYND-127 task 6)", () => {

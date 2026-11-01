@@ -2,9 +2,10 @@
 //
 // # Why this exists as a hook rather than four copies
 //
-// It was four copies. `DeviceManagementPanel` (the approving side),
-// `JoinDeviceModal` and `AccountBootstrap` (the two joining sides) each
-// hand-rolled the same self-scheduling tick, and `mobile/` had two more. The
+// It was four copies. `DeviceManagementPanel` (the approving side) and two
+// joining screens (the desktop join modal and the browser bootstrap, both since
+// deleted by `decisions/sync/0767`) each hand-rolled the same self-scheduling
+// tick, and `mobile/` had two more. The
 // copies drifted, and the drift is the bug: the mobile approving side never
 // received the poll #243 added to the desktop one, so it kept the pre-#243
 // shape — a single one-shot read — for months, untested, while the desktop

@@ -56,9 +56,9 @@ src/
 │   ├── Editor.tsx       ← the post-unlock workspace chrome + every modal mount (see "Editor screen" below)
 │   ├── Unlock.tsx       ← quick-unlock OR password form (one at a time, MYND-558) + reducer (idle / decrypting / corrupted modes); renders SuspicionBanner when stage carries one
 │   └── …                ← the remaining Stage variants (Welcome, CreateVault, VaultRecover,
-│                          VaultPicker, RestoreBackup, AccountBootstrap — which serves BOTH
-│                          account-entry and pending-approval, and composes the web-only
-│                          AccountNumberEntry); the two takeovers Editor.tsx mounts rather than
+│                          VaultPicker, RestoreBackup, PendingApproval: the web-only approval
+│                          wait and §6.3 compare, rendered by both the account-entry and
+│                          pending-approval stages); the two takeovers Editor.tsx mounts rather than
 │                          stages the router can reach, StorageLost and DeviceRevoked (see
 │                          "Editor screen" below); the web-only dead-end WebNoAccount; and the
 │                          layout helpers (editorLayout, centerView, layoutClamp,
@@ -108,7 +108,7 @@ The fix is one line in the script's verdict table: `ported` (runs on web as writ
 Two neighbours in the same family, for the same reason:
 
 - **A new `plugin:<plugin>|<command>` literal anywhere in the shared tree** must be classified in `web/wasm/src/capability.rs` (`DISPATCHED` / `PLUGIN_DEFAULT` / `PER_COMMAND`) in the same change, or `scripts/check-web-command-coverage.mjs` fails — this one in **`pre-commit`** as well as CI, and whole-tree rather than glob-scoped.
-- **`scripts/check-web-testids.mjs`** (CI) holds `web/src` plus the two web-only shared screens (`src/screens/AccountNumberEntry.tsx`, `src/screens/WebNoAccount.tsx`) to the testid contract below, including the SYNC-7 rule that no `data-*` on a pre-unlock screen may carry a runtime value.
+- **`scripts/check-web-testids.mjs`** (CI) holds `web/src` plus every shared screen `check-web-screens.mjs` verdicted `web-only` (a derived set, never a hand-kept list) to the testid contract below, including the SYNC-7 rule that no `data-*` on a pre-unlock screen may carry a runtime value.
 
 ## Tauri command bindings
 
@@ -152,7 +152,7 @@ So: engine behaviour (keymaps, decorations, slash menu, vim, drawing, math) is a
 
 ## App shell (MYND-80 full state machine + route guards)
 
-**(Web note: `phase3-web-client` task 64 gives the web target browser history, URL routing and a working back button on top of this same `Stage` union — the desktop client stays URL-free.)** `src/App.tsx` uses the full Stage discriminated union — the v0.1 definition of "routing" (no URL/history-aware router). `src/lib/stage.ts` is the roster; it currently declares nine variants and `App.tsx` has one switch arm for each: `welcome`, `create-vault`, `unlock` (carries `initialStatus`), `editor`, `recover` (carries `subStep`), `picker` (≥2 vaults, SYNC-7a), `account-entry` and `pending-approval` (the web client's first-run identity step and its approval wait, MYND-635 — both rendered by `AccountBootstrap`), and `restore-backup`. Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`.
+**(Web note: `phase3-web-client` task 64 gives the web target browser history, URL routing and a working back button on top of this same `Stage` union; the desktop client stays URL-free.)** `src/App.tsx` uses the full Stage discriminated union, the v0.1 definition of "routing" (no URL/history-aware router). `src/lib/stage.ts` is the roster; it currently declares nine variants and `App.tsx` has one switch arm for each: `welcome`, `create-vault`, `unlock` (carries `initialStatus`), `editor`, `recover` (carries `subStep`), `picker` (≥2 vaults, SYNC-7a), `account-entry` and `pending-approval` (the web client's first-run entry and its approval wait, MYND-635, both rendered by `PendingApproval` since `decisions/sync/0767` removed the account-number form), and `restore-backup`. Pure `transition(prev, action): Stage` function in `src/lib/stage.ts` enforces legal source/target combinations; illegal pairs return `prev` unchanged + dev `console.warn`.
 
 Boot starts in `null` (loading shim) until the probes resolve. `initialStageFromProbe(vaultList, slotMap)` takes **two** inputs, gathered by one `Promise.all` in `App.tsx` (the on-disk vault list via `listVaults()`, and the runtime slot kind), and routes:
 
@@ -270,12 +270,12 @@ file's: shared-tree flows go to `e2e/`, web-specific behaviour to `e2e-web/`.
   asserts it by full-literal equality. Don't inline-duplicate such strings.
 - Across the shared tree the convention is held by **review alone**. The one
   mechanical enforcer is `scripts/check-web-testids.mjs` (CI), and its scope is
-  `web/src` plus the two web-only shared screens
-  (`src/screens/AccountNumberEntry.tsx`, `src/screens/WebNoAccount.tsx`): at
-  least one testid per rendering module, `<screen>.<element>` naming, and no
-  `data-*` fed a runtime expression on a pre-unlock screen — the account number
-  is typed on one of them, and a `data-value={account}` would put it in the DOM,
-  in screenshots and in every failure artefact CI keeps.
+  `web/src` plus the shared screens `check-web-screens.mjs` verdicted `web-only`
+  (`src/screens/PendingApproval.tsx`, `WebNoAccount.tsx`, and the rest of that
+  derived set, and it is derived rather than hand-listed): at least one testid per
+  rendering module, `<screen>.<element>` naming, and no `data-*` fed a runtime
+  expression on a pre-unlock screen, because a `data-value={...}` there would put
+  the value in the DOM, in screenshots and in every failure artefact CI keeps.
 
 ## Common commands
 

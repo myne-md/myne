@@ -216,7 +216,7 @@ function StageSwitch() {
 
   /**
    * Scan a join QR and route it. This is the client's ONLY join door
-   * (`decisions/sync/0765`): the account-number form that used to sit behind this
+   * (`decisions/sync/0767`): the account-number form that used to sit behind this
    * scan is gone, so every arrival decodes into one of two wizards in the identity
    * flow and nothing else.
    *
@@ -356,7 +356,7 @@ function StageSwitch() {
     );
   }
 
-  // The one join door left: a scanned QR (decisions/sync/0765).
+  // The one join door left: a scanned QR (decisions/sync/0767).
   //
   // There used to be a full-screen account-number form here — server URL, account
   // number, password or 24-word phrase — and it is gone everywhere, so this client

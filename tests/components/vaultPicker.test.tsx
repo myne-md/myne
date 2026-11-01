@@ -82,7 +82,6 @@ function renderPicker(
     onSelect: vi.fn(),
     onCreateAnother: vi.fn(),
     onRestoreBackup: vi.fn(),
-    onJoinDevice: vi.fn(),
     // No invitation notices in these cases: the row renders only above zero.
     inviteCount: 0,
     onInvites: vi.fn(),
@@ -93,19 +92,15 @@ function renderPicker(
 }
 
 describe("VaultPicker — the action block", () => {
-  it("offers joining an existing account beside creating another vault", async () => {
+  it("offers creating another vault and restoring a backup, and no join door", async () => {
     renderPicker({ ok: TWO });
     await screen.findByTestId("picker.create-cta");
-    expect(screen.getByTestId("picker.join-cta")).toBeTruthy();
     expect(screen.getByTestId("picker.restore-cta")).toBeTruthy();
-  });
-
-  it("the join affordance fires onJoinDevice", async () => {
-    const { props } = renderPicker({ ok: TWO });
-    fireEvent.click(await screen.findByTestId("picker.join-cta"));
-    expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
-    // The join door is not a vault selection — the picker must not also route.
-    expect(props.onSelect).not.toHaveBeenCalled();
+    // `picker.join-cta` left with `decisions/sync/0767`: a vault arrives by
+    // invitation, and the invitations notice below is where one is accepted.
+    // Asserted as an ABSENCE because a second door is exactly what came back
+    // last time somebody tidied this block.
+    expect(screen.queryByTestId("picker.join-cta")).toBeNull();
   });
 
   // The invitation notice (myne-md/myne#911 follow-up): a device with a vault
@@ -139,13 +134,14 @@ describe("VaultPicker — the action block", () => {
     expect(props.onInvites).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the join affordance on the defensive empty/failed surface", async () => {
+  it("keeps the action block on the defensive empty/failed surface", async () => {
     // The picker is reached only at ≥2 vaults, so an empty list here is an
     // exotic transient — and exactly when a user needs a door out. The
     // affordances render from one shared block precisely so it cannot go
     // missing on the surface that has no rows to fall back on.
     renderPicker({ err: { detail: { io_error_kind: "Other" } } });
-    await waitFor(() => expect(screen.getByTestId("picker.join-cta")).toBeTruthy());
+    await waitFor(() => expect(screen.getByTestId("picker.create-cta")).toBeTruthy());
+    expect(screen.getByTestId("picker.restore-cta")).toBeTruthy();
     expect(screen.queryAllByTestId("picker.vault-row")).toHaveLength(0);
   });
 });

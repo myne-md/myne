@@ -82,10 +82,16 @@ const VERDICTS = {
       "absent on this client. `ported` rather than `adapted` because the difference is a " +
       "capability answer the screen already reads, not a web shape of the screen.",
   },
-    "Welcome.tsx": {
-    verdict: "excluded",
-    marker: "welcome.create-cta",
-    note: "Unreachable on web (an empty client routes to account-entry, task 85) and every door it offers — create, join, fresh-install restore — is an absent capability.",
+  "Welcome.tsx": {
+    verdict: "ported",
+    note:
+      "SHIPS and is REACHABLE: the `account-entry` stage renders it, which is what an empty browser " +
+      "lands on. It was `excluded` with the `welcome.create-cta` marker while an empty client routed " +
+      "to the account-number form and every door Welcome offers was an absent capability; the form " +
+      "is gone (`decisions/sync/0767`), so the shared screen took its place and the marker would now " +
+      "be found in the served bundle, which is what `excluded` must never be. The doors differ by " +
+      "capability rather than by screen: `vaultCreation` gates create, `backup` gates restore, and " +
+      "the invited door is always present.",
   },
   "IdentityHome.tsx": {
     verdict: "ported",
@@ -144,13 +150,9 @@ const VERDICTS = {
   },
 
   // ── web-only: in the shared tree, reachable only here ───────────────────
-  "AccountNumberEntry.tsx": {
+  "PendingApproval.tsx": {
     verdict: "web-only",
-    note: "The first-run identity step. Desktop never routes to it — its empty state is 'make a vault' (tasks 30 + 85).",
-  },
-  "AccountBootstrap.tsx": {
-    verdict: "web-only",
-    note: "The first-run flow AROUND the identity step: account number → password → sync_join_account. Desktop never routes to it (same `account-entry` stage), and its two omissions are the point — no server-URL field (task 50 fixes the origin) and no TOFU fingerprint step (a page cannot see a leaf certificate). Task 85.",
+    note: "The browser's approval wait and §6.3 compare. It replaced `AccountBootstrap` (account number → password → `sync_join_account`) when that door was removed (`decisions/sync/0767`); what survives is the half a browser genuinely needs, because a page enrols through an invitation and therefore lands PENDING on the ordinary path. Reachable only here: no other client has an `account-entry` stage, and none of them loses its in-page state to a reload.",
   },
   "StorageLost.tsx": {
     verdict: "ported",

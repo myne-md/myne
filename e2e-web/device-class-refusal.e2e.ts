@@ -73,7 +73,7 @@ describeE2E("device-class refusal", () => {
           // Nothing mounted. The gate's guarantee is its ORDERING — refusal
           // before any Worker starts and any derivation is attempted — so the
           // app surfaces must be absent, not merely hidden.
-          for (const id of ["account-entry.input", "unlock.password-input", "editor.root"]) {
+          for (const id of ["welcome.root", "unlock.password-input", "editor.root"]) {
             expect(
               (await browser.session.byTestIdAll(id)).length,
               `${id} rendered on a device that was refused`,

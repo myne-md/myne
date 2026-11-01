@@ -2,14 +2,14 @@
 //
 // # Why one helper
 //
-// Three surfaces call `plugin:sync|sync_reset_local`, and two of them agreed on
-// what a failure means while the third did not. `AccountBootstrap`'s
-// SAS-mismatch escape and `JoinDeviceModal`'s both stay on screen and print the
-// banner; `AccountBootstrap`'s pending "start over" door swallowed the rejection
-// and reset the screen either way, so a user who asked to leave an enrolment that
-// would not leave got a UI that said it had. Its own comment claimed it was "the
-// same handler as the SAS-mismatch escape above, deliberately" — a second
-// implementation, described as one (test-audit #10/#65).
+// Several surfaces call `plugin:sync|sync_reset_local`, and they did not agree on
+// what a failure means. The SAS-mismatch escapes stay on screen and print the
+// banner; one "start over" door swallowed the rejection and reset the screen
+// either way, so a user who asked to leave an enrolment that would not leave got
+// a UI that said it had. Its own comment claimed it was "the same handler as the
+// SAS-mismatch escape above, deliberately", a second implementation described
+// as one (test-audit #10/#65). That door went with the account-number join
+// (`decisions/sync/0767`); this helper is why the survivors cannot repeat it.
 //
 // The failure mode is not cosmetic. This call is how a device stops trusting an
 // endpoint it has decided is hostile or wrong, and the state a refusal leaves

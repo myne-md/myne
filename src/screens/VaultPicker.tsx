@@ -10,8 +10,9 @@
 // `picker.select-vault{vaultId}` → unlock screen for that vault; the
 // vaultId-targeted unlock IPC lives in task 7). A "create another"
 // affordance → `onCreateAnother()` (→ `picker.create-vault` → create-vault),
-// and beside it "add this device to an account" → `onJoinDevice()` (myne#221),
-// which opens the `JoinDeviceModal` App.tsx mounts globally.
+// and beside it "restore from a backup" → `onRestoreBackup()`. The join door
+// that used to sit here is gone: a vault arrives by invitation, and the
+// invitations row above is where one is accepted (decisions/sync/0767).
 //
 // **Pre-unlock enumeration policy (SYNC-7 / SYNC-3).** Rows show the real
 // label ONLY when `vault_list()` returns one; a vault it has no name for shows
@@ -82,14 +83,6 @@ interface VaultPickerProps {
   onRestoreBackup: () => void;
   /** "Create another" → App dispatches `picker.create-vault` → create-vault. */
   onCreateAnother: () => void;
-  /**
-   * "Add this device to an account" → App opens the `JoinDeviceModal` it mounts
-   * globally (myne#221). The picker previously offered creation only, and the
-   * modal's sole host was the welcome screen — which boot routing produces only
-   * at ZERO vaults, so joining an existing account became unreachable the
-   * moment this screen could appear at all.
-   */
-  onJoinDevice: () => void;
   /**
    * How many invitations addressed to this identity are still unaccepted
    * (myne-md/myne#911 follow-up). Zero renders nothing: an invitation that does
@@ -412,11 +405,9 @@ const ACTION_STYLE: CSSProperties = {
 function CreateAnother({
   onClick,
   onRestoreBackup,
-  onJoinDevice,
 }: {
   onClick: () => void;
   onRestoreBackup: () => void;
-  onJoinDevice: () => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -430,16 +421,6 @@ function CreateAnother({
         style={ACTION_STYLE}
       >
         {t("vaultPicker.createShort")}
-      </Button>
-      <Button
-        variant="primary"
-        icon="link"
-        onClick={onJoinDevice}
-        title={t("vaultPicker.joinDevice")}
-        data-testid="picker.join-cta"
-        style={ACTION_STYLE}
-      >
-        {t("vaultPicker.joinShort")}
       </Button>
       <Button
         variant="primary"
@@ -579,7 +560,7 @@ function lastUnlockText(lastUnlock: number | null, t: TFunction): string {
 }
 
 export function VaultPicker({ onSelect, onCreateAnother,
-  onRestoreBackup, onJoinDevice, inviteCount, invitesUnavailable,
+  onRestoreBackup, inviteCount, invitesUnavailable,
   onInvites }: VaultPickerProps) {
   const { t } = useTranslation();
   const [state, dispatch] = useReducer(reducer, { kind: "loading" });
@@ -677,7 +658,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
           <CreateAnother
             onClick={onCreateAnother}
             onRestoreBackup={onRestoreBackup}
-            onJoinDevice={onJoinDevice}
           />
         }
       >
@@ -699,7 +679,6 @@ export function VaultPicker({ onSelect, onCreateAnother,
         <CreateAnother
           onClick={onCreateAnother}
           onRestoreBackup={onRestoreBackup}
-          onJoinDevice={onJoinDevice}
         />
       }
     >

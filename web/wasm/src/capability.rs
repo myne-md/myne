@@ -83,6 +83,18 @@ pub enum Class {
 /// `attachment_object_url`) must NOT be listed here — the coverage guard rejects
 /// a name the shared tree never mentions. Those are exempted by name in
 /// `dispatch::tests::WEB_ONLY_ARMS`, with the reasoning there.
+///
+/// **Two names that used to be listed here are absent rather than reclassified,
+/// and that is deliberate.** `plugin:sync|sync_join_account` and
+/// `plugin:vault-unlock|account_number_check` served the account-number join,
+/// which `decisions/sync/0767` removed on every client. They appear in no table
+/// in this file and in no router arm in `dispatch.rs`:
+/// `scripts/check-web-command-coverage.mjs` rejects a roster naming a command
+/// the shared tree no longer mentions, and `scripts/check-web-capabilities.mjs`
+/// rejects an `Unsupported` class that no ABSENT capability covers, so "record
+/// it as a refusal" is the one shape both guards refuse. A stale caller of
+/// either name reaches the plugin default, answers `NotPorted`, and changes
+/// nothing.
 pub const DISPATCHED: &[&str] = &[
     // The one command that is genuinely host-independent: it reads a
     // compile-time constant, touches no vault state, and is deliberately not
@@ -193,10 +205,6 @@ pub const DISPATCHED: &[&str] = &[
     // TS side used to derive it from a best-effort disk cache; the delete it
     // targets is irreversible on this client too.
     "plugin:vault-unlock|vault_active_id",
-    // Local account-number validation for the web first-run identity step
-    // (task 30). Host-independent in the same way `device_platform` is: pure
-    // over its argument, no vault, no storage, no network.
-    "plugin:vault-unlock|account_number_check",
     // Lock = zeroize (task 43). The web idle timer needs a real lock to call,
     // not a UI transition.
     "plugin:vault-unlock|lock",
@@ -342,11 +350,6 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:sync|sync_person_join_device",
     "plugin:sync|sync_person_claim_device",
     "plugin:sync|sync_person_list_vaults",
-    // First-run bootstrap (task 85) — the "log in" leg. The last precondition
-    // for a browser that has never seen this account; everything else in this
-    // plugin assumes a vault already exists. Its vault id is a constant, which
-    // is what makes re-running it idempotent by construction.
-    "plugin:sync|sync_join_account",
     // Vault creation (`decisions.md` 2026-08-15). Listed here rather than
     // defaulted by the plugin row, so a fourth creation command added later
     // lands as `Pending` and has to be argued for.

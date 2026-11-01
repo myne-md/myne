@@ -9,7 +9,6 @@
 import type { StoryDescriptor } from "../types";
 import { Welcome } from "@app/screens/Welcome";
 import { FirstRun } from "@app/screens/FirstRun";
-import { AccountNumberEntry } from "@app/screens/AccountNumberEntry";
 import { StorageLost } from "@app/screens/StorageLost";
 import { DeviceRevoked } from "@app/screens/DeviceRevoked";
 import { action } from "../actions";
@@ -39,29 +38,17 @@ export const SCREEN_STORIES: StoryDescriptor[] = [
     surface: "Welcome",
     state: "default",
     description:
-      "The zero-vault entry screen: the mark, the tagline, ONE create door that starts the first run (identity, then vault), and the two doors that create nothing, restore from a `.myne-backup`, and joining an existing account. The language picker and version sit below. Look for the single primary button and that the old identity/local fork is gone.",
+      "The zero-vault entry screen: the mark, the tagline, ONE create door that starts the first run (identity, then vault), and the doors that create nothing, restoring a `.myne-backup` and accepting an invitation. The language picker and version sit below. Look for the single primary button, that the old identity/local fork is gone, and that no account-number door remains (`decisions/sync/0767`: a vault arrives by invitation).",
     fullBleed: true,
-    tags: ["screens", "welcome", "first-run", "zero-vault", "restore-backup", "join-device", "identity", "onboarding", "language"],
+    tags: ["screens", "welcome", "first-run", "zero-vault", "restore-backup", "invitation", "identity", "onboarding", "language"],
     fixture: "no-vault",
     render: () => (
       <Welcome
         onStart={action("onStart")}
-        onRestoreBackup={action("onRestoreBackup")}
         onInvited={action("onInvited")}
-        onJoinDevice={action("onJoinDevice")}
+        onRestoreBackup={action("onRestoreBackup")}
       />
     ),
-  },
-  {
-    id: "screens/accountnumberentry/default",
-    group: "screens",
-    surface: "AccountNumberEntry",
-    state: "default",
-    description:
-      "The web client's first-run identity step. An empty browser has to be told which account to pull, so this is the 27-character account number (`MY-` plus five groups) in its grouped display form; the Damm-32 check character is validated locally before any request, and one message is shown whatever fails.",
-    fullBleed: true,
-    tags: ["screens", "account-number", "accountnumberentry", "web-only", "first-run", "identity", "damm-32", "validation", "offline"],
-    render: () => <AccountNumberEntry onValid={action("onValid")} onCreateAccount={action("onCreateAccount")} />,
   },
   {
     id: "screens/storagelost/evicted-with-unsynced-notes",
