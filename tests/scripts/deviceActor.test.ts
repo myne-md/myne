@@ -33,7 +33,6 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const GUARD = join(ROOT, "scripts/check-device-actor.mjs");
-const RECORD = join(ROOT, "scripts/device-actor-readers.json");
 const PROBE = "core/src/plugins/sync/zz_device_actor_probe.rs";
 
 /** Run the guard against `root`, which defaults to the real checkout. */
