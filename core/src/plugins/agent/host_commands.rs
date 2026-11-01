@@ -987,7 +987,13 @@ pub async fn step<R: Runtime>(
             // no trace of one either: a start that failed on a debug build with
             // logging on produced zero output. `kind()` rather than the error,
             // because two variants carry a note id.
-            tracing::debug!(
+            //
+            // `info` rather than `debug`: the diagnostic log's file layer records
+            // `info` and above with its own fixed filter, so this line was
+            // invisible in the one artefact a user is invited to send. A field
+            // report of "The run stopped before it finished" arrived with four
+            // minutes of log covering the failure and nothing in it.
+            tracing::info!(
                 target: "myne_core::agent",
                 event = "step_failed",
                 error_kind = e.kind(),

@@ -516,10 +516,13 @@ pub async fn drive(
     // filters its capture on the crate name, so a `myne::…` target here would be
     // invisible to the tests that assert these lines carry no note content —
     // and an untested DENY-list claim is the kind this repo does not make.
-    // `RUST_LOG=myne_core=debug` turns them on.
+    // Both arms below are `info`, which is the level the diagnostic log's file
+    // layer records: a run that stopped is exactly what a user reports and
+    // cannot explain, and at `debug` the log could never say why. The terminal
+    // still shows them at `RUST_LOG=myne_core=debug`.
     let outcome = drive_inner(runs, run_id, task, transcript, deps, read_ids).await;
     match &outcome {
-        Ok(o) => tracing::debug!(
+        Ok(o) => tracing::info!(
             target: "myne_core::agent",
             event = "run_stopped",
             end = o.end.tag(),
@@ -538,7 +541,7 @@ pub async fn drive(
             summary_chars = o.proposal.summary.chars().count(),
         ),
         // `kind()`, never the error itself: two variants carry a `note_id`.
-        Err(e) => tracing::debug!(
+        Err(e) => tracing::info!(
             target: "myne_core::agent",
             event = "run_failed",
             error_kind = e.kind(),

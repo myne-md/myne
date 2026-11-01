@@ -463,8 +463,14 @@ impl ProviderTransport {
         // seven seconds. Timings, a status integer and a closed error tag; the
         // request body and the reply are never touched here.
         let started = std::time::Instant::now();
+        // These three sites are the whole of what the host can say about a
+        // failed exchange, and they were all `debug`: the diagnostic log records
+        // `info` and above, so a report of "the run stopped" carried a status
+        // code nowhere. The two failure arms are `warn` because they ARE the
+        // failure; the success line stays `info` and carries the status, the
+        // body's LENGTH and the elapsed time, never the body.
         let mut tls = self.connect().inspect_err(|e| {
-            tracing::debug!(
+            tracing::warn!(
                 target: "myne::ai",
                 event = "provider_connect_failed",
                 error_kind = e.tag(),
@@ -477,7 +483,7 @@ impl ProviderTransport {
         let (resp, _reuse) =
             read_http_response(&mut reader, false, MAX_RESPONSE_BYTES).map_err(|_| {
                 let cause = self.exchange_cause();
-                tracing::debug!(
+                tracing::warn!(
                     target: "myne::ai",
                     event = "provider_read_failed",
                     error_kind = cause.tag(),
@@ -485,7 +491,7 @@ impl ProviderTransport {
                 );
                 cause
             })?;
-        tracing::debug!(
+        tracing::info!(
             target: "myne::ai",
             event = "provider_exchange",
             status = resp.status,
