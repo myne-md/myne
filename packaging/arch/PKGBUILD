@@ -1,6 +1,6 @@
 # Maintainer: Ömer Duran <me@omerduran.dev>
 pkgname=myne
-pkgver=0.11.2
+pkgver=0.11.3
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search"
 arch=('x86_64')
