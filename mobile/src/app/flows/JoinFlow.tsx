@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { CSSProperties, ReactNode } from "react";
 import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
+import { clearApprovalWait, markApprovalWait } from "@myne/client-core/approval-wait";
 import {
   Screen,
   FlowHeader,
@@ -368,10 +369,18 @@ export function JoinFlow({
     setJoinedVaultId(vaultId);
     if (result.pending) {
       // Password join → wait for approval, then the mandatory fingerprint verify.
+      //
+      // Written down, not just rendered (#535). This is the ONE moment the fact
+      // is known from the server rather than inferred from disk, and this overlay
+      // is exactly what the user loses when the phone reclaims the WebView, so
+      // the note is what lets the automatic route back to this screen fire on
+      // the next unlock.
+      markApprovalWait(vaultId);
       setStep("pending");
     } else {
       // Bootstrap/recovery self-approve (first device) → nothing to eye-compare
       // against, so go straight in.
+      clearApprovalWait(vaultId);
       onComplete(vaultId);
     }
   }
@@ -804,7 +813,17 @@ export function JoinFlow({
           )}
         </div>
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none", flexDirection: "column", gap: 10 }}>
-          <Button disabled={aborting} onClick={() => onComplete(joinedVaultId)} data-testid="sync.join.sas-match">
+          <Button
+            disabled={aborting}
+            onClick={() => {
+              // The compare just matched, so the approval this device was
+              // waiting for has been OBSERVED: retiring the marker here is what
+              // stops every later unlock from routing back to this screen.
+              if (joinedVaultId !== undefined) clearApprovalWait(joinedVaultId);
+              onComplete(joinedVaultId);
+            }}
+            data-testid="sync.join.sas-match"
+          >
             {t("sync.join.sasMatch")}
           </Button>
           <Button

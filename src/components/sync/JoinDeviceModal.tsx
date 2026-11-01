@@ -52,6 +52,7 @@ import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare
 import { useOverlayInert } from "../../hooks/useOverlayInert";
 import { useTranslation } from "react-i18next";
 import { invoke } from "../../platform/core";
+import { clearApprovalWait, markApprovalWait } from "@myne/client-core/approval-wait";
 import { resetLocalOrReport } from "../../lib/reset-local";
 import { Input } from "../primitives/Input";
 import { PasswordInput } from "../PasswordInput";
@@ -353,6 +354,13 @@ export function JoinDeviceModal({
         // re-read. Otherwise the Network panel keeps describing whatever server
         // was configured before the join.
         refreshTorState();
+        // The join's own answer, written down (#535). This is the one moment the
+        // fact is known from the server rather than inferred from disk, and it is
+        // what survives this modal being closed, the tab being reloaded or the
+        // process dying — the cases the automatic route back to the wait exists
+        // for. Cleared below on a self-approved join.
+        if (res.pending) markApprovalWait(res.vault_id);
+        else clearApprovalWait(res.vault_id);
         if (!res.pending) {
           // Self-approved (first device / recovery bootstrap): a cycle can run
           // now, so name after it — never before, or the §10.2.1 seed dies.

@@ -112,3 +112,63 @@ describe("the mobile status row reserves 'Offline' for a transport failure", () 
     expect(text).not.toContain("settings.sync.summary.offline");
   });
 });
+
+describe("the approval wait has a door that no status read can close", () => {
+  // myne-md/myne#535 shipped the wait as a verdict read after unlock, and the
+  // phone still showed an empty editor: whatever the read answers, a device that
+  // owes a compare needs a way in. The row is gated on a CONFIGURED SERVER and on
+  // nothing else, which is the point — gating it on `status` would hide it from
+  // exactly the device whose status read is the thing that failed.
+  it("offers the row once a server is configured", async () => {
+    const onShowApprovalCode = vi.fn();
+    render(
+      <SyncHubPanel
+        status={{ state: "not_enrolled" }}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+        onShowApprovalCode={onShowApprovalCode}
+      />,
+    );
+    const row = await screen.findByTestId("sync.settings.approval-code");
+    expect(row.textContent).toContain("sync.settings.approvalCode");
+    row.click();
+    expect(onShowApprovalCode).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders no row when the caller supplies no door, or no server is configured", async () => {
+    const noDoor = render(
+      <SyncHubPanel
+        status={{ state: "pending" }}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+      />,
+    );
+    expect(screen.queryByTestId("sync.settings.approval-code")).toBeNull();
+    noDoor.unmount();
+
+    render(
+      <SyncHubPanel
+        status={{ state: "disabled" }}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+        onShowApprovalCode={() => {}}
+      />,
+    );
+    // `disabled` is "no server configured", which is the one state with no
+    // approval to wait for: the row would promise a compare nothing can produce.
+    await screen.findByTestId("sync.settings.status");
+    expect(screen.queryByTestId("sync.settings.approval-code")).toBeNull();
+  });
+});

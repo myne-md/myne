@@ -230,6 +230,11 @@ export interface EditorFlowProps {
   onJoinAccount: () => void;
   onSwitchVault: (vaultId: VaultId) => void;
   onDeleteVaultSuccess: () => void;
+  /** Open the approval wait for this vault from Settings → Sync (#535). The
+   *  automatic route is a verdict read after unlock; this is the door that
+   *  survives the verdict being wrong. Optional because the editor's own tests
+   *  render it without a shell to dispatch to. */
+  onShowApprovalCode?: () => void;
 }
 
 export interface PickerFlowProps {

@@ -10,6 +10,7 @@ import {
 import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
+import { clearApprovalWait } from "@myne/client-core/approval-wait";
 import { awaitingApprovalVerdict } from "../lib/pending-approval";
 import { endAgentRun } from "../lib/agent-lifetime";
 import { clearAwareness } from "@myne/awareness-store";
@@ -229,17 +230,21 @@ function StageSwitch() {
   // `dispatch` is a no-op when the pair is illegal, so a verdict that lands after
   // the user has already locked or switched leaves them where they went rather
   // than dragging them back into the wait.
+  // Hoisted out of the effect so the dep array can name it: `stage` is a union
+  // and the narrowing the guard performs does not reach the deps expression.
+  const editorVaultId = stage?.name === "editor" ? stage.vaultId : undefined;
+
   useEffect(() => {
     if (stage?.name !== "editor") return;
     let cancelled = false;
-    void awaitingApprovalVerdict().then((awaiting) => {
+    void awaitingApprovalVerdict(editorVaultId).then((awaiting) => {
       if (cancelled || !awaiting) return;
       dispatch({ type: "editor.awaiting-approval" });
     });
     return () => {
       cancelled = true;
     };
-  }, [stage?.name, dispatch]);
+  }, [stage?.name, editorVaultId, dispatch]);
 
   /**
    * The editor's "create another vault" exit, one of the two vault-leaving paths
@@ -539,6 +544,10 @@ function StageSwitch() {
           // Same reason as the delete path below: not preceded by `lockVault`,
           // and the vault it bootstraps is a different one.
           onJoinAccount={leaveForJoinAccount}
+          // The manual door onto the approval wait (#535): the Sync panel's row
+          // dispatches the same action the automatic verdict does, so both
+          // entries land on ONE screen and the stage's legality table holds it.
+          onShowApprovalCode={() => dispatch({ type: "editor.awaiting-approval" })}
           onSwitchVault={async (vaultId: VaultId) => {
             await lockVault("switch").catch(() => {});
             dispatch({ type: "editor.switch-vault", vaultId });
@@ -579,7 +588,13 @@ function StageSwitch() {
         <PhoneColumn>
           <PendingApprovalFlow
             vaultId={stage.vaultId}
-            onApproved={(vaultId?: VaultId) => dispatch({ type: "pending-approval.approved", vaultId })}
+            onApproved={(vaultId?: VaultId) => {
+              // The compare matched, so the approval is OBSERVED: retire the
+              // join's marker or every later unlock routes back here.
+              const approved = vaultId ?? stage.vaultId;
+              if (approved !== undefined) clearApprovalWait(approved);
+              dispatch({ type: "pending-approval.approved", vaultId });
+            }}
             onCancel={leaveApprovalWait}
           />
         </PhoneColumn>

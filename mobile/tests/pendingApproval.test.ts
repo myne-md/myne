@@ -1,3 +1,10 @@
+// @vitest-environment jsdom
+//
+// jsdom, not node, because the join's own answer is persisted in `localStorage`
+// (`@myne/client-core/approval-wait`) and node's store is absent without
+// `--localstorage-file`, which would make the marker silently a no-op and the
+// three cases below pass for the wrong reason.
+//
 // The awaiting-approval verdict (myne-md/myne#535, mobile half).
 //
 // The failure this covers, in one line: a phone that lost its join overlay could
@@ -31,6 +38,7 @@ vi.mock("../src/platform/core", () => ({
   invoke: (...a: unknown[]) => invoke(...a),
 }));
 
+import { clearApprovalWait, isApprovalWait, markApprovalWait } from "@myne/client-core/approval-wait";
 import { awaitingApprovalVerdict } from "../src/lib/pending-approval";
 
 /** Answer the two reads the verdict makes, in order, by command name. */
@@ -55,6 +63,7 @@ function answers(map: {
 beforeEach(() => {
   hasTauri = true;
   invoke.mockReset();
+  clearApprovalWait("vault-a");
 });
 
 describe("awaitingApprovalVerdict", () => {
@@ -119,5 +128,39 @@ describe("awaitingApprovalVerdict", () => {
     hasTauri = false;
     await expect(awaitingApprovalVerdict()).resolves.toBe(false);
     expect(invoke).not.toHaveBeenCalled();
+  });
+
+  // The marker half (#535). The join writes down the `pending` it was told,
+  // because the derived status answered `not_enrolled` for a phone that had just
+  // joined and this verdict therefore never fired on the device that shipped it.
+  describe("the join's own answer", () => {
+    it("routes to the wait from the marker without asking the status", async () => {
+      markApprovalWait("vault-a");
+      // `answers` throws on any command it was not given, so a status read here
+      // fails the case rather than being merely unasserted: the status is the
+      // inference that answered `not_enrolled` about a device the server had
+      // already called pending.
+      answers({ baseline: null });
+      await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(true);
+      expect(invoke.mock.calls.map(([cmd]) => cmd)).toEqual([
+        "plugin:sync|sync_head_fingerprint",
+      ]);
+    });
+
+    it("retires the marker once an approval is observed", async () => {
+      markApprovalWait("vault-a");
+      answers({ baseline: "ABCD-1234" });
+      await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(false);
+      // Left behind, the marker would send this device to the wait on every
+      // later unlock, which is the failure it exists to prevent pointing the
+      // other way.
+      expect(isApprovalWait("vault-a")).toBe(false);
+    });
+
+    it("is per vault, so one pending join does not route another vault", async () => {
+      markApprovalWait("vault-a");
+      answers({ baseline: null, status: { state: "disabled" } });
+      await expect(awaitingApprovalVerdict("vault-b")).resolves.toBe(false);
+    });
   });
 });

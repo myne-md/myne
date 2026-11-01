@@ -115,7 +115,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "IntegrityAlertBanner": { file: "src/components/sync/IntegrityAlertBanner.tsx", line: 47 },
   "InvitesDialog": { file: "src/components/sync/InvitesDialog.tsx", line: 90 },
   "InviteWizard": { file: "src/components/sync/InviteWizard.tsx", line: 1 },
-  "JoinDeviceModal": { file: "src/components/sync/JoinDeviceModal.tsx", line: 235 },
+  "JoinDeviceModal": { file: "src/components/sync/JoinDeviceModal.tsx", line: 236 },
   "Keycaps": { file: "src/components/primitives/Keycaps.tsx", line: 47 },
   "KitStep": { file: "src/screens/vault-creation/KitStep.tsx", line: 109 },
   "LanguageSelect": { file: "src/components/settings/LanguageSelect.tsx", line: 31 },
