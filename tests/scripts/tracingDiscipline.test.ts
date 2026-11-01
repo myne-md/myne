@@ -12,7 +12,11 @@
 //   - a `%` below `info` is NOT a finding. The file layer's floor is `info`
 //     (`src-tauri/src/logging`), so a `debug!` `%` cannot reach disk, and the
 //     rule is scoped to what the file records rather than to a general dislike
-//     of `%`.
+//     of `%`. **One module is the exception and it is tested as one**: the run
+//     loop's target is recorded at `debug` (`design-notes/ops/0768`), so a `%`
+//     there IS a finding, and the same record one directory over is not. A rule
+//     that reads one global level list would be exactly backwards on the only
+//     module whose `debug` persists.
 //   - `target: "..."` is macro meta, not a value.
 //   - a bare identifier and `?value` are `tracing`'s field shorthands, used 111
 //     times across the tree. A guard that flagged them would be red on the tree
@@ -80,6 +84,31 @@ describe("tracing discipline: R1, the `%` rule is scoped to the levels the file 
     // reach disk by any configuration.
     expect(lint(`tracing::debug!(detail = %e);`)).toHaveLength(0);
     expect(lint(`tracing::trace!(detail = %e);`)).toHaveLength(0);
+  });
+
+  it("flags a % at debug inside the one module the file layer records at that level", () => {
+    // The exception, tested as an exception rather than by trusting the tree to
+    // stay clean. `DEBUG_FILE_TARGETS` in `src-tauri/src/logging` records
+    // `myne_core::agent` below `info`, and every `debug!` under this root carries
+    // that target: a `%` here lands in a file the user is invited to publish.
+    const found = lintSource(
+      "core/src/plugins/agent/run_loop.rs",
+      `tracing::debug!(event = "tool", verb = %name);`,
+    );
+    expect(found).toHaveLength(1);
+    expect(found[0].rule).toBe("R1");
+    expect(found[0].message).toContain("debug");
+  });
+
+  it("does NOT flag the same record one directory over, so the widening is the module's", () => {
+    // The other half of the boundary, and the failure this pair exists to catch:
+    // a widening written as `core/src/` or as the whole crate would be red on a
+    // tree whose `debug` records cannot reach disk, which is how a guard earns an
+    // allowlist that grows until it means nothing.
+    expect(
+      lintSource("core/src/inference/provider_transport.rs", `tracing::debug!(verb = %name);`),
+    ).toHaveLength(0);
+    expect(lintSource("core/src/plugins/agent/run_loop.rs", `tracing::debug!(verb = %name);`)).toHaveLength(1);
   });
 
   it("accepts a recorded exception at its own field and level", () => {

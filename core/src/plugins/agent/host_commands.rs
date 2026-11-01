@@ -996,6 +996,10 @@ pub async fn step<R: Runtime>(
             tracing::info!(
                 target: "myne_core::agent",
                 event = "step_failed",
+                // The run this leg belongs to: the surface's failure sentence
+                // names no run, so a log without the id cannot be tied to the
+                // transcript the user is looking at.
+                run_id = run_id,
                 error_kind = e.kind(),
             );
             return Err(e);
