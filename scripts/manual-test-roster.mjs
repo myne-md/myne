@@ -2838,14 +2838,14 @@ export const ROSTER = Object.freeze([
     paths: [
       "mobile/src-tauri/tauri-plugin-qr-scan",
       "mobile/src-tauri/tauri-plugin-qr-scan/ios/Sources/QrScanPlugin/QrScanPlugin.swift",
-      "mobile/src/app/flows/JoinFlow.tsx",
+      "mobile/src/app/AppShell.tsx",
       "mobile/src-tauri/Info.ios.plist",
     ],
     clients: ["ios", "android"],
     automatedBy: [],
     manual: [
       {
-        see: "Show a device-join QR on a desktop screen. On the iPhone tap \"Scan QR\" in the join flow: iOS must present its camera permission prompt the first time. Deny it once and confirm the app says so rather than showing a black scanner. Grant it, then scan in normal room light, in dim light and at an angle, and confirm each scan lands on the confirmation screen showing the right server and account number. Finally dismiss the scanner without scanning and confirm you return to the form with nothing pre-filled.",
+        see: "Show a join QR on a desktop screen and open the phone's identity door. iOS must present its camera permission prompt the first time the scan runs. Deny it once and confirm the app says so rather than showing a black scanner. Grant it, then scan in normal room light, in dim light and at an angle: a person code must open the person-join step, and a member-vault code the join step for that vault, with nothing left over from the previous attempt. Then the three refusals, which are the reason this is a walk: an expired code says so and stays put, a code from the retired account-number model says to ask the owner for an invitation rather than opening a form, and dismissing the scanner without scanning returns to the screen you came from with nothing changed.",
         whyNotAutomated: "The scanner is an AVCaptureSession view controller presented over the WKWebView after an AVCaptureDevice.requestAccess prompt gated by NSCameraUsageDescription; no simulator has a camera and no driver can present or dismiss a native view controller.",
         clients: ["ios"],
         estimateMin: 6,
@@ -6234,8 +6234,7 @@ export const ROSTER = Object.freeze([
       "src/styles/tokens.css",
       "mobile/src/styles/tokens.css",
       "mobile/src/lib/account-number-format.ts",
-      "mobile/src/app/flows/JoinFlow.tsx",
-      "mobile/src/app/flows/PendingApprovalFlow.tsx",
+      "mobile/src/app/flows/ApprovalWaitFlow.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
@@ -6250,10 +6249,6 @@ export const ROSTER = Object.freeze([
       "e2e/member-roster.e2e.ts",
       "e2e/sync-identity-block.e2e.ts",
       "e2e/member-onboarding.e2e.ts",
-      // The recovery-phrase arm and the pending escape (myne-md/myne#837). It
-      // drives both surfaces against mock IPC and records the credential each
-      // one forwards, which is the half a mocked lane can honestly hold.
-      "mobile/tests/flow-logic/sync/join.flow.ts",
       // The resumed wait (myne-md/myne#535, mobile half): the fixture boots into
       // the editor with no overlay, and the compare has to be reachable anyway.
       "mobile/tests/flow-logic/sync/pending-approval.flow.ts",
@@ -6279,13 +6274,6 @@ export const ROSTER = Object.freeze([
         clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
         estimateMin: 8,
         tier: "standard",
-      },
-      {
-        see: "Join a fresh phone to an existing account with the 24-word recovery phrase instead of the password (myne-md/myne#837), on both a real iPhone and a real Android device. Type the phrase into the 24-cell grid and confirm the on-screen keyboard does not cover the cell you are typing into and that pasting all 24 words at once distributes them in order; confirm the warning naming the phrase as full account takeover renders BEFORE the grid. Submit, and confirm the device lands on the SET-A-NEW-PASSWORD step rather than in the editor, that the new password opens the vault after the app is killed and relaunched, and that the OLD password no longer does. Then walk the second door: start a password join that comes back waiting for approval, and use the waiting screen's escape to confirm with the phrase instead. Confirm it self-approves without any other device acting and lands in the editor, and that the password typed moments earlier still opens the vault. Finally, on the same screen, enter a wrong phrase and confirm the one non-distinguishing message appears rather than a message naming the phrase as wrong.",
-        whyNotAutomated: "The flow-logic tier (mobile/tests/flow-logic/sync/join.flow.ts) drives both surfaces against a mocked IPC and asserts the two arguments each one forwards, but the pass conditions here are statements about real key material and real hardware: the phrase join derives root_key through Argon2id host-side and leaves the vault Slot::Recovering, so 'the new password opens it after a relaunch and the old one does not' cannot be answered by a mock; the recovery-path enrolment self-approves against a real relay, which is the property that makes the phrase a door for a user with no device left to approve from; the 24-cell grid sits under an on-screen keyboard whose height no lane here supplies; and the surface is WKWebView on iOS and Android System WebView, neither of which any lane in this tree drives.",
-        clients: ["ios", "android"],
-        estimateMin: 12,
-        tier: "core",
       },
     ],
     exemptionReason: "",
@@ -7670,8 +7658,8 @@ export const ROSTER = Object.freeze([
       "mobile/docs/dev/device-matrix.md",
       "mobile/src/app/flows/AttachmentsSheet.tsx",
       "mobile/src/app/flows/CreateVaultFlow.tsx",
+      "mobile/src/app/flows/ApprovalWaitFlow.tsx",
       "mobile/src/app/flows/EditorFlow.tsx",
-      "mobile/src/app/flows/JoinFlow.tsx",
       "mobile/src/app/flows/PickerFlow.tsx",
       "mobile/src/app/flows/RecordingSheet.tsx",
       "mobile/src/app/flows/RecoverFlow.tsx",
