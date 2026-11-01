@@ -2336,7 +2336,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "VaultPicker",
     state: "default",
     description:
-      "The vault picker shown when more than one vault exists on this device: each vault as a row, plus restore, create-another and join-device doors. Mounted against a locked fixture so it renders the choose-a-vault state.",
+      "The vault picker shown when more than one vault exists on this device: each vault as a row, plus the restore and create-another doors. Mounted against a locked fixture so it renders the choose-a-vault state.",
     tags: ["components", "vaults", "picker", "multi-vault", "select", "locked"],
     fixture: "locked",
     render: () => (
@@ -2344,7 +2344,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onSelect={action("onSelect")}
         onRestoreBackup={action("onRestoreBackup")}
         onCreateAnother={action("onCreateAnother")}
-        onJoinDevice={action("onJoinDevice")}
         inviteCount={0}
         onInvites={action("onInvites")}
       />

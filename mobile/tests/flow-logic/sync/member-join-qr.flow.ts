@@ -84,18 +84,19 @@ const ENROLLED = {
 };
 
 /** The first-run display name for the scan door (myne-md/myne#932): Welcome's
- *  second button opens the identity fork, whose code row starts the scanner. */
+ *  second button opens the identity fork, whose code row starts the scanner. A
+ *  device that already holds the identity lands on the identity home instead,
+ *  which carries the scanner itself. */
 async function openJoinDoor(page: Page): Promise<void> {
   await page.goto("/");
   await page.getByTestId("welcome.have-identity-cta").click();
-  // Two landings, one door. A device with no identity is offered the fork and its
-  // code row; a device that already holds the identity lands on the identity home,
-  // which carries the scanner itself (myne-md/myne#932). Whichever is on screen is
-  // the one to press, so the helper asks rather than assuming.
+  // Two landings, one door. Whichever row is on screen is the one to press, so the
+  // helper asks rather than assuming. The press IS the scan: `scanJoinQr` runs the
+  // decoder and routes the answer, so there is no intermediate scan screen left to
+  // click through (myne-md/myne, the account-number join door withdrawn).
   const forkCode = page.getByTestId("identity-flow.fork-code");
   const homeScan = page.getByTestId("identity-flow.home-scan");
   await forkCode.or(homeScan).first().click();
-  await expect(page.getByTestId("sync.join.scan-qr")).toBeVisible();
 }
 
 test.describe("member's own-device QR (myne-md/myne)", () => {
@@ -116,20 +117,13 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     });
 
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
     // Landed on the JOIN WIZARD, straight at its phrase step: no claimed-row click
     // is needed, because the code named the vault. The owner's confirm step is the
-    // screen this must NOT be, and it is asserted absent rather than merely unused
-    // — it is the plausible wrong answer, and it is the one that would have no
-    // account number to show.
+    // screen this must NOT be, and it no longer exists anywhere in this client:
+    // the account-number door it belonged to was withdrawn on every client, so a
+    // zero-count assertion against it could not fail and is not written.
     await expect(page.getByTestId("identity-flow.join-phrase")).toBeVisible();
-    await expect(page.getByTestId("sync.join.qr-confirm")).toHaveCount(0);
-
-    // No account number is asked for anywhere: not on the wizard, and not on the
-    // owner's form behind it, which a mis-dispatched member code would have
-    // returned the user to.
-    await expect(page.getByTestId("sync.join.account-input")).toHaveCount(0);
 
     // The join itself still needs the phrase and a device password, and both are
     // collected here — the QR shortens the path, it does not replace the
@@ -147,7 +141,13 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     // The command was handed the vault the CODE named, which is the whole point of
     // carrying the hash: a wizard opened for the right-looking vault but addressed
     // at another one would be indistinguishable on screen.
-    await expect(page.getByRole("button", { name: "Settings" }).first()).toBeVisible();
+    // The join installed the vault and handed the shell its id, so the device lands
+    // on the APPROVAL WAIT rather than the editor: a vault that arrived by
+    // invitation is a device the owner has not admitted yet, and the wait is where
+    // the §6.3 compare lives (`decisions/sync/0767`). Landing in the editor here
+    // would be the defect that decision fixes.
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+    await expect(page.getByTestId("sync.join.sas-fingerprint")).toHaveText("TYRS-N318");
     const joinArgs = await page.evaluate(
       () =>
         (window as unknown as { __joinVaultArgs?: Record<string, unknown> }).__joinVaultArgs,
@@ -212,7 +212,6 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     });
 
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
     // The gate, with the third door on it. Before the arm landed this screen had
     // `Create an identity` and `Not now…` and nothing else, and neither can put an
@@ -291,7 +290,6 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     });
 
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
     await page.getByTestId("identity-flow.recover-open").click();
     for (let i = 0; i < PHRASE.length; i += 1) {
       const id = i === 0 ? "identity-flow.recover-phrase" : `identity-flow.recover-phrase-cell-${i + 1}`;
@@ -310,11 +308,15 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     await expect(page.getByTestId("identity-flow.recover-phrase-cell-24")).toHaveValue(PHRASE[23]);
   });
 
-  test("an account code still takes the owner's path, so the dispatch is not one-way", async ({
+  test("a retired account code is refused with a message rather than opening a door", async ({
     page,
   }) => {
     // The control. Without it, "a member code opens the wizard" is satisfied by a
-    // flow that opens the wizard for every code.
+    // flow that opens the wizard for every code. What the control asserts changed
+    // when the account-number join door was withdrawn on every client
+    // (`decisions/sync/0767`): a legacy account code is now REFUSED rather than
+    // routed to a form, because the form it opened no longer exists. The refusal is
+    // a toast, since there is no screen to stay on.
     await installMockIpc(page, {
       freshDevice: true,
       personStatus: ENROLLED,
@@ -329,9 +331,13 @@ test.describe("member's own-device QR (myne-md/myne)", () => {
     });
 
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
-    await expect(page.getByTestId("sync.join.qr-confirm")).toBeVisible();
+    // Asserted by testid rather than by sentence: the mock echoes keys, so a
+    // `toHaveText` here would be comparing the stub against itself.
+    await expect(page.getByTestId("toast.host")).toBeVisible();
+    // Neither wizard opened, which is the half that matters: a refusal that still
+    // landed the user in a join flow would be the door this release removed.
     await expect(page.getByTestId("identity-flow.join-phrase")).toHaveCount(0);
+    await expect(page.getByTestId("identity-flow.person-join-cell")).toHaveCount(0);
   });
 });

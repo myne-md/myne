@@ -22,15 +22,19 @@ import { fillPhraseField } from "../helpers";
 
 const PERSON_ID_HEX = "cd".repeat(16);
 
-/** Welcome → "Connect to my account" → the scan door. */
+/** Welcome → "I have an identity" → the fork's code arm, which hands control to
+ *  the shell's scanner and routes the decoded code into the wizard it names. */
 async function openJoinDoor(page: import("@playwright/test").Page): Promise<void> {
   await page.goto("/");
   await page.getByTestId("welcome.have-identity-cta").click();
-  // The account door is now the first-run fork's third row: the welcome
-  // button opens the identity fork, which offers the phrase, the code and
-  // this account route (myne-md/myne#932).
-  await page.getByTestId("identity-flow.fork-account").click();
-  await expect(page.getByTestId("sync.join.scan-qr")).toBeVisible();
+  // The fork offers the two credentials an existing identity comes with: the 24
+  // words and a code. The account-and-password row that used to sit beside them
+  // is gone from the client (myne-md/myne), so its absence is asserted here
+  // rather than left to the reader: a third door reappearing would be a new
+  // ingress rather than a layout change.
+  await expect(page.getByTestId("identity-flow.fork-code")).toBeVisible();
+  await expect(page.getByTestId("identity-flow.fork-account")).toHaveCount(0);
+  await page.getByTestId("identity-flow.fork-code").click();
 }
 
 test.describe("person device join on the phone (myne-md/myne#911 task 12)", () => {
@@ -46,12 +50,11 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
       },
     });
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
     // The wizard, at its phrase step. The owner's confirm step is the screen this
     // must NOT be: a person code has no account number to show there.
     await expect(page.getByTestId("identity-flow.person-join-cell")).toBeVisible();
-    await expect(page.getByTestId("sync.join.account-input")).toHaveCount(0);
+    await expect(page.getByTestId("identity-flow.person-join-submit")).toBeVisible();
   });
 
   test("the phrase admits this device PENDING, and says the other device must approve", async ({
@@ -69,7 +72,6 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
       personJoinApproved: false,
     });
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
     // One field holding the whole phrase (myne-md/myne#945 item 02): the step takes
     // the phrase as a string because it arrives from the other device.
@@ -109,7 +111,6 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
       ],
     });
     await openJoinDoor(page);
-    await page.getByTestId("sync.join.scan-qr").click();
 
     await fillPhraseField(page, "identity-flow.person-join-cell");
     await page.getByTestId("identity-flow.person-join-submit").click();

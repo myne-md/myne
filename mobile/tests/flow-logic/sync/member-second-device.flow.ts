@@ -178,16 +178,16 @@ test.describe("member second device (myne-md/myne#852 task 7)", () => {
     await expect(page.getByTestId("identity-flow.join.submit")).toBeEnabled();
     await page.getByTestId("identity-flow.join.submit").click();
 
-    // The editor, and NOT a name step: this person already has a name for this
-    // vault, and the accept's name gate is a gate on a FIRST membership, which
-    // this is not. Reaching the editor is the assertion that the re-probe found
-    // the slot the join materialized.
-    await expect(settingsControl(page)).toBeVisible();
+    // The approval wait, and NOT a name step: this person already has a name for
+    // this vault, and the accept's name gate is a gate on a FIRST membership, which
+    // this is not. The wait rather than the editor is the landing a joined vault
+    // owes: the owner has not admitted this device yet (`decisions/sync/0767`).
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
     await expect(page.getByTestId("identity-flow.name-input")).toHaveCount(0);
 
     // What the command was handed. Read from the recorded arguments rather than
-    // from the banner, because the mocked join returns `null` whether or not it
-    // was ever called.
+    // from the banner, because a spec must prove the phone reached THIS command
+    // rather than a plausible neighbour.
     const joinArgs = await page.evaluate(
       () =>
         (window as unknown as { __joinVaultArgs?: Record<string, unknown> }).__joinVaultArgs,
