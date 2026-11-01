@@ -129,9 +129,14 @@ pub async fn agent_start<R: Runtime>(
     // while an older idle one survived. Found in the review of myne-md/myne#531.
     //
     // A v7 carries a millisecond timestamp, and this one does not leave the
-    // device: the run id is RAM-only, never persisted, and never reaches the
-    // model (nothing in `prompt.rs` or `engine.rs` reads it), so it does not
-    // widen what crosses TB13.
+    // device: the run id is RAM-only, absent from the vault, and never reaches the
+    // model (nothing in `prompt.rs` or `engine.rs` reads it), so it does not widen
+    // what crosses TB13. Since `docs/decisions/ops/0768` it IS a field on the run's
+    // own diagnostic-log records, which is what the id is for: a persisted record
+    // of what a leg did is unreadable when two runs are interleaved. That artefact
+    // is the device-local log, not the vault, and it is erased when the toggle goes
+    // off, so `never persisted` would now be false and `absent from the vault` is
+    // the claim that holds.
     let run_id = myne_core::plugins::agent::run::new_run_id();
     let (resolved, cancel) = start_run(&runs, run_id.clone(), &grant, &source).await?;
     // Seed the run with the visible conversation, under the user's budget and
@@ -203,6 +208,10 @@ pub async fn agent_start<R: Runtime>(
         state: vault.inner(),
         hooks: hooks.inner().clone(),
     };
+    // The id is moved into `step`, and both returned lines need it to tie their
+    // outcome to the run the WebView is holding. One clone per call, not per
+    // record.
+    let logged_run_id = run_id.clone();
     let outcome = step(
         app,
         run_id,
@@ -232,6 +241,7 @@ pub async fn agent_start<R: Runtime>(
     tracing::info!(
         target: "myne::agent",
         event = "agent_start_returned",
+        run_id = logged_run_id.as_str(),
         elapsed_ms = started.elapsed().as_millis() as u64,
         // The `kind`, not the error: two variants carry a note id, and the DENY
         // list is what keeps them out of the log. A start refused on its grant or
@@ -274,6 +284,8 @@ pub async fn agent_approve_scope<R: Runtime>(
     // surface's generic "The run stopped before it finished" was the only record
     // that the approval had been refused.
     let started = std::time::Instant::now();
+    // See `agent_start`: the id is moved into `step` inside the block below.
+    let logged_run_id = run_id.clone();
     let outcome: Result<AgentStepResult, AgentError> = async {
         require_unlocked(&vault).await?;
         require_ai_enabled(&app, &vault).await?;
@@ -329,6 +341,7 @@ pub async fn agent_approve_scope<R: Runtime>(
     tracing::info!(
         target: "myne::agent",
         event = "agent_approve_returned",
+        run_id = logged_run_id.as_str(),
         elapsed_ms = started.elapsed().as_millis() as u64,
         ok = outcome.is_ok(),
         error_kind = match &outcome {

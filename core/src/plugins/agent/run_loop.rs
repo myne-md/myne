@@ -35,6 +35,7 @@ use super::tools::{
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
+use tracing::Instrument;
 
 /// How many model round-trips one run may make before it stops on its own.
 ///
@@ -520,11 +521,30 @@ pub async fn drive(
     // layer records: a run that stopped is exactly what a user reports and
     // cannot explain, and at `debug` the log could never say why. The terminal
     // still shows them at `RUST_LOG=myne_core=debug`.
-    let outcome = drive_inner(runs, run_id, task, transcript, deps, read_ids).await;
+    // Both arms below are `info`, which is the level the diagnostic log's file
+    // layer records: a run that stopped is exactly what a user reports and
+    // cannot explain, and at `debug` the log could never say why. The terminal
+    // still shows them at `RUST_LOG=myne_core=debug`.
+    //
+    // The span is what puts `run_id` on every record this leg produces, including
+    // the six `tool` verbs, `iteration`, `reply` and the provider exchange
+    // underneath them. Two runs interleaved in one file are otherwise
+    // indistinguishable, and the first question a report raises is whether the
+    // approval reached a run that was still alive. It is `instrument` rather than
+    // `enter` because an `Entered` guard cannot be held across an await.
+    let span = tracing::info_span!(target: "myne_core::agent", "run", run_id = run_id);
+    let outcome = drive_inner(runs, run_id, task, transcript, deps, read_ids)
+        .instrument(span)
+        .await;
     match &outcome {
         Ok(o) => tracing::info!(
             target: "myne_core::agent",
             event = "run_stopped",
+            // Repeated here rather than left to the span: this line is emitted
+            // AFTER the instrumented future has completed, so the span is no
+            // longer current and the record would carry no run at all. It is the
+            // line a reader greps for first.
+            run_id = run_id,
             end = o.end.tag(),
             iterations = o.iterations,
             notes_read = o.notes_read,
@@ -544,6 +564,7 @@ pub async fn drive(
         Err(e) => tracing::info!(
             target: "myne_core::agent",
             event = "run_failed",
+            run_id = run_id,
             error_kind = e.kind(),
         ),
     }
@@ -3529,7 +3550,11 @@ mod tests {
         // after the dispatch loop would have missed.
         assert!(logs_contain("verbs=\"finish\""));
         // And the run says how it ended, once.
-        assert!(logs_contain("event=\"run_stopped\" end=\"finished\""));
+        // Split at `run_id`, which now sits between the event and the tag: the
+        // field is what ties this line to the run the surface shows, and the tag
+        // is what the test is actually about.
+        assert!(logs_contain("event=\"run_stopped\""));
+        assert!(logs_contain("end=\"finished\""));
         // **How long the closing summary was, never what it said**
         // (myne-md/myne#568). `"ok"` is two characters. Without this figure
         // `edits=0` is ambiguous between "the model proposed nothing" and "the
@@ -3628,7 +3653,8 @@ mod tests {
             &mut BTreeSet::new(),
         ))
         .unwrap();
-        assert!(logs_contain("event=\"run_stopped\" end=\"stalled\""));
+        assert!(logs_contain("event=\"run_stopped\""));
+        assert!(logs_contain("end=\"stalled\""));
         assert!(logs_contain("barren_streak=3"));
     }
 

@@ -23,6 +23,18 @@
 //       that reaches a record with no field name a rule could inspect, and it
 //       is how an unbounded `Display` (an `io::Error`, a path-holding `String`,
 //       a candle error wrapping `WithPath`) would arrive.
+//
+//       **The level set is per path, because the FILE's is.**
+//       `src-tauri/src/logging` records one target below `info`
+//       (`DEBUG_FILE_TARGETS`, `myne_core::agent`, `docs/decisions/ops/0768`),
+//       so `debug` is a recorded level for the module that target belongs to and
+//       for nothing else. Reading the levels from a single global list would
+//       leave the one module whose `debug` reaches disk as the one module R1 does
+//       not read, which is the hole inverted rather than closed.
+//       `RECORDED_DEBUG_ROOTS` is the mirror of that const and the two are the
+//       same list in two places by necessity: one decides what persists, the
+//       other decides what is read from `core/src`, and neither can see the
+//       other's tree.
 //   R2  no unbounded value in a `tracing` call, at any level, in either of the
 //       two shapes that reach a record under no field name a rule can inspect.
 //       One is a value interpolated INTO the message (`info!("opening {}",
@@ -90,6 +102,29 @@ export const SCANNED_ROOTS = [
 
 /** The levels the file layer records, i.e. `LevelFilter::INFO` and above. */
 export const RECORDED_LEVELS = ["info", "warn", "error"];
+
+/**
+ * The directories whose `debug` records reach the file, mirroring
+ * `DEBUG_FILE_TARGETS` in `src-tauri/src/logging`.
+ *
+ * A root rather than a target name because this guard reads source, and the
+ * source it reads is organised by module: every `debug!` under
+ * `core/src/plugins/agent/` carries the target that const admits, and a target
+ * name here would have to be re-derived from a `target:` literal at each call
+ * site, where the value comes from the macro's default instead. The direction of
+ * the safety is what matters: a root listed here that no longer reaches the file
+ * makes the guard STRICTER than the sink, which costs an exception entry; the
+ * reverse (a sink widened without this list) is the leak, and it is what the two
+ * places being adjacent in two files is meant to make hard to miss.
+ */
+export const RECORDED_DEBUG_ROOTS = ["core/src/plugins/agent/"];
+
+/** The levels whose records reach the file for this path. */
+export function recordedLevelsFor(path) {
+  return RECORDED_DEBUG_ROOTS.some((root) => path.startsWith(root))
+    ? [...RECORDED_LEVELS, "debug"]
+    : RECORDED_LEVELS;
+}
 
 /**
  * Recorded `%` sites at a recorded level, each with the reason it is bounded.
@@ -502,7 +537,7 @@ export function lintSource(path, text) {
         message: `an argument that is neither the message, a \`field = value\`, nor a field shorthand: "${arg}"`,
       });
     }
-    if (!RECORDED_LEVELS.includes(invocation.level)) continue;
+    if (!recordedLevelsFor(path).includes(invocation.level)) continue;
     // R1: a `%` Display formatter at a level the file records.
     for (const arg of topLevelArgs(invocation.args)) {
       const field = displayField(arg);
@@ -625,6 +660,7 @@ function main() {
   console.log(
     `tracing-discipline: ok (${invocations} tracing call site(s) across ${SCANNED_ROOTS.length} root(s); ` +
       `${RECORDED_LEVELS.join("/")} carry no unreasoned % formatter, no message interpolation; ` +
+      `debug is held to the same rule in ${RECORDED_DEBUG_ROOTS.length} module(s); ` +
       `${EXCEPTIONS.length} recorded exception(s))`,
   );
 }

@@ -175,21 +175,47 @@ pub const FILE_TARGETS: &[&str] = &[
     "protocol",         // the protocol crate is named `protocol`
 ];
 
-/// The file layer's filter: `info` and above, from the app's own targets only.
+/// The targets the file layer records BELOW `info`, and the only ones.
+///
+/// **One entry, and the argument is the log's own failure mode.** A report of "the run
+/// stopped before it finished" arrived with a diagnostic log covering the failure
+/// window and holding two search-index heartbeats: the run loop writes the whole story
+/// of a leg (`iteration`, six `tool` verbs with entry/hit/body counts, `reply`'s shape
+/// counts), and every one of those sites is `debug!`, which a fixed `info` floor cannot
+/// record by any configuration. Promoting the trail to `info` site by site was rejected
+/// (a level decision at every future call site inside a loop whose volume grows with the
+/// run); a target-wide floor states the rule once, in the sink, and covers call sites
+/// that do not exist yet. `docs/decisions/ops/0768` carries the argument.
+///
+/// What bounds it is the loop's own caps rather than the user's behaviour, and what keeps
+/// the content claim true is that `scripts/check-tracing-discipline.mjs` holds its `%`
+/// Display rule at `debug` for exactly the module this target belongs to. That second
+/// place is deliberate and is the one thing here that can drift: a new entry needs a
+/// matching `RECORDED_DEBUG_ROOTS` there, or a `%` of a path could reach disk.
+pub const DEBUG_FILE_TARGETS: &[&str] = &["myne_core::agent"];
+
+/// The file layer's filter: `info` and above, from the app's own targets only, with the
+/// one module `DEBUG_FILE_TARGETS` names recorded below that.
 ///
 /// Deliberately NOT `EnvFilter` and deliberately NOT `RUST_LOG`: an environment
 /// variable must not decide what persists on a user's disk, and the one call site
 /// in the tree whose own doc comment admits its detail "may include the path" is
 /// precisely the `RUST_LOG`-gated one.
 fn file_filter() -> tracing_subscriber::filter::Targets {
-    FILE_TARGETS.iter().fold(
+    let admitted = FILE_TARGETS.iter().fold(
         tracing_subscriber::filter::Targets::new()
             // Off for anything not named below, which is what excludes `hyper`,
             // `automerge`, `zbus`, `tauri`'s own crates and the rest of the
             // dependency closure.
             .with_default(LevelFilter::OFF),
         |targets, name| targets.with_target(*name, LevelFilter::INFO),
-    )
+    );
+    // Applied AFTER the `info` fold and as a longer prefix, because `Targets`
+    // resolves to the most specific entry: `myne_core::agent` at `debug` while
+    // `myne_core` stays at `info` for every other module in the crate.
+    DEBUG_FILE_TARGETS.iter().fold(admitted, |targets, name| {
+        targets.with_target(*name, LevelFilter::DEBUG)
+    })
 }
 
 /// The one subscriber: stdout with the env filter, then the file layer.
@@ -309,6 +335,77 @@ mod tests {
             !body.contains("crate noise"),
             "a `myne*` CRATE whose root the guard never scans reached the file the user is \
              invited to publish, which is what the `myne::` entry exists to prevent: {body:?}"
+        );
+    }
+
+    /// The one target recorded below `info`, plus the boundary that keeps the exception
+    /// from spreading past it (`docs/decisions/ops/0768`).
+    ///
+    /// Both halves are load-bearing and they fail in opposite directions. The admit half
+    /// is what makes the widening real: a prefix typo in `DEBUG_FILE_TARGETS` silently
+    /// re-creates the dead log the widening exists to fix, and only a test notices. The
+    /// deny half is the claim itself: `myne_core`'s floor stays at `info` for every other
+    /// module, and the HOST's own `myne::agent` target stays at `info` too, so the
+    /// exception belongs to the module that owns the run loop rather than to "the agent".
+    #[test]
+    fn the_agent_loop_is_the_only_target_recorded_below_info() {
+        let dir = ScopedTempDir::new("logging-agent-debug").expect("tempdir");
+        let sink = Arc::new(LogSink::new(dir.path().to_path_buf(), true));
+        let subscriber = tracing_subscriber::registry().with(
+            tracing_subscriber::fmt::layer()
+                .with_ansi(false)
+                .with_target(true)
+                .with_writer(SinkMaker::new(Arc::clone(&sink)))
+                .with_filter(file_filter()),
+        );
+
+        tracing::subscriber::with_default(subscriber, || {
+            tracing::debug!(target: "myne_core::agent", "the loop's own trail");
+            tracing::debug!(target: "myne_core::sync", "another module, below the floor");
+            tracing::info!(target: "myne_core::sync", "another module, at the floor");
+            tracing::debug!(target: "myne::agent", "the host target, below the floor");
+            // The trail's SHAPE, asserted rather than assumed: `run_loop::drive`
+            // carries the run id on one span and emits its records inside it, so
+            // the run id reaches the file only if the fmt layer renders span
+            // fields at all. A widening that quietly did not would leave every
+            // trail line unattributable, which is the state this changed.
+            {
+                let span = tracing::info_span!(target: "myne_core::agent", "run", run_id = "01J8Z");
+                let _entered = span.enter();
+                tracing::debug!(target: "myne_core::agent", event = "tool", verb = "read_note");
+            }
+        });
+
+        let body = std::fs::read_to_string(sink.dir().join(LOG_FILE_NAME)).expect("read log");
+        assert!(
+            body.contains("myne_core::agent: the loop's own trail"),
+            "`myne_core::agent` is in DEBUG_FILE_TARGETS but the filter dropped its \
+             `debug` record, so a run that stopped is unexplainable again: {body:?}"
+        );
+        assert!(
+            !body.contains("another module, below the floor"),
+            "the `debug` widening leaked to the rest of `myne_core`, which is not the \
+             exception the decision records: {body:?}"
+        );
+        assert!(
+            body.contains("another module, at the floor"),
+            "the `info` floor was lost for the rest of `myne_core` while widening one \
+             target: {body:?}"
+        );
+        assert!(
+            !body.contains("the host target, below the floor"),
+            "`myne::agent` (the desktop command layer) is not the loop, and recording its \
+             `debug` records widens the exception past what the decision states: {body:?}"
+        );
+        assert!(
+            body.contains("run_id") && body.contains("01J8Z"),
+            "the run's own id did not reach the file, so every trail line is unattributable \
+             and two interleaved runs read as one: {body:?}"
+        );
+        assert!(
+            body.contains("verb=\"read_note\"") || body.contains("verb=read_note"),
+            "a `tool` record inside the span did not land, so the span's presence says nothing \
+             about the trail it is supposed to carry: {body:?}"
         );
     }
 }

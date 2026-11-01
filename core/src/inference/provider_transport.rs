@@ -477,6 +477,18 @@ impl ProviderTransport {
                 elapsed_ms = started.elapsed().as_millis() as u64,
             );
         })?;
+        // **The request is about to leave, and this is the only record that says
+        // so.** Every other line here is written after a response arrives, so
+        // "the exchange failed" and "the request was never made" were the same
+        // observation: a leg that produced no view and no cost figure could not be
+        // told apart from one that never reached the network. A byte count, not the
+        // request: the body carries the prompt.
+        tracing::info!(
+            target: "myne::ai",
+            event = "provider_request",
+            request_bytes = req.len(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+        );
         tls.write_all(&req).map_err(|e| self.cause_from_io(&e))?;
         tls.flush().map_err(|e| self.cause_from_io(&e))?;
         let mut reader = BufReader::new(tls);
