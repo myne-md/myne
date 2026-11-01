@@ -922,10 +922,20 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         // button already said "devices", so the word beside the button was the
         // duplication (myne-md/myne#945 item 06).
         action={
-          enrolledHere ? (
+          enrolledHere && publishState?.person_born === true ? (
             // The owner arm needs an ENROLLED device to show a code for another
-            // one; the member arm needs the member plane. The two never render
+            // one, and it needs a PERSON-BORN vault to have a person code to
+            // show. The member arm needs the member plane. The two never render
             // together, so one slot carries one action.
+            //
+            // `person_born === true` rather than `!== false` is the deliberate
+            // half: while `publishState` is still null the button is absent
+            // rather than wrong, and a vault that is not person-born gets no QR
+            // at all. It used to get the `account` variant, and that variant now
+            // produces a code nothing can scan (both clients that could lost
+            // their join forms, `decisions/sync/0767`). Its path is the
+            // account-number form below, which is the only one an account-keyed
+            // vault has: there is no person to invite a device to.
             <IconButton
               icon="plus"
               label={t("sync.deviceJoinQr.title")}
@@ -1127,15 +1137,17 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         onCreated={handleIdentityCreated}
       />
 
-      {/* The owner's device-join code. A vault born under an identity has no
-          account number, so its code names the PERSON and the payload comes from
-          this device's own identity (myne-md/myne#911 task 9); a legacy vault
-          keeps the account-number form. */}
-      <DeviceJoinQrDialog
-        open={qrOpen}
-        onClose={() => setQrOpen(false)}
-        variant={publishState?.person_born ? "person" : "account"}
-      />
+      {/* The owner's device-join code, and it is the PERSON code now
+          (`decisions/sync/0767`). A vault born under an identity names the person
+          and the payload comes from this device's own identity (myne-md/myne#911
+          task 9). A vault that is NOT person-born used to get the account-number
+          variant, and that variant is withdrawn here rather than left to age:
+          the two clients that could SCAN an account code are the ones that lost
+          their join forms, so the dialog was producing a picture nothing could
+          consume. The form that types the number is still below for such a
+          vault, and it is the only path it has: an account-keyed vault has no
+          person to invite a device to. */}
+      <DeviceJoinQrDialog open={qrOpen} onClose={() => setQrOpen(false)} variant="person" />
 
       <Toast
         message={takeTheirsPending ? t("sync.conflicts.tookTheirsToast") : null}
