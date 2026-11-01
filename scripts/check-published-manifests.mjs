@@ -42,6 +42,10 @@
 // says the URL resolves, not that the bytes are good. That is the client's own
 // check at install time (minisign against the offline release key, which cannot
 // be disabled), and re-implementing it here would be a second crypto path.
+//
+// What it does check is the ENVELOPE the updater parses, because that is the half
+// that fails silently. See `signatureEnvelope` below: v0.11.3 published every
+// platform's signature one encoding too deep and every other gate was green.
 // It also does not check the `.sig` files beside the artefacts, which nothing
 // fetches: the signature travels INSIDE the manifest.
 //
@@ -108,6 +112,29 @@ function parseVersion(text, channel, failures) {
  * Exported and injectable (`fetchImpl`, `base`) so a test can drive it against
  * a fixture without the network.
  */
+/**
+ * The envelope `tauri-plugin-updater` parses, and nothing more.
+ *
+ * A manifest's `signature` is the CONTENT OF THE `.sig` FILE the bundler wrote, which is itself
+ * base64 of a four-line minisign blob. The updater base64-decodes the field once and hands the
+ * result to minisign, which reads line 1 as the untrusted comment and line 3 as the trusted one.
+ * Encoding the field one level deeper still decodes to a string, so the mistake surfaces only at
+ * install: "Untrusted signature comment too long", on every platform at once, from a release whose
+ * artefacts, hashes and URLs were all correct. v0.11.3 shipped exactly that.
+ *
+ * `null` means the field is not in that shape. It says nothing about whether the signature is
+ * valid: that is the client's check, at install time.
+ */
+export function signatureEnvelope(signature) {
+  if (typeof signature !== "string" || signature.length === 0) return null;
+  const text = Buffer.from(signature, "base64").toString("utf8");
+  const lines = text.split("\n");
+  if (lines.length < 4) return null;
+  if (!lines[0].startsWith("untrusted comment: ")) return null;
+  if (!lines[2].startsWith("trusted comment: ")) return null;
+  return text;
+}
+
 export async function audit({
   fetchImpl = fetch,
   base = BASE,
@@ -161,6 +188,13 @@ export async function audit({
         failures.push(
           `${url}: platform ${target} carries no signature. The updater refuses an unsigned ` +
             `artefact, so the offer would be a dead end for that platform.`,
+        );
+      } else if (signatureEnvelope(entry.signature) === null) {
+        failures.push(
+          `${url}: platform ${target}'s signature is not the .sig file's content. The updater ` +
+            `base64-decodes this field once and then parses a four-line minisign blob, so an ` +
+            `extra encoding layer (or the decoded blob pasted in) fails at install on every ` +
+            `platform with "Untrusted signature comment too long".`,
         );
       }
       const artifact = entry?.url;
