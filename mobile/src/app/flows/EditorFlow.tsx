@@ -68,7 +68,7 @@ import type { NoteListError } from "../../lib/notes";
 import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { activeVaultId, listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
-import { effectiveMobileAutoLockSecs } from "../../lib/auto-lock";
+import { useIdleAutoLock } from "../../hooks/useIdleAutoLock";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
 import {
   drainPendingCaptures,
@@ -2446,57 +2446,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
   // Auto-lock: re-lock the vault after `auto_lock_seconds` of inactivity (any
   // touch / key / pointer resets the countdown). Idle re-lock is what makes the
-  // quick-unlock PIN fast-path actually appear on the next unlock.
-  useEffect(() => {
-    if (!HAS_TAURI) return;
-    // A6 envelope: the effective timeout is always in [30, 3600] - a sentinel/
-    // replayed "off" (0) can no longer disable the idle lock (matches desktop's
-    // always-on `effective_auto_lock_secs`). No disable path.
-    const secs = effectiveMobileAutoLockSecs(prefs.auto_lock_seconds);
-    // #53: compare TIMESTAMPS, do not count down.
-    //
-    // This was a `setTimeout` the countdown restarted on every touch. A phone
-    // suspends timers the moment the app leaves the foreground, so time spent
-    // backgrounded - which is most of the time a phone is unattended, and
-    // exactly the A6 "lost or stolen device" case auto-lock is for - never
-    // counted toward the deadline. A vault locked 30 seconds after the user
-    // came back rather than 30 seconds after they left.
-    //
-    // Same shape as the shared web timer (`src/hooks/useIdleAutoLock.ts`),
-    // including the load-bearing half: the deadline is re-evaluated when the
-    // app becomes visible again, which is the first moment the elapsed time is
-    // observable at all.
-    let lastActivity = Date.now();
-    let fired = false;
-    const evaluate = () => {
-      if (fired) return;
-      if (Date.now() - lastActivity >= secs * 1000) {
-        fired = true;
-        onLock("idle");
-      }
-    };
-    const markActive = () => {
-      // After firing, activity does not un-lock: the vault is locked and the
-      // unlock screen owns what happens next.
-      if (fired) return;
-      lastActivity = Date.now();
-    };
-    const onVisibility = () => {
-      if (document.visibilityState === "visible") evaluate();
-    };
-    const events: (keyof WindowEventMap)[] = ["touchstart", "keydown", "pointerdown", "mousedown"];
-    events.forEach((e) => window.addEventListener(e, markActive, { passive: true }));
-    document.addEventListener("visibilitychange", onVisibility);
-    // A coarse tick: the deadline is a timestamp comparison, so the interval
-    // only decides how promptly a FOREGROUND idle is noticed - the suspended
-    // case is handled by the visibility check above.
-    const timer = window.setInterval(evaluate, 5000);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisibility);
-      events.forEach((e) => window.removeEventListener(e, markActive));
-    };
-  }, [prefs.auto_lock_seconds, onLock]);
+  // quick-unlock PIN fast-path actually appear on the next unlock. The timer
+  // itself moved into the shared hook when the approval wait became a second
+  // post-unlock screen that holds keys (myne-md/myne#535).
+  useIdleAutoLock(onLock, prefs.auto_lock_seconds);
 
   // Best-effort plaintext wipe on unmount.
   useEffect(() => {

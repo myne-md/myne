@@ -225,6 +225,40 @@ export type Stage =
       vaultId?: VaultId;
     }
   | {
+      /**
+       * The awaiting-approval wait (myne-md/myne#535, given to this client by
+       * the report that a phone landing here never showed its code).
+       *
+       * A device that joined with the account password is enrolled the moment
+       * `sync_join_account` returns, and the vault it bootstrapped is unlocked
+       * with the account's REAL meta, so every probe before unlock describes an
+       * ordinary container. Whether it is still waiting for an approval cannot
+       * be read from disk before unlock, which is why this stage is reached by a
+       * post-unlock verdict (`lib/pending-approval.ts`) rather than by boot
+       * routing, and why its only inbound edge is `editor.awaiting-approval`.
+       *
+       * It holds an UNLOCKED vault, deliberately: the wait exists so a sync
+       * cycle can claim the token, and the claim needs `root_key`. That is why
+       * the screen it renders arms the idle auto-lock itself, which otherwise
+       * lives inside the editor.
+       *
+       * Before this, the wait, its poll and the §6.3 fingerprint compare lived
+       * only inside `JoinFlow`'s React state. Losing that overlay (a phone
+       * reclaiming its WebView, or the pending screen's Cancel) left the device
+       * on the unlock form with no surface anywhere that could show its code:
+       * the approving device waited on a comparison that could never be made, and
+       * the first background cycle adopted a head with the compare skipped.
+       */
+      name: "pending-approval";
+      /**
+       * The vault being waited on, threaded from the `editor` stage the verdict
+       * was taken on, so `pending-approval.approved` can address the editor it
+       * returns to. `undefined` on the boot-probe editor entry, for the same
+       * reason that stage's own field is.
+       */
+      vaultId?: VaultId;
+    }
+  | {
       name: "recover";
       subStep: RecoverSubStep;
       /**
@@ -337,6 +371,29 @@ export type Action =
    * arm is only the "make a brand-new vault" branch.
    */
   | { type: "editor.create-vault" }
+  /**
+   * editor → pending-approval. **The awaiting-approval verdict** (#535).
+   *
+   * Dispatched by the shell ONCE, after unlock, from
+   * `awaitingApprovalVerdict()` (`lib/pending-approval.ts`). Nothing else may
+   * dispatch it: the question cannot be answered from disk before unlock, so an
+   * inference anywhere else is a second, wrong answer.
+   *
+   * The arm does not lock the vault, and must not: the wait is the one place a
+   * still-pending device can make progress, and progress needs `root_key` in the
+   * slot so the cycle can re-run the SCRAM claim.
+   */
+  | { type: "editor.awaiting-approval" }
+  /**
+   * pending-approval → editor. The compare was made and matched.
+   *
+   * Desktop and web leave this stage by `reprobe()` instead (their boot routing
+   * answers `editor` again once the token lands). This client needs the action
+   * because its stage carries the vault id and its screen is the join flow, so
+   * an explicit exit keeps the addressing rather than re-deriving it from a
+   * probe whose slot-priority arm carries no id.
+   */
+  | { type: "pending-approval.approved"; vaultId?: VaultId }
   // TWO ORPHANED DOCBLOCKS WERE HERE, and both argued a routing decision this
   // client no longer makes (myne-md/myne#477).
   //
@@ -594,6 +651,17 @@ export function transition(prev: Stage, action: Action): Stage {
           // Re-enter the editor addressed at the joined vault — the previous
           // one is no longer the unlocked slot (SYNC-1).
           return { name: "editor", vaultId: action.vaultId };
+        case "editor.awaiting-approval":
+          // #535. Carries the editor's targeting id onto the wait so the
+          // approval's exit lands on the same vault.
+          return { name: "pending-approval", vaultId: prev.vaultId };
+        default:
+          return rejectIllegal(prev, action);
+      }
+    case "pending-approval":
+      switch (action.type) {
+        case "pending-approval.approved":
+          return { name: "editor", vaultId: action.vaultId ?? prev.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -839,6 +907,16 @@ const LEGAL: Record<string, Stage["name"]> = {
   // runs. Same answer, different origin, which is why neither row is in
   // `SHARED_LEGAL` and neither is a drift.
   "editor|editor.join-success": "editor",
+
+  // ---- mobile-only row, the way out of the approval wait -----------------
+  //
+  // Desktop and web leave `pending-approval` by reprobe (their boot routing
+  // answers `editor` again once the token lands, and neither stage carries a
+  // vault id to lose). This client exits by action, because the screen it
+  // renders is the join flow and the editor it returns to has to stay addressed
+  // at the vault the wait was about. The INBOUND edge is shared, in
+  // `SHARED_LEGAL`: both clients reach the wait from `editor` after unlock.
+  "pending-approval|pending-approval.approved": "editor",
 };
 
 const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
@@ -870,6 +948,10 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
   // (MYND-219 / SYNC-17) — same payload-ignoring contract as the unlock
   // entries above.
   { name: "editor", vaultId: "00000000-0000-7000-8000-00000000000a" },
+  // Coverage entry for the approval wait's optional `vaultId` payload — same
+  // payload-ignoring contract as the two above.
+  { name: "pending-approval" },
+  { name: "pending-approval", vaultId: "00000000-0000-7000-8000-00000000000a" },
   { name: "recover", subStep: "select" },
   // Restore-from-backup flow (MYND-56). `entry` is payload (copy only);
   // one entry exercises the variant across every (Stage × Action) pair.
@@ -892,6 +974,8 @@ const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   // same reason `welcome.join-success` is — the walk inspects `name` only.
   { type: "picker.join-success" },
   { type: "editor.join-success" },
+  { type: "editor.awaiting-approval" },
+  { type: "pending-approval.approved" },
   { type: "create-vault.start" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },

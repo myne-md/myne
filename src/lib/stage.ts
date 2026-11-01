@@ -1102,7 +1102,7 @@ import type { VaultListResult, VaultSummary } from "../types/vault-summary";
  * `@myne/client-core/stage-decision`, so a shared transition cannot be silently
  * retargeted on one client: doing it here is a visible override of a shared
  * key, and `tests/lib/stageDecision.test.ts` fails on one. What stays below is
- * this client's own three rows and the reasons they are its own.
+ * this client's own rows and the reasons they are its own.
  */
 const LEGAL: Record<string, Stage["name"]> = {
   ...(SHARED_LEGAL as Record<string, Stage["name"]>),
@@ -1133,9 +1133,6 @@ const LEGAL: Record<string, Stage["name"]> = {
   // (`vaultCreation`), so the row stays here beside the other account-entry
   // rows rather than becoming a shared one.
   "account-entry|create-vault.start": "first-run",
-  // #535, the awaiting-approval verdict, taken after unlock rather than at
-  // boot. The only inbound edge this stage has; its exit stays reprobe-based.
-  "editor|editor.awaiting-approval": "pending-approval",
   // The third device-join door (MYND-424 welcome; myne#221 picker + switcher).
   // The other two are shared; this one is keyed on `unlock` because the
   // switcher entry locks the active vault and routes there before the join

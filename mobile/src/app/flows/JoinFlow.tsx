@@ -274,6 +274,8 @@ export function JoinFlow({
   onCancel,
   onMemberJoin,
   onPersonJoin,
+  initiallyPending = false,
+  initialVaultId,
 }: JoinFlowProps) {
   const { t } = useTranslation();
   const [serverUrl, setServerUrl] = useState("");
@@ -289,8 +291,18 @@ export function JoinFlow({
   // approve; "pending-phrase" is the escape from it (the same device, already
   // unlocked with the password, confirms with the phrase instead); "verify"
   // shows the head-fingerprint SAS for the mandatory eye-compare.
-  const [step, setStep] = useState<"form" | "confirm" | "pending" | "pending-phrase" | "verify">("form");
-  const [joinedVaultId, setJoinedVaultId] = useState<VaultId | undefined>(undefined);
+  //
+  // `initiallyPending` starts at the wait rather than at the form: the shell
+  // mounts this flow for the `pending-approval` STAGE, which a device reaches
+  // after unlock when it is enrolled and has never adopted a head
+  // (myne-md/myne#535, mobile half). Same flow, same poll, same compare — the
+  // desktop's `AccountBootstrap initiallyPending` is the same answer for the same
+  // reason, and a second component here would be a second implementation of "has
+  // an approval landed".
+  const [step, setStep] = useState<"form" | "confirm" | "pending" | "pending-phrase" | "verify">(
+    initiallyPending ? "pending" : "form",
+  );
+  const [joinedVaultId, setJoinedVaultId] = useState<VaultId | undefined>(initialVaultId);
   const [aborting, setAborting] = useState(false);
   /** The un-enrol failed — the device is STILL enrolled, and the screen must
    *  say so instead of closing (docs/decisions/ui/0482). */
@@ -620,34 +632,49 @@ export function JoinFlow({
           {/* The escape (myne-md/myne#837, mirroring myne-md/myne#468 task 8).
               Before this the only control was Cancel, so a user whose other
               device is gone waited forever with nothing saying a second door
-              existed. */}
-          <div
-            data-testid="sync.join.no-device"
-            style={{
-              marginTop: "var(--space-4)",
-              paddingTop: "var(--space-3)",
-              borderTop: "1px solid var(--line-1)",
-              maxWidth: 320,
-            }}
-          >
-            <div style={{ fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)", color: "var(--fg-2)" }}>
-              {t("sync.join.noDeviceBody")}
+              existed.
+
+              Hidden on the RESUMED entry, and that is not an oversight: this
+              arm re-enrols with the account number the form collected, and a
+              device that reached the wait through the `pending-approval` stage
+              never typed one (the stage knows only the vault id). Offering the
+              door there would submit an empty account number. The phrase door
+              remains where it has the number: the join overlay, and the
+              Settings reset that re-opens it. */}
+          {!initiallyPending && (
+            <div
+              data-testid="sync.join.no-device"
+              style={{
+                marginTop: "var(--space-4)",
+                paddingTop: "var(--space-3)",
+                borderTop: "1px solid var(--line-1)",
+                maxWidth: 320,
+              }}
+            >
+              <div style={{ fontSize: "var(--text-sm)", lineHeight: "var(--leading-normal)", color: "var(--fg-2)" }}>
+                {t("sync.join.noDeviceBody")}
+              </div>
+              <div style={{ marginTop: "var(--space-3)" }}>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    clearPhrase();
+                    phraseEnroll.reset();
+                    setStep("pending-phrase");
+                  }}
+                  data-testid="sync.join.use-phrase"
+                >
+                  {t("sync.join.usePhrase")}
+                </Button>
+              </div>
             </div>
-            <div style={{ marginTop: "var(--space-3)" }}>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  clearPhrase();
-                  phraseEnroll.reset();
-                  setStep("pending-phrase");
-                }}
-                data-testid="sync.join.use-phrase"
-              >
-                {t("sync.join.usePhrase")}
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
+        {/* Cancel leaves the wait. What that means is the CALLER's answer, not
+            this flow's: the overlay closes back to the stage it was opened from,
+            and the `pending-approval` stage locks the vault and re-probes (it has
+            no overlay to close). Kept on both entries so the wait never becomes
+            a screen with no way out. */}
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
           <Button variant="ghost" onClick={onBack} data-testid="sync.join.cancel">
             {t("common.prompt.cancel")}
