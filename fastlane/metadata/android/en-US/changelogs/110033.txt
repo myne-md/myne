@@ -1,3 +1,3 @@
-Myne 0.11.2. The vault password is now the only vault credential, the device key gained its Android Keystore rung, and the external MCP connection gained its write surface.
+Myne 0.11.3. Live collaboration no longer lists the device you are using as one of its own peers, and the device-admission ceremony is gone from Sync settings. macOS builds keep the device key in the data protection keychain.
 
 This is the same app as the .apk on myne.md. F-Droid builds it from source and signs it with its own key, so it cannot install over a sideloaded .apk: uninstall that first, after exporting your notes, because an uninstall erases the on-device vault.
