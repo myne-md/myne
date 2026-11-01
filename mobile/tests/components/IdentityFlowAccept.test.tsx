@@ -47,6 +47,19 @@ const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
+/**
+ * What the accept/join reports back. The flow reads `vault_id` off it to address
+ * the approval wait the installed vault owes (`AppShell`'s
+ * `landOnInstalledVault`), so a mock resolving `undefined` would throw inside the
+ * flow rather than exercise it.
+ */
+const ACCEPTED_VIEW = {
+  vault_id: "00000000-0000-7000-8000-00000000000b",
+  vault_account_hash_hex: "00112233445566778899aabbccddeeff",
+  owner_fingerprint_hex: "00".repeat(32),
+  group_key_epoch: 1,
+};
+
 vi.mock("../../src/lib/app-window", () => ({ HAS_TAURI: true }));
 vi.mock("../../src/lib/personAccount", () => ({
   personSetup,
@@ -180,7 +193,7 @@ beforeEach(() => {
     approved: true,
   });
   personLock.mockReset().mockResolvedValue(undefined);
-  personAcceptInvite.mockReset().mockResolvedValue(undefined);
+  personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
   // Default: an accepted member whose row carries no name yet, which is the state
   // the step exists for. `namedRoster()` below is the other answer.
@@ -384,7 +397,10 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(onAccepted).not.toHaveBeenCalled();
     await typeName(MEMBER_NAME);
     await vi.waitFor(() => expect(setMyMemberName).toHaveBeenCalledWith(MEMBER_NAME));
-    expect(onAccepted).toHaveBeenCalledTimes(1);
+    // The installed vault's id travels with the callback: the shell addresses the
+    // approval wait with it, and a fresh member device owes that wait before it can
+    // pull (`AppShell`'s `landOnInstalledVault`).
+    expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id);
   });
 
   it("keeps the credential behind the project's floor", async () => {
@@ -534,7 +550,7 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     // The roster's answer IS the question here, and a member re-invited to a vault
     // they already named in reads as named: the step is passed through rather than
     // asked again, and the callback fires without a second write.
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
     expect(setMyMemberName).not.toHaveBeenCalled();
     // Non-vacuity: the step did render (the test harness never unmounts the flow, so
     // it is still on screen) and the member was released THROUGH it rather than the

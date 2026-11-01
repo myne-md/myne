@@ -1190,12 +1190,13 @@ export function IdentityFlow({
     setBusy(true);
     setError(null);
     try {
-      await personAcceptInvite(
+      const view = await personAcceptInvite(
         acceptInvite.invite_id_hex,
         ownerCode.trim(),
         acceptWords.join(" "),
         password,
       );
+      acceptedVaultId.current = view.vault_id;
       setAcceptInvite(null);
       clearAcceptSecrets();
       setError(null);
@@ -1230,15 +1231,16 @@ export function IdentityFlow({
     setJoining(true);
     setJoinError(null);
     try {
-      await personJoinVault(
+      const view = await personJoinVault(
         joinInvite.invite_id_hex,
         joinInvite.vault_account_hash_hex,
         joinWords.join(" "),
         joinPassword,
       );
+      acceptedVaultId.current = view.vault_id;
       setJoinInvite(null);
       clearJoinSecrets();
-      accepted.current();
+      accepted.current(acceptedVaultId.current);
     } catch (e) {
       // Which failure it was, not only "could not be added": the kinds are a shared
       // closed enum and carry no secret (myne-md/myne#794). `Transport` is the arm a
@@ -1328,6 +1330,16 @@ export function IdentityFlow({
    */
   const accepted = useRef(onAccepted);
   accepted.current = onAccepted;
+  /**
+   * The vault this flow just installed, handed to `onAccepted` so the shell can
+   * address the approval wait.
+   *
+   * A ref rather than a state because the accept lands on the NAME step and the
+   * callback runs from there: the id has to survive that hop without a re-render
+   * depending on it. `undefined` until a vault actually lands, which is what keeps
+   * the shell's other `onAccepted` callers (a plain re-probe) unchanged.
+   */
+  const acceptedVaultId = useRef<string | undefined>(undefined);
   const nameChecked = useRef(false);
 
   /**
@@ -1371,7 +1383,7 @@ export function IdentityFlow({
       // future mount change reopens it.
       nameChecked.current = true;
       setNameChecking(false);
-      if (named) accepted.current();
+      if (named) accepted.current(acceptedVaultId.current);
     })();
     return () => {
       cancelled = true;
@@ -1385,7 +1397,7 @@ export function IdentityFlow({
     setNameError(null);
     try {
       await setMyMemberName(name);
-      accepted.current();
+      accepted.current(acceptedVaultId.current);
     } catch (e) {
       // Which refusal it was: `NameTooLong`, `StoreUnreadable` and `SlotNotUnlocked`
       // are three different remedies, and the mapping is shared with the desktop

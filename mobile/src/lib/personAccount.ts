@@ -183,20 +183,36 @@ export function personListInvites(): Promise<InviteSummary[]> {
   return invoke<InviteSummary[]>("plugin:sync|sync_person_list_invites");
 }
 
+/** What a successful accept or join reports: public fields only. Mirrors the Rust
+ *  `AcceptedInviteView`, and the desktop twin's identical interface. */
+export interface AcceptedInviteView {
+  vault_id: string;
+  vault_account_hash_hex: string;
+  owner_fingerprint_hex: string;
+  group_key_epoch: number;
+}
+
 /** Claim an invite and materialize the member vault.
  *
  * `password` is REQUIRED, and becomes the vault's device-local fast credential
  * (`vault.member-unlock`), written as part of installing the member session
  * (myne-md/myne#851 task 7). It is this device's password, not the vault owner's.
  * Both clients collect it in their own accept form: desktop's `IdentityHome` and
- * the phone's `IdentityFlow` accept step (myne-md/myne#851 task 14). */
+ * the phone's `IdentityFlow` accept step (myne-md/myne#851 task 14).
+ *
+ * The view is RETURNED because the shell needs the vault's id: a freshly
+ * materialized member vault carries a device the owner has to admit, so the phone
+ * owes the wait and the §6.3 compare before it is a usable device, and that stage
+ * is addressed by vault id. Re-probing could not answer it — the vault is on disk
+ * and unlocked either way, which is the whole reason a pending device used to
+ * land on an ordinary editor. */
 export function personAcceptInvite(
   inviteIdHex: string,
   ownerCode: string,
   phrase: string,
   password: string,
-): Promise<void> {
-  return invoke<void>("plugin:sync|sync_person_accept_invite", {
+): Promise<AcceptedInviteView> {
+  return invoke<AcceptedInviteView>("plugin:sync|sync_person_accept_invite", {
     inviteIdHex,
     ownerCode,
     phrase,
@@ -224,17 +240,16 @@ export function personAcceptInvite(
  * never had (`decisions/protocol/0606`). `password` is REQUIRED and becomes this
  * device's member-unlock credential; it is not the owner's password.
  *
- * Typed `void` like its sibling above rather than the desktop's
- * `AcceptedInviteView`: the shell re-probes after the call and this client's accept
- * has never returned the view, so a return shape here would have no reader.
+ * The view is returned for the same reason the accept's is: the vault id is what
+ * addresses the approval wait this device owes before it can pull.
  */
 export function personJoinVault(
   inviteIdHex: string,
   vaultAccountHashHex: string,
   phrase: string,
   password: string,
-): Promise<void> {
-  return invoke<void>("plugin:sync|sync_member_join_vault", {
+): Promise<AcceptedInviteView> {
+  return invoke<AcceptedInviteView>("plugin:sync|sync_member_join_vault", {
     inviteIdHex,
     vaultAccountHashHex,
     phrase,

@@ -105,8 +105,15 @@ export interface IdentityFlowProps {
    * NOT called by the accept itself. The name step sits between the two and reads
    * this through a ref, so the accepted vault cannot reach an editor unnamed: the
    * callback is the name gate's completion, not the accept's.
+   *
+   * `vaultId` is the vault the flow just installed, and its presence is what tells
+   * the shell that a device still owes its approval wait: a freshly installed
+   * member vault carries a device the owner has to admit, so re-probing would land
+   * on an ordinary editor (or, worse, the unlock form) with the §6.3 compare never
+   * made. `undefined` keeps the old re-probe behaviour for the callers that never
+   * install anything.
    */
-  onAccepted: () => void;
+  onAccepted: (vaultId?: string) => void;
   /**
    * Create a vault from the identity home (myne-md/myne#911 task 12).
    *
