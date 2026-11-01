@@ -150,6 +150,16 @@ function settingsControl(page: Page) {
   return page.getByRole("button", { name: "Settings" }).first();
 }
 
+/** The §6.3 eye-compare, which is where a vault that arrived by invitation lands.
+ *
+ *  A freshly accepted member vault carries a device the owner has NOT admitted, so
+ *  the client owes the approval wait and its fingerprint comparison before it can
+ *  pull anything (`decisions/sync/0767`). This used to be asserted as "the editor
+ *  mounted", which was the defect that decision names. */
+function approvalCompare(page: Page) {
+  return page.getByTestId("sync.join.verify");
+}
+
 const ENROLLED = {
   enrolled: true,
   identity_unlocked: true,
@@ -167,7 +177,7 @@ const ONE_INVITE = [
 ];
 
 test.describe("member accept (myne-md/myne#851 task 14)", () => {
-  test("Welcome → identity → accept → name → editor", async ({ page }) => {
+  test("Welcome → identity → accept → name → approval wait", async ({ page }) => {
     await installMockIpc(page, {
       freshDevice: true,
       personStatus: ENROLLED,
@@ -195,9 +205,14 @@ test.describe("member accept (myne-md/myne#851 task 14)", () => {
     await page.getByTestId("identity-flow.name-input").fill(MEMBER_NAME);
     await page.getByTestId("identity-flow.name.save").click();
 
-    // Save is what opens the vault: the shell re-probes, `vault_list` now reports
-    // the accepted vault and the slot is Unlocked, so the editor mounts.
-    await expect(settingsControl(page)).toBeVisible();
+    // Save is what opens the vault, and the vault it opens is one the owner has not
+    // admitted yet, so the landing is the §6.3 compare rather than the editor.
+    await expect(approvalCompare(page)).toBeVisible();
+    await expect(page.getByTestId("sync.join.sas-fingerprint")).toHaveText("TYRS-N318");
+    // The editor must NOT be behind it: a device that reached the editing surface
+    // with the compare skipped is exactly the TOFU gap `decisions/sync/0767`
+    // closes.
+    await expect(settingsControl(page)).toHaveCount(0);
 
     // What the writer was handed. Read from the recorded arguments rather than
     // from the banner, because the mocked `member_names_set_mine` returns `{}`
@@ -297,10 +312,11 @@ test.describe("member accept (myne-md/myne#851 task 14)", () => {
     await submitAccept(page);
 
     // The roster's answer is the question: a member re-invited to a vault they
-    // already named in lands in the editor without a second write. Asserting the
-    // absence of the write is what says no question was asked, since an editor that
-    // mounted after a silent overwrite would look the same.
-    await expect(settingsControl(page)).toBeVisible();
+    // already named in skips the name step without a second write. Asserting the
+    // absence of the write is what says no question was asked, since a wait that
+    // mounted after a silent overwrite would look the same. The landing is the
+    // approval wait, not the editor: naming is not admission.
+    await expect(approvalCompare(page)).toBeVisible();
     const written = await page.evaluate(
       () => (window as unknown as { __memberNameArgs?: unknown }).__memberNameArgs,
     );

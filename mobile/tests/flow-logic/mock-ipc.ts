@@ -2235,7 +2235,16 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (window as unknown as { __acceptInviteArgs?: unknown }).__acceptInviteArgs = args;
         if (config.acceptInviteError) throw config.acceptInviteError;
         acceptedVaultId = String(args?.vaultId ?? "accepted-vault");
-        return null;
+        // The command's contract is `AcceptedInviteView`, not unit: both clients read
+        // `vault_id` off it to address the approval wait the device now owes, so a
+        // `null` here is a mock that cannot hold the shape the app expects and reads
+        // as "the vault could not be added".
+        return {
+          vault_id: acceptedVaultId,
+          vault_account_hash_hex: String(args?.vaultAccountHashHex ?? "ab".repeat(32)),
+          owner_fingerprint_hex: "cd".repeat(32),
+          group_key_epoch: 1,
+        };
       },
       "plugin:sync|sync_member_join_vault": (args) => {
         // The second device's four arguments, in order: the invite id (from the
@@ -2254,11 +2263,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         (window as unknown as { __joinVaultArgs?: unknown }).__joinVaultArgs = args;
         if (config.memberJoinError) throw config.memberJoinError;
         // Same stateful shape as the accept: the command materializes and unlocks
-        // the slot host-side, so the shell's re-probe is what carries the user to
-        // the editor. A distinct id, so a spec asserting the editor mounted cannot
-        // be answered by a vault the accept put there.
+        // the slot host-side. A distinct id, so a spec asserting the wait mounted
+        // cannot be answered by a vault the accept put there. The view is the
+        // command's real contract (`AcceptedInviteView`); returning `null` here made
+        // every spec read a TypeError as a refusal.
         acceptedVaultId = "joined-device-vault";
-        return null;
+        return {
+          vault_id: acceptedVaultId,
+          vault_account_hash_hex: String(args?.vaultAccountHashHex ?? "ab".repeat(32)),
+          owner_fingerprint_hex: "cd".repeat(32),
+          group_key_epoch: 1,
+        };
       },
       "plugin:sync|sync_list_roster": () => {
         // `roster: null` is a REFUSAL rather than an empty roster, because the two

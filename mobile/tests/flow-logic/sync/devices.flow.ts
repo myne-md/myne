@@ -164,22 +164,22 @@ test.describe("device names", () => {
   // pre-#243 form, with no poll, no retry and no way back in. `None` is the
   // honest answer while no head is adopted, so one early call left "this code
   // appears once the new device finishes its first sync" on screen for good.
-  test("the approving side polls for the code instead of reading it once", async ({ page }) => {
+  test("the compare polls for the code instead of reading it once", async ({ page }) => {
     await installMockIpc(page, {
       syncStatus: { state: "idle" },
-      devices: [
-        ...DEVICES,
-        { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
-      ],
       // Nothing adopted yet, then a head lands. A one-shot read shows the
       // pending copy forever; a poll reaches the code.
       headFingerprint: [null, null, "TYRS-N318"],
     });
-    await openDevices(page);
 
-    await page.getByTestId("sync.approve-device").click();
-    await expect(page.getByTestId("sync.approve-verify")).toBeVisible();
-    await expect(page.getByTestId("sync.sas-fingerprint")).toHaveText("TYRS-N318", {
+    // Boot straight to the wait: this device's OWN baseline is what the shell reads
+    // on entry to the editor (`awaitingApprovalVerdict`), and a null baseline is the
+    // honest answer to "has this device adopted a head", so it is routed to the
+    // compare before Settings is reachable. That routing is `decisions/sync/0767`'s
+    // half of the ceremony, and the pending copy is what it must not get stuck on.
+    await page.goto("/");
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+    await expect(page.getByTestId("sync.join.sas-fingerprint")).toHaveText("TYRS-N318", {
       timeout: 10_000,
     });
   });
@@ -194,7 +194,12 @@ test.describe("device names", () => {
         ...DEVICES,
         { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
       ],
-      headFingerprint: ["TYRS-N318", "P8WX-2ND4"],
+      // Three values, not two: the FIRST read is the shell's own baseline check on
+      // entry (a non-null baseline is what keeps this device in the editor instead
+      // of routing it to the wait), and the panel's compare then watches the head
+      // move. With two, the hook's first read was already the last value and no
+      // change was ever observable inside it.
+      headFingerprint: ["TYRS-N318", "TYRS-N318", "P8WX-2ND4"],
     });
     await openDevices(page);
 
