@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   transition,
   initialStageFromProbe,
@@ -13,6 +14,8 @@ import { lockVault } from "../lib/vault-unlock";
 import { clearApprovalWait, markApprovalWait } from "@myne/client-core/approval-wait";
 import { awaitingApprovalVerdict } from "../lib/pending-approval";
 import { endAgentRun } from "../lib/agent-lifetime";
+import { errKind, scanQr, syncDecodeJoinQr } from "../lib/sync";
+import { showToast } from "../components/ToastHost";
 import { clearAwareness } from "@myne/awareness-store";
 import { clearHandoffCaches } from "./vaultHandoff";
 import { HAS_TAURI } from "../lib/app-window";
@@ -21,8 +24,7 @@ import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { IdentityFlow } from "./flows/IdentityFlow";
-import { JoinFlow } from "./flows/JoinFlow";
-import { PendingApprovalFlow } from "./flows/PendingApprovalFlow";
+import { ApprovalWaitFlow } from "./flows/ApprovalWaitFlow";
 import { CreateVaultFlow } from "./flows/CreateVaultFlow";
 import { UnlockFlow } from "./flows/UnlockFlow";
 import { RecoverFlow } from "./flows/RecoverFlow";
@@ -35,21 +37,6 @@ import { ToastHost } from "../components/ToastHost";
 
 /** Synthetic slotMap key for the active (sole-Unlocked under SYNC-1) slot. */
 const ACTIVE_SLOT = "active-slot";
-
-/**
- * Which stage a join was launched from → the action its success dispatches
- * (myne-mobile#40). A lookup rather than a `${from}.join-success` template so
- * the three action names stay greppable and the mapping is checked by the
- * `Action` union rather than by contextual template-literal inference.
- */
-const JOIN_SUCCESS = {
-  welcome: "welcome.join-success",
-  picker: "picker.join-success",
-  editor: "editor.join-success",
-} as const;
-
-/** The stages that offer a door into `JoinFlow` (keys of `JOIN_SUCCESS`). */
-type JoinEntry = keyof typeof JOIN_SUCCESS;
 
 /**
  * The real, wired mobile app — a port of the desktop App.tsx Stage machine.
@@ -89,6 +76,7 @@ export function AppShell() {
  * hang a sibling off without restructuring every arm.
  */
 function StageSwitch() {
+  const { t } = useTranslation();
   const [stage, setStage] = useState<Stage | null>(null);
   // The stage `dispatch` reduces from. It mirrors `stage` and is written
   // SYNCHRONOUSLY by `enterStage` — which the functional `setStage(prev => …)`
@@ -98,13 +86,6 @@ function StageSwitch() {
   // the two never diverge.
   const stageRef = useRef<Stage | null>(null);
   const probed = useRef(false);
-  // Sync-join overlay. Rendered full-screen WHILE the stage stays put; the
-  // matching `*.join-success` arm lands the editor from there (MYND-424) — an
-  // out-of-band local toggle, like recover's out-of-band entry. The value is the
-  // stage the join was launched FROM, not a boolean: the door exists on three
-  // surfaces (welcome, picker, the editor's vault switcher — myne-mobile#40) and
-  // each dispatches its own success action. `null` = no join in flight.
-  const [joinFrom, setJoinFrom] = useState<JoinEntry | null>(null);
   /** The identity-first overlay on the welcome arm (myne-md/myne#768). */
   const [identityOpen, setIdentityOpen] = useState(false);
   // Which step the identity flow opens on (myne-md/myne#932). The first-run
@@ -234,6 +215,52 @@ function StageSwitch() {
   );
 
   /**
+   * Scan a join QR and route it. This is the client's ONLY join door
+   * (`decisions/sync/0765`): the account-number form that used to sit behind this
+   * scan is gone, so every arrival decodes into one of two wizards in the identity
+   * flow and nothing else.
+   *
+   * A refusal is a toast rather than a screen, because there is no form to stay on:
+   * a dismissed scanner is silence, an expired code and a legacy account-number
+   * code each say what happened, and a transport fault is distinguished from a bad
+   * code (it leaks nothing about the account either way).
+   */
+  const scanJoinQr = useCallback(async () => {
+    try {
+      const res = await scanQr();
+      if (!res.value) return; // scanner dismissed
+      const view = await syncDecodeJoinQr(res.value);
+      if (!view.fresh) {
+        showToast(t("join.qr.expired"));
+        return;
+      }
+      if (view.kind === "person") {
+        setPersonJoinFrom({ endpointUrl: view.endpoint_url, personIdHex: view.person_id_hex });
+        return;
+      }
+      if (view.kind === "member_vault") {
+        setIdentityFromQr({
+          endpointUrl: view.endpoint_url,
+          accountHashHex: view.account_hash_hex,
+        });
+        return;
+      }
+      showToast(t("join.qr.legacyAccount"));
+    } catch (e) {
+      const kind = errKind(e);
+      showToast(
+        kind === "Unsupported"
+          ? t("join.qr.scanUnavailable")
+          : kind === "NotAQrJoinPayload"
+            ? t("join.qr.invalid")
+            : kind === "UnsupportedVersion"
+              ? t("join.qr.newerVersion")
+              : t("join.qr.scanFailed"),
+      );
+    }
+  }, [t]);
+
+  /**
    * The approval wait's Cancel, and its idle auto-lock (both land here).
    *
    * Locks first, and that is the difference from the join OVERLAY's Cancel: an
@@ -304,10 +331,10 @@ function StageSwitch() {
   };
 
   /**
-   * The editor's "join an account" exit, the other leaving path that skips
-   * `lockVault`: `sync_join_account` unlocks the vault it bootstraps, which evicts
-   * this one at the IPC layer (SYNC-1). Named for the guard (`mobile-join`), for
-   * the reason `leaveForCreateVault` gives.
+   * The editor's "join a vault" exit, the other leaving path that skips
+   * `lockVault`: the join installs and unlocks a different vault, which evicts this
+   * one at the IPC layer (SYNC-1). Named for the guard (`mobile-join`), for the
+   * reason `leaveForCreateVault` gives.
    */
   const leaveForJoinAccount = () => {
     endAgentRun("lock", "");
@@ -316,7 +343,7 @@ function StageSwitch() {
     // the previous vault's peers would otherwise stay resident into the joined one.
     clearAwareness();
     clearHandoffCaches();
-    setJoinFrom("editor");
+    void scanJoinQr();
   };
 
   if (stage === null) {
@@ -329,64 +356,25 @@ function StageSwitch() {
     );
   }
 
-  // The join flow runs full-screen while the stage underneath stays put; on a
-  // successful bootstrap it dispatches that stage's `*.join-success` arm →
-  // editor, addressed at the joined vault.
+  // The one join door left: a scanned QR (decisions/sync/0765).
   //
-  // It sits ABOVE the switch because the door is not a Welcome-only affordance
-  // (myne-mobile#40): scoping the overlay to `case "welcome"` made joining an
-  // existing account unreachable the moment the device held any vault, since
-  // `initialStageFromProbe` only produces `welcome` at zero vaults.
+  // There used to be a full-screen account-number form here — server URL, account
+  // number, password or 24-word phrase — and it is gone everywhere, so this client
+  // has exactly one way in: scan the code the vault's owner shows, prove the
+  // identity, accept the invite. The scan is a plain handler rather than an overlay
+  // because it no longer has a form to render: it decodes, routes, and gets out of
+  // the way.
   //
-  // Cancel closes the overlay back to the stage it was opened from. It is
-  // deliberately NOT `reprobe()`, tempting as the back-from-create precedent is:
-  // the SAS-mismatch exit calls `syncResetLocal()`, which clears this device's
-  // enrollment but never touches `vault.meta` (see the command's doc in
-  // `core/src/plugins/sync/commands.rs`), so a re-probe would route the user
-  // straight into the editor of the vault they had just rejected.
-  if (joinFrom !== null) {
-    return (
-      <PhoneColumn>
-        <JoinFlow
-          onComplete={(vaultId) => {
-            setJoinFrom(null);
-            dispatch({ type: JOIN_SUCCESS[joinFrom], vaultId });
-          }}
-          // A recovery-phrase join leaves the vault `Recovering`, so the editor
-          // would be a fail-closed screen: land on the chained password reset
-          // instead, addressed at the vault this join just bootstrapped.
-          onRecovering={(vaultId) => {
-            setJoinFrom(null);
-            void enterStage({ name: "recover", subStep: "password-reset", vaultId });
-          }}
-          onCancel={() => setJoinFrom(null)}
-          // A scanned member-vault code: this overlay has nothing more to show
-          // (no account number to confirm), so it closes and the identity flow
-          // opens at the join step for the vault the code named.
-          onMemberJoin={(target) => {
-            setJoinFrom(null);
-            setIdentityFromQr(target);
-          }}
-          // A scanned person code: same shape, one step over. The credential is
-          // the identity phrase and the device lands pending until an existing
-          // device approves it, so the wizard for it lives in the identity flow
-          // (myne-md/myne#911 task 12).
-          onPersonJoin={(target) => {
-            setJoinFrom(null);
-            setPersonJoinFrom(target);
-          }}
-        />
-      </PhoneColumn>
-    );
-  }
+  // `account` codes are refused with a message rather than routed: they name an
+  // account number, which only the removed form could use. A vault born that way
+  // is joined today by asking its owner for an invite.
 
-  // A scanned member-vault QR: the join overlay closed and handed the target
-  // here, and the identity flow opens at the join step for that vault. Rendered
-  // ABOVE the switch for the same reason the join overlay above is, and the same
-  // reason is load-bearing: the door is reachable from picker and editor too, so
-  // scoping it to `case "welcome"` would make it unreachable on a device that
-  // already holds vaults. `identityOpen` and this never coexist: this returns
-  // first, and the welcome arm's own `identityOpen` overlay is untouched.
+  // A scanned member-vault QR: the scanner handed the target here, and the
+  // identity flow opens at the join step for that vault. Rendered ABOVE the switch
+  // because the door is reachable from picker and editor too, so scoping it to
+  // `case "welcome"` would make it unreachable on a device that already holds
+  // vaults. `identityOpen` and this never coexist: this returns first, and the
+  // welcome arm's own `identityOpen` overlay is untouched.
   if (identityFromQr !== null) {
     return (
       <PhoneColumn>
@@ -441,18 +429,13 @@ function StageSwitch() {
           <PhoneColumn>
             <IdentityFlow
               initialStep={identityStart}
-              // The fork's "scan the code" arm hands control back here: the scanner
-              // owns the decode and re-enters this flow with `fromPersonQr`.
+              // The fork's "scan the code" arm hands control back here, and the
+              // scan routes straight into the wizard the code names
+              // (`scanJoinQr`). This is the only join door on the client, so the
+              // fork has one row for it rather than two doors into one form.
               onScanCode={() => {
                 setIdentityOpen(false);
-                setJoinFrom("welcome");
-              }}
-              // The fork's third row: the account-and-password join this screen's
-              // second button used to open directly, kept reachable because a
-              // pre-identity account is not an identity (myne-md/myne#932).
-              onJoinAccount={() => {
-                setIdentityOpen(false);
-                setJoinFrom("welcome");
+                void scanJoinQr();
               }}
               onCancel={() => {
                 setIdentityOpen(false);
@@ -573,12 +556,11 @@ function StageSwitch() {
           // Not preceded by `lockVault()`: see `leaveForCreateVault`, which is what
           // the teardown guard holds for this exit.
           onCreateVault={leaveForCreateVault}
-          // Not preceded by `lockVault()`, unlike `onSwitchVault`: the join
-          // flow's own `sync_join_account` unlocks the vault it bootstraps,
-          // which evicts this one at the IPC layer (SYNC-1) — the same posture
-          // `onCreateVault` takes toward the create → auto-unlock chain.
-          // Same reason as the delete path below: not preceded by `lockVault`,
-          // and the vault it bootstraps is a different one.
+          // Not preceded by `lockVault()`, unlike `onSwitchVault`: a join
+          // installs and unlocks a DIFFERENT vault, which evicts this one at the
+          // IPC layer (SYNC-1) — the same posture `onCreateVault` takes toward the
+          // create → auto-unlock chain. The flow that does it is the identity
+          // flow's wizard; this client has no second join door.
           onJoinAccount={leaveForJoinAccount}
           // The manual door onto the approval wait (#535): the Sync panel's row
           // dispatches the same action the automatic verdict does, so both
@@ -615,14 +597,13 @@ function StageSwitch() {
       );
 
     case "pending-approval":
-      // The wait, resumed (#535). Reached from the editor by the verdict above,
-      // never by boot routing: the question needs `root_key` in the slot, so it
-      // is asked after unlock. Renders the join flow's own wait and compare —
-      // one implementation of "has an approval landed", shared with the overlay
-      // entry that a first join uses.
+      // The wait (#535). Two ways in, one screen: the post-unlock verdict above
+      // (a device that lost its wait), and a join that just installed a vault
+      // (`landOnInstalledVault`). Never by boot routing — the question needs
+      // `root_key` in the slot, so it is asked after unlock.
       return (
         <PhoneColumn>
-          <PendingApprovalFlow
+          <ApprovalWaitFlow
             vaultId={stage.vaultId}
             onApproved={(vaultId?: VaultId) => {
               // The compare matched, so the approval is OBSERVED: retire the
@@ -642,7 +623,7 @@ function StageSwitch() {
           <PickerFlow
             onSelect={(vaultId: VaultId) => dispatch({ type: "picker.select-vault", vaultId })}
             onCreate={() => dispatch({ type: "picker.create-vault" })}
-            onJoin={() => setJoinFrom("picker")}
+            onJoin={() => void scanJoinQr()}
           />
         </PhoneColumn>
       );

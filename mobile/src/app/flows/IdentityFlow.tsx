@@ -381,7 +381,6 @@ export function IdentityFlow({
   fromQr,
   fromPersonQr,
   initialStep,
-  onJoinAccount,
   onScanCode,
 }: IdentityFlowProps) {
   const { t } = useTranslation();
@@ -1470,15 +1469,6 @@ export function IdentityFlow({
               {t("identityFlow.fork.codeBody")}
             </div>
           </>
-        ) : null}
-        {/* The account-and-password door this screen's second button used to BE
-            (myne-md/myne#932). Without it the label change would have removed the
-            only route a fresh device with a pre-identity account had: the code row
-            joins an IDENTITY, which such an account does not have. */}
-        {onJoinAccount ? (
-          <Button variant="ghost" onClick={onJoinAccount} data-testid="identity-flow.fork-account">
-            {t("welcome.connect")}
-          </Button>
         ) : null}
         <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.fork-skip">
           {t("identityFlow.skip")}

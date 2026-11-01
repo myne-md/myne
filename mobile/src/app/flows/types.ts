@@ -54,15 +54,6 @@ export interface IdentityFlowProps {
    *  dismisses the overlay. An identity, once created, is not undone here. */
   onCancel: () => void;
   /**
-   * The third row of the first-run fork: the account-and-password door that used
-   * to BE the welcome screen's second button (myne-md/myne#932). It is kept
-   * reachable because an account made before identities existed is not an
-   * identity, and a fresh device with one had no other way in once the label on
-   * that button changed. Absent means the surface offers only the identity
-   * credentials, which is what Settings' own entry does.
-   */
-  onJoinAccount?: () => void;
-  /**
    * Prefill from a scanned member-vault code: the endpoint to offer, and the
    * vault whose invite row to open the join wizard for. Seeded into the server
    * step's input (a visible, editable prefill, not a configured endpoint) and
@@ -97,10 +88,9 @@ export interface IdentityFlowProps {
   /**
    * An invite was accepted, this device has named itself, and the member vault
    * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell
-   * closes the overlay and re-probes, which is how every other flow hands a new
-   * vault back (`JoinFlowProps`' `onComplete` is the same shape): the vault is on
-   * disk and unlocked, so the probe is what decides where the user lands, rather
-   * than this flow guessing.
+   * closes the overlay and hands the vault to `landOnInstalledVault`, which is how
+   * every other flow hands a new vault back: the vault is on disk and unlocked, so
+   * what decides where the user lands is the state, not this flow guessing.
    *
    * NOT called by the accept itself. The name step sits between the two and reads
    * this through a ref, so the accepted vault cannot reach an editor unnamed: the
@@ -127,58 +117,6 @@ export interface IdentityFlowProps {
   onCreateVault?: () => void;
 }
 
-export interface JoinFlowProps {
-  /** Device bootstrapped + unlocked a fresh local vault from the server — the
-   *  shell maps this to the `*.join-success` action of whichever stage opened
-   *  the flow (welcome / picker / editor), all of which land in the editor. */
-  onComplete: (vaultId?: VaultId) => void;
-  /**
-   * The join used the recovery phrase (myne-md/myne#837). The vault is then
-   * `Slot::Recovering`, NOT unlocked, so the shell mounts the mandatory chained
-   * password reset (`recover`, `subStep: "password-reset"`) addressed at the
-   * joined vault instead of routing to the editor. The same door desktop's
-   * `JoinDeviceModal.onRecovering` opens.
-   */
-  onRecovering: (vaultId?: VaultId) => void;
-  onCancel: () => void;
-  /**
-   * A scanned member-vault code: the shell closes this overlay and opens the
-   * identity flow at the join step for that vault. One door, the code decides —
-   * the `account` arm keeps its own confirm-then-form path (`onComplete` above),
-   * and this arm has no account number for that confirm step to show, so it
-   * hands the target straight back to the shell instead.
-   */
-  onMemberJoin: (target: { endpointUrl: string; accountHashHex: string }) => void;
-  /**
-   * A scanned PERSON code (myne-md/myne#911 task 9, wired on this client by task
-   * 12): the shell closes this overlay and opens the identity flow's person-join
-   * wizard, which takes the phrase and waits for an existing device to approve.
-   *
-   * Same shape as `onMemberJoin` and for the same reason: this flow owns the
-   * account-number confirm step, and a person code has no account number. The
-   * credential a person join needs is the identity phrase, which lives in the
-   * identity flow rather than here.
-   */
-  onPersonJoin: (target: { endpointUrl: string; personIdHex: string }) => void;
-  /**
-   * Open on the approval WAIT instead of on the credential form, and close on the
-   * compare instead of on Cancel (myne-md/myne#535, mobile half).
-   *
-   * The shell mounts the flow this way for the `pending-approval` stage: a device
-   * that is enrolled and has never adopted a head, reached after unlock. The wait
-   * is a MOUNT-TIME initial value, not a controlled prop — once mounted the flow
-   * owns its own step, so an approval it observes takes effect immediately
-   * instead of waiting for the shell to re-render it. Same contract as desktop's
-   * `AccountBootstrap.initiallyPending`.
-   */
-  initiallyPending?: boolean;
-  /**
-   * The vault the wait is about, for the resumed entry. The overlay entry learns
-   * it from `sync_join_account`'s result; the stage already knows it, and
-   * `onComplete` needs it to address the editor.
-   */
-  initialVaultId?: VaultId;
-}
 
 export interface CreateVaultFlowProps {
   briefing?: boolean;
@@ -232,8 +170,9 @@ export interface EditorFlowProps {
    *  caller is manual and may. */
   onLock: (reason?: "manual" | "idle") => void;
   onCreateVault: () => void;
-  /** Enter the sync-join flow from the vault switcher — the "connect to my
-   *  account" twin of `onCreateVault` (myne-mobile#40). */
+  /** Scan a join code from the vault switcher — the "join a vault" twin of
+   *  `onCreateVault` (myne-mobile#40). It opens the scanner, not a form: the only
+   *  join door left is the QR (`decisions/sync/0765`). */
   onJoinAccount: () => void;
   onSwitchVault: (vaultId: VaultId) => void;
   onDeleteVaultSuccess: () => void;

@@ -92,7 +92,7 @@ describe("mobile idle auto-lock is deadline-based (#53)", () => {
     // Two call sites, and the second one is the reason the hook exists: an
     // approval wait with no timer is an unlocked vault left on a screen nobody
     // asked to keep open (A6).
-    for (const path of ["src/app/flows/EditorFlow.tsx", "src/app/flows/PendingApprovalFlow.tsx"]) {
+    for (const path of ["src/app/flows/EditorFlow.tsx", "src/app/flows/ApprovalWaitFlow.tsx"]) {
       const src = await read(path);
       expect(src.includes("useIdleAutoLock("), `${path} must arm the idle lock`).toBe(true);
     }

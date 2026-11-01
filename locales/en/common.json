@@ -6052,6 +6052,7 @@
       "continue": "Continue",
       "expired": "This QR has expired. Show a fresh one on your other device and scan again.",
       "invalid": "That's not a Myne device QR.",
+      "legacyAccount": "This code is for an older account type. Ask the vault's owner for an invitation.",
       "newerVersion": "This QR is from a newer version of Myne. Update the app and try again.",
       "scan": "Scan QR",
       "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
