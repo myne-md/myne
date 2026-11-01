@@ -330,7 +330,6 @@ export async function openNoteContextMenu(
  * Actions API) because that is what places a caret, and the keys go through the
  * Actions KEYBOARD source, which has no element target and therefore reaches
  * the focused node — the same thing a user's keyboard does.
- *
  * Asserts the text landed rather than trusting that the driver accepted it: a
  * `sendKeys` that resolves means the DRIVER took the keys, not that CodeMirror
  * applied them, and the desktop lane has paid for that distinction more than
@@ -338,11 +337,26 @@ export async function openNoteContextMenu(
  */
 export async function typeIntoEditor(session: Session, text: string): Promise<void> {
   await dismissImporterOfferIfPresent(session);
-  const content = await session.waitForElement(
-    testIdSelector("editor.content") + " .cm-content",
-    { timeoutMs: 20_000 },
+  // Click a LINE, not the container.
+  //
+  // The container's centre is not text in a short note: an empty note carries the
+  // cover/properties widget (`div.cm-fm-properties`, measured 129 px tall) above
+  // its two lines, so the centre of the 184 px content box lands on that chrome
+  // and no caret is placed. The keys then go to whatever had focus, the buffer
+  // stays as `"Add coverProperties+ Add property"`, and the failure reads as
+  // "the editor did not take the text" — which is why this helper asserts the
+  // text landed rather than trusting the driver. Clicking the LAST line is both
+  // the end of the note and where a user would click.
+  const lines = await session.waitUntil(
+    async () => {
+      const found = await session.findElements(
+        testIdSelector("editor.content") + " .cm-content .cm-line",
+      );
+      return found.length > 0 ? found : null;
+    },
+    { label: () => "the editor to render at least one text line", timeoutMs: 20_000 },
   );
-  await content.actionClick();
+  await lines[lines.length - 1].actionClick();
   await session.send("POST", "/actions", {
     actions: [
       {

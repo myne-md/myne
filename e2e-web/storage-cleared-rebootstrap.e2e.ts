@@ -33,14 +33,14 @@
 //
 // # Where it actually lands, measured
 //
-// `/account-entry`, showing the BETA-TERMS gate first — not the account form
-// directly. That is correct and is asserted rather than stepped over: the
-// acceptance was stored on this origin and the eviction took it too, so the
-// user is asked again. `AccountBootstrap.tsx` is explicit that this is a gate
-// rather than a dialog ("the entry form is not rendered at all until the terms
-// are accepted"), so a re-bootstrap that skipped it would mean the acceptance
-// had survived a wipe of the origin — the same class of failure as the vault
-// surviving it.
+// The identity ceremony (`welcome.root`), not a data-loss screen and no longer
+// the beta-terms gate. Both moved with `decisions/sync/0767`: the account-number
+// door is gone, so a cleared origin has no vault AND no person credential to
+// resume from, and the gate now guards registration inside the ceremony's create
+// step rather than the entry itself. What survives from the original thesis is
+// the part that matters: the three doors are offered, so the route back in is
+// `restore this identity, accept the invitation`, and nothing on the screen says
+// the notes are gone.
 //
 // # What is NOT asserted, and why
 //
@@ -96,7 +96,7 @@ async function opfsEntries(session: Session): Promise<string[]> {
 }
 
 describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () => {
-  it("lands on account entry with the storage really empty", async () => {
+  it("lands on the identity ceremony with the storage really empty", async () => {
     const browser = harnessEnv().browser as SupportedBrowser;
     if (!supportsCdp(browser)) {
       expect(
@@ -133,48 +133,21 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
       // browser reclaimed the space while the tab was closed.
       await session.execute("window.location.reload();");
 
-      // WHERE IT LANDS. The bootstrap gate, not a data-loss screen and not the
-      // Welcome create screen — measured: the route is `/account-entry` and the
-      // first thing rendered is the beta-terms gate.
+      // WHERE IT LANDS. The identity ceremony, which is this client's front door
+      // since the account-number door was withdrawn (`decisions/sync/0767`): an
+      // evicted origin holds no vault AND no person credential, so the honest
+      // answer is "who is this" rather than "your notes are gone".
       //
-      // The terms gate appearing is CORRECT and is asserted rather than
-      // stepped over: the acceptance was stored on this origin and the eviction
-      // took it with everything else, so the user is asked again. Its own
-      // comment is explicit that this is a gate rather than a dialog — "the
-      // entry form is not rendered at all until the terms are accepted. A
-      // dismissable dialog in front of a live form would be a route past the
-      // gate, not a gate." A re-bootstrap that skipped it would mean the
-      // acceptance had survived a wipe of the origin, which is the same class
-      // of failure as the vault surviving it.
+      // The beta-terms gate is NOT in front of it any more, and that is the same
+      // decision: it guarded registration, and registration now lives inside the
+      // ceremony's create step (`PersonRegisterForm`), not ahead of entry. Waiting
+      // on the gate would assert a screen the withdrawal deleted.
+      //
       // Waited for BY NAME rather than for "something rendered", so a build that
-      // routes an empty container to the Welcome/create screen fails here saying
-      // the bootstrap gate never appeared — verified by injecting exactly that
-      // into `initialStageFromProbe`.
-      await session.waitForElement(testIdSelector("bootstrap.beta-terms"), {
-        timeoutMs: 45_000,
-      });
-      const route = await session.execute<string>("return location.pathname;");
-      expect(
-        route,
-        `the emptied origin booted to ${route}. It must reach the account-entry ` +
-          `route: on this client the vault is not the only copy, so an evicted ` +
-          `origin is somebody signing back in.`,
-      ).toBe("/account-entry");
-
-      // Through the gate, the way a user goes through it.
-      await session.execute(
-        "document.querySelector('[data-testid=\"bootstrap.beta-terms.open\"]').click();",
-      );
-      await session.waitForElement(testIdSelector("sync.beta-terms.accept"), {
-        timeoutMs: 15_000,
-      });
-      await session.execute(
-        "document.querySelector('[data-testid=\"sync.beta-terms.accept\"]').click();",
-      );
-
-      // …and the account form is what is behind it.
+      // routed an empty container to a data-loss screen fails here saying the
+      // welcome never appeared.
       await session.waitForElement(testIdSelector("welcome.root"), {
-        timeoutMs: 30_000,
+        timeoutMs: 45_000,
       });
 
       // …and the storage really is empty, checked AFTER the boot so the
@@ -191,17 +164,30 @@ describeE2E("an evicted origin re-bootstraps instead of reporting a loss", () =>
           `it is — and a user who signs in again would then have two.`,
       ).toEqual([]);
 
-      // The inverse failure. An empty container on this client is a re-bootstrap,
-      // and offering to CREATE one would leave the user with a second, empty
-      // account while their notes sit on the server under the first. The Welcome
-      // screen's create CTA is the surface that must NOT be what answered.
-      const created = await session.findElements(testIdSelector("welcome.create-cta"));
-      expect(
-        created.length,
-        `the emptied origin landed on a screen offering to create a new vault. On ` +
-          `this client the vault is not the only copy — the server has one — so an ` +
-          `evicted origin is somebody signing back in, not somebody starting over.`,
-      ).toBe(0);
+      // The two doors THIS client has: create (which starts the identity ceremony)
+      // and invited. `welcome.restore-cta` is deliberately not asserted: Welcome
+      // renders it only when the host passes `onRestoreBackup`, and a browser has
+      // no local `.myne-backup` to import, so requiring it would assert a door the
+      // client never draws. On this client the vault is not the only copy (the
+      // server has one), so recovery is "restore this identity, accept the
+      // invitation", which is exactly these two.
+      //
+      // This used to be the INVERSE assertion - no create door at all - because the
+      // door opened the legacy ACCOUNT creation and would have left a user with a
+      // second, empty account. `decisions/sync/0767` moved what it opens: the
+      // identity ceremony, whose phrase re-derives the same person
+      // (`myne.v0.2 argon2id-person-identity`), so it is a way back in rather than
+      // a way to a second identity. Asserting its absence would now assert the
+      // dead end the withdrawal could have left.
+      for (const id of ["welcome.create-cta", "welcome.invited-cta"]) {
+        const door = await session.findElements(testIdSelector(id));
+        expect(
+          door.length,
+          `the emptied origin is missing the ${id} door. An evicted origin can only ` +
+            `recover by restoring this identity and accepting an invitation, so every ` +
+            `door that path needs has to be on the screen it lands on.`,
+        ).toBe(1);
+      }
     } finally {
       await ctx.browser.teardown().catch(() => {});
       await ctx.server.close();
