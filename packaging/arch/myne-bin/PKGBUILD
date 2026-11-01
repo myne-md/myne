@@ -44,7 +44,7 @@ _appname=myne
 pkgver=0.11.3
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
-arch=('x86_64')
+arch=('x86_64' 'aarch64')
 url="https://myne.md"
 license=('AGPL-3.0-only')
 depends=('webkit2gtk-4.1' 'gtk3' 'libayatana-appindicator' 'librsvg' 'openssl')
@@ -52,12 +52,21 @@ provides=("$_appname")
 conflicts=("$_appname")
 options=('!strip')
 
-source=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
-sha256sums=('9402980eddc198559bc14390b2fb80841b1a44a3804878bf9da8ddf6b853aaff')
+# One source per architecture, because the release publishes one .deb per
+# architecture and the two are not interchangeable: the app carries native
+# sidecars and a 640 MiB model payload.
+source_x86_64=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
+sha256sums_x86_64=('9402980eddc198559bc14390b2fb80841b1a44a3804878bf9da8ddf6b853aaff')
+source_aarch64=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_arm64.deb")
+sha256sums_aarch64=('428f5fdeae441b8939b67c66a8e9812b18c1bfe15d184b2e1fcf2fdbcf607aae')
 # makepkg would otherwise try to unpack the .deb into $srcdir as a source
 # archive. package() reads it directly instead, so the outer `ar` container and
 # the inner data tarball stay paired.
-noextract=("Myne_${pkgver}_amd64.deb")
+# `$CARCH` spells the architecture the way pacman does (x86_64 / aarch64) but the
+# published .deb says amd64 / arm64, so the two are mapped rather than assumed equal.
+_debarch() { case "$CARCH" in aarch64) echo arm64 ;; *) echo amd64 ;; esac; }
+_deb="Myne_${pkgver}_$(_debarch).deb"
+noextract=("$_deb")
 
 package() {
   # The deb's payload is already the FHS tree this package wants:
@@ -73,7 +82,7 @@ package() {
   # bsdtar reads the `ar` container natively, so this is one pipe: pull the
   # inner data tarball out of the .deb on stdout, unpack it into $pkgdir. The
   # glob covers whichever compression the bundler chose (data.tar.gz today).
-  bsdtar -xOf "$srcdir/Myne_${pkgver}_amd64.deb" 'data.tar.*' \
+  bsdtar -xOf "$srcdir/$_deb" 'data.tar.*' \
     | bsdtar -xf - -C "$pkgdir"
 
   # The deb declares no license file (Tauri's bundler does not emit one), so

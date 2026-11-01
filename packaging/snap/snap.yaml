@@ -1,0 +1,19 @@
+# The snap manifest, in the shape snapcraft writes into meta/snap.yaml.
+# `${VERSION}` is substituted by build-snap.sh; everything else is literal.
+name: myne
+version: '${VERSION}'
+summary: A calm place for your notes
+description: |
+  Clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]],
+  backlinks, a graph view and full-text search. Local-first: the vault lives on
+  your disk, and nothing leaves the machine unless you turn on sync.
+
+  Classic confinement: the app opens vaults you point it at, anywhere on disk.
+base: core24
+grade: stable
+confinement: classic
+
+apps:
+  myne:
+    command: usr/bin/myne-desktop
+    desktop: usr/share/applications/Myne.desktop
