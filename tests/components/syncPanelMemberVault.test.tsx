@@ -121,3 +121,53 @@ describe("the Sync panel, member vault vs owner vault", () => {
     expect(screen.getByTestId("sync.usage-meter")).toBeTruthy();
   });
 });
+
+// The owner's QR is the PERSON code, and the gate that produces it is a pair:
+// an approved current device on this account AND a vault that is person-born.
+// Both halves are asserted here because each one alone renders a code that
+// cannot be consumed: a vault that is not person-born has no person to name, and
+// its `account` variant now names a code neither client can scan
+// (`decisions/sync/0767`).
+describe("the owner's device-join QR", () => {
+  afterEach(() => resetSettingsTopics());
+
+  const DEVICES = [
+    {
+      device_id_hex: "11".repeat(16),
+      name: "this mac",
+      is_current: true,
+      approved: true,
+      retired: false,
+    },
+  ];
+
+  it("is offered on a person-born vault, where its code names the person", async () => {
+    setActiveSettingsTopic("sync", "devices");
+    await mountWith({
+      memberVault: false,
+      devices: DEVICES,
+      publishState: { published: true, person_born: true },
+    });
+
+    expect(await screen.findByTestId("sync.device-join-qr.open")).toBeTruthy();
+  });
+
+  it("is withheld on a vault that is not person-born, whose path is the account form", async () => {
+    setActiveSettingsTopic("sync", "devices");
+    await mountWith({
+      memberVault: false,
+      devices: DEVICES,
+      publishState: { published: true, person_born: false },
+    });
+
+    // Let the publish probe settle before reading, or the assertion below passes
+    // because the panel has not answered yet rather than because the icon is
+    // gated.
+    await waitFor(() =>
+      expect(
+        invokeMock.mock.calls.some((c) => c[0] === "plugin:sync|sync_published_state"),
+      ).toBe(true),
+    );
+    expect(screen.queryByTestId("sync.device-join-qr.open")).toBeNull();
+  });
+});

@@ -25,6 +25,15 @@ export interface SyncPanelRoute {
   /** What `sync_status` reports. */
   readonly syncState?: string;
   readonly betaTermsAccepted?: boolean;
+  /** What `sync_list_devices` reports. Omit it and the roster refuses
+   *  `NotEnrolled`, which is the token-less case every other case relies on. */
+  readonly devices?: readonly {
+    readonly device_id_hex: string;
+    readonly name: string;
+    readonly is_current: boolean;
+    readonly approved: boolean;
+    readonly retired?: boolean;
+  }[];
   /** What `sync_person_status` reports (the Identity block's device-local read).
    *  Defaults to "no identity on this device". */
   readonly person?: {
@@ -73,10 +82,12 @@ export interface SyncPanelRoute {
 /**
  * Route every command the panel's subtree issues.
  *
- * The device roster ALWAYS rejects `NotEnrolled`, because that is what a
- * token-less device gets and it is what made the old enrol gate stick, so any
- * behaviour difference between two mounts comes from what the caller varied and
- * not from the roster.
+ * The device roster rejects `NotEnrolled` unless a case supplies `devices`,
+ * because that is what a token-less device gets and it is what made the old
+ * enrol gate stick: any behaviour difference between two mounts comes from what
+ * the caller varied and not from the roster. The knob exists because the owner's
+ * QR icon is gated on an approved current device, so its PRESENCE cannot be
+ * asserted against a roster that always refuses.
  */
 export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
   const {
@@ -87,6 +98,7 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     memberVault = false,
     usage = null,
     publishState = null,
+    devices,
   } = route;
   return async (cmd: string): Promise<unknown> => {
     if (cmd === "plugin:vault-migrate|vault_migrate_settle_status") {
@@ -106,7 +118,15 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
         ...person,
       };
     }
-    if (cmd === "plugin:sync|sync_list_devices") throw { kind: "NotEnrolled" };
+    if (cmd === "plugin:sync|sync_list_devices") {
+      // The roster ALWAYS refuses by default, which is what a token-less device
+      // gets and what made the old enrol gate stick. `devices` is the one knob
+      // that changes it, added for the owner-QR gating: that icon needs an
+      // approved current device, so a case asserting its presence has to be able
+      // to answer the roster rather than only its refusal.
+      if (devices === undefined) throw { kind: "NotEnrolled" };
+      return devices;
+    }
     // The B2B member roster (myne-md/myne#698). The panel renders whenever the
     // `memberSharing` capability is present, so every SyncPanel mount reaches
     // this command; an unanswered one resolves `undefined` and crashes the
