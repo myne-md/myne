@@ -28,10 +28,26 @@ function fetcher(routes: Record<string, Route>): typeof fetch {
 const ORIGIN = "https://downloads.myne.md/releases/";
 const ARTIFACT = `${ORIGIN}v0.10.0/Myne.app.tar.gz`;
 
-function manifest(version: string, url = ARTIFACT) {
+/**
+ * A `.sig` file's content: base64 of the four-line minisign blob the bundler signs with.
+ *
+ * This is the shape `tauri-plugin-updater` parses (it base64-decodes the manifest field, then
+ * hands the result to minisign, which reads line 1 as the untrusted comment and line 3 as the
+ * trusted one), so the fixture has to carry it or every case here would be testing a manifest
+ * the updater rejects for a reason the test is not about.
+ */
+const SIG_TEXT = [
+  "untrusted comment: signature from tauri secret key",
+  "RUSvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+  "trusted comment: timestamp:1793526600\tfile:Myne.app.tar.gz\tversion:0.10.0",
+  "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==",
+].join("\n");
+const SIG = Buffer.from(SIG_TEXT, "utf8").toString("base64");
+
+function manifest(version: string, url = ARTIFACT, signature = SIG) {
   return {
     version,
-    platforms: { "darwin-aarch64": { signature: "c2ln", url } },
+    platforms: { "darwin-aarch64": { signature, url } },
   };
 }
 
@@ -51,6 +67,17 @@ describe("check-published-manifests", () => {
     const { failures, verdict } = await run(same());
     expect(failures).toEqual([]);
     expect(verdict).toBe("ok");
+  });
+
+  it("fails when a signature carries one encoding too many, which no other gate sees", async () => {
+    // The v0.11.3 defect, reproduced: the field was the `.sig` content base64'd a second time.
+    // Every artefact resolved, every hash matched, and the updater would have answered
+    // "Untrusted signature comment too long" on every platform at once.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = { json: manifest("0.10.0", ARTIFACT, Buffer.from(SIG).toString("base64")) };
+    const { failures, verdict } = await run(routes);
+    expect(verdict).toBe("failed");
+    expect(failures.join("\n")).toContain("not the .sig file's content");
   });
 
   it("fails when the beta document lags stable, naming the rule and the release it happened to", async () => {
