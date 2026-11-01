@@ -131,9 +131,15 @@ export const POST_RECOVERY_CANCEL_STAGE = "unlock" as const;
  * mobile's 21, they shared 20 keys, and **not one** of those 20 routed
  * differently. The four that are not here are the whole real difference:
  *
- *   - `account-entry|create-vault.start` and `editor|editor.awaiting-approval`
- *     are desktop-only because their target stages are (`account-entry`,
- *     `pending-approval`). Screen difference, not a decision difference.
+ *   - `account-entry|create-vault.start` is desktop-only because its target stage
+ *     is (`account-entry`). Screen difference, not a decision difference.
+ *   - `editor|editor.awaiting-approval` was desktop-only when this table was
+ *     extracted, for the same reason (`pending-approval` was a web-first
+ *     surface). The mobile client gained that stage after a reported defect: a
+ *     phone that lost its join overlay could never show the §6.3 compare code
+ *     again, so the approver waited on a comparison nothing could make. The row
+ *     is shared now; what stays per-client is the wait's EXIT, because mobile
+ *     addresses it by action and desktop/web by reprobe.
  *   - `unlock|unlock.join-success` (desktop) against `editor|editor.join-success`
  *     (mobile) is deliberate and stays: desktop's join goes through `unlock`
  *     because `leaveActiveVault` has to tear the prior vault down first, while
@@ -149,6 +155,7 @@ export const POST_RECOVERY_CANCEL_STAGE = "unlock" as const;
 export const SHARED_LEGAL: Readonly<Record<string, string>> = Object.freeze({
   "create-vault|create-vault.auto-unlock-success": "editor",
   "create-vault|create-vault.commit-success": "unlock",
+  "editor|editor.awaiting-approval": "pending-approval",
   "editor|editor.create-vault": "create-vault",
   "editor|editor.lock": "unlock",
   "editor|editor.restore-backup": "restore-backup",

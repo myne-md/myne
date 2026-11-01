@@ -1201,6 +1201,24 @@ const ROSTER = [
   },
 
   {
+    a: "src/lib/pending-approval.ts",
+    b: "mobile/src/lib/pending-approval.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "Is this device enrolled but not yet approved (myne-md/myne#535), asked once per entry into the editor because it cannot be answered before unlock: `sync_join_account` writes the account's real meta and unlocks the vault BEFORE the enrolment that comes back pending. One question with one answer, and the mobile copy is a deliberate exception to it rather than a drift — the desktop twin bails out on `localOnlyVault` because awaiting approval there does not block local use and the Settings panel shows the wait, while mobile's Settings panel carries only the APPROVER's side of the compare, so the wait is the only surface a joining phone has left that can show its code. A shared core would take that difference as a flag (whether this client has another surface that can display the code), and nobody has decided it. The two-read ORDER is shared and load-bearing on both: baseline first, because status-first can find the token already claimed and return past the compare.",
+  },
+
+  {
+    a: "src/hooks/useIdleAutoLock.ts",
+    b: "mobile/src/hooks/useIdleAutoLock.ts",
+    verdict: "decision",
+    destination: "undecided",
+    reason:
+      "When an unattended WebView re-locks, and whether anything can switch that off (`threat-model.md` §7, A6). One question, one answer, and a wrong answer on either client leaves an unlocked vault behind a screen nobody asked to keep open. Mobile's copy was extracted from `EditorFlow`'s inline timer when the approval wait became a second post-unlock screen holding keys (myne-md/myne#535), which is the moment the reason the web copy exists became true here too. What legitimately differs is only HOW the caller locks, which is per-client by construction. The load-bearing half is shared and stated in both: the deadline is a TIMESTAMP comparison re-evaluated on `visibilitychange`, never a countdown a suspended phone can freeze, and `effectiveMobileAutoLockSecs` / `effective_auto_lock_secs` clamp to a floor so a replayed off value cannot disable it.",
+  },
+
+  {
     a: "src-tauri/src/lib.rs",
     b: "mobile/src-tauri/src/lib.rs",
     verdict: "delegated",

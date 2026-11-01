@@ -6235,6 +6235,7 @@ export const ROSTER = Object.freeze([
       "mobile/src/styles/tokens.css",
       "mobile/src/lib/account-number-format.ts",
       "mobile/src/app/flows/JoinFlow.tsx",
+      "mobile/src/app/flows/PendingApprovalFlow.tsx",
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web", "ios", "android"],
     automatedBy: [
@@ -6253,6 +6254,9 @@ export const ROSTER = Object.freeze([
       // drives both surfaces against mock IPC and records the credential each
       // one forwards, which is the half a mocked lane can honestly hold.
       "mobile/tests/flow-logic/sync/join.flow.ts",
+      // The resumed wait (myne-md/myne#535, mobile half): the fixture boots into
+      // the editor with no overlay, and the compare has to be reachable anyway.
+      "mobile/tests/flow-logic/sync/pending-approval.flow.ts",
     ],
      manual: [
        {
@@ -6263,10 +6267,10 @@ export const ROSTER = Object.freeze([
          tier: "standard",
        },
        {
-         see: "On two real devices signed into one account, start a device approval and hold it at the fingerprint step. Confirm four things. The two screens show the SAME fingerprint, in a form a person can compare aloud without transcribing. The string does not change while you compare it, which is the push hold doing its job. A deliberate mismatch (approve on one device while the other shows a different code) is surfaced as a mismatch, and the offered action is Remove device rather than an accept-anyway. A third device pushing to the account mid-ceremony is announced rather than absorbed silently. Record which two devices you used.",
+         see: "On two real devices signed into one account, start a device approval and hold it at the fingerprint step. Confirm four things. The two screens show the SAME fingerprint, in a form a person can compare aloud without transcribing. The string does not change while you compare it, which is the push hold doing its job. A deliberate mismatch (approve on one device while the other shows a different code) is surfaced as a mismatch, and the offered action is Remove device rather than an accept-anyway. A third device pushing to the account mid-ceremony is announced rather than absorbed silently. Then confirm the joining phone can be brought BACK to that compare after losing it: with the approval still pending, force-quit the phone app (and separately, press the wait's Cancel), reopen it and unlock the vault, and confirm it returns to the waiting screen showing the same fingerprint rather than opening an empty editor. That last half is the myne-md/myne#535 defect on this client: the code lived only in the join overlay's own state, so once the overlay was gone the approving device waited on a comparison nothing could make, and the first background cycle claimed the token with the compare skipped. Record which two devices you used.",
         whyNotAutomated: "The comparison is a person reading two screens at once, which no single-session driver can be, and the property under test is that a HUMAN can tell two strings apart under time pressure. It also needs two real enrolled devices and a live lease-bounded hold that a fixture cannot reproduce. docs/threat-model.md section 7's vault-head limit names this eye-compare as the only mitigation for a malicious server seating a device onto a stale or forked history, and its myne-md/myne#462 amendment records that a moved head is announced rather than swapped in silently, with the announcement being user attention rather than a structural property.",
         clients: ["desktop-macos", "ios", "android"],
-        estimateMin: 15,
+        estimateMin: 18,
         tier: "core",
       },
       {

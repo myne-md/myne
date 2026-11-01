@@ -57,33 +57,44 @@ describe("effectiveMobileAutoLockSecs()", () => {
 // Asserted over the source rather than by driving the flow: the component needs
 // a whole vault session to mount, and the property is structural — a countdown
 // that is restarted, versus a deadline that is compared.
+//
+// It reads the HOOK, not the editor, since the timer moved there (myne-md/myne#535):
+// the approval wait is a second post-unlock screen that holds keys, so the one
+// implementation now serves two call sites and a source assertion against the
+// editor would pass while the hook it delegates to lost the property.
 describe("mobile idle auto-lock is deadline-based (#53)", () => {
+  const read = async (path: string) =>
+    import("node:fs").then((fs) => fs.readFileSync(path, "utf8"));
+
   it("re-evaluates on visibilitychange rather than trusting a suspended timer", async () => {
-    const src = await import("node:fs").then((fs) =>
-      fs.readFileSync("src/app/flows/EditorFlow.tsx", "utf8"),
-    );
-    const block = src.slice(src.indexOf("// Auto-lock:"));
+    const src = await read("src/hooks/useIdleAutoLock.ts");
     expect(
-      block.includes('document.addEventListener("visibilitychange"'),
+      src.includes('document.addEventListener("visibilitychange"'),
       "returning to the foreground is the first moment elapsed time is observable",
     ).toBe(true);
     expect(
-      /Date\.now\(\) - lastActivity >=/.test(block),
+      /Date\.now\(\) - lastActivity >=/.test(src),
       "the deadline must be a timestamp comparison",
     ).toBe(true);
   });
 
   it("no longer arms a lock-after-N countdown that activity restarts", async () => {
-    const src = await import("node:fs").then((fs) =>
-      fs.readFileSync("src/app/flows/EditorFlow.tsx", "utf8"),
-    );
-    const block = src.slice(
-      src.indexOf("// Auto-lock:"),
-      src.indexOf("// Best-effort plaintext wipe on unmount."),
-    );
-    expect(
-      /setTimeout\(\(\) => onLock\(\)/.test(block),
-      "a restartable countdown is the defect",
-    ).toBe(false);
+    for (const path of ["src/hooks/useIdleAutoLock.ts", "src/app/flows/EditorFlow.tsx"]) {
+      const src = await read(path);
+      expect(
+        /setTimeout\(\(\) => onLock\(\)/.test(src),
+        `a restartable countdown is the defect, and ${path} must not carry one`,
+      ).toBe(false);
+    }
+  });
+
+  it("is armed by every post-unlock screen that holds keys", async () => {
+    // Two call sites, and the second one is the reason the hook exists: an
+    // approval wait with no timer is an unlocked vault left on a screen nobody
+    // asked to keep open (A6).
+    for (const path of ["src/app/flows/EditorFlow.tsx", "src/app/flows/PendingApprovalFlow.tsx"]) {
+      const src = await read(path);
+      expect(src.includes("useIdleAutoLock("), `${path} must arm the idle lock`).toBe(true);
+    }
   });
 });

@@ -780,7 +780,7 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 12000,
+  "totalMinutesCeiling": 12009,
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",
@@ -1459,5 +1459,33 @@
     "",
     "The item is standard tier, so gatedMinutes is untouched (3837 before and",
     "after) and the whole 20 lands on the ceiling. Nothing was subtracted."
+  ],
+  "$comment30": [
+    "CEILING RAISED 12000 -> 12009 by the mobile half of myne-md/myne#535, in the",
+    "sanctioned direction: an EXISTING core item grew, because the compare it",
+    "already walked is now reachable after the phone loses the wait. What added",
+    "the minutes, named so the raise is an argument rather than a number:",
+    "",
+    "  + 3 minutes on the sync.device-join fingerprint item, on each of",
+    "    desktop-macos, ios and android = 9, the whole of 12000 -> 12009. The item",
+    "    now also asks the person to force-quit the joining phone (and separately to",
+    "    press the wait's Cancel) while the approval is still pending, then reopen,",
+    "    unlock, and confirm the app returns to the waiting screen with the same",
+    "    fingerprint rather than opening an empty editor.",
+    "",
+    "WHY IT IS NOT A SCENARIO. The rest of the item already records why the",
+    "ceremony itself cannot be driven (two people reading two screens, a live",
+    "lease-bounded hold, no lane for either phone WebView). The half this change",
+    "adds is a KILL AND RELAUNCH across two devices, which is the same cross-session",
+    "handoff no single-session driver owns; what a mocked tier can hold is asserted",
+    "instead, and it is the verdict rather than the flow",
+    "(mobile/tests/pendingApproval.test.ts: the two reads and their ORDER, which is",
+    "the part that decides whether the compare is reachable at all, plus the stage",
+    "edges in mobile/tests/stage.test.ts).",
+    "",
+    "The item is core and all three clients are gated, so gating minutes rise by",
+    "the same 9 and gatedMinutes is NOT edited: it is a floor that --record may",
+    "only move downward, and the rule is that gating may not fall by more than",
+    "total does. Both rose."
   ]
 }

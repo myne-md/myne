@@ -10,6 +10,7 @@ import {
 import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
+import { awaitingApprovalVerdict } from "../lib/pending-approval";
 import { endAgentRun } from "../lib/agent-lifetime";
 import { clearAwareness } from "@myne/awareness-store";
 import { clearHandoffCaches } from "./vaultHandoff";
@@ -20,6 +21,7 @@ import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { IdentityFlow } from "./flows/IdentityFlow";
 import { JoinFlow } from "./flows/JoinFlow";
+import { PendingApprovalFlow } from "./flows/PendingApprovalFlow";
 import { CreateVaultFlow } from "./flows/CreateVaultFlow";
 import { UnlockFlow } from "./flows/UnlockFlow";
 import { RecoverFlow } from "./flows/RecoverFlow";
@@ -196,6 +198,48 @@ function StageSwitch() {
     void enterStage(null);
     void boot();
   }, [boot, enterStage]);
+
+  /**
+   * The approval wait's Cancel, and its idle auto-lock (both land here).
+   *
+   * Locks first, and that is the difference from the join OVERLAY's Cancel: an
+   * overlay closes back to the stage underneath, while this stage has no stage
+   * underneath to close to. It holds an unlocked vault, so leaving it without
+   * locking would put the user in front of an editor whose keys nobody asked to
+   * keep. `reprobe()` after the lock answers `unlock` for this vault, which is
+   * exactly the state the device was in before this stage existed.
+   *
+   * The teardown itself rides `lockVault` (the mobile chokepoint
+   * `scripts/check-frontend-lock-teardown.mjs` asserts), so nothing here clears
+   * stores by hand.
+   */
+  const leaveApprovalWait = useCallback(() => {
+    void lockVault("manual")
+      .catch(() => {})
+      .finally(() => reprobe());
+  }, [reprobe]);
+
+  // The awaiting-approval verdict (#535), asked ONCE per entry into the editor,
+  // after unlock, because it cannot be answered before it: `sync_join_account`
+  // writes the account's real meta and unlocks the vault before the enrolment
+  // that comes back pending, so a device nobody has approved presents an
+  // ordinary container. Routing on that at boot is the deadlock MYND-635 shipped
+  // and 0519 removed.
+  //
+  // `dispatch` is a no-op when the pair is illegal, so a verdict that lands after
+  // the user has already locked or switched leaves them where they went rather
+  // than dragging them back into the wait.
+  useEffect(() => {
+    if (stage?.name !== "editor") return;
+    let cancelled = false;
+    void awaitingApprovalVerdict().then((awaiting) => {
+      if (cancelled || !awaiting) return;
+      dispatch({ type: "editor.awaiting-approval" });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [stage?.name, dispatch]);
 
   /**
    * The editor's "create another vault" exit, one of the two vault-leaving paths
@@ -523,6 +567,22 @@ function StageSwitch() {
             reprobe(); // #45 — see the unlock surface above
           }}
         />
+      );
+
+    case "pending-approval":
+      // The wait, resumed (#535). Reached from the editor by the verdict above,
+      // never by boot routing: the question needs `root_key` in the slot, so it
+      // is asked after unlock. Renders the join flow's own wait and compare —
+      // one implementation of "has an approval landed", shared with the overlay
+      // entry that a first join uses.
+      return (
+        <PhoneColumn>
+          <PendingApprovalFlow
+            vaultId={stage.vaultId}
+            onApproved={(vaultId?: VaultId) => dispatch({ type: "pending-approval.approved", vaultId })}
+            onCancel={leaveApprovalWait}
+          />
+        </PhoneColumn>
       );
 
     case "picker":

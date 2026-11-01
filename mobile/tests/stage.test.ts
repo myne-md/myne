@@ -61,6 +61,44 @@ describe("transition()", () => {
     expect(transition(prev, { type: "picker.join-success", vaultId: "v-joined" })).toBe(prev);
     expect(transition(prev, { type: "editor.join-success", vaultId: "v-joined" })).toBe(prev);
   });
+
+  // myne-md/myne#535, the mobile half. The wait is reached AFTER unlock, from a
+  // verdict that cannot be taken before it, and it carries the editor's vault id
+  // both ways so the approval lands on the vault it was about.
+  describe("the awaiting-approval wait", () => {
+    it("routes editor → pending-approval, carrying the vault id", () => {
+      const prev = { name: "editor", vaultId: "v-pending" } as const;
+      expect(transition(prev, { type: "editor.awaiting-approval" })).toEqual({
+        name: "pending-approval",
+        vaultId: "v-pending",
+      });
+    });
+
+    it("leaves the wait for the editor it came from", () => {
+      const prev = { name: "pending-approval", vaultId: "v-pending" } as const;
+      // No payload: the stage's own id is the answer, which is the case a caller
+      // reaches by clicking "They match".
+      expect(transition(prev, { type: "pending-approval.approved" })).toEqual({
+        name: "editor",
+        vaultId: "v-pending",
+      });
+      // A payload still wins, for a caller that knows better than the stage did.
+      expect(
+        transition(prev, { type: "pending-approval.approved", vaultId: "v-other" }),
+      ).toEqual({ name: "editor", vaultId: "v-other" });
+    });
+
+    it("is reachable from nothing but the editor, and exits nowhere but the editor", () => {
+      // The verdict is the ONLY inbound edge (a boot-time inference is the
+      // deadlock 0519 removed), and the wait has no lock or create arm: leaving it
+      // any other way is the shell's lock-then-reprobe, not a transition.
+      const fromUnlock = { name: "unlock", initialStatus: { kind: "Exists" } } as const;
+      expect(transition(fromUnlock, { type: "editor.awaiting-approval" })).toBe(fromUnlock);
+      const waiting = { name: "pending-approval" } as const;
+      expect(transition(waiting, { type: "editor.lock" })).toBe(waiting);
+      expect(transition(waiting, { type: "editor.create-vault" })).toBe(waiting);
+    });
+  });
 });
 
 describe("initialStageFromProbe()", () => {

@@ -153,6 +153,24 @@ export interface JoinFlowProps {
    * identity flow rather than here.
    */
   onPersonJoin: (target: { endpointUrl: string; personIdHex: string }) => void;
+  /**
+   * Open on the approval WAIT instead of on the credential form, and close on the
+   * compare instead of on Cancel (myne-md/myne#535, mobile half).
+   *
+   * The shell mounts the flow this way for the `pending-approval` stage: a device
+   * that is enrolled and has never adopted a head, reached after unlock. The wait
+   * is a MOUNT-TIME initial value, not a controlled prop — once mounted the flow
+   * owns its own step, so an approval it observes takes effect immediately
+   * instead of waiting for the shell to re-render it. Same contract as desktop's
+   * `AccountBootstrap.initiallyPending`.
+   */
+  initiallyPending?: boolean;
+  /**
+   * The vault the wait is about, for the resumed entry. The overlay entry learns
+   * it from `sync_join_account`'s result; the stage already knows it, and
+   * `onComplete` needs it to address the editor.
+   */
+  initialVaultId?: VaultId;
 }
 
 export interface CreateVaultFlowProps {
