@@ -49,6 +49,19 @@ const syncSetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
+/**
+ * What the accept/join reports back. The flow reads `vault_id` off it to address
+ * the approval wait the installed vault owes (`AppShell`'s
+ * `landOnInstalledVault`), so a mock resolving `undefined` would throw inside the
+ * flow rather than exercise it.
+ */
+const ACCEPTED_VIEW = {
+  vault_id: "00000000-0000-7000-8000-00000000000b",
+  vault_account_hash_hex: "00112233445566778899aabbccddeeff",
+  owner_fingerprint_hex: "00".repeat(32),
+  group_key_epoch: 1,
+};
+
 vi.mock("../../src/lib/app-window", () => ({ HAS_TAURI: true }));
 vi.mock("../../src/lib/personAccount", () => ({
   personSetup,
@@ -157,8 +170,8 @@ beforeEach(() => {
     approved: true,
   });
   personLock.mockReset().mockResolvedValue(undefined);
-  personAcceptInvite.mockReset().mockResolvedValue(undefined);
-  personJoinVault.mockReset().mockResolvedValue(undefined);
+  personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
+  personJoinVault.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
   // The name step is never reached from a join, but the accept spec's own path
   // passes through it and this module is shared state across both files' mocks.
@@ -318,8 +331,12 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // collects an owner code this step does not have.
     expect(personAcceptInvite).not.toHaveBeenCalled();
     // Reaches the shell directly: a join installs a vault the identity is already a
-    // member of, so there is nothing to name (see the next test).
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledTimes(1));
+    // member of, so there is nothing to name (see the next test). The vault ID
+    // travels with it because the shell addresses the approval wait with it: a
+    // freshly installed member vault carries a device the owner has not admitted
+    // yet, so re-probing would land on an ordinary editor and the §6.3 compare
+    // would never be made.
+    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
   });
 
   it("keeps the device password behind the project's floor", async () => {
@@ -356,7 +373,7 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     setJoinPassword(PASSWORD);
     fireEvent.click(submit());
 
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
     expect(screen.queryByTestId("identity-flow.name-input")).toBeNull();
     expect(setMyMemberName).not.toHaveBeenCalled();
   });

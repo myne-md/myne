@@ -10,7 +10,7 @@ import {
 import { listVaults } from "../lib/vault-list";
 import { probeSlotKind } from "../lib/vault-slot-kind";
 import { lockVault } from "../lib/vault-unlock";
-import { clearApprovalWait } from "@myne/client-core/approval-wait";
+import { clearApprovalWait, markApprovalWait } from "@myne/client-core/approval-wait";
 import { awaitingApprovalVerdict } from "../lib/pending-approval";
 import { endAgentRun } from "../lib/agent-lifetime";
 import { clearAwareness } from "@myne/awareness-store";
@@ -201,6 +201,39 @@ function StageSwitch() {
   }, [boot, enterStage]);
 
   /**
+   * Where an identity-flow accept or join lands.
+   *
+   * The flow hands back the vault it installed, and that id is the whole
+   * difference between two landings. Without one, re-probe: the flow wrote
+   * nothing and the stage machine decides what is on screen.
+   *
+   * WITH one, the wait: a freshly installed member vault carries a device the
+   * owner still has to admit, so this device cannot pull yet and its §6.3 compare
+   * code is owed. Re-probing here was the reported defect — the vault is on disk
+   * and unlocked either way, so the probe answered "editor" (or, after a slot
+   * race, the unlock form) and the approving desktop sat on "this code appears
+   * once the new device finishes its first sync" forever, because the phone was
+   * never going to run the cycle that makes it appear.
+   *
+   * The marker is written BEFORE the stage so a later unlock re-enters the wait
+   * instead of showing an empty editor (the join's own pending answer is the only
+   * moment that fact is known without inference). The stage holds the unlocked
+   * vault deliberately: the wait exists so a cycle can claim, and the claim needs
+   * `root_key`.
+   */
+  const landOnInstalledVault = useCallback(
+    (vaultId?: string) => {
+      if (vaultId === undefined) {
+        reprobe();
+        return;
+      }
+      markApprovalWait(vaultId);
+      void enterStage({ name: "pending-approval", vaultId });
+    },
+    [enterStage, reprobe],
+  );
+
+  /**
    * The approval wait's Cancel, and its idle auto-lock (both land here).
    *
    * Locks first, and that is the difference from the join OVERLAY's Cancel: an
@@ -361,11 +394,12 @@ function StageSwitch() {
           fromQr={identityFromQr}
           onCancel={() => setIdentityFromQr(null)}
           // The member vault is on disk and unlocked by the time the join wizard
-          // completes, so close and re-probe exactly as the welcome arm's identity
-          // overlay does; the probe decides where the user lands.
-          onAccepted={() => {
+          // completes. The wait is owed, so the wizard's vault id routes there
+          // (`landOnInstalledVault`); with no id there is nothing to wait on and
+          // the probe decides where the user lands.
+          onAccepted={(vaultId) => {
             setIdentityFromQr(null);
-            reprobe();
+            landOnInstalledVault(vaultId);
           }}
         />
       </PhoneColumn>
@@ -384,12 +418,13 @@ function StageSwitch() {
         <IdentityFlow
           fromPersonQr={personJoinFrom}
           onCancel={() => setPersonJoinFrom(null)}
-          // The join listed the account's vaults and wrote their frames locally,
-          // so the probe is what decides where the user lands: the picker when
-          // several arrived, that vault's unlock when one did.
-          onAccepted={() => {
+          // The join listed the account's vaults and wrote their frames locally.
+          // One id means one vault, and that vault's device still owes its
+          // approval wait; several means the picker, which is what the probe
+          // answers.
+          onAccepted={(vaultId) => {
             setPersonJoinFrom(null);
-            reprobe();
+            landOnInstalledVault(vaultId);
           }}
         />
       </PhoneColumn>
@@ -434,14 +469,15 @@ function StageSwitch() {
                 dispatch({ type: "create-vault.start" });
               }}
               // An invite was accepted, this device named itself, and the
-              // member vault is on disk and unlocked: close the overlay and
-              // re-probe, which is how the stage machine decides what the user
-              // opens next rather than the identity flow guessing
-              // (myne-md/myne#851 tasks 14 and 15). The name step withholds this
-              // until a name is saved, so a vault cannot arrive here unnamed.
-              onAccepted={() => {
+              // member vault is on disk and unlocked. The flow hands back the
+              // vault it installed, and that id decides the landing: the approval
+              // wait with the §6.3 compare, never a re-probe, because a freshly
+              // installed member vault is a device the owner has not admitted yet
+              // (`landOnInstalledVault`). The name step withholds this until a
+              // name is saved, so a vault cannot arrive here unnamed.
+              onAccepted={(vaultId) => {
                 setIdentityOpen(false);
-                reprobe();
+                landOnInstalledVault(vaultId);
               }}
             />
           </PhoneColumn>
