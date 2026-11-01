@@ -92,12 +92,12 @@ describe("dynamicDataAttrs: the two things it must NOT report", () => {
 
 describe("preUnlockScope: the screens plus what they compose", () => {
   const scope = preUnlockScope([
-    "src/screens/AccountNumberEntry.tsx",
+    "src/screens/PendingApproval.tsx",
     "src/screens/WebNoAccount.tsx",
   ]);
 
   it("includes the screens themselves", () => {
-    expect(scope).toContain("src/screens/AccountNumberEntry.tsx");
+    expect(scope).toContain("src/screens/PendingApproval.tsx");
     expect(scope).toContain("src/screens/WebNoAccount.tsx");
   });
 
@@ -200,8 +200,11 @@ describe("sharedWebOnlyScreens: the roster is derived, not listed", () => {
 
   it("includes the screens the hand-kept pair left out", () => {
     // The finding itself, asserted by name: these three were outside the guard.
+    // `AccountBootstrap.tsx` was the first of them and left the tree with the
+    // account-number join door (`decisions/sync/0767`); `PendingApproval.tsx`
+    // is its replacement and takes the same slot in this assertion.
     for (const file of [
-      "src/screens/AccountBootstrap.tsx",
+      "src/screens/PendingApproval.tsx",
       "src/screens/DeviceRevoked.tsx",
       "src/screens/vault-creation/ProvisioningStep.tsx",
     ]) {

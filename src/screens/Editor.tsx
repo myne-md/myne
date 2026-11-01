@@ -490,19 +490,6 @@ interface EditorProps {
    */
   onCreateAnother?: () => void;
   /**
-   * Open the device-join modal from the switcher dropdown's "Add this device to
-   * an account" footer (myne#221). App.tsx tears this vault down first - flush +
-   * `vault_lock()` + `editor.lock` - and opens the modal it mounts globally over
-   * the resulting unlock screen, because `sync_join_account` unlocks a DIFFERENT
-   * vault and SYNC-1 zeroizes this one on the way.
-   *
-   * Optional and capability-gated by App.tsx: a client that holds one container
-   * per origin cannot bootstrap a second vault, and an unavailable affordance is
-   * omitted rather than disabled. Absence hides that one row, not the switcher -
-   * so it is deliberately NOT part of `SidebarVaultSwitcher`'s null gate.
-   */
-  onJoinDevice?: () => void;
-  /**
    * Unaccepted invitations for the account-chip dropdown's notice row
    * (myne-md/myne#911 follow-up). Read by App from `usePendingInvites` and passed
    * down, so the fetch happens once per process rather than per mount.
@@ -519,9 +506,8 @@ interface EditorProps {
   invitesUnavailable?: InvitesUnavailable | null;
   /**
    * Open the invitations dialog. App tears this vault down first (`flush +
-   * vault_lock` + `editor.lock`) for the same reason `onJoinDevice` does:
-   * accepting an invitation installs and unlocks a DIFFERENT vault, and SYNC-1
-   * zeroizes this one on the way.
+   * vault_lock` + `editor.lock`): accepting an invitation installs and unlocks
+   * a DIFFERENT vault, and SYNC-1 zeroizes this one on the way.
    */
   onInvites?: () => void;
   /**
@@ -559,7 +545,6 @@ export function Editor({
   onDeleteVaultSuccess,
   onSwitchVault,
   onCreateAnother,
-  onJoinDevice,
   inviteCount = 0,
   invitesUnavailable = null,
   onInvites,
@@ -759,7 +744,6 @@ export function Editor({
           onDeleteVaultSuccess={onDeleteVaultSuccess}
           onSwitchVault={onSwitchVault}
           onCreateAnother={onCreateAnother}
-          onJoinDevice={onJoinDevice}
           inviteCount={inviteCount}
           invitesUnavailable={invitesUnavailable}
           onInvites={onInvites}
@@ -801,7 +785,6 @@ type EditorChromeProps = {
   onDeleteVaultSuccess: () => void;
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
-  onJoinDevice?: () => void;
   inviteCount?: number;
   invitesUnavailable?: InvitesUnavailable | null;
   onInvites?: () => void;
@@ -822,7 +805,6 @@ function EditorChrome({
   onDeleteVaultSuccess,
   onSwitchVault,
   onCreateAnother,
-  onJoinDevice,
   inviteCount,
   invitesUnavailable,
   onInvites,
@@ -2573,7 +2555,6 @@ function EditorChrome({
               <SidebarVaultSwitcher
                 onSwitchVault={onSwitchVault}
                 onCreateAnother={onCreateAnother}
-                onJoinDevice={onJoinDevice}
                 inviteCount={inviteCount}
                 invitesUnavailable={invitesUnavailable}
                 onInvites={onInvites}
@@ -3327,7 +3308,6 @@ const RIGHT_CLEARANCE =
 function SidebarVaultSwitcher({
   onSwitchVault,
   onCreateAnother,
-  onJoinDevice,
   inviteCount,
   invitesUnavailable,
   onInvites,
@@ -3335,15 +3315,11 @@ function SidebarVaultSwitcher({
 }: {
   onSwitchVault?: (targetVaultId: VaultId) => void;
   onCreateAnother?: () => void;
-  onJoinDevice?: () => void;
   inviteCount?: number;
   invitesUnavailable?: InvitesUnavailable | null;
   onInvites?: () => void;
   switching: boolean;
 }) {
-  // `onJoinDevice` is deliberately absent from this gate: it is capability-
-  // gated (myne#221), and a client that cannot hold a second vault must lose
-  // that one footer row, not the whole switcher.
   if (onSwitchVault === undefined || onCreateAnother === undefined) return null;
   return (
     <div
@@ -3359,7 +3335,6 @@ function SidebarVaultSwitcher({
       <VaultSwitcher
         onSwitchVault={onSwitchVault}
         onCreateAnother={onCreateAnother}
-        onJoinDevice={onJoinDevice}
         inviteCount={inviteCount}
         invitesUnavailable={invitesUnavailable}
         onInvites={onInvites}

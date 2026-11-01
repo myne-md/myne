@@ -216,13 +216,21 @@ describe("check-twin-inventory", () => {
     // went with the surface (myne-md/myne#956), so the sweep discovers one pair
     // fewer. This number tracks what is left to classify, which is why it comes
     // back down without ceremony when work leaves the tree.
-    expect(full.out).toContain("133 twin(s) discovered");
+    //
+    // Then 133 to 135, and this one was shipped RED rather than argued: the
+    // approval-wait fix added `src/lib/pending-approval.ts` and
+    // `src/hooks/useIdleAutoLock.ts` with their mobile counterparts, the guard's
+    // projection was regenerated, and these literals were not moved with it, so
+    // the suite failed on a number nobody re-measured. Both new pairs are
+    // `decision` verdicts in the roster and both files exist on both sides;
+    // the count is right and the comment is the part that was missing.
+    expect(full.out).toContain("135 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -232,7 +240,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -313,7 +321,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("135 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -508,7 +516,13 @@ describe("check-twin-inventory", () => {
     // converged. The ceremony-binding pair that raised this to 134 went with the
     // surface (myne-md/myne#956), and the count comes back down with it: a ratchet on
     // the roster is a count of what is left to decide, so it is allowed to shrink.
-    expect(ROSTER.length).toBe(133);
+    //
+    // 133 to 135: the approval-wait fix (`src/lib/pending-approval.ts`,
+    // `src/hooks/useIdleAutoLock.ts` and their mobile counterparts). This literal
+    // was left at 133 while the roster and the projection both moved, which is
+    // the one direction this pair exists to make loud: a verdict added to the
+    // tree without the roster noticing.
+    expect(ROSTER.length).toBe(135);
   });
 
   it("keeps `screen` narrow", () => {

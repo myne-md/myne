@@ -31,7 +31,6 @@ function renderWelcome(overrides: Partial<Parameters<typeof Welcome>[0]> = {}) {
   const props = {
     onStart: vi.fn(),
     onRestoreBackup: vi.fn(),
-    onJoinDevice: vi.fn(),
     onInvited: vi.fn(),
     ...overrides,
   };
@@ -56,12 +55,22 @@ describe("Welcome first run", () => {
     expect(props.onStart).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps the two doors that create nothing, and wires them", () => {
+  it("keeps the doors that create nothing, and wires them", () => {
     const props = renderWelcome();
     fireEvent.click(screen.getByTestId("welcome.restore-cta"));
-    fireEvent.click(screen.getByTestId("welcome.join-cta"));
+    fireEvent.click(screen.getByTestId("welcome.invited-cta"));
     expect(props.onRestoreBackup).toHaveBeenCalledTimes(1);
-    expect(props.onJoinDevice).toHaveBeenCalledTimes(1);
+    expect(props.onInvited).toHaveBeenCalledTimes(1);
+    // The account-number join door is gone (`decisions/sync/0767`): the invited
+    // door is what replaced it, so both halves are asserted here.
+    expect(screen.queryByTestId("welcome.join-cta")).toBeNull();
+  });
+
+  it("omits the restore door where the client cannot restore", () => {
+    // Web answers `Unsupported` to the backup commands, so App omits the prop
+    // rather than greying the row (`decisions.md` 2026-07-26).
+    render(<Welcome onStart={vi.fn()} onInvited={vi.fn()} />);
+    expect(screen.queryByTestId("welcome.restore-cta")).toBeNull();
   });
 
   // The invited door (myne-md/myne#911 follow-up). It creates an IDENTITY and no

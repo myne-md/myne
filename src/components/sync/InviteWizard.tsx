@@ -75,8 +75,14 @@ export interface InviteWizardProps {
   invite: InviteSummary;
   /** Leave the wizard without accepting; the caller returns to the invite list. */
   onCancel: () => void;
-  /** The invite is accepted / the vault is installed on this device. */
-  onAccepted: () => void;
+  /**
+   * The invite is accepted / the vault is installed on this device.
+   *
+   * `vaultId` is the vault that just arrived, and the caller uses it to hold the
+   * device on the approval wait instead of dropping it into an editor the
+   * approval has not reached yet (`sync-protocol.md` §6.3).
+   */
+  onAccepted: (vaultId?: string) => void;
 }
 
 function emptyPhraseCells(): string[] {
@@ -206,7 +212,7 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
     clearError();
     setSubmitting(true);
     try {
-      await personAcceptInvite(
+      const view = await personAcceptInvite(
         invite.invite_id_hex,
         ownerCode.trim(),
         cells.join(" "),
@@ -215,7 +221,7 @@ export function AcceptInviteWizard({ invite, onCancel, onAccepted }: InviteWizar
       // Drop the phrase before the parent swaps the screen (the name gate is
       // next); nothing else holds a copy.
       setCells(emptyPhraseCells());
-      onAccepted();
+      onAccepted(view.vault_id);
     } catch (err) {
       // Surface WHICH failure it was, not only "could not be accepted": the
       // kinds are a closed enum and carry no secret (myne-md/myne#794).
@@ -417,19 +423,23 @@ export function JoinVaultWizard({ invite, onCancel, onAccepted }: InviteWizardPr
     clearError();
     setSubmitting(true);
     try {
-      await personJoinVault(
+      const view = await personJoinVault(
         invite.invite_id_hex,
         invite.vault_account_hash_hex,
         cells.join(" "),
         password,
       );
       setCells(emptyPhraseCells());
-      // Straight to the editor: a join installs a vault this identity is
-      // ALREADY a member of, so there is no name to set and no gate to pass.
-      // The accept path owes one because it is what creates a member; this
-      // path must not write a name, or a second device would silently re-name
-      // a person its first device had already named (myne-md/myne#852 task 7).
-      onAccepted();
+      // No name gate: a join installs a vault this identity is ALREADY a
+      // member of, so there is nothing to set. The accept path owes one because
+      // it is what creates a member; this path must not write a name, or a
+      // second device would silently re-name a person its first device had
+      // already named (myne-md/myne#852 task 7).
+      //
+      // The vault id goes out with it: this device is PENDING until another
+      // device approves it, and the caller is what knows to hold it on the
+      // compare rather than drop it into a vault that is still empty.
+      onAccepted(view.vault_id);
     } catch (err) {
       setError(t(memberJoinVaultErrorKey(err)));
       setSubmitting(false);

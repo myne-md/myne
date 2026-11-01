@@ -1,32 +1,4 @@
 {
-  "accountBootstrap": {
-    "accountMismatch": "This browser already holds a different account's vault. Open that one, or sign out and erase this browser's copy first.",
-    "changeAccount": "Use a different account number",
-    "continue": "Continue",
-    "hint": "Enter the master password for this account. Myne will fetch your vault and set this browser up as a device on it.",
-    "noEndpoint": "This copy of Myne has no sync server configured, so it can't reach your vault. Contact whoever runs it.",
-    "passwordLabel": "Master password",
-    "approversIntro": "These devices can approve this one:",
-    "noApprovers": "No other device on this account can approve it right now. Open Myne on a device that already has access, then come back here.",
-    "pendingStartOver": "Start over with a different account",
-    "pendingTitle": "Waiting for approval",
-    "sasMatch": "They match, continue",
-    "sasMismatch": "They don't match",
-    "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop: something is wrong with the connection, not with your password.",
-    "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
-    "verifyTitle": "Compare this code",
-    "title": "Sign in to your vault",
-    "working": "Setting up…"
-  },
-  "accountEntry": {
-    "createAccount": "I do not have an account yet. Create one.",
-    "checkFailed": "Could not check that account number. Try again.",
-    "checking": "Checking…",
-    "continue": "Continue",
-    "hint": "It looks like MY-XXXX-XXXX-XXXX-XXXX-XXXX. Checked here on your device. Nothing is sent yet.",
-    "invalid": "That account number is not valid. Check it and try again.",
-    "title": "Enter your account number"
-  },
   "agent": {
     "hub": {
       "title": "Agent",
@@ -4796,53 +4768,13 @@
       "wordAria": "Word {{number}}"
     },
     "join": {
-      "accountLabel": "Account number",
-      "back": "Back",
-      "backToWaiting": "Back to waiting",
-      "codeBody": "Paste the code the other device is showing. A code from an identity adds this device to that whole account.",
-      "codeContinue": "Continue",
-      "codeExpired": "That code has expired. Ask the other device to show a fresh one.",
-      "codeInvalid": "That is not a Myne join code.",
-      "codeLabel": "Join code",
-      "codeMemberUnsupported": "That code is for a shared vault. Add this device from the identity screen instead, where the vault appears under your invites.",
-      "codeOpen": "I have a join code",
-      "codeTitle": "Add this device with a code",
-      "personMismatch": "That code is for a different identity than the phrase you entered. Check both and try again.",
-      "personPendingBody": "One of your other devices has to approve this one. Until it does, this device cannot open any of the account's vaults.",
-      "personPendingHint": "Waiting for approval. This finishes on its own once the other device approves.",
-      "personPendingPhraseAgain": "This device was restarted before the approval arrived, so the phrase is needed once more.",
-      "personPendingPhraseCta": "Enter the phrase again",
-      "personPendingTitle": "Waiting for approval",
-      "personPhraseBody": "The code named the identity; the 24 words prove it. This device will ask for each vault's own password when you open it.",
-      "personPhraseSubmit": "Add this device",
-      "personPhraseTitle": "Enter your identity phrase",
       "cancel": "Cancel",
-      "error": "Couldn’t add this device. Check the server URL, account number, and password, and that the server is reachable.",
-      "errorPhrase": "Couldn’t add this device. Check the server URL, account number, and recovery phrase, and that the server is reachable.",
-      "help": "Sign in with your account number and password. This device will sync your notes once an existing device approves it. No recovery phrase needed.",
-      "modePassword": "My password",
-      "modePhrase": "My recovery phrase",
-      "noDeviceBody": "No other device to approve this one? You can confirm with your recovery phrase instead.",
-      "passwordLabel": "Password",
-      "phraseEscapeBody": "Your recovery phrase is the full key to this account, so it confirms this device without approval from another device. You keep the password you just used.",
-      "phraseTitle": "Confirm with your recovery phrase",
-      "phraseWarning": "Your recovery phrase is the full key to this account, so this device is added without approval from another device. Use it only if you have no other device to approve from. You will set a new password next.",
       "sasAbortFailed": "Could not disconnect this device. It is still enrolled with that server, so treat it as untrusted: open Settings → Sync and remove it there. Your notes were not deleted.",
       "sasMatch": "They match, continue",
-      "sasMismatch": "They don’t match, remove this device",
       "serverLabel": "Sync server",
-      "serverPlaceholder": "https://your-server.example",
-      "submit": "Add device",
       "submitting": "Adding…",
-      "title": "Add this device to an account",
-      "usePhrase": "Use my recovery phrase",
-      "verifyBody": "Check that this code matches the one on the device you approved from.",
-      "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
       "verifyTitle": "Verify this device",
-      "waitingHint": "Keep this window open. Once approved, a verification code appears here to compare with your other device.",
-      "waitingTitle": "Waiting for approval",
-      "personListFailed": "You are on this account, but listing its vaults did not finish, so none are shown yet. Retry, or reopen this screen later.",
-      "personListRetry": "List the vaults again"
+      "waitingTitle": "Waiting for approval"
     },
     "panel": {
       "addDevice": {
@@ -5590,7 +5522,6 @@
     "createAnother": "Create another vault",
     "deviceOnly": "Device only",
     "heading": "Choose a vault",
-    "joinDevice": "Add this device to an account",
     "loading": "Loading your vaults…",
     "noneLoaded": "No vaults could be loaded right now.",
     "openedRelative": "opened {{rel}}",
@@ -5660,7 +5591,6 @@
     "chipFallback": "Vault",
     "createAnother": "Create another vault",
     "deviceOnly": "Device only",
-    "joinDevice": "Add this device to an account",
     "switching": "switching…",
     "switchVaultLabel": "Switch vault",
     "vaultFallback": "Vault {{n}}"
@@ -5942,7 +5872,6 @@
     "startBody": "Start fresh on this device: a new identity, then the vault that belongs to it.",
     "restoreTitle": "Restore from backup",
     "restoreBody": "Open a .myne-backup file you saved earlier.",
-    "joinTitle": "Add this device to an account",
     "joinBody": "Use a vault you already have on another device.",
     "invitedTitle": "I was invited to a vault",
     "invitedBody": "Set up the identity the invite was addressed to. You do not need a vault of your own.",
@@ -6032,29 +5961,16 @@
     "accountError": "Could not read the account grouping on this device."
   },
   "join": {
-    "transportError": "Couldn't reach that sync server. Check the address and your connection, then try again.",
-    "passwordPlaceholder": "Your vault password",
     "waitingHint": "Keep this screen open. Once approved, a verification code appears here to compare with your other device.",
     "verifyBody": "Check that this code is the same one shown on the device you approved from.",
     "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "removing": "Removing…",
     "sasMismatch": "They don't match, remove this device",
-    "title": "Connect to your account",
-    "lead": "Enter your account details to bring your notes to this device. Everything stays encrypted end to end.",
-    "serverPlaceholder": "https://sync.example.com",
-    "accountHint": "Double-check this number. It doesn't look right.",
-    "approvalHint": "Your notes appear once you approve this device from a device that already has your account.",
-    "connectingSubtitle": "Fetching your account and unlocking your vault on this device.",
     "qr": {
-      "confirmAccount": "Account",
-      "confirmServer": "Server",
-      "confirmTitle": "Add this device?",
-      "continue": "Continue",
       "expired": "This QR has expired. Show a fresh one on your other device and scan again.",
       "invalid": "That's not a Myne device QR.",
       "legacyAccount": "This code is for an older account type. Ask the vault's owner for an invitation.",
       "newerVersion": "This QR is from a newer version of Myne. Update the app and try again.",
-      "scan": "Scan QR",
       "scanFailed": "Couldn’t scan. Try again, or enter your details manually.",
       "scanUnavailable": "Scanning isn’t available on this device. Enter your details below."
     }
@@ -6140,5 +6056,16 @@
         "crypto-getrandomvalues": "This browser does not provide a cryptographic random-number source."
       }
     }
+  },
+  "approvalWait": {
+    "approversIntro": "These devices can approve this one:",
+    "noApprovers": "No other device on this account can approve it right now. Open Myne on a device that already has access, then come back here.",
+    "pendingStartOver": "Start over with a different account",
+    "pendingTitle": "Waiting for approval",
+    "sasMatch": "They match, continue",
+    "sasMismatch": "They don't match",
+    "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop: something is wrong with the connection, not with your password.",
+    "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
+    "verifyTitle": "Compare this code"
   }
 }

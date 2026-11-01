@@ -38,7 +38,6 @@ afterEach(cleanup);
 const CREDENTIAL_SURFACES: ReadonlyArray<[path: string, what: string]> = [
   ["src/screens/Unlock.tsx", "the vault password, the main front door"],
   ["src/components/QuickUnlockEntry.tsx", "the quick-unlock PIN"],
-  ["src/screens/AccountNumberEntry.tsx", "the account number"],
   ["src/screens/vault-creation/PasswordStep.tsx", "the password being chosen"],
   ["src/screens/vault-creation/KitStep.tsx", "the recovery kit: phrase + account number, shown once"],
   ["src/screens/vault-creation/ConfirmStep.tsx", "four words of the phrase, re-entered"],

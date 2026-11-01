@@ -54,7 +54,6 @@ async function renderPicker() {
       onSelect={() => {}}
       onCreateAnother={() => {}}
       onRestoreBackup={() => {}}
-      onJoinDevice={() => {}}
       inviteCount={0}
       onInvites={() => {}}
     />,
@@ -101,19 +100,19 @@ describe("VaultPicker at a vault count that overflows the window", () => {
     expect(VISIBLE_VAULT_ROWS).toBe(4);
   });
 
-  it("keeps the heading and the three actions out of the shrink", async () => {
+  it("keeps the heading and the two actions out of the shrink", async () => {
     // If the chrome shrank too, a tall list would compress the heading and the
     // actions instead of scrolling, so the same rows are lost in a different
-    // way. The three actions sit as one labelled row directly UNDER the list
+    // way. The actions sit as one labelled row directly UNDER the list
     // (they were icon-only in the shell's top bar for a round); the row is held
     // out of the shrink, so at any vault count the list scrolls and the row
     // stays on screen beneath it.
     await renderPicker();
-    for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
+    for (const testId of ["picker.create-cta", "picker.restore-cta"]) {
       expect(screen.getByTestId(testId), `${testId} is gone`).toBeTruthy();
     }
     const actions = screen.getByTestId("picker.actions");
-    for (const testId of ["picker.create-cta", "picker.join-cta", "picker.restore-cta"]) {
+    for (const testId of ["picker.create-cta", "picker.restore-cta"]) {
       expect(actions.contains(screen.getByTestId(testId)), `${testId} left the row`).toBe(true);
     }
     expect(actions.style.flexShrink, "the actions row must not compress").toBe("0");

@@ -172,7 +172,7 @@ export interface EditorFlowProps {
   onCreateVault: () => void;
   /** Scan a join code from the vault switcher — the "join a vault" twin of
    *  `onCreateVault` (myne-mobile#40). It opens the scanner, not a form: the only
-   *  join door left is the QR (`decisions/sync/0765`). */
+   *  join door left is the QR (`decisions/sync/0767`). */
   onJoinAccount: () => void;
   onSwitchVault: (vaultId: VaultId) => void;
   onDeleteVaultSuccess: () => void;

@@ -453,10 +453,10 @@ export function CreateVault({
         sessionTokenRef.current = null;
 
         // The origin comes from the deployment, not from a field the user
-        // fills in: the same resolution `AccountBootstrap` performs on the
-        // sign-in leg, and for the same reason (task 50 fixes the origin at
-        // container start, so there is no endpoint stored before the first
-        // call that would need one).
+        // fills in: the same resolution the browser's entry path performs, and
+        // for the same reason (task 50 fixes the origin at container start, so
+        // there is no endpoint stored before the first call that would need
+        // one).
         const cfg = await invoke<{ endpoint_url: string | null } | null>(
           "plugin:sync|sync_get_endpoint",
         );

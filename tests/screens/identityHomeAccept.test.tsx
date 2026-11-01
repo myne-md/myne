@@ -82,7 +82,7 @@ beforeEach(() => {
     .mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: null });
   writeSyncEndpoint.mockReset().mockResolvedValue(undefined);
   personLock.mockReset().mockResolvedValue(undefined);
-  personAcceptInvite.mockReset().mockResolvedValue(undefined);
+  personAcceptInvite.mockReset().mockResolvedValue({ vault_id: "vault-1", vault_account_hash_hex: "bb", owner_fingerprint_hex: "cc", group_key_epoch: 1 });
   listRoster.mockReset();
   setMyMemberName.mockReset();
 });
@@ -621,7 +621,7 @@ describe("IdentityHome accept reaches the name gate", () => {
 
   async function accept(onAccepted: () => void): Promise<void> {
     personListInvites.mockResolvedValue([INVITE]);
-    personAcceptInvite.mockResolvedValue({});
+    personAcceptInvite.mockResolvedValue({ vault_id: "vault-1", vault_account_hash_hex: "bb", owner_fingerprint_hex: "cc", group_key_epoch: 1 });
     render(
       <IdentityHome
         identityCode="code"

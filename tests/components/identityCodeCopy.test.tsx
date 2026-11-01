@@ -147,7 +147,7 @@ const surfaces = [
 beforeEach(() => {
   writeTextMock.mockReset().mockResolvedValue(undefined);
   personListInvitesMock.mockReset().mockResolvedValue([]);
-  personAcceptInviteMock.mockReset().mockResolvedValue(undefined);
+  personAcceptInviteMock.mockReset().mockResolvedValue({ vault_id: "vault-1", vault_account_hash_hex: "bb", owner_fingerprint_hex: "cc", group_key_epoch: 1 });
   startB2bMigrationMock.mockReset();
   // The post-accept name gate (myne-md/myne#851 task 8) sits between the accept
   // and `onAccepted`, which several tests here assert. This file is about the
@@ -361,6 +361,11 @@ describe("IdentityHome invite phrase", () => {
         ACCEPT_PASSWORD,
       ),
     );
-    expect(onAccepted).toHaveBeenCalledOnce();
+    // The vault the accept installed travels with the callback, because the
+    // landing holds the device on the approval wait with it: a freshly accepted
+    // member vault is pending until another device compares the head
+    // fingerprint (`sync-protocol.md` §6.3), and an editor reached first is an
+    // empty editor and a compare that never happens.
+    expect(onAccepted).toHaveBeenCalledWith("vault-1");
   });
 });

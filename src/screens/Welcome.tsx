@@ -35,8 +35,13 @@ import { SUPPORTED_CODES, SUPPORTED_LANGUAGES, type LanguageCode } from "../i18n
 interface WelcomeProps {
   /** The one create door: the first run, identity then vault. */
   onStart: () => void;
-  /** Fresh-install restore door (MYND-56; the user-guide UX contract). */
-  onRestoreBackup: () => void;
+  /**
+   * Fresh-install restore door (MYND-56; the user-guide UX contract). Optional
+   * because the capability is: the web client answers `Unsupported` to the
+   * backup commands, so the row is OMITTED there rather than greyed
+   * (`decisions.md` 2026-07-26).
+   */
+  onRestoreBackup?: () => void;
   /**
    * The invited door: someone else's vault, addressed to this person's identity.
    * Runs the identity ceremony and lands on the identity home rather than on
@@ -44,20 +49,13 @@ interface WelcomeProps {
    * of their own to accept it.
    */
   onInvited: () => void;
-  /**
-   * Open the device-join modal (MYND-424). The modal itself is mounted by
-   * App.tsx over every stage since myne#221 — this screen was its only host,
-   * and `welcome` is produced only at ZERO vaults, so the first vault a user
-   * created made the join door unreachable.
-   */
-  onJoinDevice: () => void;
 }
 
 // The endonyms are not translated (same as Settings → Appearance), so the
 // options come straight from the config.
 const LANGUAGE_OPTIONS = SUPPORTED_LANGUAGES.map((l) => ({ value: l.code, label: l.label }));
 
-export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: WelcomeProps) {
+export function Welcome({ onStart, onRestoreBackup, onInvited }: WelcomeProps) {
   const { t, i18n } = useTranslation();
   const active = i18n.resolvedLanguage ?? i18n.language;
   const language = SUPPORTED_CODES.includes(active) ? active : "en";
@@ -155,35 +153,23 @@ export function Welcome({ onStart, onRestoreBackup, onJoinDevice, onInvited }: W
                 </Button>
               }
             />
-            <ChoiceRow
-              title={t("welcome.restoreTitle")}
-              body={t("welcome.restoreBody")}
-              action={
-                <Button
-                  variant="secondary"
-                  onClick={onRestoreBackup}
-                  data-testid="welcome.restore-cta"
-                  style={CHOICE_ACTION_STYLE}
-                >
-                  {t("welcome.restoreAction")}
-                </Button>
-              }
-            />
-            <ChoiceRow
-              title={t("welcome.joinTitle")}
-              body={t("welcome.joinBody")}
-              action={
-                <Button
-                  variant="secondary"
-                  onClick={onJoinDevice}
-                  data-testid="welcome.join-cta"
-                  style={CHOICE_ACTION_STYLE}
-                >
-                  {t("welcome.joinAction")}
-                </Button>
-              }
-              last
-            />
+            {onRestoreBackup !== undefined && (
+              <ChoiceRow
+                title={t("welcome.restoreTitle")}
+                body={t("welcome.restoreBody")}
+                action={
+                  <Button
+                    variant="secondary"
+                    onClick={onRestoreBackup}
+                    data-testid="welcome.restore-cta"
+                    style={CHOICE_ACTION_STYLE}
+                  >
+                    {t("welcome.restoreAction")}
+                  </Button>
+                }
+                last
+              />
+            )}
           </ChoiceCard>
         </div>
 

@@ -66,7 +66,7 @@ describeE2E("capability gating renders as absence", () => {
       });
       try {
         await openApp(browser.session, server.origin);
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
 
         for (const [testId, why] of MUST_BE_ABSENT) {
           const found = await browser.session.byTestIdAll(testId);

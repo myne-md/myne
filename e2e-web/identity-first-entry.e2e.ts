@@ -56,11 +56,11 @@ describeE2E("the browser's create door is identity-first", () => {
       // door. It stays the PRIMARY door, because a browser is a window onto an
       // account that already exists more often than it is a place to make one.
       await openApp(session, server.origin);
-      await session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+      await session.byTestId("welcome.root", { timeoutMs: 30_000 });
 
       // The secondary door. Before task 13 this opened vault creation directly
       // and the identity was unreachable from here.
-      const create = await session.byTestId("account-entry.create-account");
+      const create = await session.byTestId("welcome.create-cta");
       await create.scrollIntoView();
       await create.click();
 

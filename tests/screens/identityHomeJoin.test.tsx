@@ -125,7 +125,7 @@ async function openJoinPasswordStep(): Promise<void> {
 beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personAcceptInvite.mockReset().mockResolvedValue({});
-  personJoinVault.mockReset().mockResolvedValue({});
+  personJoinVault.mockReset().mockResolvedValue({ vault_id: "vault-1", vault_account_hash_hex: "bb", owner_fingerprint_hex: "cc", group_key_epoch: 1 });
   personLock.mockReset().mockResolvedValue(undefined);
   listRoster.mockReset();
   setMyMemberName.mockReset().mockResolvedValue({});
@@ -249,7 +249,7 @@ describe("IdentityHome second-device join", () => {
   // to name. The accept owes the name gate because the accept is what creates a
   // member; a name step here would let a second device re-name a person its first
   // device had already named.
-  it("reaches the editor straight away, writing no name", async () => {
+  it("hands the caller the vault it installed, and writes no name", async () => {
     const onAccepted = vi.fn();
     personListInvites.mockResolvedValue([CLAIMED]);
     renderHome(onAccepted);
@@ -262,7 +262,10 @@ describe("IdentityHome second-device join", () => {
     });
     fireEvent.click(screen.getByTestId("identity-home.join.submit"));
 
-    await waitFor(() => expect(onAccepted).toHaveBeenCalledOnce());
+    // The id is what the landing needs: a joined vault is pending until another
+    // device approves it, so the device is held on the compare rather than
+    // dropped into a vault that is still empty (`decisions/sync/0767`).
+    await waitFor(() => expect(onAccepted).toHaveBeenCalledWith("vault-1"));
     expect(screen.queryByTestId("name-gate.input")).toBeNull();
     expect(setMyMemberName).not.toHaveBeenCalled();
   });

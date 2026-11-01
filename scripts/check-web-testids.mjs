@@ -74,7 +74,7 @@ export const SHARED_WEB_ONLY = sharedWebOnlyScreens();
  * drop that screen out of this guard, which is exactly the class R0.2 fixed.
  * It may rise with the tree; lowering it is the edit that is never routine.
  */
-const SHARED_WEB_ONLY_FLOOR = 5;
+const SHARED_WEB_ONLY_FLOOR = 4;
 
 /**
  * Modules that legitimately render NOTHING, so "at least one testid" cannot
@@ -90,7 +90,6 @@ const SHARED_WEB_ONLY_FLOOR = 5;
  */
 const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "PairingDialog.tsx"),
-  join("web", "src", "components", "sync", "JoinDeviceModal.tsx"),
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
   // The creation flow's local-disk affordances, substituted away on 2026-08-15:
@@ -149,6 +148,16 @@ export const SHARED_PRE_UNLOCK_SCREENS = Object.freeze([
  * screens compose less than they did, which is either a real simplification
  * worth saying out loud or a walk that has stopped finding things.
  *
+ * **41 -> 24, `decisions/sync/0767`, and this is the largest drop this number
+ * has taken.** The account-number join door was deleted, so `AccountBootstrap`
+ * and `AccountNumberEntry` left the tree and with them the roots that pulled
+ * `PasswordInput`, `Spinner`, `BetaTermsConsent`, `DestructiveBanner` and the
+ * number field into the walk. What replaced them is `PendingApproval`, which
+ * composes `CenteredCard`, `DestructiveBanner` and the shared compare hook.
+ * Recorded as a real simplification rather than a walk that stopped finding
+ * things: the screens that consumed those primitives are gone, and the primitive
+ * walk still starts from every derived web-only root.
+ *
  * **40 -> 39 -> 41, myne-md/myne#911, and 39 lasted one review.** The browser's
  * own `VaultPicker` substitute was deleted (one origin can hold several
  * containers now) and the note that licensed 39 said the shared
@@ -159,7 +168,7 @@ export const SHARED_PRE_UNLOCK_SCREENS = Object.freeze([
  * roots now, which is 39 + 2 = 41, and the picker's `picker.vault-row` testid
  * is asserted by `e2e-web/multi-vault.e2e.ts`.
  */
-const PRE_UNLOCK_FLOOR = 41;
+const PRE_UNLOCK_FLOOR = 24;
 
 export function webModules(dir = WEB_DIR) {
   const out = [];
@@ -442,7 +451,7 @@ export function dynamicDataAttrs(source) {
  * The pre-unlock leak budget's real scope: the screens, plus every module in the
  * SHARED tree they compose, transitively.
  *
- * A screen is not the only file that renders it. `AccountNumberEntry` and
+ * A screen is not the only file that renders it. `PendingApproval` and
  * `WebNoAccount` both render `<CenteredCard>`, which is a shared primitive
  * outside `webModules()` entirely, so an attribute added there landed on both
  * screens with nothing checking it. Following the relative imports is what makes

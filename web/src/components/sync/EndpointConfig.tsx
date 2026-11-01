@@ -50,7 +50,7 @@ export function EndpointConfig() {
   useEffect(() => {
     let cancelled = false;
     // Stored config FIRST, deployment config as the fallback — the same order
-    // `AccountBootstrap` uses, and for the same reason: on this client the
+    // the entry path uses, and for the same reason: on this client the
     // deployment is what fixes the origin (task 50), and the stored copy is a
     // consequence of the join rather than the source of truth.
     //

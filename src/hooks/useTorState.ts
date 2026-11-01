@@ -41,8 +41,8 @@
 //    and every one of those paths re-reads. That is TWO inputs, not one, and
 //    the second was missed when `exempt` was added: the toggle (which calls
 //    `refresh()`) and the sync endpoint (`sync_set_endpoint` /
-//    `sync_join_account`, whose screens call `refreshTorState()` — see
-//    `EndpointConfig.tsx` and `JoinDeviceModal.tsx`). Without that second call
+//    `sync_join_account`, whose screen calls `refreshTorState()`, as does
+//    `EndpointConfig.tsx`. Without that second call
 //    a user who repointed a loopback endpoint at a remote server kept reading
 //    "this address points at this device", with the fail-closed banner
 //    suppressed, until the slow tick came round. The slow tick is a backstop,

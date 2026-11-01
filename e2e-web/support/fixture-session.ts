@@ -114,7 +114,7 @@ export async function openFixtureVault(
     // failed closed — pointing a reader at the wrong arm of the fork.
     const landed = await waitForAnyTestId(
       session,
-      ["editor.bottom-bar", "account-bootstrap.pending-notice", "fail-closed.root"],
+      ["editor.bottom-bar", "pending-approval.pending-notice", "fail-closed.root"],
       UNLOCK_TIMEOUT_MS,
     );
     expect(

@@ -24,7 +24,7 @@
 //    is under test is what `App` does with the answer.
 // 2. That stage must arm an idle auto-lock. It holds an UNLOCKED vault
 //    deliberately (the wait exists so the sync cycle can claim a token, and the
-//    claim needs `root_key`), but it renders `AccountBootstrap`, not `Editor`,
+//    claim needs `root_key`), but it renders `PendingApproval`, not `Editor`,
 //    and on the web client the only idle auto-lock there is lives inside
 //    `Editor`. Without this the transition routes a user to a screen holding
 //    live keys where nothing ever locks them, and the stage has no outbound
@@ -36,7 +36,7 @@
 //
 // # What is stubbed, and why that is not the test stubbing its own subject
 //
-// `Editor` and `AccountBootstrap` are stubs. Neither is the subject: the subject
+// `Editor` and `PendingApproval` are stubs. Neither is the subject: the subject
 // is which one `App` renders and what it arms alongside it. Stubbing `Editor`
 // also removes the only other `useIdleAutoLock` in the tree, so a `lock` IPC
 // observed here can have come from exactly one place.
@@ -71,8 +71,8 @@ vi.mock("../../src/lib/pending-approval", () => ({
 vi.mock("../../src/screens/Editor", () => ({
   Editor: () => <div data-testid="stub.editor" />,
 }));
-vi.mock("../../src/screens/AccountBootstrap", () => ({
-  AccountBootstrap: () => <div data-testid="stub.account-bootstrap" />,
+vi.mock("../../src/screens/PendingApproval", () => ({
+  PendingApproval: () => <div data-testid="stub.pending-approval" />,
 }));
 
 import App from "../../src/App";
@@ -139,7 +139,7 @@ describe("the awaiting-approval verdict, wired through App", () => {
     render(<App />);
 
     expect(
-      await screen.findByTestId("stub.account-bootstrap"),
+      await screen.findByTestId("stub.pending-approval"),
       "the verdict answered yes and App left the editor on it",
     ).toBeTruthy();
     expect(screen.queryByTestId("stub.editor")).toBeNull();
@@ -150,7 +150,7 @@ describe("the awaiting-approval verdict, wired through App", () => {
     verdictMock.mockResolvedValue(true);
 
     render(<App />);
-    await screen.findByTestId("stub.account-bootstrap");
+    await screen.findByTestId("stub.pending-approval");
 
     expect(lockCalls(), "no deadline has passed yet").toBe(0);
     await vi.advanceTimersByTimeAsync((AUTO_LOCK_SECS + 5) * 1000);
@@ -169,7 +169,7 @@ describe("the awaiting-approval verdict, wired through App", () => {
     await screen.findByTestId("stub.editor");
 
     await vi.advanceTimersByTimeAsync((AUTO_LOCK_SECS + 5) * 1000);
-    expect(screen.queryByTestId("stub.account-bootstrap")).toBeNull();
+    expect(screen.queryByTestId("stub.pending-approval")).toBeNull();
     expect(
       lockCalls(),
       "off the pending stage App passes a timeout of 0; the editor owns its own timer, " +

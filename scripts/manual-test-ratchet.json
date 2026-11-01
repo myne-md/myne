@@ -374,7 +374,7 @@
     "clients (+20). The desktop E2E lane runs WebKitGTK on Linux against a stub",
     "model, so neither the real output nor those two renderings is observable in",
     "any lane. The item is standard tier, so gatedMinutes is unchanged.",
-    "CEILING LOWERED 12009 -> 11985 by the account-number join removal (decisions/sync/0765), and it is the one direction this tooling can move by itself. The 24 minutes were the recovery-phrase join item on ios and android (12 each): the phrase door was a credential the join FORM collected, and the form is gone with the account-number model, so a human has nothing to walk. What replaced it is not automation debt but a shorter roster: the surviving wait and compare are the same screen the sync.device-join entry already gates, and its flow-logic scenario (pending-approval.flow.ts) still drives them."
+    "CEILING LOWERED 12009 -> 11985 by the account-number join removal (decisions/sync/0767), and it is the one direction this tooling can move by itself. The 24 minutes were the recovery-phrase join item on ios and android (12 each): the phrase door was a credential the join FORM collected, and the form is gone with the account-number model, so a human has nothing to walk. What replaced it is not automation debt but a shorter roster: the surviving wait and compare are the same screen the sync.device-join entry already gates, and its flow-logic scenario (pending-approval.flow.ts) still drives them."
   ],
   "$comment2": [
     "CEILING RAISED 9822 -> 9846 by myne-md/myne#456, in the sanctioned direction.",

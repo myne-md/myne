@@ -11,7 +11,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { ActionStatus } from "@app/components/ActionStatus";
-import { AccountBootstrap } from "@app/screens/AccountBootstrap";
+import { PendingApproval } from "@app/screens/PendingApproval";
 import { CreateVault } from "@app/screens/CreateVault";
 import { AgentReview } from "@app/screens/AgentReview";
 import {
@@ -69,7 +69,6 @@ import { IdentitySetupDialog } from "@app/components/IdentitySetupDialog";
 import { IdentitySetupPanel } from "@app/components/IdentitySetupPanel";
 import { ImportPlainFileButton } from "@app/components/plain/ImportPlainFileButton";
 import { IntegrityAlertBanner } from "@app/components/sync/IntegrityAlertBanner";
-import { JoinDeviceModal } from "@app/components/sync/JoinDeviceModal";
 import { Keycaps } from "@app/components/primitives/Keycaps";
 import { MemberNameGate } from "@app/components/sync/MemberNameGate";
 import { MemberRosterPanel } from "@app/components/sync/MemberRosterPanel";
@@ -1220,23 +1219,6 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     render: () => <IntegrityAlertBanner present onDismiss={action("onDismiss")} />,
   },
   {
-    id: "components/joindevicemodal/default",
-    group: "components",
-    surface: "JoinDeviceModal",
-    state: "default",
-    description:
-      "The modal for pairing a new device: it runs the join flow and reports back joined, or recovering when a device has to fall back to the phrase.",
-    tags: ["components", "sync", "join", "device", "pairing", "modal"],
-    render: () => (
-      <JoinDeviceModal
-        onCancel={action("onCancel")}
-        onJoined={action("onJoined")}
-        onRecovering={action("onRecovering")}
-        onAccountJoined={action("onAccountJoined")}
-      />
-    ),
-  },
-  {
     id: "components/membernamegate/default",
     group: "components",
     surface: "MemberNameGate",
@@ -2177,15 +2159,15 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
 
   // ── Screens ──────────────────────────────────────────────────────────────
   {
-    id: "components/accountbootstrap/default",
+    id: "components/pendingapproval/default",
     group: "components",
-    surface: "AccountBootstrap",
+    surface: "PendingApproval",
     state: "default",
     description:
-      "The screen serving BOTH the web client's first-run account entry and its pending-approval wait, chosen by the enrolment state. It is the phase-3 bootstrap that turns an empty browser into a device pulling a known account.",
-    tags: ["components", "web", "account-bootstrap", "first-run", "pending-approval", "enrolment"],
+      "The browser's approval wait. A page enrols through an invitation, so landing PENDING is the ordinary path rather than an edge case: the screen names which devices can approve, offers a way back out, and swaps to the eight-character head fingerprint once an approval lets a head be adopted.",
+    tags: ["components", "web", "pending-approval", "wait", "enrolment", "sas", "compare"],
     fixture: "no-vault",
-    render: () => <AccountBootstrap onBootstrapped={action("onBootstrapped")} />,
+    render: () => <PendingApproval onSettled={action("onSettled")} />,
   },
   {
     id: "components/agentreview/default",

@@ -44,19 +44,22 @@
 // ── The web client's new strings, classified ────────────────────────────────
 //
 // Load-bearing (here or in `@myne/copy`):
-//   * `ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE` — shape 1. The web entry
-//     flow checks account number and password against a server-fetched
-//     `vault.meta`; both wrong inputs fail at the same AEAD-open step and must
-//     collapse to one message. The `_NO_PHRASE` sibling exists because the
-//     original names the recovery phrase as a possible cause and web has no
-//     phrase — naming a credential the client cannot accept sends the user
-//     looking for a field that does not exist. Selected by the `phraseRecovery`
-//     CAPABILITY, never by a platform name.
+//   * `ENROLL_NON_DISTINGUISHING_BANNER`: shape 1, and it has no web
+//     renderer any more. The browser's entry flow used to check an account
+//     number and a password against a server-fetched `vault.meta`; both wrong
+//     inputs failed at the same AEAD-open step and collapsed to one message, and
+//     a `_NO_PHRASE` sibling existed because web has no phrase to name. Both the
+//     flow and its form went with the account-number door (`decisions/sync/0767`),
+//     so the sibling's only renderer is gone and its re-export below went with
+//     it. The literal stays in `@myne/copy`: it is a cross-client string with a
+//     decision behind it (`decisions/clients/0364`), and deleting it is that
+//     decision's reversal rather than a tidy-up. The plain banner still renders
+//     on desktop and mobile.
 //   * The four export egress sentences — shape 2, and on web they are the only
 //     disclosure, since a download has no dialog title to carry one.
 //
 // i18n keys (`web.unsupported.*`, `storageLost.*`, `deviceRevoked.*`,
-// `accountBootstrap.*` except the banner):
+// `approvalWait.*` except the banner):
 //   * The unsupported-browser refusal — it NAMES which capability is missing,
 //     so it is deliberately distinguishing; there is nothing to collapse. Its
 //     English rides `defaultValue` from `environment-gate.ts` so an untranslated
@@ -66,10 +69,10 @@
 //     browser's own state, which leak nothing to anyone who does not already
 //     have the browser. Their honesty matters and is reviewed, but a translator
 //     rewording them cannot leak anything.
-//   * `accountBootstrap.accountMismatch` — the one deliberate departure, and it
-//     is recorded next to the rule it departs from: it is a fact about this
-//     browser's own storage, so distinguishing it from a credential failure
-//     tells an attacker nothing they could not learn by opening the browser.
+//   * `approvalWait.*`: the wait and the compare. What it says about the
+//     device (which other devices can approve, that none is left) is a fact
+//     about this browser's own session, so a translator rewording it cannot leak
+//     anything; the SAS itself is generated, never translated.
 
 // The two non-distinguishing banners (§3.4 / §7.3), the irreversibility sentence,
 // the per-note/vault export egress sentences, the clip notice and the
@@ -153,11 +156,6 @@ export {
   REMOVE_DEVICE_DISCLOSURE,
   SYNC_INTEGRITY_ALERT,
   ENROLL_NON_DISTINGUISHING_BANNER,
-  // Its sibling for a client with no phrase credential (task 98). Same
-  // non-distinguishing collapse, one fewer cause named — because naming a
-  // credential the client cannot accept is a lie of capability, and this
-  // constant's whole value is exactness.
-  ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE,
   ENROLL_PENDING_NOTICE,
   ENROLL_APPROVED_NOTICE,
   // Rendered only where `localOnlyVault` is absent (the web client), but it

@@ -15,10 +15,10 @@
 // orchestration: param-less `vault_lock()` → route to the target's unlock
 // screen) and shows the transient "switching…" caption on that row; selecting
 // the active vault is a no-op. A footer routes to vault creation
-// ("Create another vault" → `onCreateAnother` → `editor.create-vault`) and,
-// beside it, to the device-join modal ("Add this device to an account" →
-// `onJoinDevice`, myne#221 — the door that was previously offered on the
-// welcome screen alone, i.e. only while the machine held no vault at all).
+// ("Create another vault" → `onCreateAnother` → `editor.create-vault`). The
+// "Add this device to an account" row that sat beside it is gone: a vault
+// arrives by invitation and the invitations row above is where one is
+// accepted (decisions/sync/0767).
 //
 // The whole switcher hides at ZERO vaults and renders at one (`vaults !== null
 // && ordered.length < 1` in the body), so a single-vault device still has the
@@ -68,18 +68,6 @@ interface VaultSwitcherProps {
    * flow (the same target as the picker's "Create another" affordance).
    */
   onCreateAnother: () => void;
-  /**
-   * Open the device-join modal from the dropdown's "Add this device to an
-   * account" footer (myne#221). App.tsx tears the active vault down first —
-   * flush + `vault_lock()` + `editor.lock` — and opens the modal over the
-   * resulting unlock screen, because the join unlocks a DIFFERENT vault and
-   * SYNC-1 zeroizes this one on the way.
-   *
-   * Optional, and omitted rather than disabled where a client cannot hold a
-   * second vault container (`decisions.md` 2026-07-26). Absence hides this one
-   * row, not the switcher.
-   */
-  onJoinDevice?: () => void;
   /**
    * Unaccepted invitations addressed to this identity (myne-md/myne#911
    * follow-up). Zero renders no row.
@@ -335,7 +323,6 @@ const FOOTER_STYLE: CSSProperties = {
 export function VaultSwitcher({
   onSwitchVault,
   onCreateAnother,
-  onJoinDevice,
   inviteCount = 0,
   invitesUnavailable,
   onInvites,
@@ -818,23 +805,6 @@ export function VaultSwitcher({
             <Icon name="plus" size={16} style={{ flexShrink: 0 }} />
             <span>{t("vaultSwitcher.createAnother")}</span>
           </button>
-
-          {onJoinDevice !== undefined && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                onJoinDevice();
-              }}
-              {...interactiveSurface()}
-              style={FOOTER_STYLE}
-              data-testid="switcher.join-cta"
-            >
-              <Icon name="link" size={16} style={{ flexShrink: 0 }} />
-              <span>{t("vaultSwitcher.joinDevice")}</span>
-            </button>
-          )}
         </div>
       )}
     </div>

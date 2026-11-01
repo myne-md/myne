@@ -854,25 +854,6 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             outcome
         }
 
-        "plugin:vault-unlock|account_number_check" => {
-            use myne_core::plugins::vault_unlock::commands::account_number_is_valid;
-            #[derive(serde::Deserialize)]
-            #[serde(rename_all = "camelCase")]
-            struct Args {
-                account_number: String,
-            }
-            let a: Args = match serde_json::from_value(args) {
-                Ok(a) => a,
-                Err(e) => {
-                    return Outcome::BadArgs {
-                        command: cmd.to_string(),
-                        detail: e.to_string(),
-                    }
-                }
-            };
-            Outcome::ok(&account_number_is_valid(&a.account_number))
-        }
-
         "plugin:vault-unlock|vault_status" => {
             use myne_core::plugins::vault_unlock::commands::vault_status_from_host;
             match vault_status_from_host(host_ctx(), vault_io()).await {
@@ -2420,86 +2401,6 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 Err(e) => Outcome::error(&e),
             }
         }
-
-        // ── sync: first-run bootstrap ───────────────────────────────────────
-        //
-        // Task 85's "log in" leg: point at a server, fetch the account's
-        // `vault.meta` pre-auth, mint the local vault, unlock it, enrol. It is
-        // the LAST precondition for a browser that has never seen this account —
-        // everything else in this plugin assumes a vault already exists.
-        //
-        // Two arguments carry the whole per-client difference. The vault id is
-        // `paths::web_single_vault_id()`, a CONSTANT: a browser holds one vault
-        // per origin, so there is nothing to enumerate, and a constant is what
-        // makes re-running this idempotent by construction ("never mints a
-        // second container") and the `VaultId` stable across reloads. And
-        // `native_tls: false`: a page has no rustls arm, so the join does not
-        // run the host-side handshake probe. This is not "unverified": `fetch`
-        // verifies against the platform trust store, which is what the result
-        // reports as `PinSource::PlatformTrustStore`.
-        "plugin:sync|sync_join_account" => {
-            #[derive(serde::Deserialize)]
-            #[serde(rename_all = "camelCase")]
-            struct Args {
-                server_url: String,
-                account_number: String,
-                password: String,
-            }
-            let a: Args = match serde_json::from_value(args) {
-                Ok(a) => a,
-                Err(e) => {
-                    return Outcome::BadArgs {
-                        command: cmd.to_string(),
-                        detail: e.to_string(),
-                    }
-                }
-            };
-            match myne_core::plugins::sync::enroll::join_account_from_host(
-                host_ctx(),
-                vault_io(),
-                crate::session::state(),
-                myne_core::plugins::sync::enroll::JoinClient {
-                    vault_id: myne_core::paths::web_single_vault_id(),
-                    native_tls: false,
-                },
-                myne_core::plugins::sync::enroll::JoinRequest {
-                    server_url: a.server_url,
-                    account_number: a.account_number,
-                    password: a.password,
-                    // `confirmed_fingerprint: None`, the retired wire field.
-                    // Certificate pinning is gone (decisions/sync/0620) and this
-                    // client never produced a value for it; a web user who wants
-                    // Tor uses Tor Browser (task 12).
-                    confirmed_fingerprint: None,
-                    // Always `Password` here, and not as a default someone
-                    // forgot to widen. The phrase as a device-join credential is
-                    // the capability `phraseEnrolment`, which this client lacks
-                    // on purpose (`web/src/platform/capabilities.ts`): a routine
-                    // phrase prompt in a page is the A18 training. The web door
-                    // is `AccountBootstrap`, which never offers it.
-                    credential_kind: myne_core::plugins::sync::enroll::EnrollCredential::Password,
-                },
-            )
-            .await
-            {
-                Ok(out) => Outcome::ok(&out),
-                Err(e) => Outcome::error(&e),
-            }
-        }
-
-        // ── sync: the quarantine surface ────────────────────────────────────
-        //
-        // `quarantine/` is where `sync-protocol.md` §11.3's "moved aside, never
-        // destroyed" rule lands on disk, and these four are the only way a user
-        // gets a note back out of it. A browser that could not reach them would
-        // drop notes into a directory with no door — which is why they ship
-        // together rather than read-first (task 87).
-        //
-        // The listing needed one seam addition, `VaultIo::stat`: it shows each
-        // entry's size and age, which `std::fs::DirEntry::metadata` gave for
-        // free and the seam's `DirEntry` deliberately does not carry. A listing
-        // is cheap on both arms; a stat is not — OPFS needs a handle per entry —
-        // so the cost sits at the call site, after the name filter.
         "plugin:sync|sync_list_quarantine" => {
             let state = crate::session::state();
             match myne_core::paths::active_vault_root_io_from_host(

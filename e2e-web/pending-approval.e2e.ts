@@ -68,7 +68,7 @@
 // lands needs a server to send one. That half is covered by
 // `tests/lib/pendingApprovalVerdict.test.ts`,
 // `tests/stage/pending-approval-idle-lock.test.tsx` and
-// `tests/screens/account-bootstrap.test.tsx`, and by the manual sign-in walk in
+// `tests/screens/pending-approval.test.tsx`, and by the manual sign-in walk in
 // the issue.
 //
 // # Why the state is seeded rather than enrolled
@@ -147,8 +147,8 @@ async function bootAndLand(
       );
     return {
       passwordForm: await present("unlock.password-input"),
-      pendingNotice: await present("account-bootstrap.pending-notice"),
-      accountEntry: await present("account-entry.input"),
+      pendingNotice: await present("pending-approval.pending-notice"),
+      accountEntry: await present("welcome.root"),
     };
   } finally {
     await browser?.teardown().catch(() => {});
@@ -201,10 +201,10 @@ async function unlockAndLand(
     // vault opened, which points a reader at the wrong arm.
     const landed = await waitForAnyTestId(
       session,
-      ["account-bootstrap.pending-notice", "editor.bottom-bar"],
+      ["pending-approval.pending-notice", "editor.bottom-bar"],
       UNLOCK_TIMEOUT_MS,
     );
-    return landed === "account-bootstrap.pending-notice" ? "wait" : "vault";
+    return landed === "pending-approval.pending-notice" ? "wait" : "vault";
   } finally {
     await browser?.teardown().catch(() => {});
     await server.close();

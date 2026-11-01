@@ -57,7 +57,7 @@ describeE2E("web lane smoke", () => {
         // the first-run identity step. Landing on `unlock` here would mean the
         // profile was not clean — the isolation bug this lane cannot tolerate,
         // and the reason it is asserted rather than assumed.
-        await browser.session.byTestId("account-entry.input", { timeoutMs: 30_000 });
+        await browser.session.byTestId("welcome.root", { timeoutMs: 30_000 });
       } finally {
         await browser.teardown();
       }

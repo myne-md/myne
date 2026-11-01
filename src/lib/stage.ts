@@ -244,7 +244,7 @@ export type Stage =
    * device to approve it** (MYND-635, re-sited by myne-md/myne#535).
    *
    * A stage rather than component state, which was the original fix. It used to
-   * be a `useState(false)` inside `AccountBootstrap`, so a page refresh erased
+   * be a `useState(false)` inside the bootstrap screen, so a page refresh erased
    * it, and the boot probe, which routes on `vault.meta` existence alone, then
    * saw the meta the join had already written and sent the user to `/unlock`.
    * The password worked (the meta is the account's real one), so they landed in
@@ -536,37 +536,12 @@ export type Action =
   | { type: "welcome.invited-start" }
   /** welcome → restore-backup (fresh-install restore, user-guide UX contract). */
   | { type: "welcome.restore-backup" }
-  /**
-   * welcome → editor (MYND-424). "Add this device to an existing account":
-   * `sync_join_account` bootstrapped + UNLOCKED a fresh local vault from the
-   * server's meta, so the device lands straight in the editor (sync pending
-   * until an existing device approves). `vaultId` is the joined vault's id.
-   */
-  | { type: "welcome.join-success"; vaultId?: VaultId }
-  /**
-   * picker → editor (myne#221). The SAME join as `welcome.join-success`, from
-   * the ≥2-vault picker's "add this device to an account" affordance. A second
-   * action rather than one join action legal from several stages, because that
-   * is how this table already models a shared destination — `picker.create-vault`
-   * / `editor.create-vault`, and four separate `*.restore-backup` entries.
-   *
-   * Nothing is unlocked on the picker, so unlike the switcher entry below this
-   * one needs no teardown before the join runs.
-   */
-  | { type: "picker.join-success"; vaultId?: VaultId }
-  /**
-   * unlock → editor (myne#221). The join reached from the EDITOR's account-chip
-   * switcher — which lands here rather than dispatching from `editor` because
-   * the switcher entry tears the active vault down FIRST (`leaveActiveVault` →
-   * `editor.lock`) and opens the modal over the resulting unlock screen.
-   *
-   * That teardown is not tidiness: `sync_join_account` bootstraps AND unlocks a
-   * different vault, and SYNC-1 (`set_unlocked_locking_others`) zeroizes the
-   * previous one. A modal left over a mounted editor would therefore sit on
-   * plaintext whose keys are already gone — for the whole `join.pending` wait,
-   * which lasts until another device approves.
-   */
-  | { type: "unlock.join-success"; vaultId?: VaultId }
+  // `welcome.join-success`, `picker.join-success` and `unlock.join-success`
+  // LEFT this union with `decisions/sync/0767`. Each was the landing of an
+  // account-number join: "bootstrapped and unlocked a fresh vault, so go
+  // straight to the editor". The join that produced them is gone on every
+  // client. A join now enters `pending-approval` instead, which is a stage the
+  // joining device must SEE, not a landing it skips past.
   /** picker → restore-backup ("restore an additional vault", SYNC-5 KeepBoth door). */
   | { type: "picker.restore-backup" }
   /**
@@ -626,10 +601,6 @@ export function transition(prev: Stage, action: Action): Stage {
           return { name: "create-vault", briefing: true };
         case "welcome.restore-backup":
           return { name: "restore-backup", entry: "welcome" };
-        case "welcome.join-success":
-          // Device-join bootstrapped + unlocked a fresh local vault — land in
-          // the editor directly, vault-addressed (MYND-424).
-          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -693,12 +664,6 @@ export function transition(prev: Stage, action: Action): Stage {
           // disagrees with the actual slot at IPC time, the recover
           // screen reducer collapses the mismatch silently per Q4.
           return { name: "recover", subStep: "password-reset" };
-        case "unlock.join-success":
-          // The switcher's join door (myne#221). It routed HERE first — flush +
-          // `vault_lock()` + `editor.lock` — so the join ran with no vault
-          // mounted; now the joined vault is the sole `Unlocked` slot and the
-          // editor entry is vault-addressed, exactly like the welcome path.
-          return { name: "editor", vaultId: action.vaultId };
         case "unlock.back-to-picker":
           // Return to the ≥2-vault picker. Reached only when the unlock was
           // entered via `picker.select-vault` (the back affordance is gated on
@@ -819,11 +784,6 @@ export function transition(prev: Stage, action: Action): Stage {
         case "picker.create-vault":
           // "Create another" affordance → existing vault-creation flow.
           return { name: "create-vault" };
-        case "picker.join-success":
-          // The picker's join door (myne#221) — the same landing as the welcome
-          // one: `sync_join_account` already bootstrapped and unlocked the
-          // vault, so the editor entry is direct and vault-addressed.
-          return { name: "editor", vaultId: action.vaultId };
         default:
           return rejectIllegal(prev, action);
       }
@@ -842,12 +802,24 @@ export function transition(prev: Stage, action: Action): Stage {
       return rejectIllegal(prev, action);
     case "account-entry":
       switch (action.type) {
+        // The three doors the screen renders (decisions/sync/0767). This stage
+        // shows `Welcome` now that the account-number form is gone, so it takes
+        // the welcome screen's actions and lands exactly where they land from
+        // `welcome`: the first run, the invited first run, and the restore flow.
+        // Kept as separate arms rather than reusing `welcome`'s because the two
+        // stages must keep answering independently, because a shared arm would make a
+        // routing change to one silently a change to both.
+        case "welcome.start":
+          return { name: "first-run" };
+        case "welcome.invited-start":
+          return { name: "first-run", after: "identity-home" };
+        case "welcome.restore-backup":
+          return { name: "restore-backup", entry: "welcome" };
         case "create-vault.start":
-          // The one genuine exit (`decisions.md` 2026-08-15): a user with no
-          // account, on a client that can now make one. It is a stage change
-          // rather than a reprobe because nothing about the container has
-          // changed — the user is choosing a different door, not reporting a
-          // new fact about disk.
+          // `decisions.md` 2026-08-15: a user with no account, on a client
+          // that can now make one. It is a stage change rather than a reprobe
+          // because nothing about the container has changed. The user is
+          // choosing a different door, not reporting a new fact about disk.
           //
           // Identity first, then the vault (myne-md/myne#911 task 13). This arm
           // used to return `create-vault` directly, which is what made the
@@ -862,12 +834,10 @@ export function transition(prev: Stage, action: Action): Stage {
           // below), so the safety text is read once, on the vault step.
           return { name: "first-run" };
         default:
-          // Otherwise the same posture as before: a validated account number is
-          // not a stage change, it is the input to the unlock that follows
-          // (task 32's flow), which re-enters through `reprobe()` once the vault
-          // container exists. Modelling an `account-entry.success` action would
-          // put the same fact in two places — the reducer and the screen — and
-          // they would drift.
+          // Otherwise nothing moves. An accepted invitation is not a stage
+          // change either: it materializes and unlocks a member vault, and the
+          // boot probe is what turns that into a stage (`reprobe()`), so the
+          // fact lives on disk rather than in the reducer.
           return rejectIllegal(prev, action);
       }
     case "pending-approval":
@@ -984,9 +954,8 @@ export function initialStageFromProbe(
       // client could not create an account; they stopped being the same question
       // the day it could. What actually decides this arm is whether a vault on
       // this client may be the only copy: where sync is required, the first
-      // question is still which account, and `AccountBootstrap` is what asks it,
-      // now with a "create one" affordance beside the sign-in, since creation
-      // ships here too. Keeping the old `vaultCreation` gate would have routed the
+      // question is still which identity, and the `account-entry` stage is what
+      // asks it. Keeping the old `vaultCreation` gate would have routed the
       // browser to `welcome`, which is substituted out of that bundle and would
       // have rendered a stub as the entry screen.
       return has("localOnlyVault") ? { name: "welcome" } : { name: "account-entry" };
@@ -1126,19 +1095,21 @@ const LEGAL: Record<string, Stage["name"]> = {
   "first-run|create-vault.start": "create-vault",
   // `decisions.md` 2026-08-15, retargeted by myne-md/myne#911 task 13. The web
   // client's entry screen gained a "create an account" affordance, so
-  // `account-entry` has one legal exit that is a real stage change rather than a
-  // reprobe. It now opens the FIRST RUN, not vault creation directly: the
-  // browser's create path is identity first, then the vault, which is the same
-  // one the native clients run. Asked for by capability rather than by client
-  // (`vaultCreation`), so the row stays here beside the other account-entry
-  // rows rather than becoming a shared one.
+  // `account-entry` has legal exits that are real stage changes rather than
+  // reprobes. It opens the FIRST RUN, not vault creation directly: the browser's
+  // create path is identity first, then the vault, which is the same one the
+  // native clients run. Asked for by capability rather than by client
+  // (`vaultCreation`), so the rows stay here beside the other account-entry ones
+  // rather than becoming shared.
+  //
+  // Since `decisions/sync/0767` that stage renders the WELCOME screen, so it
+  // takes the welcome doors as well. Its own `transition` arms landed first
+  // (this file's `account-entry` case); these rows are the table's copy, and
+  // `verifyTransitionTable` is what holds the two together.
   "account-entry|create-vault.start": "first-run",
-  // The third device-join door (MYND-424 welcome; myne#221 picker + switcher).
-  // The other two are shared; this one is keyed on `unlock` because the
-  // switcher entry locks the active vault and routes there before the join
-  // runs, which mobile has no analogue of (it re-addresses the load in place
-  // from `editor`, its own one-row override).
-  "unlock|unlock.join-success": "editor",
+  "account-entry|welcome.start": "first-run",
+  "account-entry|welcome.invited-start": "first-run",
+  "account-entry|welcome.restore-backup": "restore-backup",
   // The self-update flow (myne-md/myne#870). Desktop-only, and the only row
   // here whose destination client cannot reach it at all: `selfUpdate` is
   // absent on web and mobile, so nothing on either client can dispatch it.
@@ -1211,9 +1182,6 @@ const ALL_STAGES_FOR_VERIFICATION: Stage[] = [
 const ALL_ACTIONS_FOR_VERIFICATION: Action[] = [
   { type: "welcome.start" },
   { type: "welcome.invited-start" },
-  { type: "welcome.join-success" },
-  { type: "picker.join-success" },
-  { type: "unlock.join-success" },
   { type: "create-vault.start" },
   { type: "create-vault.commit-success" },
   { type: "create-vault.auto-unlock-success" },
