@@ -229,14 +229,19 @@ pub async fn agent_start<R: Runtime>(
         on_progress,
     )
     .await;
-    tracing::debug!(
+    tracing::info!(
         target: "myne::agent",
         event = "agent_start_returned",
         elapsed_ms = started.elapsed().as_millis() as u64,
-        // A boolean, not the error: `step_failed` one frame in already logs the
-        // `kind`, and repeating it here would be a second place to keep the DENY
-        // list true.
+        // The `kind`, not the error: two variants carry a note id, and the DENY
+        // list is what keeps them out of the log. A start refused on its grant or
+        // its lock fails BEFORE `step`, so `step_failed` one frame in cannot name
+        // it and this line is the only record there is.
         ok = outcome.is_ok(),
+        error_kind = match &outcome {
+            Ok(_) => "none",
+            Err(e) => e.kind(),
+        },
     );
     outcome
 }
@@ -263,51 +268,75 @@ pub async fn agent_approve_scope<R: Runtime>(
     ai: State<'_, LocalInferenceState>,
     hooks: State<'_, myne_core::hooks::Hooks>,
 ) -> Result<AgentStepResult, AgentError> {
-    require_unlocked(&vault).await?;
-    require_ai_enabled(&app, &vault).await?;
-    // Same reason as `agent_start`: the gate is read here, not remembered.
-    ai.refresh().await;
-    let source = HostScopeSource {
-        app: app.clone(),
-        vault: vault.inner(),
-        indices: indices.inner(),
-    };
-    let resolved = expand_run(&runs, &run_id, &grant, GrantOrigin::Model, &source).await?;
-    // The run's OWN flag, not a fresh one seeded from its current value: a copy
-    // is a flag nothing else writes to, and Stop and the lock teardown would
-    // both be inert for this leg.
-    let cancel = runs.cancel_flag(&run_id)?;
-    let tauri_host = myne_core::host::tauri_host::TauriHost::new(app.clone());
-    let memory = MemoryAdapter {
-        host: &tauri_host,
-        state: vault.inner(),
-        hooks: hooks.inner().clone(),
-    };
-    step(
-        app,
-        run_id,
-        Arc::clone(&runs),
-        &sessions,
-        &indices,
-        &vault,
-        // The two seams this client supplies for itself: its own engine, and
-        // a searcher. Desktop's searcher used to query the AI embedding index;
-        // with that index retired it supplies one that finds nothing.
-        &EngineAdapter {
-            state: ai.inner(),
-            cancel: Arc::clone(&cancel),
+    // Everything that can fail BEFORE `step` lives in this block, and `step_failed`
+    // cannot reach any of it: the lock, the AI gate, the grant resolution and the
+    // run's own cancel flag. All four used to leave no trace anywhere, so the
+    // surface's generic "The run stopped before it finished" was the only record
+    // that the approval had been refused.
+    let started = std::time::Instant::now();
+    let outcome: Result<AgentStepResult, AgentError> = async {
+        require_unlocked(&vault).await?;
+        require_ai_enabled(&app, &vault).await?;
+        // Same reason as `agent_start`: the gate is read here, not remembered.
+        ai.refresh().await;
+        let source = HostScopeSource {
+            app: app.clone(),
+            vault: vault.inner(),
+            indices: indices.inner(),
+        };
+        let resolved = expand_run(&runs, &run_id, &grant, GrantOrigin::Model, &source).await?;
+        // The run's OWN flag, not a fresh one seeded from its current value: a copy
+        // is a flag nothing else writes to, and Stop and the lock teardown would
+        // both be inert for this leg.
+        let cancel = runs.cancel_flag(&run_id)?;
+        let tauri_host = myne_core::host::tauri_host::TauriHost::new(app.clone());
+        let memory = MemoryAdapter {
+            host: &tauri_host,
+            state: vault.inner(),
+            hooks: hooks.inner().clone(),
+        };
+        step(
+            app,
+            run_id,
+            Arc::clone(&runs),
+            &sessions,
+            &indices,
+            &vault,
+            // The two seams this client supplies for itself: its own engine, and
+            // a searcher. Desktop's searcher used to query the AI embedding index;
+            // with that index retired it supplies one that finds nothing.
+            &EngineAdapter {
+                state: ai.inner(),
+                cancel: Arc::clone(&cancel),
+            },
+            &NoScopeSearch,
+            // The run's memory store (myne-md/myne#697): the shared
+            // `MemoryAdapter` over this client's host + slot + hooks, so a
+            // `remember` write lands in the vault (and its sync bump fires)
+            // rather than answering "surface unavailable".
+            Some(&memory),
+            cancel,
+            resolved.excluded_count,
+            on_progress,
+        )
+        .await
+    }
+    .await;
+    // `info` because the diagnostic log's file layer starts there, and `kind()`
+    // rather than the error for the reason `step_failed` gives. A failure inside
+    // `step` therefore appears twice with the same tag; the four pre-`step` ones
+    // above appear here only, and had no record at all before this line.
+    tracing::info!(
+        target: "myne::agent",
+        event = "agent_approve_returned",
+        elapsed_ms = started.elapsed().as_millis() as u64,
+        ok = outcome.is_ok(),
+        error_kind = match &outcome {
+            Ok(_) => "none",
+            Err(e) => e.kind(),
         },
-        &NoScopeSearch,
-        // The run's memory store (myne-md/myne#697): the shared
-        // `MemoryAdapter` over this client's host + slot + hooks, so a
-        // `remember` write lands in the vault (and its sync bump fires)
-        // rather than answering "surface unavailable".
-        Some(&memory),
-        cancel,
-        resolved.excluded_count,
-        on_progress,
-    )
-    .await
+    );
+    outcome
 }
 
 /// What a grant would resolve to, without committing it.
