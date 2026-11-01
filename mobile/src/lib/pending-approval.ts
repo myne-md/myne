@@ -64,6 +64,7 @@
 // window is one local read against a network round trip.
 
 import { invoke } from "../platform/core";
+import { clearApprovalWait, isApprovalWait } from "@myne/client-core/approval-wait";
 import { HAS_TAURI } from "./app-window";
 import type { SyncStatus } from "./use-sync-status";
 
@@ -75,8 +76,15 @@ import type { SyncStatus } from "./use-sync-status";
  * wrong `true` sends someone to a wait for an approval they already have, and a
  * wrong `false` leaves them in the editor, where the sync indicator still
  * reports the real state.
+ *
+ * `vaultId` is optional only for the tests that drive the two reads alone; the
+ * shell always passes it. With it, the join's own answer is checked FIRST (see
+ * `@myne/client-core/approval-wait`): a join that came back `pending` wrote that
+ * down, and the derived status below is the read that answered `not_enrolled`
+ * on a device that had just joined, which is how myne-md/myne#535 shipped a fix
+ * that never fired on the phone.
  */
-export async function awaitingApprovalVerdict(): Promise<boolean> {
+export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean> {
   // Browser dev has no IPC at all; every read below would reject and the
   // answer would be `false` anyway. Answered here so the dev console stays
   // quiet rather than logging a verdict read failure on every boot.
@@ -88,7 +96,19 @@ export async function awaitingApprovalVerdict(): Promise<boolean> {
     } catch {
       /* stays null: fail toward showing the compare */
     }
-    if (baseline !== null) return false;
+    if (baseline !== null) {
+      // An approval has been observed: the marker has done its job and would
+      // otherwise send this device to the wait on every later unlock.
+      if (vaultId !== undefined) clearApprovalWait(vaultId);
+      return false;
+    }
+
+    // The join's own answer, checked AFTER the baseline and BEFORE the status.
+    // After the baseline because a non-null head is an observed approval and has
+    // to retire the marker, which it cannot do if the marker answers first; before
+    // the status because the status is the read that answered `not_enrolled` for
+    // a device that had just joined.
+    if (vaultId !== undefined && isApprovalWait(vaultId)) return true;
 
     const status = await invoke<SyncStatus>("plugin:sync|sync_status");
     return status.state !== "not_enrolled" && status.state !== "disabled";

@@ -4973,6 +4973,7 @@
       "serverSection": "Server",
       "serverNotSet": "Not set",
       "statusLabel": "Status",
+      "approvalCode": "This device's approval code",
       "hubHelp": "Sync keeps your notes up to date across devices. Everything is encrypted on this device before it is sent. The server never sees your notes.",
       "connectedTls": "Connected over TLS.",
       "connectedLocal": "Connected on your local network.",

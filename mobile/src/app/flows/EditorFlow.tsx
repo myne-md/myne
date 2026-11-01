@@ -466,7 +466,7 @@ function releasePhotoPreview(url: string | null): void {
   }
 }
 
-export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess }: EditorFlowProps) {
+export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoinAccount, onSwitchVault, onDeleteVaultSuccess, onShowApprovalCode }: EditorFlowProps) {
   const { t } = useTranslation();
   // The authoritative active-vault id for every vault-targeting surface below,
   // mirroring `src/screens/Editor.tsx` since myne-md/myne#476. Prefer the id
@@ -5057,6 +5057,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           }}
           onLock={onLock}
           onDeleteVaultSuccess={onDeleteVaultSuccess}
+          onShowApprovalCode={onShowApprovalCode}
         />
       )}
       {/* SF5 share-import confirmation toast (§9.20, SYNC-18) - self-contained,

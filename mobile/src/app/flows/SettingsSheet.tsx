@@ -1579,9 +1579,13 @@ export interface SettingsSheetProps {
   /** Panel to open on mount. Defaults to `root`. The first-run AI onboarding
    *  opens `ai` directly (myne-md/myne#805). */
   initialPanel?: Panel;
+  /** The Sync panel's manual door onto the approval wait (#535). Passed straight
+   *  through to `SyncHubPanel`; see the prop's own note for why it exists beside
+   *  the automatic route. */
+  onShowApprovalCode?: () => void;
 }
 
-export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel }: SettingsSheetProps) {
+export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel, onShowApprovalCode }: SettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
   const [panel, setPanel] = useState<Panel>(initialPanel ?? "root");
@@ -2867,6 +2871,18 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             onOpenEnroll={() => setPanel("sync-enroll")}
             onOpenDevices={() => setPanel("sync-devices")}
             onOpenMembers={() => setPanel("sync-members")}
+            onShowApprovalCode={
+              onShowApprovalCode === undefined
+                ? undefined
+                : () => {
+                    // The sheet closes FIRST: the wait is a stage, and leaving a
+                    // sheet mounted over a stage change is how a phone ends up
+                    // with a settings panel over a lock screen. `onClose` is the
+                    // sheet's own exit, so the stage sees no stale panel.
+                    onClose();
+                    onShowApprovalCode();
+                  }
+            }
           />
         )}
 

@@ -339,10 +339,14 @@ function App() {
     installCloseInterceptor();
   }, []);
 
+  // Hoisted out of the effect so the dep array can name it: `stage` is a union
+  // and the narrowing the guard performs does not reach the deps expression.
+  const editorVaultId = stage?.name === "editor" ? stage.vaultId : undefined;
+
   useEffect(() => {
     if (stage?.name !== "editor") return;
     let cancelled = false;
-    void awaitingApprovalVerdict().then((awaiting) => {
+    void awaitingApprovalVerdict(editorVaultId).then((awaiting) => {
       if (cancelled || !awaiting) return;
       setStage((prev) =>
         prev?.name === "editor" ? transition(prev, { type: "editor.awaiting-approval" }) : prev,
@@ -351,7 +355,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stage?.name]);
+  }, [stage?.name, editorVaultId]);
 
   // Out-of-band stage reset for fail-closed recovery (Q5β-1
   // belt+suspenders). Bypasses the transition fn intentionally — the

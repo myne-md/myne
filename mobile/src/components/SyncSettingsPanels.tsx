@@ -263,10 +263,20 @@ export interface SyncHubPanelProps {
   onOpenEnroll: () => void;
   onOpenDevices: () => void;
   onOpenMembers: () => void;
+  /** Open the approval wait (and its compare code) for THIS device.
+   *
+   *  The wait screen has two entries and this is the one that cannot be
+   *  starved: the automatic route is a verdict read after unlock, and when that
+   *  read is wrong the device sits in an empty editor with the compare it owes
+   *  unreachable, which is the shape myne-md/myne#535 shipped and the phone
+   *  still showed. A row behind the status is a door that exists whatever the
+   *  verdict answers. Optional so a caller with no vault in scope renders none.
+   */
+  onShowApprovalCode?: () => void;
 }
 
 /** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
-export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers }: SyncHubPanelProps) {
+export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers, onShowApprovalCode }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
@@ -334,6 +344,20 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
             <span style={{ fontSize: 15 }}>{view.label}</span>
           </div>
         </Row>
+        {onShowApprovalCode !== undefined && status !== null && status.state !== "disabled" && (
+          // The manual door onto the approval wait (#535). Gated on "a server is
+          // configured", read from the STATUS this panel already renders and
+          // deliberately NOT on a finer state: a device whose status reads
+          // `not_enrolled` because its enrolment record could not be read is
+          // exactly the device that needs this row, so gating it on the very
+          // read that fails would hide the door from the only user who needs
+          // it. An approved device that taps it sees its own compare code and
+          // can leave, which is the same screen a pending one sees.
+          <Row onClick={onShowApprovalCode} testId="sync.settings.approval-code">
+            <span style={{ ...rowLabel, color: "var(--accent)" }}>{t("sync.settings.approvalCode")}</span>
+            <RowChevron />
+          </Row>
+        )}
         {canSyncNow && (
           // Force sync (MYND-481). The outcome surfaces in the status row above
           // (Synced / Offline / N conflicts) + the SyncBanners error channel —
