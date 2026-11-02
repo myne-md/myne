@@ -1148,6 +1148,50 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/devicemanagementpanel/unnamed-row",
+    group: "components",
+    surface: "DeviceManagementPanel",
+    state: "unnamed-row",
+    description:
+      "Two approved devices that carry no stored name, which is the roster a device sees before MYND-548 named anything, plus one device still awaiting approval. An unnamed row leads with the id-derived label, so its demoted code line would print the same six characters twice; the pending row never carries a name at all (SYNC-40).",
+    tags: ["components", "devicemanagementpanel", "unnamed"],
+    render: () => (
+      <DeviceManagementPanel
+        hook={{
+          devices: [
+            {
+              device_id_hex: "eda5561f0c4b4e0a9d3f2b7c8e1a5d60",
+              approved: true,
+              retired: false,
+              is_current: true,
+            },
+            {
+              device_id_hex: "3f9ac2b7e5d14a8cbb02ef61a7c9d4b3",
+              approved: true,
+              retired: false,
+              is_current: false,
+            },
+          ],
+          pending: [
+            {
+              device_id_hex: "77c1de40a9b34f1e8c2d5a6b9e0f3c7d",
+              approved: false,
+              retired: false,
+              is_current: false,
+            },
+          ],
+          error: null,
+          busy: false,
+          refresh: asyncNoop,
+          approve: async () => true,
+          remove: asyncNoop,
+          resetLocal: asyncNoop,
+        }}
+        plane="owner"
+      />
+    ),
+  },
+  {
     id: "components/devicemanagementpanel/member-vault",
     group: "components",
     surface: "DeviceManagementPanel",

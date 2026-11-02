@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਰੀਸੈੱਟ ਕਰਕੇ ਦੁਬਾਰਾ ਜੋੜੋ",
       "resetSyncOnThisDevice": "ਇਸ ਡਿਵਾਈਸ ਉੱਤੇ ਸਿੰਕ ਰੀਸੈੱਟ ਕਰੋ",
       "shortName": "ਡਿਵਾਈਸ {{hex}}",
-      "syncedHere": "ਇੱਥੇ ਸਿੰਕ ਹੋਇਆ",
       "thisDevice": "ਇਹ ਡਿਵਾਈਸ",
       "reasonUnreachable": "ਸਰਵਰ ਨੇ ਜਵਾਬ ਨਹੀਂ ਦਿੱਤਾ",
       "reasonUnexpected": "ਇੱਕ ਅਣਕਿਆਸੀ ਗ਼ਲਤੀ",
@@ -4834,8 +4833,7 @@
       "transportError": "ਸਿੰਕ ਸਰਵਰ ਤੱਕ ਪਹੁੰਚ ਨਹੀਂ ਹੋਈ। ਸਰਵਰ ਪਤਾ ਅਤੇ ਉਸਦਾ HTTPS ਸਰਟੀਫਿਕੇਟ ਜਾਂਚੋ।",
       "retiredSelf": "ਇਸ ਡਿਵਾਈਸ ਨੂੰ ਕਿਸੇ ਹੋਰ ਡਿਵਾਈਸ ਤੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਸੀ।",
       "resetAndAddAgain": "ਰੀਸੈੱਟ ਕਰਕੇ ਦੁਬਾਰਾ ਜੋੜੋ",
-      "noDevices": "ਹਾਲੇ ਕੋਈ ਡਿਵਾਈਸ ਨਹੀਂ।",
-      "syncingHere": "ਇੱਥੇ ਸਿੰਕ ਹੋ ਰਿਹਾ ਹੈ"
+      "noDevices": "ਹਾਲੇ ਕੋਈ ਡਿਵਾਈਸ ਨਹੀਂ।"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} ਟਕਰਾਅ ਵੇਖਣ ਦੀ ਲੋੜ ਹੈ",

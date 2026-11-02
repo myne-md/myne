@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "このデバイスをリセットして再追加",
       "resetSyncOnThisDevice": "このデバイスの同期をリセット",
       "shortName": "デバイス{{hex}}",
-      "syncedHere": "ここで同期済み",
       "thisDevice": "このデバイス",
       "reasonUnreachable": "サーバーが応答しませんでした",
       "reasonUnexpected": "予期しないエラー",
@@ -4834,8 +4833,7 @@
       "transportError": "同期サーバーに接続できませんでした。サーバーアドレスとそのHTTPS証明書を確認してください。",
       "retiredSelf": "このデバイスは別のデバイスから削除されました。",
       "resetAndAddAgain": "リセットして再追加",
-      "noDevices": "デバイスはまだありません。",
-      "syncingHere": "このデバイスで同期中"
+      "noDevices": "デバイスはまだありません。"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}}件の競合の確認が必要です",

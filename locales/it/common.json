@@ -4706,7 +4706,6 @@
       "resetAndReAdd": "Reimposta e aggiungi di nuovo questo dispositivo",
       "resetSyncOnThisDevice": "Reimposta la sincronizzazione su questo dispositivo",
       "shortName": "Dispositivo {{hex}}",
-      "syncedHere": "Sincronizzato qui",
       "thisDevice": "Questo dispositivo",
       "reasonUnreachable": "il server non ha risposto",
       "reasonUnexpected": "un errore imprevisto",
@@ -4976,8 +4975,7 @@
       "transportError": "Impossibile raggiungere il server di sincronizzazione. Controlla l'indirizzo del server e il suo certificato HTTPS.",
       "retiredSelf": "Questo dispositivo è stato rimosso da un altro dispositivo.",
       "resetAndAddAgain": "Reimposta e aggiungi di nuovo",
-      "noDevices": "Ancora nessun dispositivo.",
-      "syncingHere": "Sincronizzazione qui"
+      "noDevices": "Ancora nessun dispositivo."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflitto richiede revisione",

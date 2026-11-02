@@ -208,8 +208,10 @@ describe("DeviceManagementPanel — a member vault", () => {
     await waitFor(() =>
       expect(screen.getAllByTestId("sync.device-row")).toHaveLength(2),
     );
-    // The other device is listed…
-    expect(screen.getAllByTestId("sync.device-code").length).toBe(2);
+    // The other device is listed… and NO code lines: neither row has a stored
+    // name, so each title IS its code and the demoted line would print the same
+    // six characters twice (myne-md/myne#973).
+    expect(screen.queryAllByTestId("sync.device-code")).toHaveLength(0);
     // …and it carries the verify affordance but no Remove, on either row.
     expect(screen.getAllByTestId("sync.verify-device")).toHaveLength(1);
     expect(screen.queryByTestId("sync.remove-device")).toBeNull();
@@ -259,12 +261,18 @@ describe("DeviceManagementPanel — SAS verify polling", () => {
     { device_id_hex: "cc22", approved: false, retired: false, is_current: false },
   ];
 
-  /** Roster + prefs, with `sync_head_fingerprint` driven by `fingerprints`. */
+  /** Roster + prefs, with `sync_head_fingerprint` driven by `fingerprints`.
+   *
+   *  The current row is NAMED here on purpose: an unnamed one makes the panel's
+   *  self-naming probe read `sync_head_fingerprint` once, which consumes an entry
+   *  of the queue this test is holding for the SAS poller. The assertion then
+   *  fails against the wrong fingerprint, blaming the poller for a read it never
+   *  made (myne-md/myne#973). */
   function mountWith(fingerprints: (string | null)[]) {
     const queue = [...fingerprints];
     invokeMock.mockImplementation(async (cmd: string) => {
       if (cmd === "plugin:sync|sync_list_devices") return ROSTER;
-      if (cmd === "plugin:prefs|prefs_read") return PREFS_STUB;
+      if (cmd === "plugin:prefs|prefs_read") return { device_names: { aa00: "Studio Mac" } };
       if (cmd === "plugin:sync|sync_head_fingerprint") {
         return queue.length > 1 ? queue.shift()! : (queue[0] ?? null);
       }

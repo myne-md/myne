@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Weka upya na uongeze kifaa hiki tena",
       "resetSyncOnThisDevice": "Weka upya usawazishaji kwenye kifaa hiki",
       "shortName": "Kifaa {{hex}}",
-      "syncedHere": "Kimesawazishwa hapa",
       "thisDevice": "Kifaa hiki",
       "reasonUnreachable": "seva haikujibu",
       "reasonUnexpected": "hitilafu isiyotarajiwa",
@@ -4834,8 +4833,7 @@
       "transportError": "Imeshindwa kufikia seva ya usawazishaji. Kagua anwani ya seva na cheti chake cha HTTPS.",
       "retiredSelf": "Kifaa hiki kimeondolewa kupitia kifaa kingine.",
       "resetAndAddAgain": "Weka upya na uongeze tena",
-      "noDevices": "Hakuna vifaa bado.",
-      "syncingHere": "Inasawazisha hapa"
+      "noDevices": "Hakuna vifaa bado."
     },
     "banner": {
       "conflictsNeedReview_one": "Mgongano {{count}} unahitaji kupitiwa",

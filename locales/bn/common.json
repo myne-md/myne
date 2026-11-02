@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "এই ডিভাইসটি রিসেট করে আবার যোগ করুন",
       "resetSyncOnThisDevice": "এই ডিভাইসে সিঙ্ক রিসেট করুন",
       "shortName": "ডিভাইস {{hex}}",
-      "syncedHere": "এখানে সিঙ্ক হয়েছে",
       "thisDevice": "এই ডিভাইস",
       "reasonUnreachable": "সার্ভার উত্তর দেয়নি",
       "reasonUnexpected": "অপ্রত্যাশিত একটি সমস্যা",
@@ -4834,8 +4833,7 @@
       "transportError": "সিঙ্ক সার্ভারে পৌঁছানো যায়নি। সার্ভারের ঠিকানা ও তার HTTPS সার্টিফিকেট দেখে নিন।",
       "retiredSelf": "অন্য একটি ডিভাইস থেকে এই ডিভাইসটি সরানো হয়েছে।",
       "resetAndAddAgain": "রিসেট করে আবার যোগ করুন",
-      "noDevices": "এখনও কোনও ডিভাইস নেই।",
-      "syncingHere": "এখানে সিঙ্ক হচ্ছে"
+      "noDevices": "এখনও কোনও ডিভাইস নেই।"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}}টি দ্বন্দ্ব দেখা দরকার",

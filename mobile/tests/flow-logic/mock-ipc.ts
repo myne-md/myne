@@ -2105,9 +2105,15 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       },
       // MYND-548 device naming. The setter mirrors the real one's contract: a
       // blank name is refused (no write), so an empty submit cannot blank a row.
+      // Every CALL is recorded as well, because "the row still shows the hex" is
+      // true whether or not a write happened (a pending row renders the fallback
+      // regardless), so a test about NOT naming needs the call itself
+      // (myne-md/myne#973).
       "plugin:prefs|set_device_name": (args) => {
         const id = args.deviceIdHex as string;
         const name = (args.name as string).trim();
+        const w = window as unknown as { __deviceNameWrites?: { id: string; name: string }[] };
+        (w.__deviceNameWrites ??= []).push({ id, name });
         if (name !== "") deviceNames[id] = name;
         return null;
       },

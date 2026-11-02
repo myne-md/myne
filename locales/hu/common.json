@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Az eszköz visszaállítása és újbóli hozzáadása",
       "resetSyncOnThisDevice": "Szinkronizálás visszaállítása ezen az eszközön",
       "shortName": "{{hex}} eszköz",
-      "syncedHere": "Itt szinkronizálva",
       "thisDevice": "Ez az eszköz",
       "reasonUnreachable": "a szerver nem válaszolt",
       "reasonUnexpected": "váratlan hiba",
@@ -4834,8 +4833,7 @@
       "transportError": "Nem sikerült elérni a szinkronszervert. Ellenőrizd a szerver címét és az HTTPS-tanúsítványát.",
       "retiredSelf": "Ezt az eszközt egy másik eszközről távolították el.",
       "resetAndAddAgain": "Visszaállítás és újbóli hozzáadás",
-      "noDevices": "Még nincsenek eszközök.",
-      "syncingHere": "Itt szinkronizál"
+      "noDevices": "Még nincsenek eszközök."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} ütközés áttekintésre vár",
