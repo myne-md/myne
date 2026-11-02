@@ -35,13 +35,13 @@
 # lists, so `makepkg` refuses a substituted download instead of trusting the
 # transport. Update it in the same edit as `pkgver`, never separately.
 #
-# Bumped to 0.11.3 on 2026-11-01. The hash is the v0.11.3 amd64 `.deb`
-# (`Myne_0.11.3_amd64.deb`, 156 MiB, built on the VPS from the pinned tag); the
-# source URL resolves once Phase H publishes `downloads.myne.md/releases/v0.11.3/`.
+# Bumped to 0.11.4 on 2026-11-02. The hash is the v0.11.4 amd64 `.deb`
+# (`Myne_0.11.4_amd64.deb`, 157 MiB, built on the VPS from the pinned tag); the
+# source URL resolves once the origin publishes `downloads.myne.md/releases/v0.11.4/`.
 
 pkgname=myne-bin
 _appname=myne
-pkgver=0.11.3
+pkgver=0.11.4
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search (binary release)"
 arch=('x86_64' 'aarch64')
@@ -56,9 +56,9 @@ options=('!strip')
 # architecture and the two are not interchangeable: the app carries native
 # sidecars and a 640 MiB model payload.
 source_x86_64=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_amd64.deb")
-sha256sums_x86_64=('9402980eddc198559bc14390b2fb80841b1a44a3804878bf9da8ddf6b853aaff')
+sha256sums_x86_64=('4886be998f931907f955e9b2a6b003cc4ee88a3770cb30215a37d2a7b226101e')
 source_aarch64=("https://downloads.myne.md/releases/v${pkgver}/Myne_${pkgver}_arm64.deb")
-sha256sums_aarch64=('428f5fdeae441b8939b67c66a8e9812b18c1bfe15d184b2e1fcf2fdbcf607aae')
+sha256sums_aarch64=('deb62492afabeaa9d2018137649c8fba5aa24a8ee3ddab90d243fef5561f2a88')
 # makepkg would otherwise try to unpack the .deb into $srcdir as a source
 # archive. package() reads it directly instead, so the outer `ar` container and
 # the inner data tarball stay paired.
