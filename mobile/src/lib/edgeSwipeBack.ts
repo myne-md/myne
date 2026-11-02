@@ -5,7 +5,7 @@
 // Every pushed surface on this client had exactly one way out: a small "‹ Notes"
 // control at the top left. On a phone held one-handed, that corner is the
 // hardest pixel on the screen to reach, and the gesture every user already
-// performs — drag in from the left edge — did nothing at all. iOS ships the
+// performs (drag in from the left edge) did nothing at all. iOS ships the
 // gesture at the OS level for a navigation controller and Android has its own
 // system back gesture; a WebView app gets neither for free, which is why this is
 // the client's own code rather than a platform behaviour.
@@ -50,7 +50,7 @@ export interface EdgeSwipeHandlers {
 
 /**
  * Wire an edge swipe to `onBack`. Spread the result on the surface the gesture
- * belongs to — the pane, not the document, so a swipe inside a sheet or a modal
+ * belongs to: the pane, not the document, so a swipe inside a sheet or a modal
  * cannot close the screen behind it.
  *
  * `onBack` may change between renders (it closes over the current view); the

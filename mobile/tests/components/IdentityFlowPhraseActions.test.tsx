@@ -5,7 +5,7 @@
 // The screen said "write these 24 words down and keep them safe" and offered no
 // way to move the words off the screen. Every other secret-bearing surface in the
 // app does (`CreateVaultFlow`'s kit), and the gap is what pushes people to
-// screenshot a phrase — the thing `screen_guard` exists to prevent. So what this
+// screenshot a phrase, the thing `screen_guard` exists to prevent. So what this
 // spec pins is the pair of actions, what they hand over, and the one thing that
 // must NOT happen: a Copy button on a device whose clipboard cannot hold a secret.
 //
@@ -145,6 +145,37 @@ describe("IdentityFlow phrase actions (myne-md/myne#970 item 20)", () => {
     expect(
       await screen.findByText("createVault.savedToShareSheet"),
     ).toBeTruthy();
+  });
+
+  it("reports a failed save even after a copy has already succeeded", async () => {
+    // One status line under two buttons. With a separate message state per
+    // action the render had to pick a winner, and a successful copy permanently
+    // hid a later save failure: the user read a stale "Copied" while the phrase
+    // file was never written (myne-md/myne#972 review, D9). Reverting to two
+    // states reddens this test, which is the only thing that can tell the two
+    // designs apart.
+    await revealPhrase();
+
+    // The shared mock answers `null` and never fires the callback; this test
+    // needs the success sentence on screen, so it runs the hook the real
+    // transport runs.
+    copySecretToClipboard.mockImplementationOnce(
+      async (_text: string, hooks: { onSuccess: { run: () => void } }) => {
+        hooks.onSuccess.run();
+        return null;
+      },
+    );
+    fireEvent.click(await screen.findByTestId("identity-flow.phrase-copy"));
+    await waitFor(() => expect(copySecretToClipboard).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText("createVault.phraseCopied")).toBeTruthy();
+
+    // The callee answers `null` for every failure rather than rejecting, which is
+    // what `secretSaveMessage` maps to the error sentence.
+    saveSecretToDocuments.mockResolvedValueOnce(null);
+    fireEvent.click(await screen.findByTestId("identity-flow.phrase-save"));
+
+    expect(await screen.findByText("createVault.saveFileError")).toBeTruthy();
+    expect(screen.queryByText("createVault.phraseCopied")).toBeNull();
   });
 
   it("hides Copy where the OS cannot hold a secret on the clipboard", async () => {

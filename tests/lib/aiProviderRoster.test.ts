@@ -4,15 +4,15 @@
 // `ai_provider` is a CLOSED enum in `docs/spec/protocol.md` §9.5.2, and growing
 // it means editing the same four names in four files:
 //
-//   1. `core/src/plugins/prefs/commands.rs` — `KNOWN_AI_PROVIDERS`, the only
+//   1. `core/src/plugins/prefs/commands.rs`: `KNOWN_AI_PROVIDERS`, the only
 //      copy that VALIDATES a write, and the reference the host table is already
 //      tested against (`provider_transport.rs`, `the_host_table_and_the_accepted
 //      _provider_names_agree`).
-//   2. `src/components/settings/AiPanel.tsx` — `REMOTE_PROVIDERS`, the desktop
+//   2. `src/components/settings/AiPanel.tsx`: `REMOTE_PROVIDERS`, the desktop
 //      consent picker.
-//   3. `mobile/src/app/flows/SettingsSheet.tsx` — `KNOWN_PROVIDERS`, the mobile
+//   3. `mobile/src/app/flows/SettingsSheet.tsx`: `KNOWN_PROVIDERS`, the mobile
 //      picker and the root row's label lookup.
-//   4. `myne-test-vectors` — the schema enum and a vector pair (a separate repo,
+//   4. `myne-test-vectors`: the schema enum and a vector pair (a separate repo,
 //      held by that repo's own `check` and by the byte-level vector runner).
 //
 // Only the Rust pair was checked. A client list that omits a name the host

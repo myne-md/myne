@@ -436,7 +436,7 @@ pub async fn list_provider_models<R: Runtime>(
     // satisfy every assertion about the RESULT while still having sent a byte.
     super::provider_registry::list_models_gated(&prefs, |provider, key| {
         let transport = super::provider_transport::ProviderTransport::new(provider.host());
-        transport.get_json(provider.models_path(), key, &provider.extra_headers())
+        transport.get_json(provider, key)
     })
     .await
 }

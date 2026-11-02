@@ -57,6 +57,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::cancellable_io::{CancellableStream, CancelledFn, POLL_INTERVAL};
+use super::provider_registry::RemoteProvider;
 use crate::http::codec::{build_http_request_ext, read_http_response};
 use crate::http::HttpMethod;
 use rustls::pki_types::ServerName;
@@ -400,12 +401,11 @@ impl ProviderTransport {
     /// **never** logged, echoed into an error, or retained past this call.
     pub fn post_json(
         &self,
-        path: &str,
+        provider: RemoteProvider,
         body: &[u8],
         bearer: &str,
-        extra_headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Post, path, body, bearer, extra_headers)
+        self.exchange(HttpMethod::Post, provider, body, bearer)
     }
 
     /// The read-side round trip — today exactly one caller, the model list
@@ -420,11 +420,10 @@ impl ProviderTransport {
     /// that says "post".
     pub fn get_json(
         &self,
-        path: &str,
+        provider: RemoteProvider,
         bearer: &str,
-        extra_headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Get, path, &[], bearer, extra_headers)
+        self.exchange(HttpMethod::Get, provider, &[], bearer)
     }
 
     /// Distinguish "the user stood this down" from "the far side broke". The
@@ -470,23 +469,50 @@ impl ProviderTransport {
         headers
     }
 
+    /// The request head, byte for byte: `content-type` first, then whatever
+    /// the provider asked for.
+    ///
+    /// **The provider is the argument rather than a header slice**, and that is
+    /// the point of the signature (myne-md/myne#972 review, D7). With a slice,
+    /// `exchange` and its callers were two places the headers could be dropped
+    /// independently: a caller passing `&[]`, or the assembly forgetting the
+    /// `extend_from_slice`, each left every test green while every OpenCode Go
+    /// request was refused by the far side for a missing `x-opencode-session`.
+    /// Taking `RemoteProvider` removes the caller half of that class by type:
+    /// there is no way to name a provider and still send it without its
+    /// headers. The remaining half is the test below.
+    fn request_head(
+        &self,
+        method: HttpMethod,
+        provider: RemoteProvider,
+        body: &[u8],
+        bearer: &str,
+    ) -> Vec<u8> {
+        let headers = Self::request_headers(&provider.extra_headers());
+        // The path follows the verb because the provider owns both: a POST is a
+        // chat turn and a GET is the model list (SYNC-24). Neither is read from
+        // configuration, for the same reason the host is not.
+        let path = match method {
+            HttpMethod::Post => provider.chat_path(),
+            HttpMethod::Get => provider.models_path(),
+            // Unreachable from this crate: `post_json` and `get_json` are the
+            // only callers and each names its own verb. The arms exist because
+            // `HttpMethod` is shared with the sync transport, and mapping them
+            // to the chat path keeps a hypothetical third caller inside the
+            // header set rather than silently outside it.
+            HttpMethod::Put | HttpMethod::Head | HttpMethod::Delete => provider.chat_path(),
+        };
+        build_http_request_ext(method, path, self.host.host(), &headers, body, Some(bearer))
+    }
+
     fn exchange(
         &self,
         method: HttpMethod,
-        path: &str,
+        provider: RemoteProvider,
         body: &[u8],
         bearer: &str,
-        extra_headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        // `content-type` first, then the provider's own. The extra set is
-        // supplied by `RemoteProvider::extra_headers`, which is the only place
-        // that knows a far side needs one (OpenCode Go refuses a request
-        // without `x-opencode-session`); nothing here is read from
-        // configuration, so a header name cannot be chosen by data any more
-        // than the host can.
-        let headers = Self::request_headers(extra_headers);
-        let req =
-            build_http_request_ext(method, path, self.host.host(), &headers, body, Some(bearer));
+        let req = self.request_head(method, provider, body, bearer);
         // **How long the exchange took and how it ended** (myne-md/myne#546).
         // Without it, a request that is still in flight and a request that
         // completed are the same observation from outside the process: an
@@ -584,28 +610,32 @@ mod tests {
     /// The provider's own headers reach the request BYTES, not just the list
     /// `RemoteProvider::extra_headers()` returns.
     ///
-    /// Asserted through the same two things `exchange` uses: `request_headers`
-    /// and the codec that serializes a head. Deleting the `extend_from_slice`
-    /// in `request_headers` leaves `extra_headers()` unchanged, so a test that
-    /// stopped there would stay green while every OpenCode Go request was
-    /// refused for a missing `x-opencode-session`.
+    /// Asserted through [`ProviderTransport::request_head`], which is the exact
+    /// function `exchange` sends: the same call, not a reconstruction of it.
+    /// This is the guard the first version of this test was not (myne-md/myne#972
+    /// review, D7): it called `request_headers` and the head codec side by side,
+    /// so replacing the assembly with `Self::request_headers(&[])` left the
+    /// whole `remote-ai` suite green while every OpenCode Go request would have
+    /// been refused for a missing `x-opencode-session`.
+    ///
+    /// Two injections prove this one fails on the defect it names. Dropping the
+    /// `extend_from_slice` in `request_headers` reddens it, and so does
+    /// hardcoding `&[]` at the call below inside `request_head`. The third path,
+    /// a caller passing an empty slice, no longer exists: `post_json` and
+    /// `get_json` take a `RemoteProvider` rather than a header slice, so there is
+    /// nothing for a caller to leave out.
     #[test]
     fn the_providers_headers_reach_the_request_head() {
         let body = b"{}";
-        let head_for = |provider: crate::inference::provider_registry::RemoteProvider| {
-            let headers = ProviderTransport::request_headers(&provider.extra_headers());
-            let head = build_http_request_ext(
-                HttpMethod::Post,
-                provider.chat_path(),
-                provider.host().host(),
-                &headers,
-                body,
-                Some("k"),
+        let head_for = |provider: RemoteProvider| {
+            let transport = ProviderTransport::new(
+                ProviderHost::resolve(provider.wire_name()).expect("a known provider"),
             );
+            let head = transport.request_head(HttpMethod::Post, provider, body, "k");
             String::from_utf8(head).expect("a request head is ASCII")
         };
 
-        let go = head_for(crate::inference::provider_registry::RemoteProvider::OpenCodeGo);
+        let go = head_for(RemoteProvider::OpenCodeGo);
         assert!(
             go.to_ascii_lowercase().contains("x-opencode-session: myne"),
             "Go's session header must be on the wire; head was:\n{go}"
@@ -622,10 +652,49 @@ mod tests {
 
         // And a provider that needs nothing extra sends nothing extra: the
         // negative half, which is what makes the positive half mean something.
-        let cloud = head_for(crate::inference::provider_registry::RemoteProvider::OllamaCloud);
+        let cloud = head_for(RemoteProvider::OllamaCloud);
         let lower = cloud.to_ascii_lowercase();
         assert!(!lower.contains("x-opencode-session"));
         assert!(!lower.contains("user-agent"));
+    }
+
+    /// The head is built from the PROVIDER, so the path follows the verb: a POST
+    /// is a chat turn and a GET is the model list. Asserted rather than implied,
+    /// because the two-verb split is the reason the path is chosen inside the
+    /// assembly instead of being passed in by a caller.
+    #[test]
+    fn the_request_path_follows_the_verb_and_the_provider() {
+        let transport = ProviderTransport::new(
+            ProviderHost::resolve(RemoteProvider::OpenCodeZen.wire_name()).expect("known"),
+        );
+        let post = String::from_utf8(transport.request_head(
+            HttpMethod::Post,
+            RemoteProvider::OpenCodeZen,
+            b"{}",
+            "k",
+        ))
+        .expect("a request head is ASCII");
+        let get = String::from_utf8(transport.request_head(
+            HttpMethod::Get,
+            RemoteProvider::OpenCodeZen,
+            &[],
+            "k",
+        ))
+        .expect("a request head is ASCII");
+        assert!(
+            post.starts_with(&format!(
+                "POST {} HTTP/1.1",
+                RemoteProvider::OpenCodeZen.chat_path()
+            )),
+            "a POST must reach the chat path; head was:\n{post}"
+        );
+        assert!(
+            get.starts_with(&format!(
+                "GET {} HTTP/1.1",
+                RemoteProvider::OpenCodeZen.models_path()
+            )),
+            "a GET must reach the models path; head was:\n{get}"
+        );
     }
 
     /// A provider that accepts and then never answers must fail **within the

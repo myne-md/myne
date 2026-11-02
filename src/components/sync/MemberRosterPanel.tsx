@@ -180,7 +180,12 @@ export function MemberRosterPanel({
     const fingerprint = row.person_fingerprint_hex.toLowerCase();
     devicesPerPerson.set(fingerprint, (devicesPerPerson.get(fingerprint) ?? 0) + 1);
   }
-  const unverifiedClaims = claims.view?.unverified_device_ids.length ?? 0;
+  // `?.length` rather than `.length`: the view arrives over IPC, and a shape
+  // mismatch there must not take the whole Settings surface down with it. This
+  // is not hypothetical, it is what the story host's benign `[]` default did to
+  // this render (myne-md/myne#972 review, D9), and the same one-line shape
+  // appears at every other read below.
+  const unverifiedClaims = claims.view?.unverified_device_ids?.length ?? 0;
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
   // vault (myne-md/myne#783). The migration is permanent, so it is an explicit

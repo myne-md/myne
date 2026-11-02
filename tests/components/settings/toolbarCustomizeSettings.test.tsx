@@ -177,6 +177,45 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     expect(setEditorToolbarHidden.mock.calls[0]![0]).toContain(allShown[0]);
   });
 
+  it("will not write the empty sentinel when the last hidden control is shown", async () => {
+    // The mirror of the rule above, and the half that was missing (myne-md/myne#972
+    // review, D8). `resolveToolbarHidden` reads `[]` as "never customized", so
+    // un-hiding the only hidden control would persist `[]` and the user's whole
+    // layout would silently revert to the default set on the next read. Hide is
+    // bounded by `shownCount`; un-hide has to be bounded too, or the guard only
+    // covers one direction.
+    const allShown = EDITOR_TOOLBAR_ITEMS.map((i) => i.id);
+    const hiddenId = allShown[0]!;
+    const rows = await renderToolbar({ hidden: [hiddenId] });
+    const hiddenRow = rows.find((r) => r.getAttribute("data-item-id") === hiddenId)!;
+    const toggle = hiddenRow.querySelector<HTMLInputElement>(
+      '[data-testid="settings.toolbar-customize.toggle"]',
+    )!;
+    expect(toggle.checked).toBe(false);
+    expect(hiddenRow.textContent ?? "").toContain("Keep at least one hidden");
+    act(() => {
+      fireEvent.click(toggle);
+    });
+    expect(setEditorToolbarHidden).not.toHaveBeenCalled();
+
+    // And with two hidden, the same click DOES write, so the assertion above is
+    // about "last hidden" rather than about the toggle being inert.
+    cleanup();
+    setEditorToolbarHidden.mockClear();
+    const two = await renderToolbar({ hidden: allShown.slice(0, 2) });
+    const firstHidden = two.find((r) => r.getAttribute("data-item-id") === hiddenId)!;
+    expect(firstHidden.textContent ?? "").not.toContain("Keep at least one hidden");
+    act(() => {
+      fireEvent.click(
+        firstHidden.querySelector<HTMLInputElement>(
+          '[data-testid="settings.toolbar-customize.toggle"]',
+        )!,
+      );
+    });
+    await waitFor(() => expect(setEditorToolbarHidden).toHaveBeenCalledTimes(1));
+    expect(setEditorToolbarHidden.mock.calls[0]![0]).toEqual([allShown[1]]);
+  });
+
   it("refuses to write over a layout it never read", async () => {
     // The failure this exists for: `prefsRead` rejects (locked, or a vault that
     // is not there yet), `hidden` is left holding the DEFAULTS, and one click

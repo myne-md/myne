@@ -442,8 +442,12 @@ export function IdentityFlow({
   // phrase, the thing `screen_guard` exists to prevent. Both outcomes are
   // reported INLINE rather than in a toast: this screen is shown once, and a
   // toast the user misses is indistinguishable from a copy that never happened.
-  const [copyMsg, setCopyMsg] = useState<string | null>(null);
-  const [fileMsg, setFileMsg] = useState<string | null>(null);
+  // ONE message for both actions, not one each. With two, the render had to
+  // pick a winner (`copyMsg ?? fileMsg`), so once a copy had succeeded a later
+  // save failure could never appear: the user read a stale "Copied" and the
+  // phrase file was never written (myne-md/myne#972 review, D9). Last action
+  // wins, which is what a one-line status under two buttons means.
+  const [actionMsg, setActionMsg] = useState<string | null>(null);
   // The clipboard gate, same probe and same default as the vault flow: the
   // control is ABSENT until the OS answers yes, because a button that appears
   // and then explains its own limits still implies a guarantee. iOS can hold a
@@ -1916,8 +1920,8 @@ export function IdentityFlow({
   const copyPhrase = () => {
     void (async () => {
       const cancel = await copySecretToClipboard(phraseText(), {
-        onSuccess: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopied")) },
-        onFailure: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopyFailed")) },
+        onSuccess: { kind: "inline", run: () => setActionMsg(t("createVault.phraseCopied")) },
+        onFailure: { kind: "inline", run: () => setActionMsg(t("createVault.phraseCopyFailed")) },
       });
       if (cancel === null) return;
       clipboardCancelRef.current?.();
@@ -1927,10 +1931,18 @@ export function IdentityFlow({
 
   const savePhraseFile = () => {
     void (async () => {
-      const { key, params } = secretSaveMessage(
-        await saveSecretToDocuments("myne-identity-phrase.txt", phraseText()),
-      );
-      setFileMsg(t(key, params));
+      // `saveSecretToDocuments` is total: it logs and answers `null` rather than
+      // rejecting, and `secretSaveMessage(null)` is the error sentence. The
+      // `try` is here for the one thing outside it, `phraseText()`, so a throw
+      // there still says something instead of leaving the button inert.
+      try {
+        const { key, params } = secretSaveMessage(
+          await saveSecretToDocuments("myne-identity-phrase.txt", phraseText()),
+        );
+        setActionMsg(t(key, params));
+      } catch {
+        setActionMsg(t("createVault.saveFileError"));
+      }
     })();
   };
 
@@ -1979,7 +1991,7 @@ export function IdentityFlow({
                   {t("createVault.saveToFile")}
                 </Button>
               </div>
-              {(copyMsg ?? fileMsg) && (
+              {actionMsg && (
                 <p
                   role="status"
                   aria-live="polite"
@@ -1990,7 +2002,7 @@ export function IdentityFlow({
                     color: "var(--fg-3)",
                   }}
                 >
-                  {copyMsg ?? fileMsg}
+                  {actionMsg}
                 </p>
               )}
             </div>

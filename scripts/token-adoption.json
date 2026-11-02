@@ -134,7 +134,7 @@
   "mobile/src/components/ReminderSettings.tsx": 10,
   "mobile/src/components/SnapshotFailedBanner.tsx": 2,
   "mobile/src/components/SyncBanners.tsx": 2,
-  "mobile/src/components/SyncSettingsPanels.tsx": 94,
+  "mobile/src/components/SyncSettingsPanels.tsx": 93,
   "mobile/src/components/ThemeChiplet.tsx": 1,
   "mobile/src/components/WikiGraph.tsx": 4,
   "mobile/src/components/feedback.tsx": 13,
