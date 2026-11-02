@@ -145,6 +145,26 @@ const CLASSES = {
     fix: "match the generation: `serialize_vault_meta_v0_2` for V0_2 (see `sync::orchestrator`'s meta merge)",
     why: "`serialize_vault_meta` unconditionally stamps `MYV1` + `0x01`, so writing a v0.2 meta through it claims v0.1 over v0.2 wrap bytes — the next unlock refuses BOTH credentials and strands every `NC05` note",
   },
+  // A GENERATION is one question with four answers, and an equality test against one variant is a
+  // partial question that reads as a complete one. It is not automatically wrong, and this class must
+  // not say it is: `carrier_applies` compares to `B2b` ON PURPOSE, because the carrier is `NTV6`-only
+  // and sealing the person keypair under a vault credential on a person-born generation is the
+  // cross-vault key escalation that `vault_migrate/ntv7.rs` deletes the carrier for. That site is
+  // recorded in ALLOWED, with that reason, and NOT routed.
+  //
+  // What the class catches is the same spelling used WITHOUT that argument, which is the shape that
+  // ages badly: a fifth generation falls out of every partial question silently, and the consumer then
+  // answers "not this vault" for a vault it was meant to serve. The shapes that age well are a `match`
+  // over all four variants, which turns a fifth generation into a compile error for every consumer,
+  // and a named predicate from `sync::meta_kind` (`is_person_born`, `carries_b2b_tail`, `b2b_tail`),
+  // which answers the question the caller actually has.
+  gen: {
+    // `[A-Za-z0-9_]+`, not `[A-Za-z]+`: the variant `B2b` carries a digit, so a letters-only class
+    // matches `== Legacy` and silently misses `matches!(g, VaultMetaGeneration::B2b)`. Measured.
+    re: /[=!]=\s*(?:protocol::)?VaultMetaGeneration::[A-Za-z0-9_]+|(?:protocol::)?VaultMetaGeneration::[A-Za-z0-9_]+\s*[=!]=|matches!\([^;]*?(?:protocol::)?VaultMetaGeneration::[A-Za-z0-9_]+/,
+    fix: "match all four variants, or ask a `sync::meta_kind` predicate. An equality test is right only when the variant IS the caller's question, and then it belongs in ALLOWED with that reason",
+    why: "an equality test against ONE generation variant answers a partial question as if it were complete: a fifth generation falls out of it silently, and the consumer answers 'not this vault' for a vault it was meant to serve. Match every variant, or ask the classifier",
+  },
   pwkdf: {
     names: [
       "derive_password_wrap_key",
@@ -213,6 +233,20 @@ export function callsProtocolName(line, name, imports) {
  * population actually changes, which is the thing being ratcheted.
  */
 const ALLOWED = new Map([
+  // ── legitimately partial: the variant IS the caller's question ────────────
+  // Two sites, and both are here for a reason a reader can check, because an ALLOWED entry is what
+  // blesses a site permanently.
+  //
+  // The decrypter is asking a NARROWER question than "does a person wrap exist" (NTV6 carries none
+  // either): `NotPersonWrapped` is "this frame has neither a person wrap nor a recovery wrap, so the
+  // phrase is the wrong KIND of credential", and `PersonNoWrap` is that question by name.
+  ["decrypt/src/unlock.rs#gen", [1, "`NotPersonWrapped`: neither a person wrap nor a recovery wrap is on this frame, so a phrase is the wrong KIND of credential here, and `PersonNoWrap` names exactly that"]],
+  // The one that must NOT be routed. `carrier_applies` is `NTV6`-only ON PURPOSE: on a person-born
+  // generation the carrier would let a vault password, or a quick-unlock PIN or a biometric that
+  // yields `root_key`, unwrap the person keypair and from it open every other vault that identity
+  // owns, offline. `carries_b2b_tail` answers true for `NTV7` and `NTV8`, which is precisely the
+  // mistake this predicate must not make, so the variant comparison is the correct spelling here.
+  ["core/src/plugins/sync/person_vault_carrier.rs#gen", [1, "`NTV6` only ON PURPOSE: on a person-born generation the carrier is a cross-vault key escalation (see the predicate's own doc and `vault_migrate/ntv7.rs`). DO NOT route it through `carries_b2b_tail`"]],
   // ── legitimately v0.1: REBUILDABLE, NEVER-SYNCED CACHES ───────────────────
   // EMPTY. The last entry here was `local_inference/hydrate.rs#kek`, the KEK
   // for the `vault.embeddings` cache. The AI-embeddings family was retired
@@ -300,15 +334,12 @@ const ALLOWED = new Map([
 // and the entry leaves this table (or moves up into `ALLOWED` with a real
 // argument) when it stops being true.
 const DEBT = new Map([
-  // The `is_nc05_blob` dispatch: the v0.1 leg of an explicit branch, which is
-  // the SHAPE the "v0.1 arm of an explicit branch" group in `ALLOWED` already
-  // covers. It is recorded as debt rather than as that group because the two
-  // differ in one way a reader should decide deliberately rather than inherit:
-  // those sites branch on the VAULT generation (`is_v0_2`), while this one
-  // branches on the BLOB's magic, so a `MY01` blob inside a v0.2 vault takes the
-  // v0.1 decoder with no `version` in hand. Moving this entry up into `ALLOWED`
-  // is the deliberate act of accepting that; leaving it here is what keeps the
-  // debt figure honest until somebody does.
+  // Not "wrong", just not yet decided: each of these asks a partial question that happens to have the
+  // right answer today, and a fifth generation forces the decision. None of them is a security
+  // predicate, so none carries the "do not route this" warning the ALLOWED entries above do.
+  ["core/src/plugins/vault_migrate/adopt.rs#gen", [1, "NOT YET ROUTED: `== Legacy` asks whether the local frame is the pre-B2B one before an incoming newer meta may replace it, and a fifth generation forces a deliberate answer here"]],
+  ["core/src/plugins/sync/orchestrator.rs#gen", [2, "NOT YET ROUTED: `!= Legacy` twice in the meta-merge condition, the same shape as adopt.rs"]],
+  ["core/src/plugins/sync/person_discovery.rs#gen", [1, "NOT YET ROUTED: `is_person_born` spelled as a subset `matches!` over Person|PersonNoWrap, where `meta_kind::is_person_born` is a range and would take a fifth person-born generation with no edit here"]],
   ["core/src/plugins/notes/commands.rs#note", [4, "the v0.1 arm of an explicit `is_nc05_blob` branch — note_read, note_update, note_set_field, note_write_batch"]],
 ]);
 
@@ -329,7 +360,7 @@ export function debtTotal() {
   return [...DEBT.values()].reduce((a, [n]) => a + n, 0);
 }
 
-export { ALLOWED, DEBT };
+export { ALLOWED, CLASSES, DEBT };
 
 const SKIP_DIRS = new Set(["target"]);
 
@@ -421,6 +452,19 @@ for (const file of files) {
       else hits.set(name, { line: i + 1, count: 1 });
     }
   });
+
+  // A `matches!` whose variant list WRAPS is invisible to the per-line loop above, and the one live
+  // instance is spelled exactly that way: `person_discovery::person_frame_namespace` re-derives
+  // `meta_kind::is_person_born` as `Person | PersonNoWrap` across three lines. One whole-text pass for
+  // that shape, bounded so a stray `)` far away cannot stretch the match. Matches that fit on one line
+  // are skipped because the per-line pass already counted them.
+  for (const m of text.matchAll(/matches!\([\s\S]{0,400}?(?:protocol::)?VaultMetaGeneration::[A-Za-z0-9_]+/g)) {
+    if (!m[0].includes("\n")) continue;
+    const line = text.slice(0, m.index).split("\n").length;
+    const prev = hits.get("gen");
+    if (prev) prev.count += 1;
+    else hits.set("gen", { line, count: 1 });
+  }
 
   for (const [name, { line, count }] of hits) {
     const key = `${rel}#${name}`;
