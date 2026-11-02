@@ -135,6 +135,40 @@ describe("task checkbox reveal (myne-md/myne#563)", () => {
     focusAt(m, doc.length);
     expect(m.view.state.doc.toString()).toBe(doc);
   });
+
+  it("lifts the markup when the caret sits in the SEPARATOR beside the checkbox", () => {
+    // myne#952. The gap between `]` and the label is where a click to "start
+    // typing this task" lands, and it was the one hidden run in this construct
+    // that no reveal covered: the predicate ended at the marker. A caret inside
+    // a replaced run gets clamped, so typed characters accumulated at a fixed
+    // position instead of advancing — the user's text came out reversed.
+    //
+    // A WIDER-than-one-space separator is what makes the case reachable: with a
+    // single space the caret can only sit at its start (already revealed by the
+    // closed predicate) or at the label (which must stay rendered), so a fixture
+    // built on one space cannot fail. That is the vacuous fixture this test was
+    // first written with, caught by injecting the defect and watching it pass.
+    m = mount("- [ ]   milk\nother\n");
+    // EVERY position in that gap, not one of them: the predicate is a range, and
+    // a single sampled offset cannot tell a range from a lucky boundary. 5 is
+    // the first space (already covered by the old closed predicate), 7 the last
+    // (covered only by the extended half-open one), 6 the middle.
+    for (const caret of [5, 6, 7]) {
+      focusAt(m, caret);
+      expect(query(m, ".cm-task-checkbox"), `caret ${caret} in the separator`).toBeNull();
+      expect(renderedText(m)).toContain("- [ ]   milk");
+    }
+  });
+
+  it("keeps the checkbox with the caret on the label's FIRST character", () => {
+    // The other half of that change, and the reason the separator uses the
+    // half-open predicate: a caret exactly on the label must not lift the
+    // markup, which is what #563 exists to guarantee. Asserted on the WIDE
+    // separator too, where the two predicates differ.
+    m = mount("- [ ]   milk\nother\n");
+    focusAt(m, 8); // `m`
+    expect(query(m, ".cm-task-checkbox")).not.toBeNull();
+  });
 });
 
 describe("a selection that covers the marker (myne-md/myne#560)", () => {

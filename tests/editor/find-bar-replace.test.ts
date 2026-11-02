@@ -70,25 +70,38 @@ describe("find-bar replace: data-testids (E2E contract)", () => {
 });
 
 describe("find-bar replace: expand / collapse toggle", () => {
-  it("starts collapsed: no replace row rendered, toggle not pressed", () => {
+  // The row is mounted for the panel's lifetime and animated open/closed
+  // (myne#952), so "collapsed" is no longer "absent from the DOM". What the
+  // absence used to guarantee — that a closed replace row cannot be typed into or
+  // reached by Tab — is now `inert`, which is a stronger statement (it is out of
+  // the accessibility tree as well as the tab order). These three tests follow
+  // the guarantee rather than the implementation.
+  it("starts collapsed: the row is present but inert, toggle not pressed", () => {
     bar = createFindBarView(IDLE, noopHandlers());
-    expect(replaceRow(bar)).toBeNull();
+    expect(replaceRow(bar)).not.toBeNull();
+    expect(replaceRow(bar)!.dataset.expanded).toBe("false");
+    expect(replaceRow(bar)!.hasAttribute("inert")).toBe(true);
     expect(toggleBtn(bar).getAttribute("aria-expanded")).toBe("false");
   });
 
-  it("expanded state renders the replace row and marks the toggle pressed", () => {
+  it("expanded state opens the row and marks the toggle pressed", () => {
     bar = createFindBarView(IDLE, noopHandlers());
     bar.update({ ...IDLE, expanded: true });
-    expect(replaceRow(bar)).not.toBeNull();
+    expect(replaceRow(bar)!.dataset.expanded).toBe("true");
+    expect(replaceRow(bar)!.hasAttribute("inert")).toBe(false);
     expect(replaceInput(bar)).not.toBeNull();
     expect(toggleBtn(bar).getAttribute("aria-expanded")).toBe("true");
   });
 
-  it("toggle is reversible: expanded → collapsed removes the replace row", () => {
+  it("toggle is reversible: expanded → collapsed closes and re-inerts the row", () => {
     bar = createFindBarView({ ...IDLE, expanded: true }, noopHandlers());
-    expect(replaceRow(bar)).not.toBeNull();
+    expect(replaceRow(bar)!.dataset.expanded).toBe("true");
     bar.update({ ...IDLE, expanded: false });
-    expect(replaceRow(bar)).toBeNull();
+    // Still mounted, so a height transition has something to run on, and
+    // unreachable again in the same update.
+    expect(replaceRow(bar)).not.toBeNull();
+    expect(replaceRow(bar)!.dataset.expanded).toBe("false");
+    expect(replaceRow(bar)!.hasAttribute("inert")).toBe(true);
     expect(toggleBtn(bar).getAttribute("aria-expanded")).toBe("false");
   });
 

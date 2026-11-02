@@ -2,14 +2,14 @@
 //
 // Heading-SECTION folding ships for free: @codemirror/lang-markdown composes a
 // `headerIndent` foldService into editor state, and mounting `codeFolding()` +
-// `foldGutter()` (extensions.ts) surfaces it. The one custom piece is LIST
-// folding — stock markdown's `foldNodeProp` deliberately excludes lists, so we
-// add a `foldService` keyed on the lezer `ListItem` node.
+// the inline fold markers (extensions.ts) surfaces it. The one custom piece is
+// LIST folding — stock markdown's `foldNodeProp` deliberately excludes lists, so
+// we add a `foldService` keyed on the lezer `ListItem` node.
 //
 // CHILDREN-ONLY predicate (story 3): a list item folds only when it has a
 // nested sub-list (`BulletList`/`OrderedList` child) — i.e. it spans more than
-// its own first line. A flat single-line item returns null, so the gutter shows
-// no arrow on it (the prose-first "quiet gutter on flat lists" requirement).
+// its own first line. A flat single-line item returns null, so it shows no
+// arrow at all (the prose-first "no fold chrome on flat lists" requirement).
 //
 // CM6 calls a foldService with `(state, lineStart, lineEnd)` per line and folds
 // the FIRST non-null range. We anchor the fold to the item's FIRST line: the

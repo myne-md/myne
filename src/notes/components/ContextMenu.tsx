@@ -18,11 +18,13 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
 } from "react";
 import { Icon } from "../../components/primitives/Icon";
+import type { IconName } from "../../lib/icons";
 import { usePressSurface } from "../../components/primitives/pressSurface";
 
 export type ContextMenuItem = {
@@ -67,6 +69,28 @@ export type ContextMenuItem = {
   children?: ContextMenuItem[];
   /** Called when the item is selected. Ignored when `children` is present. */
   onSelect: () => void;
+  /**
+   * Leading glyph, by `Icon` name. Rendered in a fixed leading column so labels
+   * stay aligned across rows that have one and rows that do not.
+   */
+  icon?: IconName;
+  /**
+   * Tree mode only: this row's nesting depth in the flat list it belongs to
+   * (`0` = the tree's root row). Ignored outside tree mode, where the list is
+   * flat by definition.
+   *
+   * The flat-with-depth shape rather than nested `children` is deliberate: the
+   * folder list these menus are built from is already a depth-first flatten of
+   * the derived tree (`folderTreeRows.ts`), so re-nesting it here would be a
+   * second traversal that can disagree with the first.
+   */
+  depth?: number;
+  /**
+   * Tree mode only: the canonical folder path. While a filter is active every
+   * row arrives out of tree order, so its indent stops meaning anything — the
+   * ancestry is read off this instead and shown as a dim prefix.
+   */
+  path?: string;
 };
 
 export type ContextMenuProps = {
@@ -79,6 +103,19 @@ export type ContextMenuProps = {
    *  list like the "Move to…" folder tree of a deep vault (#205). Default off, so
    *  short menus (rename / delete) are unchanged. */
   searchable?: boolean;
+  /**
+   * Render the items as a COLLAPSIBLE tree (myne#952). A row whose following
+   * rows go deeper is a parent: it gets a disclosure toggle, indented children
+   * and an indent rail per ancestor level. Collapsing is per-menu-session state
+   * and every row starts EXPANDED, which is what this menu looked like before
+   * the toggle existed — so a vault whose folders the user has already learnt is
+   * not re-hidden on them.
+   *
+   * Selecting a parent still SELECTS it (unlike a `children` submenu parent,
+   * whose only action is opening the submenu): "move to 02 - AREAS" has to stay
+   * reachable, and it is the most common destination of all.
+   */
+  tree?: boolean;
   /** Placeholder for the filter box (only when `searchable`). */
   searchPlaceholder?: string;
   /**
@@ -147,6 +184,52 @@ const DIVIDER_STYLE: CSSProperties = {
   border: 0,
 };
 
+/* Tree-mode geometry (myne#952). One 16px step per depth level, and the indent
+   rail for an ancestor level sits in the MIDDLE of that level's disclosure slot —
+   so the line descends from the toggle that opened the group, which is the spine
+   the eye follows. Deliberately NOT `TreeRails`: that component's 18px step and
+   16px origin are tuned to the sidebar's own padding, and importing it here
+   would either drag the menu onto the sidebar's geometry or need it parameterised
+   for one caller. Same visual language, different container. */
+const TREE_STEP = 16;
+const TREE_PAD = 6;
+/** Width reserved for the disclosure toggle on EVERY tree row, so a leaf's icon
+ *  lines up with its parent's. */
+const TREE_TOGGLE_SLOT = 14;
+
+/** Indices of `items` whose rows are visible under `collapsed`. */
+function visibleTreeIndices(
+  items: readonly ContextMenuItem[],
+  collapsed: ReadonlySet<string>,
+): number[] {
+  const out: number[] = [];
+  // Depth at which the walk is currently hidden; cleared by the first row that
+  // is NOT deeper, which is by construction the next visible sibling/ancestor.
+  let hiddenBelow: number | null = null;
+  items.forEach((item, i) => {
+    const depth = item.depth ?? 0;
+    if (hiddenBelow !== null) {
+      if (depth > hiddenBelow) return;
+      hiddenBelow = null;
+    }
+    out.push(i);
+    const hasChildren =
+      i + 1 < items.length && (items[i + 1]?.depth ?? 0) > depth;
+    if (hasChildren && collapsed.has(item.id)) hiddenBelow = depth;
+  });
+  return out;
+}
+
+/** A tree row's ancestry, trimmed to its last `max` segments with a leading `…`
+ *  when there is more, and the full path kept for the `title` attribute. */
+function ancestryOf(path: string, max = 2): string {
+  const parts = path.split("/").filter(Boolean);
+  parts.pop();
+  if (parts.length === 0) return "";
+  const kept = parts.slice(-max);
+  return `${parts.length > kept.length ? "…/" : ""}${kept.join(" / ")}`;
+}
+
 // The filter box at the top of the "Move to…" menu (#205). Deliberately NOT
 // sticky — it scrolls with the list, so no list row can ever paint through it,
 // and since typing filters the list short there is rarely anything to scroll
@@ -177,6 +260,7 @@ export function ContextMenu({
   searchPlaceholder,
   autoFocus = true,
   label,
+  tree = false,
 }: ContextMenuProps) {
   const ref = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -201,9 +285,55 @@ export function ContextMenu({
     focus: boolean;
   } | null>(null);
   const [query, setQuery] = useState("");
+  // Tree mode's collapsed set. Empty means fully expanded, which is the shape
+  // this menu had before the toggle existed (see `tree`).
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set<string>(),
+  );
   const q = query.trim().toLowerCase();
   const visibleItems =
     q === "" ? items : items.filter((it) => it.label.toLowerCase().includes(q));
+
+  /**
+   * The rows actually rendered, in order, with what the row needs to draw
+   * itself. In tree mode under a filter the indent and the disclosure toggles
+   * are dropped: matches arrive out of tree order and their depths are
+   * meaningless next to each other, which is exactly the "I cannot tell whose
+   * subfolder this is" problem the ancestry prefix solves instead.
+   */
+  const rows = useMemo(() => {
+    const treeActive = tree && q === "";
+    const indices = treeActive
+      ? visibleTreeIndices(items, collapsed)
+      : // Under a filter, walk the WHOLE list: a match inside a collapsed folder
+        // must still be findable, which is the point of searching.
+        items
+          .map((_, i) => i)
+          .filter((i) => q === "" || items[i]!.label.toLowerCase().includes(q));
+    return indices.map((i) => {
+      const item = items[i]!;
+      const depth = treeActive ? (item.depth ?? 0) : 0;
+      const hasChildren =
+        tree && i + 1 < items.length && (items[i + 1]?.depth ?? 0) > (item.depth ?? 0);
+      return {
+        item,
+        depth,
+        // A parent row's toggle is only meaningful while the tree is drawn; a
+        // filtered list has no hierarchy to fold.
+        expandable: hasChildren && treeActive,
+        expanded: hasChildren && treeActive && !collapsed.has(item.id),
+      };
+    });
+  }, [tree, q, items, collapsed]);
+
+  const toggleRow = useCallback((id: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
 
   // Viewport-edge clamp: after first paint, measure the menu's actual
   // size and shift left/up if it would overflow the viewport.
@@ -378,6 +508,22 @@ export function ContextMenu({
           next = cur < 0 ? its.length - 1 : (cur - 1 + its.length) % its.length;
         else if (e.key === "Home") next = 0;
         else if (e.key === "End") next = its.length - 1;
+        else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          // Tree row disclosure from the keyboard (myne#952). The toggle itself
+          // is a presentational span inside the row's button — a nested
+          // interactive element would be invalid — so the pointer gets the
+          // toggle and the keyboard gets these two keys, the tree convention.
+          if (!tree || cur < 0) return;
+          const focused = its[cur]!;
+          const row = rows.find(
+            (r) => r.item.id === focused.getAttribute("data-item-id"),
+          );
+          if (row === undefined || !row.expandable) return;
+          e.preventDefault();
+          const wantOpen = e.key === "ArrowRight";
+          if (wantOpen !== row.expanded) toggleRow(row.item.id);
+          return;
+        }
         else return;
         e.preventDefault();
         its[next]?.focus();
@@ -406,7 +552,8 @@ export function ContextMenu({
           }}
         />
       )}
-      {visibleItems.map((item, i) => {
+      {rows.map((row, i) => {
+        const { item, depth, expandable, expanded } = row;
         const isHovering = hoverId === item.id;
         const isPressing = isPressed(item.id);
         const baseStyle = item.destructive
@@ -415,13 +562,28 @@ export function ContextMenu({
         const hoverBg = item.destructive
           ? "var(--warning-soft)"
           : "var(--paper-3)";
+        const rowStyle: CSSProperties = tree
+          ? {
+              ...baseStyle,
+              // `relative` hosts the indent rails below; the depth indent is a
+              // LOGICAL padding so an RTL UI indents from the right edge.
+              position: "relative",
+              paddingInlineStart: TREE_PAD + depth * TREE_STEP,
+            }
+          : baseStyle;
         const style: CSSProperties = isPressing
-          ? { ...baseStyle, background: pressBg }
+          ? { ...rowStyle, background: pressBg }
           : isHovering
-            ? { ...baseStyle, background: hoverBg }
-            : baseStyle;
+            ? { ...rowStyle, background: hoverBg }
+            : rowStyle;
         // Divider before an item that opens a new logical group.
-        const showDivider = i > 0 && item.group !== visibleItems[i - 1]?.group;
+        const showDivider = i > 0 && item.group !== rows[i - 1]?.item.group;
+        const ancestry = item.path === undefined ? "" : ancestryOf(item.path);
+        const richRow =
+          tree ||
+          item.icon !== undefined ||
+          item.checked !== undefined ||
+          item.children !== undefined;
         return (
           <Fragment key={item.id}>
             {showDivider && <div style={DIVIDER_STYLE} role="separator" />}
@@ -431,10 +593,16 @@ export function ContextMenu({
             aria-checked={item.checked === undefined ? undefined : item.checked}
             aria-haspopup={item.children === undefined ? undefined : "menu"}
             aria-expanded={
-              item.children === undefined ? undefined : submenu?.id === item.id
+              expandable
+                ? expanded
+                : item.children === undefined
+                  ? undefined
+                  : submenu?.id === item.id
             }
             data-testid="notes.context-menu-item"
             data-item-id={item.id}
+            data-depth={tree ? depth : undefined}
+            data-expanded={expandable ? String(expanded) : undefined}
             data-checked={item.checked === undefined ? undefined : String(item.checked)}
             style={style}
             {...handlersFor(item.id)}
@@ -458,10 +626,64 @@ export function ContextMenu({
               handleSelect(item);
             }}
           >
-            {item.checked === undefined && item.children === undefined ? (
-              item.label
-            ) : (
-              <span style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+            {tree &&
+              Array.from({ length: depth }, (_, k) => (
+                // One rail per ancestor level, centred in that level's toggle
+                // slot: the line descends from the control that opened the
+                // group, which is the spine the eye follows down the tree.
+                <span
+                  key={`rail-${k}`}
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    insetInlineStart: TREE_PAD + k * TREE_STEP + TREE_TOGGLE_SLOT / 2,
+                    top: 0,
+                    bottom: 0,
+                    borderInlineStart: "1px solid var(--line-1)",
+                    pointerEvents: "none",
+                  }}
+                />
+              ))}
+            {richRow ? (
+              <span
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "var(--space-2)",
+                  minWidth: 0,
+                }}
+              >
+                {tree && (
+                  <span
+                    aria-hidden="true"
+                    data-testid="notes.context-menu-disclosure"
+                    style={{
+                      width: TREE_TOGGLE_SLOT,
+                      flexShrink: 0,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      color: "var(--fg-3)",
+                    }}
+                    onClick={
+                      expandable
+                        ? (e) => {
+                            // The row itself selects the folder, so the toggle
+                            // must not also fire that selection.
+                            e.stopPropagation();
+                            toggleRow(item.id);
+                          }
+                        : undefined
+                    }
+                  >
+                    {expandable && (
+                      <Icon
+                        name={expanded ? "chevron-down" : "chevron-right"}
+                        size={12}
+                      />
+                    )}
+                  </span>
+                )}
                 {item.checked !== undefined && (
                   <span
                     aria-hidden="true"
@@ -470,13 +692,58 @@ export function ContextMenu({
                     {item.checked ? "✓" : ""}
                   </span>
                 )}
-                <span style={{ flex: 1 }}>{item.label}</span>
+                {item.icon !== undefined && (
+                  <span
+                    aria-hidden="true"
+                    style={{ display: "flex", flexShrink: 0, color: "var(--fg-3)" }}
+                  >
+                    <Icon name={item.icon} size={14} />
+                  </span>
+                )}
+                {ancestry !== "" && q !== "" && (
+                  // A filtered list has no indent to read, so the ancestry is
+                  // said out loud — trimmed from the FRONT, because the nearest
+                  // parent is the part that identifies the match.
+                  <span
+                    title={item.path}
+                    data-testid="notes.context-menu-ancestry"
+                    style={{
+                      flexShrink: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--fg-3)",
+                      // A path is a bidi-sensitive string in an app that ships
+                      // ar/fa/ur: without this the neutral " / " between two
+                      // segments reorders against the row's direction and the
+                      // breadcrumb reads disconnected from the name beside it.
+                      unicodeBidi: "plaintext",
+                    }}
+                  >
+                    {ancestry} /
+                  </span>
+                )}
+                <span
+                  data-testid="notes.context-menu-label"
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {item.label}
+                </span>
                 {item.children !== undefined && (
                   <span aria-hidden="true" style={{ display: "flex" }}>
                     <Icon name="chevron-right" size={12} />
                   </span>
                 )}
               </span>
+            ) : (
+              item.label
             )}
             </button>
             {item.children !== undefined && submenu?.id === item.id && (
