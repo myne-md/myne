@@ -743,16 +743,20 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // Their cores are gated `#[cfg(not(target_arch = "wasm32"))]` inside
     // `person_account` for the same reason.
     ("plugin:sync|sync_person_unlock", Class::Unsupported),
-    // Publishing a person-born vault (myne-md/myne#911 task 8) stays
-    // `Unsupported`, and the reason is narrower than it used to be. The person
-    // session EXISTS here since task 13; what a browser still lacks is the
-    // device-local namespace record the publish act writes, and the container
-    // layout that record addresses. `Unsupported` rather than `Pending` because
-    // the missing piece is the storage shape, not a port.
-    ("plugin:sync|sync_publish_vault", Class::Unsupported),
-    // The durable publish state (myne-md/myne#911 task 8) is the same refusal one
-    // command over: it reads the namespace record the publish above writes, and
-    // that record does not exist in this container layout.
+    // The durable publish state (myne-md/myne#911 task 8) is refused as a COMMAND,
+    // and the distinction matters because the act itself is no longer one:
+    // publishing is the sync cycle's act since myne-md/myne#974, so this browser
+    // DOES publish (`sync_loop` hands the cycle the person io, and `publish_if_due`
+    // has no host gate). What stays unsupported is the readout, because it is the
+    // desktop panel's own query and there is no web surface that needs it.
+    //
+    // **The consequence, stated rather than implied:** the shared `SyncPanel` reads
+    // this to decide whether a vault is person-born, and the refusal leaves it
+    // `null`, so the web panel offers the legacy "add this device" form to a vault
+    // whose generation has no such account. That is a web-only display gap, it
+    // predates this change, and closing it means dispatching this arm through
+    // `person_vault_io_ref()` like the identity plane above (unverifiable here: the
+    // web bundle cannot be built in this worktree without a staged `web/wasm/pkg`).
     ("plugin:sync|sync_published_state", Class::Unsupported),
     ("plugin:sync|sync_person_list_invites", Class::Unsupported),
     ("plugin:sync|sync_list_vault_invites", Class::Unsupported),

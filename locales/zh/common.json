@@ -4253,7 +4253,6 @@
         "bar": "底栏 状态栏 指示器 自定义 重新排序 隐藏 显示 工具栏 bottom bar status bar indicators customize reorder hide show toolbar",
         "syncDeviceBindings": "设备 成员声明 归属 谁签名 哪个设备属于 devices claimed by members attribution who signed which device belongs",
         "vaultFormat": "保险库 格式 升级 单短语 恢复 停用 保险库恢复短语 迁移 身份 vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",
-        "publishVault": "发布 已发布 保险库 服务器 仅设备 同步 publish published vault server device only sync",
         "externalAccess": "外部访问 MCP myne-mcp Claude Desktop 客户端 连接 批准 范围 撤销 external access client approve scope revoke",
         "diagnosticLog": "诊断日志 日志 记录 调试 故障排查 崩溃报告 缺陷报告 支持 diagnostic log logging debug troubleshooting crash report bug report support"
       },
@@ -4745,26 +4744,6 @@
         "account": "账户",
         "server": "服务器",
         "devices": "你账户上的设备"
-      },
-      "publish": {
-        "label": "发布到你的服务器",
-        "cta": "发布此保险库",
-        "republishCta": "重新发布",
-        "deviceOnlyHelper": "此保险库仅存在于此设备上。发布会将其绑定到你的身份，使你的其他设备可以打开它。",
-        "publishedHelper": "发布于 {{when}}。此保险库已在你的同步服务器上，因此你的其他设备可以访问。",
-        "publishedHelperNoDate": "已发布。此保险库已在你的同步服务器上，因此你的其他设备可以访问。",
-        "error": {
-          "NotConfigured": "请先在上方同步中设置同步服务器。",
-          "PersonSessionRequired": "请先解锁你的身份。发布需要拥有此保险库的身份。",
-          "PersonNotRegistered": "请先在上方身份块中注册你的身份。此设备持有身份但从未在服务器注册，因此没有账户可发布到。",
-          "NotEnrolled": "此保险库属于本设备未注册的账户。请先将设备添加到该账户。",
-          "NotOwner": "此保险库已属于其他身份，因此无法在此发布。",
-          "Unauthenticated": "服务器拒绝了此设备。请重试；若持续发生，请重新注册。",
-          "Transport": "无法连接到服务器。保险库未更改；请重试。",
-          "TlsFailure": "无法建立受信任的连接。保险库未更改；请重试。",
-          "BadRequest": "无法读取此保险库的元数据。未发送任何内容。",
-          "Other": "发布失败。保险库未更改；请重试。"
-        }
       }
     },
     "reconcile": {

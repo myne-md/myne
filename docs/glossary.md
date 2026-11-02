@@ -126,7 +126,7 @@ namespace. Two vaults owned by the same person are unrelated cryptographic
 domains that happen to share a credential, so an account-level compromise is not a
 vault-level one and a vault can in principle be detached. **What becomes
 account-level:** device approval and revocation (one act covers every vault),
-publishing (an explicit act per vault, which binds the owner on first write),
+publishing (per vault, done by the sync cycle once the person names a server, which binds the owner on first write),
 discovery (`GET /b2b/vaults` lists the bindings and authorizes nothing), and the
 usage figure, which is the sum over the vaults the person OWNS and is reported
 rather than enforced. A vault the person merely joined does not count.
@@ -2920,9 +2920,9 @@ Used in: `decisions.md` 2026-08-16, `threat-model.md` §7
 
 ### **publish** &nbsp; 📦 *Product*
 
-The explicit act that turns a **device-only** vault into a server vault (myne-md/myne#911 task 8, `decisions/sync/0720`). A vault created from a person identity exists only on this device until its owner publishes it; publishing `PUT`s `vault.meta` to the vault's namespace and records that namespace on the device so every later sync request addresses it. The act is **idempotent** (a retry after a failure is safe) and **owner-at-first-write** on the server: a vault with no owner binding gains the publishing person as owner, a vault owned by this person is written, and a vault owned by anyone else is refused with `403` before any bytes are stored. The panel therefore reads **device only** or **published**, and an unpublished vault is the honest state a user can see and act on rather than a silent one. Distinct from **registration**, which is the account reaching a server at all, and from **enabling sync**, which is pointing a device at one.
+The act that turns a **device-only** vault into a server vault (myne-md/myne#911 task 8, `decisions/sync/0720`; automatic since `decisions/sync/0770`, myne-md/myne#974). A vault created from a person identity exists only on this device until it is published; publishing `PUT`s `vault.meta` to the vault's namespace and records that namespace on the device so every later sync request addresses it. **It is no longer a control a user presses**: the sync cycle performs it the first time an endpoint, a registered identity and a person session are all present, because the row that used to own the act was the only way a vault could reach a server and a vault nobody published was invisible to every other device. The act is **idempotent** (a retry after a failure is safe) and **owner-at-first-write** on the server: a vault with no owner binding gains the publishing person as owner, a vault owned by this person is written, and a vault owned by anyone else is refused with `403` before any bytes are stored. A publish **never overwrites a frame the server already holds**: an absent server frame is the only case with something to establish, and a present one is adopted and left to the meta phase's own baselines, because a password change bumps neither the generation nor the group epoch and so no comparison could protect it. A published vault whose server record vanishes is re-published by the cycle when `GET /b2b/vaults` stops listing it; that is the remedy the deleted "Publish again" button used to offer. Distinct from **registration**, which is the account reaching a server at all, and from **enabling sync**, which is pointing a device at one.
 
-Used in: `docs/spec/server-protocol.md` §3.1a, `src/lib/sync-publish.ts`, `decisions/sync/0720`
+Used in: `docs/spec/server-protocol.md` §3.1a, `core/src/plugins/sync/publish.rs`, `decisions/sync/0720`, `decisions/sync/0770`
 
 ### **quick-unlock credential** &nbsp; 🗝️ *Key/identifier*
 

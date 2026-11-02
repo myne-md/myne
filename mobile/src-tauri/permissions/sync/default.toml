@@ -38,7 +38,6 @@ permissions = [
     # seven were registered in `generate_handler!` and absent here, so
     # `sync:default` refused every one of them on the device while both mobile
     # lanes stayed green behind a mocked IPC boundary.
-    "allow-sync-publish-vault",
     "allow-sync-published-state",
     "allow-sync-person-list-vaults",
     "allow-sync-person-register",
@@ -126,11 +125,6 @@ commands.allow = ["sync_person_unlock"]
 identifier = "allow-sync-person-setup"
 description = "Allow invoking sync:sync_person_setup (B2B identity-only setup: generate or recover a person identity and register its account at the device-scoped endpoint under person_id_hash; the phrase is returned once when generated and never logged)."
 commands.allow = ["sync_person_setup"]
-
-[[permission]]
-identifier = "allow-sync-publish-vault"
-description = "Allow invoking sync:sync_publish_vault (publish the active vault to the sync server under the person session; binds the owner on first write, never rolls back)."
-commands.allow = ["sync_publish_vault"]
 
 [[permission]]
 identifier = "allow-sync-published-state"

@@ -4253,7 +4253,6 @@
         "bar": "thanh dưới thanh trạng thái chỉ báo tùy chỉnh sắp xếp lại ẩn hiện thanh công cụ",
         "syncDeviceBindings": "thiết bị được thành viên nhận ai đã ký thiết bị nào thuộc về",
         "vaultFormat": "định dạng kho nâng cấp khôi phục một cụm từ nghỉ hưu kho cụm từ khôi phục di chuyển danh tính",
-        "publishVault": "xuất bản kho đã xuất bản máy chủ chỉ thiết bị đồng bộ",
         "externalAccess": "truy cập ngoài MCP myne-mcp Claude Desktop kết nối phê duyệt phạm vi thu hồi",
         "diagnosticLog": "nhật ký chẩn đoán ghi nhật ký gỡ lỗi khắc phục sự cố báo cáo sự cố báo cáo lỗi hỗ trợ"
       },
@@ -4745,26 +4744,6 @@
         "account": "Tài khoản",
         "server": "Máy chủ",
         "devices": "Thiết bị trên tài khoản của bạn"
-      },
-      "publish": {
-        "label": "Xuất bản lên máy chủ của bạn",
-        "cta": "Xuất bản kho này",
-        "republishCta": "Xuất bản lại",
-        "deviceOnlyHelper": "Kho này chỉ tồn tại trên thiết bị này. Xuất bản gắn nó với danh tính của bạn để các thiết bị khác mở được.",
-        "publishedHelper": "Đã xuất bản {{when}}. Kho này trên máy chủ đồng bộ của bạn, nên các thiết bị khác truy cập được.",
-        "publishedHelperNoDate": "Đã xuất bản. Kho này trên máy chủ đồng bộ của bạn, nên các thiết bị khác truy cập được.",
-        "error": {
-          "NotConfigured": "Đặt máy chủ đồng bộ trước, trong Đồng bộ phía trên.",
-          "PersonSessionRequired": "Mở khóa danh tính trước. Xuất bản cần danh tính sở hữu kho này.",
-          "PersonNotRegistered": "Đăng ký danh tính trước, trong khối Danh tính phía trên. Thiết bị này giữ danh tính nhưng chưa bao giờ đăng ký với máy chủ, nên không có tài khoản để xuất bản dưới đó.",
-          "NotEnrolled": "Kho này thuộc tài khoản thiết bị này chưa đăng ký. Thêm thiết bị vào tài khoản đó trước.",
-          "NotOwner": "Kho này đã thuộc danh tính khác, nên không xuất bản được ở đây.",
-          "Unauthenticated": "Máy chủ từ chối thiết bị này. Thử lại, và đăng ký lại nếu còn xảy ra.",
-          "Transport": "Không liên lạc được máy chủ. Kho không đổi; thử lại.",
-          "TlsFailure": "Không thiết lập được kết nối đáng tin. Kho không đổi; thử lại.",
-          "BadRequest": "Không đọc được metadata của kho này. Không có gì được gửi.",
-          "Other": "Xuất bản thất bại. Kho không đổi; thử lại."
-        }
       }
     },
     "reconcile": {

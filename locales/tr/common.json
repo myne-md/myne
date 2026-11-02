@@ -4226,7 +4226,6 @@
         "bar": "alt çubuk durum çubuğu göstergeler özelleştir yeniden sırala gizle göster araç çubuğu bottom bar",
         "syncDeviceBindings": "cihazlar üyeler tarafından sahiplenilen atıf kim imzaladı hangi cihaz ait device bindings",
         "vaultFormat": "kasa biçimi yükselt tek ifade kurtarma kasa kurtarma ifadesini emekli et taşı kimlik",
-        "publishVault": "yayımla yayımlanmış kasa sunucu yalnızca cihaz eşitleme",
         "externalAccess": "dış erişim MCP myne-mcp Claude Desktop istemci bağlantı onayla kapsam iptal",
         "diagnosticLog": "tanılama günlük günlüğü hata ayıklama sorun giderme çökme raporu hata raporu destek diagnostic log logging debug troubleshooting crash report bug report support"
       },
@@ -4719,26 +4718,6 @@
         "account": "Hesap",
         "server": "Sunucu",
         "devices": "Hesabınızdaki cihazlar"
-      },
-      "publish": {
-        "label": "Sunucunuza yayımlayın",
-        "cta": "Bu kasayı yayımlayın",
-        "republishCta": "Yeniden yayımlayın",
-        "deviceOnlyHelper": "Bu kasa yalnızca bu cihazda var. Yayımlamak onu kimliğinizle bağlar, böylece diğer cihazlarınız açabilir.",
-        "publishedHelper": "{{when}} tarihinde yayımlandı. Bu kasa eşitleme sunucunuzda, bu yüzden diğer cihazlarınız ona erişebilir.",
-        "publishedHelperNoDate": "Yayımlandı. Bu kasa eşitleme sunucunuzda, bu yüzden diğer cihazlarınız ona erişebilir.",
-        "error": {
-          "NotConfigured": "Önce Eşitleme bölümünde bir eşitleme sunucusu belirleyin.",
-          "PersonSessionRequired": "Önce kimliğinizin kilidini açın. Yayımlama bu kasaya sahip kimliği ister.",
-          "PersonNotRegistered": "Önce yukarıdaki Kimlik bloğundan kimliğinizi kaydedin. Bu cihaz kimliği tutuyor ama hiç bir sunucuya kaydetmedi, bu yüzden yayımlanacak bir hesap yok.",
-          "NotEnrolled": "Bu kasa bu cihazın kayıtlı olmadığı bir hesaba ait. Önce cihazı o hesaba ekleyin.",
-          "NotOwner": "Bu kasa zaten başka bir kimliğe ait, bu yüzden burada yayımlanamaz.",
-          "Unauthenticated": "Sunucu bu cihazı reddetti. Tekrar deneyin, devam ederse yeniden kaydedin.",
-          "Transport": "Sunucuya ulaşılamadı. Kasa değişmedi; tekrar deneyin.",
-          "TlsFailure": "Güvenilir bir bağlantı kurulamadı. Kasa değişmedi; tekrar deneyin.",
-          "BadRequest": "Bu kasann üst verisi okunamadı. Hiçbir şey gönderilmedi.",
-          "Other": "Yayımlama başarısız oldu. Kasa değişmedi; tekrar deneyin."
-        }
       }
     },
     "reconcile": {

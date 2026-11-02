@@ -717,7 +717,7 @@ pub async fn run_active_cycle_from_host(
     // reporting it here would bury a corrupt file under normal traffic. A device
     // whose sync silently stopped, with nothing in the log saying why, is the
     // failure this distinction exists to prevent.
-    let st = match super::state::read_sync_state(io, &dir).await {
+    let mut st = match super::state::read_sync_state(io, &dir).await {
         Ok(st) => st,
         Err(_) => {
             tracing::error!(
@@ -726,6 +726,90 @@ pub async fn run_active_cycle_from_host(
             );
             return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
         }
+    };
+    // Publishing is automatic (myne-md/myne#974), and this is the only place it
+    // happens: the first cycle that has an endpoint, a registered identity and a
+    // person session publishes the vault, so "is this vault on my server" no longer
+    // depends on the user finding a control in Settings. `publish_if_due` answers
+    // "not due" for every missing precondition, so this arm is silent on a legacy
+    // vault, on an unpublished vault with no endpoint, and on a device whose
+    // identity is locked or was never registered.
+    //
+    // **`allow_push` is what keeps this off the ambient tick.** A poll cycle is
+    // pull-only, and a vault must not be uploaded because thirty seconds passed:
+    // the preconditions were supplied by user acts (connecting a server,
+    // registering the identity, connecting a device) and the acts themselves ask
+    // (`person_register_with_path` publishes the moment the identity registers),
+    // while a PUSH cycle is one the user caused by editing, by pressing Sync now or
+    // by opening a verify screen. Without the gate a device left running with a
+    // configured server would publish an hour after the user last touched it, which
+    // is exactly the ambient behaviour this feature was told not to have.
+    //
+    // The re-read is what carries the namespace into the resolution below, and it is
+    // a read rather than an assumption because `publish_vault` is the writer: the
+    // namespace, the meta baseline and the timestamp land in one state write, and
+    // duplicating that here would be a second opinion about the same record.
+    let st = if st.namespace_hex.is_none() && allow_push {
+        match super::publish::publish_if_due(host, io, &dir).await {
+            Ok(Some(outcome)) => match super::state::read_sync_state(io, &dir).await {
+                Ok(fresh) => fresh,
+                Err(_) => {
+                    // The publish DID land; only the read-back failed. Falling back
+                    // to the pre-publish state would hide the namespace and make the
+                    // next tick publish again, so the outcome is carried instead.
+                    tracing::warn!(
+                        stage = "publish_if_due",
+                        "published, but sync-state.json could not be re-read; \
+                         carrying the outcome's namespace"
+                    );
+                    let mut carried = st;
+                    carried.namespace_hex = Some(outcome.namespace_hex.clone());
+                    carried
+                }
+            },
+            Ok(None) => st,
+            Err(e) => {
+                tracing::warn!(
+                    stage = "publish_if_due",
+                    error = ?e,
+                    "an unpublished person-born vault could not be published"
+                );
+                st
+            }
+        }
+    } else {
+        // Already published: the only thing left is the REPAIR case, which nothing
+        // local can see. The server may have lost the vault (an account reset, a
+        // restored server), leaving every scoped request addressing a namespace it
+        // has never heard of, with no control left to press now that publishing is
+        // automatic. `repair_if_unbound` asks the account's binding list and
+        // re-publishes only when this vault is missing from it. Gated on
+        // `allow_push` and stamped on disk, so the poll path does not pay a request
+        // per tick, and neither does a verification screen calling `sync_now` once a
+        // second.
+        if allow_push {
+            match super::publish::repair_if_unbound(host, io, &dir).await {
+                Ok(Some(outcome)) => {
+                    st = match super::state::read_sync_state(io, &dir).await {
+                        Ok(fresh) => fresh,
+                        Err(_) => {
+                            let mut carried = st;
+                            carried.namespace_hex = Some(outcome.namespace_hex.clone());
+                            carried
+                        }
+                    };
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        stage = "repair_if_unbound",
+                        error = ?e,
+                        "a published vault could not be re-published after a server-side loss"
+                    );
+                }
+            }
+        }
+        st
     };
     // A PUBLISHED person-born vault (myne-md/myne#911 task 8). Its namespace is
     // `vault.meta`'s random binding and its credential is the person session, so

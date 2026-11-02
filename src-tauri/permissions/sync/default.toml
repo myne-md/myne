@@ -30,7 +30,6 @@ permissions = [
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
-    "allow-sync-publish-vault",
     "allow-sync-published-state",
     "allow-resolve-identity",
     "allow-sync-person-create-invite",
@@ -58,7 +57,12 @@ permissions = [
     # The explicit registration act (decisions/protocol/0719). It was DEFINED
     # below and absent from this bundle, so `sync:default` refused it and the
     # identity home's register button failed on every press (myne-md/myne#911
-    # review). `allow-sync-publish-vault` was the same omission one task earlier.
+    # review).
+    #
+    # `allow-sync-publish-vault` is DELETED for the reason stated two paragraphs
+    # down rather than re-listed: publishing moved into the sync cycle
+    # (myne-md/myne#974), so the command lost its last caller and a grant for a
+    # dead command is a permission nobody can audit.
     #
     # `allow-sync-person-create-identity` is deliberately NOT here: that command
     # had no caller on any client (the first run creates through `person_setup`,
@@ -153,11 +157,6 @@ commands.allow = ["sync_materialisation_progress"]
 identifier = "allow-sync-now"
 description = "Allow invoking sync:sync_now (request an immediate sync; returns the resulting status). No new vault access beyond the engine's authed session."
 commands.allow = ["sync_now"]
-
-[[permission]]
-identifier = "allow-sync-publish-vault"
-description = "Allow invoking sync:sync_publish_vault (publish this vault's metadata under the identity the device holds, binding the owner on the server's first write). Writes no vault content: one opaque vault.meta PUT plus a device-local record."
-commands.allow = ["sync_publish_vault"]
 
 [[permission]]
 identifier = "allow-sync-published-state"

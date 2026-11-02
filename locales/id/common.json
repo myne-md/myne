@@ -4253,7 +4253,6 @@
         "bar": "bilah bawah bilah status indikator kustomisasi urutkan ulang sembunyikan tampilkan bilah alat",
         "syncDeviceBindings": "perangkat diklaim oleh anggota atribusi siapa yang menandatangani perangkat mana milik siapa",
         "vaultFormat": "format brankas peningkatan pemulihan satu frasa pensiun brankas frasa pemulihan migrasi identitas",
-        "publishVault": "terbitkan brankas yang diterbitkan server hanya perangkat sinkronisasi",
         "externalAccess": "akses eksternal MCP myne-mcp Claude Desktop koneksi klien setujui cakupan cabut",
         "diagnosticLog": "log diagnostik pencatatan debug pemecahan masalah laporan crash laporan bug dukungan diagnostic log"
       },
@@ -4745,26 +4744,6 @@
         "account": "Akun",
         "server": "Server",
         "devices": "Perangkat di akun Anda"
-      },
-      "publish": {
-        "label": "Terbitkan ke server Anda",
-        "cta": "Terbitkan brankas ini",
-        "republishCta": "Terbitkan lagi",
-        "deviceOnlyHelper": "Brankas ini ada hanya di perangkat ini. Menerbitkan mengikatnya ke identitas Anda agar perangkat lain dapat membukanya.",
-        "publishedHelper": "Diterbitkan {{when}}. Brankas ini ada di server sinkronisasi Anda, jadi perangkat lain dapat menjangkaunya.",
-        "publishedHelperNoDate": "Diterbitkan. Brankas ini ada di server sinkronisasi Anda, jadi perangkat lain dapat menjangkaunya.",
-        "error": {
-          "NotConfigured": "Atur server sinkronisasi terlebih dahulu, di Sinkronisasi di atas.",
-          "PersonSessionRequired": "Buka kunci identitas Anda terlebih dahulu. Penerbitan memerlukan identitas yang memiliki brankas ini.",
-          "PersonNotRegistered": "Daftarkan identitas Anda terlebih dahulu, di blok Identitas di atas. Perangkat ini menyimpan identitas tetapi belum pernah mendaftarkannya ke server, jadi tidak ada akun untuk diterbitkan di bawahnya.",
-          "NotEnrolled": "Brankas ini milik akun yang perangkat ini belum terdaftar di dalamnya. Tambahkan perangkat ke akun itu terlebih dahulu.",
-          "NotOwner": "Brankas ini sudah milik identitas lain, jadi tidak dapat diterbitkan di sini.",
-          "Unauthenticated": "Server menolak perangkat ini. Coba lagi, dan daftar ulang jika terus terjadi.",
-          "Transport": "Tidak dapat menjangkau server. Brankas tidak berubah; coba lagi.",
-          "TlsFailure": "Tidak dapat membangun koneksi terpercaya. Brankas tidak berubah; coba lagi.",
-          "BadRequest": "Metadata brankas ini tidak dapat dibaca. Tidak ada yang dikirim.",
-          "Other": "Penerbitan gagal. Brankas tidak berubah; coba lagi."
-        }
       }
     },
     "reconcile": {

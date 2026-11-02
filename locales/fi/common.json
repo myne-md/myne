@@ -4253,7 +4253,6 @@
         "bar": "alapalkki tilarivi ilmaisimet mukauta järjestä piilota näytä työkalurivi",
         "syncDeviceBindings": "laitteet jäsenten ilmoittamat kuka allekirjoitti mikä laite kuuluu",
         "vaultFormat": "holvin muoto päivitä yhden lauseen palautus eläköity holvi palautuslause siirrä identiteetti",
-        "publishVault": "julkaise julkaistu holvi palvelin vain laite synkronointi",
         "externalAccess": "ulkoinen pääsy MCP myne-mcp Claude Desktop asiakas yhteys hyväksy rajaus peruuta",
         "diagnosticLog": "diagnostiikkaloki lokitus virheenjäljitys vianmääritys kaatumisraportti virheraportti tuki"
       },
@@ -4745,26 +4744,6 @@
         "account": "Tili",
         "server": "Palvelin",
         "devices": "Tilisi laitteet"
-      },
-      "publish": {
-        "label": "Julkaise palvelimellesi",
-        "cta": "Julkaise tämä holvi",
-        "republishCta": "Julkaise uudelleen",
-        "deviceOnlyHelper": "Tämä holvi on olemassa vain tällä laitteella. Julkaiseminen sitoo sen identiteettiisi, jotta muut laitteesi voivat avata sen.",
-        "publishedHelper": "Julkaistu {{when}}. Tämä holvi on synkronointipalvelimellasi, joten muut laitteesi tavoittavat sen.",
-        "publishedHelperNoDate": "Julkaistu. Tämä holvi on synkronointipalvelimellasi, joten muut laitteesi tavoittavat sen.",
-        "error": {
-          "NotConfigured": "Aseta ensin synkronointipalvelin, yllä kohdassa Synkronointi.",
-          "PersonSessionRequired": "Avaa identiteettisi ensin. Julkaiseminen tarvitsee vaultin omistavan identiteetin.",
-          "PersonNotRegistered": "Rekisteröi identiteettisi ensin yllä olevassa Identiteetti-lohkossa. Tämä laite pitää identiteettiä, mutta ei ole koskaan rekisteröinyt sitä palvelimelle, joten tiliä, jonka alle julkaista, ei ole.",
-          "NotEnrolled": "Tämä holvi kuuluu tilille, jolle tätä laitetta ei ole lisätty. Lisää laite siihen tiliin ensin.",
-          "NotOwner": "Tämä holvi kuuluu jo toiselle identiteetille, joten sitä ei voi julkaista täällä.",
-          "Unauthenticated": "Palvelin hylkäsi tämän laitteen. Yritä uudelleen, ja lisää laite uudelleen, jos ongelma toistuu.",
-          "Transport": "Palvelinta ei tavoitettu. Holvi on ennallaan; yritä uudelleen.",
-          "TlsFailure": "Luotettua yhteyttä ei voitu muodostaa. Holvi on ennallaan; yritä uudelleen.",
-          "BadRequest": "Tämän holvin metatietoja ei voitu lukea. Mitään ei lähetetty.",
-          "Other": "Julkaiseminen epäonnistui. Holvi on ennallaan; yritä uudelleen."
-        }
       }
     },
     "reconcile": {
