@@ -89,6 +89,14 @@ ignore = [
     # destination, SUID/SGID bits preserved, permissions applied through a
     # symlink). The fix upstream is `>=9.0.0`.
     #
+    # RUSTSEC-2026-0429 (GHSA-q7v9-x93c-xqv3, added here 2026-11-03) is the same
+    # function reached from the other end: `extract()` sizes its symlink-target
+    # buffer from the `uncompressed_size` the central directory declares, before
+    # reading a byte of entry data, and ZIP64 widens that to a full `u64` with no
+    # cross-check against the compressed size or the archive length, so a crafted
+    # archive asks for an arbitrary allocation. It is a fourth advisory on the
+    # sink, not a new surface, and the argument below is about the sink.
+    #
     # No call to any of them exists in this workspace, which is the whole
     # argument:
     #
@@ -118,6 +126,7 @@ ignore = [
     "RUSTSEC-2026-0367",  # zip: SUID/SGID bits preserved during extraction
     "RUSTSEC-2026-0368",  # zip: extracted symlink may point outside the destination
     "RUSTSEC-2026-0369",  # zip: permissions applied through extracted symlinks
+    "RUSTSEC-2026-0429",  # zip: symlink-target buffer sized from the declared uncompressed size
 
     # ── the `zbus` family, unmaintained (2026-10-17) ─────────────────────────
     # RUSTSEC-2026-0370 / -0371 / -0372: upstream merged `zvariant`,
@@ -134,29 +143,16 @@ ignore = [
     "RUSTSEC-2026-0371",  # zbus_names unmaintained (merged into zbus 6)
     "RUSTSEC-2026-0372",  # zvariant_derive unmaintained (merged into zbus 6)
 
-    # ── the yanked-but-unfixable `zip` 1.x line (2026-10-16) ──────────
-    # `zip 1.1.4` is reached through `candle-core 0.8.4`'s NON-optional
-    # `zip = "^1.1.1"`, and every 1.x release is yanked upstream — cargo prints
-    # 1.2.1 … 1.3.1 as yanked and refuses to select any of them. So no
-    # semver-compatible replacement exists: `cargo update -p zip@1.1.4` fails by
-    # design, and so does a FULL `cargo update`, which is the part worth stating
-    # — Cargo.lock cannot currently be regenerated from scratch.
-    #
-    # A crate-scoped exemption rather than a repo-wide `yanked = "warn"`: the
-    # check still denies a yank on every other crate, including the `zip` our
-    # own attachment extractor uses. A repo-wide warn would have hidden exactly
-    # the class that bit us at v0.4 (`zip 2.4.2` yanked, and nothing looked).
-    #
-    # No advisory is attached to 1.1.4 — RUSTSEC-2025-0168 lists
-    # `unaffected = ["< 1.3.0"]` — so this is upstream's bulk yank of the whole
-    # 1.x line, not a security statement about this version.
-    #
-    # The real fix is the candle bump that moves `zip` onto a live major
-    # (candle 0.9.2+ asks for ^7.2.0), and that touches the whole on-device AI
-    # stack on desktop AND mobile plus this workspace's `[profile.dev.package]`
-    # gemm overrides — a separate change with its own review. Re-argue this entry
-    # the day candle moves; do not re-date it.
-    { crate = "zip@1.1.4", reason = "every zip 1.x is yanked upstream while candle-core 0.8.4 requires ^1.1.1, so no compatible replacement exists; no advisory attaches to it (RUSTSEC-2025-0168 unaffected = < 1.3.0). Real fix is the candle bump onto a live zip major." },
+    # ── the `zip` 1.x yank, LIFTED (checked 2026-11-03) ──────────────────
+    # `zip 1.1.4` still reaches us through `candle-core 0.8.4`'s non-optional
+    # `zip = "^1.1.1"`, and its yank exemption lived here from 2026-10-16 until
+    # the day upstream unyanked the line. `cargo deny check advisories` says so
+    # in its own words now ("yanked crate not detected"), which is how to tell:
+    # an exemption that no longer names a real yank licenses the next one for
+    # free. The candle bump onto a live `zip` major is still the real fix, and
+    # it is still a separate change (candle 0.9.2+ asks for ^7.2.0, which
+    # touches the on-device AI stack on desktop AND mobile plus the
+    # `[profile.dev.package]` gemm overrides).
 ]
 
 # ─────────────────────────────────────────────────────────────────────
