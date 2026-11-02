@@ -288,8 +288,7 @@ fn main() {
             // (without it the `device-binding:` permissions flatten into `__app-acl__`
             // and never match the `plugin:device-binding|<cmd>` authorize form); keep it
             // lock-stepped with `permissions/device-binding/default.toml`.
-            tauri_build::InlinedPlugin::new()
-                .commands(&["device_bindings_list", "device_bindings_claim"]),
+            tauri_build::InlinedPlugin::new().commands(&["device_bindings_list"]),
         )
         .plugin(
             "notes",

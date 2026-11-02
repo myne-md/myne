@@ -418,6 +418,35 @@ fn beats(a: &DeviceBindingEntry, b: &DeviceBindingEntry) -> bool {
     a.signature_hex > b.signature_hex
 }
 
+/// Whether one device's two copies are the tie [`merge_device_bindings`] refuses: the
+/// same `device_id`, the same version, two different people. Named once, because the
+/// merge and [`conflicting_device_ids`] must answer it identically and a second copy of
+/// the condition is how the two would drift.
+fn is_conflicting(incoming: &DeviceBindingEntry, current: &DeviceBindingEntry) -> bool {
+    incoming.version == current.version && incoming.person_fingerprint != current.person_fingerprint
+}
+
+/// The devices whose two copies are that unresolvable tie, by map key.
+///
+/// [`merge_device_bindings`] answers [`DeviceBindingBlobError::ConflictingBinding`] for
+/// the WHOLE map, and its error names no device. That leaves a caller unable to tell the
+/// one case it can end from the one it cannot: re-writing its OWN row at a strictly
+/// higher version separates a pair it is party to, and does nothing at all to a pair
+/// between two other members, because `reclaim_self_in_dir` moves only its own key. So
+/// the caller asks this question instead of assuming an answer (myne-md/myne#976).
+///
+/// Reads the same two maps through the same predicate as the merge, so the two can never
+/// disagree about what a conflict is.
+pub fn conflicting_device_ids(a: &DeviceBindingsMap, b: &DeviceBindingsMap) -> Vec<String> {
+    b.iter()
+        .filter(|(device, incoming)| {
+            a.get(device.as_str())
+                .is_some_and(|current| is_conflicting(incoming, current))
+        })
+        .map(|(device, _)| device.clone())
+        .collect()
+}
+
 /// Merge two copies of the map entry by entry. Newest version wins per device, and at
 /// equal version a tombstone beats a live entry; a device that only one side carries
 /// is taken as-is. The result does not depend on argument order, so two devices that
@@ -456,9 +485,7 @@ pub fn merge_device_bindings(
                 out.insert(device.clone(), incoming.clone());
             }
             Some(current) => {
-                if incoming.version == current.version
-                    && incoming.person_fingerprint != current.person_fingerprint
-                {
+                if is_conflicting(incoming, current) {
                     return Err(DeviceBindingBlobError::ConflictingBinding);
                 }
                 if beats(incoming, current) {
@@ -1191,6 +1218,63 @@ mod tests {
                 .unwrap()
                 .person_fingerprint,
             fp(2)
+        );
+    }
+
+    #[test]
+    fn the_named_conflicts_are_exactly_the_pairs_the_merge_refuses() {
+        // `conflicting_device_ids` exists so a caller can tell a tie on its OWN device
+        // (which a re-claim at a higher version separates) from one between two peers
+        // (which no local write moves). It is only useful if it names precisely the pairs
+        // `merge_device_bindings` refuses, so this asserts the two agree in BOTH
+        // directions over four shapes rather than asserting the ids alone: a set that
+        // missed the refused device would leave the caller repairing nothing, and one
+        // that named a device the merge resolves would have it re-write a row that was
+        // never in dispute.
+        let mut mine = DeviceBindingsMap::new();
+        mine.insert(id(1), entry(&fp(1), 4, false));
+        // A second device only this side carries: merging it is never a refusal.
+        mine.insert(id(9), entry(&fp(1), 2, false));
+
+        // 1. The tie, alone.
+        let mut theirs = DeviceBindingsMap::new();
+        theirs.insert(id(1), entry(&fp(2), 4, false));
+        assert_eq!(
+            merge_device_bindings(&mine, &theirs).map(|_| ()),
+            Err(DeviceBindingBlobError::ConflictingBinding)
+        );
+        assert_eq!(conflicting_device_ids(&mine, &theirs), vec![id(1)]);
+        assert_eq!(
+            conflicting_device_ids(&theirs, &mine),
+            vec![id(1)],
+            "the answer must not depend on argument order, like the merge it mirrors"
+        );
+
+        // 2. A strictly higher version is a REPAIR, not a conflict, and the pair of maps
+        //    that carries one is the state a successful reclaim leaves behind.
+        let mut repaired = DeviceBindingsMap::new();
+        repaired.insert(id(1), entry(&fp(2), 5, false));
+        assert!(merge_device_bindings(&mine, &repaired).is_ok());
+        assert!(conflicting_device_ids(&mine, &repaired).is_empty());
+
+        // 3. A tombstone at the same version does not rescue the tie, so it must still be
+        //    named: this is the arm a "tombstone wins" reading of the rule would miss.
+        let mut dead = DeviceBindingsMap::new();
+        dead.insert(id(1), entry(&fp(2), 4, true));
+        assert!(merge_device_bindings(&mine, &dead).is_err());
+        assert_eq!(conflicting_device_ids(&mine, &dead), vec![id(1)]);
+
+        // 4. TWO tied devices: a caller told only "a conflict happened" cannot ask whether
+        //    either is its own, which is the whole reason the boundary is handed ids
+        //    instead of a flag.
+        let mut two = DeviceBindingsMap::new();
+        two.insert(id(1), entry(&fp(2), 4, false));
+        two.insert(id(9), entry(&fp(2), 2, false));
+        assert!(merge_device_bindings(&mine, &two).is_err());
+        assert_eq!(
+            conflicting_device_ids(&mine, &two),
+            vec![id(1), id(9)],
+            "every tied device is named, sorted by the map's own key order"
         );
     }
 

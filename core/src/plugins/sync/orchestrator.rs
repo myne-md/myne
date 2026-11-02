@@ -141,6 +141,19 @@ pub struct SyncSummary {
     /// refresh choreography lives at the command boundary, and a devices panel re-reads
     /// the map over IPC on demand.
     pub device_bindings_applied_remote: bool,
+    /// The binding merge refused a conflict this cycle: two copies bound one device to two
+    /// people at the SAME version (myne-md/myne#976).
+    ///
+    /// **Names the devices rather than just saying "a conflict happened", and that is
+    /// load-bearing.** The phase cannot repair a conflict (it is deliberately
+    /// `AppHandle`-free AND session-free: it holds no `VaultRuntimeState`, so it cannot
+    /// sign a row). The cycle boundary can, but only for THIS device: `reclaim_self_in_dir`
+    /// moves this device's own key, so re-writing it does nothing whatsoever to a pair
+    /// between two other members. A bare flag would have the boundary bump and re-seal its
+    /// own row every cycle for a conflict it cannot touch, never push it (this path records
+    /// no baseline), and log a repair that repaired nothing, which is the silent freeze
+    /// this change exists to end wearing a green tick. Empty means no conflict.
+    pub device_bindings_conflict: Vec<String>,
 
     /// Changed-note downloads skipped WITHOUT any local mutation this cycle:
     /// the body was 404/410 (reclaimed, §11.3) or its bytes failed the header
@@ -3897,6 +3910,12 @@ struct DeviceBindingsPhase {
     /// The exact bytes to push, carried out of the phase whenever `dirty` (the myne#436
     /// single-derivation discipline: the push site never re-derives a key).
     push_bytes: Option<Vec<u8>>,
+    /// `merge_device_bindings` answered `ConflictingBinding`: nothing was written and the
+    /// cycle recorded no baseline. Carried out rather than only logged because the repair is
+    /// a SIGNED write, which this phase cannot perform (it holds no session) and the cycle
+    /// boundary can. The keys say WHICH devices are tied, so the boundary repairs only a pair
+    /// this device is party to ([`conflicting_device_ids`]).
+    conflict: Vec<String>,
 }
 
 impl DeviceBindingsPhase {
@@ -3907,6 +3926,7 @@ impl DeviceBindingsPhase {
             dirty: false,
             applied_remote: false,
             push_bytes: None,
+            conflict: Vec::new(),
         }
     }
 }
@@ -4057,12 +4077,17 @@ async fn sync_device_bindings_phase(
         let merged = match merge_device_bindings(&local_map, &remote_map) {
             Ok(merged) => merged,
             Err(_) => {
+                let conflicts = protocol::conflicting_device_ids(&local_map, &remote_map);
                 tracing::warn!(
                     stage = "device_bindings",
                     event = "merge_conflict",
-                    "two copies bind one device to two people at the same version; no local mutation"
+                    conflicts = conflicts.len(),
+                    "two copies bind one device to two people at the same version; no local mutation, the cycle boundary re-claims this device's own row if it is one of them"
                 );
-                return Ok(DeviceBindingsPhase::idle());
+                return Ok(DeviceBindingsPhase {
+                    conflict: conflicts,
+                    ..DeviceBindingsPhase::idle()
+                });
             }
         };
         let applied_remote = merged != local_map;
@@ -4095,6 +4120,7 @@ async fn sync_device_bindings_phase(
             dirty,
             applied_remote,
             push_bytes: dirty.then_some(bytes),
+            conflict: Vec::new(),
         });
     }
 
@@ -4111,6 +4137,7 @@ async fn sync_device_bindings_phase(
         dirty,
         applied_remote: false,
         push_bytes: if dirty { local_bytes } else { None },
+        conflict: Vec::new(),
     })
 }
 
@@ -7647,6 +7674,7 @@ async fn sync_cycle_attempt(
             .unwrap_or(false),
         member_names_applied_remote: names_phase.applied_remote,
         device_bindings_applied_remote: bindings_phase.applied_remote,
+        device_bindings_conflict: bindings_phase.conflict,
         pull_skipped,
         dropped,
         pulled_note_ids,
@@ -16745,6 +16773,83 @@ mod tests {
                 "the offline claim survived"
             );
             assert!(on_disk.contains_key(&hex(&theirs)), "and so did the peer's");
+            std::fs::remove_dir_all(&dir).ok();
+        }
+
+        // A merge the codec REFUSES is carried OUT of the phase, not only logged
+        // (myne-md/myne#976).
+        //
+        // The phase cannot repair it: the repair is a signed write and the phase holds no
+        // session, deliberately (it is `AppHandle`-free AND session-free so `sim.rs` can
+        // drive it). So the one thing it must not do is swallow the conflict, which is what
+        // made a single forged row a SILENT, permanent freeze of the store: the codec
+        // refuses the whole map rather than the row, no baseline was recorded, and every
+        // later cycle retried the same refusal with nothing on any surface saying so.
+        #[test]
+        fn a_refused_merge_is_reported_and_mutates_nothing() {
+            let dir = scratch("bindings-conflict-reported");
+            seed_meta(&dir);
+
+            let me = person(0x11, 0x12, 0x13);
+            let device = [0x21; 16];
+            write_local(&dir, &one_row(&me, &device, 1));
+            let before = std::fs::read(device_bindings_file_path(&dir)).unwrap();
+
+            // The ONE pair with no winner: the same device, the same version, a different
+            // person. Expressed as a co-member's row so the fixture reaches the state the
+            // refusal needs: a row for a different DEVICE would merge cleanly and this test
+            // would prove nothing.
+            let them = person(0x31, 0x32, 0x33);
+            let remote_bytes = protocol::encode_device_binding_blob(
+                &bindings_key(),
+                &HASH,
+                EPOCH,
+                &one_row(&them, &device, 1),
+            )
+            .unwrap();
+            assert!(
+                protocol::merge_device_bindings(
+                    &one_row(&me, &device, 1),
+                    &one_row(&them, &device, 1)
+                )
+                .is_err(),
+                "the fixture must be a conflict the codec really refuses, or the phase's \
+                 flag would be asserting the wrong thing"
+            );
+
+            let mut st = SyncState::default();
+            let t = FakeTransport::new();
+            let id = device_bindings_sync_id(&group_tier()).unwrap();
+            let rec = serve_remote(&t, &id, &remote_bytes, 4);
+
+            let phase = blocking(sync_device_bindings_phase(
+                &IO,
+                &t,
+                "tok",
+                &group_tier(),
+                &dir,
+                &mut st,
+                &id,
+                Some(&rec),
+            ))
+            .unwrap();
+            assert_eq!(
+                phase.conflict,
+                vec![protocol::hex::encode_lower(&device)],
+                "a refused merge must reach the cycle boundary naming the DEVICE that is tied, \
+                 which is the only frame that can sign the repair and the only way it can tell a \
+                 pair it can separate from one between two other members"
+            );
+            assert!(
+                !phase.dirty && !phase.applied_remote && phase.push_bytes.is_none(),
+                "a refused merge writes nothing: reporting the conflict must not become a \
+                 merge that guessed a winner"
+            );
+            assert_eq!(
+                std::fs::read(device_bindings_file_path(&dir)).unwrap(),
+                before,
+                "the local store is byte-untouched by the refusal"
+            );
             std::fs::remove_dir_all(&dir).ok();
         }
     }

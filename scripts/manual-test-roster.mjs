@@ -7189,7 +7189,6 @@ export const ROSTER = Object.freeze([
       "web/src/components/sync/EndpointConfig.tsx",
       "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
-      "web/src/components/sync/DeviceAttributionPanel.tsx",
       "web/src/components/settings/MigrateVaultForm.tsx",
       "web/src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "scripts/check-web-capabilities.mjs",

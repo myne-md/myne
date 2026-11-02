@@ -591,7 +591,7 @@ const V = {
   ],
   "src/hooks/useDeviceBindings.ts": [
     "typed-unsupported",
-    "The device-binding commands (myne-md/myne#852) are `Class::Unsupported` on web: the store is `NTV6`-only and group-tier sealed, and `memberSharing` is absent, so a browser has neither a group key nor a person identity to reach it with. Its only importer is `DeviceAttributionPanel`, itself substituted out of the bundle, so the hook does not reach served code. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file, exactly as `useRoster` one row up.",
+    "The device-binding read (myne-md/myne#852, `plugin:device-binding|device_bindings_list`) is `Class::Unsupported` on web: the store is `NTV6`-only and group-tier sealed, and `memberSharing` is absent, so a browser has neither a group key nor a person identity to reach it with. Its one importer is `MemberRosterPanel`, which `SyncPanel` renders only under `hasCapability(\"memberSharing\")`, so the hook is in the graph and never runs. Recorded as typed-unsupported rather than excluded because the absence is a capability refusal, not a build-time substitution of this file, exactly as `useRoster` one row up. It had a second command (`device_bindings_claim`) until myne-md/myne#976; that write is now the sync cycle's own automatic repair.",
   ],
   "src/lib/invite.ts": [
     "typed-unsupported",
@@ -599,7 +599,7 @@ const V = {
   ],
   "src/lib/deviceBindings.ts": [
     "typed-unsupported",
-    "The device-to-person binding bindings (myne-md/myne#852, `plugin:device-binding|*`), `Class::Unsupported` on web for the same reason as the rest of the member surface: the store is `NTV6`-only and group-tier sealed. Its only importer is `DeviceAttributionPanel`, substituted out of the bundle, so nothing here reaches served code.",
+    "The device-to-person binding read (myne-md/myne#852, `plugin:device-binding|device_bindings_list`), `Class::Unsupported` on web for the same reason as the rest of the member surface: the store is `NTV6`-only and group-tier sealed. Its one importer is `useDeviceBindings`, reached only from `MemberRosterPanel`, which renders only where `memberSharing` exists.",
   ],
   "src/lib/memberNames.ts": [
     "typed-unsupported",

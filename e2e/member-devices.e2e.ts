@@ -280,27 +280,6 @@ async function openWhoIsHere(session: Session): Promise<void> {
   );
 }
 
-/** Every row of the vault's device list, as `{ id, text }`.
- *
- *  Read fresh PER ROUND rather than held as handles, for the reason
- *  `e2e/AGENTS.md` gives: the list re-renders on every sync tick, so a handle
- *  taken before one is stale on the next and a click or read on it can only
- *  time out. `id` is the row's `data-device-id`, which the panel deliberately
- *  writes as the 16-character PREFIX of the device id (the full 32-hex value
- *  never reaches the DOM), so a caller comparing against a full id slices the
- *  same way. `text` is the whole row, which is `label + claim + [badge]`. */
-async function readDeviceRows(
-  session: Session,
-): Promise<Array<{ id: string; text: string }>> {
-  const rows = await session.byTestIdAll("device-bindings.row");
-  return Promise.all(
-    rows.map(async (row) => ({
-      id: (await row.attribute("data-device-id")) ?? "",
-      text: ((await row.text()) ?? "").trim(),
-    })),
-  );
-}
-
 /** Publish ONE presence frame from `session` for `noteId`. *
  *  `label: null` is the whole point and is also what production does: the backend
  *  command stores it verbatim (`signal.set_local_label(label)`), and the supervisor
@@ -661,19 +640,24 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       ).toEqual([]);
 
 
-      // ---- the owner's device list, which is what story 11 is for ----
+      // ---- the owner's side: the durable join, asked the way both surfaces ask it ----
       //
-      // The panel reads the VAULT-scoped `device_bindings_list` and never the account
-      // roster: a member's device is enrolled on the MEMBER's own account, so
-      // `sync_list_devices` on the owner can never carry it, and there is no row on the
-      // owner's device-management panel to augment. That is why this is a read of its
-      // own rather than an assertion over a surface the scenario already had open.
+      // The settings block that listed the vault's devices with the member each was
+      // claimed by is GONE (myne-md/myne#976): it was a management-shaped list with no
+      // management actions, and it restated on a fourth surface what the account device
+      // list, the member list and the row's own signature already said. What it proved
+      // here still has to be proved, because the live presence roster and the version
+      // history both depend on it: the owner can turn a member's DEVICE ID into that
+      // member. That hop is `durable_attribution_in_dir` -> device id -> bound person ->
+      // the owner-signed roster -> that person's own signed name row, reached through
+      // `plugin:sync|resolve_identity`. It is the SAME resolver the history rows above
+      // went through, asked from the other side of the vault.
       //
-      // Read the second device's OWN id first, so the owner-side assertion is about a
-      // SPECIFIC device rather than about "some row carries a name", which a list
-      // holding only the owner's own device would satisfy. The read is a page-seat
-      // invoke of production IPC, which is the sanctioned way to reach a backend path
-      // on a device whose UI this scenario has already finished with.
+      // The member's own row is read first, so the owner-side assertion is about a
+      // SPECIFIC device rather than about "some actor resolves to a person", which an
+      // actor belonging to the owner would satisfy. The read is a page-seat invoke of
+      // production IPC, which is the sanctioned way to reach a backend path on a device
+      // whose UI this scenario has already finished with.
       //
       // The `.ok` hop is not decoration: `pageSeatInvoke` resolves with an
       // `{ok, err}` ENVELOPE (its declared type, and how every other caller reads
@@ -697,13 +681,10 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
         secondDeviceId,
         "the member's second device holds a verified binding naming itself",
       ).toBeTruthy();
-      // The panel writes the 16-character prefix, so that is the form to compare in.
-      const secondDevicePrefix = (secondDeviceId as string).slice(0, 16);
 
       await openSyncDevices(owner.session);
-      await owner.session.byTestId("device-bindings", { timeoutMs: 30_000 });
 
-      // The owner's half of the member-QR pair, read BEFORE the list settles: the
+      // The owner's half of the member-QR pair, read BEFORE the resolver settles: the
       // icon exists only where the ACTIVE session is a member of the vault, and an
       // owner's second device joins through the account-number path instead
       // (myne-md/myne). Placed here rather than after the wait below so it runs even
@@ -718,10 +699,17 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // bet on the two having met. Nudge and re-read, the shape `openNoteOn` uses.
       const nudgeOwner = makeNudger(owner.session);
       const nudgeSecond = makeNudger(second.session);
-      const ownerRows = await owner.session.waitUntil(
+      const ownerResolved = await owner.session.waitUntil(
         async () => {
-          const rows = await readDeviceRows(owner.session);
-          if (rows.some((row) => row.id === secondDevicePrefix)) return rows;
+          const resolved = (await pageSeatInvoke(
+            owner.session,
+            "plugin:sync|resolve_identity",
+            { actorHex: secondDeviceId },
+            20_000,
+          )) as { ok?: { kind?: string; name?: string }; err?: unknown };
+          if (resolved.ok?.kind === "Person" && resolved.ok.name === MEMBER_NAME) {
+            return resolved;
+          }
           // **Nudge the WRITER as well as the reader.** The row is claimed as the
           // tail of the join (`materialize_member_vault` →
           // `claim_own_binding_best_effort`), which runs AFTER that join's own sync
@@ -734,38 +722,61 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
           return null;
         },
         {
-          label: "the owner's device list carries a row for the member's second device",
+          label: "the owner's resolver turns the member's device id into the member's name",
           timeoutMs: SYNC_BUDGET_MS,
         },
       );
+      // The claim, stated as what it is: the owner's own device resolves the member's
+      // other machine to that member, through the same three stores the presence roster
+      // and the history read on every call.
+      expect(
+        ownerResolved.ok?.name,
+        `the owner attributes the member's second device to the member: ${JSON.stringify(ownerResolved)}`,
+      ).toBe(MEMBER_NAME);
 
-      // Story 11, asserted: the owner's list says WHICH MEMBER that device is claimed by,
-      // so the row reads as an attribution rather than as an opaque id.
-      const secondRow = ownerRows.find((row) => row.id === secondDevicePrefix);
+      // ---- the roster, which is where the removed panel's two facts live now ----
+      //
+      // The count is the fact nothing else said ("this member has two devices in THIS
+      // vault"), so it is read on the surface that renders it rather than through IPC:
+      // a `member-roster.device-count` row existing for the member is the panel's
+      // surviving half actually rendering, and its text names a number rather than an
+      // id (the roster never puts a device id beside a member's name, which is the one
+      // rule the old panel carried and this keeps).
+      const memberRow = await owner.session.waitUntil(
+        async () => {
+          const rows = await owner.session.byTestIdAll("member-roster.device-count");
+          const found = await Promise.all(
+            rows.map(async (row) => ((await row.text()) ?? "").trim()),
+          );
+          // Two devices, and not vacuous: the resolver above already resolved the
+          // member's device, so the store it read holds the row this count is built
+          // from. A "1" here would mean one of the member's two devices never claimed
+          // itself.
+          return found.some((text) => /\b2\b/.test(text)) ? found : null;
+        },
+        {
+          label: "the member's roster row counts both of their devices",
+          timeoutMs: 30_000,
+        },
+      );
       expect(
-        secondRow?.text,
-        `the owner's row for the member's second device names the member: ${JSON.stringify(ownerRows)}`,
-      ).toContain(MEMBER_NAME);
-      // Both of the member's devices, and it is not vacuous: the scenario established a
-      // hop earlier that this device's history resolved the FIRST device's revisions to a
-      // Person label, which needs that device's verified binding and the owner-signed
-      // roster, so the same two rows are in this store. A list of one would satisfy the
-      // assertion above while the panel still meant nothing.
+        memberRow.join(" | "),
+        `the roster counts the member's devices: ${JSON.stringify(memberRow)}`,
+      ).toMatch(/\b2\b/);
+      // **The wording is the rule, and it is asserted rather than left to review.** A row
+      // is signed by the person it names and binds NOTHING to the device
+      // (`protocol.md` §9.30.4), so `threat-model.md` AS26 requires a surface that puts a
+      // person beside a device to say "claimed": a member can sign a row naming a machine
+      // they do not run, and miss one they do. The deleted panel's own test was the only
+      // machine-check on that sentence, and this is where it lives now.
       expect(
-        ownerRows.filter((row) => row.text.includes(MEMBER_NAME)).length,
-        `both of the member's devices are on the owner's list: ${JSON.stringify(ownerRows)}`,
-      ).toBeGreaterThanOrEqual(2);
-
-      // Story 4, and the wording rule the panel exists to hold: the row's signature
-      // binds the row to the SIGNER and nothing to the device (`protocol.md` §9.30.4), so
-      // the honest claim is "claimed by" and never ownership. Asserted as copy rather
-      // than as a comment because a testid carries no opinion about the words.
-      expect(secondRow?.text).toContain("claimed by");
-      const ownerPanel = await owner.session.byTestId("device-bindings");
-      expect(
-        (await ownerPanel.text()) ?? "",
-        "no row on the owner's device list claims ownership",
-      ).not.toMatch(/belong|owned/i);
+        memberRow.join(" | "),
+        `the count is worded as a CLAIM, never as ownership: ${JSON.stringify(memberRow)}`,
+      ).toMatch(/claim/i);
+      const rosterText = (await (await owner.session.byTestId("member-roster")).text()) ?? "";
+      expect(rosterText, "the roster claims no ownership of a device").not.toMatch(
+        /belongs to|owned by/i,
+      );
     });
     // A FIVE-STEP, THREE-DEVICE scenario, and 180 s is the config default rather
     // than a decision anybody made about it. The step count is what it is: two

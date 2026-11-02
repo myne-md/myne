@@ -823,10 +823,9 @@ const PER_COMMAND: &[(&str, Class)] = &[
         "plugin:device-binding|device_bindings_list",
         Class::Unsupported,
     ),
-    (
-        "plugin:device-binding|device_bindings_claim",
-        Class::Unsupported,
-    ),
+    // `device_bindings_claim` was here until myne-md/myne#976 retired it from every
+    // host: the conflict it repaired is now repaired by the sync cycle's own
+    // boundary, which is core behaviour rather than a command a page could reach.
     // **The device-admission ceremony's five commands are GONE from this table,
     // not reclassified** (myne-md/myne#956, `design-notes/protocol/0764`). The
     // surface was withdrawn on both clients, so the shared tree names none of

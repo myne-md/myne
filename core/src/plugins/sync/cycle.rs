@@ -41,6 +41,15 @@ use zeroize::Zeroizing;
 /// Outcome of one orchestrated sync cycle, shared by `sync_now` (manual) and the
 /// background loop (`loop_control`). Honest "not ready" states (locked /
 /// unenrolled) are distinct from a genuine transport/protocol failure.
+///
+/// `large_enum_variant` is allowed rather than boxed: this value is returned once per
+/// cycle from one function and destructured immediately, so the size is one stack slot and
+/// never a collection of them, which is the shape the lint exists for. `SyncSummary` crossed
+/// clippy's 200-byte heuristic when the binding-conflict field became the list of tied
+/// devices (myne-md/myne#976), and the two alternatives both cost more than the bytes: a
+/// `Box` allocates for a value about to be moved out, and a single flag would leave the
+/// repair unable to tell the pair it can separate from one between two other members.
+#[allow(clippy::large_enum_variant)]
 pub enum CycleOutcome {
     /// No endpoint configured — sync is off.
     Disabled,
@@ -968,6 +977,14 @@ pub async fn run_active_cycle_from_host(
     // closure below, and the success stamp is written after it returns.
     let vault_root_for_stamp = dir.clone();
     let dir_for_prefs = dir.clone();
+    // Cloned for the conflict repair below: `dir` moves into the blocking closure.
+    let dir_for_bindings = dir.clone();
+    // The vault this cycle was started for. The repair below writes AFTER the whole cycle
+    // has run, so it re-reads the id and declines when the user has locked this vault and
+    // opened another in that window: the row's group key comes from the SESSION and its
+    // account hash from THIS vault's `vault.meta`, so a mismatch would seal this vault's
+    // store under another vault's key and every later read would refuse the file.
+    let cycle_vault_id = state.active_vault_id().await;
     // Snapshot the live-session note ids BEFORE the `'static` closure (task 7):
     // the registry itself cannot cross that boundary, but a plain `HashSet` can.
     let live_note_ids = live_registry.live_note_blob_ids();
@@ -1109,6 +1126,28 @@ pub async fn run_active_cycle_from_host(
     // Tauri app), so the emit lives at this boundary off the summary/error.
     let outcome = match res {
         Ok(Ok(summary)) => {
+            // A REFUSED device-binding merge is repaired here, once, because this is the
+            // only frame that can (myne-md/myne#976). The merge refuses the WHOLE map when
+            // two copies bind one device to two people at the same version, so one such row
+            // froze the store for every member on every later cycle, silently. The phase
+            // cannot sign the repair (it holds no session); this boundary holds the session
+            // and `write_mutex`, so it re-writes THIS device's own row at a strictly higher
+            // version and the next cycle's ordinary merge resolves the pair.
+            //
+            // What this does NOT do, stated because the log line has to be narrower than
+            // "fixed": it cannot stop a peer holding the group key from writing a row naming
+            // someone else, and it does not make that row verify. Attribution stays
+            // legibility rather than proof (§9.30.4). What it stops is a forged row ALSO
+            // being a permanent denial of the store.
+            repair_device_binding_conflict(
+                host,
+                io,
+                state,
+                &dir_for_bindings,
+                &cycle_vault_id,
+                &summary.device_bindings_conflict,
+            )
+            .await;
             // Index what the cycle wrote (myne#305). Every LOCAL note writer
             // does this through the hooks seam; the pull path could not, because
             // the orchestrator holds no `Hooks`, so the note went to disk and
@@ -1591,6 +1630,121 @@ pub async fn push_vault_meta_now_via_io(
     }
 }
 
+/// Repair a refused `vault.device-bindings` pair, from the one frame that can sign
+/// (myne-md/myne#976).
+///
+/// **Why here and not in the phase.** `merge_device_bindings` refuses the WHOLE map when
+/// two copies bind one device to two people at the same version, so a single such row froze
+/// the store for every member on every later cycle, in silence. Ending it needs a SIGNED
+/// write, and the phase is deliberately both `AppHandle`-free and session-free (it cannot
+/// hold the person identity). The cycle boundary holds the session, the host and the
+/// family's `write_mutex`, so the repair is a call, not a new mechanism.
+///
+/// **Only a pair this device is in.** `reclaim_self_in_dir` moves THIS device's key, so a
+/// bump fixes a tie on its own row and does nothing at all to a tie between two other
+/// members. Repairing the second case anyway would re-seal the whole map, never push it
+/// (this path records no baseline) and log a repair that repaired nothing, every cycle,
+/// with the row's version climbing. So the summary names the tied devices and the two cases
+/// are told apart rather than assumed equal.
+///
+/// **What it does not do**, stated because the log line has to be narrower than "fixed": it
+/// cannot stop a peer holding the group key from writing a row naming someone else, and it
+/// does not make that row verify. Attribution stays legibility rather than proof
+/// (`protocol.md` §9.30.4). It stops a forged row also being a permanent denial of the
+/// store. Quarantining the row itself instead of refusing the map is the real fix and needs
+/// a format generation (`0770` records it as the follow-up).
+///
+/// Native-only, and that is not a convenience: the whole repair signs with a person identity
+/// the web client never has, and `device_binding::commands` does not exist on `wasm32`. The
+/// call site stays unconditional so neither platform carries a `cfg` in the middle of the
+/// cycle.
+#[cfg(not(target_arch = "wasm32"))]
+async fn repair_device_binding_conflict(
+    host: &dyn HostCtx,
+    io: &'static dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    vault_dir: &std::path::Path,
+    started_for: &Option<crate::vault_id::VaultId>,
+    conflicts: &[String],
+) {
+    if conflicts.is_empty() {
+        return;
+    }
+    if state.active_vault_id().await != *started_for {
+        tracing::warn!(
+            stage = "device_bindings",
+            event = "conflict_vault_switched",
+            conflicts = conflicts.len(),
+            "the active vault changed while this cycle ran; the binding conflict is left to the next cycle rather than signed against a store this session no longer holds the key for"
+        );
+        return;
+    }
+    let own = match crate::plugins::device_binding::session_device_id(host, io, vault_dir).await {
+        Ok(id) => protocol::hex::encode_lower(&id),
+        Err(error) => {
+            // A never-enrolled vault has no row to re-write, so this is the quiet case as
+            // much as the loud one; either way the store stays as it was.
+            tracing::warn!(
+                stage = "device_bindings",
+                event = "conflict_unrepairable",
+                error = ?error,
+                "no device id to re-write, so the binding conflict was not repaired on this device"
+            );
+            return;
+        }
+    };
+    if !conflict_is_ours(conflicts, &own) {
+        tracing::warn!(
+            stage = "device_bindings",
+            event = "conflict_not_ours",
+            conflicts = conflicts.len(),
+            "a device-binding pair this device is not party to was refused; re-writing this device's row cannot separate it, so nothing was written"
+        );
+        return;
+    }
+    match crate::plugins::device_binding::reclaim_own_binding_with_dir(host, io, state, vault_dir)
+        .await
+    {
+        Ok(outcome) => tracing::info!(
+            stage = "device_bindings",
+            event = "conflict_reclaimed",
+            outcome = ?outcome,
+            "this device re-wrote its own binding row at a higher version; the next cycle's merge resolves the pair"
+        ),
+        Err(error) => tracing::warn!(
+            stage = "device_bindings",
+            event = "conflict_unrepaired",
+            error = ?error,
+            "the binding conflict could not be repaired on this device; the store stays frozen for now"
+        ),
+    }
+}
+
+/// Whether the refused pair includes THIS device, which is the only pair re-writing a row
+/// can separate ([`repair_device_binding_conflict`] states why the other case writes
+/// nothing).
+///
+/// An exact comparison, deliberately: `conflicts` holds the store's own map keys and
+/// `own_hex` comes from [`protocol::hex::encode_lower`] over the same 16 bytes, so the two
+/// are the same string by construction. A case-insensitive or prefix-shaped comparison here
+/// would repair rows that are not in dispute.
+fn conflict_is_ours(conflicts: &[String], own_hex: &str) -> bool {
+    conflicts.iter().any(|device| device == own_hex)
+}
+
+/// The `wasm32` arm of [`repair_device_binding_conflict`]: a browser tab holds no person
+/// identity and no device binding to re-write, so this is a decision rather than a gap.
+#[cfg(target_arch = "wasm32")]
+async fn repair_device_binding_conflict(
+    _host: &dyn HostCtx,
+    _io: &'static dyn crate::vault_io::VaultIo,
+    _state: &VaultRuntimeState,
+    _vault_dir: &std::path::Path,
+    _started_for: &Option<crate::vault_id::VaultId>,
+    _conflicts: &[String],
+) {
+}
+
 #[cfg(test)]
 mod tests {
     //! The AAD identity the cycle binds. Driven at [`cycle_account_number_hash`]
@@ -1600,6 +1754,39 @@ mod tests {
     //! runtime slot and a live server.
 
     use super::*;
+
+    /// The party-ness gate on the binding repair, tested for the ONE mistake that would
+    /// make it dangerous rather than merely useless: matching a device that is not the
+    /// one in the pair. `conflicts` holds the store's 32-char lowercase map keys and
+    /// `own_hex` is `encode_lower` over the same 16 bytes, so the two agree exactly; a
+    /// prefix, substring or case-insensitive comparison here would have the cycle re-sign
+    /// a row nothing is disputing, every cycle, and the pair would stay refused.
+    #[test]
+    fn a_conflict_is_ours_only_on_an_exact_device_id() {
+        let mine = "00112233445566778899aabbccddeeff";
+        // A second id that SHARES a prefix with mine: the fixture a `starts_with` arm would
+        // answer `true` on, which is why the pair is spelled out rather than using one id.
+        let neighbour = "00112233445566778899aabbccddee00";
+
+        assert!(super::conflict_is_ours(&[mine.to_string()], mine));
+        assert!(
+            super::conflict_is_ours(&[neighbour.to_string(), mine.to_string()], mine),
+            "my id is in the pair, whatever else is"
+        );
+        assert!(
+            !super::conflict_is_ours(&[neighbour.to_string()], mine),
+            "a device that merely shares a prefix with mine is not mine"
+        );
+        assert!(
+            !super::conflict_is_ours(&[mine.to_uppercase()], mine),
+            "the store's keys are lowercase hex and so is `encode_lower`; a case-different \
+             string is a different key, not the same one spelled differently"
+        );
+        assert!(
+            !super::conflict_is_ours(&[], mine),
+            "no conflict must never read as one on this device"
+        );
+    }
     use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
 
     /// **A device with no key store keeps signing `0x02`**, and every other reason the
