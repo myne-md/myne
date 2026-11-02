@@ -37,7 +37,19 @@ export interface RecoveryKitLabels {
 export interface RecoveryKitInput {
   /** The vault's name, or empty if the user left the name step blank. */
   vaultName: string;
-  /** Already-formatted date, so this module holds no locale logic. */
+  /**
+   * Already-formatted date, so this module holds no locale logic.
+   *
+   * `dateStyle: "medium"` in the user's own language, deliberately, and NOT the
+   * `civilDateIn` treatment `src/AGENTS.md` requires of a date the app stores:
+   * that rule exists because three call sites let a formatter's LAYOUT stand in
+   * for a value they then parsed and compared, and this one is never parsed or
+   * compared by any code. It is read by a person holding a printed kit, in the
+   * language they chose, which is what the medium style is for. The distinction
+   * is stated here rather than at the three call sites (`KitStep`,
+   * `CreateVaultFlow`, `IdentityFlow`) so a future reader can tell a decision
+   * from an oversight (myne-md/myne#972 review, D7 minor).
+   */
   savedOn: string;
   phrase: readonly string[];
   accountNumber: string;

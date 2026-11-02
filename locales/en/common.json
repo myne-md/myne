@@ -3760,6 +3760,7 @@
       "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
       "label": "Toolbar buttons",
       "lastShownHint": "Keep at least one",
+      "lastHiddenHint": "Keep at least one hidden",
       "moveDown": "Move down",
       "moveUp": "Move up"
     },

@@ -1,13 +1,13 @@
 // Lucide line-icons for the selection toolbar (issue #970, item 2).
 //
-// The toolbar used to draw its buttons as TEXT glyphs — `B`, `S`, `<>` and `↗`
+// The toolbar used to draw its buttons as TEXT glyphs: `B`, `S`, `<>` and `↗`
 // in the button's own font, with the italic and strikethrough ones faked by
 // `font-style` and `text-decoration`. At 28px beside a real editor that reads as
 // plain prose sitting on a surface rather than as controls, and two of the four
 // were indistinguishable from the letter the user had selected. Every button now
 // carries a glyph from the same family the rest of the app draws.
 //
-// **Composed via `createElementNS`, never `innerHTML`** — the staggering TB2
+// **Composed via `createElementNS`, never `innerHTML`**, the staggering TB2
 // discipline `editor/src/slash/icons.ts` records, and the reason this file is a
 // second DOM table rather than an import of `host/lib/icons.ts`: that table is
 // markup strings consumed by React's `<Icon>` (which owns the `{__html}`
@@ -123,7 +123,7 @@ function shapes(name: ToolbarIconName): SVGElement[] {
       ];
     case "wikilink":
       // Lucide `brackets`: the doubled square the `[[note]]` syntax is written
-      // in. Distinct from `link`'s chain on purpose — one makes a URL, the other
+      // in. Distinct from `link`'s chain on purpose: one makes a URL, the other
       // points at another note, and they are two different promises.
       return [
         el("path", { d: "M8 3H7a2 2 0 0 0-2 2v5.5" }),

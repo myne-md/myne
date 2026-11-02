@@ -191,7 +191,14 @@ export function ToolbarCustomizeSettings() {
     if (!loaded) return;
     const shown = !hiddenSet.has(id);
     if (shown && shownCount <= 1) return;
-    void persistHidden(shown ? [...hidden, id] : hidden.filter((h) => h !== id));
+    const next = shown ? [...hidden, id] : hidden.filter((h) => h !== id);
+    // Un-hiding the LAST hidden control would persist `[]`, and `[]` reads back
+    // as "never customized" (`resolveToolbarHidden`), so the stored layout would
+    // silently revert to the default set on the next read (myne-md/myne#972
+    // review, D8). The hidden set therefore always keeps one id: hide is bounded
+    // by `shownCount` above, un-hide by this line.
+    if (next.length === 0) return;
+    void persistHidden(next);
   }
   function move(id: string, delta: number) {
     if (!loaded) return;
@@ -226,6 +233,7 @@ export function ToolbarCustomizeSettings() {
               const label = t(toolbarItemLabelKey(id) ?? id);
               // The one row that may not be switched off: see `toggleShown`.
               const isLastShown = !hiddenSet.has(id) && shownCount <= 1;
+              const isLastHidden = hiddenSet.has(id) && hiddenSet.size <= 1;
               return (
                 <CustomizeRow
                   key={id}
@@ -239,6 +247,10 @@ export function ToolbarCustomizeSettings() {
                     isLastShown ? (
                       <span style={LAST_SHOWN_HINT_STYLE}>
                         {t("settings.toolbarCustomize.lastShownHint")}
+                      </span>
+                    ) : isLastHidden ? (
+                      <span style={LAST_SHOWN_HINT_STYLE}>
+                        {t("settings.toolbarCustomize.lastHiddenHint")}
                       </span>
                     ) : undefined
                   }

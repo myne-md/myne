@@ -360,7 +360,18 @@ fn opencode_session_id() -> &'static str {
             // one place, so the fallback stays unique per process instead of
             // random per process: the pid, which names nothing about the
             // device, the vault or the user either.
-            Err(_) => format!("myne-{}", std::process::id()),
+            Err(_) => {
+                // One line, because a working random-number generator is an
+                // assumption every other path in this crate shares: if it has
+                // failed here, something else is failing too and this is the
+                // message that says where to look. The value is still not a
+                // constant, and still names nothing (myne-md/myne#972 review).
+                tracing::warn!(
+                    "OS entropy refused a 16-byte read; the AI session header falls back to \
+                     one id per process"
+                );
+                format!("myne-{}", std::process::id())
+            }
         }
     })
 }
@@ -855,7 +866,7 @@ impl RemoteEngine {
         let body =
             provider.build_chat_body(&model, system, messages, max_output_tokens, cache_system);
         let raw = transport
-            .post_json(provider.chat_path(), &body, &key, &provider.extra_headers())
+            .post_json(provider, &body, &key)
             .map_err(engine_error_of)?;
         let text = provider
             .parse_chat_reply(&raw)

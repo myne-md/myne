@@ -1270,6 +1270,16 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
           authority: "member",
           group_key_epoch: null,
         }),
+        // The roster reads the device-claim view too, and an UNHANDLED command
+        // resolves to the host's `BENIGN_DEFAULT` (`[]`). `claims.view` is then
+        // a truthy array with no `unverified_device_ids`, which crashed this
+        // story on `undefined.length` while every production path was fine: a
+        // fixture that answers nothing is not the empty answer, it is a
+        // different shape. A shared vault with no claims answers exactly this.
+        "plugin:device-binding|device_bindings_list": () => ({
+          rows: [],
+          unverified_device_ids: [],
+        }),
       },
     },
     render: () => <MemberRosterPanel />,

@@ -5,7 +5,7 @@
 //
 // What is worth pinning is the discrimination, not the plumbing: the gesture has
 // to fire on a drag that starts at the bezel and travel right, and it must NOT
-// fire on the three things that look similar from the outside — a drag that
+// fire on the three things that look similar from the outside: a drag that
 // starts mid-pane (a list row's own swipe), a diagonal that is really a scroll,
 // and a second drag after the first has already navigated. A hook that fires on
 // any of those closes the screen under a user's finger, which is the failure mode
