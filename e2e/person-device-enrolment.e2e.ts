@@ -97,22 +97,18 @@ describeDevice("person-scoped device enrolment (myne-md/myne#911 task 9)", () =>
         // any secret is typed); see `registerPersonIdentity`.
         await registerPersonIdentity(a.session, phrase);
 
-        // Publishing then works with the identity LOCKED: the PUT authenticates
-        // with the device token on disk, and the B vaults only need the frame on
-        // the server to be findable.
-        await openSettings(a.session, "sync");
-        // The publish row lives in the CONNECTION topic since 2026-10-25 (it is an
-        // identity act, and "Enrolled devices" over it read as a device operation).
-        await selectSettingsTopic(a.session, "sync", "connection");
-        await clickByTestId(a.session, "sync.panel.publish", { timeoutMs: 20_000 });
+        // A's vault then publishes ITSELF: registering the identity is the last
+        // act, and the sync cycle uploads the metadata the first time it runs with
+        // an endpoint, a registered identity and a person session
+        // (`publish_if_due`, myne-md/myne#974). There is no press to wait on, so
+        // this waits for the DURABLE record (the namespace only a real publish
+        // writes) with the loop's own cadence in mind: one poll interval, 30s.
+        // The PUT authenticates with the device token on disk, so it works with
+        // the identity LOCKED; B only needs the frame on the server to be
+        // findable.
         await a.session.waitUntil(
-          async () =>
-            (await (await a.session.byTestId("sync.panel.publish-state")).textContent()).includes(
-              "on your sync server",
-            )
-              ? true
-              : null,
-          { label: "A's vault published", timeoutMs: 40_000 },
+          async () => (typeof syncState(a.appDataDir)?.namespace_hex === "string" ? true : null),
+          { label: "A's vault published", timeoutMs: 90_000 },
         );
 
         // The owner's code names the PERSON, and the dialog is the real surface
@@ -123,10 +119,11 @@ describeDevice("person-scoped device enrolment (myne-md/myne#911 task 9)", () =>
         };
         expect(qr.payload.startsWith(`MYQR3|p|${srv.url}|`)).toBe(true);
         expect(qr.svg.length).toBeGreaterThan(0);
-        // The QR icon is an icon in the DEVICES section's header, and the publish
-        // above left Settings on CONNECTION — so the control was not in the tree
-        // at all and the click reported "nothing matches that selector", which
-        // reads as a missing affordance rather than as the other topic.
+        // The QR icon is an icon in the DEVICES section's header, and registering
+        // left Settings on CONNECTION, so the control is not in the tree until the
+        // topic moves. A click without this reports "nothing matches that
+        // selector", which reads as a missing affordance rather than as the other
+        // topic.
         await selectSettingsTopic(a.session, "sync", "devices");
         await clickByTestId(a.session, "sync.device-join-qr.open", { timeoutMs: 20_000 });
         // The PERSON variant, not the account-number one: this vault has no

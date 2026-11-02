@@ -1,55 +1,57 @@
-// Publishing a vault to the server (myne-md/myne#911 task 8, stories 13/14/23).
+// A vault publishing itself to the server (myne-md/myne#911 task 8, #974).
 //
-// Three scenarios, because "published" is three different claims and each one can
-// be false on its own:
+// Publishing used to be a button, and the button was the only door: the command
+// had one call site, so a user who never found the row sat on a vault their other
+// devices could not see. It is now the sync cycle's job, taken the first time it
+// has an endpoint, a registered identity and a person session
+// (`core/src/plugins/sync/publish.rs::publish_if_due`). Two scenarios, because
+// "published" is now two different claims and each one can be false on its own:
 //
-//  1. A vault born under an identity publishes, and the metadata really lands in
-//     the namespace the client recorded. Asserted from BOTH ends: the panel reads
-//     "published" out of its own durable record, and an unauthenticated GET of
-//     `/vault.meta?account=<namespace>` returns that vault's `NTV8` frame. The
+//  1. A vault born under an identity is published with NOTHING PRESSED, and the
+//     metadata really lands in the namespace the client recorded. Asserted from
+//     BOTH ends: the durable record on disk, and an unauthenticated GET of
+//     `/vault.meta?account=<namespace>` returning that vault's `NTV8` frame. The
 //     server binding the owner on its first write is what makes the second one
 //     possible, so the fetch is the end-to-end proof rather than a second read of
-//     local state.
-//     It also proves the ENGINE half: after a publish, one ordinary `sync_now`
-//     completes a cycle. Before this change the cycle refused a person-born vault
-//     outright (it demanded an enrolment record such a vault cannot have), so a
-//     published vault was reachable and un-syncable.
-//  2. A publish that cannot reach the server leaves the vault exactly as it was,
-//     and a retry completes once the cause is fixed. The retry is driven through
-//     the real Settings endpoint field, which is what a user does about it.
-//  3. A legacy vault publishes through its OWN credential path, with no identity
-//     on the device at all. This is the half a person-token-only implementation
-//     would quietly break, and it is exercised over a real enrolment: the token
-//     that authorizes the PUT is the vault account's.
+//     local state. It also proves the ENGINE half: after publishing, one ordinary
+//     `sync_now` completes a cycle.
+//  2. A legacy enrolled vault is NEVER published by the cycle, and records no
+//     namespace: its own credential already names one, so taking the person arm
+//     would switch it onto a credential it does not have.
+//
+// WHAT THIS FILE NO LONGER COVERS, stated rather than implied. Two scenarios went
+// with the button. "A publish that cannot reach the server leaves the vault
+// intact, and a retry completes" is now unreachable from the UI: there is no
+// press to fail, the attempt belongs to the loop, and a transport failure surfaces
+// as the ordinary sync-status error that other scenarios already drive. The
+// no-rollback contract itself is held in `core/src/plugins/sync/publish.rs`, where
+// the failure paths are unit-testable without a server. And "a legacy vault
+// publishes through its own credential" lost its subject with the button: what
+// remains of that claim is the negative above plus
+// `publish_is_not_due_for_a_legacy_vault`.
 //
 // What is NOT proved here, and cannot be: "publishes and opens on a second
 // device". Opening it elsewhere is the person-scoped device-add flow (task 9), so
 // nothing in this file claims it.
 //
-// **And the register-from-Settings door ("this refusal's remedy") is not drivable
-// here either, stated rather than faked (2026-10-23).** It renders only for a
-// `reserved` identity, and this harness cannot construct "reserved identity plus a
-// vault": the first run enrols the identity whenever a server answers (see the
-// comment in the retry scenario below), while a vault cannot be created without
+// **And the register-from-Settings door is not drivable here, stated rather than
+// faked (2026-10-23).** It renders only for a `reserved` identity, and this
+// harness cannot construct "reserved identity plus a vault": the first run enrols
+// the identity whenever a server answers, while a vault cannot be created without
 // an endpoint. An offline first run stays reserved but never reaches a vault. The
 // flow is covered at the unit tier instead, where the state is a prop:
-// `tests/components/personRegisterForm.test.tsx` (submit, address-before-phrase
-// order, both failure arms, the beta-terms gate) and the Settings mount in
-// `tests/components/SyncPanel.identity-block.test.tsx`. The refusal-to-alert half
-// IS driven here, by the transport-failure scenario below, which is the same
-// `SettingRow.error` slot.
+// `tests/components/personRegisterForm.test.tsx` and the Settings mount in
+// `tests/components/SyncPanel.identity-block.test.tsx`.
 
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { testIdSelector } from "./support/webdriver";
 import { scenario } from "./support/scenario";
 import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import { syncConfigSeed, setupTwoSyncedDevices } from "./support/multi-device";
 import {
   clickByTestId,
-  closeSettings,
   dismissImporterOffer,
   openSettings,
   registerPersonIdentity,
@@ -91,6 +93,32 @@ function readSyncState(appDataDir: string): Record<string, unknown> {
   const path = join(vaultsDir, ids[0], "sync-state.json");
   if (!existsSync(path)) return {};
   return JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+}
+
+/**
+ * Wait for the CYCLE to publish, and answer the recorded state once it has.
+ *
+ * No click exists to drive this, so the only honest signal is the durable record:
+ * `publish_vault` writes `namespace_hex` and `published_at_ms` in one atomic state
+ * write, and nothing else in the product writes a namespace for a person-born
+ * vault. The budget covers two poll intervals (30s each) plus the round trip,
+ * because the trigger is the loop rather than a press.
+ */
+async function waitForPublish(
+  app: Awaited<Parameters<Parameters<typeof scenario>[2]>>[0],
+  timeoutMs: number,
+): Promise<{ namespace_hex?: unknown; published_at_ms?: unknown }> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const state = readSyncState(app.appDataDir);
+    if (typeof state.namespace_hex === "string") return state;
+    if (Date.now() > deadline) {
+      throw new Error(
+        `the vault was never published: sync-state.json still has no namespace after ${timeoutMs}ms`,
+      );
+    }
+    await new Promise((r) => setTimeout(r, 1_000));
+  }
 }
 
 /**
@@ -157,8 +185,8 @@ async function unlockIdentity(
   await app.session.byTestId("sync.panel.identity-unlocked", { timeoutMs: 30_000 });
 }
 
-describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
-  it("publishes a person-born vault, and the metadata lands in its namespace", async () => {
+describePublish("a vault publishes itself (myne-md/myne#911 task 8, #974)", () => {
+  it("puts a person-born vault on the server with nothing pressed", async () => {
     const srv = await startSyncServer();
     try {
       await scenario(
@@ -169,84 +197,53 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
 
           // The identity exists on this device; it is not REGISTERED with the
           // server, and a person-born vault can only be published under a
-          // registered identity (the panel says exactly that when asked). See
-          // `registerPersonIdentity` for why this is now its own act.
+          // registered identity. Registration is therefore the last act the user
+          // performs before the vault stops being local-only, and it is the one
+          // this scenario delegates to the product.
           await registerPersonIdentity(app.session, phrase);
 
           await openSettings(app.session, "sync");
           await selectSettingsTopic(app.session, "sync", "connection");
 
-          // Device only, before anything is pressed. The row's own state line is
-          // read from disk, so this is the durable answer and not this session's.
-          const state = await app.session.byTestId("sync.panel.publish-state", {
-            timeoutMs: 15_000,
-          });
-          expect(await state.textContent()).toContain("exists only on this device");
-
           // A person-born vault has no vault account, so the legacy "add this
           // device" form (account number + password) must not be offered here.
           expect(await app.session.byTestIdAll("sync.enroll")).toHaveLength(0);
 
-          await clickByTestId(app.session, "sync.panel.publish", { timeoutMs: 20_000 });
-          await app.session.waitUntil(
-            async () =>
-              (await (await app.session.byTestId("sync.panel.publish-state")).textContent()).includes(
-                "on your sync server",
-              ),
-            { label: "publish reported as done", timeoutMs: 30_000 },
-          );
-
-          // The recorded namespace, off disk, is what the request named.
-          const recorded = readSyncState(app.appDataDir);
-          const namespace = recorded.namespace_hex;
-          expect(typeof namespace).toBe("string");
+          // **Nothing is clicked from here until the assertion.** Publishing is
+          // the cycle's job now (`publish_if_due`), so what this waits on is the
+          // DURABLE record on disk, which only a real cycle can write. The budget
+          // is two poll intervals (30s each) plus the round trip, because the
+          // trigger is the loop rather than a press.
+          const recorded = await waitForPublish(app, 90_000);
           expect(recorded.published_at_ms).toBeTypeOf("number");
+
+          // The control is GONE, and it is gone for a reason rather than hidden:
+          // no press exists that could have produced the record above.
+          expect(await app.session.byTestIdAll("sync.panel.publish")).toHaveLength(0);
 
           // The server end: an unauthenticated fetch of that namespace answers
           // with this vault's frame. `NTV8` pins that what was uploaded is the
           // password-only B2B generation rather than a legacy meta blob, and that
           // the published frame is the one creation wrote (myne-md/myne#938,
           // `decisions/protocol/0758`).
-          const resp = await fetch(`${srv.url}/vault.meta?account=${String(namespace)}`);
+          const resp = await fetch(`${srv.url}/vault.meta?account=${String(recorded.namespace_hex)}`);
           expect(resp.status).toBe(200);
           const body = new Uint8Array(await resp.arrayBuffer());
           expect(Buffer.from(body.subarray(0, 4)).toString("latin1")).toBe("NTV8");
 
           // The engine half. A published person-born vault must actually run a
           // cycle: it has no enrolment record, so the pre-fix cycle refused it at
-          // `NotReady` and the vault was reachable but un-syncable. Two things have
-          // to be true for that: the status indicator must stop calling the vault
-          // "not enrolled" (which also re-offers the manual trigger), and a cycle
-          // must then complete, which is what stamps `last_success_at_ms`.
-          // On the CONNECTION topic, because that is the body the indicator
-          // lives in and only the active topic is mounted. The status has to
-          // read enrolled there, which it can only do from the publish record
-          // (a person-born vault has no enrolment of its own) and is why this
-          // is an assertion rather than a lane into another sync.
-          //
-          // Publishing worked with the identity LOCKED, and that is the correct
-          // split rather than an accident: the PUT authenticates with the device
-          // token on disk, while signing a head needs the keypair in RAM. So the
-          // identity is unlocked here, with the phrase, before the cycle runs.
+          // `NotReady` and the vault was reachable but un-syncable. Signing a head
+          // needs the keypair in RAM, so the identity is unlocked here first.
           await unlockIdentity(app, phrase);
           const syncNow = await app.session.byTestId("sync.sync-now", { timeoutMs: 30_000 });
           await syncNow.click();
           let stamped: unknown = undefined;
-          for (let i = 0; i < 30 && stamped == null; i++) {
+          for (let i = 0; i < 60 && stamped == null; i++) {
             await new Promise((r) => setTimeout(r, 1000));
             stamped = readSyncState(app.appDataDir).last_success_at_ms;
           }
           expect(stamped).toBeTypeOf("number");
-
-          // Durable across the panel's own lifetime: closing Settings unmounts
-          // the panel, so the reopened row can only have come from disk.
-          await closeSettings(app.session);
-          await openSettings(app.session, "sync");
-          await selectSettingsTopic(app.session, "sync", "connection");
-          const reopened = await app.session.byTestId("sync.panel.publish-state", {
-            timeoutMs: 15_000,
-          });
-          expect(await reopened.textContent()).toContain("on your sync server");
         },
       );
     } finally {
@@ -254,87 +251,7 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
     }
   });
 
-  it("leaves the vault intact when the server cannot be reached, and a retry completes", async () => {
-    const srv = await startSyncServer();
-    try {
-      // Boot against the LIVE server, because that is what issues the identity's
-      // device token: the first run registers the identity when a server answers
-      // (an offline first run stays `reserved`, and a reserved identity has
-      // nothing to publish under). Getting a token is therefore not something
-      // this scenario can skip to.
-      await scenario("publish-vault-down", { seedConfig: syncConfigSeed(srv.url) }, async (app) => {
-        const downPhrase = await createIdentityAndVault(app);
-        // Registered against the LIVE server before the endpoint is broken: the
-        // device token is what a publish authenticates with, and a token cannot
-        // be minted from a refused connection.
-        await registerPersonIdentity(app.session, downPhrase);
-
-        // Break the connection the way a user does: point the endpoint at a port
-        // nothing listens on. Port 9 is the discard port, so the attempt is
-        // strictly refused rather than left hanging. Saving an `http` loopback
-        // URL performs no TLS probe, so this both persists and leaves the token
-        // it was issued alone.
-        await openSettings(app.session, "sync");
-        await selectSettingsTopic(app.session, "sync", "connection");
-        const field = await app.session.byTestId("sync.endpoint-input", { timeoutMs: 15_000 });
-        await field.replaceText("http://127.0.0.1:9");
-        await clickByTestId(app.session, "sync.endpoint-connect", { timeoutMs: 30_000 });
-
-        await selectSettingsTopic(app.session, "sync", "connection");
-        await clickByTestId(app.session, "sync.panel.publish", { timeoutMs: 20_000 });
-        // The refusal has its OWN element now (`sync.panel.publish-row-error`),
-        // not a sentence folded into the row's state line: the state line is the
-        // durable fact read from disk ("exists only on this device") and the
-        // error is what this attempt said. Measured 2026-10-24 — the state line
-        // still carried the durable sentence while the refusal was on screen, so
-        // the assertion was reading the wrong element and reported a swallowed
-        // error that was not swallowed.
-        await app.session.waitUntil(
-          async () => {
-            const [el] = await app.session.findElements(
-              testIdSelector("sync.panel.publish-row-error"),
-            );
-            if (el === undefined) return null;
-            return (await el.textContent()).includes("Could not reach the server") ? true : null;
-          },
-          { label: "the refused publish is reported, not swallowed", timeoutMs: 75_000 },
-        );
-
-        // Nothing was recorded, so the retry is a FIRST attempt rather than a
-        // resume of half-written state. This is the "deliberately no rollback"
-        // claim, measured: the namespace field is absent, not restored.
-        expect(readSyncState(app.appDataDir).namespace_hex ?? null).toBeNull();
-
-        // The vault is still a working vault while all of that failed.
-        await closeSettings(app.session);
-        await app.session.byTestId("editor.root", { timeoutMs: 15_000 });
-
-        // The cause, fixed the way a user fixes it: point the endpoint back.
-        await openSettings(app.session, "sync");
-        await selectSettingsTopic(app.session, "sync", "connection");
-        const again = await app.session.byTestId("sync.endpoint-input", { timeoutMs: 15_000 });
-        await again.replaceText(srv.url);
-        await clickByTestId(app.session, "sync.endpoint-connect", { timeoutMs: 30_000 });
-
-        await selectSettingsTopic(app.session, "sync", "connection");
-        await clickByTestId(app.session, "sync.panel.publish", { timeoutMs: 20_000 });
-        await app.session.waitUntil(
-          async () =>
-            (await (await app.session.byTestId("sync.panel.publish-state")).textContent()).includes(
-              "on your sync server",
-            )
-              ? true
-              : null,
-          { label: "the retry completes once the server is reachable", timeoutMs: 40_000 },
-        );
-        expect(typeof readSyncState(app.appDataDir).namespace_hex).toBe("string");
-      });
-    } finally {
-      await srv.teardown();
-    }
-  });
-
-  it("publishes a legacy vault through its own credential, with no identity", async () => {
+  it("never records a namespace for a legacy enrolled vault", async () => {
     const srv = await startSyncServer();
     let teardown = async (): Promise<void> => {};
     try {
@@ -347,24 +264,19 @@ describePublish("publish a vault (myne-md/myne#911 task 8)", () => {
 
       await openSettings(a.session, "sync");
       await selectSettingsTopic(a.session, "sync", "connection");
-      // Enrolled, so its own token already puts it on the server.
-      const line = await a.session.byTestId("sync.panel.publish-state", { timeoutMs: 15_000 });
-      expect(await line.textContent()).toContain("on your sync server");
+      // The publish control is absent for EVERY generation, so a legacy device
+      // cannot reach a path that would switch it onto the person credential.
+      expect(await a.session.byTestIdAll("sync.panel.publish")).toHaveLength(0);
 
-      // Pressing it re-asserts the metadata; the point is that it SUCCEEDS with a
-      // vault token and no person session anywhere on the device.
-      await clickByTestId(a.session, "sync.panel.publish", { timeoutMs: 20_000 });
-      await a.session.waitUntil(
-        async () =>
-          (await (await a.session.byTestId("sync.panel.publish-state")).textContent()).includes(
-            "on your sync server",
-          ),
-        { label: "a legacy vault publishes on its own credential", timeoutMs: 40_000 },
-      );
-      // And the vault did not lose its own addressing: a legacy publish records
-      // the act but never a namespace, because its credential already names one.
-      const recorded = readSyncState(a.appDataDir);
-      expect(recorded.namespace_hex ?? null).toBeNull();
+      // And the automatic path refuses it: a legacy vault's namespace is its own
+      // account, which its credential already names, so `publish_if_due` answers
+      // "not due" and `publish_vault` records nothing. A namespace here would
+      // mean the cycle had taken the person arm for a vault that has no person.
+      await a.session.byTestId("sync.status-indicator", { timeoutMs: 20_000 });
+      const syncNow = await a.session.byTestId("sync.sync-now", { timeoutMs: 30_000 });
+      await syncNow.click();
+      await new Promise((r) => setTimeout(r, 5_000));
+      expect(readSyncState(a.appDataDir).namespace_hex ?? null).toBeNull();
     } finally {
       await teardown();
       await srv.teardown();

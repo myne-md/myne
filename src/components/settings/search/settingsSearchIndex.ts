@@ -453,32 +453,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.syncDevices",
   },
   {
-    // Publishing (myne-md/myne#911): the explicit act that makes a device-local
-    // vault reachable from the person's other devices.
-    //
-    // Gated on `localOnlyVault`, which is the fact the commands answer for: a
-    // vault can be device-only WHERE a vault may live with no server behind it.
-    // The web client has no such state (`decisions.md` 2026-07-26 makes sync
-    // required there) and both `sync_published_state` and `sync_publish_vault`
-    // are `Class::Unsupported` in its dispatcher, so `publishState` stays null
-    // and the row never renders. `personIdentity` was the gate before, and the
-    // browser has it since task 13: search offered a row that client cannot
-    // draw.
-    id: "sync.publish",
-    agentWritability: WRITABILITY_NONE,
-    capability: "localOnlyVault",
-    panelId: "sync",
-    // `connection`, not `devices` (2026-10-25): the row moved into the account
-    // section, under the identity and the server, because publishing is an identity
-    // act and a devices heading over it read as a device operation. Search lands on
-    // the topic the row actually renders in; this registry is what says so.
-    topic: "connection",
-    testid: "sync.panel.publish",
-    titleKey: "sync.panel.publish.label",
-    descriptionKey: "sync.panel.publish.deviceOnlyHelper",
-    keywordsKey: "settings.search.keywords.publishVault",
-  },
-  {
     id: "sync.members",
     agentWritability: WRITABILITY_NONE,
     panelId: "sync",

@@ -4253,7 +4253,6 @@
         "bar": "下部バー ステータスバー インジケーター カスタマイズ 並べ替え 非表示 表示 ツールバー bottom bar status bar indicators customize reorder hide show",
         "syncDeviceBindings": "デバイス クレーム メンバー 署名 帰属 所有者 devices claimed by members attribution signed belongs",
         "vaultFormat": "保管庫形式 アップグレード 一括フレーズ復元 廃止 保管庫復元フレーズ 移行 アイデンティティ vault format upgrade one-phrase recovery retire vault recovery phrase migrate identity",
-        "publishVault": "公開 公開済み保管庫 サーバー この端末のみ 同期 publish published vault server device only sync",
         "externalAccess": "外部アクセス MCP myne-mcp Claude Desktop クライアント 接続 承認 範囲 取り消し external access MCP myne-mcp Claude Desktop client connection approve scope revoke",
         "diagnosticLog": "診断ログ ログ デバッグ トラブルシューティング クラッシュレポート バグレポート サポート diagnostic log logging debug troubleshooting crash report bug report support"
       },
@@ -4745,26 +4744,6 @@
         "account": "アカウント",
         "server": "サーバー",
         "devices": "アカウントの端末"
-      },
-      "publish": {
-        "label": "サーバーに公開",
-        "cta": "この保管庫を公開",
-        "republishCta": "再公開",
-        "deviceOnlyHelper": "この保管庫はこの端末にのみ存在します。公開するとアイデンティティに紐づくため、他の端末で開けるようになります。",
-        "publishedHelper": "{{when}}に公開しました。この保管庫は同期サーバー上にあるため、他の端末からアクセスできます。",
-        "publishedHelperNoDate": "公開しました。この保管庫は同期サーバー上にあるため、他の端末からアクセスできます。",
-        "error": {
-          "NotConfigured": "先に同期で同期サーバーを設定してください。",
-          "PersonSessionRequired": "先にアイデンティティのロックを解除してください。公開にはこの保管庫を所有するアイデンティティが必要です。",
-          "PersonNotRegistered": "先に上のアイデンティティブロックでアイデンティティを登録してください。この端末はアイデンティティを保持していますが、サーバーに登録したことがないため、公開できるアカウントがありません。",
-          "NotEnrolled": "この保管庫は、この端末が参加していないアカウントに属しています。先にそのアカウントにこの端末を追加してください。",
-          "NotOwner": "この保管庫はすでに別のアイデンティティに属しているため、ここでは公開できません。",
-          "Unauthenticated": "サーバーがこの端末を拒否しました。もう一度お試しください。繰り返すなら再登録してください。",
-          "Transport": "サーバーに接続できませんでした。保管庫は変更されていません。もう一度お試しください。",
-          "TlsFailure": "信頼できる接続を確立できませんでした。保管庫は変更されていません。もう一度お試しください。",
-          "BadRequest": "この保管庫のメタデータを読み取れませんでした。何も送信されていません。",
-          "Other": "公開に失敗しました。保管庫は変更されていません。もう一度お試しください。"
-        }
       }
     },
     "reconcile": {

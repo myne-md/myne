@@ -4253,7 +4253,6 @@
         "bar": "untere leiste statusleiste indikatoren anpassen umsortieren ausblenden anzeigen symbolleiste",
         "syncDeviceBindings": "geräte beansprucht von mitgliedern zuordnung wer welches gerät unterschrieben gehört",
         "vaultFormat": "tresor format upgrade eine-phrase wiederherstellung phrase zurückziehen tresor wiederherstellungsphrase migrieren identität",
-        "publishVault": "veröffentlichen veröffentlicht tresor server nur gerät synchronisieren",
         "externalAccess": "externer zugriff MCP myne-mcp Claude Desktop client verbindung genehmigen bereich entziehen",
         "diagnosticLog": "diagnoseprotokoll protokollierung debug fehlerbehebung absturzbericht fehlerbericht support"
       },
@@ -4745,26 +4744,6 @@
         "account": "Konto",
         "server": "Server",
         "devices": "Geräte auf Ihrem Konto"
-      },
-      "publish": {
-        "label": "Auf Ihren Server veröffentlichen",
-        "cta": "Diesen Tresor veröffentlichen",
-        "republishCta": "Erneut veröffentlichen",
-        "deviceOnlyHelper": "Dieser Tresor existiert nur auf diesem Gerät. Das Veröffentlichen bindet ihn an Ihre Identität, damit Ihre anderen Geräte ihn öffnen können.",
-        "publishedHelper": "Veröffentlicht {{when}}. Dieser Tresor ist auf Ihrem Sync-Server, daher können Ihre anderen Geräte ihn erreichen.",
-        "publishedHelperNoDate": "Veröffentlicht. Dieser Tresor ist auf Ihrem Sync-Server, daher können Ihre anderen Geräte ihn erreichen.",
-        "error": {
-          "NotConfigured": "Legen Sie zuerst einen Sync-Server fest, oben unter Synchronisierung.",
-          "PersonSessionRequired": "Entsperren Sie zuerst Ihre Identität. Das Veröffentlichen braucht die Identität, der dieser Tresor gehört.",
-          "PersonNotRegistered": "Registrieren Sie zuerst Ihre Identität, im Identitätsblock oben. Dieses Gerät hält die Identität, hat sie aber noch nie bei einem Server registriert, daher gibt es kein Konto, unter dem veröffentlicht werden kann.",
-          "NotEnrolled": "Dieser Tresor gehört zu einem Konto, auf dem dieses Gerät nicht angemeldet ist. Fügen Sie das Gerät zuerst zu diesem Konto hinzu.",
-          "NotOwner": "Dieser Tresor gehört bereits einer anderen Identität, daher kann er hier nicht veröffentlicht werden.",
-          "Unauthenticated": "Der Server hat dieses Gerät abgelehnt. Versuchen Sie es erneut und melden Sie es neu an, falls es weiterhin passiert.",
-          "Transport": "Der Server konnte nicht erreicht werden. Der Tresor ist unverändert; versuchen Sie es erneut.",
-          "TlsFailure": "Es konnte keine vertrauenswürdige Verbindung hergestellt werden. Der Tresor ist unverändert; versuchen Sie es erneut.",
-          "BadRequest": "Die Metadaten dieses Tresors konnten nicht gelesen werden. Es wurde nichts gesendet.",
-          "Other": "Veröffentlichung fehlgeschlagen. Der Tresor ist unverändert; versuchen Sie es erneut."
-        }
       }
     },
     "reconcile": {

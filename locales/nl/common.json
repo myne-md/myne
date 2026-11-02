@@ -4253,7 +4253,6 @@
         "bar": "onderbalk statusbalk indicatoren aanpassen herordenen verbergen tonen werkbalk",
         "syncDeviceBindings": "apparaten opgeëist door leden toeschrijving wie ondertekende welk apparaat hoort",
         "vaultFormat": "kluis formaat bijwerken een-zins herstel intrekken kluis herstelzin migreren identiteit vault format upgrade recovery phrase",
-        "publishVault": "publiceren gepubliceerd kluis alleen server apparaat synchroniseren publish published device sync",
         "externalAccess": "externe toegang MCP myne-mcp Claude Desktop client verbinding goedkeuren bereik intrekken external access client",
         "diagnosticLog": "diagnostisch logboek logboekregistratie debug probleemoplossing crashrapport bugrapport ondersteuning"
       },
@@ -4745,26 +4744,6 @@
         "account": "Account",
         "server": "Server",
         "devices": "Aangemelde apparaten"
-      },
-      "publish": {
-        "label": "Publiceer naar je server",
-        "cta": "Publiceer deze kluis",
-        "republishCta": "Opnieuw publiceren",
-        "deviceOnlyHelper": "Deze kluis bestaat alleen op dit apparaat. Publiceren koppelt hem aan je identiteit, zodat je andere apparaten hem kunnen openen.",
-        "publishedHelper": "Gepubliceerd {{when}}. Deze kluis staat op je synchronisatieserver, zodat je andere apparaten hem kunnen bereiken.",
-        "publishedHelperNoDate": "Gepubliceerd. Deze kluis staat op je synchronisatieserver, zodat je andere apparaten hem kunnen bereiken.",
-        "error": {
-          "NotConfigured": "Stel eerst een synchronisatieserver in, in Sync hierboven.",
-          "PersonSessionRequired": "Ontgrendel eerst je identiteit. Publiceren vereist de identiteit die deze kluis bezit.",
-          "PersonNotRegistered": "Registreer eerst je identiteit, in het Identiteitsblok hierboven. Dit apparaat bevat de identiteit, maar heeft hem nooit bij een server geregistreerd, dus er is geen account om onder te publiceren.",
-          "NotEnrolled": "Deze kluis hoort bij een account waarop dit apparaat niet is ingeschreven. Voeg het apparaat eerst toe aan dat account.",
-          "NotOwner": "Deze kluis hoort al bij een andere identiteit, dus hij kan hier niet worden gepubliceerd.",
-          "Unauthenticated": "De server weigerde dit apparaat. Probeer het opnieuw, en schrijf opnieuw in als het zich blijft voordoen.",
-          "Transport": "De server kon niet worden bereikt. De kluis is ongewijzigd; probeer het opnieuw.",
-          "TlsFailure": "Er kon geen vertrouwde verbinding worden opgezet. De kluis is ongewijzigd; probeer het opnieuw.",
-          "BadRequest": "De metadata van deze kluis kon niet worden gelezen. Er is niets verzonden.",
-          "Other": "Publiceren mislukt. De kluis is ongewijzigd; probeer het opnieuw."
-        }
       }
     },
     "reconcile": {

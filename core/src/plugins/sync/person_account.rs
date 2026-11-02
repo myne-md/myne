@@ -310,6 +310,34 @@ pub async fn person_create_identity_from_host(
     // persist would send a later session to the phrase prompt for nothing.
     mark_identity_created(host, io).await;
 
+    // **Publishing happens at the user's acts, and this is one of them**
+    // (myne-md/myne#974). The identity becoming registered is what a person-born
+    // vault was waiting for, and it is the only precondition the user can supply
+    // from this screen. The sync cycle is the mechanism and NOT the trigger: it
+    // publishes only when it is allowed to push, so an ambient poll never uploads
+    // a vault on its own, and this call is the act. A failure here is not the
+    // registration's failure: the credential is on disk, the vault is still
+    // usable, and the next push cycle retries.
+    match crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await) {
+        Ok(root) => {
+            if let Err(e) = super::publish::publish_if_due(host, io, &root).await {
+                tracing::warn!(
+                    stage = "publish_if_due",
+                    error = ?e,
+                    "registered the identity but could not publish this vault; the next \
+                     push cycle retries"
+                );
+            }
+        }
+        Err(_) => {
+            tracing::warn!(
+                stage = "publish_if_due",
+                "registered the identity but the active vault root did not resolve, so the \
+                 publish was left to the next push cycle"
+            );
+        }
+    }
+
     Ok(PersonSetupView {
         // Shown once, for the kit. Never logged.
         phrase: Some((*phrase).clone()),

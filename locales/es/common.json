@@ -4388,7 +4388,6 @@
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de herramientas",
         "syncDeviceBindings": "dispositivos reclamados por miembros atribución quién firmó a qué dispositivo pertenece",
         "vaultFormat": "formato de bóveda actualización recuperación de una frase retirar bóveda frase de recuperación migrar identidad",
-        "publishVault": "publicar bóveda publicada servidor solo dispositivo sincronización",
         "externalAccess": "acceso externo MCP myne-mcp Claude Desktop conexión aprobar alcance revocar",
         "diagnosticLog": "registro de diagnóstico registro depuración solución de problemas informe de fallo informe de error soporte"
       },
@@ -4885,26 +4884,6 @@
         "account": "Cuenta",
         "server": "Servidor",
         "devices": "Dispositivos de tu cuenta"
-      },
-      "publish": {
-        "label": "Publicar en tu servidor",
-        "cta": "Publicar esta bóveda",
-        "republishCta": "Publicar de nuevo",
-        "deviceOnlyHelper": "Esta bóveda existe solo en este dispositivo. Publicarla la vincula a tu identidad para que tus otros dispositivos puedan abrirla.",
-        "publishedHelper": "Publicada {{when}}. Esta bóveda está en tu servidor de sincronización, así que tus otros dispositivos pueden alcanzarla.",
-        "publishedHelperNoDate": "Publicada. Esta bóveda está en tu servidor de sincronización, así que tus otros dispositivos pueden alcanzarla.",
-        "error": {
-          "NotConfigured": "Configura primero un servidor de sincronización, en Sincronización arriba.",
-          "PersonSessionRequired": "Desbloquea primero tu identidad. Publicar necesita la identidad que posee esta bóveda.",
-          "PersonNotRegistered": "Registra primero tu identidad, en el bloque de Identidad de arriba. Este dispositivo tiene la identidad pero nunca la ha registrado en un servidor, así que no hay ninguna cuenta bajo la que publicar.",
-          "NotEnrolled": "Esta bóveda pertenece a una cuenta en la que este dispositivo no está inscrito. Añade primero el dispositivo a esa cuenta.",
-          "NotOwner": "Esta bóveda ya pertenece a otra identidad, así que no se puede publicar aquí.",
-          "Unauthenticated": "El servidor rechazó este dispositivo. Inténtalo de nuevo y vuelve a inscribirlo si sigue ocurriendo.",
-          "Transport": "No se pudo contactar con el servidor. La bóveda no cambió; inténtalo de nuevo.",
-          "TlsFailure": "No se pudo establecer una conexión de confianza. La bóveda no cambió; inténtalo de nuevo.",
-          "BadRequest": "No se pudieron leer los metadatos de esta bóveda. No se envió nada.",
-          "Other": "La publicación falló. La bóveda no cambió; inténtalo de nuevo."
-        }
       }
     },
     "reconcile": {

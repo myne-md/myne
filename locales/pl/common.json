@@ -4523,7 +4523,6 @@
         "bar": "dolny pasek pasek stanu wskaźniki dostosuj kolejność ukryj pokaż pasek narzędzi",
         "syncDeviceBindings": "urządzenia przypisane przez członków atrybucja kto podpisał które urządzenie należy",
         "vaultFormat": "format skarbca aktualizacja jedna fraza odzyskiwanie wycofaj skarbiec fraza odzyskiwania migruj tożsamość",
-        "publishVault": "publikuj opublikowany skarbiec serwer tylko urządzenie synchronizacja",
         "externalAccess": "dostęp zewnętrzny MCP myne-mcp Claude Desktop połączenie zatwierdź zakres cofnij",
         "diagnosticLog": "dziennik diagnostyczny dziennik logowanie debugowanie rozwiązywanie problemów raport awarii raport błędu wsparcie"
       },
@@ -5025,26 +5024,6 @@
         "account": "Konto",
         "server": "Serwer",
         "devices": "Urządzenia na Twoim koncie"
-      },
-      "publish": {
-        "label": "Opublikuj na serwerze",
-        "cta": "Opublikuj ten skarbiec",
-        "republishCta": "Opublikuj ponownie",
-        "deviceOnlyHelper": "Ten skarbiec istnieje tylko na tym urządzeniu. Opublikowanie wiąże go z Twoją tożsamością, żeby Twoje inne urządzenia mogły go otworzyć.",
-        "publishedHelper": "Opublikowano {{when}}. Ten skarbiec jest na Twoim serwerze synchronizacji, więc Twoje inne urządzenia mogą do niego dotrzeć.",
-        "publishedHelperNoDate": "Opublikowano. Ten skarbiec jest na Twoim serwerze synchronizacji, więc Twoje inne urządzenia mogą do niego dotrzeć.",
-        "error": {
-          "NotConfigured": "Najpierw ustaw serwer synchronizacji, w Synchronizacji powyżej.",
-          "PersonSessionRequired": "Najpierw odblokuj tożsamość. Publikowanie wymaga tożsamości, która posiada ten skarbiec.",
-          "PersonNotRegistered": "Najpierw zarejestruj tożsamość, w bloku Tożsamość powyżej. To urządzenie przechowuje tożsamość, ale nigdy jej nie zarejestrowało na serwerze, więc nie ma konta, pod którym publikować.",
-          "NotEnrolled": "Ten skarbiec należy do konta, na którym to urządzenie nie jest zapisane. Najpierw dodaj urządzenie do tego konta.",
-          "NotOwner": "Ten skarbiec należy już do innej tożsamości, więc nie można go tu opublikować.",
-          "Unauthenticated": "Serwer odrzucił to urządzenie. Spróbuj ponownie, a jeśli to się powtarza, zapisz je ponownie.",
-          "Transport": "Nie udało się połączyć z serwerem. Skarbiec jest niezmieniony; spróbuj ponownie.",
-          "TlsFailure": "Nie udało się nawiązać zaufanego połączenia. Skarbiec jest niezmieniony; spróbuj ponownie.",
-          "BadRequest": "Nie udało się odczytać metadanych tego skarbca. Nic nie zostało wysłane.",
-          "Other": "Publikowanie nie powiodło się. Skarbiec jest niezmieniony; spróbuj ponownie."
-        }
       }
     },
     "reconcile": {

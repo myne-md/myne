@@ -274,7 +274,6 @@ const CAPABILITY_BACKING = {
     // register. Both take the phrase across a prompt or return it once, which is
     // the half served code may not hold; a browser still reaches its own
     // identity story through the web first-run step instead.
-    "plugin:sync|sync_publish_vault",
     "plugin:sync|sync_published_state",
     "plugin:sync|sync_person_list_invites",
     "plugin:sync|sync_list_vault_invites",
