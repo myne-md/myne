@@ -197,9 +197,9 @@
         "count": 2,
         "reason": "A command ARGUMENT: the id of the device row the user asked to approve or remove, not this device's own id."
       },
-      "a.device_id_hex,": {
+      "let device_id_hex = a.device_id_hex;": {
         "count": 1,
-        "reason": "A command ARGUMENT naming the device row to rename."
+        "reason": "A command ARGUMENT naming the device row to rename, bound once and passed to whichever write path runs (the manual setter or the self-naming one). It is that row's id, not this device's own."
       }
     }
   }

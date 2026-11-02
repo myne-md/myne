@@ -2114,8 +2114,13 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         const name = (args.name as string).trim();
         const w = window as unknown as { __deviceNameWrites?: { id: string; name: string }[] };
         (w.__deviceNameWrites ??= []).push({ id, name });
-        if (name !== "") deviceNames[id] = name;
-        return null;
+        if (name === "") return false;
+        deviceNames[id] = name;
+        // `selfName` adds three refusals on the Rust side that this tier cannot
+        // model (a member session's plane, an absent `vault.prefs`, an entry a peer
+        // already wrote) — they are backend state, not UI state. What this tier
+        // asserts is whether the page ASKED, plus the actual write landing.
+        return true;
       },
       "plugin:prefs|device_platform": () => config.devicePlatform ?? "ios",
       "plugin:sync|sync_list_devices": () => config.devices ?? [],

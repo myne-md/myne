@@ -340,12 +340,17 @@ export function DeviceManagementPanel({
   useEffect(() => {
     if (!loaded || devices === null || selfNamed.current) return;
     selfNamed.current = true;
-    void selfNameDevice({
+    // `.catch` rather than a `void` and an empty catch inside the policy: a write
+    // that fails and reports success is a wire nobody can see, and the row is
+    // legible either way so there is nothing to keep from the user.
+    selfNameDevice({
       devices,
       names,
       readBaseline: adoptedHeadBaseline,
       suggestName: nameableDeviceSuggestion,
-      writeName: (deviceIdHex, name) => setDeviceName(deviceIdHex, name),
+      writeName: (deviceIdHex, name) => setDeviceName(deviceIdHex, name, { selfName: true }),
+    }).catch((err: unknown) => {
+      console.warn("[DeviceManagementPanel] self-naming failed:", err);
     });
   }, [loaded, devices, names]);
 
