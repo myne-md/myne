@@ -781,7 +781,25 @@
     "cli",
     "clipper"
   ],
-  "totalMinutesCeiling": 11985,
+  "totalMinutesCeiling": 12010,
+  "$comment25": [
+    "CEILING RAISED 11985 -> 12010 by the device self-naming item, and the",
+    "argument is that the state it walks cannot be manufactured rather than that",
+    "it was not worth automating.",
+    "",
+    "An approved device with no `device_names` entry is a HISTORY, not a",
+    "configuration: the device id is minted by the server at enrollment and the",
+    "name is written in that same act, so the nameless state arrives from an",
+    "enrollment that predates names, a write that failed, or an approval that",
+    "spanned a restart. A driver reaches it only by planting it, which is a",
+    "fixture asserting itself, and the second half of the item has the same shape",
+    "in TIME rather than in data: the pass condition is that nothing was written",
+    "while the enrollment seed had not yet run, so a driver would have to prove it",
+    "was inside a window it cannot observe. The gates themselves are covered where",
+    "the state IS constructible: core::plugins::prefs::commands::tests::self_name_*",
+    "(the backend refusals), tests/client-core/deviceName.test.ts (the policy), and",
+    "the two panels' component and flow tiers."
+  ],
   "$comment24": [
     "CEILING RAISED 11832 -> 11857 in the SAME BRANCH as $comment23, as a",
     "correction rather than a second surface. $comment23's raise rested on",

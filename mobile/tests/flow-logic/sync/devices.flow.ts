@@ -28,6 +28,20 @@ async function openDevices(page: import("@playwright/test").Page) {
   await expect(page.getByTestId("sync.device-row").first()).toBeVisible();
 }
 
+/** Every `plugin:prefs|set_device_name` the page issued. A row that keeps its hex
+ *  label proves nothing about a write that never landed in `device_names`, which
+ *  is why the negatives below assert the CALL rather than the rendering. */
+async function deviceNameWrites(page: import("@playwright/test").Page) {
+  return page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __deviceNameWrites?: { id: string; name: string; selfName: boolean }[];
+        }
+      ).__deviceNameWrites ?? [],
+  );
+}
+
 test.describe("device names", () => {
   test("a named device leads with its name; an unnamed one keeps the id-derived fallback", async ({
     page,
@@ -45,9 +59,13 @@ test.describe("device names", () => {
     await expect(names.nth(1)).toContainText(UNNAMED.slice(0, 6));
   });
 
-  test("every row demotes the device code to a secondary line", async ({ page }) => {
+  test("only a named row demotes the device code, because the unnamed title IS it", async ({
+    page,
+  }) => {
     // The code is what tells two same-named devices apart, so it is a permanent
-    // line rather than a hover affordance (mobile has no hover).
+    // line rather than a hover affordance (mobile has no hover). On an unnamed row
+    // the title is derived from the same six characters, so the line would print
+    // them twice (myne-md/myne#973).
     await installMockIpc(page, {
       syncStatus: { state: "idle" },
       devices: DEVICES,
@@ -56,9 +74,61 @@ test.describe("device names", () => {
     await openDevices(page);
 
     const codes = page.getByTestId("sync.device-code");
-    await expect(codes).toHaveCount(2);
+    await expect(codes).toHaveCount(1);
     await expect(codes.nth(0)).toHaveText(NAMED.slice(0, 6));
-    await expect(codes.nth(1)).toHaveText(UNNAMED.slice(0, 6));
+  });
+
+  test("an unnamed current device names itself once a cycle has completed", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devicePlatform: "ios",
+      devices: [{ device_id_hex: UNNAMED, approved: true, retired: false, is_current: true }],
+      // Non-null: this device has adopted a head, i.e. a cycle completed. Writing a
+      // name before that would create `vault.prefs` ahead of the enrollment seed
+      // (`decisions/sync/0348` clause 2).
+      headFingerprint: "TYRS-N318",
+    });
+    await openDevices(page);
+
+    await expect(page.getByTestId("sync.device-name")).toHaveText("iPhone");
+    // The row now carries two facts instead of one repeated, so the code is back.
+    await expect(page.getByTestId("sync.device-code")).toHaveText(UNNAMED.slice(0, 6));
+    // `selfName: true` is the load-bearing half: the automatic write is the one
+    // Rust gates (member plane, absent prefs, an entry a peer already wrote), and
+    // taking the manual path here would render identically while skipping all three.
+    expect(await deviceNameWrites(page)).toEqual([
+      { id: UNNAMED, name: "iPhone", selfName: true },
+    ]);
+  });
+
+  // The desktop suite's twin of the head-baseline case ("writes nothing before this
+  // device has adopted a vault head") cannot be expressed here, and the reason is
+  // the product rather than the harness: `awaitingApprovalVerdict` uses that same
+  // null head as its discriminator, so a device with no baseline boots to
+  // `PendingApproval`, where this panel does not exist. On DESKTOP the two do not
+  // coincide (a local-only vault lands in the editor with no head by design, so the
+  // panel is reachable and the gate fires), which is why the null case lives in
+  // `tests/components/DeviceManagementPanel.selfName.test.tsx`. The gate that has to
+  // hold in every client whichever surface you come from is the backend's, and it is
+  // tested there: `core::plugins::prefs::commands::tests::self_name_*`.
+  test("never names a pending device, which is still unverified", async ({ page }) => {
+    await installMockIpc(page, {
+      syncStatus: { state: "idle" },
+      devicePlatform: "ios",
+      devices: [
+        { device_id_hex: NAMED, approved: true, retired: false, is_current: false },
+        { device_id_hex: PENDING, approved: false, retired: false, is_current: true },
+      ],
+      deviceNames: { [NAMED]: "Work phone" },
+      headFingerprint: "TYRS-N318",
+    });
+    await openDevices(page);
+
+    await expect(page.getByTestId("sync.pending-name")).toContainText(PENDING.slice(0, 6));
+    await expect(page.getByText("iPhone")).toHaveCount(0);
+    // The assertion that has teeth: a pending device was never written, even
+    // though its own label renders the fallback either way.
+    expect(await deviceNameWrites(page)).toEqual([]);
   });
 
   test("renaming a row persists and re-renders from the stored map", async ({ page }) => {
@@ -76,6 +146,12 @@ test.describe("device names", () => {
     await input.press("Enter");
 
     await expect(page.getByTestId("sync.device-name").nth(0)).toHaveText("Studio iPad");
+    // A rename a person made opens the three refusals rather than honouring them:
+    // a person naming a row is looking at it, and refusing them because a peer
+    // already wrote one would be a rule with no user behind it.
+    expect(await deviceNameWrites(page)).toEqual([
+      { id: NAMED, name: "Studio iPad", selfName: false },
+    ]);
   });
 
   test("rename is offered on a device that is NOT this one", async ({ page }) => {
@@ -194,6 +270,11 @@ test.describe("device names", () => {
         ...DEVICES,
         { device_id_hex: PENDING, approved: false, retired: false, is_current: false },
       ],
+      // The current row is NAMED here on purpose: an unnamed one makes the panel's
+      // self-naming probe read `sync_head_fingerprint` once, which consumes an
+      // entry of the queue below and leaves the compare with nothing to observe
+      // (myne-md/myne#973). The fixture's subject is the head, not the name.
+      deviceNames: { [NAMED]: "Work phone" },
       // Three values, not two: the FIRST read is the shell's own baseline check on
       // entry (a non-null baseline is what keeps this device in the editor instead
       // of routing it to the wait), and the panel's compare then watches the head

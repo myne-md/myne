@@ -83,6 +83,7 @@
   "components/devicejoinqr/default": "44f0e0b4c0f76e08",
   "components/devicejoinqr/member": "57c0143c50ecfbda",
   "components/devicemanagementpanel/default": "46a5b3ae36e75a5a",
+  "components/devicemanagementpanel/unnamed-row": "3c9b3a59c24485f6",
   "components/devicemanagementpanel/member-vault": "46a5b3ae36e75a5a",
   "components/endpointconfig/default": "2fd314015d90110c",
   "components/enrolldeviceform/default": "1a5ff809f8ff57eb",

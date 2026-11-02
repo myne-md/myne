@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Đặt lại và thêm lại thiết bị này",
       "resetSyncOnThisDevice": "Đặt lại đồng bộ trên thiết bị này",
       "shortName": "Thiết bị {{hex}}",
-      "syncedHere": "Đã đồng bộ tại đây",
       "thisDevice": "Thiết bị này",
       "reasonUnreachable": "máy chủ không phản hồi",
       "reasonUnexpected": "một lỗi không mong đợi",
@@ -4834,8 +4833,7 @@
       "transportError": "Không thể kết nối tới máy chủ đồng bộ. Hãy kiểm tra địa chỉ máy chủ và chứng chỉ HTTPS của nó.",
       "retiredSelf": "Thiết bị này đã bị gỡ từ một thiết bị khác.",
       "resetAndAddAgain": "Đặt lại và thêm lần nữa",
-      "noDevices": "Chưa có thiết bị nào.",
-      "syncingHere": "Đang đồng bộ ở đây"
+      "noDevices": "Chưa có thiết bị nào."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} xung đột cần xem xét",

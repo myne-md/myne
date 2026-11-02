@@ -4706,7 +4706,6 @@
       "resetAndReAdd": "Resetează și readaugă acest dispozitiv",
       "resetSyncOnThisDevice": "Resetează sincronizarea pe acest dispozitiv",
       "shortName": "Dispozitivul {{hex}}",
-      "syncedHere": "Sincronizat aici",
       "thisDevice": "Acest dispozitiv",
       "reasonUnreachable": "serverul nu a răspuns",
       "reasonUnexpected": "o eroare neașteptată",
@@ -4976,8 +4975,7 @@
       "transportError": "Serverul de sincronizare nu a putut fi contactat. Verifică adresa serverului și certificatul său HTTPS.",
       "retiredSelf": "Acest dispozitiv a fost eliminat de pe alt dispozitiv.",
       "resetAndAddAgain": "Resetează și adaugă din nou",
-      "noDevices": "Niciun dispozitiv încă.",
-      "syncingHere": "Se sincronizează aici"
+      "noDevices": "Niciun dispozitiv încă."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict necesită revizuire",

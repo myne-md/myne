@@ -167,7 +167,13 @@ describe("useEnroll — credential forwarding to sync_enroll", () => {
     // It also lands only AFTER a sync cycle: writing vault.prefs before this
     // device's first authed cycle would disable the §10.2.1 wholesale seed.
     expect(nameCalls()).toHaveLength(1);
-    expect(nameCalls()[0][1]).toEqual({ deviceIdHex: DEVICE_ID, name: "Test Device" });
+    // `selfName: false`: enrollment is a user submitting a field they can see, so
+    // the write must take the manual path and not the self-naming refusals.
+    expect(nameCalls()[0][1]).toEqual({
+      deviceIdHex: DEVICE_ID,
+      name: "Test Device",
+      selfName: false,
+    });
     const order = invokeMock.mock.calls.map((c) => c[0]);
     expect(order.indexOf("plugin:sync|sync_now")).toBeLessThan(order.indexOf(SET_NAME_CMD));
   });

@@ -4690,7 +4690,6 @@
       "resetAndReAdd": "Reset and re-add this device",
       "resetSyncOnThisDevice": "Reset sync on this device",
       "shortName": "Device {{hex}}",
-      "syncedHere": "Synced here",
       "thisDevice": "This device",
       "reasonUnreachable": "the server didn’t answer",
       "reasonUnexpected": "an unexpected error",
@@ -4926,7 +4925,6 @@
       "transportError": "Couldn't reach the sync server. Check the server address and its HTTPS certificate.",
       "retiredSelf": "This device was removed from another device.",
       "resetAndAddAgain": "Reset and add again",
-      "syncingHere": "Syncing here",
       "noDevices": "No devices yet."
     },
     "banner": {

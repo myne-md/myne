@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Dit apparaat opnieuw instellen en opnieuw toevoegen",
       "resetSyncOnThisDevice": "Synchronisatie op dit apparaat opnieuw instellen",
       "shortName": "Apparaat {{hex}}",
-      "syncedHere": "Hier gesynchroniseerd",
       "thisDevice": "Dit apparaat",
       "reasonUnreachable": "de server antwoordde niet",
       "reasonUnexpected": "een onverwachte fout",
@@ -4834,8 +4833,7 @@
       "transportError": "Kon de synchronisatieserver niet bereiken. Controleer het serveradres en het HTTPS-certificaat.",
       "retiredSelf": "Dit apparaat is verwijderd vanaf een ander apparaat.",
       "resetAndAddAgain": "Opnieuw instellen en opnieuw toevoegen",
-      "noDevices": "Nog geen apparaten.",
-      "syncingHere": "Synchroniseert hier"
+      "noDevices": "Nog geen apparaten."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflict vereist beoordeling",

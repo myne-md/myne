@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "重置并重新添加此设备",
       "resetSyncOnThisDevice": "在此设备上重置同步",
       "shortName": "设备 {{hex}}",
-      "syncedHere": "已在此同步",
       "thisDevice": "此设备",
       "reasonUnreachable": "服务器没有响应",
       "reasonUnexpected": "意外错误",
@@ -4834,8 +4833,7 @@
       "transportError": "无法连接到同步服务器。请检查服务器地址及其 HTTPS 证书。",
       "retiredSelf": "此设备已从另一台设备上移除。",
       "resetAndAddAgain": "重置并重新添加",
-      "noDevices": "尚无设备。",
-      "syncingHere": "正在此处同步"
+      "noDevices": "尚无设备。"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} 个冲突需要审阅",

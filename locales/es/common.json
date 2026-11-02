@@ -4706,7 +4706,6 @@
       "resetAndReAdd": "Restablecer y volver a añadir este dispositivo",
       "resetSyncOnThisDevice": "Restablecer la sincronización en este dispositivo",
       "shortName": "Dispositivo {{hex}}",
-      "syncedHere": "Sincronizado aquí",
       "thisDevice": "Este dispositivo",
       "reasonUnreachable": "el servidor no respondió",
       "reasonUnexpected": "un error inesperado",
@@ -4976,8 +4975,7 @@
       "transportError": "No se pudo conectar con el servidor de sincronización. Comprueba la dirección del servidor y su certificado HTTPS.",
       "retiredSelf": "Este dispositivo fue eliminado desde otro dispositivo.",
       "resetAndAddAgain": "Restablecer y añadir de nuevo",
-      "noDevices": "Aún no hay dispositivos.",
-      "syncingHere": "Sincronizando aquí"
+      "noDevices": "Aún no hay dispositivos."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflicto necesita revisión",

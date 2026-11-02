@@ -1679,9 +1679,24 @@ export async function setPeriodicNoteSetting(
  * propagate — it resurrects from the first peer that still holds it. Renaming
  * always works (it stamps a fresh clock and wins LWW). The backend refuses a
  * blank name, so an empty submit is a no-op the caller should treat as "cancel".
+ *
+ * `selfName` marks the UNATTENDED write a device makes on its own behalf when it
+ * has never had a name (myne-md/myne#973). It is not a hint: the backend refuses
+ * that write on a member session, when this device has no `vault.prefs` yet (the
+ * enrollment seed is keyed on that file being absent, so creating it early costs
+ * the device the account's device-local preferences), and when the entry already
+ * exists because a peer named it a cycle earlier. Resolves to whether it wrote.
  */
-export async function setDeviceName(deviceIdHex: string, name: string): Promise<void> {
-  await writePref("plugin:prefs|set_device_name", { deviceIdHex, name });
+export async function setDeviceName(
+  deviceIdHex: string,
+  name: string,
+  options?: { selfName?: boolean },
+): Promise<boolean> {
+  return writePref<boolean>("plugin:prefs|set_device_name", {
+    deviceIdHex,
+    name,
+    selfName: options?.selfName === true,
+  });
 }
 
 /**
