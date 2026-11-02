@@ -377,9 +377,32 @@ export class AttachmentImageWidget extends WidgetType {
       rememberAspect(this.id, img);
       img.style.display = "";
       loading?.remove();
+      // The box changed size AFTER CodeMirror measured this widget, and nothing
+      // watches a block widget's own geometry: without this the height map keeps
+      // the placeholder's height (0 on a first paint), so every coordinate past
+      // this embed resolves that far off and a click lands rows low.
+      // `decorations/cover-banner.ts` and `decorations/mermaid.ts` carry the same
+      // call for the same reason (myne-md/myne#990).
+      view.requestMeasure();
     });
     img.addEventListener("error", () => {
       loading?.remove();
+      // A failed decode used to leave NOTHING behind. The chip was removed, the
+      // `<img>` stayed `display: none`, and the frame collapsed to 0x0, so the
+      // only thing still painted was the "⋯" overlay hanging ~34px to the LEFT
+      // of the content column. A stray box between the rows, in a note that
+      // looks like it never finished loading (myne-md/myne#990). Say what broke,
+      // where the image would have been, so the box is real and its chrome lands
+      // inside it.
+      const broken = buildTombstoneDom("broken", this.filename);
+      broken.setAttribute("data-testid", "attachment-image.failed");
+      frame.replaceChild(broken, img);
+      // The resize handles were bound to the `<img>` that just left the document:
+      // left in place they drag a detached element and write a width for an image
+      // nobody can see. The drag affordance goes with the media.
+      this.resizeTeardown?.();
+      this.resizeTeardown = null;
+      view.requestMeasure();
     });
     // Click the rendered image → full-size lightbox preview (same decrypted
     // source). Cursor + title hint the affordance.
@@ -715,7 +738,7 @@ export class AttachmentPdfWidget extends WidgetType {
     });
     frame.appendChild(scroller);
 
-    this.cleanup = mountPdfScroller(scroller, {
+    const readerCleanup = mountPdfScroller(scroller, {
       url: attachmentUrl(this.id),
       // Render the pages at the width the author asked for, so an enlarged PDF
       // is genuinely re-rendered rather than a 320px raster scaled up. A
@@ -738,6 +761,29 @@ export class AttachmentPdfWidget extends WidgetType {
     });
 
     appendDroppedSegmentMarker(frame, this.dropped, "attachment-pdf");
+
+    // The reader fills in asynchronously, page by page, so the scroller's height
+    // at measure time is not its final height and the height map holds the stale
+    // one. The same defect as the image widget's `load` handler, and the reason
+    // a click below a PDF lands rows low (myne-md/myne#990). Observing the box
+    // rather than hooking pdf.js's render callback keeps this independent of its
+    // internals, which the plugin seam is allowed to swap.
+    let readerObserver: ResizeObserver | null = null;
+    let readerGone = false;
+    if (typeof ResizeObserver !== "undefined") {
+      readerObserver = new ResizeObserver(() => {
+        // A queued delivery can land after the widget is discarded, and
+        // `requestMeasure` on a destroyed view is not a no-op.
+        if (!readerGone) view.requestMeasure();
+      });
+      readerObserver.observe(scroller);
+    }
+    this.cleanup = () => {
+      readerGone = true;
+      readerObserver?.disconnect();
+      readerObserver = null;
+      readerCleanup();
+    };
 
     const menu = buildEmbedOverflowMenu(view, frame, this.id, this.filename, this.dropped, "attachment-pdf");
     this.menuTeardown = menu.teardown;
@@ -763,6 +809,41 @@ export class AttachmentPdfWidget extends WidgetType {
 
 // --- tombstone (deleted / broken) ------------------------------------------
 
+/**
+ * The deleted/broken chip.
+ *
+ * Shared with the image widget's decode-failure path (myne-md/myne#990): an
+ * embed whose bytes never arrive has to LOOK like the broken reference it is,
+ * in place, at its own size, rather than vanish and leave its chrome behind.
+ */
+function buildTombstoneDom(kind: TombstoneKind, filename: string): HTMLElement {
+  const chip = document.createElement("span");
+  chip.className =
+    kind === "deleted"
+      ? "cm-attachment-tombstone cm-attachment-tombstone-deleted"
+      : "cm-attachment-tombstone cm-attachment-tombstone-broken";
+  chip.setAttribute("role", "img");
+  chip.setAttribute(
+    "aria-label",
+    kind === "deleted"
+      ? i18n.t("editor.attachment.widget.tombstone.deletedAria", { filename })
+      : i18n.t("editor.attachment.widget.tombstone.brokenAria", { filename }),
+  );
+
+  chip.appendChild(makeAttachmentIcon(kind === "deleted" ? "image-off" : "file-warning"));
+
+  const label = document.createElement("span");
+  label.className = "cm-attachment-tombstone-label";
+  label.textContent =
+    filename ||
+    (kind === "deleted"
+      ? i18n.t("editor.attachment.widget.tombstone.deletedLabel")
+      : i18n.t("editor.attachment.widget.tombstone.brokenLabel"));
+  chip.appendChild(label);
+
+  return chip;
+}
+
 export class AttachmentTombstoneWidget extends WidgetType {
   constructor(
     private readonly kind: TombstoneKind,
@@ -776,33 +857,7 @@ export class AttachmentTombstoneWidget extends WidgetType {
   }
 
   toDOM(): HTMLElement {
-    const chip = document.createElement("span");
-    chip.className =
-      this.kind === "deleted"
-        ? "cm-attachment-tombstone cm-attachment-tombstone-deleted"
-        : "cm-attachment-tombstone cm-attachment-tombstone-broken";
-    chip.setAttribute("role", "img");
-    chip.setAttribute(
-      "aria-label",
-      this.kind === "deleted"
-        ? i18n.t("editor.attachment.widget.tombstone.deletedAria", { filename: this.filename })
-        : i18n.t("editor.attachment.widget.tombstone.brokenAria", { filename: this.filename }),
-    );
-
-    chip.appendChild(
-      makeAttachmentIcon(this.kind === "deleted" ? "image-off" : "file-warning"),
-    );
-
-    const label = document.createElement("span");
-    label.className = "cm-attachment-tombstone-label";
-    label.textContent =
-      this.filename ||
-      (this.kind === "deleted"
-        ? i18n.t("editor.attachment.widget.tombstone.deletedLabel")
-        : i18n.t("editor.attachment.widget.tombstone.brokenLabel"));
-    chip.appendChild(label);
-
-    return chip;
+    return buildTombstoneDom(this.kind, this.filename);
   }
 
   ignoreEvent(): boolean {
@@ -1367,6 +1422,10 @@ export class AttachmentVideoWidget extends WidgetType {
     video.addEventListener("loadedmetadata", () => {
       video.style.display = "block";
       loading.remove();
+      // Same defect as the image widget's `load` handler: the box appears after
+      // the measure, so the height map is stale until something else updates
+      // (myne-md/myne#990).
+      view.requestMeasure();
     });
     frame.appendChild(video);
 
@@ -1823,6 +1882,9 @@ export class AttachmentTextPreviewWidget extends WidgetType {
     // the loading-chip height is not representative.
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => {
+        // The card grew or shrank after the measure: the height map is stale
+        // until something re-measures (myne-md/myne#990).
+        view.requestMeasure();
         const entry = previewCache.get(key);
         if (entry === undefined) return;
         const measured = card.getBoundingClientRect().height;
