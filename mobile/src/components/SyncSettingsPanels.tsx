@@ -11,7 +11,7 @@
 // timestamp. The cert-trust surface never claims "-PLUS"/channel-binding (cbind empty,
 // R3 transport review-debt).
 
-import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import type { SyncStatus } from "../lib/use-sync-status";
@@ -40,7 +40,9 @@ import { normalizeBip39Phrase } from "../lib/bip39-normalize";
 import { PHRASE_CELL_COUNT } from "@myne/client-core/phrase-cells";
 import { usePrefs } from "../lib/use-prefs";
 import { setDeviceName } from "../lib/prefs";
-import { DEVICE_NAME_MAX_LEN, useDeviceNameField } from "../lib/device-name";
+import { DEVICE_NAME_MAX_LEN, nameableDeviceSuggestion, useDeviceNameField } from "../lib/device-name";
+import { syncHeadFingerprint } from "../lib/sync";
+import { hasDeviceName, selfNameDevice } from "@myne/client-core/device-name";
 import {
   ENROLL_APPROVED_NOTICE,
   ENROLL_NON_DISTINGUISHING_BANNER,
@@ -801,7 +803,7 @@ interface SasState {
 export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
   const { t } = useTranslation();
   const { devices, pending, error, busy, approve, remove, resetLocal } = useDevices();
-  const { prefs } = usePrefs();
+  const { prefs, loaded } = usePrefs();
   const names = prefs.device_names;
   const [confirmRemove, setConfirmRemove] = useState<string | null>(null);
   // Which account plane this vault's device list describes — see `useMemberVault`.
@@ -834,6 +836,25 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
     }
   };
   const [sas, setSas] = useState<SasState | null>(null);
+
+  // Self-naming (myne-md/myne#973). The policy in `client-core/device-name`
+  // decides everything that carries risk; this effect supplies the three host
+  // reads it is not allowed to own and fires at most once per session. It runs
+  // off `loaded` rather than off `prefs`: an unloaded or failed prefs read leaves
+  // an empty `device_names` map indistinguishable from a real one, and writing on
+  // that could overwrite a name a peer just chose.
+  const selfNamed = useRef(false);
+  useEffect(() => {
+    if (!loaded || devices === null || selfNamed.current) return;
+    selfNamed.current = true;
+    void selfNameDevice({
+      devices,
+      names,
+      readBaseline: syncHeadFingerprint,
+      suggestName: nameableDeviceSuggestion,
+      writeName: (deviceIdHex, name) => setDeviceName(deviceIdHex, name),
+    });
+  }, [loaded, devices, names]);
 
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // Not unless this is positively an OWNER vault: there the roster is the member's
@@ -1190,15 +1211,18 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                     )}
                   </div>
                 )}
-                {/* The demoted device code — a permanent line, not a hover
-                    affordance (mobile has no hover). It is what tells two
-                    same-named devices apart. */}
-                <span
-                  style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}
-                  data-testid="sync.device-code"
-                >
-                  {d.device_id_hex.slice(0, 6)}
-                </span>
+                {/* The demoted device code, only where the title is NOT the code
+                    (myne-md/myne#973). Permanent rather than a hover affordance
+                    (mobile has no hover); its job is to tell two same-named
+                    devices apart, so it is absent exactly where it repeats. */}
+                {hasDeviceName(names, d.device_id_hex) && (
+                  <span
+                    style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}
+                    data-testid="sync.device-code"
+                  >
+                    {d.device_id_hex.slice(0, 6)}
+                  </span>
+                )}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 {/* Rename is offered on EVERY approved row: devices enrolled
@@ -1222,9 +1246,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                 >
                   {t("sync.devices.rename")}
                 </button>
-              {d.is_current ? (
-                <span style={{ fontSize: 13, color: "var(--fg-3)" }}>{t("sync.settings.syncingHere")}</span>
-              ) : plane === "owner" ? (
+              {d.is_current ? null : plane === "owner" ? (
                 <button
                   type="button"
                   disabled={busy}
