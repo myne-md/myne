@@ -51,6 +51,19 @@ export async function suggestedDeviceName(): Promise<string> {
   }
 }
 
+/** The suggestion as a NAME to write unattended, or `null` when it is not one.
+ *
+ *  `suggestedDeviceName` falls back to the neutral "we do not know this
+ *  platform" label, which is fine as a pre-filled field a human then edits and
+ *  wrong as a name written without them: it would print the same words in the
+ *  row's title and in the "This device" badge beside it (myne-md/myne#973). The
+ *  self-naming path therefore writes nothing in that case and the row keeps its
+ *  id-derived label. */
+export async function nameableDeviceSuggestion(): Promise<string | null> {
+  const name = await suggestedDeviceName();
+  return name === i18n.t("sync.devices.platform.unknown") ? null : name;
+}
+
 /** The "Name this device" field's state, shared by both mobile enrollment doors so
  *  they cannot drift. `resolved` is what to submit — never blank, which matters
  *  because the backend refuses a blank name outright. */

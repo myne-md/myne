@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Setel ulang dan tambahkan kembali perangkat ini",
       "resetSyncOnThisDevice": "Setel ulang sinkronisasi di perangkat ini",
       "shortName": "Perangkat {{hex}}",
-      "syncedHere": "Tersinkron di sini",
       "thisDevice": "Perangkat ini",
       "reasonUnreachable": "server tidak menjawab",
       "reasonUnexpected": "kesalahan tak terduga",
@@ -4834,8 +4833,7 @@
       "transportError": "Tidak dapat menjangkau server sinkronisasi. Periksa alamat server dan sertifikat HTTPS-nya.",
       "retiredSelf": "Perangkat ini dihapus dari perangkat lain.",
       "resetAndAddAgain": "Setel ulang dan tambahkan lagi",
-      "noDevices": "Belum ada perangkat.",
-      "syncingHere": "Menyinkronkan di sini"
+      "noDevices": "Belum ada perangkat."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} konflik perlu ditinjau",

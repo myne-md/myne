@@ -4846,7 +4846,6 @@
       "resetAndReAdd": "Obnovit a znovu přidat toto zařízení",
       "resetSyncOnThisDevice": "Obnovit synchronizaci na tomto zařízení",
       "shortName": "Zařízení {{hex}}",
-      "syncedHere": "Synchronizováno zde",
       "thisDevice": "Toto zařízení",
       "reasonUnreachable": "server neodpověděl",
       "reasonUnexpected": "neočekávaná chyba",
@@ -5118,8 +5117,7 @@
       "transportError": "Synchronizační server se nepodařilo kontaktovat. Zkontrolujte adresu serveru a jeho certifikát HTTPS.",
       "retiredSelf": "Toto zařízení bylo odebráno z jiného zařízení.",
       "resetAndAddAgain": "Resetovat a přidat znovu",
-      "noDevices": "Zatím žádná zařízení.",
-      "syncingHere": "Synchronizuje se zde"
+      "noDevices": "Zatím žádná zařízení."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} konflikt vyžaduje kontrolu",

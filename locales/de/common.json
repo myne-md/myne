@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Dieses Gerät zurücksetzen und erneut hinzufügen",
       "resetSyncOnThisDevice": "Sync auf diesem Gerät zurücksetzen",
       "shortName": "Gerät {{hex}}",
-      "syncedHere": "Hier synchronisiert",
       "thisDevice": "Dieses Gerät",
       "reasonUnreachable": "der Server hat nicht geantwortet",
       "reasonUnexpected": "ein unerwarteter Fehler",
@@ -4834,8 +4833,7 @@
       "transportError": "Der Sync-Server konnte nicht erreicht werden. Prüfen Sie die Serveradresse und sein HTTPS-Zertifikat.",
       "retiredSelf": "Dieses Gerät wurde von einem anderen Gerät entfernt.",
       "resetAndAddAgain": "Zurücksetzen und erneut hinzufügen",
-      "noDevices": "Noch keine Geräte.",
-      "syncingHere": "Synchronisiert hier"
+      "noDevices": "Noch keine Geräte."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} Konflikt muss überprüft werden",

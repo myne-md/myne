@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "이 기기를 초기화하고 다시 추가",
       "resetSyncOnThisDevice": "이 기기에서 동기화 초기화",
       "shortName": "기기 {{hex}}",
-      "syncedHere": "여기에서 동기화됨",
       "thisDevice": "이 기기",
       "reasonUnreachable": "서버가 응답하지 않음",
       "reasonUnexpected": "예기치 않은 오류",
@@ -4834,8 +4833,7 @@
       "transportError": "동기화 서버에 연결하지 못했습니다. 서버 주소와 HTTPS 인증서를 확인하세요.",
       "retiredSelf": "이 기기는 다른 기기에서 제거되었습니다.",
       "resetAndAddAgain": "재설정하고 다시 추가",
-      "noDevices": "아직 기기가 없습니다.",
-      "syncingHere": "여기서 동기화 중"
+      "noDevices": "아직 기기가 없습니다."
     },
     "banner": {
       "conflictsNeedReview_one": "충돌 {{count}}건이 검토가 필요합니다",

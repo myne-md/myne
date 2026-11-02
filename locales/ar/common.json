@@ -5125,7 +5125,6 @@
       "resetAndReAdd": "إعادة تعيين هذا الجهاز وإضافته من جديد",
       "resetSyncOnThisDevice": "إعادة تعيين المزامنة على هذا الجهاز",
       "shortName": "الجهاز {{hex}}",
-      "syncedHere": "متزامن هنا",
       "thisDevice": "هذا الجهاز",
       "reasonUnreachable": "لم يستجب الخادم",
       "reasonUnexpected": "خطأ غير متوقع",
@@ -5402,8 +5401,7 @@
       "transportError": "تعذّر الوصول إلى خادم المزامنة. تحقّق من عنوان الخادم ومن شهادته لـ HTTPS.",
       "retiredSelf": "أُزيل هذا الجهاز من جهاز آخر.",
       "resetAndAddAgain": "إعادة التعيين والإضافة من جديد",
-      "noDevices": "لا توجد أجهزة بعد.",
-      "syncingHere": "المزامنة تجري هنا"
+      "noDevices": "لا توجد أجهزة بعد."
     },
     "banner": {
       "conflictsNeedReview_zero": "{{count}} تعارض يحتاج إلى مراجعة",
