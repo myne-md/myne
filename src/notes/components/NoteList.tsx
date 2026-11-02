@@ -1147,6 +1147,22 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
     walk(tree.roots);
     return out;
   }, [tree]);
+  // The same folders for the MOVE pickers, in the shape a collapsible tree needs
+  // (myne#952): the bare name plus its depth, instead of a label pre-indented
+  // with spaces. Depth is 1-based off the tree — the picker's own root row
+  // ("Vault root") sits at 0, so a top-level folder is its child by exactly one
+  // level and the indent rail lands where the eye expects it.
+  const folderChoices = useMemo<FolderChoice[]>(() => {
+    const out: FolderChoice[] = [];
+    const walk = (nodes: readonly FolderNode[]) => {
+      for (const n of nodes) {
+        out.push({ path: n.path, name: n.name, depth: n.depth });
+        walk(n.children);
+      }
+    };
+    walk(tree.roots);
+    return out;
+  }, [tree]);
   // Folders are closed unless opened. The flatten pass consumes a `collapsed`
   // set, so derive it as every folder key NOT in `expanded` — keeping the pure
   // `flattenVisibleRows` contract while making "closed" the default. A key that
@@ -1352,7 +1368,7 @@ export function NoteList({ exportHooks }: NoteListProps = {}) {
           favRows={favRows}
           navIds={navIds}
           treeAnimRows={treeAnimRows}
-          folderOptions={folderOptions}
+          folderChoices={folderChoices}
           folderIndexRoles={folderIndexRoles}
           folderIndexByKey={folderIndexByKey}
           onToggleFolder={toggleFolder}
@@ -1472,6 +1488,7 @@ function EmptyState({
       </div>
       {fm.newFolder !== null && (
         <NewFolderInput
+          depth={0}
           parentPath={fm.newFolder.parentPath}
           onCommit={fm.commitNewFolder}
           onCancel={fm.cancelNewFolder}
@@ -1589,12 +1606,21 @@ function DisclosureWrapper({
 
 type ContextMenuState = { id: NoteId; x: number; y: number } | null;
 
+/**
+ * A folder as the MOVE pickers need it (myne#952): the canonical path (the value
+ * the move writes and the menu's `data-item-id`), the bare name, and the tree
+ * depth the picker indents by. Derived in one depth-first walk of the same
+ * derived tree the sidebar renders, so the picker cannot disagree with it about
+ * what contains what.
+ */
+type FolderChoice = { path: string; name: string; depth: number };
+
 function PopulatedList({
   rows,
   favRows,
   navIds,
   treeAnimRows,
-  folderOptions,
+  folderChoices,
   folderIndexRoles,
   folderIndexByKey,
   onToggleFolder,
@@ -1607,9 +1633,11 @@ function PopulatedList({
   rows: VisibleRow[];
   favRows: VisibleRow[];
   navIds: NoteId[];
-  /** Flat folder choices (tree order, depth-indented label) for the bulk
-   *  "Move N notes to…" target submenu (MYND-367). Reuses the parent's memo. */
-  folderOptions: FolderOption[];
+  /** Folder choices for the two move pickers (myne#952): bare name + tree depth,
+   *  so the picker can render them as a collapsible tree rather than a flat list
+   *  of space-indented labels. Kept separate from `NoteList.folderOptions`, which
+   *  is the FilterBuilder's indented-label shape. */
+  folderChoices: readonly FolderChoice[];
   /** Note-id → folder-index role (MYND-370): "index" = the folder's index note,
    *  "conflict" = a claimant that lost the tiebreak. Drives the NoteRow badge +
    *  conflict indicator. Computed in the parent off the derived tree. */
@@ -2371,22 +2399,28 @@ function PopulatedList({
     );
   }, [bulkUndo, ctx, t]);
 
-  // Bulk "Move N notes to…" submenu: Vault root + every folder (depth-indented).
-  // Folder path is the item id → addressable by `data-item-id` in E2E.
+  // Bulk "Move N notes to…" picker: Vault root + every folder as a collapsible
+  // tree (myne#952). Folder path is the item id → addressable by `data-item-id`
+  // in E2E.
   const moveMenuItems: ContextMenuItem[] = useMemo(
     () => [
       {
         id: "__vault_root__",
         label: t("notes.list.vaultRoot"),
+        icon: "folder",
+        depth: 0,
         onSelect: () => void runBulkMove(null, moveTarget?.ids),
       },
-      ...folderOptions.map((o) => ({
+      ...folderChoices.map((o) => ({
         id: o.path,
-        label: o.label,
+        label: o.name,
+        path: o.path,
+        depth: o.depth,
+        icon: "folder" as const,
         onSelect: () => void runBulkMove(o.path, moveTarget?.ids),
       })),
     ],
-    [folderOptions, runBulkMove, moveTarget, t],
+    [folderChoices, runBulkMove, moveTarget, t],
   );
 
   // myne#281 — "Move folder to…": Vault root + every folder that is not the
@@ -2401,17 +2435,22 @@ function PopulatedList({
       {
         id: "__vault_root__",
         label: t("notes.list.vaultRoot"),
+        icon: "folder",
+        depth: 0,
         onSelect: () => void fm.moveFolderTo(node, null),
       },
-      ...folderOptions
+      ...folderChoices
         .filter((o) => !foldSegment(o.path).startsWith(selfKey))
         .map((o) => ({
           id: o.path,
-          label: o.label,
+          label: o.name,
+          path: o.path,
+          depth: o.depth,
+          icon: "folder" as const,
           onSelect: () => void fm.moveFolderTo(node, o.path),
         })),
     ];
-  }, [folderOptions, folderMoveTarget, fm, t]);
+  }, [folderChoices, folderMoveTarget, fm, t]);
 
   const menuItems: ContextMenuItem[] = useMemo(() => {
     if (menu === null) return [];
@@ -2423,6 +2462,7 @@ function PopulatedList({
         {
           id: "bulk-move",
           group: "organize",
+          icon: "folder" as const,
           label: t("notes.list.bulkMove", { count: selCount }),
           onSelect: () =>
             setMoveTarget({ x: menu.x, y: menu.y, ids: [...ctx.selectedIds] }),
@@ -2434,6 +2474,7 @@ function PopulatedList({
               {
                 id: "bulk-archive",
                 group: "danger",
+                icon: "archive" as const,
                 label: t("notes.list.bulkArchive", { count: selCount }),
                 onSelect: () => void handleBulkArchive(),
               },
@@ -2441,6 +2482,7 @@ function PopulatedList({
         {
           id: "bulk-delete",
           group: "danger",
+          icon: "trash-2" as const,
           label: t("notes.list.bulkDelete", { count: selCount }),
           destructive: true,
           onSelect: () => void handleBulkDelete(),
@@ -2451,12 +2493,14 @@ function PopulatedList({
       {
         id: "open-in-new-tab",
         group: "open",
+        icon: "maximize-2",
         label: t("notes.list.openInNewTab"),
         onSelect: () => openNote(menu.id, { newTab: true }),
       },
       {
         id: "open-to-side",
         group: "open",
+        icon: "columns-2",
         label: t("notes.list.openToSide"),
         onSelect: () => openNote(menu.id, { toSide: true }),
       },
@@ -2467,12 +2511,14 @@ function PopulatedList({
         // folder is collapsed or off-screen.
         id: "move",
         group: "organize",
+        icon: "folder",
         label: t("notes.list.moveTo"),
         onSelect: () => setMoveTarget({ x: menu.x, y: menu.y, ids: [menu.id] }),
       },
       {
         id: "rename",
         group: "edit",
+        icon: "pencil",
         label: t("notes.list.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
@@ -2481,12 +2527,14 @@ function PopulatedList({
         // the copy opens in the focused pane.
         id: "duplicate",
         group: "edit",
+        icon: "copy",
         label: t("notes.list.duplicate"),
         onSelect: () => void ctx.duplicateAndOpen(menu.id),
       },
       {
         id: "favorite",
         group: "edit",
+        icon: "bookmark",
         label: favSet.has(menu.id)
           ? t("notes.list.removeFromFavorites")
           : t("notes.list.addToFavorites"),
@@ -2507,6 +2555,7 @@ function PopulatedList({
           {
             id: "note.set-index",
             group: "edit",
+            icon: "file-text" as const,
             label: t("notes.list.setAsFolderNote"),
             onSelect: () => void handleSetIndex(menu.id),
           },
@@ -2515,6 +2564,7 @@ function PopulatedList({
       {
         id: "color",
         group: "edit",
+        icon: "palette",
         label: t("notes.list.color"),
         onSelect: () =>
           setDecoPopover({
@@ -2537,6 +2587,7 @@ function PopulatedList({
         // one.
         id: "export",
         group: "export",
+        icon: "download",
         label: t("notes.export.submenuLabel"),
         // Never called: a row with `children` opens them instead of acting.
         onSelect: () => {},
@@ -2559,6 +2610,7 @@ function PopulatedList({
             {
               id: "archive",
               group: "danger",
+              icon: "archive" as const,
               label: t("notes.list.archiveNote"),
               onSelect: () => void handleArchive(menu.id),
             },
@@ -2566,6 +2618,7 @@ function PopulatedList({
       {
         id: "delete",
         group: "danger",
+        icon: "trash-2",
         label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void handleTrash(menu.id),
@@ -2590,6 +2643,12 @@ function PopulatedList({
   ]);
 
   // Folder context-menu items (right-click a folder row).
+  //
+  // Grouped and glyphed (myne#952): a flat run of eight label-only rows gave the
+  // eye nothing to land on, and "New subfolder" read as a sibling of "Rename"
+  // rather than as the one item that acts on the folder's CONTENTS. The `group`
+  // tag draws a divider between runs (organise / create / style / destructive)
+  // and the icon column turns each row into something scannable.
   const folderMenuItems: ContextMenuItem[] = useMemo(() => {
     const menuPos = fm.menu;
     const node = menuPos?.node;
@@ -2597,6 +2656,8 @@ function PopulatedList({
     return [
       {
         id: "rename",
+        group: "organize",
+        icon: "pencil",
         label: t("notes.list.rename"),
         onSelect: () => fm.startRenameFolder(node),
       },
@@ -2605,11 +2666,15 @@ function PopulatedList({
         // folder menu had no equivalent, so a keyboard or non-drag user had no
         // way to re-nest a folder at all. Same picker, same guards as the drop.
         id: "move",
+        group: "organize",
+        icon: "arrow-right",
         label: t("notes.list.moveFolderTo"),
         onSelect: () => setFolderMoveTarget({ x: menuPos.x, y: menuPos.y, node }),
       },
       {
         id: "new-note",
+        group: "create",
+        icon: "file-plus",
         label: t("notes.list.newNoteHere"),
         onSelect: () => {
           onRevealFolder(node.path);
@@ -2618,6 +2683,8 @@ function PopulatedList({
       },
       {
         id: "new-drawing",
+        group: "create",
+        icon: "image-plus",
         label: t("notes.list.newDrawingHere"),
         onSelect: () => {
           onRevealFolder(node.path);
@@ -2631,11 +2698,15 @@ function PopulatedList({
             node.indexNoteId !== null
               ? {
                   id: "folder.open-index",
+                  group: "create",
+                  icon: "file-text" as const,
                   label: t("notes.list.openFolderNote"),
                   onSelect: () => handleOpenIndexNote(node.indexNoteId as string),
                 }
               : {
                   id: "folder.create-index",
+                  group: "create",
+                  icon: "file-plus" as const,
                   label: t("notes.list.createFolderNote"),
                   onSelect: () => void handleCreateFolderNote(node.path),
                 },
@@ -2648,6 +2719,8 @@ function PopulatedList({
         ? [
             {
               id: "folder.remove-index",
+              group: "create",
+              icon: "x" as const,
               label: t("notes.list.removeFolderNote"),
               onSelect: () => void handleUnsetIndex(node.indexNoteId as string),
             },
@@ -2655,6 +2728,8 @@ function PopulatedList({
         : []),
       {
         id: "new-subfolder",
+        group: "create",
+        icon: "folder-plus",
         label: t("notes.list.newSubfolder"),
         onSelect: () => {
           onRevealFolder(node.path);
@@ -2663,6 +2738,8 @@ function PopulatedList({
       },
       {
         id: "color",
+        group: "style",
+        icon: "palette",
         label: t("notes.list.customize"),
         onSelect: () =>
           setDecoPopover({
@@ -2681,6 +2758,8 @@ function PopulatedList({
         ? [
             {
               id: "folder.archive",
+              group: "danger",
+              icon: "archive" as const,
               label: t("notes.list.archiveFolder"),
               onSelect: () => fm.archiveFolderAction(node),
             },
@@ -2688,6 +2767,8 @@ function PopulatedList({
         : []),
       {
         id: "delete",
+        group: "danger",
+        icon: "trash-2",
         label: t("notes.list.delete"),
         destructive: true,
         onSelect: () => void fm.deleteFolderAction(node),
@@ -2901,9 +2982,14 @@ function PopulatedList({
           />
         </div>
       </div>
-      {fm.newFolder !== null && (
+      {fm.newFolder !== null && fm.newFolder.parentPath === "" && (
+        // Root-level creation has no parent row to hang from, so the input takes
+        // the tree's FIRST slot — where a top-level folder would appear — instead
+        // of sitting above the tree as it did before (myne#952). Children are
+        // rendered by their parent's row; see `renderFolderRow`.
         <NewFolderInput
-          parentPath={fm.newFolder.parentPath}
+          depth={0}
+          parentPath=""
           onCommit={fm.commitNewFolder}
           onCancel={fm.cancelNewFolder}
         />
@@ -3041,6 +3127,22 @@ function PopulatedList({
                     }
                     onActivate={handleFolderActivate}
                   />
+                  {/* A new SUBFOLDER's input renders as this folder's child row
+                      (myne#952). It used to render once, above the whole tree, no
+                      matter which folder it was for — so the one thing the input
+                      could not tell you was where the folder would land. Height is
+                      measured by `VirtualList`'s ResizeObserver like any other row
+                      growth. */}
+                  {fm.newFolder !== null &&
+                    fm.newFolder.parentPath !== "" &&
+                    fm.newFolder.parentPath === row.node.path && (
+                      <NewFolderInput
+                        depth={row.depth + 1}
+                        parentPath={fm.newFolder.parentPath}
+                        onCommit={fm.commitNewFolder}
+                        onCancel={fm.cancelNewFolder}
+                      />
+                    )}
                 </DisclosureWrapper>
               );
             }
@@ -3205,6 +3307,7 @@ function PopulatedList({
           y={moveTarget.y}
           items={moveMenuItems}
           searchable
+          tree
           searchPlaceholder={t("commands.picker.moveNotePlaceholder")}
           onClose={() => setMoveTarget(null)}
         />
@@ -3215,6 +3318,7 @@ function PopulatedList({
           y={folderMoveTarget.y}
           items={folderMoveMenuItems}
           searchable
+          tree
           searchPlaceholder={t("commands.picker.moveNotePlaceholder")}
           onClose={() => setFolderMoveTarget(null)}
         />
@@ -3280,13 +3384,21 @@ function PopulatedList({
 }
 
 /** Inline name input for creating a new folder (auto-focuses; Enter commits,
- *  Esc cancels, blur commits a non-empty name). */
+ *  Esc cancels, blur commits a non-empty name).
+ *
+ *  `depth` puts it in the TREE at the level the folder will actually be created
+ *  at (myne#952): same base offset and per-level step a folder row uses, plus the
+ *  indent rails of every ancestor level. Rendered by its parent's row (or by the
+ *  tree's head slot for the vault root), so the input sits where the folder is
+ *  about to appear instead of above the whole tree. */
 function NewFolderInput({
   parentPath,
+  depth,
   onCommit,
   onCancel,
 }: {
   parentPath: string;
+  depth: number;
   onCommit: (name: string) => void;
   onCancel: () => void;
 }) {
@@ -3294,6 +3406,10 @@ function NewFolderInput({
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     ref.current?.focus();
+    // The parent may be far down a long sidebar: starting a subfolder has to
+    // bring its input into view, or the caret lands somewhere invisible and the
+    // keystrokes go nowhere the user can see.
+    ref.current?.scrollIntoView({ block: "nearest" });
   }, []);
   const commit = () => {
     const v = ref.current?.value.trim() ?? "";
@@ -3301,7 +3417,15 @@ function NewFolderInput({
     else onCancel();
   };
   return (
-    <div style={NEW_FOLDER_ROW_STYLE}>
+    <div
+      style={{
+        ...NEW_FOLDER_ROW_STYLE,
+        position: "relative",
+        paddingInlineStart:
+          TREE_BASE_PADDING_LEFT + depth * NOTE_INDENT_PER_LEVEL,
+      }}
+    >
+      <TreeRails depth={depth} />
       <input
         ref={ref}
         type="text"

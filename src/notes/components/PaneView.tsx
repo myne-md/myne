@@ -2743,7 +2743,27 @@ export function PaneView({
           // slack a flowing body wants at the end of its text, and under one that
           // fills there is no end to scroll past, so it would read as a dead
           // strip below a list that is already scrolling internally.
-          padding: paneBody.gutters ? (paneBody.fill ? "0 24px" : "0 24px 32px") : 0,
+          padding: paneBody.gutters ? (paneBody.fill ? "0 var(--pane-gutter-inline, 24px) 0" : "0 var(--pane-gutter-inline, 24px) 32px") : 0,
+          // The inline gutter is declared ONCE here and read by the find bar's
+          // panel, which cancels it with a negative margin so its bottom hairline
+          // reaches this container's edges instead of stopping at the text
+          // column (myne#952). Written as a custom property rather than 24px in
+          // both places so the two cannot drift apart: a theme that widens the
+          // gutter would otherwise leave the divider floating mid-strip.
+          ["--pane-gutter-inline" as string]: paneBody.gutters ? "24px" : "0px",
+          // And the find bar needs a second number it cannot read any other way:
+          // how far this container is wider than the writing column centred
+          // inside it. `cqi` units answer that in CSS, against THIS pane rather
+          // than the window (a split view is as narrow as a phone and has the
+          // same problem). Without a container the panel's hairline can only
+          // reach the column, which is the "it still doesn't go edge to edge"
+          // the owner reported after the gutter was already cancelled.
+          //
+          // Safe against the one hazard of layout containment: every surface
+          // that relies on `position: fixed` is mounted to `document.body`
+          // (task-field menu, attachment menus, floating styles), outside this
+          // subtree, so none of them gets re-anchored here.
+          containerType: "inline-size",
         }}
       >
         <div style={paneBody.fill ? { height: "100%" } : { paddingTop: "var(--space-3)" }}>

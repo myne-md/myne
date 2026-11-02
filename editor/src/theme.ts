@@ -795,32 +795,41 @@ export const myneTheme = EditorView.theme({
     minWidth: "1.6em",
   },
 
-  // Fold gutter (heading-list-folding / MYND-300) — HOVER-REVEAL, Obsidian-style
-  // minimal chrome on a prose-first editor. The gutter slot stays narrow + quiet;
-  // the fold arrow appears only when the editor is hovered (the "can fold" ⌄),
-  // EXCEPT a line that is currently folded keeps its › visible so the user can
-  // always find + click to unfold. Tokens only (no hex).
-  ".cm-foldGutter .cm-gutterElement": {
-    // Top-align the fold arrow to the first row too, so it lines up with the
-    // now-top-aligned line number instead of centring on a tall/wrapped line.
-    padding: "0.28em 2px 0",
-    minWidth: "1.1em",
-    display: "flex",
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
+  // Inline fold arrows (myne#952) — HOVER-REVEAL, Obsidian-style minimal chrome on
+  // a prose-first editor. Each foldable line carries its OWN marker, a widget at
+  // its first non-whitespace character, so there is no fold gutter and no fixed
+  // column that drifts away from the row it folds the deeper the row is
+  // indented. The reveal discipline below is the one the gutter had: quiet until
+  // the editor is hovered (the "can fold" ⌄), EXCEPT a line that is currently
+  // folded, which keeps its › visible so it can always be found and clicked.
+  // Tokens only (no hex).
   ".cm-fold-marker": {
     color: "var(--fg-3, #6b6a64)",
     cursor: "pointer",
     fontSize: "0.9em",
     lineHeight: "1",
     userSelect: "none",
+    // The marker costs no horizontal space: `inline-block` at a fixed width with
+    // a matching negative inline margin, so the document does not reflow the
+    // moment a line becomes foldable — and the box is identical for ⌄ and ›.
+    display: "inline-block",
+    width: "1.15em",
+    marginInlineStart: "-1.15em",
+    textAlign: "center",
     transition:
       "opacity var(--duration-fast, 120ms) var(--ease-standard, ease), color var(--duration-fast, 120ms) var(--ease-standard, ease)",
   },
   // "Can fold" arrow: invisible until the editor is hovered (hover-reveal).
   '.cm-fold-marker[data-fold-open="true"]': {
     opacity: "0",
+  },
+  // The glyph is CSS, not a text node, because the marker sits INSIDE `.cm-line`
+  // and a text node there would join the line's textContent (see folding.ts).
+  '.cm-fold-marker[data-fold-open="true"]::before': {
+    content: '"\u2304"',
+  },
+  '.cm-fold-marker[data-fold-open="false"]::before': {
+    content: '"\u203A"',
   },
   '&:hover .cm-fold-marker[data-fold-open="true"]': {
     opacity: "0.7",
@@ -1750,12 +1759,33 @@ export const myneTheme = EditorView.theme({
     color: "var(--fg-1)",
   },
   ".cm-panels.cm-panels-top": {
-    borderBottom: "none",
+    borderBottom: "1px solid var(--line-1, #e3e2dd)",
     // Opaque fill (MYND-299 QA): the find bar is a sticky top panel inside a
     // padded scroll container, so a transparent panel let the scrolled note text
     // bleed through the strip above the bar. Match the bar's own `--paper` so the
     // whole top-panel region is solid — no content shows behind it.
     backgroundColor: "var(--paper)",
+    // EDGE TO EDGE (myne#952). The divider lives on the panel, so it spans the
+    // panel's width — and the panel spans the editor, which sits inside the pane
+    // body's gutter AND inside the centred writing column (the editor-typography
+    // max-width, `margin: 0 auto` on `editor.content-frame`). Cancelling only the
+    // gutter left the line stopping a long way short, because most of the inset
+    // is the CENTRING, not the padding. That is what the owner reported after the
+    // first attempt: still not edge to edge.
+    //
+    // The centring is not a constant, so it cannot be a second negative margin
+    // written by hand. `100cqi` is the pane body's content-box width (the scroll
+    // parent declares `container-type: inline-size`), `100%` is this panel's own
+    // width — the writing column — so the difference halved is exactly the slack
+    // on each side, and subtracting the gutter takes it the rest of the way to
+    // the pane's own borders. In a split view this is measured against the pane,
+    // not the window, which is the whole reason for a container query here.
+    //
+    // Where `cqi` is unsupported the calc is invalid and the declaration is
+    // dropped, which puts the divider back on the text column: the old look, not
+    // a broken one.
+    marginInline:
+      "calc((100cqi - 100%) / -2 - var(--pane-gutter-inline, 0px))",
   },
 
   // Attachment embeds (MYND-164 / 147 / 149) — decorations/attachment-embed.ts,

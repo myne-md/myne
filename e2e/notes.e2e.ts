@@ -381,11 +381,29 @@ describeE2E("ms1 multi-select bulk move (MYND-367)", () => {
             testIdSelector("notes.context-menu-item", { "data-item-id": "bulk-move" }),
           )
         ).click();
-        await (
-          await s.waitForElement(
-            testIdSelector("notes.context-menu-item", { "data-item-id": "Arsiv/" }),
-          )
-        ).click();
+
+        // The picker is a TREE, not a flat indented list (myne#952). Its whole
+        // point is the disclosure: the folder sits one level under the root row
+        // and can be folded away, which the old leading-spaces list could not
+        // do. Asserted through the driver because the depth is a rendered
+        // attribute and the fold is a DOM removal — a jsdom test sees the same
+        // thing, but only here does it sit between a real vault and a real move.
+        const folderItem = testIdSelector("notes.context-menu-item", {
+          "data-item-id": "Arsiv/",
+        });
+        const rootDisclosure =
+          testIdSelector("notes.context-menu-item", {
+            "data-item-id": "__vault_root__",
+          }) + ' [data-testid="notes.context-menu-disclosure"]';
+        expect(
+          await (await s.waitForElement(folderItem)).attribute("data-depth"),
+        ).toBe("1");
+
+        // Fold the root away: its child goes. Unfold: it comes back.
+        await (await s.waitForElement(rootDisclosure)).click();
+        await s.waitForGone(folderItem);
+        await (await s.waitForElement(rootDisclosure)).click();
+        await (await s.waitForElement(folderItem)).click();
 
         // The bulk move lands both notes inside the folder, which defaults to
         // collapsed (NoteList `expanded` starts empty) — so the moved notes are

@@ -813,11 +813,18 @@ const CSS = `
   display: flex;
   flex-direction: column;
   gap: 6px;
+  /* FULL BLEED, LEFT-ALIGNED (myne#952). The row starts at the strip's left
+     edge with the input and runs rightwards through the controls. Both earlier
+     shapes missed that: the original stretched the input across the whole editor
+     for a three-word query, and the compact one hugged the right edge, so the
+     field you came here to type in was never where the eye starts. The bar fills
+     the panel so its bottom hairline is a boundary of the strip rather than a
+     rule under one cluster; the padding keeps the input off the very edge. */
   width: 100%;
+  max-width: none;
   box-sizing: border-box;
   padding: var(--space-2) 12px;
   background-color: var(--paper, #fbfbfa);
-  border-bottom: 1px solid var(--line-1, #e3e2dd);
   font-family: var(--font-sans);
 }
 .cm-find-bar-row {
@@ -825,6 +832,17 @@ const CSS = `
   align-items: center;
   gap: var(--space-2);
   width: 100%;
+}
+/* A field is the input plus its lead glyph, which sits INSIDE the input's box
+   (see field() in find-bar-view.ts). The wrapper carries the width budget, so
+   the find row and the replace row agree about where their text starts without a
+   spacer column doing the arithmetic. */
+.cm-find-bar-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 0 1 240px;
+  min-width: 0;
 }
 /* The date-fallback notice (myne-md/myne#609): a quiet line of prose, not a row
    of controls, so it overrides the flex row it inherits from. Muted like the
@@ -839,19 +857,44 @@ const CSS = `
   line-height: 1.4;
   padding-left: 2px;
 }
-/* The replace row's leading glyph sits in the same lead column as the find
-   row's search icon (the toggle is the first element on the find row; the
-   replace row reuses the lead-icon slot so the two inputs align). */
+/* The replace row's disclosure. It no longer opens the row with a rotation:
+   the glyph is a stacked chevron pair, which says "a second row" on its own and
+   cannot be mistaken for the Previous/Next arrows beside it (myne#952). */
 .cm-find-bar-toggle {
   color: var(--fg-3, #6b6a64);
-  transition: transform var(--duration-fast, 120ms) var(--ease-standard, ease);
-}
-/* Expanded: the disclosure chevron rotates from ▶ to ▼. */
-.cm-find-bar-toggle[aria-expanded="true"] svg {
-  transform: rotate(90deg);
 }
 .cm-find-bar-replace-lead {
   color: var(--fg-3, #6b6a64);
+}
+/* The replace row opens and closes by height, not by existing (myne#952).
+   max-height is what can be interpolated without measuring the row in JS, and
+   the collapsed margin-block-start cancels the column gap so a zero-height row
+   does not leave a strip of empty space under the find row. overflow: hidden is
+   what makes the height real rather than a layout the row ignores; the replace
+   input's focus ring is a border, so nothing draws outside the box and nothing
+   gets clipped.
+
+   The zero-height row is unreachable because the view also sets inert on it (see
+   find-bar-view.ts). The animation is presentation; inert is the contract. */
+.cm-find-bar-replace-row {
+  max-height: 0;
+  margin-block-start: -6px;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    max-height var(--duration-fast, 120ms) var(--ease-standard, ease),
+    margin-block-start var(--duration-fast, 120ms) var(--ease-standard, ease),
+    opacity var(--duration-fast, 120ms) var(--ease-standard, ease);
+}
+.cm-find-bar-replace-row[data-expanded="true"] {
+  max-height: var(--space-6);
+  margin-block-start: 0;
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cm-find-bar-replace-row {
+    transition: none;
+  }
 }
 /* Replace action buttons ("Replace" / "Replace all (N)") — text pills matching
    the inline-URL apply button's restraint, but secondary (not accent-filled):
@@ -881,26 +924,36 @@ const CSS = `
   cursor: default;
   background-color: transparent;
 }
+/* The lead glyph of a field: absolutely positioned in the field's own start
+   padding, out of the flow (myne#952). pointer-events: none so a click on the
+   magnifier lands in the input and places the caret instead of being swallowed
+   by an icon that has nothing to do. */
 .cm-find-bar-lead {
+  position: absolute;
+  inset-inline-start: 8px;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
   color: var(--fg-3, #6b6a64);
+  pointer-events: none;
 }
 .cm-find-bar-input {
-  flex: 1;
+  /* Fills its field; the field owns the width budget (myne#952).
+     padding-inline-start is the room the lead glyph sits in, so the text never
+     lands under the icon. */
+  flex: 1 1 auto;
+  width: 100%;
   min-width: 0;
-  height: 32px;
+  height: 28px;
   box-sizing: border-box;
   appearance: none;
   -webkit-appearance: none;
   border: 1px solid var(--line-2, #c8c7c1);
   border-radius: var(--radius-1, 3px);
   background: var(--paper, #fbfbfa);
-  padding: 0 10px;
+  padding-block: 0;
+  padding-inline: 30px 8px;
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   color: var(--fg-1, #1a1a17);
   outline: none;
   box-shadow: none;

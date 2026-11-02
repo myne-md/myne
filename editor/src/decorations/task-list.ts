@@ -30,7 +30,7 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { makeCursorAwareDecorationPlugin } from "./plugin-factory";
-import { revealsRange } from "./cursor-aware";
+import { revealsAtOrInside, revealsRange } from "./cursor-aware";
 import { listLabelStart } from "./list";
 import { completeRecurringTask, uncompleteRecurringTask } from "./task-recurrence";
 
@@ -170,7 +170,28 @@ function buildTaskListDecorations(view: EditorView): DecorationSet {
         //    clause is what keeps a translucent selection band off the OPAQUE
         //    checkbox fill: if the markup is in the selection, show the markup.
         //    See `revealsRange`.
-        if (!revealsRange(view, bulletStart, node.to)) {
+        //
+        // The run tested here ENDS at the separator, not at the marker
+        // (myne#952). The separator is hidden by the third replace below, and it
+        // used to sit OUTSIDE this predicate — so a caret placed in the gap
+        // between `]` and the label, which is the most natural place to click
+        // when you want to start typing a task, was inside a hidden atomic run
+        // that no reveal covered. Typing there accumulated at a clamped position
+        // instead of advancing, which is how a user's text came out
+        // character-reversed. Covering the separator is the same rule the bullet
+        // half already followed: hide it only while the caret is elsewhere.
+        //
+        // `revealsAtOrInside` (half-open) for the separator, `revealsRange`
+        // (closed) when there is none: a caret sitting exactly on `labelStart`
+        // must keep the checkbox rendered — that is the label the user is
+        // typing, and #563 exists because it used to vanish — while the boundary
+        // right after `]` on an item with no label is still editing the markup.
+        const separator = labelStart > node.to ? labelStart : null;
+        const revealed =
+          separator === null
+            ? revealsRange(view, bulletStart, node.to)
+            : revealsAtOrInside(view, bulletStart, separator);
+        if (!revealed) {
           if (node.from > bulletStart) {
             decorations.push(Decoration.replace({}).range(bulletStart, node.from));
           }
