@@ -74,7 +74,11 @@ FRAME_ENV=""
 if [[ -n "${MYNE_UI_PASS_FRAMES:-}" ]]; then
   FRAME_ENV="MYNE_UI_PASS_FRAMES=$MYNE_UI_PASS_FRAMES"
 fi
-E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store $FRAME_ENV"
+# The commit this capture describes. The image has no `git`, so without this the
+# diagnostics frame photographs `commit: unknown` in every screenshot it appears
+# in (issue #970, item 15); `vite.config.ts` reads this variable first.
+BUILD_COMMIT_ENV="MYNE_BUILD_COMMIT=$(git rev-parse --short=9 HEAD 2>/dev/null || echo unknown)"
+E2E_ENV="export ${SCALE_ENV}HOME=/home/e2e CARGO_HOME=/home/e2e/.cargo RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin CI=true npm_config_store_dir=/home/e2e/.pnpm-store $FRAME_ENV $BUILD_COMMIT_ENV"
 # Chown ALL of /work (not just the volumes): on a native-Linux bind mount the
 # repo root stays host-owned (root), so the unprivileged `e2e` build user can't
 # create /work/dist and `vite build` fails with EACCES. (Docker Desktop on macOS

@@ -1969,6 +1969,28 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    // The biometric arm, which the PIN-primary story above cannot reach: with
+    // `method="pin"` the Touch ID button is not mounted at all, so the app's own
+    // wait (issue #970, item 16) had no picture. The prompt never resolves in the
+    // fake host, which is exactly the state worth photographing.
+    id: "components/quickunlockentry/biometric",
+    group: "components",
+    surface: "QuickUnlockEntry",
+    state: "biometric",
+    description:
+      "The biometric arm of the same entry. The fake host answers the prompt immediately, so the catalogue shows the resting state; the wait the app states while the system sheet is up is asserted in unlock-quick-unlock-precedence.test.tsx rather than photographed here.",
+    tags: ["components", "quick-unlock", "biometric", "touch-id", "waiting", "locked"],
+    fixture: "locked",
+    render: () => (
+      <QuickUnlockEntry
+        vaultId={FIXTURE_VAULT_ID}
+        method="biometric"
+        onUnlocked={action("onUnlocked")}
+        onUnavailable={action("onUnavailable")}
+      />
+    ),
+  },
+  {
     id: "components/secretphrasereveal/default",
     group: "components",
     surface: "SecretPhraseReveal",

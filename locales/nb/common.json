@@ -3215,8 +3215,7 @@
         "diagnostics": "Diagnostikk"
       },
       "diagnosticFilesHelper_one": "Én fil vil inneholde denne blokken pluss {{count}} loggfil, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
-      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner."
     },
     "vault": {
       "changePasswordButton": "Endre passord",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne leser formen på hvelvet ditt først: notattitler, mapper og tagger. Det ber om notattekst bare hvis det trenger det, og aldri for vedlegg.",
         "provider": "Leverandør: {{provider}}",
         "estimatedChars": "Omtrent {{chars}} tegn",
-        "excluded": "{{count}} notater utelatt fordi mappen er utelatt fra AI",
         "showPayload": "Vis nøyaktig hva som sendes",
         "hidePayload": "Skjul nyttelasten",
         "consentLabel": "Send dette sammendraget til {{provider}} (omtrent {{chars}} tegn). Jeg forstår at leverandøren mottar det.",

@@ -3215,8 +3215,7 @@
         "diagnostics": "ڈایاگنوسٹکس"
       },
       "diagnosticFilesHelper_one": "ایک فائل میں یہ بلاک اور {{count}} لاگ فائل ہوگی، کل {{size}}۔ کچھ بھی کہیں نہیں بھیجا جاتا؛ آپ طے کرتے ہیں کہ یہ کہاں جائے۔",
-      "diagnosticFilesHelper_other": "ایک فائل میں یہ بلاک اور {{count}} لاگ فائلیں ہوں گی، کل {{size}}۔ کچھ بھی کہیں نہیں بھیجا جاتا؛ آپ طے کرتے ہیں کہ یہ کہاں جائے۔",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "ایک فائل میں یہ بلاک اور {{count}} لاگ فائلیں ہوں گی، کل {{size}}۔ کچھ بھی کہیں نہیں بھیجا جاتا؛ آپ طے کرتے ہیں کہ یہ کہاں جائے۔"
     },
     "vault": {
       "changePasswordButton": "پاس ورڈ تبدیل کریں",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne پہلے آپ کے والٹ کی شکل پڑھتا ہے: نوٹ کے عنوان، فولڈرز اور ٹیگز۔ یہ نوٹ کا متن صرف اگر ضرورت ہو مانگتا ہے، اور کبھی منسلکات نہیں۔",
         "provider": "فراہم کنندہ: {{provider}}",
         "estimatedChars": "تقریباً {{chars}} حروف",
-        "excluded": "{{count}} نوٹس خارج کیے گئے کیونکہ ان کا فولڈر AI سے خارج ہے",
         "showPayload": "بالکل وہی دکھائیں جو بھیجا جائے گا",
         "hidePayload": "payload چھپائیں",
         "consentLabel": "یہ خاکہ {{provider}} کو بھیجیں (تقریباً {{chars}} حروف)۔ میں سمجھتا ہوں کہ فراہم کنندہ اسے وصول کرتا ہے۔",

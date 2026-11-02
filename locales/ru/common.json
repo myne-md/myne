@@ -3451,8 +3451,7 @@
       "diagnosticFilesHelper_one": "Один файл содержал бы этот блок плюс {{count}} файл журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
       "diagnosticFilesHelper_other": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
       "diagnosticFilesHelper_few": "Один файл содержал бы этот блок плюс {{count}} файла журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
-      "diagnosticFilesHelper_many": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт."
     },
     "vault": {
       "changePasswordButton": "Сменить пароль",
@@ -4599,7 +4598,6 @@
         "scopeIntro": "Myne сначала читает форму вашего хранилища: названия заметок, папки и теги. Текст заметок запрашивается только если нужен, и никогда вложения.",
         "provider": "Провайдер: {{provider}}",
         "estimatedChars": "Около {{chars}} символов",
-        "excluded": "Оставлено без внимания заметок: {{count}}, потому что их папка исключена из ИИ",
         "showPayload": "Показать, что именно будет отправлено",
         "hidePayload": "Скрыть полезную нагрузку",
         "consentLabel": "Отправить этот обзор в {{provider}} (около {{chars}} символов). Я понимаю, что провайдер его получает.",

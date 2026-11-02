@@ -126,6 +126,12 @@ const PREFS_FIXTURE: Fixture = {
 
 /** The reviewed vault seed (myne-md/myne#915): AI on, an empty memory and a
  *  small vault outline, so the scope step has real counts to state. */
+// The command names below are matched EXACTLY by the fake host
+// (`stories/src/host/internals.ts`, `handlers[cmd]`), so `local_inference` with an
+// underscore is not a near miss: it misses, `invoke` resolves the benign `[]`,
+// and every field the surface reads is `undefined`. That is how this wizard
+// rendered raw i18n keys for its count chips, and it is why the plugin id here
+// is `local-inference`.
 const SEED_FIXTURE: Fixture = {
   description: "AI on, empty memory, a small vault outline",
   handlers: {
@@ -133,7 +139,7 @@ const SEED_FIXTURE: Fixture = {
     "plugin:prefs|prefs_read": () => ({ ...DEFAULT_PREFS, ai_enabled: true }),
     "plugin:memory|memory_list": () => ({ rows: [], cap: 100 }),
     "plugin:memory|personality_read": () => ({ directives: [] }),
-    "plugin:local_inference|seed_memory_status": () => ({
+    "plugin:local-inference|seed_memory_status": () => ({
       notes: 24,
       folders: 4,
       tags: 7,
@@ -142,7 +148,20 @@ const SEED_FIXTURE: Fixture = {
       provider: "in-process",
       remote: false,
     }),
-    "plugin:local_inference|seed_memory_generate": () => ({
+    // The scope step reads its counts from `seed_memory_payload`, a SECOND
+    // command, and a fixture that answers only the status left every chip
+    // rendering its raw i18n key (`count: undefined`), which is what the
+    // catalogue showed until this was added.
+    "plugin:local-inference|seed_memory_payload": () => ({
+      notes: 24,
+      folders: 4,
+      tags: 7,
+      excludedNotes: 3,
+      titlesOmitted: 24,
+      payload: "Prefer short, decision-first answers.\nFolders are organised by area.",
+      chars: 1_284,
+    }),
+    "plugin:local-inference|seed_memory_generate": () => ({
       candidates: [
         { text: "Projects: Myne, including the roadmap and the release checklist." },
         { text: "Prefers short, decision-first answers." },
@@ -152,7 +171,7 @@ const SEED_FIXTURE: Fixture = {
       foldersRead: [],
     }),
     "plugin:memory|memory_seed_apply": () => ({ ids: ["a", "b", "c"], replaced: 0, liveCount: 3 }),
-    "plugin:local_inference|seed_memory_payload": () => ({
+    "plugin:local-inference|seed_memory_payload": () => ({
       notes: 24,
       folders: 4,
       tags: 7,
@@ -185,7 +204,7 @@ const SEEDED_FIXTURE: Fixture = {
       if (id === "user1") return "A fact the user wrote herself.";
       return "An entry distilled from the vault.";
     },
-    "plugin:local_inference|seed_memory_status": () => ({
+    "plugin:local-inference|seed_memory_status": () => ({
       notes: 24,
       folders: 4,
       tags: 7,

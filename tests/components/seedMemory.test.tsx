@@ -136,7 +136,11 @@ describe("SeedMemoryWizard", () => {
     expect(screen.getByTestId("settings.memory.seed.payload").textContent).toBe(
       PAYLOAD.payload,
     );
-    expect(screen.getByTestId("settings.memory.seed.excluded").textContent).toContain("2");
+    // Plural, not "2 notes"-shaped-by-luck: the chip is the one count a user may
+    // have to act on, and a count of one used to read "1 notes left out".
+    const excluded = screen.getByTestId("settings.memory.seed.excluded").textContent ?? "";
+    expect(excluded).toContain("2");
+    expect(excluded).toContain("notes left out");
   });
 
   // Issue #970, item 8. The scope screen used to read "Provider: remote ·

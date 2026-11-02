@@ -3451,8 +3451,7 @@
       "diagnosticFilesHelper_one": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubor protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
       "diagnosticFilesHelper_other": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souborů protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
       "diagnosticFilesHelper_few": "Jeden soubor by obsahoval tento blok a k tomu {{count}} soubory protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
-      "diagnosticFilesHelper_many": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souboru protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Jeden soubor by obsahoval tento blok a k tomu {{count}} souboru protokolu, celkem {{size}}. Nikam se nic neodesílá; vy rozhodujete, kam se uloží."
     },
     "vault": {
       "changePasswordButton": "Změnit heslo",
@@ -4599,7 +4598,6 @@
         "scopeIntro": "Myne nejprve čte tvar vašeho trezoru: názvy poznámek, složky a štítky. Text poznámek požádá jen pokud ho potřebuje a nikdy přílohy.",
         "provider": "Poskytovatel: {{provider}}",
         "estimatedChars": "Asi {{chars}} znaků",
-        "excluded": "{{count}} poznámek vynecháno, protože jejich složka je vyloučena z AI",
         "showPayload": "Zobrazit přesně to, co se odešle",
         "hidePayload": "Skrýt obsah",
         "consentLabel": "Odeslat tento obrys poskytovateli {{provider}} (asi {{chars}} znaků). Rozumím, že ho poskytovatel dostane.",

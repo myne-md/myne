@@ -3215,8 +3215,7 @@
         "diagnostics": "ਡਾਇਗਨੋਸਟਿਕਸ"
       },
       "diagnosticFilesHelper_one": "ਇੱਕ ਫ਼ਾਈਲ ਵਿੱਚ ਇਹ ਬਲਾਕ ਅਤੇ ਨਾਲ ਹੀ {{count}} ਲੌਗ ਫ਼ਾਈਲ ਹੋਵੇਗੀ, ਕੁੱਲ {{size}}। ਕੁਝ ਵੀ ਕਿਤੇ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ; ਤੁਸੀਂ ਤੈਅ ਕਰਦੇ ਹੋ ਕਿ ਇਹ ਕਿੱਥੇ ਜਾਵੇ।",
-      "diagnosticFilesHelper_other": "ਇੱਕ ਫ਼ਾਈਲ ਵਿੱਚ ਇਹ ਬਲਾਕ ਅਤੇ ਨਾਲ ਹੀ {{count}} ਲੌਗ ਫ਼ਾਈਲਾਂ ਹੋਣਗੀਆਂ, ਕੁੱਲ {{size}}। ਕੁਝ ਵੀ ਕਿਤੇ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ; ਤੁਸੀਂ ਤੈਅ ਕਰਦੇ ਹੋ ਕਿ ਇਹ ਕਿੱਥੇ ਜਾਵੇ।",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "ਇੱਕ ਫ਼ਾਈਲ ਵਿੱਚ ਇਹ ਬਲਾਕ ਅਤੇ ਨਾਲ ਹੀ {{count}} ਲੌਗ ਫ਼ਾਈਲਾਂ ਹੋਣਗੀਆਂ, ਕੁੱਲ {{size}}। ਕੁਝ ਵੀ ਕਿਤੇ ਨਹੀਂ ਭੇਜਿਆ ਜਾਂਦਾ; ਤੁਸੀਂ ਤੈਅ ਕਰਦੇ ਹੋ ਕਿ ਇਹ ਕਿੱਥੇ ਜਾਵੇ।"
     },
     "vault": {
       "changePasswordButton": "ਪਾਸਵਰਡ ਬਦਲੋ",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne ਪਹਿਲਾਂ ਤੁਹਾਡੇ ਵਾਲਟ ਦਾ ਰੂਪ ਪੜ੍ਹਦਾ ਹੈ: ਨੋਟ ਸਿਰਲੇਖ, ਫੋਲਡਰ ਅਤੇ ਟੈਗ। ਜੇ ਉਸਨੂੰ ਚਾਹੀਦਾ ਹੋਵੇ ਤਾਂ ਹੀ ਨੋਟ ਦੀ ਲਿਖਤ ਮੰਗਦਾ ਹੈ, ਅਤੇ ਕਦੇ ਵੀ ਅਟੈਚਮੈਂਟ ਨਹੀਂ।",
         "provider": "ਪ੍ਰਦਾਤਾ: {{provider}}",
         "estimatedChars": "ਲਗਭਗ {{chars}} ਅੱਖਰ",
-        "excluded": "{{count}} ਨੋਟ ਬਾਹਰ ਰੱਖੇ ਗਏ ਕਿਉਂਕਿ ਉਹਨਾਂ ਦਾ ਫੋਲਡਰ AI ਤੋਂ ਬਾਹਰ ਹੈ",
         "showPayload": "ਜੋ ਭੇਜਿਆ ਜਾਵੇਗਾ, ਉਹ ਦਿਖਾਓ",
         "hidePayload": "ਪੇਲੋਡ ਲੁਕਾਓ",
         "consentLabel": "ਇਹ ਆਉਟਲਾਈਨ {{provider}} ਨੂੰ ਭੇਜੋ (ਲਗਭਗ {{chars}} ਅੱਖਰ)। ਮੈਂ ਸਮਝਦਾ/ਸਮਝਦੀ ਹਾਂ ਕਿ ਪ੍ਰਦਾਤਾ ਇਸਨੂੰ ਪ੍ਰਾਪਤ ਕਰੇਗਾ।",

@@ -3333,8 +3333,7 @@
       },
       "diagnosticFilesHelper_one": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
       "diagnosticFilesHelper_other": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
-      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va."
     },
     "vault": {
       "changePasswordButton": "Cambia password",
@@ -4464,7 +4463,6 @@
         "scopeIntro": "Myne legge prima la forma della tua cassaforte: titoli delle note, cartelle e tag. Chiede il testo delle note solo se ne ha bisogno, e mai gli allegati.",
         "provider": "Provider: {{provider}}",
         "estimatedChars": "Circa {{chars}} caratteri",
-        "excluded": "{{count}} note escluse perché la loro cartella è esclusa dall'AI",
         "showPayload": "Mostra esattamente cosa verrà inviato",
         "hidePayload": "Nascondi il payload",
         "consentLabel": "Invia questo schema a {{provider}} (circa {{chars}} caratteri). Capisco che il provider lo riceve.",

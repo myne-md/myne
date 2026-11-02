@@ -3215,8 +3215,7 @@
         "diagnostics": "诊断"
       },
       "diagnosticFilesHelper_one": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
-      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。"
     },
     "vault": {
       "changePasswordButton": "更改密码",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne 先读取保险库的结构：笔记标题、文件夹和标签。仅在需要时请求笔记文本，且从不请求附件。",
         "provider": "服务商：{{provider}}",
         "estimatedChars": "约 {{chars}} 个字符",
-        "excluded": "{{count}} 篇笔记因所在文件夹被排除在 AI 之外而未纳入",
         "showPayload": "显示将发送的确切内容",
         "hidePayload": "隐藏载荷",
         "consentLabel": "将此大纲发送给 {{provider}}（约 {{chars}} 个字符）。我了解服务商将收到它。",

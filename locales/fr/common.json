@@ -3333,8 +3333,7 @@
       },
       "diagnosticFilesHelper_one": "Un fichier contiendrait ce bloc plus {{count}} fichier journal, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
       "diagnosticFilesHelper_other": "Un fichier contiendrait ce bloc plus {{count}} fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
-      "diagnosticFilesHelper_many": "Un fichier contiendrait ce bloc plus {{count}} de fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Un fichier contiendrait ce bloc plus {{count}} de fichiers journaux, {{size}} au total. Rien n'est envoyé nulle part ; vous choisissez où il va."
     },
     "vault": {
       "changePasswordButton": "Changer le mot de passe",
@@ -4464,7 +4463,6 @@
         "scopeIntro": "Myne lit d'abord la forme de votre coffre : titres des notes, dossiers et étiquettes. Il ne demande le texte des notes que s'il en a besoin, et jamais pour les pièces jointes.",
         "provider": "Fournisseur : {{provider}}",
         "estimatedChars": "Environ {{chars}} caractères",
-        "excluded": "{{count}} notes laissées de côté car leur dossier est exclu de l'IA",
         "showPayload": "Afficher exactement ce qui sera envoyé",
         "hidePayload": "Masquer le contenu",
         "consentLabel": "Envoyer ce plan à {{provider}} (environ {{chars}} caractères). Je comprends que le fournisseur le reçoit.",

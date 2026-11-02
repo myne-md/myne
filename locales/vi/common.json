@@ -3215,8 +3215,7 @@
         "diagnostics": "Chẩn đoán"
       },
       "diagnosticFilesHelper_one": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi.",
-      "diagnosticFilesHelper_other": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Một tệp sẽ chứa khối này cộng với {{count}} tệp nhật ký, tổng cộng {{size}}. Không có gì được gửi đi đâu cả; bạn chọn nơi nó đi."
     },
     "vault": {
       "changePasswordButton": "Đổi mật khẩu",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne đọc hình dạng kho của bạn trước: tiêu đề ghi chú, thư mục và thẻ. Nó chỉ yêu cầu văn bản ghi chú khi cần, và không bao giờ phần đính kèm.",
         "provider": "Nhà cung cấp: {{provider}}",
         "estimatedChars": "Khoảng {{chars}} ký tự",
-        "excluded": "{{count}} ghi chú bị bỏ qua vì thư mục của chúng bị loại trừ khỏi AI",
         "showPayload": "Hiện chính xác điều sẽ được gửi",
         "hidePayload": "Ẩn payload",
         "consentLabel": "Gửi phác thảo này đến {{provider}} (khoảng {{chars}} ký tự). Tôi hiểu nhà cung cấp nhận được nó.",

@@ -3215,8 +3215,7 @@
         "diagnostics": "診断"
       },
       "diagnosticFilesHelper_one": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
-      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。"
     },
     "vault": {
       "changePasswordButton": "パスワードを変更",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myneはまず保管庫の構造を読み取ります: ノートのタイトル、フォルダ、タグ。必要な場合のみノート本文を求め、添付ファイルは求めません。",
         "provider": "プロバイダー: {{provider}}",
         "estimatedChars": "約{{chars}}文字",
-        "excluded": "フォルダがAIから除外されているため、ノートを{{count}}件除外しました",
         "showPayload": "送信される内容を正確に表示",
         "hidePayload": "ペイロードを隠す",
         "consentLabel": "この概要を{{provider}}に送信します(約{{chars}}文字)。プロバイダーが受け取ることを理解しています。",

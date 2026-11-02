@@ -3333,8 +3333,7 @@
       },
       "diagnosticFilesHelper_one": "Un solo archivo contendría este bloque más {{count}} archivo de registro, {{size}} en total. No se envía nada a ninguna parte; tú decides dónde va.",
       "diagnosticFilesHelper_other": "Un solo archivo contendría este bloque más {{count}} archivos de registro, {{size}} en total. No se envía nada a ninguna parte; tú decides dónde va.",
-      "diagnosticFilesHelper_many": "Un solo archivo contendría este bloque más {{count}} archivos de registro, {{size}} en total. No se envía nada a ninguna parte; tú decides dónde va.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Un solo archivo contendría este bloque más {{count}} archivos de registro, {{size}} en total. No se envía nada a ninguna parte; tú decides dónde va."
     },
     "vault": {
       "changePasswordButton": "Cambiar contraseña",
@@ -4464,7 +4463,6 @@
         "scopeIntro": "Myne lee primero la forma de tu bóveda: títulos de notas, carpetas y etiquetas. Pide texto de las notas solo si lo necesita, y nunca de los adjuntos.",
         "provider": "Proveedor: {{provider}}",
         "estimatedChars": "Unas {{chars}} caracteres",
-        "excluded": "{{count}} notas excluidas porque su carpeta está excluida de la IA",
         "showPayload": "Mostrar exactamente lo que se enviará",
         "hidePayload": "Ocultar el contenido",
         "consentLabel": "Enviar este esquema a {{provider}} (unas {{chars}} caracteres). Entiendo que el proveedor lo recibe.",

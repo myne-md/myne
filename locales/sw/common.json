@@ -3215,8 +3215,7 @@
         "diagnostics": "Uchunguzi"
       },
       "diagnosticFilesHelper_one": "Faili moja lingekuwa na kizuizi hiki pamoja na faili {{count}} la kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
-      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda."
     },
     "vault": {
       "changePasswordButton": "Badilisha nenosiri",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne inasoma umbo la kasha lako kwanza: vichwa vya madokezo, folda na tagi. Inaomba maandishi ya dokezo tu ikiwa inahitaji, na kamwe viambatisho.",
         "provider": "Mtoa huduma: {{provider}}",
         "estimatedChars": "Herufi takriban {{chars}}",
-        "excluded": "Madokezo {{count}} yameachwa kwa sababu folda yake imetengwa na AI",
         "showPayload": "Onyesha hasa kinachotumwa",
         "hidePayload": "Ficha mzigo",
         "consentLabel": "Tuma muhtasari huu kwa {{provider}} (herufi takriban {{chars}}). Ninaelewa mtoa huduma anapokea.",

@@ -93,23 +93,26 @@ describe("DiagnosticsPanel — the report block", () => {
     expect(preview.style.resize).toBe("");
   });
 
-  // Issue #970, item 14. `bundleHash: unknown` and `storageUsedMb: 0` are both
-  // CORRECT on desktop and both read as the app failing to know itself: a
-  // desktop build has no served bundle to hash, and the storage estimate
-  // measures the WebView's store rather than the vault on disk. The block says
-  // so where it is read, and only on the client where it is true.
-  it("explains the two desktop fields that read as unknown or zero", () => {
-    env.tauri = true;
-    render(<DiagnosticsPanel />);
-    expect(document.body.textContent).toContain(
-      "settings.about.diagnosticBlockHelperDesktop",
-    );
-    cleanup();
+  // Issue #970 item 15, second attempt. The first fix answered the desktop
+  // readings that looked broken (`bundleHash: unknown`, `storageUsedMb: 0`) with
+  // a two-line paragraph explaining them, which is an apology in a settings
+  // panel and was rejected on sight. The block now omits a reading it cannot
+  // take, so there is nothing to explain and no desktop-only text at all: one
+  // helper sentence, on every client.
+  it("describes the block in one sentence, with no desktop-only explanation", () => {
+    for (const tauri of [true, false]) {
+      env.tauri = tauri;
+      render(<DiagnosticsPanel />);
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("settings.about.diagnosticBlockHelper");
+      expect(
+        text.includes("diagnosticBlockHelperDesktop"),
+        "a desktop-only caveat is back. The block carries no placeholders, so " +
+          "it does not owe an explanation of them either.",
+      ).toBe(false);
+      cleanup();
+    }
     env.tauri = false;
-    render(<DiagnosticsPanel />);
-    expect(document.body.textContent).not.toContain(
-      "settings.about.diagnosticBlockHelperDesktop",
-    );
   });
 
   it("keeps the preview's settings-search anchor on the canon block root", () => {

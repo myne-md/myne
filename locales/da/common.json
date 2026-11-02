@@ -3215,8 +3215,7 @@
         "diagnostics": "Diagnostik"
       },
       "diagnosticFilesHelper_one": "Én fil ville indeholde denne blok plus {{count}} logfil, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen.",
-      "diagnosticFilesHelper_other": "Én fil ville indeholde denne blok plus {{count}} logfiler, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Én fil ville indeholde denne blok plus {{count}} logfiler, i alt {{size}}. Intet sendes nogen steder hen; du vælger, hvor den skal hen."
     },
     "vault": {
       "changePasswordButton": "Skift adgangskode",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne læser først formen på din boks: notetitler, mapper og tags. Den beder kun om notetekst, hvis den skal bruge den, og aldrig om vedhæftninger.",
         "provider": "Udbyder: {{provider}}",
         "estimatedChars": "Omkring {{chars}} tegn",
-        "excluded": "{{count}} noter udeladt, fordi deres mappe er udelukket fra AI",
         "showPayload": "Vis præcis, hvad der sendes",
         "hidePayload": "Skjul payloaden",
         "consentLabel": "Send denne oversigt til {{provider}} (omkring {{chars}} tegn). Jeg forstår, at udbyderen modtager den.",
