@@ -74,12 +74,29 @@ export const CORRUPT_META: Fixture = {
   },
 };
 
+/** One vault on disk, locked, and the biometric prompt never answers.
+ *
+ *  The state this exists for lasts as long as the OS sheet is up, which is the
+ *  one thing a story host cannot do: it answers every command immediately. A
+ *  handler that never settles holds the component in its waiting state instead,
+ *  which is the only way the app's own half of that exchange can be photographed
+ *  (myne-md/myne#970, item 15). */
+export const LOCKED_BIOMETRIC_PENDING: Fixture = {
+  description: "one locked vault whose Touch ID prompt has been raised and not answered",
+  handlers: {
+    ...LOCKED.handlers,
+    "plugin:quick-unlock|quick_unlock_with_biometric": () =>
+      new Promise<never>(() => {}),
+  },
+};
+
 /** Every named fixture, keyed by the name a story references. */
 export const FIXTURES: Record<string, Fixture> = {
   "no-vault": NO_VAULT,
   locked: LOCKED,
   unlocked: UNLOCKED,
   "corrupt-meta": CORRUPT_META,
+  "locked-biometric-pending": LOCKED_BIOMETRIC_PENDING,
 };
 
 /** Resolve a story's `fixture` field (a name or an inline fixture) to a fixture. */

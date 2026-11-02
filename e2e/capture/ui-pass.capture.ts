@@ -255,6 +255,19 @@ runner(
 
       await dismissImporterOffer(s);
 
+      // ── The sidebar's zero state (issue #970, item 4) ─────────────────
+      // Seeded vault, nothing written yet: this is the one moment the list is
+      // empty, and it is reachable only here, before any frame creates a note.
+      await frame(
+        s,
+        "02a-sidebar-empty",
+        "The notes sidebar on a vault with no notes: the icon, the accent wash " +
+          "and two words, with no card, no paragraph and no button.",
+        async () => {
+          await sleep(900);
+        },
+      );
+
       // ── The shell ─────────────────────────────────────────────────────
       // Through the palette rather than the sidebar's create menu: the same
       // spec also captures the PR's BEFORE side from the merge base, where
@@ -363,6 +376,19 @@ runner(
         async () => {
           await openSettings(s, "ai");
           await sleep(1200);
+        },
+      );
+      // The Limits topic, where the chat-history budget lives (issue #970,
+      // item 3). Its own frame because the unset state of that field is the
+      // whole complaint: a blank box with a native stepper and no reading.
+      await frame(
+        s,
+        "11b-ai-limits",
+        "Settings → AI → Limits: the chat-history budget field, whose unset " +
+          "state names the number it stands for instead of rendering empty.",
+        async () => {
+          await selectSettingsTopic(s, "ai", "limits");
+          await sleep(900);
         },
       );
       await safe("close settings", async () => {

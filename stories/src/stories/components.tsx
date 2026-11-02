@@ -1991,6 +1991,24 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/quickunlockentry/waiting",
+    group: "components",
+    surface: "QuickUnlockEntry",
+    state: "waiting",
+    description:
+      "The same entry with the system biometric sheet up and unanswered. Myne states the wait and the way out, because the sheet is the security boundary and cannot be replaced; press the button to reach it, since the state only exists while a prompt is in flight.",
+    tags: ["components", "quick-unlock", "biometric", "touch-id", "waiting", "locked"],
+    fixture: "locked-biometric-pending",
+    render: () => (
+      <QuickUnlockEntry
+        vaultId={FIXTURE_VAULT_ID}
+        method="biometric"
+        onUnlocked={action("onUnlocked")}
+        onUnavailable={action("onUnavailable")}
+      />
+    ),
+  },
+  {
     id: "components/secretphrasereveal/default",
     group: "components",
     surface: "SecretPhraseReveal",
