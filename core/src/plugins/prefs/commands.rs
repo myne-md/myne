@@ -273,10 +273,23 @@ async fn update_prefs_with_dir(
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
-    update_prefs_with_dir_if(vault_dir, state, hooks, |_, _| true, mutate, io, host).await
+    update_prefs_with_dir_if(
+        vault_dir,
+        state,
+        hooks,
+        |_, _| true,
+        |prefs| {
+            mutate(prefs);
+            None
+        },
+        io,
+        host,
+    )
+    .await
 }
 
-/// [`update_prefs_with_dir`], with the last word on whether the write happens.
+/// [`update_prefs_with_dir`], with the last word on whether the write happens,
+/// and on the clock it is stamped with.
 ///
 /// `proceed` runs after the blob has been read and its [`PrefsOrigin`] is known,
 /// which is the one moment a caller can refuse on a fact that is not in
@@ -284,6 +297,12 @@ async fn update_prefs_with_dir(
 /// this exists for (see [`self_name_device_with_dir`]). It runs under the same
 /// write mutex as the mutation, so it cannot be raced by a second writer the way
 /// a check taken before the call would be.
+///
+/// `mutate` returns an optional clock override. `Some(0)` is how a setter makes
+/// its value the WEAKEST claim on a shared field: §10.2's per-key merge keeps
+/// the later clock, so an entry stamped at zero loses to any write a client ever
+/// makes, on every device, which is what an AUTOMATIC value owes a human one
+/// (see [`self_name_device_with_dir`]). `None` stamps `now`, the ordinary case.
 ///
 /// A refusal is `Ok(())` and writes nothing: the caller's own `mutate` never runs,
 /// so a caller that reports an outcome tracks it from inside `mutate` rather than
@@ -293,7 +312,7 @@ async fn update_prefs_with_dir_if(
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     proceed: impl FnOnce(&PrefsView, PrefsOrigin) -> bool,
-    mutate: impl FnOnce(&mut PrefsView),
+    mutate: impl FnOnce(&mut PrefsView) -> Option<u64>,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
@@ -373,7 +392,7 @@ async fn update_prefs_with_dir_if(
         return Ok(());
     }
     let before = prefs.clone();
-    mutate(&mut prefs);
+    let clock_override = mutate(&mut prefs);
 
     // MYND-478 (sync-protocol.md §10.2): stamp the LWW field clock of every
     // SHARED field this write changed — centrally, so no setter can forget.
@@ -390,7 +409,7 @@ async fn update_prefs_with_dir_if(
     // second-granularity one would make two edits inside the same second
     // unorderable. Exactly why `HostCtx` carries both clocks at millisecond
     // resolution.
-    let now_ms = host.now_unix_millis();
+    let now_ms = clock_override.unwrap_or_else(|| host.now_unix_millis());
     crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
 
     // myne#613: the last-resort cap guard, AFTER stamping, because stamping is
@@ -5630,7 +5649,7 @@ pub async fn set_device_name_from_host(
     device_id_hex: String,
     name: String,
     io: &dyn crate::vault_io::VaultIo,
-) -> Result<(), PrefsWriteError> {
+) -> Result<bool, PrefsWriteError> {
     let dir =
         vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
     set_device_name_with_dir(&dir, state, hooks, device_id_hex, name, io, host).await
@@ -5687,7 +5706,6 @@ pub async fn set_device_name<R: Runtime>(
             &crate::vault_io::StdVaultIo,
         )
         .await
-        .map(|()| true)
     }
 }
 
@@ -5714,6 +5732,15 @@ fn validated_device_name(device_id_hex: String, name: String) -> Option<(String,
     Some((device_id_hex, trimmed.to_string()))
 }
 
+/// The clock an automatic device name is stamped with (`decisions/sync/0770`).
+///
+/// Zero rather than `now`, deliberately: §10.2's per-key merge keeps the entry
+/// with the later clock, so zero is the one value that can never outrank a name
+/// a person chose. `single_sided_clock_rule` treats a zero clock as "no claim"
+/// on both sides, so an entry stamped at zero still survives a peer that has no
+/// entry at all, and loses to any peer that has one.
+const AUTOMATIC_NAME_CLOCK: u64 = 0;
+
 /// Whether the synced `device_names` map already answers for this device.
 ///
 /// A whitespace-only stored value counts as absent, mirroring
@@ -5727,6 +5754,12 @@ fn has_stored_device_name(prefs: &PrefsView, device_id_hex: &str) -> bool {
 }
 
 /// Testable core of [`set_device_name`].
+/// Returns whether it wrote. A refused value (a device id that is not 32-char
+/// lowercase hex, a name that trims to empty) is `Ok(false)`, not `Ok(())`: both
+/// clients document `set_device_name` as resolving to whether the name landed
+/// (`src/lib/prefs.ts`, `mobile/src/lib/prefs.ts`), so a refusal has to be
+/// distinguishable from a write on the same channel or the surface above it has
+/// to guess.
 pub(crate) async fn set_device_name_with_dir(
     vault_dir: &Path,
     state: &VaultRuntimeState,
@@ -5735,9 +5768,9 @@ pub(crate) async fn set_device_name_with_dir(
     name: String,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
-) -> Result<(), PrefsWriteError> {
+) -> Result<bool, PrefsWriteError> {
     let Some((device_id_hex, value)) = validated_device_name(device_id_hex, name) else {
-        return Ok(());
+        return Ok(false);
     };
 
     update_prefs_with_dir(
@@ -5755,7 +5788,7 @@ pub(crate) async fn set_device_name_with_dir(
     // Field name only — neither the label nor the device id reaches the log
     // surface (see the doc comment).
     tracing::info!(event = "prefs_written", field = "device_names");
-    Ok(())
+    Ok(true)
 }
 
 /// The write an approved device makes on its OWN behalf, once, when it has never
@@ -5787,9 +5820,22 @@ pub(crate) async fn set_device_name_with_dir(
 ///    downloading bodies) while the seed runs at the end of that same cycle, so
 ///    "has adopted a head" is true for minutes on a large account while "has
 ///    prefs" is still false.
-/// 3. **An entry that is already there**, checked INSIDE the write mutex: a peer
-///    may have named this device from its own copy a cycle ahead, and the value it
-///    wrote is a human-chosen label this path must never overwrite.
+/// 3. **An entry that is already there**, checked INSIDE the write mutex.
+///
+/// Refusal 3 is necessary and NOT sufficient, which is why this path also stamps
+/// at the floor. `has_stored_device_name` reads this device's own `vault.prefs`,
+/// and a peer's name reaches it only at the next merge: a device that has been
+/// offline since somebody renamed it holds no entry, so the check passes and the
+/// write would land with `now`, a clock LATER than the human write it never saw,
+/// and `device_names` is a per-key LWW map — the rename would be replaced on
+/// every device with no history to recover it from. A process-local mutex cannot
+/// close a race between two devices.
+///
+/// So the value is stamped at clock ZERO (§10.2's per-key rule keeps the later
+/// clock), which makes it the weakest claim on the key: any name a client ever
+/// writes beats it, on every device, forever, and this path can then only ever
+/// fill an entry nobody has claimed. The name it writes is derived from a closed
+/// set of platform tokens rather than typed, so losing that race costs nothing.
 ///
 /// Returns `Ok(false)` for every refusal. Nothing failed in those cases and the
 /// caller has nothing to report: the row keeps its id-derived label, and the
@@ -5814,7 +5860,7 @@ pub(crate) async fn self_name_device_with_dir(
             event = "prefs_write_refused",
             field = "device_names",
             reason = "person_plane",
-            "the roster speaks for a person account, so this name would label no row of the vault's"
+            "the roster speaks for a person account, so this name would label no row of the vault's roster"
         );
         return Ok(false);
     }
@@ -5827,12 +5873,15 @@ pub(crate) async fn self_name_device_with_dir(
         |_, origin| origin != PrefsOrigin::Absent,
         |prefs| {
             if has_stored_device_name(prefs, &device_id_hex) {
-                return;
+                return None;
             }
             prefs
                 .device_names
                 .insert(device_id_hex.clone(), value.clone());
             wrote = true;
+            // The floor clock: see refusal 3 above. `None` (the ordinary stamp)
+            // would let this unattended write outrank a human rename it never saw.
+            Some(AUTOMATIC_NAME_CLOCK)
         },
         io,
         host,
@@ -7767,6 +7816,136 @@ mod tests {
         });
     }
 
+    /// The automatic name must never outrank a name a person chose
+    /// (`decisions/sync/0770`, and the D8 finding that made it a bound).
+    ///
+    /// `has_stored_device_name` reads THIS device's blob, so it cannot see a
+    /// rename that landed on a peer and has not merged here yet: a device that has
+    /// been offline since somebody renamed it holds no entry, the check passes,
+    /// and a `now` stamp would beat the human write in §10.2's per-key merge on
+    /// every device, with no history to recover it from. The fix is the floor
+    /// clock, and this asserts the outcome rather than the mechanism: the merge of
+    /// (this device's auto name at zero) with (a peer's rename at a real clock)
+    /// keeps the rename.
+    ///
+    /// Injected: stamp `None` instead of `Some(AUTOMATIC_NAME_CLOCK)` and the
+    /// merge below keeps "Studio Mac", so this goes red on the human name.
+    #[test]
+    fn an_automatic_name_loses_to_a_human_name_it_never_saw() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
+            // `TestHost`, not `NoopHost`: NoopHost's clock is 0, which is the very
+            // value the floor clock uses, so a mutation that drops the override
+            // would be invisible here. This test has to be run against a host whose
+            // "now" is a real, later number or it proves nothing.
+            let host = crate::host::test_host::TestHost::new(tmp.path());
+            set_spell_languages_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                SetMutation::adding_all(vec!["en".into()]),
+                &crate::vault_io::StdVaultIo,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("seed the prefs blob");
+
+            self_name_device_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "Studio Mac".into(),
+                &crate::vault_io::StdVaultIo,
+                &host,
+            )
+            .await
+            .expect("self name");
+
+            let mine = prefs_read_with_dir(tmp.path(), &state, &crate::vault_io::StdVaultIo)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                mine.field_clocks
+                    .get(&format!("device_names/{DEV_HEX}"))
+                    .copied(),
+                Some(0),
+                "the automatic name must carry the floor clock, not a real one"
+            );
+
+            // A peer renamed this device while it was offline, EARLIER in wall-clock
+            // time than the auto write that follows it here. §10.2 keeps the later
+            // clock, so a real stamp on this side would win the key on every device
+            // and the rename would be gone with no history.
+            let mut peer = mine.clone();
+            peer.device_names
+                .insert(DEV_HEX.into(), "Kid's iPad".into());
+            peer.field_clocks
+                .insert(format!("device_names/{DEV_HEX}"), 1_699_000_000_000);
+
+            let merged = crate::plugins::sync::prefs_merge::merge_prefs(&mine, &peer);
+            assert_eq!(
+                merged.device_names.get(DEV_HEX).map(String::as_str),
+                Some("Kid's iPad"),
+                "a human name must outrank an automatic one on every device"
+            );
+        });
+    }
+
+    /// The command's advertised contract is "resolves to whether it wrote", and
+    /// `set_device_name_with_dir` refuses two shapes without writing: an id that
+    /// is not 32-char lowercase hex, and a name that trims to empty (the clients'
+    /// own "blank means cancel"). Both used to answer `true` through
+    /// `.map(|()| true)`, which is the "sink that resolves on a refused write"
+    /// shape. Injected: put the `.map` back and the two `false` assertions go red.
+    #[test]
+    fn set_device_name_reports_a_refused_value_as_not_written() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x4c).await;
+            let io = crate::vault_io::StdVaultIo;
+            let host = crate::host::NoopHost;
+
+            let blank = set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "   ".into(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("a blank name is a cancel, not an error");
+            assert!(!blank, "a blank name did not write anything");
+
+            let bad_id = set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "not-a-device-id".into(),
+                "Studio Mac".into(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("a malformed id is refused, not an error");
+            assert!(!bad_id, "a malformed device id did not write anything");
+
+            let real = set_device_name_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                DEV_HEX.into(),
+                "Studio Mac".into(),
+                &io,
+                &host,
+            )
+            .await
+            .expect("a real rename writes");
+            assert!(real);
+        });
+    }
+
     /// The gate that keeps a joining device's device-local preferences: the
     /// enrollment wholesale seed is keyed on `vault.prefs` being ABSENT, so a name
     /// written here must not create the blob first (§10.2.1). Injected: drop the
@@ -7912,7 +8091,8 @@ mod tests {
     }
 
     /// #250: the key comes from the unlocked slot and the directory comes from
-    /// the caller. A caller holding a stale "which vault is active" answer used    /// to encrypt this vault's prefs under that vault's key and write them over
+    /// the caller. A caller holding a stale "which vault is active" answer used
+    /// to encrypt this vault's prefs under that vault's key and write them over
     /// the other vault's real blob — silently, because `read_or_default`
     /// degrades an unreadable blob to defaults instead of failing.
     #[test]

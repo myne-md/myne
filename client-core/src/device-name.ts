@@ -20,7 +20,7 @@ export interface DeviceRow {
 }
 
 /**
- * Whether the synced `n` map carries a usable name for this device.
+ * Whether the synced `device_names` map carries a usable name for this device.
  *
  * A whitespace-only value counts as absent. The Rust setter refuses to write one
  * (`decisions/sync/0348` clause 3), so this arm only fires on a hand-edited or
@@ -102,6 +102,9 @@ export async function selfNameDevice(input: {
   // "a head was adopted", which is the direction that must not happen.
   if (!(await input.readBaseline())) return;
   const name = await input.suggestName();
-  if (name === null) return;
+  // Blank is "not nameable", not a name: the backend refuses a blank value
+  // outright (a cleared rename field reads as cancel), so a suggestion that
+  // trims to nothing would be a call that cannot write anything.
+  if (name === null || name.trim() === "") return;
   await input.writeName(deviceId, name);
 }

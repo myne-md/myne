@@ -106,6 +106,14 @@ describe("selfNameDevice", () => {
     expect(calls.suggest).toBe(0);
   });
 
+  it("treats a blank suggestion as not nameable rather than calling the writer", async () => {
+    // The backend refuses a blank name (a cleared rename field reads as cancel), so
+    // a call carrying one could not write and would only cost a round trip.
+    const { calls, input } = seams({ name: "   " });
+    await selfNameDevice({ devices: [row()], names: {}, ...input });
+    expect(calls.writes).toEqual([]);
+  });
+
   it("writes nothing when the platform is not nameable", async () => {
     const { calls, input } = seams({ name: null });
     await selfNameDevice({ devices: [row()], names: {}, ...input });
