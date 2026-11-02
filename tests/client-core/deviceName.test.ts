@@ -51,10 +51,17 @@ function seams(over: {
 }
 
 describe("hasDeviceName", () => {
+  // The Rust half of this vector is `has_stored_device_name_matches_the_client_predicate`
+  // in `core/src/plugins/prefs/commands.rs`, and the two must answer alike: this one
+  // decides whether the client ASKS, the other whether the backend WRITES, and a
+  // divergence is silent in the direction that matters (asked, refused, device stays
+  // unnamed with nothing said).
   it("treats an absent and a whitespace-only entry the same way", () => {
     expect(hasDeviceName({}, SELF)).toBe(false);
     expect(hasDeviceName(undefined, SELF)).toBe(false);
+    expect(hasDeviceName({ [SELF]: "" }, SELF)).toBe(false);
     expect(hasDeviceName({ [SELF]: "   " }, SELF)).toBe(false);
+    expect(hasDeviceName({ [SELF]: " Mac " }, SELF)).toBe(true);
   });
 
   it("accepts a real name", () => {
