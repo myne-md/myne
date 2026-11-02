@@ -4253,7 +4253,6 @@
         "bar": "upau wa chini upau wa hali viashiria boreka panga upya ficha onyesha upau wa zana",
         "syncDeviceBindings": "vifaa vinavyodaiwa na wanachama uhusiano nani alisaini kifaa kipi ni cha nani",
         "vaultFormat": "muundo wa kasha upgradu kurejesha kifungu kimoja staafu kasha kifungu cha kurejesha hamisha utambulisho",
-        "publishVault": "chapisha kasha lililochapishwa seva kifaa pekee usawazishaji",
         "externalAccess": "ufikiaji wa nje MCP myne-mcp Claude Desktop muunganisho idhinisha wigo futa",
         "diagnosticLog": "kumbukumbu za uchunguzi uwekaji kumbukumbu utatuzi wa hitilafu utatuzi wa matatizo ripoti ya kuanguka ripoti ya hitilafu msaada"
       },
@@ -4745,26 +4744,6 @@
         "account": "Akaunti",
         "server": "Seva",
         "devices": "Vifaa kwenye akaunti yako"
-      },
-      "publish": {
-        "label": "Chapisha kwenye seva yako",
-        "cta": "Chapisha kasha hili",
-        "republishCta": "Chapisha tena",
-        "deviceOnlyHelper": "Kasha hili lipo kwenye kifaa hiki tu. Kuchapisha kunaliunganisha na utambulisho wako ili vifaa vyako vingine viweze kulifungua.",
-        "publishedHelper": "Imechapishwa {{when}}. Kasha hili liko kwenye seva yako ya usawazishaji, kwa hivyo vifaa vyako vingine vinaweza kulifikia.",
-        "publishedHelperNoDate": "Imechapishwa. Kasha hili liko kwenye seva yako ya usawazishaji, kwa hivyo vifaa vyako vingine vinaweza kulifikia.",
-        "error": {
-          "NotConfigured": "Weka seva ya usawazishaji kwanza, kwenye Sync hapo juu.",
-          "PersonSessionRequired": "Fungua utambulisho wako kwanza. Kuchapisha kunahitaji utambulisho unayomiliki kasha hili.",
-          "PersonNotRegistered": "Sajili utambulisho wako kwanza, katika sehemu ya Utambulisho hapo juu. Kifaa hiki kinashikilia utambulisho lakini haujawahi kusajiliwa kwenye seva, kwa hivyo hakuna akaunti ya kuchapisha chini yake.",
-          "NotEnrolled": "Kasha hili linahusiana na akaunti ambayo kifaa hiki hakijaandikishwa. Ongeza kifaa kwenye akaunti hiyo kwanza.",
-          "NotOwner": "Kasha hili tayari linahusiana na utambulisho mwingine, kwa hivyo haliwezi kuchapishwa hapa.",
-          "Unauthenticated": "Seva ilikataa kifaa hiki. Jaribu tena, na uandikishe upya ikizidi kutokea.",
-          "Transport": "Haikuweza kufikia seva. Kasha halijabadilika; jaribu tena.",
-          "TlsFailure": "Haikuweza kuanzisha muunganisho wa kuaminika. Kasha halijabadilika; jaribu tena.",
-          "BadRequest": "Metadata ya kasha hiki haikuweza kusomwa. Hakuna kilichotumwa.",
-          "Other": "Kuchapisha kumeshindwa. Kasha halijabadilika; jaribu tena."
-        }
       }
     },
     "reconcile": {

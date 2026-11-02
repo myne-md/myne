@@ -4388,7 +4388,6 @@
         "bar": "barre inférieure barre d'état indicateurs personnaliser réorganiser masquer afficher barre d'outils",
         "syncDeviceBindings": "appareils revendiqués par les membres attribution qui a signé quel appareil appartient",
         "vaultFormat": "format de coffre mise à niveau récupération en une phrase retraite coffre phrase de récupération migrer identité",
-        "publishVault": "publier coffre publié serveur appareil uniquement synchroniser",
         "externalAccess": "accès externe MCP myne-mcp Claude Desktop connexion approuver périmètre révoquer",
         "diagnosticLog": "journal de diagnostic journalisation débogage dépannage rapport de plantage rapport de bug assistance"
       },
@@ -4885,26 +4884,6 @@
         "account": "Compte",
         "server": "Serveur",
         "devices": "Appareils de votre compte"
-      },
-      "publish": {
-        "label": "Publier sur votre serveur",
-        "cta": "Publier ce coffre",
-        "republishCta": "Publier à nouveau",
-        "deviceOnlyHelper": "Ce coffre n'existe que sur cet appareil. Le publier le lie à votre identité pour que vos autres appareils puissent l'ouvrir.",
-        "publishedHelper": "Publié le {{when}}. Ce coffre est sur votre serveur de synchronisation, vos autres appareils peuvent donc l'atteindre.",
-        "publishedHelperNoDate": "Publié. Ce coffre est sur votre serveur de synchronisation, vos autres appareils peuvent donc l'atteindre.",
-        "error": {
-          "NotConfigured": "Définissez d'abord un serveur de synchronisation, dans Synchronisation ci-dessus.",
-          "PersonSessionRequired": "Déverrouillez d'abord votre identité. La publication a besoin de l'identité qui possède ce coffre.",
-          "PersonNotRegistered": "Inscrivez d'abord votre identité, dans le bloc Identité ci-dessus. Cet appareil détient l'identité mais ne l'a jamais inscrite sur un serveur, il n'y a donc pas de compte sous lequel publier.",
-          "NotEnrolled": "Ce coffre appartient à un compte auquel cet appareil n'est pas inscrit. Ajoutez d'abord l'appareil à ce compte.",
-          "NotOwner": "Ce coffre appartient déjà à une autre identité, il ne peut donc pas être publié ici.",
-          "Unauthenticated": "Le serveur a refusé cet appareil. Réessayez, et réinscrivez-le si cela continue.",
-          "Transport": "Impossible de joindre le serveur. Le coffre est inchangé ; réessayez.",
-          "TlsFailure": "Impossible d'établir une connexion de confiance. Le coffre est inchangé ; réessayez.",
-          "BadRequest": "Les métadonnées de ce coffre n'ont pas pu être lues. Rien n'a été envoyé.",
-          "Other": "La publication a échoué. Le coffre est inchangé ; réessayez."
-        }
       }
     },
     "reconcile": {

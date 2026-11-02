@@ -225,6 +225,18 @@ pub struct SyncState {
     /// a sharper activity log than the value it carries is worth.
     #[serde(default)]
     pub published_at_ms: Option<u64>,
+    /// Epoch-ms of the last `GET /b2b/vaults` probe that asked whether the server
+    /// still lists this vault (myne-md/myne#974).
+    ///
+    /// The probe exists because a published vault whose server record vanished is
+    /// invisible from the client side, and it is the only request this branch adds
+    /// to a healthy cycle. `sync_now` runs on every local edit and about once a
+    /// second while a verification screen is open, so an ungated probe would pay a
+    /// round trip and a share of the account's rate limit at that cadence to learn
+    /// that a healthy vault is still healthy. The stamp is what keeps it to
+    /// `BINDINGS_PROBE_INTERVAL_MS`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_bindings_check_ms: Option<u64>,
     /// Whether the last completed cycle PROVED this device holds every content
     /// blob the server's head commits to (phase3-web-client task 89).
     ///
@@ -1004,6 +1016,7 @@ mod tests {
             owner_device: None,
             namespace_hex: None,
             published_at_ms: None,
+            last_bindings_check_ms: None,
         };
         let defaulted = SyncState::default();
 

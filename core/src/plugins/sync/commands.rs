@@ -365,28 +365,6 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
     .await)
 }
 
-/// Publish this vault to the sync server (myne-md/myne#911 task 8).
-///
-/// The explicit act that turns a device-only vault into a server vault: it PUTs
-/// `vault.meta` to the vault's namespace (binding the owner on the server's first
-/// write) and records the namespace on this device so every later sync request
-/// addresses it. Idempotent, and deliberately not part of creation.
-#[tauri::command]
-pub async fn sync_publish_vault<R: Runtime>(
-    app: AppHandle<R>,
-    state: State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
-) -> Result<super::publish::PublishOutcome, SyncDeviceError> {
-    let host = crate::host::tauri_host::TauriHost::new(app);
-    // The ACTIVE vault, never `sole_vault_id()`: that is `None` on every desktop
-    // install, and the disk fallback it triggers answers the pre-multi-vault
-    // `vault/` directory as soon as two vaults exist, so publishing failed on
-    // any multi-vault device (myne-md/myne#911 review).
-    let active = state.active_vault_id().await;
-    let root = crate::paths::active_vault_root_from_host(&host, active)
-        .map_err(|_| SyncDeviceError::NotEnrolled)?;
-    super::publish::publish_vault(&host, &crate::vault_io::StdVaultIo, &root).await
-}
-
 /// Report where this vault stands with respect to the server (myne-md/myne#911
 /// task 8): published or device only, the namespace publish recorded, and
 /// whether the vault was born under an identity.
@@ -402,8 +380,10 @@ pub async fn sync_published_state<R: Runtime>(
     state: State<'_, crate::plugins::vault_unlock::state::VaultRuntimeState>,
 ) -> Result<super::publish::PublishState, SyncDeviceError> {
     let host = crate::host::tauri_host::TauriHost::new(app);
-    // The active vault, for the reason `sync_publish_vault` states above: the
-    // sole-vault fallback answers "device only" for a vault that is published.
+    // The ACTIVE vault, never `sole_vault_id()`: that is `None` on every desktop
+    // install, and the disk fallback it triggers answers the pre-multi-vault
+    // `vault/` directory as soon as two vaults exist, so the sole-vault spelling
+    // reported "device only" for a vault that is published (myne-md/myne#911).
     let active = state.active_vault_id().await;
     let Ok(root) = crate::paths::active_vault_root_from_host(&host, active) else {
         // No vault on this device yet: nothing to publish, and "device only" is

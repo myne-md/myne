@@ -271,10 +271,11 @@ const V = {
   "src/lib/account-number-format.ts": ["ported", "Pure Crockford/Damm formatting."],
   "src/lib/sync-publish.ts": [
     "typed-unsupported",
-    "SHIPS but is unreachable on web: the only binding it wraps (plugin:sync|sync_publish_vault) is " +
-      "Class::Unsupported there (myne-md/myne#911 task 13 owes the person plane), so the dispatcher " +
-      "answers its typed refusal and the SyncPanel row that calls it is gated on `memberSharing`. " +
-      "Typed rather than excluded because nothing substitutes the module out of the bundle.",
+    "SHIPS but is unreachable on web: the only binding left in it (plugin:sync|sync_published_state, " +
+      "a read of the vault's generation since myne-md/myne#974 removed the publish command) is " +
+      "Class::Unsupported there, so the dispatcher answers its typed refusal and the caller is gated " +
+      "on `memberSharing`. Typed rather than excluded because nothing substitutes the module out of " +
+      "the bundle.",
   ],
   "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
   "src/lib/close-request.ts": [

@@ -794,7 +794,6 @@ fn main() {
                 "sync_person_list_vaults",
                 "sync_person_join_qr",
                 "sync_decode_join_qr",
-                "sync_publish_vault",
                 "sync_published_state",
             ]),
         )

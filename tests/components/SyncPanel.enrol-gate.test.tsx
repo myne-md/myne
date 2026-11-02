@@ -83,9 +83,10 @@ function mountWith(
     offerable: false,
     pending: false,
   },
+  publishState: { published: boolean; person_born?: boolean } | null = null,
 ) {
   invokeMock.mockImplementation(
-    syncPanelCommandRouter({ syncState, betaTermsAccepted, migration }),
+    syncPanelCommandRouter({ syncState, betaTermsAccepted, migration, publishState }),
   );
   return renderSyncPanel();
 }
@@ -100,6 +101,30 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   absentCaps.clear();
+});
+
+/**
+ * The form is the VAULT ACCOUNT flow (account number + password), and a vault
+ * born under an identity has no such account: its credential is the person, so
+ * the form would ask for a number that does not exist (myne-md/myne#911 task 8).
+ * This is the half of the old publish row's gate that survived publishing going
+ * automatic (myne-md/myne#974).
+ */
+describe("the add-device form and the vault's generation", () => {
+  beforeEach(() => {
+    selectTopic("devices");
+  });
+
+  it("is offered for a legacy vault", async () => {
+    mountWith("not_enrolled", true, undefined, { published: false, person_born: false });
+    await waitFor(() => expect(screen.getByTestId("sync.enroll")).toBeTruthy());
+  });
+
+  it("is withheld from a person-born vault", async () => {
+    mountWith("not_enrolled", true, undefined, { published: false, person_born: true });
+    await waitFor(() => expect(screen.getByTestId("settings.sync-topic-devices")).toBeTruthy());
+    expect(screen.queryByTestId("sync.enroll")).toBeNull();
+  });
 });
 
 describe("the enrol gate, for a device that cannot read the roster", () => {
