@@ -391,6 +391,14 @@ describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
       // adds is that the real IPC path completes with no owner code anywhere.
       await (await second.session.byTestId("identity-home.join.submit")).click();
 
+      // The landing is the §6.3 compare, not the editor: a vault that arrives by
+      // invitation enters `pending-approval` by construction
+      // (`decisions/sync/0766`, and `client-core/src/approval-wait.ts`), on this
+      // client as on mobile. Confirming `sas-match` is the joining device's own
+      // acknowledgment and is what releases the vault.
+      await second.session.byTestId("pending-approval.sas", { timeoutMs: 90_000 });
+      await clickByTestId(second.session, "pending-approval.sas-match", { timeoutMs: 30_000 });
+
       // The editor, and NOT a name step: this person already has a name for this vault,
       // and re-asking would let a second device silently re-name a person its first
       // device had already named. The gate's absence IS the assertion, because a join

@@ -90,7 +90,18 @@ export class Element {
    *  mid-transition, or a layout that has not settled (the switcher
    *  `vault-row`, the Settings select rows, etc.). "element not interactable"
    *  / "element click intercepted" both mean the click did NOT dispatch, so
-   *  a retry cannot double-fire. Any other error surfaces immediately. */
+   *  a retry cannot double-fire. Any other error surfaces immediately.
+   *
+   *  **A refusal also scrolls the element into view inside its own scroller.**
+   *  WebDriver's pre-click scroll reaches the DOCUMENT viewport and not a
+   *  nested `overflow: auto` body, so a control that is painted but clipped by
+   *  its scrolling ancestor is reported "not interactable" for the whole
+   *  budget and no amount of waiting fixes it. Measured 2026-11-02: the
+   *  Settings → Sync → Devices body grew tall enough that
+   *  `sync.enroll.submit` sat at y=657 inside a scroller whose visible edge was
+   *  ≈637, which made `startOwnerIdentity` time out and took 26 scenarios down
+   *  with it — while `clickBySelector` in `flows.ts`, which scrolls per poll,
+   *  was green on the same tree. */
   async click(): Promise<void> {
     await this.session.waitUntil(
       async () => {
@@ -103,6 +114,7 @@ export class Element {
             (e.code === "element not interactable" ||
               e.code === "element click intercepted")
           ) {
+            await this.scrollIntoViewBestEffort();
             return null; // not hit-testable yet — keep polling
           }
           throw e;
@@ -110,6 +122,22 @@ export class Element {
       },
       { label: "element interactable + clicked", timeoutMs: 10_000 },
     );
+  }
+
+  /** Centre this element in whatever scroll container holds it, best-effort:
+   *  a scroll failure must not become the caller's error, because the click
+   *  that follows is the assertion. */
+  private async scrollIntoViewBestEffort(): Promise<void> {
+    try {
+      await this.session.send("POST", "/execute/sync", {
+        script:
+          "var el = arguments[0];" +
+          "if (el) el.scrollIntoView({ block: 'center', inline: 'center' });",
+        args: [{ "element-6066-11e4-a52e-4f735466cecf": this.elementId }],
+      });
+    } catch {
+      // The node may have gone between the find and this call; the poll re-finds.
+    }
   }
 
   /** One raw click attempt — no interactability/stale retry. For callers that
