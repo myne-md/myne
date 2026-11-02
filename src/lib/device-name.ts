@@ -12,6 +12,7 @@
 
 import { useEffect, useState } from "react";
 import i18n from "../i18n";
+import { invoke } from "../platform/core";
 import { devicePlatform } from "./prefs";
 
 /** The maximum device-name length the UI accepts. Purely a readability bound —
@@ -49,6 +50,18 @@ export async function suggestedDeviceName(): Promise<string> {
 export async function nameableDeviceSuggestion(): Promise<string | null> {
   const name = await suggestedDeviceName();
   return name === i18n.t("sync.devices.platform.unknown") ? null : name;
+}
+
+/** This device's adopted vault head, or `null` when it has never pulled.
+ *
+ *  The self-naming path's second gate (`decisions/sync/0348` clause 2 made
+ *  mechanical): the enrollment wholesale seed is keyed on `vault.prefs` being
+ *  ABSENT, so a name written before the first completed cycle costs a joining
+ *  device the account's device-local preferences. One frozen encoding of the head
+ *  (`protocol::head_fingerprint`), so this is the same string the SAS compare
+ *  shows rather than a second reading of "has this device synced". */
+export function adoptedHeadBaseline(): Promise<string | null> {
+  return invoke<string | null>("plugin:sync|sync_head_fingerprint");
 }
 
 /** The "Name this device" field's state, shared by every enrollment door so the

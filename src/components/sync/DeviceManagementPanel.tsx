@@ -17,7 +17,7 @@
 // mobile SY-05 shows (SYNC-40 carries both ends in 459). Ship-gate: the SYNC-17
 // primitive-level review of the fingerprint substrate is recorded, not passed.
 
-import { useState, type CSSProperties } from "react";
+import { useState, useEffect, useRef, type CSSProperties } from "react";
 import {
   REMOVE_DEVICE_CONFIRM,
   REMOVE_DEVICE_DISCLOSURE,
@@ -28,7 +28,8 @@ import { type DeviceEntry, type DevicesHook } from "../../hooks/useDevices";
 import { usePrefs } from "../../hooks/usePrefs";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { setDeviceName } from "../../lib/prefs";
-import { DEVICE_NAME_MAX_LEN } from "../../lib/device-name";
+import { DEVICE_NAME_MAX_LEN, adoptedHeadBaseline, nameableDeviceSuggestion } from "../../lib/device-name";
+import { hasDeviceName, selfNameDevice } from "@myne/client-core/device-name";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface, type InteractiveSurfaceHandlers } from "../primitives/interactiveSurface";
 import { Icon } from "../primitives/Icon";
@@ -297,7 +298,7 @@ export function DeviceManagementPanel({
   // The synced `device_names` map (MYND-548). Read off the shared prefs hook like
   // every other prefs consumer — `setDeviceName` bumps the prefs nonce, so a local
   // rename and a peer's merged rename both land here the same way.
-  const { prefs } = usePrefs();
+  const { prefs, loaded } = usePrefs();
   // `?? {}` is not defensive noise: a client can outrun its own backend (mobile
   // ships ahead of core), and a payload without the key must degrade to the
   // id-derived labels rather than take the panel down.
@@ -327,6 +328,27 @@ export function DeviceManagementPanel({
       setRenameFailed(true);
     }
   };
+  // Self-naming (myne-md/myne#973). An approved device that has never had a name
+  // adopts the platform suggestion once, and only once per session: the policy in
+  // `client-core/device-name` decides everything that carries risk (which row is
+  // ours, whether it is safe to name, the adopted-head gate), and this effect is
+  // only the three host reads it is not allowed to own. It runs off `loaded`
+  // rather than off `prefs`, because an unloaded or failed prefs read leaves an
+  // empty `device_names` map that is indistinguishable from a real one and a write
+  // on it could overwrite a name a peer just chose.
+  const selfNamed = useRef(false);
+  useEffect(() => {
+    if (!loaded || devices === null || selfNamed.current) return;
+    selfNamed.current = true;
+    void selfNameDevice({
+      devices,
+      names,
+      readBaseline: adoptedHeadBaseline,
+      suggestName: nameableDeviceSuggestion,
+      writeName: (deviceIdHex, name) => setDeviceName(deviceIdHex, name),
+    });
+  }, [loaded, devices, names]);
+
   const approved = (devices ?? []).filter((d) => d.approved && !d.retired);
   // This device, if the roster came back marking it retired — it was removed from
   // another device. It is filtered out of `approved`/`pending`, so without this it
@@ -622,18 +644,17 @@ export function DeviceManagementPanel({
                     )}
                   </span>
                 )}
-                <span style={CODE_LINE} data-testid="sync.device-code">
-                  {d.device_id_hex.slice(0, 6)}
-                </span>
-              </span>
-              <span style={ACTIONS}>
-                {/* This device: "Synced here" reads first, THEN the rename pencil
-                    (swapped per feedback). Other devices: rename then remove. */}
-                {d.is_current && (
-                  <span style={{ color: "var(--fg-3)", fontSize: "var(--text-xs)" }}>
-                    {t("sync.devices.syncedHere")}
+                {/* The demoted code line, only where the title is NOT the code
+                    (myne-md/myne#973). Its job is to tell two same-named devices
+                    apart; an unnamed row's title is already the same six
+                    characters, so printing them twice is a tautology. */}
+                {hasDeviceName(names, d.device_id_hex) && (
+                  <span style={CODE_LINE} data-testid="sync.device-code">
+                    {d.device_id_hex.slice(0, 6)}
                   </span>
                 )}
+              </span>
+              <span style={ACTIONS}>
                 {/* Rename is offered on EVERY approved row, not just this device:
                     devices enrolled before names existed are named from whatever
                     device the user happens to be holding. Icon-only (E3d): the
