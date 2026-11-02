@@ -15,7 +15,7 @@ import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
 import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
-import { publishErrorKind, publishVault, readPublishState, type PublishState } from "../../lib/sync-publish";
+import { readPublishState, type PublishState } from "../../lib/sync-publish";
 import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
@@ -46,7 +46,6 @@ import {
   UNKNOWN_CONFLICT_ORIGINAL,
 } from "../../notes/sidebarState";
 import { noteRead } from "../../notes/readNote";
-import { formatRelativeTime, useTick } from "../../notes/components/relativeTime";
 import { noteUpdate } from "../../notes/updateNote";
 import { deleteNoteRouted } from "../../notes/deleteNote";
 import {
@@ -230,34 +229,21 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   };
   const awaitingApproval = syncStatus?.state === "pending";
   const showEnroll = canAddThisDevice(syncStatus?.state);
-  // Publish state (myne-md/myne#911 task 8). Two facts, and they are different
-  // ones: `publishState` is the DURABLE answer read from disk on mount (so a
-  // published vault says so after a restart), and `publishRun` is this session's
-  // own click (busy / error / the answer the user just got).
+  // The vault's GENERATION, and the only thing this panel still needs from the
+  // publish record (myne-md/myne#974). Publishing itself is automatic: the sync
+  // cycle does it the first time it has an endpoint, a registered identity and a
+  // person session (`core/src/plugins/sync/publish.rs::publish_if_due`), so there
+  // is no control here and no readout, because the vault rows already carry
+  // "Device only" and the sync status row carries every failure.
+  //
+  // What is still needed is `person_born`: the legacy "add this device" form is
+  // the VAULT ACCOUNT flow (account number + password), and a person-born vault
+  // has no such account (myne-md/myne#911 task 8). Offering the form there would
+  // ask for a number that does not exist.
   const [publishState, setPublishState] = useState<PublishState | null>(null);
-  const [publishRun, setPublishRun] = useState<"idle" | "busy" | "done" | "error">("idle");
-  const [publishError, setPublishError] = useState<string | null>(null);
-  // Whether the vault is on a server, from either source: the record read on
-  // mount, or the click that just succeeded.
-  const published = publishRun === "done" || publishState?.published === true;
-  // When that happened, as the row says it. `published_at_ms` was read from disk
-  // and then dropped on the floor: the panel had the one fact that turns “Published”
-  // from a claim into a record. `useTick` is the shared 30-second interval every
-  // relative-time string in the app rides on, so “2 min ago” does not freeze at the
-  // moment the panel mounted. The empty string means the record predates the field.
-  useTick();
-  const publishedWhen =
-    publishState?.published_at_ms != null
-      ? formatRelativeTime(new Date(publishState.published_at_ms))
-      : "";
-  // The legacy "add this device" form is the VAULT ACCOUNT flow (account number +
-  // password), and a person-born vault has no such account: its credential is the
-  // identity, so publishing is what puts it on a server. Offering the form there
-  // would ask for a number that does not exist (myne-md/myne#911 task 8).
   const showEnrollForm = showEnroll && publishState?.person_born !== true;
-  // The durable read, re-run when the identity becomes ready: that is exactly
-  // when a device-only person vault starts being publishable, and the row's gate
-  // keys off this answer.
+  // Re-read when the identity becomes ready, because that is when the answer can
+  // change from "device only" to "published" without anything here being clicked.
   const probePublishState = useCallback(() => {
     void readPublishState()
       .then((s) => setPublishState(s))
@@ -710,92 +696,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
             the input and before the fingerprint block (E4a). */}
         <EndpointConfig />
       </div>
-
-      {/* Publish this vault (myne-md/myne#911 task 8; moved here 2026-10-25).
-          A vault created under an identity is device-only until the user says
-          otherwise, and publishing is that act: it binds the owner on the
-          server's first write and records the vault's namespace locally so sync
-          can address it.
-
-          **It lives in this section, not under “Enrolled devices”, and that is a
-          correction rather than a preference.** Publishing is an IDENTITY act: its
-          refusals are `PersonSessionRequired` and `PersonNotRegistered`, and what
-          it puts on the server is this vault under the person that owns it. Filed
-          under a devices heading it read as a device operation, and the owner's
-          2026-10-25 screenshot shows exactly that: “ENROLLED DEVICES” over
-          “Publish to your server”. The section now reads identity → server →
-          publishing → status, which is the order the facts depend on.
-
-          The gate is the READ, and the read is the capability. `publishState`
-          answers only where the command exists (desktop today; the browser and
-          mobile refuse it, myne-md/myne#911 tasks 12 and 13), so a client without
-          the read does not offer a button that would fail. `disabled` is the one
-          status that hides it too: publishing needs somewhere to publish TO, and
-          the Server row directly above this one is how that gets set. */}
-      {hasCapability("personIdentity") &&
-        publishState !== null &&
-        syncStatus?.state !== "disabled" && (
-        <SettingRow
-          anchorId="sync.publish"
-          testId="sync.panel.publish-row"
-          label={t("sync.panel.publish.label")}
-          // A published vault's row is a READOUT whose action is a repair, so the
-          // sentence states when the act happened and what it bought. It used to
-          // say only “Published.” and the date it had recorded (`published_at_ms`)
-          // reached no surface at all: a fact the panel had in hand and withheld
-          // from the one screen that exists to report it (2026-10-25).
-          helper={
-            published
-              ? publishedWhen === ""
-                ? t("sync.panel.publish.publishedHelperNoDate")
-                : t("sync.panel.publish.publishedHelper", { when: publishedWhen })
-              : t("sync.panel.publish.deviceOnlyHelper")
-          }
-          // A REFUSAL is an error, not a readout (2026-10-23). It used to
-          // replace the helper paragraph, so a click that failed changed a muted
-          // sentence into another muted sentence: no alert, no colour, no focus.
-          // Reported as "clicking does nothing", which is what it looked like.
-          // `SettingRow`'s `error` slot is the announcing one, and the button
-          // stays enabled so the retry is the same control.
-          error={
-            publishRun === "error"
-              ? t(`sync.panel.publish.error.${publishError ?? "Other"}`)
-              : null
-          }
-          helperTestId="sync.panel.publish-state"
-          control={
-            <Button
-              // A repeat of a completed act is not a primary action: it is the
-              // repair for a server that lost this vault's record (an account
-              // reset is the real case), and it is the only way back, so it stays
-              // reachable rather than being deleted. `ghost` is the row's own
-              // vocabulary for “quiet but findable” (`decisions/ui/0726`).
-              variant={published ? "ghost" : "primary"}
-              disabled={publishRun === "busy"}
-              onClick={() => {
-                setPublishRun("busy");
-                setPublishError(null);
-                void publishVault()
-                  .then(() => {
-                    setPublishRun("done");
-                    // The durable record now says published; re-read rather than
-                    // infer, so the panel and the vault row cannot disagree.
-                    probePublishState();
-                  })
-                  .catch((e: unknown) => {
-                    setPublishError(publishErrorKind(e));
-                    setPublishRun("error");
-                  });
-              }}
-              data-testid="sync.panel.publish"
-            >
-              {published
-                ? t("sync.panel.publish.republishCta")
-                : t("sync.panel.publish.cta")}
-            </Button>
-          }
-        />
-      )}
 
       <div style={BLOCK_STYLE} data-setting-anchor="sync.status" data-setting-row="true">
         <span style={LABEL_STYLE}>{t("sync.panel.status.label")}</span>

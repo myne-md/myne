@@ -4253,7 +4253,6 @@
         "bar": "bunnlinje statuslinje indikatorer tilpass endre rekkefølge skjul vis verktøylinje bottom bar status bar indicators customize reorder hide show toolbar",
         "syncDeviceBindings": "enheter gjort krav på av medlemmer tilskrivning hvem signerte hvilken enhet tilhører devices claimed by members attribution who signed which device belongs",
         "vaultFormat": "hvelvformat oppgrader en-frase gjenoppretting trekk tilbake hvelv gjenopprettingsfrase migrer identitet",
-        "publishVault": "publiser publisert hvelv server bare enhet synk",
         "externalAccess": "ekstern tilgang MCP myne-mcp Claude Desktop klient tilkobling godkjenn omfang trekk tilbake",
         "diagnosticLog": "diagnostisk logg logging feilsøking krasj rapport feilrapport støtte"
       },
@@ -4745,26 +4744,6 @@
         "account": "Konto",
         "server": "Server",
         "devices": "Enheter på kontoen din"
-      },
-      "publish": {
-        "label": "Publiser til serveren din",
-        "cta": "Publiser dette hvelvet",
-        "republishCta": "Publiser igjen",
-        "deviceOnlyHelper": "Dette hvelvet finnes bare på denne enheten. Publisering binder det til identiteten din slik at de andre enhetene dine kan åpne det.",
-        "publishedHelper": "Publisert {{when}}. Dette hvelvet er på synkroniseringsserveren din, så de andre enhetene dine kan nå det.",
-        "publishedHelperNoDate": "Publisert. Dette hvelvet er på synkroniseringsserveren din, så de andre enhetene dine kan nå det.",
-        "error": {
-          "NotConfigured": "Angi en synkroniseringsserver først, i Synk over.",
-          "PersonSessionRequired": "Lås opp identiteten din først. Publisering trenger identiteten som eier dette hvelvet.",
-          "PersonNotRegistered": "Registrer identiteten din først, i Identitetsblokken over. Denne enheten holder identiteten, men har aldri registrert den hos en server, så det er ingen konto å publisere under.",
-          "NotEnrolled": "Dette hvelvet tilhører en konto denne enheten ikke er registrert på. Legg til enheten på den kontoen først.",
-          "NotOwner": "Dette hvelvet tilhører allerede en annen identitet, så det kan ikke publiseres her.",
-          "Unauthenticated": "Serveren avviste denne enheten. Prøv igjen, og registrer på nytt hvis det fortsetter.",
-          "Transport": "Kunne ikke nå serveren. Hvelvet er uendret; prøv igjen.",
-          "TlsFailure": "Kunne ikke etablere en betrodd tilkobling. Hvelvet er uendret; prøv igjen.",
-          "BadRequest": "Dette hvelvets metadata kunne ikke leses. Ingenting ble sendt.",
-          "Other": "Publisering mislyktes. Hvelvet er uendret; prøv igjen."
-        }
       }
     },
     "reconcile": {

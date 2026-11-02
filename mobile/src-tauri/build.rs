@@ -426,7 +426,6 @@ fn main() {
                     "sync_set_endpoint",
                     "sync_status",
                     "sync_now",
-                    "sync_publish_vault",
                     "sync_published_state",
                     "sync_person_list_vaults",
                     "sync_person_register",

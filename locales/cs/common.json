@@ -4523,7 +4523,6 @@
         "bar": "spodní lišta stavová lišta ukazatele přizpůsobit pořadí skrýt zobrazit panel nástrojů",
         "syncDeviceBindings": "zařízení nárokovaná členy přiřazení kdo podepsal které zařízení patří",
         "vaultFormat": "formát trezoru upgrade jedna fráze pro obnovení vyřadit trezor fráze pro obnovení migrace identita",
-        "publishVault": "publikovaný trezor server jen zařízení synchronizace",
         "externalAccess": "externí přístup MCP myne-mcp Claude Desktop spojení schválit rozsah zrušit",
         "diagnosticLog": "diagnostický protokol protokol protokolování ladění řešení potíží záznam o selhání hlášení chyby podpora"
       },
@@ -5025,26 +5024,6 @@
         "account": "Účet",
         "server": "Server",
         "devices": "Zařízení na vašem účtu"
-      },
-      "publish": {
-        "label": "Publikovat na váš server",
-        "cta": "Publikovat tento trezor",
-        "republishCta": "Publikovat znovu",
-        "deviceOnlyHelper": "Tento trezor existuje jen na tomto zařízení. Publikováním ho svážete se svou identitou, aby ho mohla otevřít vaše další zařízení.",
-        "publishedHelper": "Publikováno {{when}}. Tento trezor je na vašem synchronizačním serveru, takže vaše další zařízení k němu dosáhnou.",
-        "publishedHelperNoDate": "Publikováno. Tento trezor je na vašem synchronizačním serveru, takže vaše další zařízení k němu dosáhnou.",
-        "error": {
-          "NotConfigured": "Nejprve nastavte synchronizační server v Synchronizaci výše.",
-          "PersonSessionRequired": "Nejprve odemkněte svou identitu. Publikování vyžaduje identitu, která tento trezor vlastní.",
-          "PersonNotRegistered": "Nejprve zaregistrujte svou identitu v bloku Identita výše. Toto zařízení identitu drží, ale nikdy ji nezaregistrovalo na serveru, takže není pod jakým účtem publikovat.",
-          "NotEnrolled": "Tento trezor patří účtu, ke kterému toto zařízení není přihlášeno. Nejprve přidejte zařízení k tomuto účtu.",
-          "NotOwner": "Tento trezor už patří jiné identitě, takže zde nemůže být publikován.",
-          "Unauthenticated": "Server toto zařízení odmítl. Zkuste to znovu a v případě potíží znovu přihlaste.",
-          "Transport": "Nepodařilo se dosáhnout serveru. Trezor zůstal nezměněn; zkuste to znovu.",
-          "TlsFailure": "Nepodařilo se navázat důvěryhodné spojení. Trezor zůstal nezměněn; zkuste to znovu.",
-          "BadRequest": "Metadata tohoto trezoru se nepodařilo přečíst. Nic se neodeslalo.",
-          "Other": "Publikování se nezdařilo. Trezor zůstal nezměněn; zkuste to znovu."
-        }
       }
     },
     "reconcile": {

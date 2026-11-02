@@ -64,10 +64,10 @@ export interface SyncPanelRoute {
   readonly usage?: AccountStatus | null;
   /**
    * What `sync_published_state` reports (myne-md/myne#911 task 8): the DURABLE
-   * publish state of the active vault. `null` (the default) answers as an
-   * unreadable command does, which HIDES the publish row: the row's gate is the
-   * read, because a client that cannot answer it cannot publish either (the
-   * browser, and mobile until its person plane lands).
+   * publish state of the active vault. The panel draws no publish control since
+   * myne-md/myne#974 (the cycle publishes on its own), so what a case varies here
+   * is the vault's GENERATION: `person_born` is what withholds the legacy
+   * add-device form.
    */
   readonly publishState?:
     | {

@@ -4253,7 +4253,6 @@
         "bar": "alsó sáv, állapotsáv, jelzők, testreszabás, átrendezés, elrejtés, megjelenítés, eszköztár",
         "syncDeviceBindings": "eszközök, tagok által igényelt, hozzárendelés, ki írta alá, melyik eszköz tartozik kihez",
         "vaultFormat": "széf formátum frissítés egy kifejezés helyreállítás nyugdíjazás széf helyreállító kifejezés migráció identitás",
-        "publishVault": "közzététel közzétett széf szerver csak eszköz szinkronizálás",
         "externalAccess": "külső hozzáférés MCP myne-mcp Claude Desktop kliens kapcsolat jóváhagyás hatókör visszavonás",
         "diagnosticLog": "diagnosztikai napló naplózás hibakeresés összeomlás-jelentés hibajelentés támogatás diagnostic log debug crash support"
       },
@@ -4745,26 +4744,6 @@
         "account": "Fiók",
         "server": "Szerver",
         "devices": "Eszközök a fiókodban"
-      },
-      "publish": {
-        "label": "Közzététel a szerveredre",
-        "cta": "Széf közzététele",
-        "republishCta": "Újraközzététel",
-        "deviceOnlyHelper": "Ez a széf csak ezen az eszközön létezik. A közzététel köti az identitásodhoz, hogy a többi eszközöd is megnyithassa.",
-        "publishedHelper": "Közzétéve: {{when}}. Ez a széf a szinkronszervereden van, ezért a többi eszközöd elérheti.",
-        "publishedHelperNoDate": "Közzétéve. Ez a széf a szinkronszervereden van, ezért a többi eszközöd elérheti.",
-        "error": {
-          "NotConfigured": "Először állíts be szinkronszerveret, a Szinkronban fent.",
-          "PersonSessionRequired": "Először oldd fel az identitásodat. A közzétételhez szükség van a széfet birtokló identitásra.",
-          "PersonNotRegistered": "Először regisztráld az identitásodat, fent az Identitás blokkban. Ez az eszköz tárolja az identitást, de még soha nem regisztrálta szerveren, ezért nincs fiók, amelyhez közzétehetnéd.",
-          "NotEnrolled": "Ez a széf olyan fiókhoz tartozik, amelyre ez az eszköz nincs bejelentkezve. Először add hozzá az eszközt ahhoz a fiókhoz.",
-          "NotOwner": "Ez a széf már egy másik identitáshoz tartozik, ezért itt nem tehető közzé.",
-          "Unauthenticated": "A szerver elutasította ezt az eszközt. Próbáld újra, és ha továbbra is előfordul, jelentkezz be újra.",
-          "Transport": "Nem sikerült elérni a szervert. A széf változatlan; próbáld újra.",
-          "TlsFailure": "Nem sikerült megbízható kapcsolatot létesíteni. A széf változatlan; próbáld újra.",
-          "BadRequest": "Ez a széf adatait nem sikerült olvasni. Semmi nem került elküldésre.",
-          "Other": "A közzététel sikertelen. A széf változatlan; próbáld újra."
-        }
       }
     },
     "reconcile": {

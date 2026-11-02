@@ -49,7 +49,6 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_unsynced_edits,
             commands::sync_materialisation_progress,
             commands::sync_now,
-            commands::sync_publish_vault,
             commands::sync_published_state,
             commands::sync_person_list_vaults,
             // The desktop had never registered the decoder: it has no camera, so the

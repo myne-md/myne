@@ -4253,7 +4253,6 @@
         "bar": "bundlinje statuslinje indikatorer tilpas omorganiser skjul vis værktøjslinje",
         "syncDeviceBindings": "enheder gjort krav på af medlemmer tilskrivning hvem signerede hvilken enhed tilhører",
         "vaultFormat": "boksformat opgrader ét-sætning gendannelse pensionér boks gendannelsessætning migrér identitet",
-        "publishVault": "publicér publiceret boks server kun enhed synkroniser",
         "externalAccess": "ekstern adgang MCP myne-mcp Claude Desktop klientforbindelse godkend omfang tilbagekald",
         "diagnosticLog": "diagnostiklog log logføring fejlfinding fejlretning crashrapport crashregistrering fejlrapport support diagnostic log"
       },
@@ -4745,26 +4744,6 @@
         "account": "Konto",
         "server": "Server",
         "devices": "Enheder på din konto"
-      },
-      "publish": {
-        "label": "Publicér til din server",
-        "cta": "Publicér denne boks",
-        "republishCta": "Publicér igen",
-        "deviceOnlyHelper": "Denne boks findes kun på denne enhed. Publicering binder den til din identitet, så dine andre enheder kan åbne den.",
-        "publishedHelper": "Publiceret {{when}}. Denne boks er på din synkroniseringsserver, så dine andre enheder kan nå den.",
-        "publishedHelperNoDate": "Publiceret. Denne boks er på din synkroniseringsserver, så dine andre enheder kan nå den.",
-        "error": {
-          "NotConfigured": "Angiv en synkroniseringsserver først, i Synk ovenfor.",
-          "PersonSessionRequired": "Lås din identitet op først. Publicering skal bruge den identitet, der ejer denne boks.",
-          "PersonNotRegistered": "Registrér din identitet først, i Identitetsblokken ovenfor. Denne enhed har identiteten, men har aldrig registreret den hos en server, så der er ingen konto at publicere under.",
-          "NotEnrolled": "Denne boks tilhører en konto, denne enhed ikke er tilmeldt på. Tilføj enheden til den konto først.",
-          "NotOwner": "Denne boks tilhører allerede en anden identitet, så den kan ikke publiceres her.",
-          "Unauthenticated": "Serveren afviste denne enhed. Prøv igen, og tilmeld igen, hvis det fortsætter.",
-          "Transport": "Kunne ikke nå serveren. Boksen er uændret; prøv igen.",
-          "TlsFailure": "Kunne ikke etablere en betroet forbindelse. Boksen er uændret; prøv igen.",
-          "BadRequest": "Denne boks' metadata kunne ikke læses. Intet blev sendt.",
-          "Other": "Publicering mislykkedes. Boksen er uændret; prøv igen."
-        }
       }
     },
     "reconcile": {

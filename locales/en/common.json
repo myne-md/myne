@@ -4505,7 +4505,6 @@
         "syncMembers": "members, share, invite, team, collaboration, vault",
         "syncDeviceBindings": "devices claimed by members attribution who signed which device belongs",
         "vaultFormat": "vault format upgrade retire vault recovery phrase password only migrate identity",
-        "publishVault": "publish published vault server device only sync",
         "externalAccess": "external access MCP myne-mcp Claude Desktop client connection approve scope revoke"
       },
       "emptyBody": "Try a shorter word, or the name of a panel."
@@ -4836,26 +4835,6 @@
         "account": "Account",
         "server": "Server",
         "devices": "Devices on your account"
-      },
-      "publish": {
-        "label": "Publish to your server",
-        "cta": "Publish this vault",
-        "republishCta": "Publish again",
-        "deviceOnlyHelper": "This vault exists only on this device. Publishing binds it to your identity so your other devices can open it.",
-        "publishedHelper": "Published {{when}}. This vault is on your sync server, so your other devices can reach it.",
-        "publishedHelperNoDate": "Published. This vault is on your sync server, so your other devices can reach it.",
-        "error": {
-          "NotConfigured": "Set a sync server first, in Sync above.",
-          "PersonSessionRequired": "Unlock your identity first. Publishing needs the identity that owns this vault.",
-          "PersonNotRegistered": "Register your identity first, in the Identity block above. This device holds the identity but has never registered it with a server, so there is no account to publish under.",
-          "NotEnrolled": "This vault belongs to an account this device is not enrolled on. Add the device to that account first.",
-          "NotOwner": "This vault already belongs to another identity, so it cannot be published here.",
-          "Unauthenticated": "The server refused this device. Try again, and re-enrol if it keeps happening.",
-          "Transport": "Could not reach the server. The vault is unchanged; try again.",
-          "TlsFailure": "Could not establish a trusted connection. The vault is unchanged; try again.",
-          "BadRequest": "This vault's metadata could not be read. Nothing was sent.",
-          "Other": "Publishing failed. The vault is unchanged; try again."
-        }
       }
     },
     "reconcile": {

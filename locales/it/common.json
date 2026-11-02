@@ -4388,7 +4388,6 @@
         "bar": "barra inferiore barra di stato indicatori personalizza riordina nascondi mostra barra degli strumenti",
         "syncDeviceBindings": "dispositivi rivendicati dai membri attribuzione chi ha firmato a chi appartiene un dispositivo",
         "vaultFormat": "formato cassaforte aggiornamento recupero una frase ritira frase di recupero cassaforte migra identità",
-        "publishVault": "pubblica cassaforte pubblicata server solo dispositivo sincronizzazione",
         "externalAccess": "accesso esterno MCP myne-mcp Claude Desktop connessione client approva ambito revoca",
         "diagnosticLog": "registro diagnostico log debug diagnosi problemi arresto anomalo segnalazione bug supporto crash report"
       },
@@ -4885,26 +4884,6 @@
         "account": "Account",
         "server": "Server",
         "devices": "Dispositivi sul tuo account"
-      },
-      "publish": {
-        "label": "Pubblica sul tuo server",
-        "cta": "Pubblica questa cassaforte",
-        "republishCta": "Pubblica di nuovo",
-        "deviceOnlyHelper": "Questa cassaforte esiste solo su questo dispositivo. Pubblicarla la lega alla tua identità così i tuoi altri dispositivi possono aprirla.",
-        "publishedHelper": "Pubblicata {{when}}. Questa cassaforte è sul tuo server di sincronizzazione, quindi i tuoi altri dispositivi possono raggiungerla.",
-        "publishedHelperNoDate": "Pubblicata. Questa cassaforte è sul tuo server di sincronizzazione, quindi i tuoi altri dispositivi possono raggiungerla.",
-        "error": {
-          "NotConfigured": "Imposta prima un server di sincronizzazione, in Sincronizzazione sopra.",
-          "PersonSessionRequired": "Sblocca prima la tua identità. La pubblicazione richiede l'identità che possiede questa cassaforte.",
-          "PersonNotRegistered": "Registra prima la tua identità, nel blocco Identità sopra. Questo dispositivo ha l'identità ma non l'ha mai registrata su un server, quindi non c'è un account sotto cui pubblicare.",
-          "NotEnrolled": "Questa cassaforte appartiene a un account su cui questo dispositivo non è registrato. Aggiungi prima il dispositivo a quell'account.",
-          "NotOwner": "Questa cassaforte appartiene già a un'altra identità, quindi non può essere pubblicata qui.",
-          "Unauthenticated": "Il server ha rifiutato questo dispositivo. Riprova, e registra di nuovo se continua.",
-          "Transport": "Impossibile raggiungere il server. La cassaforte è invariata; riprova.",
-          "TlsFailure": "Impossibile stabilire una connessione attendibile. La cassaforte è invariata; riprova.",
-          "BadRequest": "I metadati di questa cassaforte non sono stati letti. Nulla è stato inviato.",
-          "Other": "Pubblicazione fallita. La cassaforte è invariata; riprova."
-        }
       }
     },
     "reconcile": {

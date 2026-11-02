@@ -4388,7 +4388,6 @@
         "bar": "barra inferior barra de estado indicadores personalizar reordenar ocultar mostrar barra de ferramentas",
         "syncDeviceBindings": "dispositivos reclamados por membros atribuição quem assinou a que dispositivo pertence",
         "vaultFormat": "formato do cofre atualização recuperação de uma frase aposentar cofre frase de recuperação migrar identidade",
-        "publishVault": "publicar cofre publicado servidor só dispositivo sincronização",
         "externalAccess": "acesso externo MCP myne-mcp Claude Desktop ligação aprovar âmbito revogar",
         "diagnosticLog": "registo de diagnóstico registos depuração resolução de problemas relatório de falhas relatório de erros suporte diagnostic log logging debug"
       },
@@ -4885,26 +4884,6 @@
         "account": "Conta",
         "server": "Servidor",
         "devices": "Dispositivos na sua conta"
-      },
-      "publish": {
-        "label": "Publicar no seu servidor",
-        "cta": "Publicar este cofre",
-        "republishCta": "Publicar de novo",
-        "deviceOnlyHelper": "Este cofre existe só neste dispositivo. Publicar liga-o à sua identidade para os seus outros dispositivos o poderem abrir.",
-        "publishedHelper": "Publicado {{when}}. Este cofre está no seu servidor de sincronização, por isso os seus outros dispositivos o podem alcançar.",
-        "publishedHelperNoDate": "Publicado. Este cofre está no seu servidor de sincronização, por isso os seus outros dispositivos o podem alcançar.",
-        "error": {
-          "NotConfigured": "Defina primeiro um servidor de sincronização, em Sincronização acima.",
-          "PersonSessionRequired": "Desbloqueie a sua identidade primeiro. Publicar precisa da identidade que possui este cofre.",
-          "PersonNotRegistered": "Registe primeiro a sua identidade, no bloco Identidade acima. Este dispositivo tem a identidade mas nunca a registou num servidor, por isso não há conta sob a qual publicar.",
-          "NotEnrolled": "Este cofre pertence a uma conta em que este dispositivo não está inscrito. Adicione o dispositivo a essa conta primeiro.",
-          "NotOwner": "Este cofre já pertence a outra identidade, por isso não pode ser publicado aqui.",
-          "Unauthenticated": "O servidor recusou este dispositivo. Tente de novo, e volte a inscrevê-lo se continuar a acontecer.",
-          "Transport": "Não foi possível alcançar o servidor. O cofre não foi alterado; tente de novo.",
-          "TlsFailure": "Não foi possível estabelecer uma ligação de confiança. O cofre não foi alterado; tente de novo.",
-          "BadRequest": "Não foi possível ler os metadados deste cofre. Nada foi enviado.",
-          "Other": "A publicação falhou. O cofre não foi alterado; tente de novo."
-        }
       }
     },
     "reconcile": {

@@ -4253,7 +4253,6 @@
         "bar": "nedre fält statusfält indikatorer anpassa ordna om dölj visa verktygsfält",
         "syncDeviceBindings": "enheter anspråk medlemmar tillskrivning vem som signerade vilken enhet tillhör",
         "vaultFormat": "valvformat uppgradering en-fras återställning pensionera valvåterställningsfras migrera identitet",
-        "publishVault": "publicera publicerat valv server endast enhet synk",
         "externalAccess": "extern åtkomst MCP myne-mcp Claude Desktop klientanslutning godkänn omfång återkalla",
         "diagnosticLog": "diagnostiklogg loggning felsökning kraschrapport buggrapport support"
       },
@@ -4745,26 +4744,6 @@
         "account": "Konto",
         "server": "Server",
         "devices": "Enheter på ditt konto"
-      },
-      "publish": {
-        "label": "Publicera till din server",
-        "cta": "Publicera det här valvet",
-        "republishCta": "Publicera igen",
-        "deviceOnlyHelper": "Det här valvet finns bara på den här enheten. Publicering binder det till din identitet så att dina andra enheter kan öppna det.",
-        "publishedHelper": "Publicerat {{when}}. Det här valvet är på din synkserver, så dina andra enheter kan nå det.",
-        "publishedHelperNoDate": "Publicerat. Det här valvet är på din synkserver, så dina andra enheter kan nå det.",
-        "error": {
-          "NotConfigured": "Ange en synkserver först, i Synk ovan.",
-          "PersonSessionRequired": "Lås upp din identitet först. Publicering kräver identiteten som äger det här valvet.",
-          "PersonNotRegistered": "Registrera din identitet först, i Identitetsblocket ovan. Den här enheten har identiteten men har aldrig registrerat den hos en server, så det finns inget konto att publicera under.",
-          "NotEnrolled": "Det här valvet tillhör ett konto den här enheten inte är inskriven på. Lägg till enheten i det kontot först.",
-          "NotOwner": "Det här valvet tillhör redan en annan identitet, så det kan inte publiceras här.",
-          "Unauthenticated": "Servern avvisade den här enheten. Försök igen, och registrera om den fortsätter.",
-          "Transport": "Kunde inte nå servern. Valvet är oförändrat; försök igen.",
-          "TlsFailure": "Kunde inte upprätta en betrodd anslutning. Valvet är oförändrat; försök igen.",
-          "BadRequest": "Det här valvets metadata kunde inte läsas. Inget skickades.",
-          "Other": "Publicering misslyckades. Valvet är oförändrat; försök igen."
-        }
       }
     },
     "reconcile": {

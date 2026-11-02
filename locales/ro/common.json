@@ -4388,7 +4388,6 @@
         "bar": "bară de jos bară de stare indicatori personalizare reordonare ascunde arată bară de instrumente",
         "syncDeviceBindings": "dispozitive revendicate de membri atribuire cine a semnat cărui dispozitiv aparține",
         "vaultFormat": "format seif actualizare recuperare dintr-o singură frază retrage frază de recuperare seif migrare identitate",
-        "publishVault": "publică seif publicat server doar dispozitiv sincronizare",
         "externalAccess": "acces extern MCP myne-mcp Claude Desktop client conexiune aprobare domeniu revocare",
         "diagnosticLog": "jurnal de diagnostic diagnosticare depanare erori crash raport de erori asistență diagnostic log logging debug troubleshooting crash report bug report support"
       },
@@ -4885,26 +4884,6 @@
         "account": "Cont",
         "server": "Server",
         "devices": "Dispozitive pe contul tău"
-      },
-      "publish": {
-        "label": "Publică pe serverul tău",
-        "cta": "Publică acest seif",
-        "republishCta": "Publică din nou",
-        "deviceOnlyHelper": "Acest seif există doar pe acest dispozitiv. Publicarea îl leagă de identitatea ta ca să îl poată deschide celelalte dispozitive.",
-        "publishedHelper": "Publicat {{when}}. Acest seif este pe serverul tău de sincronizare, așa că celelalte dispozitive îl pot accesa.",
-        "publishedHelperNoDate": "Publicat. Acest seif este pe serverul tău de sincronizare, așa că celelalte dispozitive îl pot accesa.",
-        "error": {
-          "NotConfigured": "Setează mai întâi un server de sincronizare, în Sincronizare mai sus.",
-          "PersonSessionRequired": "Deblochează-ți mai întâi identitatea. Publicarea are nevoie de identitatea care deține acest seif.",
-          "PersonNotRegistered": "Înregistrează-ți mai întâi identitatea, în blocul Identitate de mai sus. Acest dispozitiv deține identitatea dar nu a înregistrat-o niciodată la un server, așa că nu există niciun cont sub care să publici.",
-          "NotEnrolled": "Acest seif aparține unui cont pe care acest dispozitiv nu este înscris. Adaugă mai întâi dispozitivul la acel cont.",
-          "NotOwner": "Acest seif aparține deja altei identități, așa că nu poate fi publicat aici.",
-          "Unauthenticated": "Serverul a refuzat acest dispozitiv. Încearcă din nou și reînscrie-l dacă tot se întâmplă.",
-          "Transport": "Nu s-a putut ajunge la server. Seiful este neschimbat; încearcă din nou.",
-          "TlsFailure": "Nu s-a putut stabili o conexiune de încredere. Seiful este neschimbat; încearcă din nou.",
-          "BadRequest": "Metadatele acestui seif nu au putut fi citite. Nimic nu a fost trimis.",
-          "Other": "Publicarea a eșuat. Seiful este neschimbat; încearcă din nou."
-        }
       }
     },
     "reconcile": {
