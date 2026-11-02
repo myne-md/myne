@@ -127,3 +127,8 @@ web/bench/pkg/
 
 # Sidebar state: written by myne-sidebar.ts, machine-local, never committed.
 .pi/.state/
+
+# Release artefacts staged for upload (dmg/deb/rpm/apk/...): gigabytes of build
+# output the release procedure creates here and deletes once every file is
+# published. Never committed; the provenance is the tag, not the tree.
+/dist-release/
