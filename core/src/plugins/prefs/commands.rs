@@ -280,7 +280,7 @@ async fn update_prefs_with_dir(
         |_, _| true,
         |prefs| {
             mutate(prefs);
-            None
+            MutationClock::Stamped(None)
         },
         io,
         host,
@@ -288,31 +288,49 @@ async fn update_prefs_with_dir(
     .await
 }
 
+/// What a mutation approved by [`update_prefs_with_dir_if`] does on its way to
+/// the blob.
+enum MutationClock {
+    /// Write, and stamp every shared field the mutation changed at this clock.
+    /// `None` means the host clock, which is the ordinary answer for a change a
+    /// person made. One clock covers the WHOLE write, not one key: a mutation
+    /// that changes two shared fields stamps both, which is why the only caller
+    /// of the fixed-clock arm is a mutation that touches a single entry.
+    Stamped(Option<u64>),
+    /// Write, and stamp nothing, so §10.2 reads the value as an entry nobody has
+    /// claimed. This is what an AUTOMATIC value owes a human one: with no clock
+    /// the entry loses to every clocked write on every device, and it is already
+    /// the canonical wire form, because the merge treats an absent clock as zero
+    /// and drops a zero clock on the way through. Stamping a literal zero instead
+    /// would write the same meaning in a non-canonical shape and leave the
+    /// writer's `shared_subset_hash` disagreeing with every peer's.
+    Unstamped,
+    /// Do not write at all. The blob keeps its bytes, which means it keeps its
+    /// nonce, which is the proof §10.2.1's push gate leans on.
+    Refused,
+}
+
 /// [`update_prefs_with_dir`], with the last word on whether the write happens,
 /// and on the clock it is stamped with.
 ///
 /// `proceed` runs after the blob has been read and its [`PrefsOrigin`] is known,
 /// which is the one moment a caller can refuse on a fact that is not in
-/// `PrefsView` — "there is no `vault.prefs` on this device at all" is the case
+/// `PrefsView`. "There is no `vault.prefs` on this device at all" is the case
 /// this exists for (see [`self_name_device_with_dir`]). It runs under the same
 /// write mutex as the mutation, so it cannot be raced by a second writer the way
 /// a check taken before the call would be.
 ///
-/// `mutate` returns an optional clock override. `Some(0)` is how a setter makes
-/// its value the WEAKEST claim on a shared field: §10.2's per-key merge keeps
-/// the later clock, so an entry stamped at zero loses to any write a client ever
-/// makes, on every device, which is what an AUTOMATIC value owes a human one
-/// (see [`self_name_device_with_dir`]). `None` stamps `now`, the ordinary case.
-///
-/// A refusal is `Ok(())` and writes nothing: the caller's own `mutate` never runs,
-/// so a caller that reports an outcome tracks it from inside `mutate` rather than
-/// from this return value.
+/// `mutate` runs under that mutex too, and says both things at once: whether the
+/// write happens and what clock it carries (see [`MutationClock`]). A caller that
+/// reports an outcome tracks it from inside `mutate` rather than from this return
+/// value, which stays `Result<(), PrefsWriteError>` for the failures that are
+/// failures.
 async fn update_prefs_with_dir_if(
     vault_dir: &Path,
     state: &VaultRuntimeState,
     hooks: &crate::hooks::Hooks,
     proceed: impl FnOnce(&PrefsView, PrefsOrigin) -> bool,
-    mutate: impl FnOnce(&mut PrefsView) -> Option<u64>,
+    mutate: impl FnOnce(&mut PrefsView) -> MutationClock,
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), PrefsWriteError> {
@@ -392,7 +410,15 @@ async fn update_prefs_with_dir_if(
         return Ok(());
     }
     let before = prefs.clone();
-    let clock_override = mutate(&mut prefs);
+    let clock = match mutate(&mut prefs) {
+        // A refusal that reached the mutation still writes nothing: encoding and
+        // writing an unchanged `PrefsView` would re-encrypt under a fresh nonce,
+        // and "an unchanged blob keeps its nonce" is what lets the sync phase skip
+        // a decrypt it would otherwise have to do (§10.2.1).
+        MutationClock::Refused => return Ok(()),
+        MutationClock::Stamped(clock) => Some(clock),
+        MutationClock::Unstamped => None,
+    };
 
     // MYND-478 (sync-protocol.md §10.2): stamp the LWW field clock of every
     // SHARED field this write changed — centrally, so no setter can forget.
@@ -409,8 +435,10 @@ async fn update_prefs_with_dir_if(
     // second-granularity one would make two edits inside the same second
     // unorderable. Exactly why `HostCtx` carries both clocks at millisecond
     // resolution.
-    let now_ms = clock_override.unwrap_or_else(|| host.now_unix_millis());
-    crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
+    if let Some(clock) = clock {
+        let now_ms = clock.unwrap_or_else(|| host.now_unix_millis());
+        crate::plugins::sync::prefs_merge::stamp_changed_shared_fields(&before, &mut prefs, now_ms);
+    }
 
     // myne#613: the last-resort cap guard, AFTER stamping, because stamping is
     // the step that grows the blob. `apply_set_mutation`'s budget already keeps
@@ -5732,15 +5760,6 @@ fn validated_device_name(device_id_hex: String, name: String) -> Option<(String,
     Some((device_id_hex, trimmed.to_string()))
 }
 
-/// The clock an automatic device name is stamped with (`decisions/sync/0770`).
-///
-/// Zero rather than `now`, deliberately: §10.2's per-key merge keeps the entry
-/// with the later clock, so zero is the one value that can never outrank a name
-/// a person chose. `single_sided_clock_rule` treats a zero clock as "no claim"
-/// on both sides, so an entry stamped at zero still survives a peer that has no
-/// entry at all, and loses to any peer that has one.
-const AUTOMATIC_NAME_CLOCK: u64 = 0;
-
 /// Whether the synced `device_names` map already answers for this device.
 ///
 /// A whitespace-only stored value counts as absent, mirroring
@@ -5801,16 +5820,25 @@ pub(crate) async fn set_device_name_with_dir(
 /// separate this from [`set_device_name_with_dir`], and each one guards a loss the
 /// user would not connect to the name:
 ///
-/// 1. **A member session.** `device_names` is a set-union field of the ACTIVE
-///    VAULT's `vault.prefs`, while the roster a member session is looking at is
-///    that person's own account (`AccountPlane::Person`). The id would label no
-///    row of the vault's roster, and the name would replicate to every co-member
-///    of a group-shared map that has no deletion (`decisions/sync/0348` clause 3).
-///    The MANUAL setter stays open to a member: a person typing a name is
-///    choosing to publish it, and the row they are labelling is in front of them.
+/// 1. **A member session.** `device_names` belongs to the ACTIVE VAULT's
+///    `vault.prefs`, while the roster a member session is looking at is that
+///    person's own account (`AccountPlane::Person`). The id would label no row of
+///    the vault's roster, and the name would replicate to every co-member of a
+///    group-shared map that has no deletion: it is a per-key LWW map whose keys
+///    survive everything (`core::plugins::sync::prefs_classification`, and
+///    `decisions/sync/0348` clause 3 for the no-deletion half). The MANUAL setter
+///    stays open to a member: a person typing a name is choosing to publish it,
+///    and the row they are labelling is in front of them.
+///
+///    This is the one refusal taken BEFORE the write mutex, because the plane is
+///    read through an `await` and `proceed` is synchronous. It is a check on an
+///    authority that cannot change under this directory, which is why that is
+///    sound rather than lucky: a lock empties the slot, and a different vault
+///    cannot occupy the same directory before the write, since `update_prefs_with_dir_if`
+///    compares the slot's vault id against the directory's own.
 /// 2. **An absent `vault.prefs`.** The enrollment wholesale seed is keyed on that
 ///    file being ABSENT (§10.2.1), and it carries the account's DEVICE-LOCAL
-///    fields — `custom_theme`, `auto_lock_seconds`, the `editor_*` family — which
+///    fields (`custom_theme`, `auto_lock_seconds`, the `editor_*` family), which
 ///    the merge path can never adopt, because device-local fields are exactly the
 ///    ones it excludes. Creating the blob here would silently cost this device all
 ///    of them, and only on the devices that just joined, which is the worst place
@@ -5822,20 +5850,28 @@ pub(crate) async fn set_device_name_with_dir(
 ///    prefs" is still false.
 /// 3. **An entry that is already there**, checked INSIDE the write mutex.
 ///
-/// Refusal 3 is necessary and NOT sufficient, which is why this path also stamps
-/// at the floor. `has_stored_device_name` reads this device's own `vault.prefs`,
+/// Refusal 3 is necessary and NOT sufficient, which is why this path also writes
+/// no clock. `has_stored_device_name` reads this device's own `vault.prefs`,
 /// and a peer's name reaches it only at the next merge: a device that has been
 /// offline since somebody renamed it holds no entry, so the check passes and the
 /// write would land with `now`, a clock LATER than the human write it never saw,
-/// and `device_names` is a per-key LWW map — the rename would be replaced on
+/// and `device_names` is a per-key LWW map, so the rename would be replaced on
 /// every device with no history to recover it from. A process-local mutex cannot
 /// close a race between two devices.
 ///
-/// So the value is stamped at clock ZERO (§10.2's per-key rule keeps the later
-/// clock), which makes it the weakest claim on the key: any name a client ever
-/// writes beats it, on every device, forever, and this path can then only ever
-/// fill an entry nobody has claimed. The name it writes is derived from a closed
-/// set of platform tokens rather than typed, so losing that race costs nothing.
+/// So the value carries NO clock (`MutationClock::Unstamped`), which §10.2 reads
+/// as the weakest claim there is: any name a client ever writes beats it, on
+/// every device, forever, and this path can then only ever fill an entry nobody
+/// has claimed. Absent rather than a literal zero because the merge normalises a
+/// zero clock away, so stamping one would leave this device's `shared_subset_hash`
+/// disagreeing with every peer's and cost a redundant push round per device;
+/// absent is the same meaning in the canonical shape.
+///
+/// The name it writes is the platform word the enrollment field is pre-filled
+/// with, so losing that race costs nothing. **`set_device_name` does not bound the
+/// value**, and a reader should not read one into this: any non-blank string is
+/// accepted on both paths, exactly as a manual rename is. What holds this entry to
+/// a platform word is the client that sends it.
 ///
 /// Returns `Ok(false)` for every refusal. Nothing failed in those cases and the
 /// caller has nothing to report: the row keeps its id-derived label, and the
@@ -5873,15 +5909,18 @@ pub(crate) async fn self_name_device_with_dir(
         |_, origin| origin != PrefsOrigin::Absent,
         |prefs| {
             if has_stored_device_name(prefs, &device_id_hex) {
-                return None;
+                // Refuse rather than write the same value back: an unchanged
+                // encode would still cost a fresh nonce, and with it the proof
+                // the sync phase uses to skip this blob.
+                return MutationClock::Refused;
             }
             prefs
                 .device_names
                 .insert(device_id_hex.clone(), value.clone());
             wrote = true;
-            // The floor clock: see refusal 3 above. `None` (the ordinary stamp)
-            // would let this unattended write outrank a human rename it never saw.
-            Some(AUTOMATIC_NAME_CLOCK)
+            // No clock at all: see refusal 3 above. The ordinary stamp would let
+            // this unattended write outrank a rename it never saw.
+            MutationClock::Unstamped
         },
         io,
         host,
@@ -7823,21 +7862,22 @@ mod tests {
     /// rename that landed on a peer and has not merged here yet: a device that has
     /// been offline since somebody renamed it holds no entry, the check passes,
     /// and a `now` stamp would beat the human write in §10.2's per-key merge on
-    /// every device, with no history to recover it from. The fix is the floor
-    /// clock, and this asserts the outcome rather than the mechanism: the merge of
-    /// (this device's auto name at zero) with (a peer's rename at a real clock)
-    /// keeps the rename.
+    /// every device, with no history to recover it from. The fix is to write the
+    /// entry with no clock at all, and this asserts the outcome rather than the
+    /// mechanism: the merge of (this device's clockless auto name) with (a peer's
+    /// rename at a real clock) keeps the rename.
     ///
-    /// Injected: stamp `None` instead of `Some(AUTOMATIC_NAME_CLOCK)` and the
-    /// merge below keeps "Studio Mac", so this goes red on the human name.
+    /// Injected: return `MutationClock::Stamped(None)` there instead of
+    /// `MutationClock::Unstamped` and the merge below keeps "Studio Mac", so this
+    /// goes red on the human name.
     #[test]
     fn an_automatic_name_loses_to_a_human_name_it_never_saw() {
         rt().block_on(async {
             let (tmp, state) = make_temp_vault_with_unlocked_state(0x4b).await;
-            // `TestHost`, not `NoopHost`: NoopHost's clock is 0, which is the very
-            // value the floor clock uses, so a mutation that drops the override
-            // would be invisible here. This test has to be run against a host whose
-            // "now" is a real, later number or it proves nothing.
+            // `TestHost`, not `NoopHost`: NoopHost's clock is 0, so a mutation that
+            // stamped the host clock here would be invisible against a peer at zero
+            // and this test would prove nothing. The peer's clock below has to be a
+            // real, earlier number for the injection to be detectable.
             let host = crate::host::test_host::TestHost::new(tmp.path());
             set_spell_languages_with_dir(
                 tmp.path(),
@@ -7869,8 +7909,8 @@ mod tests {
                 mine.field_clocks
                     .get(&format!("device_names/{DEV_HEX}"))
                     .copied(),
-                Some(0),
-                "the automatic name must carry the floor clock, not a real one"
+                None,
+                "the automatic name must carry no clock at all, not a real one"
             );
 
             // A peer renamed this device while it was offline, EARLIER in wall-clock
@@ -7890,6 +7930,25 @@ mod tests {
                 "a human name must outrank an automatic one on every device"
             );
         });
+    }
+
+    /// The Rust half of a vector that also lives in
+    /// `tests/client-core/deviceName.test.ts`, and the two must answer alike:
+    /// the client decides whether to ASK, and this decides whether to WRITE. A
+    /// divergence is silent in the direction that matters (the client asks, the
+    /// backend refuses, the device stays unnamed with nothing said), so the same
+    /// cases are asserted on both sides rather than the agreement being claimed
+    /// in a comment.
+    #[test]
+    fn has_stored_device_name_matches_the_client_predicate() {
+        let mut prefs = PrefsView::default();
+        assert!(!has_stored_device_name(&prefs, DEV_HEX), "absent");
+        prefs.device_names.insert(DEV_HEX.into(), String::new());
+        assert!(!has_stored_device_name(&prefs, DEV_HEX), "empty");
+        prefs.device_names.insert(DEV_HEX.into(), "   ".into());
+        assert!(!has_stored_device_name(&prefs, DEV_HEX), "whitespace only");
+        prefs.device_names.insert(DEV_HEX.into(), " Mac ".into());
+        assert!(has_stored_device_name(&prefs, DEV_HEX), "a real name");
     }
 
     /// The command's advertised contract is "resolves to whether it wrote", and
@@ -7999,6 +8058,8 @@ mod tests {
             )
             .await
             .expect("the manual setter");
+            let prefs_path = tmp.path().join("vault.prefs");
+            let before = std::fs::read(&prefs_path).expect("prefs blob");
 
             let wrote = self_name_device_with_dir(
                 tmp.path(),
@@ -8019,6 +8080,15 @@ mod tests {
             assert_eq!(
                 view.device_names.get(DEV_HEX).map(String::as_str),
                 Some("Chosen by hand")
+            );
+            // Byte equality, not value equality: encoding the unchanged view would
+            // re-encrypt under a fresh nonce, and §10.2.1's push gate reads "same
+            // nonce" as "provably unchanged". A refusal has to leave the blob alone
+            // for that proof to survive.
+            assert_eq!(
+                std::fs::read(&prefs_path).expect("prefs blob"),
+                before,
+                "the refused write still touched the blob"
             );
         });
     }
