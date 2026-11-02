@@ -21,6 +21,7 @@ import { expect } from "vitest";
 import { type AppSession } from "./session";
 import { launchDevice, syncConfigSeed } from "./multi-device";
 import {
+  clickByTestId,
   closeSettings,
   ipcOk,
   openSyncConnection,
@@ -233,7 +234,8 @@ export async function sendInvite(owner: AppSession, memberCode: string): Promise
 
 /**
  * Accept, through the three wizard steps the accept owns (verify the owner, the
- * recovery phrase, the device password) and then the name gate.
+ * recovery phrase, the device password), then the name gate, then the §6.3 compare
+ * with the owner approving from its own device.
  *
  * This is the FIRST membership, so it is the only path that may write a name.
  * The store the name lands in is `decisions/protocol/0666` and the row is signed
@@ -285,9 +287,29 @@ export async function acceptInvite(
   await member.session.byTestId("name-gate.input", { timeoutMs: SYNC_BUDGET_MS });
   await (await member.session.byTestId("name-gate.input")).replaceText(name);
   await (await member.session.byTestId("name-gate.save")).click();
-  // Landing in the editor is the proof both steps completed: the accepted vault
-  // becomes the ACTIVE member slot, so the editor is reached without a second unlock.
-  await member.session.byTestId("editor.settings-cta", { timeoutMs: 60_000 });
+  // **The landing is the compare, never the editor** (decisions/sync/0766 + 0767):
+  // an accepted vault enters `pending-approval` by construction, so the device that
+  // arrived by invitation is one nobody has admitted yet. Asserting the editor here
+  // is what a spec wrote before the join door was withdrawn, and it now describes a
+  // design the app deliberately refuses: a joined vault that reaches the editor
+  // before the §6.3 eye-compare has taken the TOFU bootstrap with the compare
+  // skipped, which `threat-model.md` §7 does not allow on any client.
+  const memberSas = await (
+    await member.session.byTestId("pending-approval.sas", { timeoutMs: 90_000 })
+  ).textContent();
+  expect(memberSas.trim(), "the member's own compare code is eight characters").toMatch(
+    /^[0-9A-Z]{4}-[0-9A-Z]{4}$/,
+  );
+  // The compare is the joining device's OWN acknowledgment, and confirming it is what
+  // releases the vault: `sas-match` is the settle button, so the editor is one press
+  // away and needs no second unlock (the accepted vault is the ACTIVE member slot).
+  //
+  // Deliberately NOT an owner-side approval. A member is already a member by the time
+  // the vault arrives — `sync.approve-device` lives in the account's pending-device
+  // list, and a member's device never appears there, which is what this scenario
+  // measured on 2026-11-02 (the owner's Devices topic listed one device, its own).
+  await clickByTestId(member.session, "pending-approval.sas-match", { timeoutMs: 30_000 });
+  await member.session.byTestId("editor.settings-cta", { timeoutMs: 90_000 });
   // Then clear the first-run importer offer, which is what an editor mount does
   // before anything else on this device can be clicked. The offered vault is a
   // FRESH vault here in exactly the way the owner's seeded one was: the offer's
