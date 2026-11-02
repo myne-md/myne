@@ -56,11 +56,29 @@ every session in this tree, so the lane is stated here and the mechanics stay th
 **Three craft rules sit above the lane, and they are not style preferences.** They are why a change
 here is smaller than the same change elsewhere, and each one has already been paid for:
 
-1. **The least code that does the work.** A helper that exists in the tree beats a new one; a
-   library already in `package.json` beats three hundred lines of hand-rolled equivalent; a
-   command that already exists beats a second one beside it. Deleting code is a legitimate
-   outcome of a task and does not need a second task to justify it. Size is not effort, it is
-   surface: every line is something the next reader has to rule out.
+1. **The least code that does the work, which is a search before it is a principle.** Before writing
+   anything, walk this order and stop at the first rung that answers:
+
+   1. Does something in this tree already do it? Search for the CONCEPT, not the name: the same
+      question is often spelled with a different word, and `rg` for the name you were about to use is
+      how the fourth copy gets written.
+   2. Can the thing you found be extended or parameterised instead of copied?
+   3. Does a dependency already in `package.json` or `Cargo.toml` do it?
+   4. Only then write it.
+
+   A change ends with **one line in its pull request or task record** naming what it reused, what it
+   deleted, and why anything new was needed. An empty line reads as a search that did not happen, and
+   review treats it that way. Deleting code is a legitimate outcome of a task and does not need a
+   second task to justify it. Size is not effort, it is surface: every line is something the next
+   reader has to rule out.
+
+   The failure this wording exists for is on the record, not hypothetical: one question ("may this
+   device sign a head right now") was implemented three times, in `cycle::signed_head_ctx`,
+   `roster_trust::own_device_signing_pair` and `device_binding::store::claim_self_in_dir`, while a
+   fourth site answered a different question the same-looking way (`carrier_applies` against
+   `meta_kind::carries_b2b_tail`). The third and the fourth disagreed about the vault generation the
+   product had started creating, so sync stopped on every new vault and nothing failed. myne-md/myne#983
+   is the removal, and `/pr-review`'s `least-code` reviewer is the gate that asks the question.
 2. **A UI component is written once.** Before a new button, dialog, list, field, toggle or card,
    find the one that already does it: `src/components/` in the shared tree, the primitives in
    `docs/design/ui_kits/desktop/`, `client-core`'s policy modules. Reuse it, extend it, or
