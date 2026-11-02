@@ -57,7 +57,6 @@ import { buildMentionTargets } from "../ai/noteMentions";
 import { useResolverNotes } from "../resolverNotes";
 import { useWorkspace } from "../workspaceContext";
 import { aiChatHonestyNote } from "../../lib/load-bearing-copy";
-import { Button } from "../../components/primitives/Button";
 import { IconButton } from "../../components/primitives/IconButton";
 import { Tooltip } from "../../components/primitives/Tooltip";
 import {
@@ -321,8 +320,6 @@ export function AiChatTab({
    * not what a threat-model-bounded sentence is for.
    */
   const [honestyOpen, setHonestyOpen] = useState(false);
-  /** Whether the provider notice's popover is open (myne-md/myne#848). */
-  const [noticeOpen, setNoticeOpen] = useState(false);
   /**
    * Clamped exactly when there is a conversation AND the user has not opened it
    * back up. An empty transcript is the moment the claim is being made, so it
@@ -576,19 +573,23 @@ export function AiChatTab({
           takes from the thing they came for. */}
       {ready && (
         <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-1)" }}>
-          {/* **The notice is the way IN to what it claims** (myne-md/myne#848).
-              It was a `<p>`: a threat-model-bounded sentence about where the
-              user's words go, with no way to ask the follow-up it invites
-              ("which provider? what exactly leaves? how do I stop it?"). It is a
-              button now, with the SAME constant as its text, that copy is
-              load-bearing and E2E-pinned by literal equality, so it is rendered
-              verbatim in every locale rather than paraphrased into a key. */}
-          <Button
-            variant="ghost"
+          {/* The claim, rendered verbatim (load-bearing copy, never i18n'd).
+
+              It was a `<button>` that opened a popover restating what leaves,
+              who receives it and how to revoke: four answers to a sentence the
+              user had just read, in a box that pushed the transcript down and
+              duplicated the consent surface's own enumeration
+              (`CONSENT_WHAT_LEAVES` and its siblings in `@myne/copy`, which is
+              where the full text lives and what the CTA below opens). The user
+              reported it as redundancy (issue #970, item 6): one line says what
+              the claim is, and the place that spells it out is one press away.
+
+              So this is a `<p>` again, with the SAME constant as its text,
+              E2E-pinned by literal equality, so the element change must not
+              move a character of it. */}
+          <p
             data-testid="ai.honesty-note"
             data-clamped={honestyClamped ? "true" : undefined}
-            aria-expanded={noticeOpen}
-            onClick={() => setNoticeOpen((open) => !open)}
             style={{
               fontSize: "var(--text-xs)",
               lineHeight: 1.4,
@@ -596,12 +597,6 @@ export function AiChatTab({
               margin: 0,
               flex: 1,
               minWidth: 0,
-              background: "none",
-              border: "none",
-              padding: 0,
-              font: "inherit",
-              textAlign: "left",
-              cursor: "pointer",
               ...(honestyClamped
                 ? {
                     display: "-webkit-box",
@@ -613,7 +608,7 @@ export function AiChatTab({
             }}
           >
             {aiChatHonestyNote(activeProviderName)}
-          </Button>
+          </p>
           {chat.turns.length > 0 ? (
             <IconButton
               icon={honestyOpen ? "chevron-up" : "chevron-down"}
@@ -638,57 +633,28 @@ export function AiChatTab({
           ) : null}
         </div>
       )}
-      {/* **What leaves, who gets it, how to stop it, and where the control is**
-          (myne-md/myne#848). The notice above is one sentence; these are the four
-          answers a user needs before they decide to type into the box, and the
-          fourth is a link rather than a second copy of the setting.
+      {/* **One line, and one press to the full text** (issue #970, item 6).
+          The sentence above is the claim; this is where it is spelled out. The
+          enumeration of what leaves, who receives it and how to revoke already
+          exists on the provider consent surface (`CONSENT_WHAT_LEAVES` and its
+          siblings in `@myne/copy`), which is the screen the CTA opens, so this
+          surface LINKS to it rather than keeping a second, shorter copy that
+          drifts from the longer one.
 
-          Rendered only while open, unlike the notice itself: the notice is a
-          CLAIM about the feature and has to survive a text search, while this is
-          a disclosure the user asked for. */}
-      {ready && noticeOpen ? (
-        <div
-          data-testid="ai.provider-popover"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-1)",
-            padding: "var(--space-2)",
-            marginTop: "var(--space-1)",
-            background: "var(--bg-2)",
-            border: "1px solid var(--line-1)",
-            borderRadius: "var(--radius-1)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-2)",
-            lineHeight: 1.4,
-          }}
+          Rendered whenever there is something to open: a build with no settings
+          shell behind the tab (`onOpenSettings` undefined) gets no button, since
+          a control that goes nowhere is worse than a sentence on its own. */}
+      {ready && onOpenSettings !== undefined ? (
+        <button
+          type="button"
+          data-testid="ai.notice-settings"
+          className="myne-pill"
+          data-interactive="true"
+          onClick={() => onOpenSettings("ai", "ai.provider")}
+          style={{ alignSelf: "flex-start", marginTop: "var(--space-1)" }}
         >
-          <span data-testid="ai.notice-leaves">
-            {t("editor.chrome.rightPanel.aiChat.noticeLeaves")}
-          </span>
-          <span data-testid="ai.notice-receives">
-            {activeProviderName === null
-              ? t("editor.chrome.rightPanel.aiChat.noticeReceiverLocal")
-              : t("editor.chrome.rightPanel.aiChat.noticeReceiver", {
-                  provider: activeProviderName,
-                })}
-          </span>
-          <span data-testid="ai.notice-revoke">
-            {t("editor.chrome.rightPanel.aiChat.noticeRevoke")}
-          </span>
-          {onOpenSettings !== undefined ? (
-            <button
-              type="button"
-              data-testid="ai.notice-settings"
-              className="myne-pill"
-              data-interactive="true"
-              onClick={() => onOpenSettings("ai", "ai.provider")}
-              style={{ alignSelf: "flex-start" }}
-            >
-              {t("editor.chrome.rightPanel.aiChat.noticeSettingsCta")}
-            </button>
-          ) : null}
-        </div>
+          {t("editor.chrome.rightPanel.aiChat.noticeSettingsCta")}
+        </button>
       ) : null}
 
       {/* The conversation itself, shared with the agent tab. Gated on

@@ -1330,10 +1330,6 @@
           "copyFailed": "Haikuweza kunakili",
           "copyYourMessage": "Nakili ujumbe wako",
           "emptyTitle": "Uliza kuhusu madokezo yako",
-          "noticeLeaves": "Maneno unayoandika, madokezo ambayo mzunguko unasoma, vichwa, vitambulisho na njia za folda za kila dokezo ambalo uendeshaji unaweza kusoma (kasha lote isipokuwa folda ulizotenga, isipokuwa unapunguza), maandishi ambayo Myne ilichimba kutoka kwenye faili unazozibandika kwenye ujumbe (hadhi nne, kila moja iliyokatwa hadi herufi 20,000; faili yenyewe inabaki hapa), na kile AI inachokumbuka kukuhusu vinatumwa kwa chochote kinachojibu. Hakuna kingine kwenye kifaa hiki kinachotumwa.",
-          "noticeReceiver": "Anajibu: {{provider}}, ambaye Myne haiendeshi.",
-          "noticeReceiverLocal": "Anajibu: programu inayoendeshwa kwenye kifaa hiki. Hakuna kinachotoka kwenye mashine, lakini programu hiyo si sehemu ya Myne na Myne haiwezi kuona inachofanya nazo.",
-          "noticeRevoke": "Ili kuisimamisha, zima AI katika Mipangilio, au badilisha anayejibu hapo. Kubatilisha ufunguo wa mtoa huduma humsimamisha mtoa huduma huyo mara moja.",
           "noticeSettingsCta": "Fungua mipangilio ya AI",
           "viewDiff": "Ona mabadiliko",
           "revertRun": "Tendua uendeshaji huu",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Hakuna madokezo yanayolingana",
       "noNotesYet": "Bado hakuna madokezo",
       "noMatchBody": "Hakuna kinacholingana na “{{name}}”. Hariri mwonekano au uufute ili kuona madokezo yote.",
-      "emptyBody": "Gusa “Dokezo jipya” ili kuandika dokezo lako la kwanza. Kila kitu husimbwa kwa njia fiche kwenye kifaa hiki kabla ya kuhifadhiwa.",
       "unarchive": "Ondoa kwenye kumbukumbu"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "Hamisha madokezo {{count}} kwenda…",
       "caseMergeBody": "Folda yenye jina “{{name}}” tayari ipo. Hizi zitaunganishwa. Ubadilishe jina la moja ili zibaki tofauti?",
       "color": "Rangi…",
-      "createFirstNote": "Unda dokezo lako la kwanza",
       "createFolderNote": "Unda dokezo la folda",
       "customize": "Binafsisha…",
       "delete": "Futa",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Notisi na folda",
       "selectionAnnouncement": "Imechaguliwa: {{title}}",
       "untitled": "Bila jina",
-      "emptyBody": "Madokezo ni markdown wazi, yanasimbwa kwenye kifaa hiki kabla ya kwenda popote. Tengeneza moja ili kuanza, au bonyeza safu ya utafutaji juu ili kuendesha amri yoyote.",
       "search": "Tafuta"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "Uchunguzi"
       },
       "diagnosticFilesHelper_one": "Faili moja lingekuwa na kizuizi hiki pamoja na faili {{count}} la kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
-      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda."
+      "diagnosticFilesHelper_other": "Faili moja lingekuwa na kizuizi hiki pamoja na mafaili {{count}} ya kumbukumbu, jumla {{size}}. Hakuna kinachotumwa popote; wewe unachagua linakoenda.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Badilisha nenosiri",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "Badilisha upanuzi kutoka {{date}} (maingizo {{count}})?",
         "title": "Mfundishe Myne kasha lako",
         "candidatesTitle": "Kagua Myne ilichojifunza",
-        "doneTitle": "Imehifadhiwa",
         "close": "Funga",
         "loading": "Inasoma kasha lako…",
         "scopeIntro": "Myne inasoma umbo la kasha lako kwanza: vichwa vya madokezo, folda na tagi. Inaomba maandishi ya dokezo tu ikiwa inahitaji, na kamwe viambatisho.",
         "provider": "Mtoa huduma: {{provider}}",
-        "providerRemote": "mbali",
-        "providerLocal": "kwenye kifaa hiki",
-        "counts": "Madokezo {{notes}} · folda {{folders}} · tagi {{tags}}",
         "estimatedChars": "Herufi takriban {{chars}}",
         "excluded": "Madokezo {{count}} yameachwa kwa sababu folda yake imetengwa na AI",
-        "omitted": "Vichwa {{count}} viliondolewa ili kutoshea muktadha wa modeli",
         "showPayload": "Onyesha hasa kinachotumwa",
         "hidePayload": "Ficha mzigo",
         "consentLabel": "Tuma muhtasari huu kwa {{provider}} (herufi takriban {{chars}}). Ninaelewa mtoa huduma anapokea.",
@@ -4356,9 +4345,6 @@
         "apply": "Hifadhi maingizo {{count}}",
         "applying": "Inahifadhi…",
         "applied": "Maingizo {{count}} yamehifadhiwa kwenye kumbukumbu.",
-        "appliedHelper": "Yapatikane chini ya Kutoka kwenye kasha lako katika sehemu hii. Msaidizi anayasoma tangu sasa.",
-        "finish": "Maliza",
-        "appliedToast": "Kumbukumbu imetengenezwa kutoka kwenye kasha lako.",
         "refusals": {
           "empty": "Ingizo hili ni tupu.",
           "textTooLong": "Ingizo hili limezidi kikomo cha herufi 2000.",
@@ -4391,7 +4377,14 @@
         "removeAll": "Ondoa yote",
         "removeConfirm": "Ondoa maingizo yote kutoka upanuzi huu?",
         "removedToast": "Maingizo kutoka kwenye kasha lako yameondolewa.",
-        "rowStale": "Kasha limebadilika tangu upanuzi huu"
+        "rowStale": "Kasha limebadilika tangu upanuzi huu",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Hakuna kinachokumbukwa bado",
       "count": "{{used}} kati ya {{cap}}",
@@ -5122,7 +5115,9 @@
       "unlockWithTouchId": "Fungua kwa Touch ID",
       "wrongCredential": "Si sahihi. Umebakiza majaribio {{remaining}}.",
       "showPin": "Onyesha PIN",
-      "hidePin": "Ficha PIN"
+      "hidePin": "Ficha PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Mchakato wa urejeshaji ulikatizwa. Weka nenosiri jipya kwanza.",
     "recoveryInterruptedBody": "Weka nenosiri jipya kwanza, kisha kasha lako lifungwe upya kwa usimbaji.",

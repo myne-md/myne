@@ -1330,10 +1330,6 @@
           "copyFailed": "无法复制",
           "copyYourMessage": "复制你的消息",
           "emptyTitle": "询问你的笔记",
-          "noticeLeaves": "你输入的单词、某一轮读取的笔记、运行可能读取的每篇笔记的标题、标识符和文件夹路径（整个保险库减去你排除的文件夹，除非你缩小范围）、Myne 从你附加到消息的文件中提取的文本（最多四个，每个截断至 20,000 字符；文件本身留在此处），以及 AI 对你的记忆，都会发送给回答者。此设备上的其他内容都不会发送。",
-          "noticeReceiver": "正在回答的是：{{provider}}，它并非由 Myne 运营。",
-          "noticeReceiverLocal": "正在回答的是：一个在本设备上运行的程序。不会有任何内容离开这台机器，但该程序不属于 Myne，Myne 也无法看到它如何使用这些内容。",
-          "noticeRevoke": "要停止它，请在“设置”中关闭 AI，或在那里更换回答的一方。吊销服务商密钥会立即停止该服务商。",
           "noticeSettingsCta": "打开 AI 设置",
           "viewDiff": "查看更改",
           "revertRun": "还原本次运行",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "没有匹配的笔记",
       "noNotesYet": "尚无笔记",
       "noMatchBody": "没有与“{{name}}”匹配的内容。编辑或清除该视图以查看所有笔记。",
-      "emptyBody": "点按“新建笔记”以撰写你的第一篇笔记。所有内容在存储前都会在此设备上加密。",
       "unarchive": "取消归档"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "将 {{count}} 篇笔记移至…",
       "caseMergeBody": "已存在名为“{{name}}”的文件夹。它们会合并。是否重命名其中一个以将它们分开？",
       "color": "颜色…",
-      "createFirstNote": "创建你的第一篇笔记",
       "createFolderNote": "创建文件夹笔记",
       "customize": "自定义…",
       "delete": "删除",
@@ -2523,7 +2517,6 @@
       "treeLabel": "笔记和文件夹",
       "selectionAnnouncement": "已选择 {{title}}",
       "untitled": "无标题",
-      "emptyBody": "笔记是纯 markdown，在离开本设备之前就已加密。创建一篇开始吧，或按上方搜索栏运行任意命令。",
       "search": "搜索"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "诊断"
       },
       "diagnosticFilesHelper_one": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
-      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。"
+      "diagnosticFilesHelper_other": "一个文件将包含这一段内容，外加 {{count}} 个日志文件，总计 {{size}}。不会有任何内容被发送到任何地方；去向由你决定。",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "更改密码",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "替换 {{date}} 的种子（{{count}} 条条目）？",
         "title": "教 Myne 了解你的保险库",
         "candidatesTitle": "审阅 Myne 学到的内容",
-        "doneTitle": "已保存",
         "close": "关闭",
         "loading": "正在读取你的保险库…",
         "scopeIntro": "Myne 先读取保险库的结构：笔记标题、文件夹和标签。仅在需要时请求笔记文本，且从不请求附件。",
         "provider": "服务商：{{provider}}",
-        "providerRemote": "远程",
-        "providerLocal": "此设备上",
-        "counts": "{{notes}} 篇笔记 · {{folders}} 个文件夹 · {{tags}} 个标签",
         "estimatedChars": "约 {{chars}} 个字符",
         "excluded": "{{count}} 篇笔记因所在文件夹被排除在 AI 之外而未纳入",
-        "omitted": "为适配模型上下文，已省略 {{count}} 个标题",
         "showPayload": "显示将发送的确切内容",
         "hidePayload": "隐藏载荷",
         "consentLabel": "将此大纲发送给 {{provider}}（约 {{chars}} 个字符）。我了解服务商将收到它。",
@@ -4356,9 +4345,6 @@
         "apply": "保存 {{count}} 条条目",
         "applying": "正在保存…",
         "applied": "已将 {{count}} 条条目保存到记忆。",
-        "appliedHelper": "在本节的“来自你的保险库”下找到它们。助手从现在起读取它们。",
-        "finish": "完成",
-        "appliedToast": "已从你的保险库构建记忆。",
         "refusals": {
           "empty": "此条目为空。",
           "textTooLong": "此条目超过 2000 字符限制。",
@@ -4391,7 +4377,11 @@
         "removeAll": "全部移除",
         "removeConfirm": "移除该种子的所有条目？",
         "removedToast": "已移除来自保险库的条目。",
-        "rowStale": "自该种子后保险库已更改"
+        "rowStale": "自该种子后保险库已更改",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_other": "{{count}} folders",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "还没有记住任何内容",
       "count": "{{used}} / {{cap}}",
@@ -5122,7 +5112,9 @@
       "unlockWithTouchId": "使用 Touch ID 解锁",
       "wrongCredential": "不正确。还剩 {{remaining}} 次尝试机会。",
       "showPin": "显示 PIN",
-      "hidePin": "隐藏 PIN"
+      "hidePin": "隐藏 PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "恢复流程被中断。请先设置新密码。",
     "recoveryInterruptedBody": "请先设置新密码，然后重新封存你的保险库。",

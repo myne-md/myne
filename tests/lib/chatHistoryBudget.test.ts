@@ -21,7 +21,10 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-import { CHAT_HISTORY_BUDGET_MAX } from "../../src/lib/agent-run";
+import {
+  CHAT_HISTORY_BUDGET_DEFAULT,
+  CHAT_HISTORY_BUDGET_MAX,
+} from "../../src/lib/agent-run";
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const HISTORY_RS = join(REPO, "core", "src", "plugins", "agent", "history.rs");
@@ -49,13 +52,21 @@ describe("the agent history budget", () => {
     expect(CHAT_HISTORY_BUDGET_MAX).toBe(rustConst(source, "MAX_HISTORY_BUDGET"));
   });
 
-  /// The default is not duplicated in TS on purpose: an unset budget sends
-  /// `null` and the host supplies its own. This asserts the Rust default is
-  /// BELOW the ceiling, which is the only relationship between the two that has
-  /// to hold, and would catch a ceiling lowered under an unchanged default.
+  /// The default is BELOW the ceiling, which is the only relationship between
+  /// the two that has to hold, and would catch a ceiling lowered under an
+  /// unchanged default.
   it("has a default below its own ceiling", () => {
     expect(rustConst(source, "DEFAULT_HISTORY_BUDGET")).toBeLessThan(
       rustConst(source, "MAX_HISTORY_BUDGET"),
     );
+  });
+
+  /// The default IS mirrored in TS since issue #970, and only for display: the
+  /// settings input's empty state has to name the number an empty field means,
+  /// or "leave empty for the default" says a default exists without saying what
+  /// it is. It is checked here rather than trusted, because a mirror nothing
+  /// reads is the same shape as the ceiling's own mirror going stale.
+  it("has the same default on both sides of the IPC boundary", () => {
+    expect(CHAT_HISTORY_BUDGET_DEFAULT).toBe(rustConst(source, "DEFAULT_HISTORY_BUDGET"));
   });
 });

@@ -104,10 +104,14 @@ export type CommandContext = {
   onOpenPalette: () => void;
   /**
    * Whether the palette is currently open. Read by `palette.open`'s own
-   * `visibility` so the action hides itself while the palette is showing: a row
+   * `visibility` so the ROW hides itself while the palette is showing: a row
    * that reopens the surface you are already looking at is a no-op that makes
    * the palette look broken, and `actions.ts` states the standing rule that the
    * palette never exposes an action unavailable in the current state.
+   *
+   * Read by that action's `railVisibility` for the opposite decision; see the
+   * field's own comment, and issue #970 item 5 for what happened when the two
+   * audiences shared one predicate.
    */
   paletteOpen: boolean;
   /** Invoke the lock-vault flow (mirrors BottomBar Lock button). */
@@ -312,6 +316,21 @@ export type CommandAction = {
    * Called every render with the current app context.
    */
   visibility: (ctx: CommandContext) => ActionVisibility;
+  /**
+   * The RAIL's own answer, when it differs from the palette's (issue #970,
+   * item 5). Omitted means "same as {@link visibility}", which is what every
+   * action but one wants.
+   *
+   * It exists because those are two audiences with opposite needs, and treating
+   * them as one produced a flicker: `palette.open` hides itself while the
+   * palette is open (a palette row that reopens the surface you are looking at
+   * is a no-op), and the rail reads the same predicate, so pressing the
+   * sidebar's search row made the rail's search glyph vanish and come back. A
+   * rail entry is a pinned piece of furniture, not a row in a list that may
+   * come and go: the user put it there, and it should not blink because another
+   * surface opened.
+   */
+  railVisibility?: (ctx: CommandContext) => ActionVisibility;
   /** Invocation handler. May be async. */
   run: (ctx: CommandContext) => void | Promise<void>;
 };

@@ -68,7 +68,6 @@ import {
 } from "../folderNote";
 import type { TitleRecord } from "../loadNoteBatch";
 import { VirtualList } from "./VirtualList";
-import { Button } from "../../components/primitives/Button";
 import { EmptyState as ZeroState } from "../../components/primitives/EmptyState";
 import { tabKindSpec } from "../tabKinds";
 import { isPanesNotSettled, panesNotSettledMessage, useWorkspace } from "../workspaceContext";
@@ -1494,24 +1493,29 @@ function EmptyState({
           onCancel={fm.cancelNewFolder}
         />
       )}
-      {/* The first thing a new user sees in this app. It used to be the string
-          "No notes yet." above a button — true, and saying nothing about what
-          the surface is for. It is also the one zero state in the sidebar that
-          is a DESTINATION rather than a transient, which is why it carries the
-          brand field and the filtered states below do not. */}
+      {/* The first thing a new user sees in this app: a glyph, two words and
+          the wash behind them (issue #970, item 4).
+
+          It used to be a card: hairline border, radius, a four-line paragraph
+          explaining that notes are markdown and encrypted, and a "Create your
+          first note" button, inside a sidebar that is itself a bordered panel.
+          Two boxes nested, a paragraph of onboarding copy in the narrowest
+          column of the app, and a button for a command the `+` in the left rail
+          and ⌘N already run. The state's job is to say the list is empty, and
+          the way out is visible from where the eye already is.
+
+          So: no frame (the panel is the frame), no body, no action. What stays
+          is `field` (the accent wash), because that is what makes this read as
+          a destination rather than as a caption. The words themselves are
+          `notes.list.emptyState`, unchanged. */}
       <div style={EMPTY_WRAPPER_STYLE}>
         <ZeroState
           variant="firstRun"
           icon="file-text"
           title={t("notes.list.emptyState")}
-          body={t("notes.list.emptyBody")}
           size="sm"
+          frame={false}
           testId="notes.empty-state"
-          action={
-            <Button variant="primary" icon="file-plus" onClick={onCreate}>
-              {t("notes.list.createFirstNote")}
-            </Button>
-          }
         />
       </div>
     </div>

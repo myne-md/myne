@@ -29,8 +29,19 @@ import {
   Spinner,
   BlockingOverlay,
   Icon,
+  ListGroup,
 } from "../../components";
 import { HAS_TAURI } from "../../lib/app-window";
+import {
+  copySecretToClipboard,
+  saveSecretToDocuments,
+  secretSaveMessage,
+} from "../../lib/secret-export";
+import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
+// The kit's file format, ALIASED to the desktop implementation rather than
+// re-derived here, for the reason `CreateVaultFlow` gives: a document saved on a
+// phone is read back by a person on a computer, so it has to be one function.
+import { recoveryKitText } from "@myne/recovery-kit";
 import {
   personSetup,
   personStatus,
@@ -383,7 +394,19 @@ export function IdentityFlow({
   initialStep,
   onScanCode,
 }: IdentityFlowProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  // The clipboard's auto-clear timer holds the phrase in its closure, so this
+  // ref MUST be cancelled on unmount: the same rule `CreateVaultFlow` states
+  // over the account number: without it the only copy of a person's identity
+  // phrase sits in the JS heap for the full 30 s after the screen is gone.
+  const clipboardCancelRef = useRef<(() => void) | null>(null);
+  useEffect(
+    () => () => {
+      clipboardCancelRef.current?.();
+      clipboardCancelRef.current = null;
+    },
+    [],
+  );
   // Names the accept step's phrase grid, which is 24 bare inputs with no visible
   // label of their own.
   const phraseLabelId = useId();
@@ -412,6 +435,35 @@ export function IdentityFlow({
   // Identity
   const [result, setResult] = useState<PersonSetupView | null>(null);
   const [revealed, setRevealed] = useState(false);
+  // Copy and Save on the phrase step (myne-md/myne#970 item 20). The step told
+  // the user to write 24 words down and gave them no way to move the words off
+  // the screen, which is the one thing the vault flow's kit screen does
+  // (`CreateVaultFlow`) and the exact gap that pushes people to screenshot a
+  // phrase, the thing `screen_guard` exists to prevent. Both outcomes are
+  // reported INLINE rather than in a toast: this screen is shown once, and a
+  // toast the user misses is indistinguishable from a copy that never happened.
+  const [copyMsg, setCopyMsg] = useState<string | null>(null);
+  const [fileMsg, setFileMsg] = useState<string | null>(null);
+  // The clipboard gate, same probe and same default as the vault flow: the
+  // control is ABSENT until the OS answers yes, because a button that appears
+  // and then explains its own limits still implies a guarantee. iOS can hold a
+  // secret to a standard Android has no equivalent of, so the honest answer
+  // differs per device and only the device can give it.
+  const [canCopyPhrase, setCanCopyPhrase] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void canHoldSecretOnClipboard().then(
+      (ok) => {
+        if (live) setCanCopyPhrase(ok);
+      },
+      () => {
+        // Unknown resolves to NO: an unanswered question is not a yes.
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
   // The type-back challenge (myne-md/myne#855): four positions drawn when the
   // phrase arrives, plus the answers. It REPLACES the acknowledgement checkbox,
   // for the reason `docs/spec/protocol.md` section 7.1.3 gives and the vault flow
@@ -1837,6 +1889,51 @@ export function IdentityFlow({
     </Screen>
   );
 
+  /** What Save writes and what Copy puts on the clipboard: the same bytes, from
+   *  the shared kit writer the vault flow uses, so a document saved on a phone is
+   *  the one a person reads on a computer (myne-md/myne#468).
+   *
+   *  The second value in the document is the IDENTITY CODE, not an account
+   *  number: an identity is vault-less by design (`decisions/protocol/0592`), and
+   *  the code is the string an owner pastes to invite this person. It carries
+   *  public material only, so a document holding it beside the phrase is not a
+   *  second secret. */
+  const phraseText = (): string =>
+    recoveryKitText({
+      vaultName: "",
+      savedOn: new Intl.DateTimeFormat(i18n.language, { dateStyle: "medium" }).format(
+        new Date(),
+      ),
+      phrase: (result?.phrase ?? "").split(" ").filter((w) => w.length > 0),
+      accountNumber: result?.identity_code ?? "",
+      labels: {
+        title: t("identityFlow.phrase.title"),
+        phraseHeading: t("vaultCreation.kit.phraseFor"),
+        accountHeading: t("identityFlow.home.codeLabel"),
+      },
+    });
+
+  const copyPhrase = () => {
+    void (async () => {
+      const cancel = await copySecretToClipboard(phraseText(), {
+        onSuccess: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopied")) },
+        onFailure: { kind: "inline", run: () => setCopyMsg(t("createVault.phraseCopyFailed")) },
+      });
+      if (cancel === null) return;
+      clipboardCancelRef.current?.();
+      clipboardCancelRef.current = cancel;
+    })();
+  };
+
+  const savePhraseFile = () => {
+    void (async () => {
+      const { key, params } = secretSaveMessage(
+        await saveSecretToDocuments("myne-identity-phrase.txt", phraseText()),
+      );
+      setFileMsg(t(key, params));
+    })();
+  };
+
   const renderPhrase = () => {
     const phrase = (result?.phrase ?? "").split(" ");
     return (
@@ -1854,6 +1951,50 @@ export function IdentityFlow({
               </Button>
             )}
           </div>
+          {/* Copy and Save, the two actions this screen was missing (issue #970
+              item 20). Under the words rather than in the footer: the footer
+              keeps ONE primary ("Continue"), and a pair of secondary buttons
+              beside it on a phone reads as three equal choices. */}
+          {revealed ? (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                {canCopyPhrase ? (
+                  <Button
+                    variant="secondary"
+                    onClick={copyPhrase}
+                    style={{ flex: 1 }}
+                    data-testid="identity-flow.phrase-copy"
+                  >
+                    <Icon name="copy" size={16} color="var(--fg-2)" strokeWidth={1.5} />
+                    {t("vaultCreation.kit.copy")}
+                  </Button>
+                ) : null}
+                <Button
+                  variant="secondary"
+                  onClick={savePhraseFile}
+                  style={{ flex: 1 }}
+                  data-testid="identity-flow.phrase-save"
+                >
+                  <Icon name="download" size={16} color="var(--fg-2)" strokeWidth={1.5} />
+                  {t("createVault.saveToFile")}
+                </Button>
+              </div>
+              {(copyMsg ?? fileMsg) && (
+                <p
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    margin: "var(--space-2) 0 0",
+                    fontSize: "var(--text-sm)",
+                    lineHeight: 1.5,
+                    color: "var(--fg-3)",
+                  }}
+                >
+                  {copyMsg ?? fileMsg}
+                </p>
+              )}
+            </div>
+          ) : null}
         </ScreenScroll>
         <FooterBar>
           {/* Revealed is the only gate here (myne-md/myne#869): the challenge
@@ -2083,38 +2224,104 @@ export function IdentityFlow({
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.home.title")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
-
-          {accountNumber ? (
+          {/* **The action comes first** (myne-md/myne#970 item 22). This block
+              used to sit fourth, under the account number, the identity code and
+              the invitation list: a person who arrived here from onboarding
+              scrolled past three blocks of material they had not asked for to
+              reach the one thing the screen exists to offer. The material is
+              still on the screen, and it is what makes this identity usable, but
+              it is below, in the grouped cards the rest of the app uses. */}
+          {onCreateVault ? (
             <div style={{ marginTop: "var(--space-4)" }}>
-              <FieldLabel>{t("identityHome.accountNumberHeading")}</FieldLabel>
-              {/* The display form, not the canonical body: the command answers the
-                  body on purpose (`core/src/plugins/sync/person_account.rs`) and the
-                  grouping lives in `@myne/client-core`, which is where the desktop
-                  takes it from. Rendering the raw 20 characters here showed the
-                  number without its `MY-` prefix or its dash groups
-                  (myne-md/myne#932). */}
-              <MonoBox
-                value={formatPersonAccountNumber(accountNumber)}
-                testId="identity-flow.home-account-number"
-              />
-              <Lead style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
-                {t("identityHome.accountNumberHint")}
-              </Lead>
+              <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
+                {t("identityFlow.home.vaultHint")}
+              </div>
+              {vaultListFailed ? (
+                <div data-testid="identity-flow.home-vault-list-failed" style={HINT_STYLE}>
+                  <Banner kind="warning">{t("identityFlow.personJoin.listFailed")}</Banner>
+                </div>
+              ) : null}
+              {/* The action is WITHHELD while the identity is sealed, not shown
+                  disabled: creating a vault signs its first member list with the
+                  identity, so the sealed state makes the command answer
+                  `PersonLocked`. On a phone that answer used to dead-end, because
+                  the unlock door only existed on desktop. The door is the action
+                  here (`decisions/ui/0729`). */}
+              {identityUnlocked ? (
+                <Button
+                  onClick={onCreateVault}
+                  style={{ marginTop: "var(--space-3)" }}
+                  data-testid="identity-flow.home-create-vault"
+                >
+                  {t("identityHome.createVaultCta")}
+                </Button>
+              ) : (
+                <div
+                  style={{ marginTop: "var(--space-3)" }}
+                  data-testid="identity-flow.home-create-vault-locked"
+                >
+                  <div style={HINT_STYLE}>{t("identityHome.createVaultLocked")}</div>
+                  <Button
+                    variant="secondary"
+                    full={false}
+                    onClick={() => {
+                      setError(null);
+                      setStep("unlock-identity");
+                    }}
+                    style={{ marginTop: "var(--space-3)" }}
+                    data-testid="identity-flow.home-unlock-open"
+                  >
+                    {t("identityFlow.unlock.open")}
+                  </Button>
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          {/* The identity material, as the grouped cards every other screen on
+              this client uses (`ListGroup`: a header, an inset card, a footer).
+              It used to be four consecutive `FieldLabel` + box + grey sentence
+              stacks, which on a phone is one undifferentiated column where the
+              least-used values take the most height. Same content, same
+              testids, same hints: grouped, and below the action.
+
+              The account number is rendered in its DISPLAY form, not the
+              canonical body: the command answers the body on purpose
+              (`core/src/plugins/sync/person_account.rs`) and the grouping lives
+              in `@myne/client-core`, which is where the desktop takes it from.
+              Rendering the raw 20 characters here showed the number without its
+              `MY-` prefix or its dash groups (myne-md/myne#932). */}
+          {accountNumber ? (
+            <div style={{ marginTop: "var(--space-5)" }}>
+              <ListGroup
+                header={t("identityHome.accountNumberHeading")}
+                footer={t("identityHome.accountNumberHint")}
+              >
+                <div style={{ padding: "14px 16px" }}>
+                  <MonoBox
+                    value={formatPersonAccountNumber(accountNumber)}
+                    testId="identity-flow.home-account-number"
+                  />
+                </div>
+              </ListGroup>
             </div>
           ) : null}
 
           {identityCode ? (
-            <div style={{ marginTop: "var(--space-5)" }}>
-              <FieldLabel>{t("identityFlow.home.codeLabel")}</FieldLabel>
-              <MonoBox value={identityCode} testId="identity-flow.home-code" />
+            <div style={{ marginTop: "var(--space-4)" }}>
               {/* What the code is, beside the code (myne-md/myne-ops#54). The
                   desktop identity home carried this sentence and the phone did
                   not, so a reader was shown a long string with a copy button and
                   nothing telling them whether sending it is safe. Same key as
                   the desktop: one sentence, one meaning. */}
-              <Lead style={{ fontSize: "var(--text-sm)", color: "var(--fg-3)" }}>
-                {t("identityHome.shareCodeHint")}
-              </Lead>
+              <ListGroup
+                header={t("identityFlow.home.codeLabel")}
+                footer={t("identityHome.shareCodeHint")}
+              >
+                <div style={{ padding: "14px 16px" }}>
+                  <MonoBox value={identityCode} testId="identity-flow.home-code" />
+                </div>
+              </ListGroup>
             </div>
           ) : null}
 
@@ -2221,57 +2428,6 @@ export function IdentityFlow({
             </div>
           ) : null}
 
-          {/* The two actions this identity home exists for (myne-md/myne#911
-              task 12): create a vault, and register the identity if it was
-              created offline. Both are explicit, and neither is a side effect of
-              the other. */}
-          {onCreateVault ? (
-            <div style={{ marginTop: "var(--space-5)" }}>
-              <FieldLabel>{t("identityFlow.home.vaultHeading")}</FieldLabel>
-              <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
-                {t("identityFlow.home.vaultHint")}
-              </div>
-              {vaultListFailed ? (
-                <div data-testid="identity-flow.home-vault-list-failed" style={HINT_STYLE}>
-                  <Banner kind="warning">{t("identityFlow.personJoin.listFailed")}</Banner>
-                </div>
-              ) : null}
-              {/* The action is WITHHELD while the identity is sealed, not shown
-                  disabled: creating a vault signs its first member list with the
-                  identity, so the sealed state makes the command answer
-                  `PersonLocked`. On a phone that answer used to dead-end, because
-                  the unlock door only existed on desktop. The door is the action
-                  here (`decisions/ui/0729`). */}
-              {identityUnlocked ? (
-                <Button
-                  onClick={onCreateVault}
-                  style={{ marginTop: "var(--space-3)" }}
-                  data-testid="identity-flow.home-create-vault"
-                >
-                  {t("identityHome.createVaultCta")}
-                </Button>
-              ) : (
-                <div
-                  style={{ marginTop: "var(--space-3)" }}
-                  data-testid="identity-flow.home-create-vault-locked"
-                >
-                  <div style={HINT_STYLE}>{t("identityHome.createVaultLocked")}</div>
-                  <Button
-                    variant="secondary"
-                    full={false}
-                    onClick={() => {
-                      setError(null);
-                      setStep("unlock-identity");
-                    }}
-                    style={{ marginTop: "var(--space-3)" }}
-                    data-testid="identity-flow.home-unlock-open"
-                  >
-                    {t("identityFlow.unlock.open")}
-                  </Button>
-                </div>
-              )}
-            </div>
-          ) : null}
 
           {/* A `reserved` identity is one created with no server account: sealed,
               usable, and not reachable by anybody else. Registration is the act

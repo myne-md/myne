@@ -1330,10 +1330,6 @@
           "copyFailed": "Tidak dapat menyalin",
           "copyYourMessage": "Salin pesan Anda",
           "emptyTitle": "Tanyakan tentang catatan Anda",
-          "noticeLeaves": "Kata-kata yang Anda ketik, catatan yang dibaca satu putaran, judul, pengidentifikasi dan jalur folder dari setiap catatan yang dapat dibaca eksekusi (seluruh brankas dikurangi folder yang Anda keluarkan, kecuali Anda mempersempitnya), teks yang diekstrak Myne dari berkas apa pun yang Anda lampirkan ke pesan (hingga empat, masing-masing dipotong 20.000 karakter; berkasnya sendiri tetap di sini), dan apa yang diingat AI tentang Anda dikirim ke apa pun yang menjawab. Tidak ada yang lain di perangkat ini yang dikirim.",
-          "noticeReceiver": "Yang menjawab: {{provider}}, yang tidak dijalankan Myne.",
-          "noticeReceiverLocal": "Yang menjawab: program yang berjalan di perangkat ini. Tidak ada yang keluar dari mesin ini, tetapi program itu bukan bagian dari Myne dan Myne tidak dapat melihat apa yang dilakukannya dengan data itu.",
-          "noticeRevoke": "Untuk menghentikannya, matikan AI di Pengaturan, atau ubah apa yang menjawab di sana. Mencabut kunci penyedia langsung menghentikan penyedia itu.",
           "noticeSettingsCta": "Buka pengaturan AI",
           "viewDiff": "Lihat perubahan",
           "revertRun": "Kembalikan proses ini",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Tidak ada catatan yang cocok",
       "noNotesYet": "Belum ada catatan",
       "noMatchBody": "Tidak ada yang cocok dengan “{{name}}”. Edit tampilan atau bersihkan untuk melihat semua catatan.",
-      "emptyBody": "Ketuk “Catatan baru” untuk menulis catatan pertama Anda. Semuanya dienkripsi di perangkat ini sebelum disimpan.",
       "unarchive": "Batal arsip"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "Pindahkan {{count}} catatan ke…",
       "caseMergeBody": "Folder bernama “{{name}}” sudah ada. Keduanya akan digabung. Ganti nama salah satunya agar tetap terpisah?",
       "color": "Warna…",
-      "createFirstNote": "Buat catatan pertama Anda",
       "createFolderNote": "Buat catatan folder",
       "customize": "Sesuaikan…",
       "delete": "Hapus",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Catatan dan folder",
       "selectionAnnouncement": "Dipilih {{title}}",
       "untitled": "Tanpa judul",
-      "emptyBody": "Catatan berupa markdown biasa, dienkripsi di perangkat ini sebelum ke mana pun. Buat satu untuk memulai, atau tekan baris pencarian di atas untuk menjalankan perintah apa pun.",
       "search": "Cari"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "Diagnostik"
       },
       "diagnosticFilesHelper_one": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi.",
-      "diagnosticFilesHelper_other": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi."
+      "diagnosticFilesHelper_other": "Satu berkas akan memuat blok ini ditambah {{count}} berkas log, totalnya {{size}}. Tidak ada yang dikirim ke mana pun; Anda yang memilih ke mana berkas itu pergi.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Ubah kata sandi",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "Ganti seed dari {{date}} ({{count}} entri)?",
         "title": "Ajari Myne brankas Anda",
         "candidatesTitle": "Tinjau apa yang dipelajari Myne",
-        "doneTitle": "Disimpan",
         "close": "Tutup",
         "loading": "Membaca brankas Anda…",
         "scopeIntro": "Myne membaca bentuk brankas Anda terlebih dahulu: judul catatan, folder dan tag. Ia meminta teks catatan hanya jika perlu, dan tidak pernah lampiran.",
         "provider": "Penyedia: {{provider}}",
-        "providerRemote": "jarak jauh",
-        "providerLocal": "di perangkat ini",
-        "counts": "{{notes}} catatan · {{folders}} folder · {{tags}} tag",
         "estimatedChars": "Sekitar {{chars}} karakter",
         "excluded": "{{count}} catatan dikeluarkan karena foldernya dikeluarkan dari AI",
-        "omitted": "{{count}} judul dihilangkan agar muat konteks model",
         "showPayload": "Tampilkan persis apa yang akan dikirim",
         "hidePayload": "Sembunyikan muatan",
         "consentLabel": "Kirim ringkasan ini ke {{provider}} (sekitar {{chars}} karakter). Saya paham penyedia menerimanya.",
@@ -4356,9 +4345,6 @@
         "apply": "Simpan {{count}} entri",
         "applying": "Menyimpan…",
         "applied": "Disimpan {{count}} entri ke memori.",
-        "appliedHelper": "Temukan di bawah Dari brankas Anda di bagian ini. Asisten membacanya mulai sekarang.",
-        "finish": "Selesai",
-        "appliedToast": "Memori dibangun dari brankas Anda.",
         "refusals": {
           "empty": "Entri ini kosong.",
           "textTooLong": "Entri ini melebihi batas 2000 karakter.",
@@ -4391,7 +4377,11 @@
         "removeAll": "Hapus semua",
         "removeConfirm": "Hapus semua entri dari seed ini?",
         "removedToast": "Entri dari brankas Anda dihapus.",
-        "rowStale": "Brankas berubah sejak seed ini"
+        "rowStale": "Brankas berubah sejak seed ini",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_other": "{{count}} folders",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Belum ada yang diingat",
       "count": "{{used}} dari {{cap}}",
@@ -5122,7 +5112,9 @@
       "unlockWithTouchId": "Buka kunci dengan Touch ID",
       "wrongCredential": "Salah. Sisa {{remaining}} percobaan.",
       "showPin": "Tampilkan PIN",
-      "hidePin": "Sembunyikan PIN"
+      "hidePin": "Sembunyikan PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Alur pemulihan terputus. Atur kata sandi baru terlebih dahulu.",
     "recoveryInterruptedBody": "Atur kata sandi baru terlebih dahulu, lalu segel kembali brankas Anda.",

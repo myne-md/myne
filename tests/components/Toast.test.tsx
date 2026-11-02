@@ -95,4 +95,31 @@ describe("headless <Toast> bridge (#238)", () => {
     expect(screen.getByText("Hi there")).toBeTruthy();
     expect(screen.getByTestId("editor.toast").className).toContain("myne-toast--info");
   });
+
+  it("carries a surface's own testids through to the rendered row and action", () => {
+    // Issue #970, item 7 moved the auto-tag report from a strip above the note to
+    // this stack. The ids it is reached by in the scenario and the specs did not
+    // move with it, so the bridge has to be able to carry them: a scenario that
+    // pressed `editor.toast-action` would be pressing whichever toast happened to
+    // be on screen.
+    const onAction = vi.fn();
+    render(
+      <>
+        <Toast
+          message="Tags added: a, b"
+          onDone={() => {}}
+          testId="editor.auto-tag-applied"
+          action={{ label: "Undo", onAction, testId: "editor.auto-tag-undo" }}
+        />
+        <Toaster />
+      </>,
+    );
+    expect(screen.getByTestId("editor.auto-tag-applied")).toBeTruthy();
+    const undo = screen.getByTestId("editor.auto-tag-undo");
+    expect(undo.textContent).toBe("Undo");
+    fireEvent.click(undo);
+    expect(onAction).toHaveBeenCalledTimes(1);
+    // The default ids are untouched for every other caller.
+    expect(screen.queryByTestId("editor.toast-action")).toBeNull();
+  });
 });

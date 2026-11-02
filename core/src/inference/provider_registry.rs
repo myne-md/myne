@@ -46,6 +46,29 @@
 //!   local Ollama**, not an OpenAI-compatible shape, so the reply parse is
 //!   shared with #189's arm: `{"message":{"content":…}}`.
 //!
+//! Two more were added on 2026-11-01 (myne-md/myne#970) and verified against
+//! the provider's own docs plus a live `GET` of each model list, not recalled:
+//!
+//! - **OpenCode Zen**: the pay-as-you-go gateway. `POST
+//!   https://opencode.ai/inference/openai/v1/chat/completions`,
+//!   `Authorization: Bearer <key>`, OpenAI-shaped reply and model list
+//!   (`GET /inference/v1/models`). Its free tier answers **403 to any client
+//!   that is not OpenCode itself**, so only its paid models are reachable from
+//!   here; that is a fact about the far side, not a rule this module enforces.
+//! - **OpenCode Go**: the subscription plan, a different base path on the same
+//!   host: `POST https://opencode.ai/zen/go/v1/chat/completions`,
+//!   `Authorization: Bearer <key>`, same OpenAI shape, model list at
+//!   `GET /zen/go/v1/models`. Two headers are required by the far side and sent
+//!   through [`RemoteProvider::extra_headers`]: `x-opencode-session` (a stable
+//!   opaque id; a request without one fails outright) and a `user-agent` that
+//!   names the client rather than a library. When its monthly allowance is
+//!   spent the request is refused non-retryably.
+//!
+//! **Both share one host, and the path is what separates them.** That is why
+//! [`RemoteProvider::chat_path`] is a full path rather than a suffix appended to
+//! a per-provider base: one host table entry serves both, and a second entry
+//! would have claimed two destinations where there is one.
+//!
 //! **One thing was NOT verified and is flagged rather than assumed:** Ollama
 //! Cloud's model-list endpoint. The native API's list endpoint is `/api/tags`
 //! and that is what is used here, but the cloud docs page fetched did not
@@ -88,6 +111,11 @@ pub enum RemoteProvider {
     /// A broker that forwards to model vendors. Myne may state what it sends
     /// and to whom; never what the far side retains (A17).
     OpenRouter,
+    /// OpenCode's pay-as-you-go gateway. OpenAI-compatible.
+    OpenCodeZen,
+    /// OpenCode's subscription plan. Same host as [`Self::OpenCodeZen`], a
+    /// different path, and two headers the far side requires.
+    OpenCodeGo,
 }
 
 /// What went wrong reading a provider's reply. Content-free: a provider's own
@@ -302,6 +330,41 @@ fn has_text(modalities: &[String]) -> bool {
     modalities.iter().any(|m| m == TEXT_MODALITY)
 }
 
+/// The `x-opencode-session` value: one random opaque id per process, and a
+/// process-unique one (the pid) in the entropy-failure corner.
+///
+/// **Random, because a constant would route every Myne installation to one
+/// place**; **once per process, because stability is the whole point of the
+/// field.** It carries nothing about the device, the vault or the user and is
+/// never persisted, so it cannot become an identifier anything else joins on.
+///
+/// An entropy failure falls back to a fixed value rather than propagating or
+/// panicking: the header is routing metadata with no security role, and the far
+/// side's only requirement is that the field be present.
+fn opencode_session_id() -> &'static str {
+    static SESSION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    SESSION.get_or_init(|| {
+        let mut bytes = [0u8; 16];
+        match rand_core::TryRng::try_fill_bytes(&mut crate::rng::OsRng, &mut bytes) {
+            Ok(()) => {
+                // `protocol::hex::encode_lower` rather than a hand-rolled loop:
+                // it is the tree's one lowercase encoder, and
+                // `scripts/check-hex-helpers.mjs` exists because a second copy
+                // drifts.
+                let mut out = String::from("myne");
+                out.push_str(&protocol::hex::encode_lower(&bytes));
+                out
+            }
+            // Entropy failed. A constant here would undo the one property this
+            // value is chosen for, since a shared id routes every install to
+            // one place, so the fallback stays unique per process instead of
+            // random per process: the pid, which names nothing about the
+            // device, the vault or the user either.
+            Err(_) => format!("myne-{}", std::process::id()),
+        }
+    })
+}
+
 impl OllamaDetails {
     /// Ollama publishes no modality, so the question it CAN answer is asked
     /// instead: is this an embedding family? Everything else generates text.
@@ -325,6 +388,8 @@ impl RemoteProvider {
         match name {
             "ollama-cloud" => Some(Self::OllamaCloud),
             "openrouter" => Some(Self::OpenRouter),
+            "opencode-zen" => Some(Self::OpenCodeZen),
+            "opencode-go" => Some(Self::OpenCodeGo),
             _ => None,
         }
     }
@@ -333,6 +398,8 @@ impl RemoteProvider {
         match self {
             Self::OllamaCloud => "ollama-cloud",
             Self::OpenRouter => "openrouter",
+            Self::OpenCodeZen => "opencode-zen",
+            Self::OpenCodeGo => "opencode-go",
         }
     }
 
@@ -344,20 +411,63 @@ impl RemoteProvider {
             .expect("every RemoteProvider variant has a compiled-in host")
     }
 
-    /// Chat completion. Verified 2026-08-10; see the module header.
+    /// Chat completion. Verified 2026-08-10, and re-verified for the two
+    /// OpenCode arms on 2026-11-01; see the module header.
     pub fn chat_path(self) -> &'static str {
         match self {
             Self::OllamaCloud => "/api/chat",
             Self::OpenRouter => "/api/v1/chat/completions",
+            Self::OpenCodeZen => "/inference/openai/v1/chat/completions",
+            Self::OpenCodeGo => "/zen/go/v1/chat/completions",
         }
     }
 
     /// The model **list** — names only, no weights. See the header on why this
     /// is not the forbidden fetch path.
+    ///
+    /// Zen's list is deliberately NOT under the chat path's `/openai/v1`
+    /// prefix: the catalogue is published at `/inference/v1/models` while the
+    /// chat endpoint lives at `/inference/openai/v1/chat/completions`. Deriving
+    /// one from the other would 404 the model chooser.
     pub fn models_path(self) -> &'static str {
         match self {
             Self::OllamaCloud => "/api/tags",
             Self::OpenRouter => "/api/v1/models",
+            Self::OpenCodeZen => "/inference/v1/models",
+            Self::OpenCodeGo => "/zen/go/v1/models",
+        }
+    }
+
+    /// Headers beyond `authorization` and `content-type`, and the reason this is
+    /// a method rather than a constant on the transport.
+    ///
+    /// **OpenCode Go refuses a request that carries no `x-opencode-session`**
+    /// (`"Request is missing x-opencode-session and cannot be routed
+    /// efficiently"`), and asks for a `user-agent` that names the client rather
+    /// than an HTTP library. The user agent says `myne` and not a client name:
+    /// this crate is compiled into the desktop and the mobile client alike, so
+    /// a value naming one of them would be false on the other. Both are
+    /// routing metadata on the far side, not
+    /// identity: the value is a random per-process string that says nothing
+    /// about the device, the vault or the user, and it is not persisted. Two
+    /// runs in one process are one id, which is exactly what the far side is
+    /// meant to route on; two processes are two unrelated ids.
+    ///
+    /// The session id is minted ONCE per process rather than per request. It is
+    /// meant to be stable (that is what makes it routable), and a fresh id per
+    /// request would be a per-request identifier the far side could not have
+    /// inferred otherwise: more, not less, than the provider needs.
+    ///
+    /// The other three providers send nothing extra: a header a provider does
+    /// not read would be noise on the wire and a claim in this file that
+    /// nothing checks.
+    pub fn extra_headers(self) -> Vec<(&'static str, &'static str)> {
+        match self {
+            Self::OllamaCloud | Self::OpenRouter | Self::OpenCodeZen => Vec::new(),
+            Self::OpenCodeGo => vec![
+                ("x-opencode-session", opencode_session_id()),
+                ("user-agent", "myne"),
+            ],
         }
     }
 
@@ -436,7 +546,9 @@ impl RemoteProvider {
                 }],
             }),
             (Self::OpenRouter, false) => json!({ "role": "system", "content": system }),
-            (Self::OllamaCloud, _) => json!({ "role": "system", "content": system }),
+            (Self::OllamaCloud | Self::OpenCodeZen | Self::OpenCodeGo, _) => {
+                json!({ "role": "system", "content": system })
+            }
         };
         wire.push(system_turn);
         for m in messages {
@@ -459,6 +571,18 @@ impl RemoteProvider {
                     obj.insert("max_tokens".into(), json!(cap));
                 }
                 obj.insert("provider".into(), json!({ "sort": "throughput" }));
+            }
+            // The two OpenCode arms speak the same OpenAI shape and nothing
+            // more. No routing object (there is one upstream, not a broker
+            // choice), and **no cache marker** even when `cache_system` is set:
+            // Console translates each model to its native API family, so the
+            // marker's meaning would depend on which family answered, and
+            // asking to retain a span the provider may store anyway is the
+            // request `docs/decisions/ai/0555` argues Myne does not make.
+            Self::OpenCodeZen | Self::OpenCodeGo => {
+                if let Some(cap) = max_output_tokens {
+                    obj.insert("max_tokens".into(), json!(cap));
+                }
             }
             Self::OllamaCloud => {
                 // Ollama models the ceiling as a generation option, and has no
@@ -503,10 +627,15 @@ impl RemoteProvider {
             reason.is_some_and(|r| r.eq_ignore_ascii_case("length"))
         }
         match self {
-            Self::OpenRouter => serde_json::from_slice::<OpenRouterReply>(raw)
-                .ok()
-                .and_then(|r| r.choices.into_iter().next())
-                .is_some_and(|c| is_length(c.finish_reason.as_deref())),
+            // Both OpenCode arms are OpenAI-shaped, so they share the broker's
+            // readers rather than growing a third copy of the same three
+            // structs. `error` is read by presence only, in every arm.
+            Self::OpenRouter | Self::OpenCodeZen | Self::OpenCodeGo => {
+                serde_json::from_slice::<OpenRouterReply>(raw)
+                    .ok()
+                    .and_then(|r| r.choices.into_iter().next())
+                    .is_some_and(|c| is_length(c.finish_reason.as_deref()))
+            }
             Self::OllamaCloud => serde_json::from_slice::<OllamaReply>(raw)
                 .ok()
                 .is_some_and(|r| {
@@ -520,7 +649,7 @@ impl RemoteProvider {
         // and `Some("")` when it carried an empty one — the distinction step 4
         // and step 5 turn on.
         let (content, error_present): (Option<String>, bool) = match self {
-            Self::OpenRouter => {
+            Self::OpenRouter | Self::OpenCodeZen | Self::OpenCodeGo => {
                 let reply = serde_json::from_slice::<OpenRouterReply>(raw)
                     .map_err(|_| ProviderCodecError::Malformed)?;
                 (
@@ -560,17 +689,19 @@ impl RemoteProvider {
     /// entries: see [`ProviderModel::text_capable`] on why the verdict travels.
     pub fn parse_models_reply(self, raw: &[u8]) -> Result<Vec<ProviderModel>, ProviderCodecError> {
         let models: Vec<ProviderModel> = match self {
-            Self::OpenRouter => serde_json::from_slice::<OpenRouterModels>(raw)
-                .map_err(|_| ProviderCodecError::Malformed)?
-                .data
-                .into_iter()
-                .map(|m| ProviderModel {
-                    id: m.id,
-                    // No `architecture` at all is fail-open, same as an
-                    // architecture carrying neither shape.
-                    text_capable: m.architecture.map(|a| a.text_capable()).unwrap_or(true),
-                })
-                .collect(),
+            Self::OpenRouter | Self::OpenCodeZen | Self::OpenCodeGo => {
+                serde_json::from_slice::<OpenRouterModels>(raw)
+                    .map_err(|_| ProviderCodecError::Malformed)?
+                    .data
+                    .into_iter()
+                    .map(|m| ProviderModel {
+                        id: m.id,
+                        // No `architecture` at all is fail-open, same as an
+                        // architecture carrying neither shape.
+                        text_capable: m.architecture.map(|a| a.text_capable()).unwrap_or(true),
+                    })
+                    .collect()
+            }
             Self::OllamaCloud => serde_json::from_slice::<OllamaModels>(raw)
                 .map_err(|_| ProviderCodecError::Malformed)?
                 .models
@@ -724,7 +855,7 @@ impl RemoteEngine {
         let body =
             provider.build_chat_body(&model, system, messages, max_output_tokens, cache_system);
         let raw = transport
-            .post_json(provider.chat_path(), &body, &key)
+            .post_json(provider.chat_path(), &body, &key, &provider.extra_headers())
             .map_err(engine_error_of)?;
         let text = provider
             .parse_chat_reply(&raw)
@@ -1176,7 +1307,12 @@ mod tests {
     /// the module agrees with itself.
     #[test]
     fn a_request_carries_separate_role_fields_not_a_spliced_prompt() {
-        for p in [RemoteProvider::OpenRouter, RemoteProvider::OllamaCloud] {
+        for p in [
+            RemoteProvider::OpenRouter,
+            RemoteProvider::OllamaCloud,
+            RemoteProvider::OpenCodeZen,
+            RemoteProvider::OpenCodeGo,
+        ] {
             let body = p.build_chat_body("some-model", "SYSTEM RULES", &turns(), None, false);
             let text = String::from_utf8(body).expect("utf-8");
             // serde_json maps are BTreeMaps, so keys serialize alphabetically:
@@ -1192,7 +1328,9 @@ mod tests {
             // satisfy that. The user turns below are unchanged in both, which is
             // what makes this a claim about splicing rather than about JSON.
             match p {
-                RemoteProvider::OllamaCloud => assert!(
+                RemoteProvider::OllamaCloud
+                | RemoteProvider::OpenCodeZen
+                | RemoteProvider::OpenCodeGo => assert!(
                     text.contains(r#""content":"SYSTEM RULES","role":"system""#),
                     "{text}"
                 ),
@@ -1268,8 +1406,14 @@ mod tests {
             literals.len()
         );
         for lit in literals {
-            // An API path is not a model tag.
-            if lit.starts_with("/api") {
+            // An API path is not a model tag. The carve-out is on the leading
+            // slash rather than on a list of known prefixes, because a model id
+            // never begins with one: OpenCode's two paths
+            // (`/inference/openai/v1/chat/completions`, `/zen/go/v1/…`) share no
+            // prefix with Ollama's and OpenRouter's, and enumerating prefixes
+            // would fail the next provider added rather than the defect this
+            // test is for.
+            if lit.starts_with('/') {
                 continue;
             }
             // The two shapes a model tag actually takes: `name:tag` (Ollama)
@@ -1315,6 +1459,11 @@ mod tests {
     fn every_variant_resolves_to_a_compiled_in_host() {
         assert_eq!(RemoteProvider::OpenRouter.host().host(), "openrouter.ai");
         assert_eq!(RemoteProvider::OllamaCloud.host().host(), "ollama.com");
+        // Both OpenCode arms reach the SAME host, and the path is what tells
+        // them apart. Pinned rather than left to the reader: a future edit that
+        // gives Go its own host would be a destination that does not exist.
+        assert_eq!(RemoteProvider::OpenCodeZen.host().host(), "opencode.ai");
+        assert_eq!(RemoteProvider::OpenCodeGo.host().host(), "opencode.ai");
         assert_eq!(
             RemoteProvider::from_wire("openrouter"),
             Some(RemoteProvider::OpenRouter)
@@ -1323,7 +1472,107 @@ mod tests {
             RemoteProvider::from_wire("ollama-cloud"),
             Some(RemoteProvider::OllamaCloud)
         );
+        assert_eq!(
+            RemoteProvider::from_wire("opencode-zen"),
+            Some(RemoteProvider::OpenCodeZen)
+        );
+        assert_eq!(
+            RemoteProvider::from_wire("opencode-go"),
+            Some(RemoteProvider::OpenCodeGo)
+        );
         assert_eq!(RemoteProvider::from_wire("anything-else"), None);
+    }
+
+    /// The two OpenCode arms: distinct paths on one host, the headers Go
+    /// requires, and the OpenAI reply shape read by the shared reader.
+    ///
+    /// Every assertion here is a fact verified against the provider's own docs
+    /// plus a live `GET` of its model list on 2026-11-01 (myne-md/myne#970),
+    /// not recalled. The paths in particular are the failure a reviewer cannot
+    /// see: `/inference/openai/v1` serves chat and `/inference/v1` serves the
+    /// catalogue, so deriving one from the other 404s the model chooser while
+    /// chat keeps working.
+    #[test]
+    fn the_opencode_arms_are_the_paths_and_headers_their_docs_publish() {
+        assert_eq!(
+            RemoteProvider::OpenCodeZen.chat_path(),
+            "/inference/openai/v1/chat/completions"
+        );
+        assert_eq!(
+            RemoteProvider::OpenCodeGo.chat_path(),
+            "/zen/go/v1/chat/completions"
+        );
+        assert_eq!(
+            RemoteProvider::OpenCodeZen.models_path(),
+            "/inference/v1/models"
+        );
+        assert_eq!(
+            RemoteProvider::OpenCodeGo.models_path(),
+            "/zen/go/v1/models"
+        );
+
+        // Go refuses a request without the session header and asks for a
+        // user-agent naming the client; Zen and the two older arms send
+        // nothing extra.
+        let go = RemoteProvider::OpenCodeGo.extra_headers();
+        assert!(go.iter().any(|(name, _)| *name == "x-opencode-session"));
+        assert!(go.iter().any(|(name, _)| *name == "user-agent"));
+        for quiet in [
+            RemoteProvider::OpenCodeZen,
+            RemoteProvider::OpenRouter,
+            RemoteProvider::OllamaCloud,
+        ] {
+            assert!(
+                quiet.extra_headers().is_empty(),
+                "{} must send no header it does not need",
+                quiet.wire_name()
+            );
+        }
+
+        // The session id is stable for the life of the process: that stability
+        // is the field's purpose, and a fresh id per call would be a
+        // per-request identifier the far side could not otherwise infer.
+        assert_eq!(
+            RemoteProvider::OpenCodeGo.extra_headers(),
+            RemoteProvider::OpenCodeGo.extra_headers()
+        );
+
+        // OpenAI-shaped reply, read by the broker's reader rather than a third
+        // copy of the same three structs.
+        let reply = br#"{"choices":[{"message":{"content":"hello"},"finish_reason":"stop"}]}"#;
+        for provider in [RemoteProvider::OpenCodeZen, RemoteProvider::OpenCodeGo] {
+            assert_eq!(provider.parse_chat_reply(reply).as_deref(), Ok("hello"));
+            assert!(!provider.reply_was_truncated(reply));
+        }
+        // …and the model list, which the chooser reads.
+        let list = br#"{"data":[{"id":"glm-5.3"},{"id":"kimi-k3"}]}"#;
+        let models = RemoteProvider::OpenCodeGo
+            .parse_models_reply(list)
+            .expect("openai-shaped list");
+        assert_eq!(
+            models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(),
+            vec!["glm-5.3", "kimi-k3"]
+        );
+
+        // The body: OpenAI ceiling, no broker routing object, and no cache
+        // marker even when the agent arm asks for one. Console translates each
+        // model to its native family, so the marker's meaning would depend on
+        // which family answered (see `build_chat_body`).
+        let body = RemoteProvider::OpenCodeZen.build_chat_body(
+            "glm-5.3",
+            "sys",
+            &[ChatMessage {
+                role: ChatRole::User,
+                content: "hi".into(),
+            }],
+            Some(512),
+            true,
+        );
+        let parsed: serde_json::Value = serde_json::from_slice(&body).expect("json");
+        assert_eq!(parsed["max_tokens"], json!(512));
+        assert!(parsed.get("provider").is_none(), "no broker routing object");
+        assert_eq!(parsed["messages"][0]["content"], json!("sys"));
+        assert!(parsed["messages"][0].get("cache_control").is_none());
     }
 
     /// The truncation reader, both providers and both directions.

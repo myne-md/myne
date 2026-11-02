@@ -1690,59 +1690,64 @@ describe("AiChatTab: the status chip leads somewhere", () => {
   });
 });
 
-describe("AiChatTab: the provider notice explains itself (myne-md/myne#848)", () => {
-  // The notice is one threat-model-bounded sentence about where the user's words
-  // go, and it invites three follow-ups it could not answer: which provider,
-  // what exactly leaves, and how to stop it. This is that conversation, one
-  // click away, with the fourth answer being a LINK to the control rather than a
-  // second copy of the setting.
+describe("AiChatTab: one line, and one press to the full text (issue #970, item 6)", () => {
+  // The notice was a button that opened a popover restating what leaves, who
+  // receives it and how to revoke, in a box that pushed the transcript down and
+  // duplicated the provider consent surface's own enumeration. The user reported
+  // it as redundancy: the one line says what the claim is, and the place that
+  // spells it out is one press away. What must NOT go with it is the sentence
+  // itself, which is load-bearing copy pinned by literal equality.
 
-  it("answers all four questions, naming the provider that is answering", async () => {
+  it("no longer opens a disclosure of its own", async () => {
     aiProvider = "openrouter";
     backendClass = "remote";
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
-
-    // Closed until asked: the notice is the claim, this is the disclosure.
+    const note = screen.getByTestId("ai.honesty-note");
+    // A paragraph, not a button: the thing it used to open is gone, and a button
+    // that does nothing is worse than the sentence on its own.
+    expect(note.tagName).toBe("P");
+    expect(note.getAttribute("aria-expanded")).toBeNull();
+    fireEvent.click(note);
     expect(screen.queryByTestId("ai.provider-popover")).toBeNull();
-    fireEvent.click(screen.getByTestId("ai.honesty-note"));
-    const popover = await screen.findByTestId("ai.provider-popover");
-    // What leaves, and to whom.
-    expect(popover.textContent).toContain("noticeLeaves");
-    expect(screen.getByTestId("ai.notice-receives").textContent).toContain(
-      "noticeReceiver:OpenRouter",
-    );
-    // How to stop it.
-    expect(popover.textContent).toContain("noticeRevoke");
+    // The restated copy is gone from this surface, not merely collapsed.
+    expect(screen.queryByTestId("ai.notice-leaves")).toBeNull();
+    expect(screen.queryByTestId("ai.notice-receives")).toBeNull();
+    expect(screen.queryByTestId("ai.notice-revoke")).toBeNull();
   });
 
-  it("says nothing leaves the machine when the local arm is answering", async () => {
-    backendClass = "in_process_local";
+  it("still names the provider that is answering, in the one line", () => {
+    aiProvider = "openrouter";
+    backendClass = "remote";
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);
-    fireEvent.click(screen.getByTestId("ai.honesty-note"));
-    // The other branch, and the one a wrong implementation would get by reusing
-    // the remote sentence: naming a provider nobody is using is the exact defect
-    // `activeProviderName` exists to prevent (myne-md/myne#466).
-    expect(screen.getByTestId("ai.notice-receives").textContent).toContain(
-      "noticeReceiverLocal",
-    );
+    expect(screen.getByTestId("ai.honesty-note").textContent).toContain("OpenRouter");
   });
 
-  it("sends the user to the control, not to the top of the panel", async () => {
+  it("sends the user to the surface that spells it out", async () => {
     const onOpenSettings = vi.fn();
     backendClass = "in_process_local";
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={onOpenSettings} />);
-    fireEvent.click(screen.getByTestId("ai.honesty-note"));
     fireEvent.click(screen.getByTestId("ai.notice-settings"));
+    // The consent surface, which carries `CONSENT_WHAT_LEAVES` and its
+    // siblings: the full text lives there and this surface links to it rather
+    // than keeping a second, shorter copy that drifts.
     expect(onOpenSettings).toHaveBeenCalledWith("ai", "ai.provider");
   });
 
-  it("keeps the load-bearing sentence VERBATIM inside the button", async () => {
-    // The notice became a `<button>`; its text is a privacy property pinned by
-    // literal equality and rendered verbatim in every locale, so the change of
-    // element must not have changed a character of it.
+  it("offers no CTA in a shell that cannot open Settings", () => {
+    backendClass = "in_process_local";
+    surfaceState = { kind: "available" };
+    render(<AiChatTab />);
+    expect(screen.queryByTestId("ai.notice-settings")).toBeNull();
+  });
+
+  it("keeps the load-bearing sentence VERBATIM", async () => {
+    // Its text is a privacy property pinned by literal equality and rendered
+    // verbatim in every locale. It has changed element twice (#848 made it a
+    // button, #970 made it a paragraph again) and must not have changed a
+    // character either time.
     backendClass = "in_process_local";
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);

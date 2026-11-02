@@ -1317,7 +1317,8 @@ pub async fn set_ai_provider<R: Runtime>(
 /// The providers this build knows how to reach. A closed list here rather than
 /// a free-form string is what keeps a stored value from outrunning the code
 /// that has to honour it.
-pub const KNOWN_AI_PROVIDERS: &[&str] = &["ollama-cloud", "openrouter"];
+pub const KNOWN_AI_PROVIDERS: &[&str] =
+    &["ollama-cloud", "openrouter", "opencode-zen", "opencode-go"];
 
 /// Testable core of [`set_ai_provider`].
 pub(crate) async fn set_ai_provider_with_dir(

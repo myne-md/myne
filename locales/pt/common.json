@@ -1392,10 +1392,6 @@
           "copyFailed": "Não foi possível copiar",
           "copyYourMessage": "Copiar a sua mensagem",
           "emptyTitle": "Pergunte sobre as suas notas",
-          "noticeLeaves": "As palavras que escreve, as notas que uma volta lê, os títulos, identificadores e caminhos de pasta de todas as notas que a execução pode ler (o cofre inteiro menos as suas pastas excluídas, a menos que restrinja), o texto que o Myne extraiu de quaisquer ficheiros que anexa a uma mensagem (até quatro, cada um cortado a 20 000 caracteres; o ficheiro em si fica aqui), e o que a IA se lembra de si são enviados para quem está a responder. Nada mais neste dispositivo é enviado.",
-          "noticeReceiver": "Está a responder: {{provider}}, que não é gerido pelo Myne.",
-          "noticeReceiverLocal": "Está a responder: um programa em execução neste dispositivo. Nada sai da máquina, mas esse programa não faz parte do Myne e o Myne não consegue ver o que ele faz com eles.",
-          "noticeRevoke": "Para o parar, desligue a IA nas Definições, ou altere o que está a responder aí. Revogar uma chave de fornecedor para esse fornecedor de imediato.",
           "noticeSettingsCta": "Abrir as definições de IA",
           "viewDiff": "Ver alterações",
           "revertRun": "Anular esta execução",
@@ -1811,7 +1807,6 @@
       "noMatchingNotes": "Nenhuma nota corresponde",
       "noNotesYet": "Ainda não há notas",
       "noMatchBody": "Nada corresponde a “{{name}}”. Edite a vista ou limpe-a para ver todas as notas.",
-      "emptyBody": "Toque em “Nova nota” para escrever a sua primeira nota. Tudo é encriptado neste dispositivo antes de ser armazenado.",
       "unarchive": "Desarquivar"
     },
     "filterSheet": {
@@ -2565,7 +2560,6 @@
       "bulkMove_other": "Mover {{count}} notas para…",
       "caseMergeBody": "Já existe uma pasta chamada “{{name}}”. Estas vão fundir-se. Mudar o nome de uma para as manter separadas?",
       "color": "Cor…",
-      "createFirstNote": "Criar a sua primeira nota",
       "createFolderNote": "Criar nota de pasta",
       "customize": "Personalizar…",
       "delete": "Apagar",
@@ -2628,7 +2622,6 @@
       "treeLabel": "Notas e pastas",
       "selectionAnnouncement": "{{title}} selecionada",
       "untitled": "Sem título",
-      "emptyBody": "As notas são markdown simples, encriptadas neste dispositivo antes de irem para qualquer lado. Crie uma para começar, ou prima a linha de pesquisa acima para executar qualquer comando.",
       "search": "Pesquisar"
     },
     "newFromTemplate": {
@@ -3340,7 +3333,8 @@
       },
       "diagnosticFilesHelper_one": "Um ficheiro conteria este bloco mais {{count}} ficheiro de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
       "diagnosticFilesHelper_other": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
-      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai."
+      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Mudar palavra-passe",
@@ -4465,17 +4459,12 @@
         "rebuildConfirm": "Substituir a semente de {{date}} ({{count}} entradas)?",
         "title": "Ensinar o Myne ao seu cofre",
         "candidatesTitle": "Rever o que o Myne aprendeu",
-        "doneTitle": "Guardado",
         "close": "Fechar",
         "loading": "A ler o seu cofre…",
         "scopeIntro": "O Myne lê primeiro a forma do seu cofre: títulos de notas, pastas e etiquetas. Só pede texto de notas se precisar, e nunca de anexos.",
         "provider": "Fornecedor: {{provider}}",
-        "providerRemote": "remoto",
-        "providerLocal": "neste dispositivo",
-        "counts": "{{notes}} notas · {{folders}} pastas · {{tags}} etiquetas",
         "estimatedChars": "Cerca de {{chars}} caracteres",
         "excluded": "{{count}} notas deixadas de fora porque a sua pasta está excluída da IA",
-        "omitted": "{{count}} títulos omitidos para caber no contexto do modelo",
         "showPayload": "Mostrar exatamente o que será enviado",
         "hidePayload": "Ocultar o conteúdo",
         "consentLabel": "Enviar este esboço para {{provider}} (cerca de {{chars}} caracteres). Compreendo que o fornecedor o recebe.",
@@ -4491,9 +4480,6 @@
         "apply": "Guardar {{count}} entradas",
         "applying": "A guardar…",
         "applied": "Guardadas {{count}} entradas na memória.",
-        "appliedHelper": "Encontre-as em A partir do seu cofre nesta secção. O assistente lê-as a partir de agora.",
-        "finish": "Terminar",
-        "appliedToast": "Memória construída a partir do seu cofre.",
         "refusals": {
           "empty": "Esta entrada está vazia.",
           "textTooLong": "Esta entrada ultrapassa o limite de 2000 caracteres.",
@@ -4526,7 +4512,17 @@
         "removeAll": "Remover tudo",
         "removeConfirm": "Remover todas as entradas desta semente?",
         "removedToast": "Entradas do seu cofre removidas.",
-        "rowStale": "O cofre mudou desde esta semente"
+        "rowStale": "O cofre mudou desde esta semente",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_many": "{{count}} notes",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_many": "{{count}} folders",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_many": "{{count}} tags",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Ainda não há nada memorizado",
       "count": "{{used}} de {{cap}}",
@@ -5267,7 +5263,9 @@
       "unlockWithTouchId": "Desbloquear com o Touch ID",
       "wrongCredential": "Incorreto. Resta(m) {{remaining}} tentativa(s).",
       "showPin": "Mostrar PIN",
-      "hidePin": "Ocultar PIN"
+      "hidePin": "Ocultar PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "O fluxo de recuperação foi interrompido. Defina primeiro uma nova palavra-passe.",
     "recoveryInterruptedBody": "Defina primeiro uma nova palavra-passe e depois volte a selar o seu cofre.",

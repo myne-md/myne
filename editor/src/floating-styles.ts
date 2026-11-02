@@ -153,14 +153,32 @@ const CSS = `
   gap: 1px;
 }
 
+/*
+ * The selection toolbar (issue #970, item 2).
+ *
+ * It used to be a flat row of 28px squares sharing one 2px gap, with the
+ * leading block-type word carrying the only divider: text glyphs, no grouping.
+ * Three changes, and each one is doing a job rather than decorating:
+ *
+ *   - 30x28 targets on the 4px step of the spacing scale, so the bar reads as a
+ *     surface with controls on it rather than a strip of touching squares, and a
+ *     press lands where the eye aimed.
+ *   - A real separator (.cm-toolbar-sep) between groups, so inline marks,
+ *     colour, links, lists and note links stop reading as one undifferentiated
+ *     run of eleven buttons.
+ *   - An active state, so a button that is ALREADY applied to the selection says
+ *     so (aria-pressed plus a tint). A formatting bar whose buttons look
+ *     identical whether or not the mark is present is a bar the user has to
+ *     check against the text.
+ */
 .cm-toolbar {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: var(--space-1);
   background-color: var(--paper, #faf8f3);
   border: 1px solid var(--line-2, #c8c7c1);
-  border-radius: var(--radius-2, 6px);
-  box-shadow: var(--shadow-2, 0 4px 12px rgba(0,0,0,0.08));
+  border-radius: var(--radius-3, 8px);
+  box-shadow: var(--shadow-3, 0 8px 24px rgba(0,0,0,0.12));
   padding: var(--space-1);
   font-family: var(--font-sans);
 }
@@ -168,32 +186,77 @@ const CSS = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
+  width: 30px;
   height: 28px;
   border: 0;
   background-color: transparent;
-  color: var(--fg-1);
+  color: var(--fg-2, #4a4944);
   font-size: var(--text-sm);
   cursor: pointer;
-  border-radius: var(--radius-1, 3px);
+  border-radius: var(--radius-2, 6px);
   font-family: var(--font-sans);
+  transition: background-color var(--duration-fast, 90ms) var(--ease-standard, ease),
+    color var(--duration-fast, 90ms) var(--ease-standard, ease);
 }
 .cm-toolbar-button:hover {
   background-color: var(--paper-2, #f3f1eb);
+  color: var(--fg-1);
 }
-/* The leading block-type control carries a word label ("Paragraph" / "H2"), so
-   it overrides the fixed 28px square button width — auto width, no wrap, a
-   little horizontal padding, and a divider separating it from the format
-   buttons (Obsidian-style). */
+/* Focus ring: the buttons call preventDefault on mousedown so a pointer press
+   never steals the editor selection, but a KEYBOARD user still needs to see where
+   they are, hence :focus-visible only. */
+.cm-toolbar-button:focus-visible {
+  outline: 2px solid var(--accent, #2c4a7a);
+  outline-offset: -1px;
+}
+/* The mark is already on the selection, or the caret line is already this kind
+   of block. Tinted rather than filled: a filled square at 30px reads as the
+   primary action of the bar, which is the word control's job. */
+.cm-toolbar-button-active,
+.cm-toolbar-button-active:hover {
+  background-color: color-mix(in srgb, var(--accent, #2c4a7a) 18%, transparent);
+  color: var(--accent, #2c4a7a);
+}
+/* Between groups: a hairline with air on both sides, drawn on its own flex item
+   so it never collapses into a button's own border. */
+.cm-toolbar-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: var(--space-1);
+  background-color: var(--line-2, #c8c7c1);
+  flex: 0 0 auto;
+}
+/* The highlight control's colour: a dot under the marker glyph. Kept out of the
+   button's own background so the ACTIVE tint and the COLOUR are two different
+   signals that cannot be confused for one another. */
+.cm-toolbar-highlight-main {
+  flex-direction: column;
+  gap: 0;
+}
+.cm-toolbar-hl-dot {
+  width: 12px;
+  height: 3px;
+  border-radius: 1px;
+  flex: 0 0 auto;
+}
+/* The leading block-type control carries a word label ("Paragraph" / "H2" /
+   "Bullet list"), so it overrides the fixed button width: auto width, no wrap,
+   a little horizontal padding. Obsidian-style. */
 .cm-toolbar-blocktype {
   width: auto;
   min-width: 0;
   padding: 0 8px;
-  gap: 3px;
+  gap: 4px;
   white-space: nowrap;
-  margin-right: 4px;
-  border-right: 1px solid var(--line-1, #e3e2dd);
-  border-radius: var(--radius-1, 3px) 0 0 var(--radius-1, 3px);
+  border-radius: var(--radius-2, 6px);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium, 500);
+  color: var(--fg-2, #4a4944);
+}
+.cm-toolbar-caret {
+  display: inline-flex;
+  align-items: center;
+  color: var(--fg-3, #6b6a64);
 }
 .cm-toolbar-heading-wrap {
   position: relative;

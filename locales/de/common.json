@@ -1330,10 +1330,6 @@
           "copyFailed": "Kopieren nicht möglich",
           "copyYourMessage": "Ihre Nachricht kopieren",
           "emptyTitle": "Fragen Sie zu Ihren Notizen",
-          "noticeLeaves": "Die Wörter, die Sie tippen, die Notizen, die ein Durchlauf liest, die Titel, Bezeichner und Ordnerpfade jeder Notiz, die der Durchlauf lesen darf (der ganze Tresor minus Ihren ausgeschlossenen Ordnern, sofern Sie ihn nicht einschränken), der Text, den Myne aus Dateien extrahiert hat, die Sie einer Nachricht anhängen (bis zu vier, jeweils auf 20.000 Zeichen gekürzt; die Datei selbst bleibt hier), und was die KI über Sie weiß, werden an das Programm gesendet, das antwortet. Nichts anderes auf diesem Gerät wird gesendet.",
-          "noticeReceiver": "Es antwortet: {{provider}}, den Myne nicht betreibt.",
-          "noticeReceiverLocal": "Es antwortet: ein Programm, das auf diesem Gerät läuft. Nichts verlässt den Rechner, aber dieses Programm gehört nicht zu Myne und Myne kann nicht sehen, was es damit tut.",
-          "noticeRevoke": "Um es zu stoppen, schalten Sie die KI in den Einstellungen aus oder ändern Sie dort, was antwortet. Das Widerrufen eines Anbieter-Schlüssels stoppt diesen Anbieter sofort.",
           "noticeSettingsCta": "KI-Einstellungen öffnen",
           "viewDiff": "Änderungen anzeigen",
           "revertRun": "Diesen Durchlauf rückgängig machen",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Keine passenden Notizen",
       "noNotesYet": "Noch keine Notizen",
       "noMatchBody": "Nichts passt zu „{{name}}“. Bearbeite die Ansicht oder setze sie zurück, um alle Notizen zu sehen.",
-      "emptyBody": "Tippe auf „Neue Notiz“, um deine erste Notiz zu schreiben. Alles wird auf diesem Gerät verschlüsselt, bevor es gespeichert wird.",
       "unarchive": "Aus Archiv holen"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "{{count}} Notizen verschieben nach…",
       "caseMergeBody": "Ein Ordner namens „{{name}}“ existiert bereits. Diese werden zusammengeführt. Einen umbenennen, um sie getrennt zu halten?",
       "color": "Farbe…",
-      "createFirstNote": "Erstellen Sie Ihre erste Notiz",
       "createFolderNote": "Ordnernotiz erstellen",
       "customize": "Anpassen…",
       "delete": "Löschen",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Notizen und Ordner",
       "selectionAnnouncement": "{{title}} ausgewählt",
       "untitled": "Unbenannt",
-      "emptyBody": "Notizen sind reines Markdown und werden auf diesem Gerät verschlüsselt, bevor sie irgendwohin gelangen. Erstellen Sie eine, um zu beginnen, oder drücken Sie die Suchzeile oben, um einen beliebigen Befehl auszuführen.",
       "search": "Suchen"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "Diagnose"
       },
       "diagnosticFilesHelper_one": "Eine Datei würde diesen Block plus {{count}} Protokolldatei enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
-      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht."
+      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Passwort ändern",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "Den Seed vom {{date}} ({{count}} Einträge) ersetzen?",
         "title": "Myne Ihren Tresor beibringen",
         "candidatesTitle": "Prüfen, was Myne gelernt hat",
-        "doneTitle": "Gespeichert",
         "close": "Schließen",
         "loading": "Ihr Tresor wird gelesen…",
         "scopeIntro": "Myne liest zuerst die Form Ihres Tresors: Notiztitel, Ordner und Tags. Es fragt nur nach Notiztext, wenn es ihn braucht, und nie nach Anhängen.",
         "provider": "Anbieter: {{provider}}",
-        "providerRemote": "entfernt",
-        "providerLocal": "auf diesem Gerät",
-        "counts": "{{notes}} Notizen · {{folders}} Ordner · {{tags}} Tags",
         "estimatedChars": "Etwa {{chars}} Zeichen",
         "excluded": "{{count}} Notizen ausgelassen, weil ihr Ordner von der KI ausgeschlossen ist",
-        "omitted": "{{count}} Titel ausgelassen, um in den Kontext des Modells zu passen",
         "showPayload": "Genau zeigen, was gesendet wird",
         "hidePayload": "Nutzlast ausblenden",
         "consentLabel": "Diese Gliederung an {{provider}} senden (etwa {{chars}} Zeichen). Ich verstehe, dass der Anbieter sie erhält.",
@@ -4356,9 +4345,6 @@
         "apply": "{{count}} Einträge speichern",
         "applying": "Wird gespeichert…",
         "applied": "{{count}} Einträge in den Speicher gespeichert.",
-        "appliedHelper": "Sie finden sie unter „Aus Ihrem Tresor“ in diesem Abschnitt. Der Assistent liest sie von nun an.",
-        "finish": "Fertig",
-        "appliedToast": "Speicher aus Ihrem Tresor aufgebaut.",
         "refusals": {
           "empty": "Dieser Eintrag ist leer.",
           "textTooLong": "Dieser Eintrag überschreitet das 2000-Zeichen-Limit.",
@@ -4391,7 +4377,14 @@
         "removeAll": "Alle entfernen",
         "removeConfirm": "Alle Einträge aus diesem Seed entfernen?",
         "removedToast": "Einträge aus Ihrem Tresor entfernt.",
-        "rowStale": "Tresor hat sich seit diesem Seed geändert"
+        "rowStale": "Tresor hat sich seit diesem Seed geändert",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Noch nichts gemerkt",
       "count": "{{used}} von {{cap}}",
@@ -5122,7 +5115,9 @@
       "unlockWithTouchId": "Mit Touch ID entsperren",
       "wrongCredential": "Falsch. Noch {{remaining}} Versuch(e) übrig.",
       "showPin": "PIN anzeigen",
-      "hidePin": "PIN verbergen"
+      "hidePin": "PIN verbergen",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Der Wiederherstellungsvorgang wurde unterbrochen. Legen Sie zuerst ein neues Passwort fest.",
     "recoveryInterruptedBody": "Legen Sie zuerst ein neues Passwort fest und versiegeln Sie dann Ihren Tresor erneut.",

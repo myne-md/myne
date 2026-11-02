@@ -55,6 +55,13 @@ export default defineConfig({
       // line. The module imports nothing host-side, which is why it can be aliased
       // out of `../src/` at all.
       { find: /^@myne\/clipboard$/, replacement: sib("../src/lib/clipboard.ts") },
+      // The recovery-kit document writer - mirror of vite.config.ts, which
+      // carries the rationale (one function, so a kit saved on a phone is read
+      // back by the recovery flow on a computer). `IdentityFlow.tsx` imports it
+      // as of myne-md/myne#970 item 20, and without this line every component
+      // test that mounts the identity flow fails to TRANSFORM rather than
+      // failing an assertion, which reads as a broken suite.
+      { find: "@myne/recovery-kit", replacement: sib("../src/lib/recovery-kit.ts") },
       // The custom-theme syntax derivation (MYND-598) - mirror of
       // vite.config.ts, which carries the rationale for sharing it.
       // The ornament role contract and the measure-token clamp (myne#394) -

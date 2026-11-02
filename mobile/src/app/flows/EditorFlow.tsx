@@ -3,9 +3,11 @@ import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
 import { ornamentRole } from "@myne/ornaments";
 import { copyText } from "@myne/clipboard";
+import { EmptyState } from "@myne/client-core/emptyState";
 import { showToast } from "../../components/ToastHost";
 import { buildMentionTargets } from "@myne/note-mentions";
 import { writeText as clipboardWriteText } from "../../lib/clipboardTransport";
+import { useEdgeSwipeBack } from "../../lib/edgeSwipeBack";
 import { CMEditor } from "@myne/editor/CMEditor";
 import { typographyStyle } from "@myne/editor/typography";
 import { REVEAL_ATTACHMENT_EVENT } from "@myne/editor/attachments/fileCardActions";
@@ -1183,6 +1185,27 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // Archive-view folder drill (MYND-470): null = archive root (folder rows +
   // loose archived notes); a folder path = browsing that archived folder's notes.
   const [archiveFolder, setArchiveFolder] = useState<string | null>(null);
+  // Edge-swipe back (myne-md/myne#970 item 24). Scoped to the list views that
+  // HAVE a back: Notes is the root, so a swipe there has nowhere to go, and the
+  // editor's own surfaces (a sheet, the tag chip row) must not be closed by a
+  // gesture that started in the middle of them. The hook only listens in the
+  // first 28px of the pane, which is why attaching it here cannot fight a row's
+  // swipe actions.
+  //
+  // Inside an archive folder the swipe goes up one level, to the archive root
+  // rather than straight out to Notes, so it mirrors the visible back control
+  // (`archive.folder-back`) exactly.
+  const edgeSwipeBack = useEdgeSwipeBack(
+    tab === "notes" && listView !== "notes"
+      ? () => {
+          if (listView === "archive" && archiveFolder !== null) {
+            setArchiveFolder(null);
+            return;
+          }
+          setListView("notes");
+        }
+      : null,
+  );
   // Folder path armed for the inline "Move N notes to Trash?" confirm (null = none).
   const [confirmArchiveFolder, setConfirmArchiveFolder] = useState<string | null>(null);
   // Current folder for NEW-note placement (root by default; the tree no longer
@@ -3809,6 +3832,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         <div
           ref={tabPaneRef}
           {...ornamentRole("surface")}
+          {...edgeSwipeBack}
           style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
         >
         {tab === "notes" && (
@@ -3817,7 +3841,13 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               {listView !== "notes" && sizeClass !== "expanded" && (
                 <button
                   onClick={() => setListView("notes")}
-                  style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8 }}
+                  data-testid="notes.list-back"
+                  // A real target, not the glyph (issue #970 item 21): this was
+                  // `padding: 0` around an 18px chevron, so the way out of
+                  // Archive on a phone was a 18px square in the one corner a
+                  // thumb cannot reach. 44 is the published minimum, and the
+                  // negative insets keep the chevron where it was drawn.
+                  style={{ display: "flex", alignItems: "center", gap: 3, border: "none", background: "transparent", color: "var(--accent)", fontSize: 15, fontWeight: 600, cursor: "pointer", padding: 0, marginBottom: 8, minHeight: 44, marginLeft: -6, paddingLeft: 6, paddingRight: 10 }}
                 >
                   <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip /> {t("notes.list.notesHeading")}
                 </button>
@@ -3996,18 +4026,44 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 <div style={{ flex: 1 }} />
               )
             ) : (treeMode ? treeEmpty && !favStripVisible : orderedNotes.length === 0 && !archiveHasFolders && !inArchiveFolder) && !listError ? (
-              <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "0 40px", textAlign: "center" }}>
-                <div style={{ fontSize: 18, fontWeight: 600, color: "var(--fg-1)" }}>
-                  {listView === "trash" ? t("editor.list.trashEmpty") : listView === "archive" ? t("editor.list.archiveEmpty") : t("editor.list.noNotesYet")}
-                </div>
-                {/* A view renders its own `view.empty` via MobileViewRenderHost
-                    above, so this generic empty-state is only the flat-list case. */}
-                {listView === "notes" ? (
-                  <div style={{ marginTop: 8, fontSize: 14, lineHeight: 1.55, color: "var(--fg-3)" }}>
-                    {t("editor.list.emptyBody")}
-                  </div>
-                ) : null}
-              </div>
+              // **The app's one zero state, not a fourth one** (myne-md/myne#970
+              // items 4 and 25). This block used to be its own layout: a bold
+              // sentence, a grey line, no glyph, no wash, and a centred column
+              // whose only chrome was the empty pane around it. The desktop had
+              // already replaced its version with `<EmptyState>` and the phone
+              // kept the old shape, so Archive on a phone read as an unfinished
+              // list while the same state on a computer read as a destination.
+              //
+              // `fill` makes the state BE the surface, and `frame={false}` drops
+              // the card's border and fill: the list area is already a panel, and
+              // a rounded box drawn inside it is a dialog nobody can dismiss.
+              // The wash stays, which is what makes it read as a place.
+              //
+              // `firstRun` is the honest variant for all three views. An empty
+              // Archive is not an error and not a filtered result; it is the
+              // collection at rest.
+              <EmptyState
+                variant="firstRun"
+                size="md"
+                fill
+                frame={false}
+                glyph={
+                  <Icon
+                    name={listView === "trash" ? "trash" : listView === "archive" ? "archive" : "file-text"}
+                    size={22}
+                    color="var(--fg-3)"
+                    strokeWidth={1.5}
+                  />
+                }
+                title={
+                  listView === "trash"
+                    ? t("editor.list.trashEmpty")
+                    : listView === "archive"
+                      ? t("editor.list.archiveEmpty")
+                      : t("editor.list.noNotesYet")
+                }
+                testId="editor.list-empty"
+              />
             ) : treeMode ? (
               <ScreenScroll style={{ marginTop: 4 }}>
                 {favStripVisible && <FavoritesStrip notes={favNotes} onOpen={(id) => void openFromList(id)} onHold={setRowActions} />}

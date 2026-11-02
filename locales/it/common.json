@@ -1392,10 +1392,6 @@
           "copyFailed": "Impossibile copiare",
           "copyYourMessage": "Copia il tuo messaggio",
           "emptyTitle": "Chiedi delle tue note",
-          "noticeLeaves": "Le parole che digiti, le note che un turno legge, i titoli, gli identificatori e i percorsi delle cartelle di ogni nota che l'esecuzione può leggere (l'intera cassaforte meno le cartelle escluse, a meno che non la restringi), il testo che Myne ha estratto da qualsiasi file che alleghi a un messaggio (fino a quattro, ognuno tagliato a 20.000 caratteri; il file resta qui), e ciò che l'AI ricorda di te vengono inviati a chi sta rispondendo. Nulla altro su questo dispositivo viene inviato.",
-          "noticeReceiver": "Sta rispondendo: {{provider}}, che Myne non gestisce.",
-          "noticeReceiverLocal": "Sta rispondendo: un programma in esecuzione su questo dispositivo. Nulla lascia la macchina, ma quel programma non fa parte di Myne e Myne non può vedere cosa ne fa.",
-          "noticeRevoke": "Per fermarlo, disattiva l'AI nelle Impostazioni oppure cambia ciò che risponde lì. Revocare la chiave di un provider ferma immediatamente quel provider.",
           "noticeSettingsCta": "Apri le impostazioni AI",
           "viewDiff": "Vedi le modifiche",
           "revertRun": "Annulla questa esecuzione",
@@ -1811,7 +1807,6 @@
       "noMatchingNotes": "Nessuna nota corrispondente",
       "noNotesYet": "Ancora nessuna nota",
       "noMatchBody": "Nessun risultato per “{{name}}”. Modifica la vista o cancellala per vedere tutte le note.",
-      "emptyBody": "Tocca “Nuova nota” per scrivere la tua prima nota. Tutto viene cifrato su questo dispositivo prima di essere archiviato.",
       "unarchive": "Rimuovi dall'archivio"
     },
     "filterSheet": {
@@ -2565,7 +2560,6 @@
       "bulkMove_other": "Sposta {{count}} note in…",
       "caseMergeBody": "Esiste già una cartella di nome “{{name}}”. Queste verranno unite. Vuoi rinominarne una per tenerle separate?",
       "color": "Colore…",
-      "createFirstNote": "Crea la tua prima nota",
       "createFolderNote": "Crea nota cartella",
       "customize": "Personalizza…",
       "delete": "Elimina",
@@ -2628,7 +2622,6 @@
       "treeLabel": "Note e cartelle",
       "selectionAnnouncement": "{{title}} selezionata",
       "untitled": "Senza titolo",
-      "emptyBody": "Le note sono semplice markdown, crittografate su questo dispositivo prima di andare ovunque. Creane una per iniziare, oppure premi la riga di ricerca qui sopra per eseguire qualsiasi comando.",
       "search": "Cerca"
     },
     "newFromTemplate": {
@@ -3340,7 +3333,8 @@
       },
       "diagnosticFilesHelper_one": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
       "diagnosticFilesHelper_other": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
-      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va."
+      "diagnosticFilesHelper_many": "Un file conterrebbe questo blocco più {{count}} file di log, {{size}} in totale. Nulla viene inviato da nessuna parte; scegli tu dove va.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Cambia password",
@@ -4465,17 +4459,12 @@
         "rebuildConfirm": "Sostituire la creazione del {{date}} ({{count}} voci)?",
         "title": "Insegna a Myne la tua cassaforte",
         "candidatesTitle": "Controlla ciò che Myne ha imparato",
-        "doneTitle": "Salvato",
         "close": "Chiudi",
         "loading": "Lettura della tua cassaforte…",
         "scopeIntro": "Myne legge prima la forma della tua cassaforte: titoli delle note, cartelle e tag. Chiede il testo delle note solo se ne ha bisogno, e mai gli allegati.",
         "provider": "Provider: {{provider}}",
-        "providerRemote": "remoto",
-        "providerLocal": "su questo dispositivo",
-        "counts": "{{notes}} note · {{folders}} cartelle · {{tags}} tag",
         "estimatedChars": "Circa {{chars}} caratteri",
         "excluded": "{{count}} note escluse perché la loro cartella è esclusa dall'AI",
-        "omitted": "{{count}} titoli omessi per stare nel contesto del modello",
         "showPayload": "Mostra esattamente cosa verrà inviato",
         "hidePayload": "Nascondi il payload",
         "consentLabel": "Invia questo schema a {{provider}} (circa {{chars}} caratteri). Capisco che il provider lo riceve.",
@@ -4491,9 +4480,6 @@
         "apply": "Salva {{count}} voci",
         "applying": "Salvataggio…",
         "applied": "Salvate {{count}} voci in memoria.",
-        "appliedHelper": "Le trovi sotto Da questa cassaforte in questa sezione. L'assistente le legge da ora in poi.",
-        "finish": "Fine",
-        "appliedToast": "Memoria costruita dalla tua cassaforte.",
         "refusals": {
           "empty": "Questa voce è vuota.",
           "textTooLong": "Questa voce supera il limite di 2000 caratteri.",
@@ -4526,7 +4512,17 @@
         "removeAll": "Rimuovi tutto",
         "removeConfirm": "Rimuovere tutte le voci di questa creazione?",
         "removedToast": "Voci da questa cassaforte rimosse.",
-        "rowStale": "Cassaforte cambiata da questa creazione"
+        "rowStale": "Cassaforte cambiata da questa creazione",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_many": "{{count}} notes",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_many": "{{count}} folders",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_many": "{{count}} tags",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Ancora nulla memorizzato",
       "count": "{{used}} di {{cap}}",
@@ -5267,7 +5263,9 @@
       "unlockWithTouchId": "Sblocca con Touch ID",
       "wrongCredential": "Errato. {{remaining}} tentativi rimasti.",
       "showPin": "Mostra PIN",
-      "hidePin": "Nascondi PIN"
+      "hidePin": "Nascondi PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Il processo di recupero è stato interrotto. Imposta prima una nuova password.",
     "recoveryInterruptedBody": "Imposta prima una nuova password, poi risigilla la tua cassaforte.",

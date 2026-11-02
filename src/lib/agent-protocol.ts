@@ -725,3 +725,16 @@ export function isMove(edit: ProposedEdit): boolean {
  *  a second clamp here would read as the control and hide the day the real one
  *  stopped working. */
 export const CHAT_HISTORY_BUDGET_MAX = 12_000;
+
+/** The budget an UNSET pref means, in characters
+ *  (`core/src/plugins/agent/history.rs::DEFAULT_HISTORY_BUDGET`).
+ *
+ *  **Display only.** It never writes and never clamps: an unset budget sends
+ *  `null` and the host supplies its own, which is the rule this mirror does not
+ *  break. It exists because the empty state of the settings input is otherwise
+ *  a blank box (issue #970, item 3): "leave empty for the default" tells the
+ *  user a default exists without telling them what it is, and the number is the
+ *  answer to the question the row asks. `tests/lib/chatHistoryBudget.test.ts`
+ *  reads the Rust file and fails when the two drift, exactly as it does for the
+ *  ceiling. */
+export const CHAT_HISTORY_BUDGET_DEFAULT = 3_000;

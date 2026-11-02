@@ -1330,10 +1330,6 @@
           "copyFailed": "コピーできませんでした",
           "copyYourMessage": "メッセージをコピー",
           "emptyTitle": "ノートについて質問",
-          "noticeLeaves": "入力した単語、ターンが読み取るノート、実行が読み取れる可能性のあるすべてのノートのタイトル・識別子・フォルダパス(除外フォルダを除いた保管庫全体。絞り込まない場合)、メッセージに添付したファイルからMyneが抽出したテキスト(最大4件、各20,000文字まで。ファイル自体はここに残ります)、そしてAIがあなたについて覚えていることが、応答する相手に送られます。この端末のそれ以外は何も送られません。",
-          "noticeReceiver": "応答しているのは {{provider}} で、Myneが運営しているものではありません。",
-          "noticeReceiverLocal": "応答しているのは、このデバイス上で動作しているプログラムです。マシンの外には何も出ませんが、そのプログラムはMyneの一部ではなく、Myneはそれがそれらをどう扱うかを把握できません。",
-          "noticeRevoke": "停止するには、設定でAIをオフにするか、そこで応答しているものを変更してください。プロバイダーのキーを取り消すと、そのプロバイダーは即座に停止します。",
           "noticeSettingsCta": "AI設定を開く",
           "viewDiff": "変更を表示",
           "revertRun": "この実行を元に戻す",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "一致するノートはありません",
       "noNotesYet": "ノートはまだありません",
       "noMatchBody": "「{{name}}」に一致するものはありません。ビューを編集するかクリアして、すべてのノートを表示してください。",
-      "emptyBody": "「新規ノート」をタップして最初のノートを書きましょう。すべては保存される前にこのデバイス上で暗号化されます。",
       "unarchive": "アーカイブ解除"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "ノート{{count}}件を移動…",
       "caseMergeBody": "「{{name}}」という名前のフォルダがすでに存在します。これらは統合されます。別々に保つには、いずれかの名前を変更しますか？",
       "color": "色…",
-      "createFirstNote": "最初のノートを作成",
       "createFolderNote": "フォルダノートを作成",
       "customize": "カスタマイズ…",
       "delete": "削除",
@@ -2523,7 +2517,6 @@
       "treeLabel": "ノートとフォルダ",
       "selectionAnnouncement": "{{title}}を選択しました",
       "untitled": "無題",
-      "emptyBody": "ノートはプレーンなMarkdownで、どこかへ行く前にこのデバイス上で暗号化されます。作成して始めるか、上の検索行を押して任意のコマンドを実行してください。",
       "search": "検索"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "診断"
       },
       "diagnosticFilesHelper_one": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
-      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。"
+      "diagnosticFilesHelper_other": "1つのファイルには、このブロックに加えてログファイル{{count}}件が含まれ、合計{{size}}になります。どこにも送信されません。保存先はあなたが選びます。",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "パスワードを変更",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "{{date}}のシード({{count}}件の項目)を置き換えますか？",
         "title": "Myneに保管庫を教える",
         "candidatesTitle": "Myneが学んだことを確認",
-        "doneTitle": "保存しました",
         "close": "閉じる",
         "loading": "保管庫を読み取り中…",
         "scopeIntro": "Myneはまず保管庫の構造を読み取ります: ノートのタイトル、フォルダ、タグ。必要な場合のみノート本文を求め、添付ファイルは求めません。",
         "provider": "プロバイダー: {{provider}}",
-        "providerRemote": "リモート",
-        "providerLocal": "この端末",
-        "counts": "{{notes}}件のノート · {{folders}}個のフォルダ · {{tags}}個のタグ",
         "estimatedChars": "約{{chars}}文字",
         "excluded": "フォルダがAIから除外されているため、ノートを{{count}}件除外しました",
-        "omitted": "モデルのコンテキストに収めるため、タイトルを{{count}}件省略しました",
         "showPayload": "送信される内容を正確に表示",
         "hidePayload": "ペイロードを隠す",
         "consentLabel": "この概要を{{provider}}に送信します(約{{chars}}文字)。プロバイダーが受け取ることを理解しています。",
@@ -4356,9 +4345,6 @@
         "apply": "{{count}}件の項目を保存",
         "applying": "保存中…",
         "applied": "メモリに{{count}}件の項目を保存しました。",
-        "appliedHelper": "このセクションの「保管庫から」の下にあります。アシスタントは今後そこから読み取ります。",
-        "finish": "完了",
-        "appliedToast": "保管庫からメモリを構築しました。",
         "refusals": {
           "empty": "この項目は空です。",
           "textTooLong": "この項目は2000文字の上限を超えています。",
@@ -4391,7 +4377,11 @@
         "removeAll": "すべて削除",
         "removeConfirm": "このシードのすべての項目を削除しますか？",
         "removedToast": "保管庫からの項目を削除しました。",
-        "rowStale": "このシード以降に保管庫が変更されています"
+        "rowStale": "このシード以降に保管庫が変更されています",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_other": "{{count}} folders",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "まだ何も覚えていません",
       "count": "{{used}} / {{cap}}",
@@ -5122,7 +5112,9 @@
       "unlockWithTouchId": "Touch IDでロック解除",
       "wrongCredential": "正しくありません。残り{{remaining}}回試行できます。",
       "showPin": "PINを表示",
-      "hidePin": "PINを非表示"
+      "hidePin": "PINを非表示",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "復元フローが中断されました。先に新しいパスワードを設定してください。",
     "recoveryInterruptedBody": "先に新しいパスワードを設定してから、保管庫を再封印してください。",

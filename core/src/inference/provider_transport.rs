@@ -202,6 +202,13 @@ pub struct ProviderHost {
 pub const PROVIDER_HOSTS: &[(&str, &str)] = &[
     ("ollama-cloud", "ollama.com"),
     ("openrouter", "openrouter.ai"),
+    // Two entries, one host: OpenCode Zen and Go are the same destination
+    // reached by different paths, and `RemoteProvider::chat_path` is what tells
+    // them apart. Collapsing them into one wire name would lose the header set
+    // Go requires; inventing a second host would be a destination that does not
+    // exist.
+    ("opencode-zen", "opencode.ai"),
+    ("opencode-go", "opencode.ai"),
 ];
 
 impl ProviderHost {
@@ -396,8 +403,9 @@ impl ProviderTransport {
         path: &str,
         body: &[u8],
         bearer: &str,
+        extra_headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Post, path, body, bearer)
+        self.exchange(HttpMethod::Post, path, body, bearer, extra_headers)
     }
 
     /// The read-side round trip — today exactly one caller, the model list
@@ -410,8 +418,13 @@ impl ProviderTransport {
     /// (`src-tauri/scripts/ai-no-network-check.sh`) records sites, and a
     /// parameterised verb would hide a second kind of request behind a name
     /// that says "post".
-    pub fn get_json(&self, path: &str, bearer: &str) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Get, path, &[], bearer)
+    pub fn get_json(
+        &self,
+        path: &str,
+        bearer: &str,
+        extra_headers: &[(&str, &str)],
+    ) -> Result<Vec<u8>, ProviderTransportError> {
+        self.exchange(HttpMethod::Get, path, &[], bearer, extra_headers)
     }
 
     /// Distinguish "the user stood this down" from "the far side broke". The
@@ -440,21 +453,40 @@ impl ProviderTransport {
         }
     }
 
+    /// The request head's header list: this arm's own `content-type` first,
+    /// then whatever the provider asked for.
+    ///
+    /// Its own function rather than three lines inside [`Self::exchange`] so
+    /// the assembled list is reachable from a test. The header set is the entire
+    /// mechanism that makes an OpenCode Go request routable, and a test that
+    /// stops at `RemoteProvider::extra_headers()` cannot see whether those
+    /// values ever reach the wire: deleting the `extend_from_slice` below left
+    /// every test in this file green while every Go request would have been
+    /// refused by the far side.
+    fn request_headers<'a>(extra_headers: &[(&'a str, &'a str)]) -> Vec<(&'a str, &'a str)> {
+        let mut headers: Vec<(&str, &str)> = Vec::with_capacity(1 + extra_headers.len());
+        headers.push(("content-type", "application/json"));
+        headers.extend_from_slice(extra_headers);
+        headers
+    }
+
     fn exchange(
         &self,
         method: HttpMethod,
         path: &str,
         body: &[u8],
         bearer: &str,
+        extra_headers: &[(&str, &str)],
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        let req = build_http_request_ext(
-            method,
-            path,
-            self.host.host(),
-            &[("content-type", "application/json")],
-            body,
-            Some(bearer),
-        );
+        // `content-type` first, then the provider's own. The extra set is
+        // supplied by `RemoteProvider::extra_headers`, which is the only place
+        // that knows a far side needs one (OpenCode Go refuses a request
+        // without `x-opencode-session`); nothing here is read from
+        // configuration, so a header name cannot be chosen by data any more
+        // than the host can.
+        let headers = Self::request_headers(extra_headers);
+        let req =
+            build_http_request_ext(method, path, self.host.host(), &headers, body, Some(bearer));
         // **How long the exchange took and how it ended** (myne-md/myne#546).
         // Without it, a request that is still in flight and a request that
         // completed are the same observation from outside the process: an
@@ -547,6 +579,53 @@ mod tests {
         // The socket wakes far more often than the deadline, which is what
         // makes a cancel observable while the provider is still thinking.
         assert!(POLL_INTERVAL < Duration::from_secs(1));
+    }
+
+    /// The provider's own headers reach the request BYTES, not just the list
+    /// `RemoteProvider::extra_headers()` returns.
+    ///
+    /// Asserted through the same two things `exchange` uses: `request_headers`
+    /// and the codec that serializes a head. Deleting the `extend_from_slice`
+    /// in `request_headers` leaves `extra_headers()` unchanged, so a test that
+    /// stopped there would stay green while every OpenCode Go request was
+    /// refused for a missing `x-opencode-session`.
+    #[test]
+    fn the_providers_headers_reach_the_request_head() {
+        let body = b"{}";
+        let head_for = |provider: crate::inference::provider_registry::RemoteProvider| {
+            let headers = ProviderTransport::request_headers(&provider.extra_headers());
+            let head = build_http_request_ext(
+                HttpMethod::Post,
+                provider.chat_path(),
+                provider.host().host(),
+                &headers,
+                body,
+                Some("k"),
+            );
+            String::from_utf8(head).expect("a request head is ASCII")
+        };
+
+        let go = head_for(crate::inference::provider_registry::RemoteProvider::OpenCodeGo);
+        assert!(
+            go.to_ascii_lowercase().contains("x-opencode-session: myne"),
+            "Go's session header must be on the wire; head was:\n{go}"
+        );
+        assert!(
+            go.to_ascii_lowercase().contains("user-agent: myne\r\n"),
+            "Go's user agent must be on the wire, and must name the product \
+             rather than one client; head was:\n{go}"
+        );
+        assert!(
+            go.contains("content-type: application/json"),
+            "the arm's own header must survive the provider's; head was:\n{go}"
+        );
+
+        // And a provider that needs nothing extra sends nothing extra: the
+        // negative half, which is what makes the positive half mean something.
+        let cloud = head_for(crate::inference::provider_registry::RemoteProvider::OllamaCloud);
+        let lower = cloud.to_ascii_lowercase();
+        assert!(!lower.contains("x-opencode-session"));
+        assert!(!lower.contains("user-agent"));
     }
 
     /// A provider that accepts and then never answers must fail **within the

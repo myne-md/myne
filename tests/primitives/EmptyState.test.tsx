@@ -20,6 +20,13 @@ afterEach(cleanup);
 
 const VARIANTS = ["firstRun", "filtered", "error", "loading"] as const;
 
+// Resolved from the project root, the way the settings block below does it:
+// `__dirname` does not exist under the jsdom environment and costs two counted
+// type errors, while `process.cwd()` resolves to the same tree from the root a
+// vitest run is started in.
+const NOTE_LIST = resolve(process.cwd(), "src/notes/components/NoteList.tsx");
+const SHEET = resolve(process.cwd(), "client-core/src/components.css");
+
 describe("the wash is on for every variant", () => {
   it.each(VARIANTS)("%s draws one", (variant) => {
     // Giving the texture to `firstRun` alone made the other three look like a
@@ -96,6 +103,56 @@ describe("a filled state marks itself so the CSS can drop the card", () => {
       el.getAttribute("data-size"),
       "and at sidebar size it would leave the words two words per line",
     ).toBe("md");
+  });
+});
+
+describe("an unframed state keeps its wash and drops its card", () => {
+  // The attribute is half the mechanism; the rule is the other half, and jsdom
+  // applies no external stylesheet, so deleting the rule would leave every
+  // assertion here green while the card came back on screen. Read it as text.
+  it("has a rule that actually drops the card", () => {
+    const sheet = readFileSync(SHEET, "utf8");
+    const at = sheet.indexOf('.myne-empty[data-frame="false"]');
+    expect(at, "no [data-frame=\"false\"] rule in components.css").toBeGreaterThan(-1);
+    const body = sheet.slice(sheet.indexOf("{", at) + 1, sheet.indexOf("}", at));
+    expect(body).toMatch(/border:\s*none/);
+    // The card's `--paper-2` fill goes; the WASH (its own element) is what stays,
+    // which is why this drops the background rather than the decoration.
+    expect(body).toMatch(/background:\s*transparent/);
+  });
+
+  it("sets data-frame only when the frame is refused", () => {
+    const { container: framed } = render(
+      <EmptyState variant="firstRun" icon="file-text" title="x" />,
+    );
+    expect(framed.querySelector(".myne-empty")?.getAttribute("data-frame")).toBeNull();
+
+    cleanup();
+    const { container: unframed } = render(
+      <EmptyState variant="firstRun" icon="file-text" title="x" frame={false} />,
+    );
+    const el = unframed.querySelector(".myne-empty")!;
+    expect(el.getAttribute("data-frame")).toBe("false");
+    // The distinction from `fill`: the wash STAYS. `fill` is for a state that
+    // becomes the surface; this is for one that sits inside a surface which is
+    // already a bordered panel (issue #970, item 4), and the wash is what keeps
+    // it reading as a destination rather than as a caption.
+    expect(el.querySelector(".myne-empty__wash")).not.toBeNull();
+  });
+
+  it("is what the sidebar's first-run state asks for", () => {
+    // The reported shape: a rounded, hairline-bordered card with a four-line
+    // paragraph and a button, nested inside the sidebar's own bordered panel.
+    // What is left is the glyph, two words and the wash.
+    const source = readFileSync(NOTE_LIST, "utf8");
+    const block = source.slice(source.indexOf("<ZeroState"));
+    const end = block.indexOf("/>");
+    expect(end, "the first ZeroState must be the sidebar's first-run one").toBeGreaterThan(0);
+    const call = block.slice(0, end);
+    expect(call).toContain("frame={false}");
+    expect(call, "the paragraph is gone").not.toContain("notes.list.emptyBody");
+    expect(call, "and the button with it").not.toContain("createFirstNote");
+    expect(call, "the title stays").toContain("notes.list.emptyState");
   });
 });
 

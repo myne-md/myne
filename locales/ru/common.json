@@ -1454,10 +1454,6 @@
           "copyFailed": "Не удалось скопировать",
           "copyYourMessage": "Скопировать своё сообщение",
           "emptyTitle": "Спросите о своих заметках",
-          "noticeLeaves": "Слова, которые вы печатаете, заметки, которые читает один ход, названия, идентификаторы и пути папок каждой заметки, которую этот запуск может прочитать (всё хранилище минус исключённые папки, если не сужать), текст, который Myne извлекла из любых файлов, прикреплённых к сообщению (до четырёх, каждый обрезан до 20 000 символов; сам файл остаётся здесь), и то, что ИИ помнит о вас, отправляются тому, кто отвечает. На этом устройстве больше ничего не отправляется.",
-          "noticeReceiver": "Отвечает: {{provider}}, которым Myne не управляет.",
-          "noticeReceiverLocal": "Отвечает: программа, работающая на этом устройстве. Ничего не покидает устройство, но эта программа не входит в Myne, и Myne не может видеть, что она с этим делает.",
-          "noticeRevoke": "Чтобы остановить это, выключите ИИ в настройках или смените там того, кто отвечает. Отзыв ключа провайдера немедленно останавливает этого провайдера.",
           "noticeSettingsCta": "Открыть настройки ИИ",
           "viewDiff": "Просмотреть изменения",
           "revertRun": "Отменить этот запуск",
@@ -1879,7 +1875,6 @@
       "noMatchingNotes": "Нет подходящих заметок",
       "noNotesYet": "Заметок пока нет",
       "noMatchBody": "Ничего не соответствует «{{name}}». Измените представление или сбросьте его, чтобы увидеть все заметки.",
-      "emptyBody": "Нажмите «Новая заметка», чтобы написать первую заметку. Всё шифруется на этом устройстве перед сохранением.",
       "unarchive": "Разархивировать"
     },
     "filterSheet": {
@@ -2665,7 +2660,6 @@
       "bulkMove_other": "Переместить {{count}} заметок в…",
       "caseMergeBody": "Папка с именем «{{name}}» уже существует. Они будут объединены. Переименовать одну, чтобы оставить их отдельно?",
       "color": "Цвет…",
-      "createFirstNote": "Создайте свою первую заметку",
       "createFolderNote": "Создать заметку папки",
       "customize": "Настроить…",
       "delete": "Удалить",
@@ -2733,7 +2727,6 @@
       "treeLabel": "Заметки и папки",
       "selectionAnnouncement": "Выбрано: {{title}}",
       "untitled": "Без названия",
-      "emptyBody": "Заметки — это обычный markdown, зашифрованный на этом устройстве, прежде чем они куда-либо попадут. Создайте заметку, чтобы начать, или нажмите строку поиска выше, чтобы выполнить любую команду.",
       "search": "Поиск"
     },
     "newFromTemplate": {
@@ -3458,7 +3451,8 @@
       "diagnosticFilesHelper_one": "Один файл содержал бы этот блок плюс {{count}} файл журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
       "diagnosticFilesHelper_other": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
       "diagnosticFilesHelper_few": "Один файл содержал бы этот блок плюс {{count}} файла журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
-      "diagnosticFilesHelper_many": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт."
+      "diagnosticFilesHelper_many": "Один файл содержал бы этот блок плюс {{count}} файлов журнала, всего {{size}}. Никуда ничего не отправляется; вы выбираете, куда он пойдёт.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Сменить пароль",
@@ -4600,17 +4594,12 @@
         "rebuildConfirm": "Заменить построение от {{date}} (записей: {{count}})?",
         "title": "Обучить Myne вашему хранилищу",
         "candidatesTitle": "Проверьте, чему Myne научилась",
-        "doneTitle": "Сохранено",
         "close": "Закрыть",
         "loading": "Чтение вашего хранилища…",
         "scopeIntro": "Myne сначала читает форму вашего хранилища: названия заметок, папки и теги. Текст заметок запрашивается только если нужен, и никогда вложения.",
         "provider": "Провайдер: {{provider}}",
-        "providerRemote": "удалённый",
-        "providerLocal": "на этом устройстве",
-        "counts": "Заметок: {{notes}} · папок: {{folders}} · тегов: {{tags}}",
         "estimatedChars": "Около {{chars}} символов",
         "excluded": "Оставлено без внимания заметок: {{count}}, потому что их папка исключена из ИИ",
-        "omitted": "Названий пропущено, чтобы уложиться в контекст модели: {{count}}",
         "showPayload": "Показать, что именно будет отправлено",
         "hidePayload": "Скрыть полезную нагрузку",
         "consentLabel": "Отправить этот обзор в {{provider}} (около {{chars}} символов). Я понимаю, что провайдер его получает.",
@@ -4626,9 +4615,6 @@
         "apply": "Сохранить {{count}} записей",
         "applying": "Сохранение…",
         "applied": "Сохранено записей в память: {{count}}.",
-        "appliedHelper": "Найдёте их в разделе «Из вашего хранилища» здесь же. Ассистент читает их с этого момента.",
-        "finish": "Готово",
-        "appliedToast": "Память построена из вашего хранилища.",
         "refusals": {
           "empty": "Эта запись пуста.",
           "textTooLong": "Эта запись превышает лимит в 2000 символов.",
@@ -4661,7 +4647,20 @@
         "removeAll": "Удалить все",
         "removeConfirm": "Удалить все записи этого построения?",
         "removedToast": "Записи из вашего хранилища удалены.",
-        "rowStale": "Хранилище изменилось с момента построения"
+        "rowStale": "Хранилище изменилось с момента построения",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_few": "{{count}} notes",
+        "countNotes_many": "{{count}} notes",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_few": "{{count}} folders",
+        "countFolders_many": "{{count}} folders",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_few": "{{count}} tags",
+        "countTags_many": "{{count}} tags",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Пока ничего не запомнено",
       "count": "{{used}} из {{cap}}",
@@ -5412,7 +5411,9 @@
       "unlockWithTouchId": "Разблокировать с Touch ID",
       "wrongCredential": "Неверно. Осталось попыток: {{remaining}}.",
       "showPin": "Показать PIN-код",
-      "hidePin": "Скрыть PIN-код"
+      "hidePin": "Скрыть PIN-код",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Процесс восстановления был прерван. Сначала задайте новый пароль.",
     "recoveryInterruptedBody": "Сначала задайте новый пароль, затем заново запечатайте хранилище.",

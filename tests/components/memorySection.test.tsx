@@ -116,6 +116,30 @@ describe("MemorySection: the roster is bounded, counted, and honest at the cap",
 });
 
 describe("MemorySection: the seed group is separate and removable", () => {
+  // Issue #970, item 12. The row's meta line ended "· v1": `version` is the
+  // causal counter conflict resolution compares, and a reader has no action it
+  // implies. A number nobody can act on reads as an unexplained status.
+  it("states when the entry changed and not its internal version", async () => {
+    mockMemoryList.mockResolvedValue({
+      rows: [
+        {
+          id: "user1",
+          created_at: 1,
+          updated_at: 2,
+          version: 7,
+          quarantined: false,
+        },
+      ],
+      cap: 100,
+    });
+    render(<MemorySection aiEnabled onShowToast={() => {}} />);
+    const row = await screen.findByTestId("settings.memory.row");
+    const meta = row.querySelector("p:last-of-type");
+    expect(meta?.textContent).not.toContain("v7");
+    expect(meta?.textContent).not.toMatch(/\bv\d/);
+    expect(meta?.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
   it("groups seed rows apart from everything else", async () => {
     const seed = (id: string) => ({
       id,

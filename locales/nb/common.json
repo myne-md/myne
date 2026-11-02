@@ -1330,10 +1330,6 @@
           "copyFailed": "Kunne ikke kopiere",
           "copyYourMessage": "Kopier meldingen din",
           "emptyTitle": "Spør om notatene dine",
-          "noticeLeaves": "Ordene du skriver, notatene en runde leser, titlene, identifikatorene og mappestiene til hvert notat kjøringen kan lese (hele hvelvet minus utelatte mapper, med mindre du begrenser det), teksten Myne hentet ut av eventuelle filer du legger ved en melding (inntil fire, hver avkuttet ved 20 000 tegn; selve filen blir her), og hva AI-en husker om deg sendes til det som svarer. Ingenting annet på denne enheten sendes.",
-          "noticeReceiver": "Det som svarer: {{provider}}, som Myne ikke drifter.",
-          "noticeReceiverLocal": "Det som svarer: et program som kjører på denne enheten. Ingenting forlater maskinen, men det programmet er ikke en del av Myne, og Myne kan ikke se hva det gjør med dem.",
-          "noticeRevoke": "For å stoppe det, slå av AI i Innstillinger, eller endre det som svarer der. Å tilbakekalle en leverandørnøkkel stopper den leverandøren umiddelbart.",
           "noticeSettingsCta": "Åpne AI-innstillinger",
           "viewDiff": "Vis endringer",
           "revertRun": "Angre denne kjøringen",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Ingen samsvarende notater",
       "noNotesYet": "Ingen notater ennå",
       "noMatchBody": "Ingenting samsvarer med «{{name}}». Rediger visningen eller fjern den for å se alle notater.",
-      "emptyBody": "Trykk «Nytt notat» for å skrive ditt første notat. Alt krypteres på denne enheten før det lagres.",
       "unarchive": "Fjern fra arkiv"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "Flytt {{count}} notater til…",
       "caseMergeBody": "En mappe med navnet «{{name}}» finnes allerede. Disse vil bli slått sammen. Gi den ene nytt navn for å holde dem adskilt?",
       "color": "Farge…",
-      "createFirstNote": "Opprett ditt første notat",
       "createFolderNote": "Opprett mappenotat",
       "customize": "Tilpass…",
       "delete": "Slett",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Notater og mapper",
       "selectionAnnouncement": "Valgt {{title}}",
       "untitled": "Uten tittel",
-      "emptyBody": "Notater er vanlig markdown, kryptert på denne enheten før de går noe sted. Opprett ett for å komme i gang, eller trykk på søkefeltet ovenfor for å kjøre en kommando.",
       "search": "Søk"
     },
     "newFromTemplate": {
@@ -3222,7 +3215,8 @@
         "diagnostics": "Diagnostikk"
       },
       "diagnosticFilesHelper_one": "Én fil vil inneholde denne blokken pluss {{count}} loggfil, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
-      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner."
+      "diagnosticFilesHelper_other": "Én fil vil inneholde denne blokken pluss {{count}} loggfiler, {{size}} til sammen. Ingenting sendes noe sted; du velger hvor den havner.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Endre passord",
@@ -4330,17 +4324,12 @@
         "rebuildConfirm": "Erstatt såingen fra {{date}} ({{count}} oppføringer)?",
         "title": "Lær Myne hvelvet ditt",
         "candidatesTitle": "Gjennomgå det Myne lærte",
-        "doneTitle": "Lagret",
         "close": "Lukk",
         "loading": "Leser hvelvet ditt…",
         "scopeIntro": "Myne leser formen på hvelvet ditt først: notattitler, mapper og tagger. Det ber om notattekst bare hvis det trenger det, og aldri for vedlegg.",
         "provider": "Leverandør: {{provider}}",
-        "providerRemote": "ekstern",
-        "providerLocal": "på denne enheten",
-        "counts": "{{notes}} notater · {{folders}} mapper · {{tags}} tagger",
         "estimatedChars": "Omtrent {{chars}} tegn",
         "excluded": "{{count}} notater utelatt fordi mappen er utelatt fra AI",
-        "omitted": "{{count}} titler utelatt for å passe modellens kontekst",
         "showPayload": "Vis nøyaktig hva som sendes",
         "hidePayload": "Skjul nyttelasten",
         "consentLabel": "Send dette sammendraget til {{provider}} (omtrent {{chars}} tegn). Jeg forstår at leverandøren mottar det.",
@@ -4356,9 +4345,6 @@
         "apply": "Lagre {{count}} oppføringer",
         "applying": "Lagrer…",
         "applied": "Lagret {{count}} oppføringer i minnet.",
-        "appliedHelper": "Finn dem under Fra hvelvet ditt i denne delen. Assistenten leser dem fra nå av.",
-        "finish": "Ferdig",
-        "appliedToast": "Minne bygget fra hvelvet ditt.",
         "refusals": {
           "empty": "Denne oppføringen er tom.",
           "textTooLong": "Denne oppføringen er over 2000-tegnsgrensen.",
@@ -4391,7 +4377,14 @@
         "removeAll": "Fjern alle",
         "removeConfirm": "Fjerne alle oppføringer fra denne såingen?",
         "removedToast": "Oppføringer fra hvelvet ditt fjernet.",
-        "rowStale": "Hvelvet har endret seg siden denne såingen"
+        "rowStale": "Hvelvet har endret seg siden denne såingen",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Ingenting husket ennå",
       "count": "{{used}} av {{cap}}",
@@ -5122,7 +5115,9 @@
       "unlockWithTouchId": "Lås opp med Touch ID",
       "wrongCredential": "Feil. {{remaining}} forsøk igjen.",
       "showPin": "Vis PIN",
-      "hidePin": "Skjul PIN"
+      "hidePin": "Skjul PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Gjenopprettingsflyten ble avbrutt. Angi et nytt passord først.",
     "recoveryInterruptedBody": "Angi et nytt passord først, og forsegl deretter hvelvet på nytt.",

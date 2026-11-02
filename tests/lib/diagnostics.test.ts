@@ -113,6 +113,38 @@ describe("engine label", () => {
     expect(label).not.toContain("Android");
   });
 
+  // Issue #970, item 14. The block said `engine: unknown` on BOTH desktop
+  // hosts, because neither UA carries a `Version/… Safari` pair or a Chrome
+  // token: macOS WKWebView and Linux WebKitGTK send `AppleWebKit/<ver>` and
+  // nothing else the five rules above recognise. The app's two primary desktop
+  // surfaces reported no engine at all.
+  it("names WebKit for the desktop WebViews", () => {
+    const WKWEBVIEW =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+    const WEBKITGTK =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+    expect(engineLabel(WKWEBVIEW)).toBe("WebKit 605");
+    expect(engineLabel(WEBKITGTK)).toBe("WebKit 605");
+    // iOS WKWebView, which adds a `Mobile/… Safari/604.1` tail but still no
+    // `Version/`.
+    expect(
+      engineLabel(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari/604.1",
+      ),
+    ).toBe("WebKit 605");
+  });
+
+  it("still prefers the specific engine over WebKit", () => {
+    // The rule above is last on purpose: every Chromium UA carries
+    // `AppleWebKit/537.36`, so a WebKit rule placed anywhere earlier would
+    // relabel every Chrome and Edge user.
+    expect(
+      engineLabel(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      ),
+    ).toBe("Chrome 140");
+  });
+
   it("says `unknown` rather than guessing", () => {
     expect(engineLabel("some-crawler/1.0")).toBe("unknown");
   });

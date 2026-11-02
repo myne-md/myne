@@ -2087,9 +2087,9 @@ Used in: `threat-model.md` §3 TB12, §1 A16; `decisions.md` 2026-08-09
 
 ### **remote AI provider** &nbsp; 📦 *Product*
 
-An off-device AI service the user names — Ollama Cloud or OpenRouter — that receives note plaintext over the network (**TB13**). The **first** thing in Myne's history that sends note content anywhere but a sync server as opaque ciphertext, and the reason this class is bounded on four sides: opt-in and default off, an explicit one-time consent step naming what is sent, barred from every surface that fires without the user asking, and limited to user-initiated work. Its operator is **A17**, an honest-but-curious party that legitimately receives what it is sent; Myne makes no claim about what happens to a request afterwards, and with a broker like OpenRouter cannot even fully enumerate who receives it.
+An off-device AI service the user names — Ollama Cloud, OpenRouter, OpenCode Zen or OpenCode Go — that receives note plaintext over the network (**TB13**). The **first** thing in Myne's history that sends note content anywhere but a sync server as opaque ciphertext, and the reason this class is bounded on four sides: opt-in and default off, an explicit one-time consent step naming what is sent, barred from every surface that fires without the user asking, and limited to user-initiated work. Its operator is **A17**, an honest-but-curious party that legitimately receives what it is sent; Myne makes no claim about what happens to a request afterwards, and with a broker like OpenRouter cannot even fully enumerate who receives it. Two of the four are products of one operator (**OpenCode Zen** and **OpenCode Go**) that share a host and are told apart by path alone, so the destination set is no longer inferable from the host set (`decisions/ai/0769`).
 
-Used in: `threat-model.md` §3 TB13, §1 A17; `decisions.md` 2026-08-09
+Used in: `threat-model.md` §3 TB13, §1 A17; `decisions.md` 2026-08-09; `decisions/ai/0769`
 
 ### **named provider** &nbsp; 📦 *Product*
 

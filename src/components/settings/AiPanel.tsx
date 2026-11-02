@@ -111,7 +111,7 @@ import {
 } from "../../notes/listFolderPaths";
 import { AiProviderConsent } from "./AiProviderConsent";
 import { Switch } from "../primitives/Switch";
-import { CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
+import { CHAT_HISTORY_BUDGET_DEFAULT, CHAT_HISTORY_BUDGET_MAX } from "../../lib/agent-run";
 import { SettingRow } from "./SettingRow";
 import { SettingsTopicPanel } from "./SettingsTabs";
 import { SettingsSection } from "./SettingsSection";
@@ -223,11 +223,18 @@ const ENDPOINT_PLACEHOLDER = "http://127.0.0.1:11434";
  * disabled one.
  *
  * Not a free-form field, and not a curated list Myne maintains beyond these
- * two: a destination the user types is one the consent screen cannot name.
+ * four: a destination the user types is one the consent screen cannot name.
+ *
+ * **OpenCode Zen and OpenCode Go are two rows on one host** (myne-md/myne#970).
+ * They are separate products with separate keys, separate billing and separate
+ * catalogues, and the registry separates them by PATH rather than by host, so
+ * the row the user picks is what decides which path a request takes.
  */
 const REMOTE_PROVIDERS: { wire: string; label: string }[] = [
   { wire: "ollama-cloud", label: "Ollama Cloud" },
   { wire: "openrouter", label: "OpenRouter" },
+  { wire: "opencode-zen", label: "OpenCode Zen" },
+  { wire: "opencode-go", label: "OpenCode Go" },
 ];
 
 /** One mapping, shared with the chat transcript (#191 task 4) — this used to be
@@ -1872,6 +1879,20 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
             disabled={!aiEnabled}
             min={0}
             max={CHAT_HISTORY_BUDGET_MAX}
+            step={1}
+            // The empty state is a real third state ("seed the host's default"),
+            // and until issue #970 it rendered as a blank box with a native
+            // stepper and no text at all, which reads as a control that failed
+            // to load rather than one that is deliberately unset. Naming the
+            // number the empty field stands for is the whole fix: the helper
+            // behind the question mark says "leave empty for the default", and
+            // this says which default. A placeholder is greyed by the browser,
+            // so it still cannot be mistaken for a stored value.
+            placeholder={String(CHAT_HISTORY_BUDGET_DEFAULT)}
+            // `inputMode` because a `type="number"` field on a phone keyboard
+            // opens a numeric pad from this hint, not from the type alone on
+            // every platform.
+            inputMode="numeric"
             value={historyBudgetDraft}
             onChange={(e) => setHistoryBudgetDraft(e.target.value)}
             onBlur={(e) => {
@@ -1915,7 +1936,9 @@ export function AiPanel({ onShowToast, onDialogOpenChange }: AiPanelProps) {
                 : `${helperId} ${explanationId}`
             }
             data-testid="ai.history-budget-input"
-            style={{ width: "8ch" }}
+            // Wide enough for the longest value the ceiling allows (12 000) plus
+            // the stepper: at 8ch the spinner overlapped the last digit.
+            style={{ width: "10ch" }}
           />
         )}
       />

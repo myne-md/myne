@@ -1454,10 +1454,6 @@
           "copyFailed": "Nie udało się skopiować",
           "copyYourMessage": "Kopiuj swoją wiadomość",
           "emptyTitle": "Zapytaj o swoje notatki",
-          "noticeLeaves": "Słowa, które piszesz, notatki, które czyta przebieg, tytuły, identyfikatory i ścieżki folderów każdej notatki, którą przebieg może przeczytać (cały skarbiec minus Twoje wykluczone foldery, chyba że go zawęzisz), tekst, który Myne wyodrębniło z plików dołączonych do wiadomości (do czterech, każdy ucięty do 20 000 znaków; sam plik zostaje tu), i to, co AI pamięta o Tobie, są wysyłane do tego, co odpowiada. Nic innego na tym urządzeniu nie jest wysyłane.",
-          "noticeReceiver": "Odpowiada: {{provider}}, którego Myne nie prowadzi.",
-          "noticeReceiverLocal": "Odpowiada: program działający na tym urządzeniu. Nic nie opuszcza tego komputera, ale ten program nie jest częścią Myne i Myne nie widzi, co z nimi robi.",
-          "noticeRevoke": "Aby to zatrzymać, wyłącz AI w Ustawieniach albo zmień tam to, co odpowiada. Odebranie klucza dostawcy natychmiast zatrzymuje tego dostawcę.",
           "noticeSettingsCta": "Otwórz ustawienia AI",
           "viewDiff": "Zobacz zmiany",
           "revertRun": "Cofnij ten przebieg",
@@ -1879,7 +1875,6 @@
       "noMatchingNotes": "Brak pasujących notatek",
       "noNotesYet": "Brak notatek",
       "noMatchBody": "Nic nie pasuje do „{{name}}”. Edytuj widok lub wyczyść go, aby zobaczyć wszystkie notatki.",
-      "emptyBody": "Dotknij „Nowa notatka”, aby napisać pierwszą notatkę. Wszystko jest szyfrowane na tym urządzeniu przed zapisaniem.",
       "unarchive": "Przywróć z archiwum"
     },
     "filterSheet": {
@@ -2665,7 +2660,6 @@
       "bulkMove_other": "Przenieś {{count}} notatek do…",
       "caseMergeBody": "Folder o nazwie „{{name}}” już istnieje. Zostaną one scalone. Zmienić nazwę jednego, aby zachować je osobno?",
       "color": "Kolor…",
-      "createFirstNote": "Utwórz swoją pierwszą notatkę",
       "createFolderNote": "Utwórz notatkę folderu",
       "customize": "Dostosuj…",
       "delete": "Usuń",
@@ -2733,7 +2727,6 @@
       "treeLabel": "Notatki i foldery",
       "selectionAnnouncement": "Wybrano {{title}}",
       "untitled": "Bez tytułu",
-      "emptyBody": "Notatki to zwykły Markdown, szyfrowany na tym urządzeniu, zanim cokolwiek opuści to urządzenie. Utwórz jedną, aby zacząć, albo naciśnij wiersz wyszukiwania powyżej, aby uruchomić dowolne polecenie.",
       "search": "Szukaj"
     },
     "newFromTemplate": {
@@ -3458,7 +3451,8 @@
       "diagnosticFilesHelper_one": "Jeden plik zawierałby ten blok oraz {{count}} plik dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_other": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_few": "Jeden plik zawierałby ten blok oraz {{count}} pliki dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
-      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi."
+      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
+      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
     },
     "vault": {
       "changePasswordButton": "Zmień hasło",
@@ -4600,17 +4594,12 @@
         "rebuildConfirm": "Zastąpić seed z {{date}} ({{count}} wpisów)?",
         "title": "Naucz Myne swojego skarbca",
         "candidatesTitle": "Przejrzyj to, czego Myne się nauczyło",
-        "doneTitle": "Zapisano",
         "close": "Zamknij",
         "loading": "Wczytywanie Twojego skarbca…",
         "scopeIntro": "Myne najpierw wczytuje kształt Twojego skarbca: tytuły notatek, foldery i tagi. Prosi o tekst notatki tylko wtedy, gdy go potrzebuje, i nigdy o załączniki.",
         "provider": "Dostawca: {{provider}}",
-        "providerRemote": "zdalny",
-        "providerLocal": "na tym urządzeniu",
-        "counts": "{{notes}} notatek · {{folders}} folderów · {{tags}} tagów",
         "estimatedChars": "Około {{chars}} znaków",
         "excluded": "{{count}} notatek pominięto, bo ich folder jest wyłączony z AI",
-        "omitted": "Pominięto {{count}} tytułów, żeby zmieścić się w kontekście modelu",
         "showPayload": "Pokaż dokładnie to, co zostanie wysłane",
         "hidePayload": "Ukryj ładunek",
         "consentLabel": "Wyślij ten szkic do {{provider}} (około {{chars}} znaków). Rozumiem, że dostawca go otrzyma.",
@@ -4626,9 +4615,6 @@
         "apply": "Zapisz {{count}} wpisów",
         "applying": "Zapisywanie…",
         "applied": "Zapisano {{count}} wpisów w pamięci.",
-        "appliedHelper": "Znajdziesz je pod „Z Twojego skarbca” w tej sekcji. Asystent czyta je od teraz.",
-        "finish": "Gotowe",
-        "appliedToast": "Pamięć zbudowana z Twojego skarbca.",
         "refusals": {
           "empty": "Ten wpis jest pusty.",
           "textTooLong": "Ten wpis przekracza limit 2000 znaków.",
@@ -4661,7 +4647,20 @@
         "removeAll": "Usuń wszystkie",
         "removeConfirm": "Usunąć wszystkie wpisy z tego seedu?",
         "removedToast": "Usunięto wpisy z Twojego skarbca.",
-        "rowStale": "Skarbiec zmienił się od tego seedu"
+        "rowStale": "Skarbiec zmienił się od tego seedu",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_few": "{{count}} notes",
+        "countNotes_many": "{{count}} notes",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_few": "{{count}} folders",
+        "countFolders_many": "{{count}} folders",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_few": "{{count}} tags",
+        "countTags_many": "{{count}} tags",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Jeszcze nic nie pamięta",
       "count": "{{used}} z {{cap}}",
@@ -5412,7 +5411,9 @@
       "unlockWithTouchId": "Odblokuj za pomocą Touch ID",
       "wrongCredential": "Nieprawidłowe. Pozostało prób: {{remaining}}.",
       "showPin": "Pokaż PIN",
-      "hidePin": "Ukryj PIN"
+      "hidePin": "Ukryj PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Proces odzyskiwania został przerwany. Najpierw ustaw nowe hasło.",
     "recoveryInterruptedBody": "Najpierw ustaw nowe hasło, a następnie ponownie zabezpiecz swój skarbiec.",

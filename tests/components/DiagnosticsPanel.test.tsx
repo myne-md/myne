@@ -63,6 +63,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
+// The desktop caveat is gated on the runtime, so the flag has to be drivable.
+const { env } = vi.hoisted(() => ({ env: { tauri: false } }));
+vi.mock("../../src/lib/app-window", () => ({
+  get HAS_TAURI() {
+    return env.tauri;
+  },
+}));
+
 import { DiagnosticsPanel } from "../../src/components/settings/DiagnosticsPanel";
 
 beforeEach(() => {
@@ -83,6 +91,25 @@ describe("DiagnosticsPanel — the report block", () => {
     expect(preview.style.whiteSpace).toBe("pre-wrap");
     expect(preview.style.overflowWrap).toBe("anywhere");
     expect(preview.style.resize).toBe("");
+  });
+
+  // Issue #970, item 14. `bundleHash: unknown` and `storageUsedMb: 0` are both
+  // CORRECT on desktop and both read as the app failing to know itself: a
+  // desktop build has no served bundle to hash, and the storage estimate
+  // measures the WebView's store rather than the vault on disk. The block says
+  // so where it is read, and only on the client where it is true.
+  it("explains the two desktop fields that read as unknown or zero", () => {
+    env.tauri = true;
+    render(<DiagnosticsPanel />);
+    expect(document.body.textContent).toContain(
+      "settings.about.diagnosticBlockHelperDesktop",
+    );
+    cleanup();
+    env.tauri = false;
+    render(<DiagnosticsPanel />);
+    expect(document.body.textContent).not.toContain(
+      "settings.about.diagnosticBlockHelperDesktop",
+    );
   });
 
   it("keeps the preview's settings-search anchor on the canon block root", () => {
