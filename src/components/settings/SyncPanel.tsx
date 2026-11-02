@@ -20,7 +20,6 @@ import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
 import { MemberRosterPanel } from "../sync/MemberRosterPanel";
-import { DeviceAttributionPanel } from "../sync/DeviceAttributionPanel";
 import { PersonIdentityUnlock } from "../sync/PersonIdentityUnlock";
 import { PersonRegisterDialog } from "../sync/PersonRegisterDialog";
 import { DeviceJoinQrDialog } from "../sync/DeviceJoinQrDialog";
@@ -948,40 +947,29 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
           joins the account roster. */}
       </SettingsSection>
 
-      {/* Both member blocks share ONE capability and are gated together, which
-          is the absent-not-disabled rule: on the web client there is no
-          person-identity carrier, so neither renders.
+      {/* The member roster needs a capability, which is the absent-not-disabled
+          rule: on the web client there is no person-identity carrier, so it
+          does not render at all.
 
           **No outer section here** (myne-md/myne#885 visual pass). The roster
           brings its own sections (identity, members, invitations), so wrapping
           it in a `Members` section drew "Members" three times: the outer
           heading, the block's own "Vault members" title, and the roster's inner
-          heading. Each block is a section of its own instead, at one level. */}
+          heading. It is a section of its own instead, at one level.
+
+          The separate `MEMBER DEVICES` block that used to sit here is gone
+          (myne-md/myne#976): it listed every device in the vault with the member
+          who claimed it, offered no action on anyone else's row, and duplicated
+          on a fourth surface what the roster and the two device lists above
+          already say. Its two useful facts moved INTO the roster, which is where
+          a reader already looks: a device count beside each member, and one
+          section line when a claim did not verify. */}
       {hasCapability("memberSharing") && (
-        <>
         <div data-setting-anchor="sync.members" data-setting-row="true">
           <MemberRosterPanel
             onDialogOpenChange={setRosterDialogOpen}
           />
         </div>
-
-      {/* The vault's devices with the member each is CLAIMED by (myne-md/myne#852
-          story 11). A separate block from the device list above and not a column
-          on it: that list is the devices of THIS ACCOUNT (`sync_list_devices`),
-          while a member's device is enrolled on the member's own account, so the
-          devices story 11 is about can never appear there. Same gate as the
-          roster, for the same reason: on a client with no person-identity
-          carrier there is no member to attribute a device to, and the store
-          itself is group-tier sealed. */}
-        {/* One heading, not two. The panel draws its own `SettingsSection`, and
-            wrapping it in a second one put "MEMBER DEVICES" above "CLAIMED
-            DEVICES": two titles for one block, which is the shape that made the
-            owner read three separate device lists on this topic (2026-10-25).
-            The anchor div stays, because the settings search scrolls to it. */}
-        <div style={BLOCK_STYLE} data-setting-anchor="sync.device-bindings" data-setting-row="true">
-          <DeviceAttributionPanel />
-        </div>
-        </>
       )}
       </SettingsTopicPanel>
 

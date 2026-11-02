@@ -5,7 +5,10 @@
 // family, myne-md/myne#852). Shared by both clients because the store is: the
 // desktop and the mobile client read the SAME `vault.device-bindings` through
 // the SAME `myne-core` command cores, and this is the shape
-// `device_bindings_list` / `device_bindings_claim` return.
+// `device_bindings_list` returns. That is the family's only command since
+// myne-md/myne#976: the write went with the `MEMBER DEVICES` panel, and the one
+// conflict it repaired is repaired by the sync cycle on the device that is party
+// to it.
 //
 // TODO(Phase-1-end): replace this hand-written mirror with a `ts-rs`
 // auto-generated artifact plus a CI drift check, like every other file in this

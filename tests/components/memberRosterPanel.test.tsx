@@ -7,7 +7,7 @@
 // Covers the parking gate: member removal is disabled until the roster wire
 // ships, so no Remove button renders and the disabled notice does.
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   cleanup,
   fireEvent,
@@ -17,13 +17,20 @@ import {
   within,
 } from "@testing-library/react";
 import type { RosterMemberView } from "../../src/lib/invite";
+import type { DeviceAttributionView } from "../../src/lib/deviceBindings";
 import {
   resetPersonIdentityState,
   setPersonIdentityState,
 } from "../../src/components/sync/personIdentityState";
 
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  // `count` is interpolated because the roster's device lines are pluralised
+  // (`_one` / `_other` in the catalog), and a mock that always answered the bare
+  // key could not tell "1 device claim" from "3 device claims".
+  useTranslation: () => ({
+    t: (key: string, opts?: Record<string, unknown>) =>
+      opts && "count" in opts ? `${key}:${String(opts.count)}` : key,
+  }),
 }));
 
 // The member display-name writers (myne-md/myne#851 task 6). Mocked so the row
@@ -89,6 +96,12 @@ let mockVaultInvites: Array<{
 let mockError: string | null = null;
 let mockErrorKind: string | null = null;
 
+// The signature-verified binding view per test (myne-md/myne#976). The roster is
+// the only surface that renders it now: the `MEMBER DEVICES` panel it used to
+// live on is gone. `null` is the absent/unshared state, which draws nothing.
+let mockBindingsView: DeviceAttributionView | null = null;
+let mockBindingsError: string | null = null;
+
 /** One row over the base fixture, so a test states only what it is about. */
 const rowView = (over: Partial<RosterMemberView>): RosterMemberView => ({
   ...mockMembers[0],
@@ -120,6 +133,16 @@ vi.mock("../../src/hooks/useRoster", () => ({
 
 vi.mock("../../src/hooks/usePrefs", () => ({
   usePrefs: () => ({ prefs: { label: "Test vault" } }),
+}));
+
+vi.mock("../../src/hooks/useDeviceBindings", () => ({
+  useDeviceBindings: () => ({
+    view: mockBindingsView,
+    loading: false,
+    error: mockBindingsError,
+    shared: mockBindingsView !== null,
+    refresh: vi.fn(),
+  }),
 }));
 
 vi.mock("../../src/hooks/useFocusTrap", () => ({
@@ -763,6 +786,83 @@ describe("MemberRosterPanel name invitation", () => {
     } finally {
       cleanup();
       mockMembers = previous;
+    }
+  });
+});
+
+// The two facts the deleted `MEMBER DEVICES` panel still owed (myne-md/myne#976).
+//
+// The panel listed every device in the vault beside the member who claimed it, and
+// nothing on it could be acted on but your own row. What survives is what nothing
+// else said: how many devices each member has claimed HERE, and whether any claim
+// failed verification. Both now live where a reader already looks.
+describe("MemberRosterPanel device claims", () => {
+  const row = (person: string, deviceByte: string) => ({
+    device_id_hex: deviceByte.repeat(32),
+    person_fingerprint_hex: person,
+    person_id_hex: null,
+    member_name: null,
+    is_this_device: false,
+  });
+
+  afterEach(() => {
+    mockBindingsView = null;
+    mockBindingsError = null;
+  });
+
+  it("counts a member's claimed devices on their row", () => {
+    mockMembers = [
+      rowView({ fingerprint_hex: "11".repeat(32), display_name: "Two Devices" }),
+      rowView({ fingerprint_hex: "22".repeat(32), display_name: "No Devices" }),
+    ];
+    mockBindingsView = {
+      rows: [row("11".repeat(32), "a"), row("11".repeat(32), "b")],
+      unverified_device_ids: [],
+    };
+    render(<MemberRosterPanel />);
+    try {
+      const counts = screen.getAllByTestId("member-roster.device-count");
+      expect(counts).toHaveLength(1);
+      expect(counts[0].textContent).toContain("sync.memberRoster.deviceCount:2");
+      // Zero is ABSENT rather than "0 devices": a member with no claim here is
+      // not a fact worth a line about a thing that does not exist.
+      expect(screen.getByText("No Devices")).toBeDefined();
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("states an unverified claim once and never renders the device id", () => {
+    mockBindingsView = {
+      rows: [row("11".repeat(32), "a")],
+      unverified_device_ids: ["f".repeat(32), "e".repeat(32)],
+    };
+    const { container } = render(<MemberRosterPanel />);
+    try {
+      const line = screen.getByTestId("member-roster.device-claims-unverified");
+      expect(line.textContent).toContain("sync.memberRoster.deviceClaimsUnverified:2");
+      // The invariant the panel itself carried, kept: `unverified_device_ids`
+      // names devices and no persons, so an id beside a member's name would be
+      // the attribution the backend's partition exists to withhold.
+      expect(container.innerHTML).not.toContain("f".repeat(32));
+      expect(container.innerHTML).not.toContain("e".repeat(32));
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("reports an unreadable store rather than an empty one", () => {
+    mockBindingsView = null;
+    mockBindingsError = "sync.deviceBindings.errorUnreadable";
+    render(<MemberRosterPanel />);
+    try {
+      const failure = screen.getByTestId("member-roster.device-claims-error");
+      expect(failure.textContent).toBe("sync.deviceBindings.errorUnreadable");
+      // A damaged store answering as "no claims" is the one way this line could
+      // be silently wrong, so the failure is not folded into the empty state.
+      expect(screen.queryByTestId("member-roster.device-claims-unverified")).toBeNull();
+    } finally {
+      cleanup();
     }
   });
 });

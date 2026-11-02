@@ -6,27 +6,25 @@
 # The family is the B2B device-to-person binding store: the encrypted
 # `vault.device-bindings` (`MYU5`) singleton, group-tier sealed and `NTV6`-only
 # (protocol.md §9.30, the member-devices feature). Ported from the desktop
-# `src-tauri/permissions/device-binding/default.toml`: the same two commands, no
-# mobile-only addition and none dropped. Every command is Slot::Unlocked-gated.
-# `device_bindings_claim` is a WRITE setter, and it can only ever write the CALLER'S OWN
-# row: the row key is the session's enrolled device id and the signer is the session's own
-# person key, both read from the session rather than from a command argument, so the ACL
-# grants no authority over another device's binding. Neither command writes a tombstone:
-# an owner's removal tombstone is written inside the group rotation, which is not
-# reachable over IPC. Like the other write-capable plugins, v0.2 multi-window MUST NOT
-# grant `allow-device-bindings-claim` to any non-main window. Neither command has a mobile
-# caller today, and that is deliberate rather than an oversight: the second-device flow
-# reads its owner's code from the per-`(person, vault)` record and writes its own row
-# inside `myne-core`, so no TypeScript binding wraps either command yet, and
-# `scripts/check-ipc-binding-callers.mjs` refuses a binding with no production caller.
-# Both stay registered and granted so a later surface needs no Rust change, which is the
-# posture `permissions/member-names/default.toml` documents for its own two.
+# `src-tauri/permissions/device-binding/default.toml`: the same command, no
+# mobile-only addition and none dropped. It is Slot::Unlocked-gated and it is a read.
+#
+# The write half has no command (myne-md/myne#976): `device_bindings_claim` was retired
+# on both hosts, because the conflict it repaired is repaired by the sync cycle inside
+# `myne-core`. No command here writes a tombstone either: an owner's removal tombstone
+# is written inside the group rotation, which is not reachable over IPC.
+#
+# The remaining command has no mobile caller today, and that is deliberate rather than an
+# oversight: the second-device flow reads its owner's code from the per-`(person, vault)`
+# record and writes its own row inside `myne-core`, so no TypeScript binding wraps it,
+# and `scripts/check-ipc-binding-callers.mjs` refuses a binding with no production
+# caller. It stays registered and granted so a later surface needs no Rust change, which
+# is the posture `permissions/member-names/default.toml` documents for its own two.
 
 "$schema" = "../../gen/schemas/mobile-schema.json"
 
 [default]
-description = "Default permission set for the device-binding plugin: list the vault's device bindings, and register this device's OWN binding."
+description = "Default permission set for the device-binding plugin: read the vault's signature-verified device bindings."
 permissions = [
   "allow-device-bindings-list",
-  "allow-device-bindings-claim",
 ]

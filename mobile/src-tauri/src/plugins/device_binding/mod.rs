@@ -20,33 +20,36 @@
 //! `commands::claim_own_binding_best_effort`, called from the B2B accept tail and from
 //! the unlock hook (the paragraph below names both sites); the member roster resolves a
 //! device through `sync::identity_resolver::join_durable_attribution`. So the STORE is
-//! the second-device flow's substrate on the phone as much as on the desktop. The two
-//! IPC commands this shim registers are the surface a later device-to-member settings
-//! screen will call, and nothing calls them today.
+//! the second-device flow's substrate on the phone as much as on the desktop. The IPC
+//! command this shim registers is the read a device-to-member settings surface will call.
 //!
 //! ## Capability ACL
 //!
-//! `device-binding:default` bundles the two commands (`device_bindings_list` /
-//! `device_bindings_claim`), exactly the desktop bundle. Both are `Slot::Unlocked`-gated,
-//! and the claim can only write the caller's OWN row: the row key is the session's
-//! enrolled device id and the signer is the session's own person, both read from the
-//! session rather than from a command argument, so no grant here carries authority over
-//! another device's binding. Neither command writes a tombstone at all: an owner's
-//! removal tombstone is written inside `sync::member_removal::rotate_group_from_host`,
-//! which is not reachable over IPC. Like the other write-capable plugins, v0.2
-//! multi-window MUST NOT grant `allow-device-bindings-claim` to a non-main window.
+//! `device-binding:default` bundles ONE command, `device_bindings_list`
+//! (`Slot::Unlocked`-gated), exactly the desktop bundle: a read of the
+//! signature-verified view, never the raw map.
 //!
-//! **No TypeScript binding wraps either command yet, and that is on purpose.**
+//! **The write command that used to sit beside it is gone** (myne-md/myne#976).
+//! `device_bindings_claim` was a write setter whose only reachable use was the desktop
+//! `MEMBER DEVICES` panel's button, and the one state it repaired (a `ConflictingBinding`
+//! this device is party to) is repaired by the sync cycle's own boundary now, without a
+//! human. A grant no reachable state needs is the shape this ACL should not carry, and
+//! that button never rendered on the phone in the first place. Nothing here writes a
+//! tombstone either: an owner's removal tombstone is written inside
+//! `sync::member_removal::rotate_group_from_host`, which is not reachable over IPC at
+//! all.
+//!
+//! **The remaining command has no mobile caller, and that is on purpose.**
 //! `scripts/check-ipc-binding-callers.mjs` refuses a binding with no production caller,
 //! and the second-device flow reaches the store from `myne-core` instead: the row is
 //! written by `claim_own_binding_best_effort`, called from the B2B accept path
 //! (`sync::person_account.rs`, which bypasses the unlock pipeline and would otherwise
 //! leave a freshly accepted device unbound until its second unlock) and from the unlock
 //! hook (`vault_unlock::commands`). Both sites are core-side and
-//! `#[cfg(not(target_arch = "wasm32"))]`, so both run on the phone. Both commands stay
-//! registered and granted so a later surface needs no Rust change to use them, NOT
-//! because one reaches them today, which is the posture `member_names`' shim documents
-//! for its own two.
+//! `#[cfg(not(target_arch = "wasm32"))]`, so both run on the phone. It stays registered
+//! and granted so a later surface needs no Rust change to use it, NOT because one
+//! reaches it today, which is the posture `member_names`' shim documents for its own
+//! two.
 //!
 //! See: mobile/AGENTS.md, and the main repo's `src-tauri/AGENTS.md`
 //! "Capability ACL" / "Plugin pattern".
@@ -67,10 +70,7 @@ use tauri::Runtime;
 /// active vault dir per call. The plugin name in the ACL namespace is `device-binding`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("device-binding")
-        .invoke_handler(tauri::generate_handler![
-            commands::device_bindings_list,
-            commands::device_bindings_claim,
-        ])
+        .invoke_handler(tauri::generate_handler![commands::device_bindings_list])
         .build()
 }
 
@@ -205,8 +205,8 @@ mod tests {
             .collect();
         assert!(
             granted.iter().any(|p| p == &format!("{PLUGIN}:default")),
-            "capabilities/default.json does not grant `{PLUGIN}:default`, so both commands \
-             are registered in the handler and refused at the IPC boundary"
+            "capabilities/default.json does not grant `{PLUGIN}:default`, so the command is \
+             registered in the handler and refused at the IPC boundary"
         );
     }
 }

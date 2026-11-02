@@ -3779,6 +3779,31 @@ not itself break order independence: a pair either merges to the same map both w
 fails both ways. No sibling family in this document carries this arm, and it is here
 rather than in the caller because only the merge sees both copies at once.
 
+**A peer that finds itself inside such a pair SHOULD resolve it on its own side.** The
+resolution is a strictly higher version on ONE of the two rows, and a writer may only
+write its own (§9.30.4), so the device party to the pair re-writes its own row at
+`version + 1` and the ordinary merge then wins it. No format moves: the version a
+writer picks is its own business, so this needs no new byte and no new magic. What it
+does NOT do is settle who the device belongs to: a peer inside the group can still seal
+a row naming someone else, and what keeps that row off a surface is its failure to
+verify (§9.30.4), never this repair. The distinction matters because the refusal is
+whole-map: without the re-write, one such row freezes the store for every member on
+every later cycle, and "legibility, not proof" would silently become "legibility, or
+nothing at all".
+
+**A peer that is NOT inside such a pair cannot separate it, and MUST NOT try.** The
+refusal names no device and covers the whole map, so a reader that only notices "a
+conflict happened" will re-write a row that is not in dispute: nothing about the pair
+changes, the store is re-sealed for nothing, the re-written row never reaches the server
+because the refusal path records no baseline, and the row's version climbs once per
+cycle. So a reader MUST establish which devices the pair concerns BEFORE it writes
+anything, and MUST NOT write when its own device is not one of them. How it establishes
+that is its own business (`conflicting_device_ids` is how this implementation does it),
+because the rule is about the WRITE and not about the shape of the error: the error
+still names no device, and no byte on disk or on the wire records an id list. Until a
+future generation can quarantine a row instead of refusing the map, a pair between two
+other members stays refused for this reader, and saying so is the honest state.
+
 For every other pair the comparator is a total order on DISTINCT rows, and the order is
 `version` (higher wins), then `tombstone` (`true` wins at equal version), then the
 `person_fingerprint` bytes, then the `signature_hex` bytes, the last two compared
@@ -3792,7 +3817,11 @@ rows directly. A port MUST compare byte-wise and MUST NOT substitute a locale co
 or two implementations land on different rows for the same pair. A merge MUST be
 commutative and idempotent: the result of merging two maps does not depend on argument
 order, so two devices that merged in opposite orders hold the same map and stop re-sending
-it. A merge is deliberately **NOT associative**, and a port MUST NOT assume it is. The
+it. **Nothing here makes a row evidence.** The comparator settles which signed ROW wins for
+a device key, and a winning row is still a claim by the person who signed it, never title
+to the machine: the merge cannot tell a device its member runs from one they merely named,
+which is why the row's signature binds no device material (§9.30.4) and why any surface
+presenting the result says "claimed by". A merge is deliberately **NOT associative**, and a port MUST NOT assume it is. The
 `ConflictingBinding` refusal above short-circuits the WHOLE map rather than the one key, so
 a set of three maps containing a same-version two-person collision resolves differently under
 different nestings: with `a = {D -> (P1, v1)}`, `b = {D -> (P2, v1)}` and `c = {D -> (P2, v2)}`,

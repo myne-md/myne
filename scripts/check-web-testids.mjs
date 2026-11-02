@@ -96,12 +96,6 @@ const RENDERS_NOTHING = new Set([
   // a native save dialog and an OS file-manager reveal, neither of which this
   // client has. Renders `null`, so there is nothing for a testid to name.
   join("web", "src", "screens", "vault-creation", "ReadyLocalArtefacts.tsx"),
-  // The device-attribution panel (myne-md/myne#852 story 11). It renders `null`
-  // by design: the store it reads is `NTV6`-only and group-tier sealed, both of
-  // its commands are `Class::Unsupported` on web, and `memberSharing` is absent
-  // here, so there is no reachable surface for a testid to name. See
-  // `web/vite.config.ts` SUBSTITUTED_MODULES.
-  join("web", "src", "components", "sync", "DeviceAttributionPanel.tsx"),
   // Whole-vault migration is desktop-only, so its phrase credential is absent
   // from the browser bundle rather than merely unreachable.
   join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),

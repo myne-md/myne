@@ -5,21 +5,23 @@
 #
 # The family is the B2B device-to-person binding store: the encrypted
 # `vault.device-bindings` (`MYU5`) singleton, group-tier sealed and `NTV6`-only
-# (protocol.md §9.30, the member-devices feature). Every command is
-# Slot::Unlocked-gated. `device_bindings_claim` is a WRITE setter, and it can only ever
-# write the CALLER'S OWN row: the row key is the session's enrolled device id and the
-# signer is the session's own person key, both read from the session rather than from a
-# command argument, so the ACL grants no authority over another device's binding.
-# Neither command writes a tombstone: an owner's removal tombstone is written inside
-# the group rotation, which is not reachable over IPC. Like the other write-capable
-# plugins, v0.2 multi-window MUST NOT grant `allow-device-bindings-claim` to any
-# non-main window. The `default` bundle is the only one consumed in v0.1.
+# (protocol.md §9.30, the member-devices feature). The ONE command is
+# Slot::Unlocked-gated and it is a read: `device_bindings_list` answers the
+# signature-verified view rather than the raw map, so no grant here can render an
+# unverified row beside a member's name.
+#
+# **The write half has no command** (myne-md/myne#976). `device_bindings_claim` was a
+# write setter whose only reachable use was the `MEMBER DEVICES` panel's button, and the
+# one state it repaired (a `ConflictingBinding` this device is party to) is repaired by
+# the sync cycle's own boundary now, without a human. Granting an affordance with no
+# reachable state behind it is what this bundle stopped doing. No command here writes a
+# tombstone either: an owner's removal tombstone is written inside the group rotation,
+# which is not reachable over IPC at all.
 
 "$schema" = "../../gen/schemas/desktop-schema.json"
 
 [default]
-description = "Default permission set for the device-binding plugin: list the vault's device bindings, and register this device's OWN binding."
+description = "Default permission set for the device-binding plugin: read the vault's signature-verified device bindings."
 permissions = [
   "allow-device-bindings-list",
-  "allow-device-bindings-claim",
 ]
