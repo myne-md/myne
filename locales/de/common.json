@@ -3215,8 +3215,7 @@
         "diagnostics": "Diagnose"
       },
       "diagnosticFilesHelper_one": "Eine Datei würde diesen Block plus {{count}} Protokolldatei enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
-      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Eine Datei würde diesen Block plus {{count}} Protokolldateien enthalten, insgesamt {{size}}. Es wird nichts irgendwohin gesendet; Sie wählen, wohin es geht."
     },
     "vault": {
       "changePasswordButton": "Passwort ändern",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne liest zuerst die Form Ihres Tresors: Notiztitel, Ordner und Tags. Es fragt nur nach Notiztext, wenn es ihn braucht, und nie nach Anhängen.",
         "provider": "Anbieter: {{provider}}",
         "estimatedChars": "Etwa {{chars}} Zeichen",
-        "excluded": "{{count}} Notizen ausgelassen, weil ihr Ordner von der KI ausgeschlossen ist",
         "showPayload": "Genau zeigen, was gesendet wird",
         "hidePayload": "Nutzlast ausblenden",
         "consentLabel": "Diese Gliederung an {{provider}} senden (etwa {{chars}} Zeichen). Ich verstehe, dass der Anbieter sie erhält.",

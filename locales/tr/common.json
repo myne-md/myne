@@ -3188,8 +3188,7 @@
         "diagnostics": "Tanılama"
       },
       "diagnosticFilesHelper_one": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz.",
-      "diagnosticFilesHelper_other": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "Bir dosya bu bloğu ve {{count}} günlük dosyasını içerir, toplam {{size}}. Hiçbir yere hiçbir şey gönderilmez; nereye gideceğini siz seçersiniz."
     },
     "vault": {
       "changePasswordButton": "Parolayı değiştir",
@@ -4305,7 +4304,6 @@
         "scopeIntro": "Myne önce vault'ının şeklini okur: not başlıkları, klasörler ve etiketler. Not metnini yalnızca ihtiyaç duyarsa ister; ekleri hiç istemez.",
         "provider": "Sağlayıcı: {{provider}}",
         "estimatedChars": "Yaklaşık {{chars}} karakter",
-        "excluded": "Klasörü AI'dan hariç tutulduğu için {{count}} not dışarıda bırakıldı",
         "showPayload": "Tam olarak ne gönderileceğini göster",
         "hidePayload": "Yükü gizle",
         "consentLabel": "Bu taslağı {{provider}} sağlayıcısına gönder (yaklaşık {{chars}} karakter). Sağlayıcının bunu alacağını anlıyorum.",

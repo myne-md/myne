@@ -3451,8 +3451,7 @@
       "diagnosticFilesHelper_one": "Один файл містив би цей блок плюс {{count}} файл журналу, загалом {{size}}. Нічого нікуди не надсилається; ви вирішуєте, куди він потрапить.",
       "diagnosticFilesHelper_other": "Один файл містив би цей блок плюс {{count}} файлів журналу, загалом {{size}}. Нічого нікуди не надсилається; ви вирішуєте, куди він потрапить.",
       "diagnosticFilesHelper_few": "Один файл містив би цей блок плюс {{count}} файли журналу, загалом {{size}}. Нічого нікуди не надсилається; ви вирішуєте, куди він потрапить.",
-      "diagnosticFilesHelper_many": "Один файл містив би цей блок плюс {{count}} файлів журналу, загалом {{size}}. Нічого нікуди не надсилається; ви вирішуєте, куди він потрапить.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Один файл містив би цей блок плюс {{count}} файлів журналу, загалом {{size}}. Нічого нікуди не надсилається; ви вирішуєте, куди він потрапить."
     },
     "vault": {
       "changePasswordButton": "Змінити пароль",
@@ -4599,7 +4598,6 @@
         "scopeIntro": "Myne спершу читає форму вашого сейфа: заголовки нотаток, теки й теги. Текст нотаток він просить лише якщо йому це потрібно, і ніколи не вкладення.",
         "provider": "Постачальник: {{provider}}",
         "estimatedChars": "Близько {{chars}} символів",
-        "excluded": "{{count}} нотаток лишено поза межами, бо їхню теку виключено з ШІ",
         "showPayload": "Показати точно те, що буде надіслано",
         "hidePayload": "Приховати навантаження",
         "consentLabel": "Надіслати цей контур до {{provider}} (близько {{chars}} символів). Я розумію, що постачальник його отримає.",

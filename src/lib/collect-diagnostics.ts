@@ -10,11 +10,12 @@
 // user presses; there is no endpoint, no beacon and no automatic send, which is
 // why task 60's zero-third-party request-log assertion is unaffected.
 
-import { buildDiagnostics, engineLabel } from "./diagnostics";
+import { buildDiagnostics, engineLabel, type HostWebView } from "./diagnostics";
 import { servedBuildInfo } from "../platform/build-info";
+import { HAS_TAURI } from "./app-window";
 
 /**
- * Bytes → whole MB, or `null` (which the block renders as `unknown`).
+ * Bytes → whole MB, or `null` (which omits the line).
  *
  * Rounded deliberately: a byte-exact figure is a finer reading of the user's
  * storage than a support block needs. Two cases are NOT rounding, though, and
@@ -24,7 +25,7 @@ import { servedBuildInfo } from "../platform/build-info";
  *     in-progress `estimate()` passed the old guard and `String(NaN)` landed in
  *     the block as the literal `NaN`. A field saying NaN says the app is broken
  *     in a way it is not, and the honest answer for an unusable reading already
- *     exists one line down: `unknown`.
+ *     exists one line down: no line at all.
  *   * a NON-EMPTY store rounding to `0`. Anything under 512 KB — a small but
  *     real vault — came out as a bare `0`, which is not a coarse version of
  *     "some", it is the one value that says the opposite. The block exists to
@@ -42,6 +43,22 @@ function mb(bytes: number | undefined): number | null {
   return whole === 0 && bytes > 0 ? 1 : whole;
 }
 
+/**
+ * Which WebView this desktop build is hosted in, or `null` in a browser.
+ *
+ * The UA order is load-bearing. Android carries both `Linux` and `Android` and a
+ * Chrome token, so it has to be recognised before either; Windows WebView2
+ * carries Chrome's and Edge's tokens plus `Windows`.
+ */
+function desktopWebView(): HostWebView | null {
+  if (!HAS_TAURI) return null;
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return "Android WebView";
+  if (/Windows/i.test(ua)) return "WebView2";
+  if (/Macintosh|Mac OS X|iPhone|iPad/i.test(ua)) return "WKWebView";
+  return "WebKitGTK";
+}
+
 export async function collectDiagnostics(failureCode: string): Promise<string> {
   const served = await servedBuildInfo().catch(() => null);
   let usage: StorageEstimate | null = null;
@@ -49,7 +66,7 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     usage = (await navigator.storage?.estimate?.()) ?? null;
   } catch {
     // Storage estimation is permission- and engine-dependent; an unavailable
-    // reading is `unknown`, never a failed copy.
+    // reading drops the two storage lines, never the copy.
   }
   return buildDiagnostics({
     version: __APP_VERSION__,
@@ -58,12 +75,15 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     // the whole SHA. Served build first for the reason given there — the web
     // define is pinned, so `version.json` is where the commit lives
     // (myne-md/myne#458).
-    commit: served?.commit ?? __BUILD_COMMIT__,
+    // `unknown` is what the define falls back to in a checkout with no git
+    // history; that is an absent reading, not a value, so it omits the line
+    // (issue #970, item 15) instead of being pasted as a fact.
+    commit: served?.commit ?? (__BUILD_COMMIT__ === "unknown" ? null : __BUILD_COMMIT__),
     bundleHash: served?.bundleHash ?? null,
     failureCode,
     // The engine and major version only — never the full UA string, whose tail
     // carries device models, OEM tokens and extension markers.
-    engine: engineLabel(navigator.userAgent),
+    engine: engineLabel(navigator.userAgent, desktopWebView()),
     crossOriginIsolated: typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false,
     storageUsedMb: mb(usage?.usage),
     storageQuotaMb: mb(usage?.quota),

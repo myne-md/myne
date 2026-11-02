@@ -62,17 +62,19 @@ export type DiagnosticField = (typeof DIAGNOSTIC_FIELDS)[number];
 export interface DiagnosticInputs {
   readonly version: string;
   readonly channel: string;
-  /** The commit the running build came from. `null` only if the caller has no
-   *  reading at all — every current caller has one, since the compile-time
-   *  define backs the served value up. */
+  /** The commit the running build came from, or `null` when this build has no
+   *  reading at all (a source tarball with no git history, or an image with no
+   *  `git`), which omits the line rather than printing a placeholder. */
   readonly commit: string | null;
   readonly bundleHash: string | null;
   /** The bounded, closed-enum failure label — never a message string. */
   readonly failureCode: string;
-  /** Engine + major version, e.g. `Chrome 140`. Never the full UA string. */
-  readonly engine: string;
+  /** Engine + major version, e.g. `Chrome 140`. Never the full UA string.
+   *  `null` when the UA is unrecognisable, which omits the line. */
+  readonly engine: string | null;
   readonly crossOriginIsolated: boolean;
-  /** `navigator.storage.estimate()` totals, in whole MB; `null` when unavailable. */
+  /** `navigator.storage.estimate()` totals, in whole MB; `null` when unavailable,
+   *  which omits the line rather than printing a placeholder. */
   readonly storageUsedMb: number | null;
   readonly storageQuotaMb: number | null;
 }
@@ -85,24 +87,53 @@ export interface DiagnosticInputs {
  */
 export function buildDiagnostics(inputs: DiagnosticInputs): string {
   const record = diagnosticRecord(inputs);
-  return DIAGNOSTIC_FIELDS.map((k) => `${k}: ${record[k]}`).join("\n");
+  return DIAGNOSTIC_FIELDS.flatMap((k) =>
+    k in record ? [`${k}: ${record[k]!}`] : [],
+  ).join("\n");
 }
 
-/** The same content as a record, for the test that pins the key set. */
-export function diagnosticRecord(inputs: DiagnosticInputs): Record<DiagnosticField, string> {
-  const unknown = "unknown";
-  return {
+/**
+ * The same content as a record, for the test that pins the key set.
+ *
+ * A field whose reading the client could not take is ABSENT, not a placeholder
+ * (issue #970, item 15). This block used to print `bundleHash: unknown` and two
+ * `unknown` storage figures on every desktop build, and four `unknown`s out of
+ * nine lines is what a user reports as a broken app; a support reader cannot
+ * tell a placeholder from a value either. Omitting the line states the same
+ * thing once, and the panel above no longer owes a paragraph explaining why its
+ * own output looks broken.
+ */
+export function diagnosticRecord(inputs: DiagnosticInputs): Partial<Record<DiagnosticField, string>> {
+  // Built in `DIAGNOSTIC_FIELDS` order and then filtered, so the key order IS
+  // the rendered order and the allowlist test still reads as an equality rather
+  // than a set comparison.
+  const values: Record<DiagnosticField, string | null> = {
     version: inputs.version,
     channel: inputs.channel,
-    commit: inputs.commit ?? unknown,
-    bundleHash: inputs.bundleHash ?? unknown,
+    commit: inputs.commit,
+    bundleHash: inputs.bundleHash,
     failureCode: inputs.failureCode,
     engine: inputs.engine,
     crossOriginIsolated: String(inputs.crossOriginIsolated),
-    storageUsedMb: inputs.storageUsedMb === null ? unknown : String(inputs.storageUsedMb),
-    storageQuotaMb: inputs.storageQuotaMb === null ? unknown : String(inputs.storageQuotaMb),
+    storageUsedMb: inputs.storageUsedMb === null ? null : String(inputs.storageUsedMb),
+    storageQuotaMb: inputs.storageQuotaMb === null ? null : String(inputs.storageQuotaMb),
   };
+  const record: Partial<Record<DiagnosticField, string>> = {};
+  for (const field of DIAGNOSTIC_FIELDS) {
+    const value = values[field];
+    if (value !== null && value !== "") record[field] = value;
+  }
+  return record;
 }
+
+/**
+ * The WebView a desktop build hosts the shared tree in.
+ *
+ * Named by the CALLER rather than inferred, because the UA cannot tell them
+ * apart: a macOS WKWebView and a Safari tab send nearly the same string, and a
+ * WebKitGTK view dresses as Safari outright.
+ */
+export type HostWebView = "WKWebView" | "WebKitGTK" | "WebView2" | "Android WebView";
 
 /**
  * Engine + major version from a user-agent string.
@@ -112,7 +143,20 @@ export function diagnosticRecord(inputs: DiagnosticInputs): Record<DiagnosticFie
  * it. Order matters — Chrome's UA also contains `Safari`, and Edge's contains
  * both, so the most specific match has to win or every Edge user reports Chrome.
  */
-export function engineLabel(ua: string): string {
+export function engineLabel(ua: string, webview: HostWebView | null = null): string | null {
+  const webkit = /AppleWebKit\/(\d+)/.exec(ua);
+  // The host wins over every rule below. Issue #970 item 15 was first answered
+  // by adding a WebKit rule LAST, which fixed a UA with no Safari token and
+  // missed the one that matters: a WebKitGTK view sends a real
+  // `Version/… Safari/…` tail, matched the Safari rule, and told a desktop user
+  // they were running Safari. The app knows which view it is in, so it says so.
+  if (webview) {
+    const version =
+      webview === "WebView2"
+        ? (/Chrome\/(\d+)/.exec(ua)?.[1] ?? webkit?.[1] ?? null)
+        : (webkit?.[1] ?? null);
+    return version ? `${webview} ${version}` : webview;
+  }
   const RULES: Array<[RegExp, string]> = [
     [/Edg\/(\d+)/, "Edge"],
     [/OPR\/(\d+)/, "Opera"],
@@ -124,18 +168,10 @@ export function engineLabel(ua: string): string {
     const m = ua.match(re);
     if (m) return `${name} ${m[1]}`;
   }
-  // **The desktop WebViews, which is where this said `unknown`** (issue #970,
-  // item 14). A WKWebView on macOS and a WebKitGTK view on Linux both send a UA
-  // with no `Version/… Safari` pair and no Chrome token: just
-  // `AppleWebKit/<ver> (KHTML, like Gecko)`, so the five rules above all miss
-  // and the block reported `engine: unknown` for the app's two primary desktop
-  // engines. The two are indistinguishable from the UA alone, which is why the
-  // label names the ENGINE (what this field is for) rather than guessing the
-  // host: `WebKit 605` is true of both, and the OS is not this field's subject.
-  //
-  // Last, not first: every Chromium UA also carries `AppleWebKit/537.36`, so
-  // putting it anywhere earlier would relabel every Chrome and Edge user.
-  const webkit = ua.match(/AppleWebKit\/(\d+)/);
+  // The browser fallback for a WebKit UA: last, because every Chromium UA also
+  // carries `AppleWebKit/537.36` and an earlier rule would relabel every Chrome
+  // and Edge user.
   if (webkit) return `WebKit ${webkit[1]}`;
-  return "unknown";
+  // `null`, never the word "unknown": the caller omits the line instead.
+  return null;
 }

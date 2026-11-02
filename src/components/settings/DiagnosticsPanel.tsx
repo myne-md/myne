@@ -28,7 +28,6 @@ import { has } from "../../platform/capabilities";
 import { useDiagnostics } from "../../hooks/useDiagnostics";
 import { copyText } from "../../lib/clipboard";
 import { collectDiagnostics } from "../../lib/collect-diagnostics";
-import { HAS_TAURI } from "../../lib/app-window";
 import { lastGlobalFailure } from "../../lib/global-failure";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { toast } from "../toast/toastStore";
@@ -229,23 +228,12 @@ export function DiagnosticsPanel() {
       <SettingsSection title={t("settings.about.sections.diagnostics")}>
         <ControlBlock
           label={t("settings.about.diagnosticBlockLabel")}
-          /* **The desktop caveat, where the block is** (issue #970, item 14).
-             Two of these fields read oddly on desktop and both are expected:
-             `bundleHash: unknown`, because a desktop build has no served bundle
-             to hash (the commit identifies it), and the storage pair, which
-             measures the WebView's own store rather than the vault on disk: a
-             desktop vault lives in the app's data folder, so `storageUsedMb: 0`
-             says nothing about it. Left unexplained, `unknown` and `0` read as
-             the app failing to read its own state, which is what a user reports
-             as a bug. A browser build measures exactly what it says, so the
-             caveat is desktop-only. */
-          helper={
-            HAS_TAURI
-              ? `${t("settings.about.diagnosticBlockHelper")} ${t(
-                  "settings.about.diagnosticBlockHelperDesktop",
-                )}`
-              : t("settings.about.diagnosticBlockHelper")
-          }
+          /* No desktop caveat, because there is nothing left to explain: a
+             reading the build cannot take is absent from the block rather than
+             printed as `unknown` (issue #970, item 15). The paragraph that used
+             to sit here described the app's own output back to the user, which
+             is the shape of an apology rather than a measurement. */
+          helper={t("settings.about.diagnosticBlockHelper")}
           anchorId="about.diagnostic-report"
           control={
             <>

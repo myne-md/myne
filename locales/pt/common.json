@@ -3333,8 +3333,7 @@
       },
       "diagnosticFilesHelper_one": "Um ficheiro conteria este bloco mais {{count}} ficheiro de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
       "diagnosticFilesHelper_other": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
-      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Um ficheiro conteria este bloco mais {{count}} ficheiros de registo, {{size}} no total. Nada é enviado para lado nenhum; é você que escolhe para onde vai."
     },
     "vault": {
       "changePasswordButton": "Mudar palavra-passe",
@@ -4464,7 +4463,6 @@
         "scopeIntro": "O Myne lê primeiro a forma do seu cofre: títulos de notas, pastas e etiquetas. Só pede texto de notas se precisar, e nunca de anexos.",
         "provider": "Fornecedor: {{provider}}",
         "estimatedChars": "Cerca de {{chars}} caracteres",
-        "excluded": "{{count}} notas deixadas de fora porque a sua pasta está excluída da IA",
         "showPayload": "Mostrar exatamente o que será enviado",
         "hidePayload": "Ocultar o conteúdo",
         "consentLabel": "Enviar este esboço para {{provider}} (cerca de {{chars}} caracteres). Compreendo que o fornecedor o recebe.",

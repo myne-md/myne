@@ -3250,8 +3250,7 @@
         "legal": "Legal and licensing",
         "developer": "Developer",
         "diagnostics": "Diagnostics"
-      },
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      }
     },
     "account": {
       "sections": {
@@ -4046,7 +4045,8 @@
         "scopeIntro": "Myne reads the shape of your vault first: note titles, folders and tags. It asks for note text only if it needs it, and never for attachments.",
         "provider": "Provider: {{provider}}",
         "estimatedChars": "About {{chars}} characters",
-        "excluded": "{{count}} notes left out because their folder is excluded from AI",
+        "excluded_one": "{{count}} note left out because its folder is excluded from AI",
+        "excluded_other": "{{count}} notes left out because their folder is excluded from AI",
         "showPayload": "Show exactly what will be sent",
         "hidePayload": "Hide the payload",
         "consentLabel": "Send this outline to {{provider}} (about {{chars}} characters). I understand the provider receives it.",

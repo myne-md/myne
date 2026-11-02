@@ -16,6 +16,13 @@ const host = process.env.TAURI_DEV_HOST;
  * not a broken build.
  */
 function buildCommit(): string {
+  // The caller's answer first. `git` is not on PATH in every build container
+  // (the desktop E2E image has none), and a build that reports `commit: unknown`
+  // in its own diagnostics is a build that cannot be identified from the block
+  // a user pastes, which is the field's whole job (issue #970, item 15). The
+  // release and capture lanes pass `MYNE_BUILD_COMMIT` instead of hoping.
+  const fromEnv = process.env.MYNE_BUILD_COMMIT?.trim();
+  if (fromEnv) return fromEnv;
   try {
     return execFileSync("git", ["rev-parse", "--short=9", "HEAD"], {
       encoding: "utf8",

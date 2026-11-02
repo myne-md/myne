@@ -3451,8 +3451,7 @@
       "diagnosticFilesHelper_one": "Jeden plik zawierałby ten blok oraz {{count}} plik dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_other": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
       "diagnosticFilesHelper_few": "Jeden plik zawierałby ten blok oraz {{count}} pliki dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
-      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "Jeden plik zawierałby ten blok oraz {{count}} plików dziennika, łącznie {{size}}. Nic nie jest nigdzie wysyłane; to Ty wybierasz, gdzie trafi."
     },
     "vault": {
       "changePasswordButton": "Zmień hasło",
@@ -4599,7 +4598,6 @@
         "scopeIntro": "Myne najpierw wczytuje kształt Twojego skarbca: tytuły notatek, foldery i tagi. Prosi o tekst notatki tylko wtedy, gdy go potrzebuje, i nigdy o załączniki.",
         "provider": "Dostawca: {{provider}}",
         "estimatedChars": "Około {{chars}} znaków",
-        "excluded": "{{count}} notatek pominięto, bo ich folder jest wyłączony z AI",
         "showPayload": "Pokaż dokładnie to, co zostanie wysłane",
         "hidePayload": "Ukryj ładunek",
         "consentLabel": "Wyślij ten szkic do {{provider}} (około {{chars}} znaków). Rozumiem, że dostawca go otrzyma.",

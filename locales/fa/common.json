@@ -3215,8 +3215,7 @@
         "diagnostics": "عیب‌یابی"
       },
       "diagnosticFilesHelper_one": "یک فایل شامل این بلوک به‌علاوهٔ {{count}} فایل گزارش، در مجموع {{size}}، می‌شود. هیچ‌چیز جایی فرستاده نمی‌شود؛ شما انتخاب می‌کنید کجا برود.",
-      "diagnosticFilesHelper_other": "یک فایل شامل این بلوک به‌علاوهٔ {{count}} فایل گزارش، در مجموع {{size}}، می‌شود. هیچ‌چیز جایی فرستاده نمی‌شود؛ شما انتخاب می‌کنید کجا برود.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "یک فایل شامل این بلوک به‌علاوهٔ {{count}} فایل گزارش، در مجموع {{size}}، می‌شود. هیچ‌چیز جایی فرستاده نمی‌شود؛ شما انتخاب می‌کنید کجا برود."
     },
     "vault": {
       "changePasswordButton": "تغییر گذرواژه",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne ابتدا شکل خزانهٔ شما را می‌خواند: عناوین یادداشت، پوشه‌ها و برچسب‌ها. متن یادداشت را فقط در صورت نیاز می‌خواهد، و هرگز پیوست‌ها را.",
         "provider": "ارائه‌دهنده: {{provider}}",
         "estimatedChars": "حدود {{chars}} نویسه",
-        "excluded": "{{count}} یادداشت کنار گذاشته شد چون پوشهٔ آن‌ها از AI مستثناست",
         "showPayload": "دقیقاً آنچه فرستاده خواهد شد را نشان بده",
         "hidePayload": "پنهان کردن بار",
         "consentLabel": "این طرح را به {{provider}} بفرست (حدود {{chars}} نویسه). می‌فهمم که ارائه‌دهنده آن را دریافت می‌کند.",

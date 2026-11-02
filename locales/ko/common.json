@@ -3215,8 +3215,7 @@
         "diagnostics": "진단"
       },
       "diagnosticFilesHelper_one": "파일 하나에는 이 블록과 로그 파일 {{count}}개가 담기며, 합계 {{size}}입니다. 어디에도 전송되지 않으며, 어디로 갈지는 사용자가 정합니다.",
-      "diagnosticFilesHelper_other": "파일 하나에는 이 블록과 로그 파일 {{count}}개가 담기며, 합계 {{size}}입니다. 어디에도 전송되지 않으며, 어디로 갈지는 사용자가 정합니다.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_other": "파일 하나에는 이 블록과 로그 파일 {{count}}개가 담기며, 합계 {{size}}입니다. 어디에도 전송되지 않으며, 어디로 갈지는 사용자가 정합니다."
     },
     "vault": {
       "changePasswordButton": "비밀번호 변경",
@@ -4329,7 +4328,6 @@
         "scopeIntro": "Myne은 먼저 보관함의 모양을 읽습니다: 노트 제목, 폴더, 태그. 필요할 때만 노트 텍스트를 요청하고, 첨부 파일은 요청하지 않습니다.",
         "provider": "제공업체: {{provider}}",
         "estimatedChars": "약 {{chars}}자",
-        "excluded": "폴더가 AI에서 제외되어 노트 {{count}}개가 빠졌습니다",
         "showPayload": "보낼 내용 정확히 보기",
         "hidePayload": "페이로드 숨기기",
         "consentLabel": "이 개요를 {{provider}}로 보냅니다(약 {{chars}}자). 제공업체가 받는다는 것을 이해합니다.",

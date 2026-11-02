@@ -44,6 +44,11 @@ function withEstimate(impl: (() => Promise<StorageEstimate>) | null): void {
   });
 }
 
+/** Whether the block carries a `key: value` line at all. */
+function hasField(text: string, key: string): boolean {
+  return text.split("\n").some((l) => l.startsWith(`${key}: `));
+}
+
 /** The value of one `key: value` line. */
 function field(text: string, key: string): string {
   const line = text.split("\n").find((l) => l.startsWith(`${key}: `));
@@ -56,28 +61,35 @@ afterEach(() => {
 });
 
 describe("the diagnostic block's storage reading (myne-md/myne#556)", () => {
-  it("says `unknown` when the estimate throws", async () => {
+  // The rule is "never a placeholder, never a lie": a reading the client cannot
+  // take is ABSENT from the block (issue #970, item 15). It used to print
+  // `unknown`, which a maintainer could not tell from a measurement and which a
+  // user read as the app failing to read its own state.
+  it("drops both storage lines when the estimate throws", async () => {
     withEstimate(() => Promise.reject(new Error("denied")));
     const text = await collectDiagnostics("io-error");
     expect(
-      field(text, "storageUsedMb"),
-      "a rejected estimate produced something other than `unknown`. The catch in " +
+      hasField(text, "storageUsedMb"),
+      "a rejected estimate still produced a storage line. The catch in " +
         "collect-diagnostics.ts exists so a permission-dependent API cannot turn " +
-        "into a failed copy — a maintainer reading this block must be able to tell " +
-        "'we could not measure' from any particular measurement.",
-    ).toBe("unknown");
-    expect(field(text, "storageQuotaMb")).toBe("unknown");
+        "into a failed copy, and the line is dropped rather than filled.",
+    ).toBe(false);
+    expect(hasField(text, "storageQuotaMb")).toBe(false);
+    // And the rest of the block is still there: a dropped reading is not a
+    // dropped report.
+    expect(hasField(text, "version")).toBe(true);
+    expect(text).not.toContain("unknown");
   });
 
-  it("says `unknown` when the browser has no storage manager at all", async () => {
+  it("drops both storage lines when the browser has no storage manager at all", async () => {
     withEstimate(null);
     const text = await collectDiagnostics("io-error");
     expect(
-      field(text, "storageUsedMb"),
-      "an absent navigator.storage produced something other than `unknown`. This " +
-        "is the older-engine path, distinct from the throwing one above, and it " +
-        "reaches the same place through `?.` rather than through the catch.",
-    ).toBe("unknown");
+      hasField(text, "storageUsedMb"),
+      "an absent navigator.storage produced a storage line. This is the " +
+        "older-engine path, distinct from the throwing one above, and it reaches " +
+        "the same place through `?.` rather than through the catch.",
+    ).toBe(false);
   });
 
   it("reports a real measurement in MB", async () => {
@@ -113,11 +125,11 @@ describe("the diagnostic block's storage reading (myne-md/myne#556)", () => {
     withEstimate(() => Promise.resolve({ usage: Number.NaN, quota: Number.NaN }));
     const text = await collectDiagnostics("io-error");
     expect(
-      field(text, "storageUsedMb"),
-      `the block reports "${field(text, "storageUsedMb")}". A field that says NaN ` +
-        `is a field that says the app is broken in a way it is not — and the ` +
-        `honest answer for an unusable reading already exists: unknown.`,
-    ).toBe("unknown");
-    expect(field(text, "storageQuotaMb")).toBe("unknown");
+      hasField(text, "storageUsedMb"),
+      `the block carries a storage line for a non-finite reading. A field that ` +
+        `says NaN is a field that says the app is broken in a way it is not, and ` +
+        `the honest answer for an unusable reading is no line at all.`,
+    ).toBe(false);
+    expect(hasField(text, "storageQuotaMb")).toBe(false);
   });
 });

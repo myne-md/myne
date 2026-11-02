@@ -3687,8 +3687,7 @@
       "diagnosticFilesHelper_zero": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
       "diagnosticFilesHelper_two": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملفَي سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
       "diagnosticFilesHelper_few": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملفات سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
-      "diagnosticFilesHelper_many": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_many": "سيحتوي ملف واحد على هذه الكتلة بالإضافة إلى {{count}} ملف سجل، {{size}} إجمالًا. لا يُرسل شيء إلى أي مكان؛ وأنت تختار إلى أين يذهب."
     },
     "vault": {
       "changePasswordButton": "تغيير كلمة المرور",
@@ -4869,7 +4868,6 @@
         "scopeIntro": "يقرأ Myne شكل خزنتك أولًا: عناوين الملاحظات والمجلدات والوسوم. يطلب نص الملاحظات فقط إذا احتاجه، ولا يطلب المرفقات أبدًا.",
         "provider": "المزوّد: {{provider}}",
         "estimatedChars": "حوالي {{chars}} حرف",
-        "excluded": "{{count}} ملاحظة مستثناة لأن مجلدها مستثنى من AI",
         "showPayload": "أظهر بالضبط ما سيُرسل",
         "hidePayload": "إخفاء الحمولة",
         "consentLabel": "إرسال هذا المخطط إلى {{provider}} (حوالي {{chars}} حرف). أفهم أن المزوّد يتلقّاه.",

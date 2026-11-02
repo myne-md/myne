@@ -3333,8 +3333,7 @@
       },
       "diagnosticFilesHelper_one": "Un fișier ar conține acest bloc plus {{count}} fișier jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
       "diagnosticFilesHelper_other": "Un fișier ar conține acest bloc plus {{count}} de fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
-      "diagnosticFilesHelper_few": "Un fișier ar conține acest bloc plus {{count}} fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge.",
-      "diagnosticBlockHelperDesktop": "On desktop, two of these read as they should: bundleHash is unknown because a desktop build has no served bundle to hash (the commit identifies it), and the storage figures measure the app window's own store, not the vault on your disk."
+      "diagnosticFilesHelper_few": "Un fișier ar conține acest bloc plus {{count}} fișiere jurnal, {{size}} în total. Nimic nu este trimis nicăieri; tu alegi unde ajunge."
     },
     "vault": {
       "changePasswordButton": "Schimbă parola",
@@ -4464,7 +4463,6 @@
         "scopeIntro": "Myne citește mai întâi forma seifului tău: titlurile notelor, dosarele și etichetele. Cere textul notei doar dacă are nevoie și niciodată atașamentele.",
         "provider": "Furnizor: {{provider}}",
         "estimatedChars": "Circa {{chars}} caractere",
-        "excluded": "{{count}} note lăsate pe dinafară pentru că dosarul lor este exclus din AI",
         "showPayload": "Arată exact ce va fi trimis",
         "hidePayload": "Ascunde încărcătura",
         "consentLabel": "Trimite această schiță către {{provider}} (circa {{chars}} caractere). Înțeleg că furnizorul o primește.",
