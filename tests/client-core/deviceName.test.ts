@@ -112,11 +112,12 @@ describe("selfNameDevice", () => {
     expect(calls.writes).toEqual([]);
   });
 
-  it("leaves the row unnamed when the write is refused, and does not retry", async () => {
+  it("propagates a refused write instead of reporting success, and does not retry", async () => {
     const { calls, input } = seams({ writeRejects: true });
-    await expect(selfNameDevice({ devices: [row()], names: {}, ...input })).resolves.toBeUndefined();
-    // The attempt is recorded, so a swallow cannot read as "never tried": the
-    // assertion below fails if the policy concludes before reaching `writeName`.
+    // The policy used to swallow this. A write that fails and resolves is a wire
+    // nobody can see, so the rejection travels and the caller logs it.
+    await expect(selfNameDevice({ devices: [row()], names: {}, ...input })).rejects.toBeTruthy();
+    // The attempt is recorded, so the rejection cannot read as "never tried".
     expect(calls.writes).toEqual([[SELF, "Mac"]]);
     expect(calls.baseline).toBe(1);
   });

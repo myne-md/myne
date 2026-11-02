@@ -4407,6 +4407,10 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             struct Args {
                 device_id_hex: String,
                 name: String,
+                /// The unattended self-naming write (myne-md/myne#973). Absent on
+                /// every manual rename, which is the same thing as `false`.
+                #[serde(default)]
+                self_name: bool,
             }
             let a: Args = match serde_json::from_value(args) {
                 Ok(a) => a,
@@ -4417,17 +4421,34 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     }
                 }
             };
-            match myne_core::plugins::prefs::commands::set_device_name_from_host(
-                host_ctx(),
-                crate::session::state(),
-                crate::session::hooks(),
-                a.device_id_hex,
-                a.name,
-                vault_io(),
-            )
-            .await
-            {
-                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+            // Bound once and passed to whichever write path runs. The guard that
+            // asks who reads a device identity counts occurrences of the argument
+            // text, so two branches reading it inline read as two readers.
+            let device_id_hex = a.device_id_hex;
+            let wrote = if a.self_name {
+                myne_core::plugins::prefs::commands::self_name_device_from_host(
+                    host_ctx(),
+                    crate::session::state(),
+                    crate::session::hooks(),
+                    device_id_hex,
+                    a.name,
+                    vault_io(),
+                )
+                .await
+            } else {
+                myne_core::plugins::prefs::commands::set_device_name_from_host(
+                    host_ctx(),
+                    crate::session::state(),
+                    crate::session::hooks(),
+                    device_id_hex,
+                    a.name,
+                    vault_io(),
+                )
+                .await
+                .map(|()| true)
+            };
+            match wrote {
+                Ok(wrote) => Outcome::ok(&serde_json::Value::Bool(wrote)),
                 Err(e) => Outcome::error(&e),
             }
         }

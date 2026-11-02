@@ -93,6 +93,16 @@ test.describe("device names", () => {
     expect(await deviceNameWrites(page)).toEqual([{ id: UNNAMED, name: "iPhone" }]);
   });
 
+  // The desktop suite's twin of the head-baseline case ("writes nothing before this
+  // device has adopted a vault head") cannot be expressed here, and the reason is
+  // the product rather than the harness: `awaitingApprovalVerdict` uses that same
+  // null head as its discriminator, so a device with no baseline boots to
+  // `PendingApproval`, where this panel does not exist. On DESKTOP the two do not
+  // coincide (a local-only vault lands in the editor with no head by design, so the
+  // panel is reachable and the gate fires), which is why the null case lives in
+  // `tests/components/DeviceManagementPanel.selfName.test.tsx`. The gate that has to
+  // hold in every client whichever surface you come from is the backend's, and it is
+  // tested there: `core::plugins::prefs::commands::tests::self_name_*`.
   test("never names a pending device, which is still unverified", async ({ page }) => {
     await installMockIpc(page, {
       syncStatus: { state: "idle" },

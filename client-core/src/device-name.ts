@@ -68,9 +68,18 @@ export function selfDeviceId(devices: readonly DeviceRow[] | null): string | nul
  * ABSENT, so a name written before the first completed cycle silently costs a
  * joining device the account's device-local preferences.
  *
- * Every failure is swallowed. This is a convenience: the fallback row is legible
- * either way, the user can always rename, and a thrown rejection in a Settings
- * effect would be a worse outcome than a device that stays "Device 3f9ac2".
+ * It is a CHEAP pre-check and not the authoritative gate, because "this device has
+ * adopted a head" is not the same fact as "the seed has run". A freshly approved
+ * device persists the pulled head early in its first cycle and the seed runs at
+ * the END of that same cycle, so on a large account the two disagree for minutes.
+ * `writeName` must therefore be the backend's self-naming variant, which refuses
+ * an absent `vault.prefs` on the fact itself
+ * (`core::plugins::prefs::commands::self_name_device_with_dir`). Passing the plain
+ * manual setter here re-opens the loss this gate exists for.
+ *
+ * A rejected host read or write is NOT swallowed: the caller logs it. A write that
+ * fails and reports success is a broken wire nobody can see, and two clients
+ * discarding the promise for the same reason is how that stays invisible.
  */
 export async function selfNameDevice(input: {
   /** The LOADED roster, or `null`. Never the first paint: see below. */
@@ -80,26 +89,19 @@ export async function selfNameDevice(input: {
   readBaseline: () => Promise<string | null>;
   /** The platform suggestion, or `null` when the platform is not nameable. */
   suggestName: () => Promise<string | null>;
-  writeName: (deviceIdHex: string, name: string) => Promise<void>;
+  /** The backend's self-naming write; see the doc comment. */
+  writeName: (deviceIdHex: string, name: string) => Promise<unknown>;
 }): Promise<void> {
   const deviceId = selfDeviceId(input.devices);
   // A cached-empty names map that was never loaded would let this overwrite a name
   // a peer had just chosen, so the caller owes a loaded view; `null` devices means
   // the roster read has not landed either.
   if (deviceId === null || hasDeviceName(input.names, deviceId)) return;
-  try {
-    // Truthiness rather than `=== null`: the absent answer is `null` on every
-    // real client, and a host that answered `undefined` would otherwise read as
-    // "a head was adopted", which is the direction that must not happen.
-    if (!(await input.readBaseline())) return;
-    const name = await input.suggestName();
-    if (name === null) return;
-    await input.writeName(deviceId, name);
-  } catch {
-    /* Stays unnamed: the row keeps its id-derived label and the pencil still works.
-     * This function therefore never rejects, which is why both call sites discard
-     * the promise with `void` instead of wrapping it. A rejection is deliberately
-     * not rethrown out of a Settings render effect either; the write is a
-     * convenience and no surface can act on its failure. */
-  }
+  // Truthiness rather than `=== null`: the absent answer is `null` on every
+  // real client, and a host that answered `undefined` would otherwise read as
+  // "a head was adopted", which is the direction that must not happen.
+  if (!(await input.readBaseline())) return;
+  const name = await input.suggestName();
+  if (name === null) return;
+  await input.writeName(deviceId, name);
 }

@@ -94,7 +94,11 @@ describe("self-naming (myne-md/myne#973)", () => {
   it("names an approved device that has never had a name", async () => {
     mount([approved(SELF, true)], { fingerprint: "ABCD-EFGH" });
 
-    await waitFor(() => expect(nameWrites()).toEqual([{ deviceIdHex: SELF, name: "Mac" }]));
+    // `selfName: true` is what selects the backend's refusing variant; without it
+    // the write is the manual setter and the prefs-seed gate is not in play.
+    await waitFor(() =>
+      expect(nameWrites()).toEqual([{ deviceIdHex: SELF, name: "Mac", selfName: true }]),
+    );
   });
 
   it("writes nothing before this device has adopted a vault head", async () => {
