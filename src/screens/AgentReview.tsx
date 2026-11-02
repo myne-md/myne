@@ -687,6 +687,15 @@ export function AgentReview({
         className="myne-review-region"
         style={{
           display: "flex",
+          // **Wrap between the acts, never inside one** (issue #970, item 13).
+          // The panel is narrow and the two verbs are long ("Approve 2 changes"),
+          // so the row ran out of width and broke EACH label across two lines:
+          // "Reject / all 2" and "Approve 2 / changes", which reads as four
+          // half-sentences rather than two buttons. `flexWrap` lets the row give
+          // way between controls, and the labels below refuse to break inside
+          // themselves, so a narrow panel moves a button down instead of
+          // shredding its name.
+          flexWrap: "wrap",
           alignItems: "center",
           gap: "var(--space-2)",
           padding: "var(--space-2) var(--space-3)",
@@ -710,7 +719,10 @@ export function AgentReview({
             {t("agent.review.undo")}
           </Button>
         ) : null}
-        <span style={{ flex: 1 }} />
+        {/* `flex: 1` with a zero basis, so it eats the slack when there is room
+            and disappears when there is not (a `flex: 1` spacer with a content
+            basis keeps a line of its own and pushes both acts down). */}
+        <span style={{ flex: "1 1 0", minWidth: 0 }} />
         <Button
           variant="ghost"
           // **Gated on "the proposal holds anything", not on the edit rows**
@@ -745,6 +757,7 @@ export function AgentReview({
             onClose();
           }}
           data-testid="agentReview.rejectAll"
+          style={{ whiteSpace: "nowrap" }}
         >
           {/* **The count, like the sibling control has** (myne-md/myne#894, from
               review). This is the one act that drops the whole proposal, it is
@@ -765,6 +778,7 @@ export function AgentReview({
           disabled={busy || !hasApprovedWork}
           onClick={() => void approveAll()}
           data-testid="agentReview.approveAll"
+          style={{ whiteSpace: "nowrap" }}
         >
           {t("agent.review.approveAll", { count: approveAllCount })}
         </Button>

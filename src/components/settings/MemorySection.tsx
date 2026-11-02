@@ -211,9 +211,12 @@ function MemoryRow(props: {
       ) : (
         <p style={ROW_TEXT_STYLE}>{props.text ?? ""}</p>
       )}
-      <p style={ROW_META_STYLE}>
-        {formatUpdatedAt(props.row.updated_at, t)} · v{props.row.version}
-      </p>
+      {/* **When it last changed, and nothing else** (issue #970, item 12). The
+          row used to end "· v1": `version` is the row's causal counter, the
+          value conflict resolution compares, and a reader has no action it
+          implies: there is no v2 to open and no history behind it. A number
+          nobody can act on reads as an unexplained status. */}
+      <p style={ROW_META_STYLE}>{formatUpdatedAt(props.row.updated_at, t)}</p>
       <div style={{ display: "flex", gap: "var(--space-2)" }}>
         <button
           type="button"

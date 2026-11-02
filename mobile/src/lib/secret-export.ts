@@ -161,6 +161,37 @@ async function savedFileDelivery(): Promise<SecretSaveOutcome["kind"]> {
   return platform === "android" ? "path" : "shared";
 }
 
+/**
+ * The i18n key (and params) that states what {@link saveSecretToDocuments}
+ * actually did.
+ *
+ * **Shared rather than repeated, because it had already been written twice.**
+ * `CreateVaultFlow` carried this `switch` and the identity flow needed the same
+ * one for its own phrase screen (myne-md/myne#970); a second copy of a
+ * three-arm switch over a union is how one screen keeps a claim the other has
+ * stopped making, which is exactly the drift `savedFileDelivery` above was
+ * factored out to prevent.
+ *
+ * A `switch` over the union rather than a ternary chain: a fourth `kind` becomes
+ * a compile error here instead of falling into whichever arm happens to be last.
+ * The sentences differ in exactly what they CLAIM, which is the point of the
+ * union: one names a folder, one names the share sheet as the route, and one
+ * names neither because the probe that would have decided between them failed.
+ */
+export function secretSaveMessage(
+  outcome: SecretSaveOutcome | null,
+): { key: string; params?: Record<string, string> } {
+  if (outcome === null) return { key: "createVault.saveFileError" };
+  switch (outcome.kind) {
+    case "path":
+      return { key: "createVault.savedToFile", params: { label: outcome.label } };
+    case "shared":
+      return { key: "createVault.savedToShareSheet" };
+    case "written":
+      return { key: "createVault.savedFileWritten" };
+  }
+}
+
 export async function saveSecretToDocuments(
   filename: string,
   contents: string,

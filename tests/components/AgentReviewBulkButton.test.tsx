@@ -136,6 +136,29 @@ describe("Approve all", () => {
     expect(button.textContent).toBe("agent.review.approveAll:1");
   });
 
+  // Issue #970, item 13. In the AI chat panel the footer ran out of width and
+  // broke EACH label across two lines ("Reject / all 2", "Approve 2 / changes"),
+  // so the card offered four half-sentences instead of two buttons. The rule is
+  // that the row gives way BETWEEN the acts and never inside one.
+  it("keeps both act labels on one line and lets the row wrap between them", () => {
+    settleWith([ORDINARY]);
+    mount();
+    const reject = screen.getByTestId("agentReview.rejectAll");
+    const approve = screen.getByTestId("agentReview.approveAll");
+    expect(reject.style.whiteSpace).toBe("nowrap");
+    expect(approve.style.whiteSpace).toBe("nowrap");
+    const footer = approve.closest("footer");
+    expect(footer?.style.flexWrap).toBe("wrap");
+    // The spacer collapses when the row wraps rather than keeping a line of its
+    // own, which is what pushed both acts down in the report. Asserted on
+    // `min-width`, because jsdom drops the `flex: "1 1 0"` shorthand.
+    const spacer = Array.from(footer?.children ?? []).find(
+      (el) => el.tagName === "SPAN" && el.textContent === "",
+    );
+    expect(spacer).toBeTruthy();
+    expect(spacer?.getAttribute("style")).toContain("min-width: 0");
+  });
+
   it("keeps a create the host REFUSED actionable, through the real click", async () => {
     // **The deletion test on the call site** (myne-md/myne#913, review rounds
     // three and five). `settleApply` was handed the SENT create indices, so a

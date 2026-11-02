@@ -383,7 +383,10 @@ pub async fn agent_list_provider_models<R: Runtime>(
     // satisfy every assertion about the RESULT while still having sent a byte.
     list_models_gated(&prefs, |provider, key| {
         let transport = ProviderTransport::new(provider.host());
-        transport.get_json(provider.models_path(), key)
+        // The provider's own headers travel with the request: OpenCode Go
+        // refuses one without `x-opencode-session`, so the desktop caller
+        // passes these too and the two clients must not diverge here.
+        transport.get_json(provider.models_path(), key, &provider.extra_headers())
     })
     .await
     .map_err(|_| AgentError::ProviderFailed)

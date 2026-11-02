@@ -15,7 +15,16 @@ import {
 } from "@codemirror/view";
 import { computePosition } from "../positioning";
 import { ensureFloatingStyles } from "../floating-styles";
-import { wrapCommand, applyHeadingLevel, currentHeadingLevel } from "./commands";
+import {
+  applyHeadingLevel,
+  currentBlockType,
+  editorCommands,
+  toggleListPrefix,
+  wrapCommand,
+  type BlockTypeKind,
+  type ToolbarCommand,
+} from "./commands";
+import { makeToolbarIcon, type ToolbarIconName } from "./icons";
 import {
   detectEnclosingHighlight,
   applyHighlightEdit,
@@ -27,12 +36,251 @@ import i18n from "@myne/editor/i18n";
 
 type Mode = "toolbar" | "url-overlay";
 
-const TOOLBAR_BUTTONS = [
-  { id: "bold", label: "B", weight: "700", action: wrapCommand("**", "**") },
-  { id: "italic", label: "I", weight: "600", italic: true, action: wrapCommand("*", "*") },
-  { id: "strike", label: "S", weight: "600", strike: true, action: wrapCommand("~~", "~~") },
-  { id: "code", label: "<>", weight: "600", mono: true, action: wrapCommand("`", "`") },
-] as const;
+/**
+ * One formatting control: its glyph, the catalog key that names it (used as the
+ * tooltip AND the accessible name), the command it runs, and the group it sits
+ * in.
+ *
+ * ── Why glyphs replaced the text labels (issue #970, item 2) ───────────────
+ * The toolbar used to render `B`, `I`, `S`, `<>` and `↗` in the app's own font,
+ * faking italic and strikethrough with `font-style`/`text-decoration`. Beside a
+ * real editor that reads as prose on a bar, and the italic `I` and the struck
+ * `S` were the same shape as a letter the user may have just selected. Real
+ * icons plus a tooltip carry both halves of what the button does: the shape says
+ * what it is, the name says it in words.
+ *
+ * ── Why the labels come from `editor.toolbar.customize.*` ────────────────
+ * Those are the strings Settings already shows for the very same commands. A
+ * second set of names for one set of buttons is two names to keep in step, and
+ * the settings list is where a user goes to find out what a button is called.
+ *
+ * ── Groups ──────────────────────────────────────────────────────────────
+ * A divider is drawn wherever two ADJACENT controls disagree, so the default
+ * layout reads `block type | inline marks | colour, link | lists | note links`
+ * and a user's custom order still gets dividers in the same spirit rather than
+ * a group outline that fights the order they chose.
+ */
+interface ToolbarControl {
+  readonly id: string;
+  readonly icon: ToolbarIconName;
+  readonly labelKey: string;
+  readonly group: "inline" | "color" | "link" | "list" | "note";
+  readonly action: ToolbarCommand;
+}
+
+/** The whole reorderable vocabulary, in the editor's own order. Every id here is
+ *  also a `src/notes/toolbarItems.ts` id: that file owns persistence, this one
+ *  owns rendering, and they are checked against each other by
+ *  `tests/notes/toolbarItems.test.ts`.
+ *
+ *  The commands come from `editorCommands` rather than being spelled here: that
+ *  object is the single source the keymap and the mobile keyboard bar also read,
+ *  so a fix to `toggleListPrefix` reaches all three surfaces at once. */
+const TOOLBAR_CONTROLS: readonly ToolbarControl[] = [
+  {
+    id: "bold",
+    icon: "bold",
+    labelKey: "editor.toolbar.customize.bold",
+    group: "inline",
+    action: editorCommands.bold,
+  },
+  {
+    id: "italic",
+    icon: "italic",
+    labelKey: "editor.toolbar.customize.italic",
+    group: "inline",
+    action: editorCommands.italic,
+  },
+  {
+    id: "strike",
+    icon: "strike",
+    labelKey: "editor.toolbar.customize.strike",
+    group: "inline",
+    action: editorCommands.strike,
+  },
+  {
+    id: "code",
+    icon: "code",
+    labelKey: "editor.toolbar.customize.code",
+    group: "inline",
+    action: editorCommands.code,
+  },
+  {
+    id: "highlight",
+    icon: "highlight",
+    labelKey: "editor.toolbar.customize.highlight",
+    group: "color",
+    // The control renders its own swatch compound below; this action is what a
+    // plain press means and is only reached through `renderHighlightControl`.
+    action: editorCommands.highlight,
+  },
+  {
+    id: "link",
+    icon: "link",
+    labelKey: "editor.toolbar.customize.link",
+    group: "link",
+    action: editorCommands.link,
+  },
+  {
+    id: "bulletList",
+    icon: "bullet-list",
+    labelKey: "editor.toolbar.customize.bulletList",
+    group: "list",
+    action: editorCommands.bulletList,
+  },
+  {
+    id: "numberedList",
+    icon: "numbered-list",
+    labelKey: "editor.toolbar.customize.numberedList",
+    group: "list",
+    action: editorCommands.numberedList,
+  },
+  {
+    id: "checklist",
+    icon: "checklist",
+    labelKey: "editor.toolbar.customize.checklist",
+    group: "list",
+    action: editorCommands.checklist,
+  },
+  {
+    id: "quote",
+    icon: "quote",
+    labelKey: "editor.toolbar.customize.quote",
+    group: "list",
+    action: editorCommands.quote,
+  },
+  {
+    id: "wikilink",
+    icon: "wikilink",
+    labelKey: "editor.toolbar.customize.wikilink",
+    group: "note",
+    action: editorCommands.wikilink,
+  },
+];
+
+const CONTROL_BY_ID = new Map(TOOLBAR_CONTROLS.map((c) => [c.id, c]));
+
+/** The mark each control's ACTIVE state is read from. `block` is handled by the
+ *  leading control instead, since it names the whole line. */
+interface MarkState {
+  readonly bold: boolean;
+  readonly italic: boolean;
+  readonly strike: boolean;
+  readonly code: boolean;
+  readonly link: boolean;
+  readonly block: BlockTypeKind;
+}
+
+/**
+ * Which marks the current selection already sits inside, so a pressed-looking
+ * button means "this text already IS bold" rather than "this button was clicked
+ * once".
+ *
+ * Read from the delimiter characters immediately outside the range rather than by
+ * walking a syntax tree: the marks this toolbar writes are inline delimiters, so
+ * `**` before and after IS the fact, and the alternative is a parser round trip
+ * per selection change. The nesting order matters: `*` is a prefix of `**` and
+ * of `~~`'s neighbour, so the two-character tests run first and a shorter test
+ * only counts when it is not the tail of a longer one.
+ */
+function markStateOf(view: EditorView): MarkState {
+  const { from, to } = view.state.selection.main;
+  const doc = view.state.doc;
+  const before = (n: number): string => (from >= n ? doc.sliceString(from - n, from) : "");
+  const after = (n: number): string => (to + n <= doc.length ? doc.sliceString(to, to + n) : "");
+  const bold = before(2) === "**" && after(2) === "**";
+  const strike = before(2) === "~~" && after(2) === "~~";
+  const code = before(1) === "`" && after(1) === "`" && before(2) !== "``";
+  const italic =
+    !bold && before(1) === "*" && after(1) === "*" && before(2) !== "**" && after(2) !== "**";
+  const link = before(1) === "[" && after(2) === "](";
+  return { bold, italic, strike, code, link, block: currentBlockType(view).kind };
+}
+
+/** Does this control's active state apply to the given marks? */
+function isActive(control: ToolbarControl, marks: MarkState): boolean {
+  switch (control.id) {
+    case "bold":
+      return marks.bold;
+    case "italic":
+      return marks.italic;
+    case "strike":
+      return marks.strike;
+    case "code":
+      return marks.code;
+    case "link":
+      return marks.link;
+    case "highlight":
+      // The enclosing-highlight detection lives in the swatch control, which
+      // needs the same answer to decide between creating and editing.
+      return false;
+    case "bulletList":
+      return marks.block === "bullet" || marks.block === "checklist";
+    case "numberedList":
+      return marks.block === "numbered";
+    case "checklist":
+      return marks.block === "checklist";
+    case "quote":
+      return marks.block === "quote";
+    default:
+      return false;
+  }
+}
+
+/** The block-type control's word for the line the caret is on.
+ *
+ *  A heading reads `H1`..`H6` rather than "Heading 1": the control sits at the
+ *  start of a 36px bar, and `#`-count is the same fact the source shows one line
+ *  above. Every other block names itself in full, because "List" alone would not
+ *  say which of the three lists the line already is. */
+function blockTypeLabel(kind: BlockTypeKind, level: number): string {
+  switch (kind) {
+    case "heading":
+      return `H${level}`;
+    case "bullet":
+      return i18n.t("editor.toolbar.customize.bulletList");
+    case "numbered":
+      return i18n.t("editor.toolbar.customize.numberedList");
+    case "checklist":
+      return i18n.t("editor.toolbar.customize.checklist");
+    case "quote":
+      return i18n.t("editor.toolbar.customize.quote");
+    default:
+      return i18n.t("editor.toolbar.heading.paragraph");
+  }
+}
+
+/** The list and quote blocks the block-type dropdown offers below the headings.
+ *  `prefixId` doubles as the testid suffix and as the vocabulary id; `prefix` is
+ *  the exact marker `toggleListPrefix` writes, which must stay the same string
+ *  the toolbar button and the keymap write or the three surfaces would disagree
+ *  about what a bullet is. */
+const BLOCK_MENU_ITEMS: ReadonlyArray<{
+  prefixId: string;
+  labelKey: string;
+  prefix: string;
+}> = [
+  {
+    prefixId: "bulletList",
+    labelKey: "editor.toolbar.customize.bulletList",
+    prefix: "- ",
+  },
+  {
+    prefixId: "numberedList",
+    labelKey: "editor.toolbar.customize.numberedList",
+    prefix: "1. ",
+  },
+  {
+    prefixId: "checklist",
+    labelKey: "editor.toolbar.customize.checklist",
+    prefix: "- [ ] ",
+  },
+  {
+    prefixId: "quote",
+    labelKey: "editor.toolbar.customize.quote",
+    prefix: "> ",
+  },
+];
 
 /** The default floating-toolbar layout — control ids in render order — used when
  *  no user customization has been fed via {@link setToolbarLayout} (MYND-336).
@@ -72,33 +320,11 @@ export function setSelectionExportHandler(fn: (() => void) | null): void {
   selectionExportHandler = fn;
 }
 
-/** Feather-style "image" icon for the export button (static UI chrome, built via
- *  the DOM — no innerHTML). */
+/** The export button's glyph. Kept as a named wrapper so the call site does not
+ *  reach into the toolbar icon table for a control that is NOT part of the
+ *  reorderable vocabulary. */
 function makeExportImageIcon(): SVGElement {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("width", "15");
-  svg.setAttribute("height", "15");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  const rect = document.createElementNS(ns, "rect");
-  rect.setAttribute("x", "3");
-  rect.setAttribute("y", "3");
-  rect.setAttribute("width", "18");
-  rect.setAttribute("height", "18");
-  rect.setAttribute("rx", "2");
-  const circle = document.createElementNS(ns, "circle");
-  circle.setAttribute("cx", "8.5");
-  circle.setAttribute("cy", "8.5");
-  circle.setAttribute("r", "1.5");
-  const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M21 15l-5-5L5 21");
-  svg.append(rect, circle, path);
-  return svg;
+  return makeToolbarIcon("export-image");
 }
 
 // Multi-color highlight palette (decisions.md 2026-06-15). Yellow is the
@@ -124,6 +350,46 @@ const HIGHLIGHT_SWATCHES = [
 ] as const;
 
 
+
+/**
+ * Run `action` on a pointer press or on a keyboard activation.
+ *
+ * `mousedown` rather than `click` is what this bar has always used, and the
+ * reason holds: the press has to `preventDefault()` to keep the editor
+ * selection alive, and a `click` arrives after focus has moved, by which time
+ * the selection the control is about to act on is gone.
+ *
+ * What that left behind is the defect this function exists for: every control
+ * was pointer-only. Enter and Space on a focused button fire `click` and
+ * nothing else, so no formatting control could be reached from the keyboard
+ * even though the stylesheet gives each one a `:focus-visible` ring
+ * (myne-md/myne#970 review, D6). The `click` listener below closes that, gated
+ * on `detail === 0` (a synthetic, keyboard-generated click) so a real pointer
+ * press does not run the action twice: once from `mousedown`, once from the
+ * `click` that follows it.
+ *
+ * The block-type dropdown's entries are `role="menuitem"` divs, which no
+ * browser focuses or activates on its own, so they get the tab stop and the
+ * keys explicitly.
+ */
+function bindPress(el: HTMLElement, action: () => void): void {
+  el.addEventListener("mousedown", (e) => {
+    e.preventDefault();
+    action();
+  });
+  el.addEventListener("click", (e) => {
+    if (e.detail !== 0) return;
+    action();
+  });
+  if (el.getAttribute("role") === "menuitem") {
+    el.tabIndex = 0;
+    el.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      e.preventDefault();
+      action();
+    });
+  }
+}
 
 class ToolbarView implements PluginValue {
   private container: HTMLDivElement | null = null;
@@ -357,10 +623,18 @@ class ToolbarView implements PluginValue {
 
     if (this.mode === "toolbar") {
       this.renderToolbar(container);
+      // Measured, not assumed (issue #970, item 2). The width used to be a 280px
+      // constant, which was close enough while the bar held seven controls and is
+      // not now: with the lists, quote and wikilink addable the same bar can be
+      // twice that, and `computePosition` centring a 380px bar as if it were 280
+      // hangs it past the right edge of a narrow pane. `getBoundingClientRect`
+      // forces the layout, which the placement needs anyway. jsdom reports 0, so
+      // the constants stay as the fallback the placement tests rely on.
+      const measured = container.getBoundingClientRect();
       const pos = computePosition({
         anchor: rect,
-        surfaceWidth: 280,
-        surfaceHeight: 36,
+        surfaceWidth: measured.width > 0 ? measured.width : 280,
+        surfaceHeight: measured.height > 0 ? measured.height : 36,
         preferredPlacement: "above",
         gap: 6,
       });
@@ -389,44 +663,87 @@ class ToolbarView implements PluginValue {
     // MYND-336: render the controls in the user's resolved layout order, hidden
     // ones already filtered out by the host. Falls back to the default layout.
     const layout = getToolbarLayout() ?? DEFAULT_TOOLBAR_LAYOUT;
+    const marks = markStateOf(this.view);
+    container.setAttribute("role", "toolbar");
+    container.setAttribute("aria-label", i18n.t("editor.toolbar.label"));
+    container.setAttribute("aria-orientation", "horizontal");
     // Obsidian-style leading block-type indicator: the heading control renders
     // FIRST (far left) and shows the CURRENT block type, not a generic "H▾" on
     // the right. It is skipped in the layout loop below so it isn't rendered twice.
+    let previousGroup: string | null = null;
     if (layout.includes("heading")) {
       this.renderBlockTypeControl(container);
+      previousGroup = "type";
     }
     for (const id of layout) {
-      switch (id) {
-        case "bold":
-        case "italic":
-        case "strike":
-        case "code": {
-          const btn = TOOLBAR_BUTTONS.find((b) => b.id === id);
-          if (btn !== undefined) this.renderSimpleButton(container, btn);
-          break;
-        }
-        case "highlight":
-          // "H" swatch: plain click = default yellow (==…==); caret opens the
-          // 5-color swatch row (MYND-156 + multi-color, decisions.md 2026-06-15).
-          this.renderHighlightControl(container);
-          break;
-        case "link":
-          this.renderLinkButton(container);
-          break;
-        case "heading":
-          break; // rendered as the leading block-type control above
-        default:
-          // The addable list/quote/wikilink commands are not yet rendered on the
-          // floating toolbar (MYND-336 follow-up); config still persists them.
-          break;
+      if (id === "heading") continue; // rendered as the leading control above
+      const control = CONTROL_BY_ID.get(id);
+      if (control === undefined) continue;
+      if (previousGroup !== null && control.group !== previousGroup) {
+        this.renderSeparator(container);
       }
+      previousGroup = control.group;
+      if (id === "highlight") {
+        // "H" swatch: plain click = default yellow (==…==); caret opens the
+        // 12-color swatch row (MYND-156 + multi-color, decisions.md 2026-06-15).
+        this.renderHighlightControl(container);
+        continue;
+      }
+      if (id === "link") {
+        // The link control opens the URL overlay instead of wrapping in place.
+        // a `[text](url)` with a placeholder `url` would be a broken link the
+        // user then has to go and fix by hand.
+        this.renderButton(container, control, marks, () => this.openUrlOverlay());
+        continue;
+      }
+      this.renderButton(container, control, marks);
     }
     // Trailing export-selection-as-image button (MYND-361) — only when the host
     // wired the handler. A separate fixed control (not part of the reorderable
     // vocabulary) so it can't be lost from the layout.
     if (selectionExportHandler !== null) {
+      if (previousGroup !== null) this.renderSeparator(container);
       this.renderExportButton(container);
     }
+  }
+
+  /** A hairline between two control groups, and the reason the bar reads as a
+   *  toolbar rather than as a row of eleven identical squares. Decorative: roles
+   *  and names carry the grouping for a screen reader. */
+  private renderSeparator(container: HTMLDivElement): void {
+    const sep = document.createElement("span");
+    sep.className = "cm-toolbar-sep";
+    sep.setAttribute("aria-hidden", "true");
+    container.appendChild(sep);
+  }
+
+  /** One glyph button. `active` paints the pressed state and sets
+   *  `aria-pressed`, so the state is not colour-only. */
+  private renderButton(
+    container: HTMLDivElement,
+    control: ToolbarControl,
+    marks: MarkState,
+    action?: ToolbarCommand,
+  ): void {
+    const active = isActive(control, marks);
+    const label = i18n.t(control.labelKey);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cm-toolbar-button";
+    btn.dataset["control"] = control.id;
+    btn.setAttribute("data-testid", `toolbar.${control.id}`);
+    btn.title = label;
+    btn.setAttribute("aria-label", label);
+    // A formatting control is a toggle over the selection, so `aria-pressed` is
+    // the honest role; `wikilink` is too (it wraps or unwraps `[[…]]`).
+    btn.setAttribute("aria-pressed", active ? "true" : "false");
+    if (active) btn.classList.add("cm-toolbar-button-active");
+    btn.appendChild(makeToolbarIcon(control.icon));
+    bindPress(btn, () => {
+      this.openDropdown = null;
+      (action ?? control.action)(this.view);
+    });
+    container.appendChild(btn);
   }
 
   /** The export-selection-as-image button (MYND-361). Delegates to the
@@ -438,64 +755,36 @@ class ToolbarView implements PluginValue {
     btn.title = i18n.t("editor.toolbar.exportImageTitle");
     btn.setAttribute("aria-label", i18n.t("editor.toolbar.exportImageTitle"));
     btn.appendChild(makeExportImageIcon());
-    btn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      selectionExportHandler?.();
-    });
+    bindPress(btn, () => selectionExportHandler?.());
     container.appendChild(btn);
   }
 
-  /** One simple inline-formatting button (bold/italic/strike/code). */
-  private renderSimpleButton(
-    container: HTMLDivElement,
-    btn: (typeof TOOLBAR_BUTTONS)[number],
-  ): void {
-    const el = document.createElement("button");
-    el.type = "button";
-    el.className = "cm-toolbar-button";
-    el.textContent = btn.label;
-    el.style.fontWeight = btn.weight;
-    if ("italic" in btn && btn.italic) el.style.fontStyle = "italic";
-    if ("strike" in btn && btn.strike) el.style.textDecoration = "line-through";
-    if ("mono" in btn && btn.mono) el.style.fontFamily = "var(--font-mono)";
-    el.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      btn.action(this.view);
-    });
-    container.appendChild(el);
-  }
-
-  /** The link button (opens the URL overlay). */
-  private renderLinkButton(container: HTMLDivElement): void {
-    const link = document.createElement("button");
-    link.type = "button";
-    link.className = "cm-toolbar-button cm-toolbar-button-link";
-    link.textContent = "↗";
-    link.style.fontWeight = "700";
-    link.style.fontSize = "16px";
-    link.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      this.openUrlOverlay();
-    });
-    container.appendChild(link);
-  }
-
-  /** Leading block-type control: shows the CURRENT block type (Text / H1..H6)
-   *  on the far left (Obsidian parity) and opens the paragraph/H1..H6 dropdown. */
+  /** Leading block-type control: names the block the caret is IN (Paragraph /
+   *  H1..H6 / Bullet list / Numbered list / Checklist / Quote) on the far left,
+   *  and opens the dropdown that changes it. */
   private renderBlockTypeControl(container: HTMLDivElement): void {
-    const level = currentHeadingLevel(this.view);
-    const label =
-      level === 0 ? i18n.t("editor.toolbar.heading.paragraph") : `H${level}`;
+    const { kind, level } = currentBlockType(this.view);
+    const label = blockTypeLabel(kind, level);
     const headingWrap = document.createElement("div");
     headingWrap.className = "cm-toolbar-heading-wrap cm-toolbar-blocktype-wrap";
     headingWrap.style.position = "relative";
     const headingBtn = document.createElement("button");
     headingBtn.type = "button";
     headingBtn.className = "cm-toolbar-button cm-toolbar-blocktype";
+    headingBtn.setAttribute("data-testid", "toolbar.blockType");
+    headingBtn.title = label;
+    headingBtn.setAttribute("aria-label", label);
+    headingBtn.setAttribute("aria-haspopup", "menu");
+    headingBtn.setAttribute("aria-expanded", this.openDropdown === "heading" ? "true" : "false");
     // Current type + a caret so it reads as an opener.
-    headingBtn.textContent = `${label} ▾`;
-    headingBtn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    const headingText = document.createElement("span");
+    headingText.textContent = label;
+    const caret = document.createElement("span");
+    caret.className = "cm-toolbar-caret";
+    caret.setAttribute("aria-hidden", "true");
+    caret.appendChild(makeToolbarIcon("chevron-down", 12));
+    headingBtn.append(headingText, caret);
+    bindPress(headingBtn, () => {
       this.openDropdown = this.openDropdown === "heading" ? null : "heading";
       this.scheduleRender();
     });
@@ -503,6 +792,7 @@ class ToolbarView implements PluginValue {
     if (this.openDropdown === "heading") {
       const drop = document.createElement("div");
       drop.className = "cm-toolbar-heading-dropdown";
+      drop.setAttribute("role", "menu");
       drop.style.position = "absolute";
       drop.style.top = "32px";
       drop.style.left = "0";
@@ -518,11 +808,29 @@ class ToolbarView implements PluginValue {
       for (const item of items) {
         const el = document.createElement("div");
         el.className = "cm-toolbar-heading-item";
+        el.setAttribute("role", "menuitem");
         el.textContent = item.label;
-        el.addEventListener("mousedown", (e) => {
-          e.preventDefault();
+        bindPress(el, () => {
           this.openDropdown = null;
           applyHeadingLevel(this.view, item.level);
+        });
+        drop.appendChild(el);
+      }
+      // The list and quote blocks belong in the SAME dropdown: they are the rest
+      // of the answer to "what kind of block is this line", which is exactly the
+      // question this control asks. Before this they were reachable only from
+      // their own toolbar buttons, and only after the user had found them in
+      // Settings (issue #970, item 1).
+      for (const block of BLOCK_MENU_ITEMS) {
+        const el = document.createElement("div");
+        el.className = "cm-toolbar-heading-item";
+        el.setAttribute("role", "menuitem");
+        el.setAttribute("data-testid", `toolbar.blockType.${block.prefixId}`);
+        el.textContent = i18n.t(block.labelKey);
+        bindPress(el, () => {
+          this.openDropdown = null;
+          toggleListPrefix(block.prefix)(this.view);
+          this.view.focus();
         });
         drop.appendChild(el);
       }
@@ -552,21 +860,26 @@ class ToolbarView implements PluginValue {
     // its colour and remove it on click (toggle-off, like an active Bold button).
     const mainBtn = document.createElement("button");
     mainBtn.type = "button";
-    mainBtn.className = "cm-toolbar-button";
+    mainBtn.className = "cm-toolbar-button cm-toolbar-highlight-main";
     mainBtn.setAttribute("data-testid", "toolbar.highlight");
-    const swatch = document.createElement("span");
-    swatch.textContent = "H";
-    swatch.style.backgroundColor = `var(${activeCssVar}, #f3e7c4)`;
-    swatch.style.padding = "0 3px";
-    swatch.style.borderRadius = "2px";
-    swatch.style.color = "var(--fg-1)";
-    mainBtn.appendChild(swatch);
-    if (enc) {
-      mainBtn.title = i18n.t("editor.toolbar.highlight.remove");
-      mainBtn.setAttribute("aria-label", i18n.t("editor.toolbar.highlight.remove"));
-    }
-    mainBtn.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    if (enc !== null) mainBtn.classList.add("cm-toolbar-button-active");
+    mainBtn.setAttribute("aria-pressed", enc !== null ? "true" : "false");
+    // The glyph says WHAT the control does; the dot under it says WHICH colour it
+    // will write. Spelling the colour as the letter "H" on a tinted square (the
+    // old shape) made the button read as a text badge, and at 15px the tint was
+    // the only cue that survived.
+    mainBtn.appendChild(makeToolbarIcon("highlight"));
+    const dot = document.createElement("span");
+    dot.className = "cm-toolbar-hl-dot";
+    dot.setAttribute("aria-hidden", "true");
+    dot.style.backgroundColor = `var(${activeCssVar}, #f3e7c4)`;
+    mainBtn.appendChild(dot);
+    const hlLabel = enc
+      ? i18n.t("editor.toolbar.highlight.remove")
+      : i18n.t("editor.toolbar.customize.highlight");
+    mainBtn.title = hlLabel;
+    mainBtn.setAttribute("aria-label", hlLabel);
+    bindPress(mainBtn, () => {
       this.openDropdown = null;
       if (enc) applyHighlightEdit(this.view, enc, enc.color); // toggle off
       else wrapCommand("==", "==")(this.view);
@@ -577,10 +890,16 @@ class ToolbarView implements PluginValue {
     const caret = document.createElement("button");
     caret.type = "button";
     caret.className = "cm-toolbar-button cm-toolbar-highlight-caret";
-    caret.textContent = "▾";
     caret.setAttribute("data-testid", "toolbar.highlight-caret");
-    caret.addEventListener("mousedown", (e) => {
-      e.preventDefault();
+    caret.setAttribute("aria-haspopup", "menu");
+    caret.setAttribute(
+      "aria-expanded",
+      this.openDropdown === "highlight" ? "true" : "false",
+    );
+    caret.title = i18n.t("editor.toolbar.highlight.colours");
+    caret.setAttribute("aria-label", i18n.t("editor.toolbar.highlight.colours"));
+    caret.appendChild(makeToolbarIcon("chevron-down", 12));
+    bindPress(caret, () => {
       this.openDropdown = this.openDropdown === "highlight" ? null : "highlight";
       this.scheduleRender();
     });
@@ -605,8 +924,7 @@ class ToolbarView implements PluginValue {
           square.style.outline = "2px solid var(--accent, #2c4a7a)";
           square.style.outlineOffset = "1px";
         }
-        square.addEventListener("mousedown", (e) => {
-          e.preventDefault();
+        bindPress(square, () => {
           this.openDropdown = null;
           // Editing → recolour in place (choosing the active colour removes it);
           // creating → wrap the selection in this colour's markers.
@@ -622,8 +940,7 @@ class ToolbarView implements PluginValue {
         remove.className = "cm-toolbar-highlight-remove";
         remove.textContent = i18n.t("editor.toolbar.highlight.remove");
         remove.setAttribute("data-testid", "toolbar.highlight-remove");
-        remove.addEventListener("mousedown", (e) => {
-          e.preventDefault();
+        bindPress(remove, () => {
           this.openDropdown = null;
           applyHighlightEdit(this.view, enc, enc.color);
         });
@@ -677,10 +994,7 @@ class ToolbarView implements PluginValue {
         this.view.focus();
       }
     });
-    apply.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      commit();
-    });
+    bindPress(apply, commit);
     container.append(input, apply);
   }
 }

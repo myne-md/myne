@@ -124,5 +124,18 @@ export function engineLabel(ua: string): string {
     const m = ua.match(re);
     if (m) return `${name} ${m[1]}`;
   }
+  // **The desktop WebViews, which is where this said `unknown`** (issue #970,
+  // item 14). A WKWebView on macOS and a WebKitGTK view on Linux both send a UA
+  // with no `Version/… Safari` pair and no Chrome token: just
+  // `AppleWebKit/<ver> (KHTML, like Gecko)`, so the five rules above all miss
+  // and the block reported `engine: unknown` for the app's two primary desktop
+  // engines. The two are indistinguishable from the UA alone, which is why the
+  // label names the ENGINE (what this field is for) rather than guessing the
+  // host: `WebKit 605` is true of both, and the OS is not this field's subject.
+  //
+  // Last, not first: every Chromium UA also carries `AppleWebKit/537.36`, so
+  // putting it anywhere earlier would relabel every Chrome and Edge user.
+  const webkit = ua.match(/AppleWebKit\/(\d+)/);
+  if (webkit) return `WebKit ${webkit[1]}`;
   return "unknown";
 }

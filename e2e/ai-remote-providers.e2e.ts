@@ -152,6 +152,25 @@ describeE2E("arp1 remote-provider consent flow (default-off, no real provider)",
           // The host agrees with the copy: nothing remote is selected.
           expect((await capabilityReport(s)).backend_class).not.toBe("remote");
 
+          // ── the picker offers the closed set, all four rows ──
+          // myne-md/myne#970. Two of them are OpenCode products on ONE host,
+          // separated by path in the registry, so the row a user picks is the
+          // only thing that decides which path a request takes. Asserted here
+          // rather than only in a unit test because the panel's list is a
+          // hand-written copy of the host's `KNOWN_AI_PROVIDERS`: a row dropped
+          // from one side leaves a provider a user can select but never reach.
+          {
+            const trigger = await s.byTestId("ai.provider-choice");
+            await trigger.scrollIntoView();
+            await trigger.click();
+            for (const wire of ["ollama-cloud", "openrouter", "opencode-zen", "opencode-go"]) {
+              await s.waitForElement(
+                `[data-testid="ai.provider-choice-option"][data-value="${wire}"]`,
+              );
+            }
+            await pressKey(s, KEY.ESCAPE);
+          }
+
           // ── selecting a provider shows the consent dialog and stores nothing ──
           await pickSelect(s, "ai.provider-choice", "openrouter");
           await s.waitUntil(

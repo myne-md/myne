@@ -23,12 +23,39 @@ export function wrapCommand(open: string, close: string): ToolbarCommand {
   };
 }
 
-/** The ATX heading level (1–6) of the cursor's line, or 0 for a plain
- *  paragraph — drives the toolbar's leading block-type indicator. */
-export function currentHeadingLevel(view: EditorView): number {
+/** The block a caret line is written in, as the toolbar's leading control names
+ *  it. One value, because the control shows ONE word: a line is a heading, a
+ *  bullet, a numbered item, a task, a quote or a paragraph, and the fenced-code
+ *  / table cases never reach here (the toolbar is suppressed inside code). */
+export type BlockTypeKind =
+  | "paragraph"
+  | "heading"
+  | "bullet"
+  | "numbered"
+  | "checklist"
+  | "quote";
+
+/** Which block the cursor's line is, and, for a heading, its level.
+ *
+ *  This is what makes the toolbar's leading control say where the caret IS
+ *  rather than what it could become: the control reads `Bullet list` on a bullet
+ *  line, `Quote` inside a blockquote, and `Paragraph` on plain prose. Detection
+ *  order matters, because the prefixes nest: `- [ ] ` starts with `- `, and every
+ *  list can sit inside a quote, so the most specific marker has to win. */
+export function currentBlockType(view: EditorView): { kind: BlockTypeKind; level: number } {
   const line = view.state.doc.lineAt(view.state.selection.main.from);
-  const m = view.state.doc.sliceString(line.from, line.to).match(/^(#{1,6})\s/);
-  return m ? m[1]!.length : 0;
+  // Strip the quote markers first, so a task inside a blockquote reads as a task
+  // (`> - [ ]`) and not as a quote with a strange tail.
+  const text = view.state.doc.sliceString(line.from, line.to).replace(/^(\s*>\s*)+/, "");
+  if (/^[-*+]\s+\[[ xX]\]\s/.test(text)) return { kind: "checklist", level: 0 };
+  if (/^\d+[.)]\s/.test(text)) return { kind: "numbered", level: 0 };
+  if (/^[-*+]\s/.test(text)) return { kind: "bullet", level: 0 };
+  const heading = text.match(/^(#{1,6})\s/);
+  if (heading) return { kind: "heading", level: heading[1]!.length };
+  if (/^>/.test(view.state.doc.sliceString(line.from, line.to).trimStart())) {
+    return { kind: "quote", level: 0 };
+  }
+  return { kind: "paragraph", level: 0 };
 }
 
 /** Set (or clear, `level === 0`) the ATX heading level of the cursor's line. */

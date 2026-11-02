@@ -26,7 +26,11 @@ import { useTranslation } from "react-i18next";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { useSelectedNoteOptional } from "../../notes/sidebarState";
+import { usePrefs } from "../../hooks/usePrefs";
+import { providerLabelOf } from "../../lib/ai-capability";
 import { Textarea } from "../primitives/Textarea";
+import { MIN_TARGET } from "../primitives/targetSize";
+import { toast } from "../toast/toastStore";
 import {
   isSeedStale,
   memorySeedApply,
@@ -40,7 +44,7 @@ import {
   type SeedStatus,
 } from "../../lib/seed-memory";
 
-type Step = "scope" | "candidates" | "done";
+type Step = "scope" | "candidates";
 
 const BLOCK: CSSProperties = {
   display: "flex",
@@ -108,10 +112,100 @@ const ACTIONS: CSSProperties = {
   marginTop: "var(--space-2)",
 };
 
+/** The scope's numbers, as chips (issue #970, item 8).
+ *
+ *  They used to be one dot-separated sentence, "171 notes · 41 folders · 22
+ *  tags", which reads as prose about the vault rather than as four facts about
+ *  the thing being sent. A chip is the app's shape for a short countable fact
+ *  (the tag editor and the filter bar both use it), and it makes the row
+ *  scannable at a glance, which is what a consent screen's numbers should be. */
 const FACTS: CSSProperties = {
   display: "flex",
   flexWrap: "wrap",
-  gap: "var(--space-2) var(--space-4)",
+  alignItems: "center",
+  gap: "var(--space-2)",
+  margin: 0,
+};
+
+const FACT_CHIP: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  padding: "2px var(--space-2)",
+  borderRadius: "var(--radius-2)",
+  border: "1px solid var(--line-1)",
+  background: "var(--paper-2)",
+  color: "var(--fg-2)",
+  fontSize: "var(--text-xs)",
+  whiteSpace: "nowrap",
+};
+
+/** The candidate's header row: the label for its own checkbox, sized so the
+ *  whole line is clickable. */
+const CANDIDATE_HEAD: CSSProperties = {
+  display: "flex",
+  gap: "var(--space-2)",
+  alignItems: "center",
+  cursor: "pointer",
+};
+
+/** The selection box itself, at the WCAG pointer floor rather than the browser's
+ *  13px default. `accent-color` keeps it the accent rather than the platform's
+ *  blue, which is what it was in the report. */
+const SELECT_BOX: CSSProperties = {
+  ...MIN_TARGET,
+  width: "var(--target-min)",
+  height: "var(--target-min)",
+  margin: 0,
+  accentColor: "var(--accent)",
+  cursor: "pointer",
+};
+
+/** An unselected entry stays readable but stops competing for attention: its
+ *  text is dimmed rather than removed, because the decision is reversible right
+ *  up until Save. */
+const UNSELECTED_CARD: CSSProperties = {
+  opacity: 0.55,
+};
+
+/** A textarea long enough to show its entry, capped so the Save button stays on
+ *  the modal (issue #970, item 10). ~72 characters per line at the body's width,
+ *  which is a rough measure on purpose: one row of error in either direction
+ *  costs nothing, a clipped sentence costs the review. */
+const MAX_CANDIDATE_ROWS = 8;
+function candidateRows(text: string): number {
+  return Math.min(MAX_CANDIDATE_ROWS, Math.max(3, Math.ceil(text.length / 72) + 1));
+}
+
+/** The run's own state, in the wizard's body rather than in a box of its own
+ *  (issue #970, item 9). */
+const PROGRESS_BLOCK: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  gap: "var(--space-2)",
+  margin: 0,
+};
+
+const PROGRESS_TRACK: CSSProperties = {
+  height: 4,
+  borderRadius: "var(--radius-1)",
+  background: "var(--line-1)",
+  overflow: "hidden",
+};
+
+// A scale on the compositor rather than a width on the main thread: a width
+// transition lays out and paints every frame, and `motion-canon` refuses it for
+// that reason (PRODUCT.md principle 4, decisions/ui/0632). `scaleX` with the
+// origin pinned left draws exactly the same bar.
+const PROGRESS_FILL: CSSProperties = {
+  height: "100%",
+  background: "var(--accent)",
+  transformOrigin: "left center",
+  transition: "transform var(--duration-fast) var(--ease-out, ease)",
+};
+
+/** The provider line: a sentence, not a chip, because it names a party rather
+ *  than counting something. */
+const PROVIDER_LINE: CSSProperties = {
   margin: 0,
   fontSize: "var(--text-xs)",
   color: "var(--fg-2)",
@@ -171,6 +265,9 @@ export function SeedMemoryWizard(props: {
   onApplied?: () => void;
 }) {
   const { t } = useTranslation();
+  // Only to NAME the provider on the scope screen: the engine reports its own id
+  // ("remote"), and the human label lives in the preferences.
+  const { prefs } = usePrefs();
   const [step, setStep] = useState<Step>("scope");
   const [status, setStatus] = useState<SeedStatus | null>(null);
   const [payload, setPayload] = useState<SeedPayload | null>(null);
@@ -183,7 +280,6 @@ export function SeedMemoryWizard(props: {
   const [candidates, setCandidates] = useState<CandidateDraft[]>([]);
   const [runError, setRunError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
-  const [applied, setApplied] = useState(0);
   const [capDetail, setCapDetail] = useState<{ remaining: number; requested: number } | null>(
     null,
   );
@@ -196,7 +292,6 @@ export function SeedMemoryWizard(props: {
     setProgress(null);
     setCandidates([]);
     setRunError(null);
-    setApplied(0);
     setCapDetail(null);
   }, []);
 
@@ -283,9 +378,20 @@ export function SeedMemoryWizard(props: {
         chosen.map((c) => c.text),
         (status?.seedEntries ?? 0) > 0,
       );
-      setApplied(outcome.ids.length);
-      setStep("done");
+      // **The wizard closes and the outcome is a toast** (issue #970, item 11).
+      // The third step was a 720px dialog holding two sentences and a Done
+      // button, drawn over the Memory section that already lists every entry it
+      // was talking about: "Saved 9 entries" was the group header behind it, and
+      // "find them under From your vault" described a list the user could see.
+      // Nothing is lost by leaving the screen: the count is in the message, the
+      // entries are in the panel, and `onApplied` is what makes the panel show
+      // them.
       props.onApplied?.();
+      toast({
+        message: t("settings.memory.seed.applied", { count: outcome.ids.length }),
+        variant: "success",
+      });
+      close();
     } catch (e) {
       const err = e as { kind?: string; detail?: unknown };
       if (err.kind === "SeedCandidateRefused") {
@@ -313,12 +419,17 @@ export function SeedMemoryWizard(props: {
     }
   }, [candidates, props, status]);
 
+  // **One provider name, both sentences that state it** (issue #970, item 8).
+  // The engine reports its own id, and the remote arm's id is literally
+  // "remote", a class, not a provider. The label only exists in the
+  // preferences, which is where the AI chat notice and the panel's caption read
+  // it from too, so all three name the same provider the same way.
+  const providerName = providerLabelOf(prefs.ai_provider) ?? status?.provider ?? "";
+
   const title =
     step === "scope"
       ? t("settings.memory.seed.title")
-      : step === "candidates"
-        ? t("settings.memory.seed.candidatesTitle")
-        : t("settings.memory.seed.doneTitle");
+      : t("settings.memory.seed.candidatesTitle");
 
   return (
     <ModalShell
@@ -350,32 +461,45 @@ export function SeedMemoryWizard(props: {
           {payload !== null && status !== null ? (
             <>
               <p style={HELPER}>{t("settings.memory.seed.scopeIntro")}</p>
-              <p data-testid="settings.memory.seed.provider" style={FACTS}>
-                <span>
-                  {t("settings.memory.seed.provider", { provider: status.provider })}
-                  {" · "}
-                  {status.remote
-                    ? t("settings.memory.seed.providerRemote")
-                    : t("settings.memory.seed.providerLocal")}
+              {/* **The provider line names the provider, once** (issue #970,
+                  item 8). It read "Provider: remote · remote": `status.provider`
+                  is the ENGINE's id (`RemoteEngine::ID` is literally "remote"),
+                  and the class was appended after it, so the same word appeared
+                  twice and the actual provider never appeared at all. The name
+                  only exists in the preferences, exactly as the AI chat notice
+                  and the panel's own caption resolve it, so it is resolved the
+                  same way here: `providerLabelOf(prefs.ai_provider)`, with the
+                  engine id kept only as a last resort for a build whose provider
+                  is unset (where the run would be refused anyway). */}
+              <p data-testid="settings.memory.seed.provider" style={PROVIDER_LINE}>
+                {status.remote
+                  ? t("settings.memory.seed.provider", {
+                      provider: providerName,
+                    })
+                  : t("settings.memory.seed.providerLocalName")}
+              </p>
+              <p style={FACTS}>
+                <span data-testid="settings.memory.seed.count-notes" style={FACT_CHIP}>
+                  {t("settings.memory.seed.countNotes", { count: payload.notes })}
                 </span>
-                <span>
-                  {t("settings.memory.seed.counts", {
-                    notes: payload.notes,
-                    folders: payload.folders,
-                    tags: payload.tags,
-                  })}
+                <span data-testid="settings.memory.seed.count-folders" style={FACT_CHIP}>
+                  {t("settings.memory.seed.countFolders", { count: payload.folders })}
                 </span>
-                <span>
+                <span data-testid="settings.memory.seed.count-tags" style={FACT_CHIP}>
+                  {t("settings.memory.seed.countTags", { count: payload.tags })}
+                </span>
+                <span data-testid="settings.memory.seed.estimatedChars" style={FACT_CHIP}>
                   {t("settings.memory.seed.estimatedChars", { chars: payload.chars })}
                 </span>
+                {/* The exclusion is a CONTROL statement rather than a count, and
+                    it is the one number here a user may need to act on, so it
+                    keeps its own sentence instead of becoming a fourth chip. */}
                 {payload.excludedNotes > 0 ? (
-                  <span data-testid="settings.memory.seed.excluded">
+                  <span
+                    data-testid="settings.memory.seed.excluded"
+                    style={{ ...FACT_CHIP, color: "var(--fg-3)" }}
+                  >
                     {t("settings.memory.seed.excluded", { count: payload.excludedNotes })}
-                  </span>
-                ) : null}
-                {payload.titlesOmitted > 0 ? (
-                  <span data-testid="settings.memory.seed.omitted">
-                    {t("settings.memory.seed.omitted", { count: payload.titlesOmitted })}
                   </span>
                 ) : null}
               </p>
@@ -406,7 +530,7 @@ export function SeedMemoryWizard(props: {
                   />
                   <span>
                     {t("settings.memory.seed.consentLabel", {
-                      provider: status.provider,
+                      provider: providerName,
                       chars: payload.chars,
                     })}
                   </span>
@@ -437,21 +561,48 @@ export function SeedMemoryWizard(props: {
       ) : step === "candidates" ? (
         <div style={BLOCK} data-testid="settings.memory.seed.candidates">
           {generating ? (
-            <div data-testid="settings.memory.seed.progress" style={CARD}>
+            /* **No card** (issue #970, item 9). The run report used to be a
+               bordered `--paper-2` box with a heading, a helper and a
+               full-width button inside the modal, a dialog drawn inside a
+               dialog, which is what made a 3-line status read as a second thing
+               that had appeared on top of the wizard. It is the wizard's own
+               state, so it occupies the wizard's own body: a line of text, the
+               helper, and a ghost button that hugs its own width instead of
+               stretching into a field. */
+            <div data-testid="settings.memory.seed.progress" style={PROGRESS_BLOCK}>
               <p style={{ margin: 0 }}>
                 {t(progressKey(progress?.phase ?? "working"))}
                 {progress !== null && progress.total > 0
                   ? ` (${progress.done}/${progress.total})`
                   : ""}
               </p>
+              {progress !== null && progress.total > 0 ? (
+                <div
+                  style={PROGRESS_TRACK}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={progress.total}
+                  aria-valuenow={progress.done}
+                >
+                  <div
+                    style={{
+                      ...PROGRESS_FILL,
+                      width: "100%",
+                      transform: `scaleX(${Math.min(1, progress.done / progress.total)})`,
+                    }}
+                  />
+                </div>
+              ) : null}
               <p style={HELPER}>{t("settings.memory.seed.generatingHelper")}</p>
-              <Button
-                variant="ghost"
-                data-testid="settings.memory.seed.cancel-run"
-                onClick={cancelRun}
-              >
-                {t("settings.memory.seed.cancelRun")}
-              </Button>
+              <div style={{ display: "flex" }}>
+                <Button
+                  variant="ghost"
+                  data-testid="settings.memory.seed.cancel-run"
+                  onClick={cancelRun}
+                >
+                  {t("settings.memory.seed.cancelRun")}
+                </Button>
+              </div>
             </div>
           ) : (
             <>
@@ -460,12 +611,25 @@ export function SeedMemoryWizard(props: {
               </p>
               <ul style={LIST} data-testid="settings.memory.seed.candidate-list">
                 {candidates.map((candidate, index) => (
-                  <li key={index} style={CARD} data-testid="settings.memory.seed.candidate">
-                    <label
-                      style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}
-                    >
+                  <li
+                    key={index}
+                    style={{ ...CARD, ...(candidate.selected ? null : UNSELECTED_CARD) }}
+                    data-testid="settings.memory.seed.candidate"
+                    data-selected={candidate.selected ? "true" : "false"}
+                  >
+                    {/* **The selection control leads the entry and is a real
+                        target** (issue #970, item 10). It used to be a native
+                        16px checkbox tucked beside the character count ABOVE the
+                        text, so the one decision this screen exists for was the
+                        smallest thing on it and sat away from the text it
+                        decides about. Now the whole header row is the label
+                        (clicking the words toggles the entry), the box is
+                        `--target-min` square, and the count follows it as the
+                        secondary fact it is. */}
+                    <label style={CANDIDATE_HEAD}>
                       <input
                         type="checkbox"
+                        style={SELECT_BOX}
                         data-testid={`settings.memory.seed.candidate-select-${index}`}
                         checked={candidate.selected}
                         onChange={(e) =>
@@ -476,17 +640,25 @@ export function SeedMemoryWizard(props: {
                           )
                         }
                       />
-                      <span style={HELPER}>
+                      <span style={{ ...HELPER, cursor: "pointer" }}>
                         {t("settings.memory.seed.charCount", {
                           count: candidate.text.length,
                         })}
                       </span>
                     </label>
+                    {/* The textarea grows with its own content, because a fixed
+                        `rows={3}` cut the entry off mid-sentence: the first
+                        candidate in the report ended on "Subfolders split by
+                        project." with the rest of the line clipped, and a review
+                        screen that hides the words it is asking you to approve
+                        is asking you to approve something you did not read. It
+                        stops growing at `MAX_ROWS` and scrolls past that, so one
+                        long entry cannot push the Save button off the modal. */}
                     <Textarea
                       data-testid={`settings.memory.seed.candidate-text-${index}`}
                       aria-label={t("settings.memory.seed.candidateLabel", { index: index + 1 })}
                       value={candidate.text}
-                      rows={3}
+                      rows={candidateRows(candidate.text)}
                       spellCheck={false}
                       disabled={applying}
                       invalid={candidate.refusal !== undefined}
@@ -552,17 +724,7 @@ export function SeedMemoryWizard(props: {
             </>
           )}
         </div>
-      ) : (
-        <div style={BLOCK} data-testid="settings.memory.seed.done">
-          <p>{t("settings.memory.seed.applied", { count: applied })}</p>
-          <p style={HELPER}>{t("settings.memory.seed.appliedHelper")}</p>
-          <div style={ACTIONS}>
-            <Button data-testid="settings.memory.seed.finish" onClick={close}>
-              {t("settings.memory.seed.finish")}
-            </Button>
-          </div>
-        </div>
-      )}
+      ) : null}
     </ModalShell>
   );
 }
@@ -669,7 +831,6 @@ export function SeedMemoryRow(props: {
         onApplied={() => {
           void reload();
           props.onApplied?.();
-          props.onShowToast(t("settings.memory.seed.appliedToast"));
         }}
       />
     </div>

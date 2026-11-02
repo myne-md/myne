@@ -13,8 +13,8 @@
 // So these are partly PARITY assertions, deliberately: they hold this list to the
 // affordances its twins have (draggable, focusable, position-labelled, Alt+Arrow),
 // which is the property that regressed and the one a future edit could lose again.
-// The rest are this list's OWN contract, which nothing else can cover: a pending
-// row's toggle is inert, and the ↑/↓ buttons survive — they are the whole subject
+// The rest are this list's OWN contract, which nothing else can cover: the last
+// visible row cannot be switched off, and the ↑/↓ buttons survive; they are the whole subject
 // of `e2e/toolbar-customize.e2e.ts`'s tc2 (myne-md/myne#557), the scenario that
 // retired a manual roster row because a WebDriver seat cannot start a native
 // HTML5 drag.
@@ -34,7 +34,7 @@ vi.mock("../../../src/lib/prefs", async (importOriginal) => ({
 }));
 
 import { ToolbarCustomizeSettings } from "../../../src/components/settings/ToolbarCustomizeSettings";
-import { EDITOR_TOOLBAR_PENDING_IDS } from "../../../src/notes/toolbarItems";
+import { EDITOR_TOOLBAR_ITEMS } from "../../../src/notes/toolbarItems";
 
 async function renderToolbar(prefs: { order?: string[]; hidden?: string[] } = {}) {
   prefsRead.mockResolvedValue({
@@ -111,26 +111,103 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     ).toBe(true);
   });
 
-  it("pins a not-yet-renderable row's toggle off, and says why", async () => {
+  it("renders every vocabulary row as toggleable (the pin is gone, issue #970)", async () => {
+    // The five list/quote/wikilink ids used to carry a disabled "Coming soon"
+    // toggle because the floating toolbar skipped them. Their commands existed
+    // all along and now render, so a disabled row here would be the lie: it would
+    // say a control cannot be shown while the toolbar would happily show it.
     const rows = await renderToolbar();
-    const pendingId = EDITOR_TOOLBAR_PENDING_IDS[0];
-    expect(pendingId, "the pending roster must be non-empty or this case asserts nothing").toBeTruthy();
-    const pendingRow = rows.find((r) => r.getAttribute("data-item-id") === pendingId);
-    expect(pendingRow).toBeTruthy();
-    const toggle = pendingRow!.querySelector<HTMLInputElement>(
+    expect(rows).toHaveLength(EDITOR_TOOLBAR_ITEMS.length);
+    for (const row of rows) {
+      const toggle = row.querySelector<HTMLInputElement>(
+        '[data-testid="settings.toolbar-customize.toggle"]',
+      )!;
+      expect(toggle.disabled, row.getAttribute("data-item-id") ?? "").toBe(false);
+    }
+    expect(document.body.textContent ?? "").not.toContain("Coming soon");
+  });
+
+  it("will not switch off the last visible control, and says why", async () => {
+    // `resolveToolbarHidden` reads an empty stored list as "never customized", so
+    // hiding everything would persist `[]` and read back as the defaults. The pin
+    // used to keep every persisted value non-empty and so kept that reading
+    // unambiguous; with the pin gone this rule does the same job, and a
+    // formatting toolbar with no formatting is not a state worth supporting.
+    const allShown = EDITOR_TOOLBAR_ITEMS.map((i) => i.id);
+    const rows = await renderToolbar({ hidden: allShown.slice(1) });
+    const visibleId = allShown[0]!;
+    const visibleRow = rows.find((r) => r.getAttribute("data-item-id") === visibleId)!;
+    const toggle = visibleRow.querySelector<HTMLInputElement>(
       '[data-testid="settings.toolbar-customize.toggle"]',
     )!;
+    expect(toggle.checked).toBe(true);
     expect(toggle.disabled).toBe(true);
-    expect(toggle.checked).toBe(false);
-    expect(pendingRow!.textContent ?? "").toMatch(/./);
-    // …and a non-pending row's toggle is live, so the assertion above is about the
-    // pending row rather than about every row.
-    const liveRow = rows.find((r) => r.getAttribute("data-item-id") !== pendingId)!;
+    expect(visibleRow.textContent ?? "").toContain("Keep at least one");
+    act(() => {
+      fireEvent.click(toggle);
+    });
+    expect(setEditorToolbarHidden).not.toHaveBeenCalled();
+    // A hidden row's toggle stays live, so the assertion above is about "last
+    // visible" rather than about every checked box.
+    const hiddenRow = rows.find((r) => r.getAttribute("data-item-id") !== visibleId)!;
     expect(
-      liveRow.querySelector<HTMLInputElement>(
+      hiddenRow.querySelector<HTMLInputElement>(
         '[data-testid="settings.toolbar-customize.toggle"]',
       )!.disabled,
     ).toBe(false);
+    // And with two visible, both are live: the real second half, which the
+    // first version of this test only ASSERTED ABOUT A CONSTANT
+    // (`EDITOR_TOOLBAR_DEFAULT_HIDDEN.length`), so it could not have failed on
+    // the drift it existed for. Hide one of the two and watch the write land.
+    const twoVisible = await (async () => {
+      cleanup();
+      return renderToolbar({ hidden: allShown.slice(2) });
+    })();
+    const first = twoVisible.find(
+      (r) => r.getAttribute("data-item-id") === allShown[0],
+    )!;
+    const firstToggle = first.querySelector<HTMLInputElement>(
+      '[data-testid="settings.toolbar-customize.toggle"]',
+    )!;
+    expect(firstToggle.disabled).toBe(false);
+    act(() => {
+      fireEvent.click(firstToggle);
+    });
+    await waitFor(() => expect(setEditorToolbarHidden).toHaveBeenCalledTimes(1));
+    expect(setEditorToolbarHidden.mock.calls[0]![0]).toContain(allShown[0]);
+  });
+
+  it("refuses to write over a layout it never read", async () => {
+    // The failure this exists for: `prefsRead` rejects (locked, or a vault that
+    // is not there yet), `hidden` is left holding the DEFAULTS, and one click
+    // would persist those defaults over the user's stored layout. Nothing would
+    // say so, the write itself succeeds, and the layout is gone with no undo.
+    // A preference is recoverable by re-customizing, but "recoverable" is not
+    // "not lost", so the write is refused until a read has succeeded.
+    prefsRead.mockRejectedValueOnce(new Error("locked"));
+    render(<ToolbarCustomizeSettings />);
+    await waitFor(() => expect(prefsRead).toHaveBeenCalled());
+
+    const row = screen.getAllByTestId(/^settings\.toolbar-customize\.row\./)[0]!;
+    const toggle = row.querySelector<HTMLInputElement>(
+      '[data-testid="settings.toolbar-customize.toggle"]',
+    )!;
+    expect(toggle.disabled).toBe(true);
+    act(() => {
+      fireEvent.click(toggle);
+    });
+    act(() => {
+      fireEvent.click(
+        row.querySelector<HTMLButtonElement>(
+          '[data-testid="settings.toolbar-customize.move-down"]',
+        )!,
+      );
+    });
+    expect(setEditorToolbarHidden).not.toHaveBeenCalled();
+    expect(setEditorToolbarOrder).not.toHaveBeenCalled();
+    // And the panel says why, rather than presenting rows that look live and
+    // silently do nothing.
+    expect(screen.getByText(/read-only until you reopen/i)).toBeTruthy();
   });
 
   it("rolls an optimistic hide back, and shows the failure", async () => {
@@ -138,9 +215,12 @@ describe("ToolbarCustomizeSettings adopts the shared customize row", () => {
     // is the one that skips it (audit Aile 4 #6); this list must not join it.
     setEditorToolbarHidden.mockRejectedValueOnce(new Error("locked"));
     const rows = await renderToolbar();
-    const liveRow = rows.find(
-      (r) => r.getAttribute("data-item-id") !== EDITOR_TOOLBAR_PENDING_IDS[0],
-    )!;
+    const liveRow = rows.find((r) => {
+      const toggle = r.querySelector<HTMLInputElement>(
+        '[data-testid="settings.toolbar-customize.toggle"]',
+      );
+      return toggle !== null && toggle.checked && !toggle.disabled;
+    })!;
     const toggle = liveRow.querySelector<HTMLInputElement>(
       '[data-testid="settings.toolbar-customize.toggle"]',
     )!;

@@ -117,9 +117,33 @@ export function FlowHeader({
     >
       {onBack ? (
         <button
+          type="button"
           onClick={onBack}
           aria-label={t("common.back")}
-          style={{ border: "none", background: "transparent", padding: 0, cursor: "pointer", display: "flex" }}
+          data-testid="flow-header.back"
+          style={{
+            border: "none",
+            background: "transparent",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            // **The target is 44x44, the glyph is 18** (myne-md/myne#970). The
+            // button used to be the glyph: `padding: 0` around an 18px icon, so
+            // the tappable area was a 18px square in a corner and hitting it on
+            // a phone was luck. 44 is what both platforms publish as the
+            // minimum, and the same floor `components/inputs.tsx` applies to the
+            // PIN dots.
+            minWidth: 44,
+            minHeight: 44,
+            // The icon keeps its old position on the screen: the target grows
+            // AROUND it rather than pushing the row right. Without these the
+            // chevron jumps 13px and every flow header's text shifts with it.
+            marginLeft: -13,
+            marginTop: -13,
+            marginBottom: -13,
+            padding: 0,
+          }}
         >
           <Icon name="chevron-left" size={18} color="var(--accent)" strokeWidth={2} flip />
         </button>

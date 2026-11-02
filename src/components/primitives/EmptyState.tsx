@@ -42,6 +42,9 @@ interface EmptyStateProps {
   size?: "sm" | "md" | "lg";
   field?: boolean;
   fill?: boolean;
+  /** Draw the card's border/radius/fill. Off inside a surface that already has
+   *  its own (the sidebar's first-run state, issue #970). */
+  frame?: boolean;
   testId?: string;
   rest?: React.HTMLAttributes<HTMLDivElement>;
 }

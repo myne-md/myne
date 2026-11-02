@@ -89,6 +89,17 @@ interface EmptyStateProps {
    * bug rather than as a card.
    */
   fill?: boolean;
+  /**
+   * Draw the card's chrome: the hairline border, its radius and the `--paper-2`
+   * fill. On by default.
+   *
+   * Off for a state that sits INSIDE a surface which is already a bordered
+   * region (issue #970, item 4: the sidebar's first-run state drew a rounded box
+   * inside the sidebar's own panel, and the box read as a dialog nobody could
+   * dismiss). Unlike `fill` this KEEPS the wash, which is what makes the state
+   * still read as a destination rather than as a caption floating in the pane.
+   */
+  frame?: boolean;
   testId?: string;
   /**
    * Passed through to the root. For the `data-*` a caller needs ON the element
@@ -110,6 +121,7 @@ export function EmptyState({
   size = "md",
   field = true,
   fill = false,
+  frame = true,
   testId,
   rest,
 }: EmptyStateProps) {
@@ -120,6 +132,7 @@ export function EmptyState({
       data-variant={variant}
       data-size={size}
       data-fill={fill ? "true" : undefined}
+      data-frame={frame ? undefined : "false"}
       data-testid={testId}
     >
       {field && (

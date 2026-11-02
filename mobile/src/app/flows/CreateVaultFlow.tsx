@@ -31,7 +31,7 @@ import { LOST_BOTH_SECRETS_SENTENCE } from "../../lib/load-bearing-copy";
 import {
   copySecretToClipboard,
   saveSecretToDocuments,
-  type SecretSaveOutcome,
+  secretSaveMessage,
 } from "../../lib/secret-export";
 import { canHoldSecretOnClipboard } from "../../lib/clipboardTransport";
 import { setVaultLabel } from "../../lib/prefs";
@@ -880,21 +880,16 @@ export function CreateVaultFlow({
   // point of the union: one names a folder, one names the share sheet as the
   // route, and one names neither because the probe that would have decided
   // between them failed.
-  const saveMessage = (outcome: SecretSaveOutcome | null): string => {
-    if (outcome === null) return t("createVault.saveFileError");
-    switch (outcome.kind) {
-      case "path":
-        return t("createVault.savedToFile", { label: outcome.label });
-      case "shared":
-        return t("createVault.savedToShareSheet");
-      case "written":
-        return t("createVault.savedFileWritten");
-    }
-  };
-
+  // The switch itself moved to `secretSaveMessage` in `lib/secret-export.ts`
+  // (myne-md/myne#970): the identity flow's phrase screen makes the same three
+  // claims about the same three outcomes, and one copy is what keeps the two
+  // screens from drifting into different promises about one file.
   const saveKitFile = () => {
     void (async () => {
-      setFileMsg(saveMessage(await saveSecretToDocuments("myne-recovery-kit.txt", kitText())));
+      const { key, params } = secretSaveMessage(
+        await saveSecretToDocuments("myne-recovery-kit.txt", kitText()),
+      );
+      setFileMsg(t(key, params));
     })();
   };
 
