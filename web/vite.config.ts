@@ -167,19 +167,6 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "vault-creation",
     "ReadyLocalArtefacts",
   ),
-  // The device-attribution panel (myne-md/myne#852 story 11). Substituted
-  // because the store it reads is `NTV6`-only and group-tier sealed, its two
-  // commands are `Class::Unsupported` on web, and `memberSharing` is absent here
-  // anyway. Left in the graph it would be member-sharing surface no route can
-  // reach, at a cost in first-load budget.
-  [path.join(repoRoot, "src", "components", "sync", "DeviceAttributionPanel")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "components",
-    "sync",
-    "DeviceAttributionPanel",
-  ),
   // Whole-vault migration is a desktop flow (`MigrateVaultForm` drives
   // `plugin:vault-migrate|*`, which the web dispatcher answers `Unsupported`),
   // so this is a decided absence rather than a port that is owed. It used to be

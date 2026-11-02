@@ -552,8 +552,7 @@ fn main() {
                 // `permissions/device-binding/default.toml`. All three lists must
                 // agree, and `scripts/check-mobile-plugin-acl.mjs` compares them.
                 "device-binding",
-                tauri_build::InlinedPlugin::new()
-                    .commands(&["device_bindings_list", "device_bindings_claim"]),
+                tauri_build::InlinedPlugin::new().commands(&["device_bindings_list"]),
             )
             .plugin(
                 // On-device speech-to-text (MYND-563): creates the

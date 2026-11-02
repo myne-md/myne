@@ -11,23 +11,26 @@
 //!
 //! ## Capability ACL
 //!
-//! `device-binding:default` bundles the two commands (`device_bindings_list` /
-//! `device_bindings_claim`). Both are `Slot::Unlocked`-gated, and the claim can only
-//! write the caller's OWN row: the row key is the session's enrolled device id and the
-//! signer is the session's own person, both read from the session rather than from a
-//! command argument, so no grant here carries authority over another device's binding.
-//! Neither command writes a tombstone at all: an owner's removal tombstone is written
-//! inside `sync::member_removal::rotate_group_from_host`, which is not reachable over
-//! IPC. Like the other write-capable plugins, v0.2 multi-window MUST NOT grant
-//! `allow-device-bindings-claim` to a non-main window.
+//! `device-binding:default` bundles ONE command, `device_bindings_list`
+//! (`Slot::Unlocked`-gated), and it is a read: it answers the signature-verified view
+//! rather than the raw map, so nothing reachable over IPC can render an unverified row
+//! beside a member's name.
 //!
-//! **No TypeScript binding wraps either command yet, and that is on purpose.** Tasks 4
-//! and 5 own the device list and the presence surface; until one of them lands a caller,
-//! a binding here would be the dead export `scripts/check-ipc-binding-callers.mjs`
-//! refuses. Both stay registered and granted so that a later surface needs no Rust
-//! change to use them, NOT because one reaches them today, which is the posture
-//! `member_names`' shim documents for `member_names_list` and
-//! `mobile/src-tauri/src/plugins/member_names/mod.rs` documents for its own two.
+//! **The write has no command, deliberately** (myne-md/myne#976). `device_bindings_claim`
+//! existed for the `MEMBER DEVICES` panel's button, and the only state it repaired (a
+//! `ConflictingBinding` this device is party to) is now repaired by the sync cycle's own
+//! boundary without a human in the loop (`core/src/plugins/sync/cycle.rs`). A grant here
+//! would therefore be an affordance with no reachable state behind it, which is the shape
+//! this plugin's ACL should not carry.
+//!
+//! Nothing in the bundle writes a tombstone: an owner's removal tombstone is written
+//! inside `sync::member_removal::rotate_group_from_host`, which is not reachable over IPC
+//! at all.
+//!
+//! **The one TypeScript binding is `listDeviceBindings`**, whose caller is the member
+//! roster: it shows how many devices each member has claimed here and says once when a
+//! claim did not verify. The list stays registered and granted for any later device
+//! surface, which is the posture `member_names`' shim documents for `member_names_list`.
 //!
 //! See: src-tauri/AGENTS.md "Capability ACL", "Plugin pattern".
 
@@ -48,10 +51,7 @@ use tauri::Runtime;
 /// `device-binding`.
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::<R>::new("device-binding")
-        .invoke_handler(tauri::generate_handler![
-            commands::device_bindings_list,
-            commands::device_bindings_claim,
-        ])
+        .invoke_handler(tauri::generate_handler![commands::device_bindings_list])
         .build()
 }
 
@@ -185,8 +185,8 @@ mod tests {
             .collect();
         assert!(
             granted.iter().any(|p| p == &format!("{PLUGIN}:default")),
-            "capabilities/default.json does not grant `{PLUGIN}:default`, so both commands \
-             are registered in the handler and refused at the IPC boundary"
+            "capabilities/default.json does not grant `{PLUGIN}:default`, so the command is \
+             registered in the handler and refused at the IPC boundary"
         );
     }
 }

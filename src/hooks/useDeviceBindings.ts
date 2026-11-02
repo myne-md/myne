@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: AGPL-3.0
 //
-// The device-to-person binding view for the Sync panel (myne-md/myne#852).
-// Reads `vault.device-bindings` through the two commands in
+// The device-to-person binding view for the member roster (myne-md/myne#852,
+// cut down by myne-md/myne#976). Reads `vault.device-bindings` through
 // `src/lib/deviceBindings.ts` and re-reads when a sync cycle lands, so a device
-// that claims itself on another machine appears here without reopening Settings.
+// that claims itself on another machine appears without reopening Settings.
+//
+// **What it is for now that the panel is gone.** The roster renders two facts
+// from it: how many devices each member has claimed in this vault, and whether any
+// claim failed verification. There is no write half: the manual re-claim went with
+// the panel, because the one state it repaired (a `ConflictingBinding` this device
+// is party to) is now repaired by the sync cycle's own boundary without a human.
 //
 // **A vault that is not shared is a STATE and not an error.** The family is
 // `NTV6`-only: a pre-B2B vault has no group key to seal a member-writable
 // binding map under, and no members to bind a device to, so the backend answers
-// `NotASharedVault`. That sets `shared` false and leaves `error` null, and a
-// panel on an unshared vault renders the roster panel's own "not shared yet"
-// notice rather than a failure line over a state the user did not cause
-// (`useRoster` draws the same distinction for the same vault).
+// `NotASharedVault`. That sets `shared` false and leaves `error` null, and the
+// roster shows nothing rather than a failure line over a state the user did not
+// cause (`useRoster` draws the same distinction for the same vault).
 //
 // **Why `sync://changed` and not a poll.** The map is a shared singleton: the
 // interesting change is always a row written on ANOTHER device and pulled by a
@@ -24,7 +29,6 @@
 
 import { useCallback, useEffect, useState } from "react";
 import {
-  claimOwnDeviceBinding,
   deviceBindingErrorKey,
   deviceBindingErrorKind,
   listDeviceBindings,
@@ -37,18 +41,14 @@ export interface DeviceBindingsHook {
    *  resolves or after one that failed. */
   view: DeviceAttributionView | null;
   loading: boolean;
-  /** The i18n key of the last LOAD or CLAIM failure, or `null`. A non-shared
-   *  vault sets `shared` false instead of filling this in. */
+  /** The i18n key of the last LOAD failure, or `null`. A non-shared vault sets
+   *  `shared` false instead of filling this in. */
   error: string | null;
   /** Whether this vault carries the B2B group tier. False while the first read
-   *  is in flight, on an `NTV5` vault, and after any failure, so a panel that
-   *  gates on it renders nothing rather than an empty list. */
+   *  is in flight, on an `NTV5` vault, and after any failure, so a caller that
+   *  gates on it renders nothing rather than an empty count. */
   shared: boolean;
-  claiming: boolean;
   refresh: () => void;
-  /** Re-register this device's own binding, then re-read the view. A failure's
-   *  i18n key lands in `error`. */
-  claimSelf: () => Promise<void>;
 }
 
 export function useDeviceBindings(): DeviceBindingsHook {
@@ -56,7 +56,6 @@ export function useDeviceBindings(): DeviceBindingsHook {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
-  const [claiming, setClaiming] = useState(false);
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -99,19 +98,5 @@ export function useDeviceBindings(): DeviceBindingsHook {
 
   const refresh = useCallback(() => setTick((t) => t + 1), []);
 
-  const claimSelf = useCallback(async () => {
-    setClaiming(true);
-    setError(null);
-    try {
-      const next = await claimOwnDeviceBinding();
-      setView(next);
-      setShared(true);
-    } catch (failure: unknown) {
-      setError(deviceBindingErrorKey(failure));
-    } finally {
-      setClaiming(false);
-    }
-  }, []);
-
-  return { view, loading, error, shared, claiming, refresh, claimSelf };
+  return { view, loading, error, shared, refresh };
 }

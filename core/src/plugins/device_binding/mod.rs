@@ -58,8 +58,8 @@ pub use sync::{
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use commands::{
-    claim_own_binding_with_dir, device_bindings_list_with_dir, resolve_bindings, session_device_id,
-    session_person_id,
+    claim_own_binding_with_dir, device_bindings_list_with_dir, reclaim_own_binding_with_dir,
+    resolve_bindings, session_device_id, session_person_id,
 };
 
 /// The family's file at the vault root.
