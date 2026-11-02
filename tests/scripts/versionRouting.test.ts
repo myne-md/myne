@@ -21,9 +21,12 @@
 // names a real offender must still fire, because a guard that has quietly
 // stopped checking is green by definition.
 
+import { execFileSync } from "node:child_process";
+
 import { describe, expect, it } from "vitest";
 import {
   ALLOWED,
+  CLASSES,
   DEBT,
   debtTotal,
   overlappingKeys,
@@ -61,7 +64,18 @@ describe("the debt figure is a property of the table, not of a reason string", (
     // bytes), so it carries the same debt the other three do. `decode_note_any`
     // cannot replace it here without dropping back to bytes this module has no
     // way to re-seal.
-    expect(debtTotal()).toBe(4);
+    //
+    // 4 → 8 when the `gen` class landed (myne-md/myne#984): the three quarters of
+    // that class the tree already carries. `adopt.rs` is one, `orchestrator.rs` is
+    // two (the `!= Legacy` pair in the meta-merge condition), and
+    // `person_discovery.rs` is one (`is_person_born` spelled as a subset
+    // `matches!`). Two sites are NOT here: `decrypt/src/unlock.rs` and
+    // `person_vault_carrier.rs` both sit in ALLOWED, because in each the variant IS
+    // the caller's question. The carrier one is the load-bearing case: routing it
+    // through `carries_b2b_tail` would let a vault credential unwrap the person
+    // keypair on a person-born generation, which is the escalation the predicate
+    // exists to exclude.
+    expect(debtTotal()).toBe(8);
     expect(DEBT.get("core/src/plugins/notes/commands.rs#note")?.[0]).toBe(4);
   });
 
@@ -116,5 +130,60 @@ describe("every offender it named before, it still names", () => {
       callsProtocolName("pub fn derive_items_key(version: MetaVersion) -> Zeroizing<[u8; 32]> {", "derive_items_key", imports),
     ).toBe(false);
     expect(callsProtocolName("fn derive_items_key(", "derive_items_key", imports)).toBe(false);
+  });
+});
+
+// The generation-equality class (myne-md/myne#983).
+//
+// `person_vault_carrier::carrier_applies` asked "is this a B2B vault" as
+// `vault_meta_generation(&b) == VaultMetaGeneration::B2b`. `NTV8` is
+// `PersonNoWrap`, so the predicate answered false for every vault the product had
+// started creating, the person-identity carrier stood down, and sync stopped after
+// every lock with nothing failing.
+//
+// The class is worth a test of its own rather than only the injection that proved
+// it, because the two shapes it must tell apart look almost identical: an equality
+// test against ONE variant (the defect) and a `match` naming ALL of them (the shape
+// that makes a fifth generation a compile error). A regex that swallowed both would
+// pass the injection and then force the good shape out of the tree.
+describe("the generation-equality class", () => {
+  const re = CLASSES.gen.re;
+
+  it("fires on an equality test against a single variant", () => {
+    expect(
+      re.test("if protocol::vault_meta_generation(&b) == protocol::VaultMetaGeneration::B2b {"),
+    ).toBe(true);
+    expect(re.test("if local_generation != protocol::VaultMetaGeneration::Legacy")).toBe(true);
+    expect(re.test("if protocol::VaultMetaGeneration::PersonNoWrap == g {")).toBe(true);
+    expect(re.test("matches!(g, VaultMetaGeneration::B2b)")).toBe(true);
+  });
+
+  it("does not fire on a match naming every variant, or on the classifier itself", () => {
+    expect(re.test("match protocol::vault_meta_generation(&b) {")).toBe(false);
+    expect(re.test("protocol::VaultMetaGeneration::Person => Some(Self::Ntv7),")).toBe(false);
+    expect(re.test("protocol::VaultMetaGeneration::PersonNoWrap => Some(Self::Ntv8),")).toBe(false);
+    expect(re.test("let generation = protocol::vault_meta_generation(&bytes);")).toBe(false);
+  });
+
+  it("is recorded in at least one table, so the count is not a silent zero", () => {
+    const recorded = [...ALLOWED.keys(), ...DEBT.keys()].filter((k) => k.endsWith("#gen"));
+    expect(recorded.length).toBeGreaterThan(0);
+  });
+});
+
+// The class both directions, measured rather than asserted. The guard's own staleness
+// half ties every recorded entry to a live site, so this run fails if the class is
+// removed, if the regex stops matching a recorded site, or if a budget drifts. The
+// injection was run by hand as well: a Rust file carrying
+// `vault_meta_generation(&b) == protocol::VaultMetaGeneration::B2b` is reported by
+// name, and the tree was restored afterwards.
+describe("the guard still runs over the tree", () => {
+  it("exits clean, which is also what proves the recorded budgets describe live sites", () => {
+    const out = execFileSync(process.execPath, ["scripts/check-version-routing.mjs"], {
+      cwd: process.cwd(),
+      encoding: "utf8",
+    });
+    expect(out).toContain("version-routing: ok");
+    expect(out).toContain("This number must only go down");
   });
 });
