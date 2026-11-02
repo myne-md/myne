@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Nulstil og tilføj denne enhed igen",
       "resetSyncOnThisDevice": "Nulstil synkronisering på denne enhed",
       "shortName": "Enhed {{hex}}",
-      "syncedHere": "Synkroniseret her",
       "thisDevice": "Denne enhed",
       "reasonUnreachable": "serveren svarede ikke",
       "reasonUnexpected": "en uventet fejl",
@@ -4834,8 +4833,7 @@
       "transportError": "Kunne ikke få forbindelse til synkroniseringsserveren. Tjek serveradressen og dens HTTPS-certifikat.",
       "retiredSelf": "Denne enhed blev fjernet fra en anden enhed.",
       "resetAndAddAgain": "Nulstil og tilføj igen",
-      "noDevices": "Ingen enheder endnu.",
-      "syncingHere": "Synkroniserer her"
+      "noDevices": "Ingen enheder endnu."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} konflikt kræver gennemgang",

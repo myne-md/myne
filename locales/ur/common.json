@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "اس آلے کو ری سیٹ کر کے دوبارہ شامل کریں",
       "resetSyncOnThisDevice": "اس آلے پر مطابقت پذیری ری سیٹ کریں",
       "shortName": "آلہ {{hex}}",
-      "syncedHere": "یہاں ہم آہنگ",
       "thisDevice": "یہ آلہ",
       "reasonUnreachable": "سرور نے جواب نہیں دیا",
       "reasonUnexpected": "ایک غیر متوقع خرابی",
@@ -4834,8 +4833,7 @@
       "transportError": "مطابقت پذیری سرور تک نہیں پہنچا جا سکا۔ سرور کا پتہ اور اس کا HTTPS سرٹیفکیٹ جانچیں۔",
       "retiredSelf": "اس آلے کو کسی دوسرے آلے سے ہٹا دیا گیا تھا۔",
       "resetAndAddAgain": "ری سیٹ کر کے دوبارہ شامل کریں",
-      "noDevices": "ابھی کوئی آلہ نہیں۔",
-      "syncingHere": "یہاں مطابقت پذیری جاری"
+      "noDevices": "ابھی کوئی آلہ نہیں۔"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} تصادم کا جائزہ درکار ہے",

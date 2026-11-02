@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "بازنشانی و افزودن دوبارهٔ این دستگاه",
       "resetSyncOnThisDevice": "بازنشانی همگام‌سازی روی این دستگاه",
       "shortName": "دستگاه {{hex}}",
-      "syncedHere": "همگام‌شده در اینجا",
       "thisDevice": "این دستگاه",
       "reasonUnreachable": "سرور پاسخ نداد",
       "reasonUnexpected": "خطایی غیرمنتظره",
@@ -4834,8 +4833,7 @@
       "transportError": "دسترسی به سرور همگام‌سازی ممکن نشد. نشانی سرور و گواهی HTTPS آن را بررسی کنید.",
       "retiredSelf": "این دستگاه از دستگاهی دیگر حذف شد.",
       "resetAndAddAgain": "بازنشانی و افزودن دوباره",
-      "noDevices": "هنوز دستگاهی نیست.",
-      "syncingHere": "همگام‌سازی در اینجا"
+      "noDevices": "هنوز دستگاهی نیست."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} تعارض نیاز به بررسی دارد",

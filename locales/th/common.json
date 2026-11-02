@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "รีเซ็ตแล้วเพิ่มอุปกรณ์นี้ใหม่",
       "resetSyncOnThisDevice": "รีเซ็ตการซิงค์บนอุปกรณ์นี้",
       "shortName": "อุปกรณ์ {{hex}}",
-      "syncedHere": "ซิงค์ที่นี่",
       "thisDevice": "อุปกรณ์นี้",
       "reasonUnreachable": "เซิร์ฟเวอร์ไม่ตอบ",
       "reasonUnexpected": "ข้อผิดพลาดที่ไม่คาดคิด",
@@ -4834,8 +4833,7 @@
       "transportError": "เข้าถึงเซิร์ฟเวอร์ซิงค์ไม่ได้ ตรวจสอบที่อยู่เซิร์ฟเวอร์และใบรับรอง HTTPS ของมัน",
       "retiredSelf": "อุปกรณ์นี้ถูกนำออกจากอุปกรณ์อื่น",
       "resetAndAddAgain": "รีเซ็ตแล้วเพิ่มใหม่",
-      "noDevices": "ยังไม่มีอุปกรณ์",
-      "syncingHere": "กำลังซิงค์ที่นี่"
+      "noDevices": "ยังไม่มีอุปกรณ์"
     },
     "banner": {
       "conflictsNeedReview_one": "มีข้อขัดแย้ง {{count}} รายการที่ต้องตรวจสอบ",

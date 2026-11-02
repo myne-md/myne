@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "Nollaa ja lisää tämä laite uudelleen",
       "resetSyncOnThisDevice": "Nollaa synkronointi tällä laitteella",
       "shortName": "Laite {{hex}}",
-      "syncedHere": "Synkronoitu täällä",
       "thisDevice": "Tämä laite",
       "reasonUnreachable": "palvelin ei vastannut",
       "reasonUnexpected": "odottamaton virhe",
@@ -4834,8 +4833,7 @@
       "transportError": "Synkronointipalvelinta ei tavoitettu. Tarkista palvelimen osoite ja sen HTTPS-varmenne.",
       "retiredSelf": "Tämä laite poistettiin toiselta laitteelta.",
       "resetAndAddAgain": "Nollaa ja lisää uudelleen",
-      "noDevices": "Ei vielä laitteita.",
-      "syncingHere": "Synkronoidaan tässä"
+      "noDevices": "Ei vielä laitteita."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} ristiriita vaatii tarkistusta",

@@ -135,7 +135,7 @@ describe("removing a device", () => {
   it("never offers removal for the device you are on", async () => {
     render(<Harness />);
     await waitFor(() => expect(screen.getAllByTestId("sync.device-row").length).toBe(2));
-    // One Remove button, not two — the current device shows "Synced here".
+    // One Remove button, not two: removal is never offered on the current row.
     expect(screen.getAllByTestId("sync.remove-device")).toHaveLength(1);
   });
 });

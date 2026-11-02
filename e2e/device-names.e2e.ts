@@ -13,6 +13,15 @@
 // the newcomer chose for itself. A name next to an unverified device reads as a
 // trust signal while nothing verifies it, which would weaken the SAS eye-compare
 // that is the actual defense (SYNC-40).
+//
+// The SELF-NAMING path (myne-md/myne#973) has no scenario here, and the reason is
+// the fixture rather than the tier: enrollment always writes a name and no
+// affordance clears one, so this harness cannot reach an approved device with no
+// entry in `device_names`. A scenario for it would have to PLANT that state, which
+// is the shape of a test that still passes with the behaviour removed. The policy
+// is covered where the state is reachable: `tests/client-core/deviceName.test.ts`
+// for every gate, `tests/components/DeviceManagementPanel.selfName.test.tsx` and
+// `mobile/tests/flow-logic/sync/devices.flow.ts` for the two clients' wiring.
 
 import { describe, expect, it } from "vitest";
 import { harnessSupported } from "./support/session";

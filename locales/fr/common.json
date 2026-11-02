@@ -4706,7 +4706,6 @@
       "resetAndReAdd": "Réinitialiser et rajouter cet appareil",
       "resetSyncOnThisDevice": "Réinitialiser la synchronisation sur cet appareil",
       "shortName": "Appareil {{hex}}",
-      "syncedHere": "Synchronisé ici",
       "thisDevice": "Cet appareil",
       "reasonUnreachable": "le serveur n'a pas répondu",
       "reasonUnexpected": "une erreur inattendue",
@@ -4976,8 +4975,7 @@
       "transportError": "Impossible de joindre le serveur de synchronisation. Vérifiez l'adresse du serveur et son certificat HTTPS.",
       "retiredSelf": "Cet appareil a été retiré depuis un autre appareil.",
       "resetAndAddAgain": "Réinitialiser et rajouter",
-      "noDevices": "Aucun appareil pour l'instant.",
-      "syncingHere": "Synchronisation ici"
+      "noDevices": "Aucun appareil pour l'instant."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} conflit à examiner",

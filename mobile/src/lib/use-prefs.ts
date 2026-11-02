@@ -97,6 +97,19 @@ export const DEFAULT_PREFS: PrefsView = {
 export interface UsePrefs {
   prefs: PrefsView;
   loading: boolean;
+  /** True when the view in `prefs` came from a read that SUCCEEDED and no read
+   *  has failed since. `prefs` falls back to `DEFAULT_PREFS` while a read is in
+   *  flight and, by design, when one fails, so `loading === false && error ===
+   *  true` still leaves an empty `device_names` map that is indistinguishable
+   *  from a real one. A consumer about to WRITE on the strength of what it read
+   *  must ask this instead; the self-naming gate does (myne-md/myne#973),
+   *  because writing on an unloaded or failed map could overwrite a name a peer
+   *  had just chosen. It goes false again when a read STARTS, on purpose: a flag
+   *  that only ever set true would report a map from an earlier read as current.
+   *  Desktop's `src/hooks/usePrefs.ts` carries the same field and the same rule;
+   *  `loading` is kept beside it because the spinner consumers want "no read in
+   *  flight" and that is a different question. */
+  loaded: boolean;
   error: boolean;
   reload: () => void;
 }
@@ -106,6 +119,7 @@ export function usePrefs(): UsePrefs {
   const nonce = usePrefsNonce();
   const [prefs, setPrefs] = useState<PrefsView>(DEFAULT_PREFS);
   const [loading, setLoading] = useState(HAS_TAURI);
+  const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
 
   // Monotonic request token: only the LATEST read may write state.
@@ -142,6 +156,10 @@ export function usePrefs(): UsePrefs {
       setLoading(false);
       return;
     }
+    // `loaded` answers "may a consumer act on this map", so it drops the moment
+    // a read is issued: a flag that only ever rose would present an earlier
+    // read's map as current after a failure (myne-md/myne#973).
+    setLoaded(false);
     setError(false);
     try {
       const view = await prefsRead();
@@ -154,6 +172,7 @@ export function usePrefs(): UsePrefs {
       if (mine <= applied.current) return;
       applied.current = mine;
       setPrefs(view);
+      setLoaded(true);
     } catch {
       if (superseded()) return;
       // Non-distinguishing: keep the last-known / default view; surface a flag.
@@ -168,5 +187,5 @@ export function usePrefs(): UsePrefs {
     // Re-run on nonce advance (a setter resolved) so the UI reflects disk truth.
   }, [load, nonce]);
 
-  return { prefs, loading, error, reload: load };
+  return { prefs, loading, loaded, error, reload: load };
 }

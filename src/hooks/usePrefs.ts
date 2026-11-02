@@ -171,6 +171,15 @@ export const DEFAULT_PREFS: PrefsView = {
 interface UsePrefsResult {
   /** Current prefs view — DEFAULT_PREFS until loaded. */
   prefs: PrefsView;
+  /** True when the view in `prefs` came from a read that SUCCEEDED and no read
+   *  has failed since. `prefs` is `DEFAULT_PREFS` while a read is in flight and,
+   *  by design, after one fails, so a consumer that cannot tell "loaded and
+   *  empty" from "never loaded" must ask this rather than read the cache. It
+   *  goes false again when a read STARTS, on purpose: a hook that only ever set
+   *  it true would report a map from an earlier read as current, and the
+   *  self-naming gate acts on that map by WRITING
+   *  (myne-md/myne#973). */
+  loaded: boolean;
   /**
    * Toggle screen_capture_protection. Optimistic: cache flips
    * immediately. On IPC rejection, the cache is re-read from disk
@@ -320,6 +329,7 @@ interface UsePrefsResult {
  */
 export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   const [prefs, setPrefs] = useState<PrefsView>(DEFAULT_PREFS);
+  const [loaded, setLoaded] = useState(false);
 
   // Latest-read-wins, shared by the mount read below and by `reload`, which is
   // the shape the mobile twin has (`mobile/src/lib/use-prefs.ts`). One counter
@@ -342,6 +352,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   useEffect(() => {
     let cancelled = false;
     const mine = ++request.current;
+    setLoaded(false);
     (async () => {
       try {
         const view = await prefsRead();
@@ -351,6 +362,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
         if (!cancelled && view && mine > applied.current) {
           applied.current = mine;
           setPrefs(view);
+          setLoaded(true);
         }
       } catch {
         // SlotNotUnlocked / Io / InvalidVaultMeta → keep DEFAULT_PREFS
@@ -879,11 +891,13 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
   // and a reload order against each other rather than only against themselves.
   const reload = useCallback(async () => {
     const mine = ++request.current;
+    setLoaded(false);
     try {
       const view = await prefsRead();
       if (mine <= applied.current) return;
       applied.current = mine;
       setPrefs(view);
+      setLoaded(true);
     } catch {
       // Keep the current cache (safer-state per spec § 9.5.5).
     }
@@ -898,6 +912,7 @@ export function usePrefs(onError?: (message: string) => void): UsePrefsResult {
 
   return {
     prefs,
+    loaded,
     toggleScreenCapture,
     setAiEnabled: setAiEnabledPref,
     setAiExcludedFolders: setAiExcludedFoldersPref,

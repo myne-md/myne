@@ -4540,7 +4540,6 @@
       "resetAndReAdd": "Bu cihazı sıfırla ve yeniden ekle",
       "resetSyncOnThisDevice": "Bu cihazda eşitlemeyi sıfırla",
       "shortName": "Cihaz {{hex}}",
-      "syncedHere": "Burada eşitlendi",
       "thisDevice": "Bu cihaz",
       "reasonUnreachable": "sunucu yanıt vermedi",
       "reasonUnexpected": "beklenmeyen bir hata",
@@ -4808,8 +4807,7 @@
       "transportError": "Eşitleme sunucusuna ulaşılamadı. Sunucu adresini ve HTTPS sertifikasını kontrol edin.",
       "retiredSelf": "Bu cihaz, başka bir cihazdan kaldırıldı.",
       "resetAndAddAgain": "Sıfırla ve yeniden ekle",
-      "noDevices": "Henüz cihaz yok.",
-      "syncingHere": "Burada eşitleniyor"
+      "noDevices": "Henüz cihaz yok."
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} çakışma gözden geçirilmeli",

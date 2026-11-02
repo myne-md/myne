@@ -4566,7 +4566,6 @@
       "resetAndReAdd": "इस डिवाइस को रीसेट करके दोबारा जोड़ें",
       "resetSyncOnThisDevice": "इस डिवाइस पर सिंक रीसेट करें",
       "shortName": "डिवाइस {{hex}}",
-      "syncedHere": "यहाँ सिंक हुआ",
       "thisDevice": "यह डिवाइस",
       "reasonUnreachable": "सर्वर ने जवाब नहीं दिया",
       "reasonUnexpected": "एक अनपेक्षित गड़बड़ी",
@@ -4834,8 +4833,7 @@
       "transportError": "सिंक सर्वर तक नहीं पहुँच सका। सर्वर का पता और उसका HTTPS प्रमाणपत्र जाँचें।",
       "retiredSelf": "इस डिवाइस को किसी दूसरे डिवाइस से हटा दिया गया था।",
       "resetAndAddAgain": "रीसेट करके दोबारा जोड़ें",
-      "noDevices": "अभी कोई डिवाइस नहीं।",
-      "syncingHere": "यहाँ सिंक हो रहा है"
+      "noDevices": "अभी कोई डिवाइस नहीं।"
     },
     "banner": {
       "conflictsNeedReview_one": "{{count}} टकराव देखना ज़रूरी है",
