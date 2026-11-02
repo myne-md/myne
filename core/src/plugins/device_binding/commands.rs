@@ -15,7 +15,9 @@
 //! desktop/mobile by decision (the web client has no member sharing at all).
 
 use super::error::DeviceBindingError;
-use super::store::{claim_self_in_dir, read_device_bindings_in_dir, write_mutex, ClaimOutcome};
+use super::store::{
+    claim_self_in_dir, read_device_bindings_in_dir, reclaim_self_in_dir, write_mutex, ClaimOutcome,
+};
 use super::sync::ResolvedBindings;
 use crate::plugins::sync::identity_resolver::{device_attribution_view, DeviceAttributionView};
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
@@ -171,6 +173,38 @@ pub async fn claim_own_binding_with_dir(
     state: &VaultRuntimeState,
     vault_dir: &Path,
 ) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
+    write_own_binding_with_dir(host, io, state, vault_dir, false).await
+}
+
+/// The sync cycle's own repair for a binding conflict (myne-md/myne#976).
+///
+/// Everything `claim_own_binding_with_dir` does, except that the row is re-written at a
+/// strictly higher version even when it looks current, because "looks current" is exactly
+/// what a conflicting pair looks like from this side. Two gates are unchanged, and the
+/// caller is the cycle boundary rather than a UI: the state it repairs has one reachable
+/// cause and nobody is watching for it, which is why the manual `Claim this device` button
+/// was the wrong home for it.
+///
+/// Returns the outcome rather than the map: the caller has nothing to render, and the only
+/// decision it makes is whether to say so in the log.
+pub async fn reclaim_own_binding_with_dir(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_dir: &Path,
+) -> Result<ClaimOutcome, DeviceBindingError> {
+    let (_map, outcome) = write_own_binding_with_dir(host, io, state, vault_dir, true).await?;
+    Ok(outcome)
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn write_own_binding_with_dir(
+    host: &dyn crate::host::HostCtx,
+    io: &dyn VaultIo,
+    state: &VaultRuntimeState,
+    vault_dir: &Path,
+    bump: bool,
+) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
     let _guard = write_mutex().lock().await;
     let _quiesce = crate::singleton_quiesce::shared().await;
     let resolved = resolve_bindings(io, state, vault_dir).await?;
@@ -198,16 +232,29 @@ pub async fn claim_own_binding_with_dir(
         }
     };
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
-    let (map, outcome) = claim_self_in_dir(
-        io,
-        vault_dir,
-        &resolved.borrow(),
-        &person,
-        &device_id,
-        device_public.as_ref(),
-        &mut rng,
-    )
-    .await?;
+    let (map, outcome) = if bump {
+        reclaim_self_in_dir(
+            io,
+            vault_dir,
+            &resolved.borrow(),
+            &person,
+            &device_id,
+            device_public.as_ref(),
+            &mut rng,
+        )
+        .await?
+    } else {
+        claim_self_in_dir(
+            io,
+            vault_dir,
+            &resolved.borrow(),
+            &person,
+            &device_id,
+            device_public.as_ref(),
+            &mut rng,
+        )
+        .await?
+    };
     Ok((protocol::live_device_bindings(&map), outcome))
 }
 
@@ -276,31 +323,6 @@ pub async fn device_bindings_list<R: tauri::Runtime>(
     let host = crate::host::tauri_host::TauriHost::new(app);
     let io = crate::vault_io::StdVaultIo;
     let dir = active_vault_dir(&host, state.inner()).await?;
-    device_bindings_list_with_dir(&host, &io, state.inner(), &dir).await
-}
-
-/// Register this device's own binding and answer the live, verified device list.
-///
-/// The write is the SAME operation the unlock pipeline performs, so a caller that wants
-/// to force a re-claim (after an identity change, or after the user re-installed this
-/// device's identity) does not need a second code path. It cannot write another device's
-/// row: the row key is this device's own enrolled id and the signer is this session's own
-/// person, both read from the session rather than from the caller's arguments.
-///
-/// Answers the LIST's shape rather than the raw map, so both device commands hand the
-/// frontend one type. The extra read is a user-initiated re-claim rather than the per-unlock
-/// path, so the attribution partition is affordable here and the frontend never sees an
-/// unverified row.
-#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-#[tauri::command]
-pub async fn device_bindings_claim<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
-    state: tauri::State<'_, VaultRuntimeState>,
-) -> Result<DeviceAttributionView, DeviceBindingError> {
-    let host = crate::host::tauri_host::TauriHost::new(app);
-    let io = crate::vault_io::StdVaultIo;
-    let dir = active_vault_dir(&host, state.inner()).await?;
-    let (_map, _outcome) = claim_own_binding_with_dir(&host, &io, state.inner(), &dir).await?;
     device_bindings_list_with_dir(&host, &io, state.inner(), &dir).await
 }
 

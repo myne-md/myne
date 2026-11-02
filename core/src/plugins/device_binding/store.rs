@@ -171,6 +171,68 @@ pub async fn claim_self_in_dir(
     device_public: Option<&protocol::device_key::DevicePublicHalf>,
     rng: &mut (impl rand_core::CryptoRng + ?Sized),
 ) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
+    claim_self_in_dir_with(
+        io,
+        vault_dir,
+        key,
+        person,
+        device_id,
+        device_public,
+        rng,
+        false,
+    )
+    .await
+}
+
+/// Re-write this device's own row at a strictly higher version, whether or not the row it
+/// finds is already current. This is the ONE write that can separate a `ConflictingBinding`.
+///
+/// `beats` resolves a disagreement by version first, so two rows for one device that hold the
+/// SAME version and name different people (or carry different device halves) have no winner
+/// and `merge_device_bindings` answers `ConflictingBinding` for the WHOLE map. One such row
+/// therefore freezes the binding store for every member on every later cycle, silently, and
+/// the only side of that pair this device may move is its own. Writing it at `version + 1`
+/// makes this device's copy strictly newer, and the ordinary merge then resolves in its
+/// favour.
+///
+/// **It repairs a conflict and nothing else.** It cannot stop a peer holding the group key
+/// from writing a row naming someone else, and it does not make that row verify: attribution
+/// stays legibility rather than proof (§9.30.4). What it stops is the forgery ALSO being a
+/// permanent denial of the store. Bounded to one write per cycle by the caller, under the
+/// same two gates as every other writer.
+pub async fn reclaim_self_in_dir(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    key: &DeviceBindingKey<'_>,
+    person: &protocol::PersonKeyPair,
+    device_id: &[u8; 16],
+    device_public: Option<&protocol::device_key::DevicePublicHalf>,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
+    claim_self_in_dir_with(
+        io,
+        vault_dir,
+        key,
+        person,
+        device_id,
+        device_public,
+        rng,
+        true,
+    )
+    .await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn claim_self_in_dir_with(
+    io: &dyn VaultIo,
+    vault_dir: &Path,
+    key: &DeviceBindingKey<'_>,
+    person: &protocol::PersonKeyPair,
+    device_id: &[u8; 16],
+    device_public: Option<&protocol::device_key::DevicePublicHalf>,
+    rng: &mut (impl rand_core::CryptoRng + ?Sized),
+    bump: bool,
+) -> Result<(DeviceBindingsMap, ClaimOutcome), DeviceBindingError> {
     let mut map = read_device_bindings_in_dir(io, vault_dir, key).await?;
     let id = device_id_hex(device_id);
     let mine = fingerprint_hex(person.fingerprint());
@@ -187,7 +249,7 @@ pub async fn claim_self_in_dir(
                     && existing.device_mldsa_vk.as_deref() == Some(public.mldsa_vk_hex().as_str())
             }
         };
-        if !existing.tombstone && existing.person_fingerprint == mine && halves_match {
+        if !bump && !existing.tombstone && existing.person_fingerprint == mine && halves_match {
             return Ok((map, ClaimOutcome::AlreadyCurrent));
         }
     }
@@ -545,6 +607,100 @@ mod tests {
                 first, second,
                 "byte-identical: the second unlock re-sealed nothing at all"
             );
+        });
+    }
+
+    /// The ONE write that separates a `ConflictingBinding` pair (myne-md/myne#976).
+    ///
+    /// The codec refuses the WHOLE map when two copies bind one device to two people at the
+    /// same version, so one such row froze the store for every member on every later cycle,
+    /// silently and permanently. A device may only move its OWN side, so the repair is
+    /// [`reclaim_self_in_dir`]: the same claim, at a strictly higher version, whether or not
+    /// the row it finds already looks current.
+    ///
+    /// **Why the assertion is the MERGE and not the version.** Reverting the bump leaves
+    /// every other assertion here true: the row is still this device's, still verifies, and
+    /// `claim_self_in_dir` reports `AlreadyCurrent`, which is a perfectly good outcome for a
+    /// claim. What breaks is the pair, and the pair is what the repair exists for: the
+    /// version climb is only how it is achieved.
+    #[test]
+    fn a_reclaim_at_a_higher_version_separates_a_conflict() {
+        let dir = ScopedTempDir::new("device-binding-reclaim").unwrap();
+        let io = StdVaultIo;
+        let me = pair(b"me");
+        let them = pair(b"them");
+        let mut rng = SeededRng(7);
+
+        with_key(|k| {
+            block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("the first claim");
+            let claimed = block_on(read_device_bindings_in_dir(&io, dir.path(), k))
+                .expect("read back the claim");
+            assert_eq!(claimed.get(&device_id_hex(&DEV_A)).unwrap().version, 1);
+
+            // A peer's copy of the SAME device bound to a DIFFERENT person at the SAME
+            // version: the one pair `merge_device_bindings` refuses.
+            let mut their_copy = protocol::DeviceBindingsMap::new();
+            their_copy.insert(
+                device_id_hex(&DEV_A),
+                protocol::sign_device_binding(
+                    &them,
+                    &DEV_A,
+                    them.fingerprint(),
+                    1,
+                    false,
+                    &mut rng,
+                )
+                .expect("sign the peer's row"),
+            );
+            assert!(
+                protocol::merge_device_bindings(&claimed, &their_copy).is_err(),
+                "the fixture must be a pair the codec really refuses, or this test measures \
+                 nothing"
+            );
+
+            let (reclaimed, outcome) = block_on(reclaim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &me,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("the repair");
+            assert_eq!(
+                outcome,
+                ClaimOutcome::Written,
+                "a repair must WRITE even though the row it found named the right person, \
+                 which is the whole difference from a plain claim"
+            );
+            let mine = reclaimed.get(&device_id_hex(&DEV_A)).unwrap();
+            assert_eq!(
+                mine.version, 2,
+                "the repair moves ONE version past the pair"
+            );
+            assert_eq!(mine.person_fingerprint, fingerprint_hex(me.fingerprint()));
+            assert!(verify_device_binding(&me.public_half(), &DEV_A, mine));
+
+            let merged = protocol::merge_device_bindings(&reclaimed, &their_copy)
+                .expect("the pair now has a winner, so the merge stops refusing the map");
+            assert_eq!(
+                merged.get(&device_id_hex(&DEV_A)).map(|row| row.version),
+                Some(2),
+                "and the winner is the higher version, whichever side it is merged from"
+            );
+            let other_order = protocol::merge_device_bindings(&their_copy, &reclaimed)
+                .expect("the refusal is symmetric and so is the repair");
+            assert_eq!(merged, other_order, "merge stays commutative");
         });
     }
 

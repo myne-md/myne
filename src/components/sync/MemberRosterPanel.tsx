@@ -20,6 +20,7 @@ import { startB2bMigration } from "../../lib/invite";
 import { copyText } from "../../lib/clipboard";
 import { writeText as clipboardWriteText } from "../../platform/clipboardManager";
 import { usePrefs } from "../../hooks/usePrefs";
+import { useDeviceBindings } from "../../hooks/useDeviceBindings";
 import { Button } from "../primitives/Button";
 import { ModalShell } from "../primitives/ModalShell";
 import { IconButton } from "../primitives/IconButton";
@@ -167,6 +168,19 @@ export function MemberRosterPanel({
     lockPerson,
     reload,
   } = useRoster(personReady);
+  // The device claims this vault holds, per member (myne-md/myne#976). What the
+  // removed `MEMBER DEVICES` panel showed, reduced to the two facts that were not
+  // duplicated elsewhere: how many devices a member has claimed here, and whether
+  // any claim failed verification. Deliberately NOT rendered as ids: an
+  // unverified id carries no person and no name, so putting one on screen invites
+  // exactly the attribution the backend's partition exists to withhold.
+  const claims = useDeviceBindings();
+  const devicesPerPerson = new Map<string, number>();
+  for (const row of claims.view?.rows ?? []) {
+    const fingerprint = row.person_fingerprint_hex.toLowerCase();
+    devicesPerPerson.set(fingerprint, (devicesPerPerson.get(fingerprint) ?? 0) + 1);
+  }
+  const unverifiedClaims = claims.view?.unverified_device_ids.length ?? 0;
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
   // vault (myne-md/myne#783). The migration is permanent, so it is an explicit
@@ -619,6 +633,18 @@ export function MemberRosterPanel({
                     ? t("sync.memberRoster.ownerBadge")
                     : t("sync.memberRoster.memberBadge")}
                 </span>
+                {/* How many devices this member has claimed in THIS vault. A count
+                    and never a list: the row is about the person, and a device id
+                    beside a name is the shape the removed panel was criticized for.
+                    Absent at zero rather than "0 devices", which would be a line
+                    about something that does not exist. */}
+                {(devicesPerPerson.get(m.fingerprint_hex.toLowerCase()) ?? 0) > 0 ? (
+                  <span data-testid="member-roster.device-count" style={CODE_STYLE}>
+                    {t("sync.memberRoster.deviceCount", {
+                      count: devicesPerPerson.get(m.fingerprint_hex.toLowerCase()) ?? 0,
+                    })}
+                  </span>
+                ) : null}
                 {/* The rename affordance, on the caller's own row only, the
                     owner's included: `is_self` is the identity-based test the
                     backend enforces in the key, and `shared` is here because the
@@ -681,6 +707,23 @@ export function MemberRosterPanel({
               </li>
             ))}
           </ul>
+          {/* A claim that did not verify, said once for the section and with no
+              id beside it (`protocol.md` §9.30.4: the row's signature binds the
+              row to its signer and nothing to the device, so an id nobody signed
+              for is a bare allegation). This is the whole of what the removed
+              panel's "not verified" list still owes: the fact, not the roster of
+              ids. A failed READ is reported too, because a damaged store answered
+              as "no claims" is the one way this line can be silently wrong. */}
+          {unverifiedClaims > 0 ? (
+            <p data-testid="member-roster.device-claims-unverified" style={WARNING_STYLE}>
+              {t("sync.memberRoster.deviceClaimsUnverified", { count: unverifiedClaims })}
+            </p>
+          ) : null}
+          {claims.error !== null ? (
+            <p data-testid="member-roster.device-claims-error" style={WARNING_STYLE}>
+              {t(claims.error)}
+            </p>
+          ) : null}
           {/* The removal disclosure is about an act this vault can now perform on
               every generation: it used to be withheld on a person-born vault because
               there was no member for it to describe. */}

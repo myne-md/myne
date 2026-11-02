@@ -1,26 +1,25 @@
 // SPDX-License-Identifier: AGPL-3.0
 //
-// The device-to-person binding bindings (`vault.device-bindings`, magic `MYU5`;
-// myne-md/myne#852, `decisions/protocol/0669`). One `invoke` per command.
+// The device-to-person binding read (`vault.device-bindings`, magic `MYU5`;
+// myne-md/myne#852, `decisions/protocol/0669`). One `invoke`, one command.
 //
-// **Both commands answer the same verified view, and that is the contract this
-// file exists to keep.** The store is group-tier sealed, which is exactly what
-// makes it writable by every member, and the map key is the DEVICE with the
-// claimed person inside the row: `protocol.md` §9.30.4 has the signature cover
-// the row's own contents, so it binds the row to the person who signed it and
-// binds NOTHING to the device. A raw map handed to this layer could therefore
-// only be rendered unverified or not at all, which is why neither command above
-// returns one. Both return `DeviceAttributionView`, already partitioned against
-// the owner-signed roster and the name store by
-// `core/src/plugins/sync/identity_resolver.rs`, so no unverified row can reach a
-// surface through this file and there is one type to mirror rather than two.
+// **It answers the verified view, and that is the contract this file exists to
+// keep.** The store is group-tier sealed, which is exactly what makes it
+// writable by every member, and the map key is the DEVICE with the claimed
+// person inside the row: `protocol.md` §9.30.4 has the signature cover the row's
+// own contents, so it binds the row to the person who signed it and binds NOTHING
+// to the device. A raw map handed to this layer could therefore only be rendered
+// unverified or not at all, which is why the command does not return one. It
+// returns `DeviceAttributionView`, already partitioned against the owner-signed
+// roster and the name store by `core/src/plugins/sync/identity_resolver.rs`, so
+// no unverified row can reach a surface through this file.
 //
-// The claim is the SAME write the unlock pipeline performs opportunistically
-// (`claim_own_binding_best_effort`), offered here so a device whose automatic
-// claim stood down has a way to retry rather than waiting for a state to change.
-// It cannot write another device's row: the row key is this device's own
-// enrolled id and the signer is this session's own person, both read from the
-// session rather than from these arguments.
+// **The write half is gone** (myne-md/myne#976). `device_bindings_claim` existed
+// for the `MEMBER DEVICES` panel's `Claim this device` button, and what it
+// repaired is now repaired without a human: a `ConflictingBinding` this device is
+// party to is re-claimed at a strictly higher version by the sync cycle's own
+// boundary (`core/src/plugins/sync/cycle.rs`). A manual re-claim had exactly one
+// reachable failure mode, and nobody was watching for it.
 
 import { invoke } from "../platform/core";
 import type { DeviceBindingError } from "@myne/client-core/types/device-binding-error";
@@ -38,24 +37,12 @@ export type {
 /**
  * The vault's devices with the member each one is CLAIMED by.
  *
- * A row is a claim and never an ownership (§9.30.4): render "claimed by", never
- * "belongs to". A device whose row did not verify appears only in
- * `unverified_device_ids`, which carries no person and no name.
+ * A row is a claim and never an ownership (§9.30.4). A device whose row did not
+ * verify appears only in `unverified_device_ids`, which carries no person and no
+ * name, so no surface may render one beside a member.
  */
 export async function listDeviceBindings(): Promise<DeviceAttributionView> {
   return invoke<DeviceAttributionView>("plugin:device-binding|device_bindings_list");
-}
-
-/**
- * Re-register THIS device's own binding, then answer the same verified view.
- *
- * Idempotent: a device already claiming itself correctly keeps its row, and the
- * call is the repair for a row that does not verify (a claim at a strictly
- * higher version is the only arm left to separate a
- * `ConflictingBinding` pair).
- */
-export async function claimOwnDeviceBinding(): Promise<DeviceAttributionView> {
-  return invoke<DeviceAttributionView>("plugin:device-binding|device_bindings_claim");
 }
 
 /** The error kind of a thrown `DeviceBindingError`, or `"Internal"` for anything
