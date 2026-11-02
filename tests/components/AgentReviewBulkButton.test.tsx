@@ -138,9 +138,13 @@ describe("Approve all", () => {
 
   // Issue #970, item 13. In the AI chat panel the footer ran out of width and
   // broke EACH label across two lines ("Reject / all 2", "Approve 2 / changes"),
-  // so the card offered four half-sentences instead of two buttons. The rule is
-  // that the row gives way BETWEEN the acts and never inside one.
-  it("keeps both act labels on one line and lets the row wrap between them", () => {
+  // so the card offered four half-sentences instead of two buttons. Forbidding a
+  // break inside a label fixed the shredding and left the real complaint: the row
+  // still did not fit, so `flexWrap` moved the primary act down a line and the
+  // user read the pair as stacked. A footer with exactly two closing acts does
+  // not wrap at all: the row is `nowrap`, both buttons may shrink, and the
+  // remaining slack goes to a spacer that can collapse to nothing.
+  it("keeps the two closing acts on one line, and lets them shrink", () => {
     settleWith([ORDINARY]);
     mount();
     const reject = screen.getByTestId("agentReview.rejectAll");
@@ -148,10 +152,17 @@ describe("Approve all", () => {
     expect(reject.style.whiteSpace).toBe("nowrap");
     expect(approve.style.whiteSpace).toBe("nowrap");
     const footer = approve.closest("footer");
-    expect(footer?.style.flexWrap).toBe("wrap");
-    // The spacer collapses when the row wraps rather than keeping a line of its
-    // own, which is what pushed both acts down in the report. Asserted on
-    // `min-width`, because jsdom drops the `flex: "1 1 0"` shorthand.
+    expect(footer?.style.flexWrap).toBe("nowrap");
+    // Both may give way, or a label that fits its line at 340px overflows the
+    // card the moment the panel is narrower. `minWidth: 0` is what lets a flex
+    // item below its content width at all.
+    for (const act of [reject, approve]) {
+      expect(act.style.minWidth).toBe("0px");
+      expect(act.style.flexGrow).toBe("0");
+    }
+    // The spacer collapses rather than keeping a line of its own, which is what
+    // pushed both acts down in the report. Asserted on `min-width`, because
+    // jsdom drops the `flex: "1 1 0"` shorthand.
     const spacer = Array.from(footer?.children ?? []).find(
       (el) => el.tagName === "SPAN" && el.textContent === "",
     );

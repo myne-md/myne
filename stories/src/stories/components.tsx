@@ -1597,6 +1597,47 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/toast/auto-tag-report",
+    group: "components",
+    surface: "Toast",
+    state: "auto-tag-report",
+    description:
+      "Automatic tagging's own report, in the shared stack where it now lives: the tags it wrote and the action that removes exactly those. The copy is the catalogue's, `notes.autoTag.applied` with `notes.autoTag.undo` as the action.",
+    tags: ["components", "toast", "auto-tag", "tags", "undo", "report", "transient"],
+    render: () => (
+      <ToastWithStack>
+        <Toast
+          message="Tags added: Notes, account, delete"
+          testId="editor.auto-tag-applied"
+          action={{
+            label: "Undo",
+            onAction: action("undoAutoTag"),
+            testId: "editor.auto-tag-undo",
+          }}
+          onDone={action("onDone")}
+        />
+      </ToastWithStack>
+    ),
+  },
+  {
+    id: "components/toast/seed-saved-report",
+    group: "components",
+    surface: "Toast",
+    state: "seed-saved-report",
+    description:
+      "What the memory seed says once it has written, as the toast it is now: the count in the message, the entries in the panel behind it (myne-md/myne#970, item 11). The copy is the catalogue's `settings.memory.seed.applied`.",
+    tags: ["components", "toast", "memory", "seed", "saved", "success", "report"],
+    render: () => (
+      <ToastWithStack>
+        <Toast
+          message="Saved 3 entries to memory."
+          variant="success"
+          onDone={action("onDone")}
+        />
+      </ToastWithStack>
+    ),
+  },
+  {
     id: "components/toaster/default",
     group: "components",
     surface: "Toaster",
@@ -1971,7 +2012,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
   {
     // The biometric arm, which the PIN-primary story above cannot reach: with
     // `method="pin"` the Touch ID button is not mounted at all, so the app's own
-    // wait (issue #970, item 16) had no picture. The prompt never resolves in the
+    // wait (myne-md/myne#970, item 16) had no picture. The prompt never resolves in the
     // fake host, which is exactly the state worth photographing.
     id: "components/quickunlockentry/biometric",
     group: "components",
