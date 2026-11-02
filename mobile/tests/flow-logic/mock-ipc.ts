@@ -2112,8 +2112,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:prefs|set_device_name": (args) => {
         const id = args.deviceIdHex as string;
         const name = (args.name as string).trim();
-        const w = window as unknown as { __deviceNameWrites?: { id: string; name: string }[] };
-        (w.__deviceNameWrites ??= []).push({ id, name });
+        // `selfName` is recorded because it decides WHICH write path Rust takes, and
+        // the two are not interchangeable: the automatic one carries the plane,
+        // absent-prefs and insert-only refusals, the manual one opens all three
+        // because a person naming a row is looking at it. A page that sent the
+        // automatic name down the manual path would defeat every one of them while
+        // rendering identically, so the call has to be assertable here.
+        const selfName = args.selfName === true;
+        const w = window as unknown as {
+          __deviceNameWrites?: { id: string; name: string; selfName: boolean }[];
+        };
+        (w.__deviceNameWrites ??= []).push({ id, name, selfName });
         if (name === "") return false;
         deviceNames[id] = name;
         // `selfName` adds three refusals on the Rust side that this tier cannot

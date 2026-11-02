@@ -34,8 +34,11 @@ async function openDevices(page: import("@playwright/test").Page) {
 async function deviceNameWrites(page: import("@playwright/test").Page) {
   return page.evaluate(
     () =>
-      (window as unknown as { __deviceNameWrites?: { id: string; name: string }[] })
-        .__deviceNameWrites ?? [],
+      (
+        window as unknown as {
+          __deviceNameWrites?: { id: string; name: string; selfName: boolean }[];
+        }
+      ).__deviceNameWrites ?? [],
   );
 }
 
@@ -90,7 +93,12 @@ test.describe("device names", () => {
     await expect(page.getByTestId("sync.device-name")).toHaveText("iPhone");
     // The row now carries two facts instead of one repeated, so the code is back.
     await expect(page.getByTestId("sync.device-code")).toHaveText(UNNAMED.slice(0, 6));
-    expect(await deviceNameWrites(page)).toEqual([{ id: UNNAMED, name: "iPhone" }]);
+    // `selfName: true` is the load-bearing half: the automatic write is the one
+    // Rust gates (member plane, absent prefs, an entry a peer already wrote), and
+    // taking the manual path here would render identically while skipping all three.
+    expect(await deviceNameWrites(page)).toEqual([
+      { id: UNNAMED, name: "iPhone", selfName: true },
+    ]);
   });
 
   // The desktop suite's twin of the head-baseline case ("writes nothing before this
@@ -138,6 +146,12 @@ test.describe("device names", () => {
     await input.press("Enter");
 
     await expect(page.getByTestId("sync.device-name").nth(0)).toHaveText("Studio iPad");
+    // A rename a person made opens the three refusals rather than honouring them:
+    // a person naming a row is looking at it, and refusing them because a peer
+    // already wrote one would be a rule with no user behind it.
+    expect(await deviceNameWrites(page)).toEqual([
+      { id: NAMED, name: "Studio iPad", selfName: false },
+    ]);
   });
 
   test("rename is offered on a device that is NOT this one", async ({ page }) => {

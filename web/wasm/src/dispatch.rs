@@ -4445,7 +4445,6 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                     vault_io(),
                 )
                 .await
-                .map(|()| true)
             };
             match wrote {
                 Ok(wrote) => Outcome::ok(&serde_json::Value::Bool(wrote)),
