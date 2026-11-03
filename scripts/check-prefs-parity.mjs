@@ -98,8 +98,8 @@
 // # Why the projection lives under docs/dev/
 //
 // It is a `docs/**` file a docs-only commit can hand-edit, which is why its CI
-// gate carries no `code-paths` filter, exactly as `twin-inventory` and
-// `manual-test-roster` do. See `.woodpecker/main.yml`.
+// gate carries no `code-paths` filter, exactly as `twin-inventory` does. See
+// `.woodpecker/main.yml`.
 //
 // Zero dependencies, hand-runnable:
 //   node scripts/check-prefs-parity.mjs [--emit|--check|--record]

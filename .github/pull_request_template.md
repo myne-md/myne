@@ -24,13 +24,13 @@ Do NOT mention AI/assistant tooling anywhere — the commit-msg hook rejects att
 
 ## How was this tested?
 
-<!-- Commands run, platforms covered. A new user-facing flow ships WITH its E2E coverage — see AGENTS.md. -->
+<!-- Commands run, platforms covered. A new user-facing flow ships WITH its data-testid pass, see AGENTS.md; its E2E scenario is written by hand, later. -->
 
 ## Checklist
 
 - [ ] Conventional-commit subject; the issue is referenced above with a non-closing keyword (`Refs #n`), so the merge does not close it.
 - [ ] Lint + tests pass locally (`cargo clippy --workspace --all-targets -- -D warnings`, `pnpm build`, `pnpm test`).
-- [ ] A new user-facing flow ships with its `data-testid` pass + an E2E scenario on the right harness (`e2e/` desktop, `e2e-web/` web).
+- [ ] A new user-facing flow ships with its `data-testid` pass (`src/AGENTS.md` "Test observability"); its E2E scenario is written by hand, later.
 - [ ] Docs / specs / glossary / decisions updated where behavior changed.
 - [ ] No new plaintext, key-handling, network, or third-party-origin surface — or it's justified against `docs/threat-model.md`.
 - [ ] If the on-disk format or a load-bearing identifier changed, `myne-test-vectors` is updated in lockstep.

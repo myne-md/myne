@@ -1,7 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
-    ".opencode/skills/adhd/SKILL.md",
     ".opencode/skills/diverge/SKILL.md"
   ],
   "permission": {
