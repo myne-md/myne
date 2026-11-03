@@ -158,6 +158,17 @@ pre-commit:
       # number is written here by hand (AGENTS.md "Repo guards").
       run: node scripts/check-device-actor.mjs
 
+    sync-authority:
+      # myne-md/myne#983: "may this device sign a vault head, and with what?" was
+      # answered in three places with three error policies. One binding row
+      # published a signing key the OS store did not hold, so every cycle refused
+      # with "Unlock your identity to sync" and the 24-word phrase fixed it for
+      # exactly one session. The three answers COMPILED and agreed on every state
+      # that existed; they diverged only on the state that did not. So the four
+      # primitives that answer a piece of that question are recorded, and a new
+      # call site has to argue for itself in scripts/sync-authority-sites.json.
+      run: node scripts/check-sync-authority.mjs
+
     datetime-display-publisher:
       # myne-md/myne#609: the shared date/time display store had exactly ONE
       # publisher in the whole tree while three clients read it. The mobile

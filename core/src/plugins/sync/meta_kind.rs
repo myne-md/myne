@@ -143,6 +143,106 @@ pub fn serialize_tail_frame(
 }
 
 #[cfg(test)]
+mod generation_matrix {
+    //! **Every generation the spec names, answered by every consumer that branches on one.**
+    //!
+    //! This is the ratchet for the defect class myne-md/myne#983 came from, one level above the
+    //! `gen` guard in `scripts/check-version-routing.mjs`: that guard catches a PARTIAL question
+    //! (an equality test against one variant), and this matrix catches an UNANSWERED one (a
+    //! generation that a consumer simply has no case for, which is how `NTV8` silently fell out
+    //! of the person-identity carrier and out of the head context before anybody noticed).
+    //!
+    //! The list of magics is READ FROM THE SPEC rather than copied here. A generation added to
+    //! `docs/spec/protocol.md` without a row below turns this red, which is the whole point: the
+    //! failure mode it replaces is a silent `_ =>` arm.
+
+    use super::{carries_b2b_tail, is_person_born};
+
+    /// One row per magic `docs/spec/protocol.md` names, with what every consumer must answer.
+    ///
+    /// `(magic, person_born, carries_tail)`. `person_born` is deliberate about the two older
+    /// frames: `MYV1` and `NTV5` are single-user, and `NTV6` is a shared vault that is NOT
+    /// person-born (it has no person wrap and no `?account=` selector).
+    const MATRIX: &[(&str, bool, bool)] = &[
+        ("MYV1", false, false),
+        ("NTV5", false, false),
+        ("NTV6", false, true),
+        ("NTV7", true, true),
+        ("NTV8", true, true),
+    ];
+
+    /// The magics the spec names, as 4-byte frames the classifier can be asked about.
+    fn spec_magics() -> Vec<String> {
+        let spec = std::fs::read_to_string(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../docs/spec/protocol.md"
+        ))
+        .expect("docs/spec/protocol.md is part of the tree");
+        let mut out: Vec<String> = Vec::new();
+        let bytes = spec.as_bytes();
+        for (i, _) in spec.match_indices(['M', 'N']) {
+            let tail = &bytes[i..(i + 4).min(bytes.len())];
+            if tail.len() == 4
+                && (tail[0] == b'M' || tail[0] == b'N')
+                && tail[3].is_ascii_digit()
+                && tail[1..3].iter().all(|b| b.is_ascii_uppercase())
+            {
+                let magic = String::from_utf8(tail.to_vec()).expect("ascii");
+                // The `vault.meta` family only: `MYV1` and the `NTV` generations. Every OTHER
+                // four-character magic in the spec is a blob family (`MYA1`, `MYC5`, ...), and
+                // those are not generations a consumer branches on.
+                if magic.starts_with("MYV") || magic.starts_with("NTV") {
+                    out.push(magic);
+                }
+            }
+        }
+        out.sort();
+        out.dedup();
+        out
+    }
+
+    /// A new generation cannot land silently: the spec names it and this matrix has no row.
+    #[test]
+    fn every_magic_the_spec_names_has_a_row_here() {
+        let named = spec_magics();
+        assert!(
+            named.len() >= 5,
+            "the spec's magic list went missing or the scan broke: {named:?}"
+        );
+        let missing: Vec<&String> = named
+            .iter()
+            .filter(|magic| !MATRIX.iter().any(|(known, _, _)| known == &magic.as_str()))
+            .collect();
+        assert!(
+            missing.is_empty(),
+            "docs/spec/protocol.md names {missing:?} and this matrix has no row for it. Answer for \
+             it before adding it: which consumers branch on generation, and what does each answer? \
+             See myne-md/myne#983 and myne-md/myne#984."
+        );
+    }
+
+    /// Every consumer's answer, per generation. Both predicates are asked because they are the two
+    /// questions a generation-branching consumer actually has, and getting either wrong is silent.
+    #[test]
+    fn every_consumer_answers_for_every_generation() {
+        for (magic, person_born, carries_tail) in MATRIX {
+            let mut frame = [0u8; 64];
+            frame[0..4].copy_from_slice(magic.as_bytes());
+            assert_eq!(
+                is_person_born(&frame),
+                *person_born,
+                "{magic}: is_person_born"
+            );
+            assert_eq!(
+                carries_b2b_tail(&frame),
+                *carries_tail,
+                "{magic}: carries_b2b_tail"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
