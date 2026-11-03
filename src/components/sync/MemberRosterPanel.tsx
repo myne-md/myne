@@ -181,10 +181,10 @@ export function MemberRosterPanel({
     devicesPerPerson.set(fingerprint, (devicesPerPerson.get(fingerprint) ?? 0) + 1);
   }
   // `?.length` rather than `.length`: the view arrives over IPC, and a shape
-  // mismatch there must not take the whole Settings surface down with it. This
-  // is not hypothetical, it is what the story host's benign `[]` default did to
-  // this render (myne-md/myne#972 review, D9), and the same one-line shape
-  // appears at every other read below.
+  // mismatch there must not take the whole Settings surface down with it. A
+  // truthy value that is not a `DeviceAttributionView` is reachable, which is
+  // what the story host's benign `[]` default demonstrated: it crashed this
+  // render and, behind it, every story the a11y gate measures after it.
   const unverifiedClaims = claims.view?.unverified_device_ids?.length ?? 0;
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
