@@ -49,8 +49,7 @@
 
 use crate::host::HostCtx;
 use crate::plugins::sync::enroll::{
-    device_credential_username, enroll_with_username, install_device_credential,
-    mint_device_credential, DeviceCredential, EnrollPath,
+    install_device_credential, mint_device_credential, DeviceCredential,
 };
 use crate::plugins::sync::{config, devices::SyncDeviceError, http_transport, person_auth};
 use crate::vault_io::VaultIo;
@@ -385,6 +384,11 @@ async fn endpoint_url(host: &dyn HostCtx, io: &dyn VaultIo) -> Result<String, Sy
 
 /// Authenticate as this device with the credential the other side installed, and store the
 /// session it returns.
+///
+/// The handshake itself is [`crate::plugins::sync::enroll::device_login`], shared with the
+/// merged approval flow (`decisions/protocol/0783`); this function's own job is the one the
+/// ceremony needs and the merged flow does not: the OTHER device installed the verifier, so
+/// there is nothing to install here, only a login and a stored token.
 async fn login_as_device(
     host: &dyn HostCtx,
     io: &dyn VaultIo,
@@ -394,7 +398,6 @@ async fn login_as_device(
     let url = endpoint_url(host, io).await?;
     let person_id = decode_person_id(admission)?;
     let device_id = admission.device_id;
-    let username = device_credential_username(&device_id);
     let secret = Zeroizing::new(secret.to_vec());
     let mut nonce_bytes = [0u8; 32];
     getrandom::getrandom(&mut nonce_bytes).map_err(|_| SyncDeviceError::Internal)?;
@@ -403,14 +406,12 @@ async fn login_as_device(
     let outcome = crate::task::run_blocking(move || {
         let transport =
             http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
-        enroll_with_username(
+        super::enroll::device_login(
             transport.as_ref(),
             &person_id,
-            secret.as_ref(),
-            EnrollPath::Password,
-            &client_nonce,
             device_id,
-            Some(&username),
+            secret.as_ref(),
+            &client_nonce,
         )
         .map_err(SyncDeviceError::from)
     })

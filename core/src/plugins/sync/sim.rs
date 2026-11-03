@@ -2650,7 +2650,10 @@ struct PersonDevice {
     identity_code: String,
 }
 
-async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
+/// The raw shape: an identity sealed from `phrase` and an endpoint configured, with nothing
+/// sent to the server. This is where a joining device stands the moment the phrase is typed,
+/// and where a device being SET UP stands before its explicit register call.
+async fn person_device_unregistered(name: &str, url: &str, phrase: &str) -> PersonDevice {
     use crate::plugins::sync::config::{config_path_from_host, write_config, SyncEndpointConfig};
     use crate::plugins::sync::person_account::person_setup_from_host;
 
@@ -2681,24 +2684,175 @@ async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
     person_setup_from_host(&host, &io, &state, Some(phrase.to_string()))
         .await
         .expect("the person identity sets up locally");
+    PersonDevice {
+        _tmp: tmp,
+        host,
+        state,
+        identity_code: String::new(),
+    }
+}
+
+/// One simulated person on one device, REGISTERED and admitted: what every existing device of
+/// a person looks like, and the only shape that can approve another device.
+async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
+    let mut device = person_device_unregistered(name, url, phrase).await;
     // Registration is its own act since the review: setup no longer reaches the
     // network, so the harness asks for it explicitly, which is what a client does
     // from the identity home.
     let view = crate::plugins::sync::person_account::person_register_from_host(
-        &host,
-        &io,
-        &state,
+        &device.host,
+        &crate::vault_io::StdVaultIo,
+        &device.state,
         phrase.to_string(),
     )
     .await
     .expect("the person identity registers against the real server");
     assert!(view.approved, "the person plane admits this device");
-    PersonDevice {
-        _tmp: tmp,
-        host,
-        state,
-        identity_code: view.identity_code,
-    }
+    device.identity_code = view.identity_code;
+    device
+}
+
+/// myne-md/myne#957, end to end against the real `myne-server`: ONE approval ceremony.
+///
+/// This is the only lane that can prove the merged flow, because every half of it is a server
+/// answer: the credential is installed over an authed route, the approval is a registry state,
+/// and the login that follows is a real SCRAM handshake. The unit tests pin the shapes; this
+/// pins that a real server accepts them.
+///
+/// The story, in order, with the gate asserted at the point where it holds:
+///
+///   1. an existing device of the account (registered, admitted);
+///   2. a joining device that has typed the phrase and NOTHING else — identity sealed, endpoint
+///      configured, nothing sent (`person_device_unregistered`);
+///   3. the join lands `pending`, and the credential it minted is NOT installed yet, which is
+///      checked the only way that means anything: a device-credential login is refused;
+///   4. one tap on the existing device approves the row;
+///   5. the claim installs the credential and the device now authenticates with a proof over
+///      its OWN secret. That is the merge: no second paste, no second comparison, and the
+///      phrase is not asked for again.
+#[test]
+fn a_joining_device_ends_up_authenticating_with_its_own_credential() {
+    use crate::plugins::sync::devices::approve_device;
+    use crate::plugins::sync::http_transport::build_transport;
+    use crate::plugins::sync::person_account::{
+        person_claim_device_from_host, person_join_device_from_host,
+    };
+    use crate::plugins::sync::person_auth::{person_auth_path_for_read, read_person_auth};
+
+    const OWNER_PHRASE: &str =
+        "legal winner thank year wave sausage worth useful legal winner thank yellow";
+    const JOINING_PHRASE: &str = OWNER_PHRASE;
+
+    let (_guard, url) =
+        server_or_skip!("a_joining_device_ends_up_authenticating_with_its_own_credential");
+    let io = crate::vault_io::StdVaultIo;
+
+    crate::test_support::block_on(async {
+        let owner = person_device("j957-owner", &url, OWNER_PHRASE).await;
+        let owner_auth = read_person_auth(
+            &io,
+            &person_auth_path_for_read(&owner.host).expect("owner auth path"),
+        )
+        .await
+        .expect("owner auth reads")
+        .expect("the owner holds a person credential");
+        assert!(!owner_auth.token_hex.is_empty(), "the owner is admitted");
+
+        // ---- 2. the joining device, nothing but the phrase ---------------------
+        let joining = person_device_unregistered("j957-joining", &url, JOINING_PHRASE).await;
+
+        // ---- 3. pending, and nothing installed ---------------------------------
+        let joined = person_join_device_from_host(
+            &joining.host,
+            &io,
+            &joining.state,
+            owner_auth.person_id_hex.clone(),
+            url.clone(),
+            JOINING_PHRASE.to_string(),
+            None,
+        )
+        .await
+        .expect("the join registers against the real server");
+        assert!(
+            !joined.approved,
+            "the phrase alone must not admit a NEW device"
+        );
+
+        let joining_auth = read_person_auth(
+            &io,
+            &person_auth_path_for_read(&joining.host).expect("joining auth path"),
+        )
+        .await
+        .expect("joining auth reads")
+        .expect("the join wrote a credential");
+        let minted = joining_auth
+            .device_secret_hex
+            .clone()
+            .expect("the join mints its own credential from a phrase in hand (#957)");
+        let device_id =
+            crate::plugins::sync::devices::hex16(&joining_auth.device_id_hex).expect("device id");
+        let person_id =
+            crate::plugins::sync::devices::hex16(&joining_auth.person_id_hex).expect("person id");
+        let transport = build_transport(&url).expect("transport");
+
+        let early = crate::plugins::sync::enroll::device_login(
+            transport.as_ref(),
+            &person_id,
+            device_id,
+            &protocol::hex::decode_lower::<32>(&minted).expect("32-byte secret"),
+            "e0000000000000000000000000000001",
+        )
+        .expect_err("a credential nobody approved is not installed");
+        assert_eq!(
+            early,
+            crate::plugins::sync::enroll::EnrollError::Unauthenticated,
+            "the approval is the gate, and it has not happened yet"
+        );
+
+        // And the claim poll before the tap agrees.
+        let still = person_claim_device_from_host(&joining.host, &io, &joining.state)
+            .await
+            .expect("the poll answers");
+        assert!(!still.approved, "still pending: no token, nothing to sync");
+
+        // ---- 4. the one tap ---------------------------------------------------
+        approve_device(transport.as_ref(), &owner_auth.token_hex, &device_id)
+            .expect("the existing device approves the pending row");
+
+        // ---- 5. the claim installs it, and the device authenticates as itself --
+        let claimed = person_claim_device_from_host(&joining.host, &io, &joining.state)
+            .await
+            .expect("the claim completes now that the row is approved");
+        assert!(claimed.approved, "an approved device claims its token");
+
+        let after = read_person_auth(
+            &io,
+            &person_auth_path_for_read(&joining.host).expect("joining auth path"),
+        )
+        .await
+        .expect("joining auth reads")
+        .expect("the joining device holds a credential");
+        assert!(!after.token_hex.is_empty(), "the claim persisted a token");
+        assert_eq!(
+            after.device_secret_hex.as_deref(),
+            Some(minted.as_str()),
+            "the secret is the one minted at join time, never re-minted"
+        );
+
+        let login = crate::plugins::sync::enroll::device_login(
+            transport.as_ref(),
+            &person_id,
+            device_id,
+            &protocol::hex::decode_lower::<32>(&minted).expect("32-byte secret"),
+            "e0000000000000000000000000000002",
+        )
+        .expect("the device authenticates with its own credential");
+        assert!(
+            login.approved && !login.token.is_empty(),
+            "no phrase, no account credential: this token is its own"
+        );
+        assert_eq!(login.device_id, device_id);
+    });
 }
 
 /// member-devices task 7, end to end against the real `myne-server`.

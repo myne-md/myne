@@ -152,6 +152,12 @@
         "reason": "Test fixture: asserts the attestation a person-born vault produces carries the id its binding row was claimed under. It reads the IDENTITY OF THE ROW, not this device's id."
       }
     },
+    "core/src/plugins/sync/sim.rs": {
+      "crate::plugins::sync::devices::hex16(&joining_auth.device_id_hex).expect(\"device id\");": {
+        "count": 1,
+        "reason": "Test fixture in the myne#957 scenario: it names the PENDING row the existing device approves, read from the joining device's own credential because that is the id the server registered for it in the handshake two lines above. Nothing here decides which device this is; the id is the one the join just used, and the scenario's next step proves the approval by logging in with it."
+      }
+    },
     "core/src/plugins/sync/state.rs": {
       "assert_eq!(after.device_id_hex, Some(\"ab\".repeat(16)));": {
         "count": 1,
