@@ -2917,10 +2917,6 @@
       "writesHeading": "Módosítható mezők",
       "writesNote": "A Myne minden változtatást ellenőriz ezen a listán, mielőtt ír, és elutasítja a változtatást egy olyan mezőn, amelyet máshol szerkesztettek, mióta a nézet utoljára olvasta."
     },
-    "welcome": {
-      "body": "Üdvözöl a Myne, a magánterületed a gondolkodáshoz és íráshoz.\n\nMinden, amit ide mentesz, titkosított, és az eszközödön marad. A **jelszavad** és a **helyreállító mondatod** az egyetlen kulcs hozzá, ezért tartsd őket biztonságos helyen. Ha mindkettő valaha elveszik, senki sem tudja visszaszerezni a jegyzeteidet, még mi sem.\n\n**A jegyzeteket össze is kapcsolhatod egymással.** Írd be, hogy `[[`, és a Myne felkínálja a már meglévő jegyezeteidet; válassz egyet, és az hivatkozássá válik. A jegyzet, AMELYRE hivatkoztál, a saját visszahivatkozás-paneljében mutatja, honnan jött a hivatkozás, így egy jegyzetcsoportot mindkét irányban követhetsz.\n\nEz csak egy hétköznapi jegyzet, úgyhogy tedd a sajátoddá. Szerkeszd, nevezd át vagy töröld, amikor csak akarod, és adj hozzá újakat, ahogy az ötleteid gyarapodnak.\n\nHa többet szeretnél megtudni a Myne-ról, látogass el a https://myne.md oldalra.\n",
-      "title": "Üdvözöl a Myne"
-    },
     "workspace": {
       "defaultSlotName": "Alapértelmezett"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Jogi információk",
       "legalHelper": "A böngésződben nyílik meg a myne.md oldalon. Ahol a felület német, ott németül.",
       "legalPrivacy": "Adatvédelmi tájékoztató",
-      "licenseBody": "Pre-alfa · CC-BY-4.0 dokumentáció · AGPL-3.0 alkalmazáskód az 1. fázis kiadásakor.",
+      "licenseBody": "CC-BY-4.0 dokumentáció · AGPL-3.0 alkalmazáskód.",
       "licenseLabel": "Licenc",
-      "tagline": "Pre-alfa · 1. fázisú asztali kliens",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Nyisd meg a nyilvános fenyegetésmodell-dokumentumot a böngésződben.",
       "threatModelLabel": "Fenyegetésmodell",
       "version": "Verzió",
@@ -4022,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Széf",
         "data": "Adatok",
-        "diagnostics": "Diagnosztika"
+        "diagnostics": "Diagnosztika",
+        "extensions": "Böngészőbővítmények"
       },
       "passwordUpdatedToast": "Jelszó frissítve",
       "title": "Beállítások"
@@ -4054,7 +4051,6 @@
       "importLabel": "Importálás",
       "importObsidian": "Jegyzetek importálása…",
       "locationHelper": "Minden széf titkosított fájlokat tartalmazó mappa ezen az útvonalon. A kézi másolatok helyett inkább az alábbi Biztonsági mentés gombot használd: az ellenőrzi a kiírt fájlt.",
-      "locationLabel": "Széf helye",
       "openInFiles": "Megnyitás a Fájlokban",
       "webLocationHelper": "A jegyzeteid ennek a böngészőnek az ehhez az oldalhoz tartozó tárhelyén vannak, amelyet a böngésző kezel. Nincs megnyitható mappa. Az oldal adatainak törlése eltávolítja a helyi példányt; mivel ez a kliens szinkronizál, az újbóli bejelentkezés visszatölti.",
       "webLocationLabel": "Hol tárolódnak a jegyzeteid",
@@ -4412,7 +4408,6 @@
       "devicesNote": "Eszközök, megosztott széf tagok és az identitásod a Szinkronban kezelhető.",
       "groupingError": "Nem sikerült olvasni a fiókcsoportosítást ezen az eszközön. Semmi nem változott.",
       "sections": {
-        "extensions": "Böngészőbővítmények",
         "grouping": "Ez a fiók"
       }
     },

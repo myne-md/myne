@@ -152,21 +152,13 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "backup",
     "BackupExportModal",
   ),
-  // The creation flow's two LOCAL-DISK affordances (2026-08-15). Creation itself
-  // ships here now, which turned every one of its transitive imports into
-  // served code — including `src/lib/vault-backup.ts` and its five
-  // `plugin:backup|*` command names, a module whose verdict is `excluded`.
-  // `check-web-surfaces.mjs` caught it on the first build after the screen was
-  // un-substituted, which is precisely the case a screen-level verdict cannot
-  // cover.
-  [path.join(repoRoot, "src", "screens", "vault-creation", "ReadyLocalArtefacts")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "screens",
-    "vault-creation",
-    "ReadyLocalArtefacts",
-  ),
+  // The creation flow's ReadyStep used to carry two LOCAL-DISK affordances behind a
+  // substituted module (`ReadyLocalArtefacts`, 2026-08-15): a `.myne-backup` save
+  // dialog and an OS file-manager reveal, both absent here. myne-md/myne#960 deleted
+  // those two controls outright, so the module and its substitution edge are gone
+  // rather than rendering `null`; the `plugin:backup|*` names they pulled in stay out
+  // of the served bundle by construction, and `check-web-surfaces.mjs` still asserts
+  // that.
   // Whole-vault migration is a desktop flow (`MigrateVaultForm` drives
   // `plugin:vault-migrate|*`, which the web dispatcher answers `Unsupported`),
   // so this is a decided absence rather than a port that is owed. It used to be

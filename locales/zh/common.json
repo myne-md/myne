@@ -2917,10 +2917,6 @@
       "writesHeading": "它可更改的字段",
       "writesNote": "Myne 在每次写入前都会按此列表核对更改，若字段在视图上次读取后于别处被编辑，则拒绝更改。"
     },
-    "welcome": {
-      "body": "欢迎来到 Myne，这是属于你的私人空间，用来思考与写作。\n\n你在这里保存的一切都经过加密，并留在你的设备上。你的**密码**和**恢复短语**是打开它的唯一钥匙，所以请把它们妥善保管。如果两者都丢失了，没有人能找回你的笔记，连我们也不行。\n\n**你可以把笔记彼此链接起来。**输入 `[[`，Myne 会提供你已有的笔记；选一篇，它就成为一条链接。被链接到的那篇笔记会在自己的反向链接面板中显示链接来自哪里，因此一组笔记是你可以双向追踪的。\n\n这只是一篇普通的笔记，把它变成你自己的吧。随时可以编辑、重命名或删除它，并随着想法的增多添加新的笔记。\n\n要进一步了解 Myne，请访问 https://myne.md\n",
-      "title": "欢迎来到 Myne"
-    },
     "workspace": {
       "defaultSlotName": "默认"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "法律信息",
       "legalHelper": "在浏览器中打开 myne.md 上的页面。界面为德语时显示德语版本。",
       "legalPrivacy": "隐私政策",
-      "licenseBody": "预览版（pre-alpha）· 文档采用 CC-BY-4.0 · 第 1 阶段发布时应用代码采用 AGPL-3.0。",
+      "licenseBody": "文档采用 CC-BY-4.0 · 应用代码采用 AGPL-3.0。",
       "licenseLabel": "许可证",
-      "tagline": "预览版（pre-alpha）· 第 1 阶段桌面客户端",
+      "tagline": "预览版（pre-alpha）",
       "threatModelHelper": "在浏览器中打开公开的威胁模型文档。",
       "threatModelLabel": "威胁模型",
       "version": "版本",
@@ -4022,7 +4018,8 @@
         "cli": "命令行",
         "vault": "保险库",
         "data": "数据",
-        "diagnostics": "诊断"
+        "diagnostics": "诊断",
+        "extensions": "浏览器扩展"
       },
       "passwordUpdatedToast": "密码已更新",
       "title": "设置"
@@ -4054,7 +4051,6 @@
       "importLabel": "导入",
       "importObsidian": "导入笔记…",
       "locationHelper": "每个保险库都是此路径下的一个加密文件夹。请优先使用下方的“备份”按钮，而非手动复制：它会校验所写入的文件。",
-      "locationLabel": "保险库位置",
       "openInFiles": "在文件管理器中打开",
       "webLocationHelper": "你的笔记保存在此浏览器为本站点分配的存储中，由浏览器管理。没有可打开的文件夹。清除本站点的数据会移除本地副本；由于此客户端会同步，重新登录即可把它下载回来。",
       "webLocationLabel": "你的笔记存放在哪里",
@@ -4409,7 +4405,6 @@
       "devicesNote": "设备、共享保险库成员和身份在同步中管理。",
       "groupingError": "无法读取此设备上的账户分组。未更改任何内容。",
       "sections": {
-        "extensions": "浏览器扩展",
         "grouping": "此账户"
       }
     },

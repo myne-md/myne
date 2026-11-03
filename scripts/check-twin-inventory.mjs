@@ -412,18 +412,6 @@ const CURATED_TWINS = [
       '`@myne/editor/host/notes/attachmentRef`; mobile carries 69 lines.',
   },
   {
-    a: "src/dialect/welcomeNote.ts",
-    b: "mobile/src/lib/welcomeNote.ts",
-    what: "is the English-only hand copy of the shared welcome note",
-    why:
-      "Shim against hand copy, and the one case where mobile carries BOTH. " +
-      "`mobile/src/dialect/welcomeNote.ts` is the one-line shim into `@myne/dialect` (already a " +
-      "same-path twin, classified `delegated`), while `mobile/src/lib/welcomeNote.ts` is a " +
-      "separate 62-line copy at a different path. The shared source is `dialect/src/welcomeNote.ts` " +
-      "at 37 lines, so the copy is not even a stale duplicate of it. This is the English-only " +
-      "welcomeNote named in `check-twin-drift.mjs`'s own header.",
-  },
-  {
     a: "core/src/inference/engine.rs",
     b: "mobile/src-tauri/src/plugins/local_inference/engine.rs",
     what: "is the shared engine trait against mobile's surviving copy of it",
@@ -567,28 +555,22 @@ const ROSTER = [
     reason: "Re-export shim, byte-identical.",
   },
   {
-    a: "src/dialect/welcomeNote.ts",
-    b: "mobile/src/dialect/welcomeNote.ts",
+    a: "src/dialect/exampleVault.ts",
+    b: "mobile/src/dialect/exampleVault.ts",
     verdict: "delegated",
     destination: "@myne/dialect",
     reason:
-      "Re-export shim, byte-identical. Not to be confused with mobile/src/lib/welcomeNote.ts, an English-only hand copy at a different path, which is the separate pair below.",
+      "Re-export shim, byte-identical. The note SET is the shared builder's; each client keeps only its own seeder (`src/notes/exampleVault.ts`, `mobile/src/lib/exampleVault.ts`), which is where the platform differences live (desktop pre-seeds the MYW1 workspace, mobile does not).",
   },
 
-  // ── the one curated pair that lands inside a classified root
-  //
-  // Classified here rather than deferred to task 4 because its location forces
-  // it: `src/dialect/` is a classified root, so the guard demands a verdict the
-  // moment the curated pair joins the set. Leaving the guard red to preserve a
-  // task boundary would be bureaucracy, and the verdict is not in doubt.
-  {
-    a: "src/dialect/welcomeNote.ts",
-    b: "mobile/src/lib/welcomeNote.ts",
-    verdict: "decision",
-    destination: "@myne/dialect",
-    reason:
-      "What a new vault's welcome note says is one question with one answer, and it is answered twice. Desktop is a one-line shim onto `dialect/src/welcomeNote.ts` (37 lines); mobile carries an unrelated 62-line hand copy at a different path while ALSO carrying the one-line shim at mobile/src/dialect/welcomeNote.ts. This is the English-only welcomeNote named in check-twin-drift.mjs's own header, and mobile holding both the shim and the copy is the clearest evidence in the tree that a path sweep alone cannot describe this problem.",
-  },
+  // The one curated pair that used to land inside a classified root,
+  // `src/dialect/welcomeNote.ts` → `mobile/src/lib/welcomeNote.ts`, is GONE
+  // rather than reclassified: myne-md/myne#960 deleted the Welcome note on both
+  // clients and both now seed the shared `exampleVault` note set, so there is no
+  // pair left to have a verdict. Its curator entry is why the block below opens
+  // with an explanation instead of a heading, and why the guard would have caught
+  // a straggler: `src/dialect/` is a classified root, so a leftover shim there
+  // fails for want of a verdict.
 
 
   // ── the frontend twins: src/lib, src/types, src/ root, src/styles, plus the
@@ -1692,10 +1674,10 @@ function discover(pairs = TREE_PAIRS, curated = CURATED_TWINS) {
   // are both in `CURATED_TWINS`. `src/App.tsx` has a same-path twin in
   // `mobile/src/App.tsx`, the 121-line viewport wrapper, AND a behavioural
   // counterpart in `mobile/src/app/AppShell.tsx`; both are real twins and they
-  // are not the same twin. `src/dialect/welcomeNote.ts` is the same shape: its
-  // same-path twin is mobile's one-line shim, its curated pair is mobile's
-  // separate 62-line hand copy at another path. A desktop file may have two
-  // mobile counterparts, so the unit is the pair.
+  // are not the same twin. A desktop file may have two mobile counterparts, so
+  // the unit is the pair. (`src/dialect/welcomeNote.ts`, a shim whose curated
+  // counterpart sat at a different path, was the second worked example here until
+  // myne-md/myne#960 deleted the Welcome note outright.)
   const seen = new Set(twins.map(pairKey));
   for (const c of curated) {
     const key = pairKey(c);

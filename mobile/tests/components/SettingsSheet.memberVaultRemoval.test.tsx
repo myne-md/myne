@@ -33,7 +33,7 @@
 // are stubbed and everything else runs as written. `HAS_TAURI` is left real (false
 // under jsdom), which is what keeps the sheet's host-touching effects inert.
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const plane = vi.hoisted(() => ({ value: "owner" as "owner" | "member" | "unknown" }));
@@ -137,8 +137,12 @@ describe("SettingsSheet member-vault removal copy (audit K2-i)", () => {
     // The owner's permanent-deletion warning is absent, not corrected after.
     expect(screen.queryByText("settings.deleteVault.warning")).toBeNull();
     // myne-md/myne#761: iOS destroys the per-vault keychain item on this same
-    // command, so the disclosure is present on the member arm too.
-    expect(screen.getByTestId("settings.delete-vault.keychain-note").textContent).toBe(
+    // command, so the sentence is reachable on the member arm too. It sits one
+    // press away since myne-md/myne#960, which is why this opens the info sheet
+    // rather than reading a standing paragraph: "reachable" is the claim, and a
+    // trigger that opened nothing would still satisfy a reading of the trigger.
+    fireEvent.click(screen.getByTestId("settings.delete-vault.keychain-note-trigger"));
+    expect(screen.getByTestId("settings.delete-vault.keychain-note-sheet").textContent).toBe(
       "settings.deleteVault.keychainNote",
     );
     // The submit carries the member sentence, not "Delete this vault".
@@ -151,7 +155,8 @@ describe("SettingsSheet member-vault removal copy (audit K2-i)", () => {
 
     expect(screen.getByText("settings.deleteVault.warning")).toBeTruthy();
     expect(screen.queryByTestId("settings.member-removal-disclosure")).toBeNull();
-    expect(screen.getByTestId("settings.delete-vault.keychain-note").textContent).toBe(
+    fireEvent.click(screen.getByTestId("settings.delete-vault.keychain-note-trigger"));
+    expect(screen.getByTestId("settings.delete-vault.keychain-note-sheet").textContent).toBe(
       "settings.deleteVault.keychainNote",
     );
     expect(screen.getByTestId("settings.panel-title").textContent).toBe(

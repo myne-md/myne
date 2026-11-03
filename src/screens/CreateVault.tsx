@@ -648,11 +648,7 @@ export function CreateVault({
       );
     case "ready":
       return (
-        <ReadyStep
-          onDone={handleAutoUnlock}
-          pending={autoUnlocking}
-          vaultId={committedVaultIdRef.current}
-        />
+        <ReadyStep onDone={handleAutoUnlock} pending={autoUnlocking} />
       );
     case "session-lost":
       // SESSION_LOST and PROVISION_ERR are the two paths into this step, and

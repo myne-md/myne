@@ -1633,6 +1633,7 @@ export const ROSTER = Object.freeze([
     id: "clipper.connected-extensions",
     title: "Connected extensions list, revoke and host install",
     paths: [
+      "src/components/settings/BrowserExtensionsPanel.tsx",
       "src/components/settings/ConnectedExtensions.tsx",
       "src/components/settings/browser-icons.tsx",
       "web/src/components/settings/ConnectedExtensions.tsx",
@@ -1648,7 +1649,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Pair two different browsers (say Chrome and Firefox) with the same vault. Confirm Settings → Account → Connected extensions lists exactly two rows, each showing the correct browser name and icon and a pairing age that matches when you actually paired it. Press Revoke on one: that browser must stop clipping while the other keeps working.",
+        see: "Pair two different browsers (say Chrome and Firefox) with the same vault. Confirm Settings → Browser extensions → Connected extensions lists exactly two rows, each showing the correct browser name and icon and a pairing age that matches when you actually paired it. Press Revoke on one: that browser must stop clipping while the other keeps working.",
         whyNotAutomated: "Two real browsers must be paired through the native-messaging host, which no lane launches, and the observable effect of a revoke is on the extension's side inside a browser no harness runs.",
         clients: ["clipper", "desktop-macos", "desktop-linux"],
         estimateMin: 10,
@@ -5786,7 +5787,6 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows", "web"],
     automatedBy: [
-      "e2e/storage-panel.e2e.ts",
       "e2e/backup-restore.e2e.ts",
       "e2e/scheduled-backup.e2e.ts",
       "e2e/vault-export.e2e.ts",
@@ -6560,7 +6560,6 @@ export const ROSTER = Object.freeze([
       "src/screens/vault-creation/NameStep.tsx",
       "src/screens/vault-creation/PasswordStep.tsx",
       "src/screens/vault-creation/ProvisioningStep.tsx",
-      "src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "src/screens/vault-creation/ReadyStep.tsx",
       "src/screens/vault-creation/SessionLostStep.tsx",
       "src/screens/vault-creation/index.ts",
@@ -7190,7 +7189,6 @@ export const ROSTER = Object.freeze([
       "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
       "web/src/components/settings/MigrateVaultForm.tsx",
-      "web/src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "scripts/check-web-capabilities.mjs",
       "src/screens/WebNoAccount.tsx",
     ],
@@ -7435,7 +7433,6 @@ export const ROSTER = Object.freeze([
       "design-notes/protocol/0704-the-recovery-phrase-is-no-longer-forbidden-in-served-code.md",
       "web/vite.config.ts",
       "src/components/PhraseEntryGrid.tsx",
-      "web/src/screens/vault-creation/ReadyLocalArtefacts.tsx",
       "e2e-web/create-account.e2e.ts",
       "src/screens/vault-creation/KitStep.tsx",
       "src/screens/vault-recover/PhraseEntryStep.tsx",

@@ -10,6 +10,7 @@ import {
   BlockingOverlay,
   Sheet,
   Icon,
+  InfoNote,
   MyneMark,
 } from "../../components";
 import { HAS_TAURI, closeApp } from "../../lib/app-window";
@@ -74,15 +75,13 @@ const CONFIRM_BODY_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
-/** Footnote weight for a claim that qualifies the arm above rather than being
- *  the one the user must act on (myne-md/myne#761). Token-bound and hoisted, so
- *  it matches the desktop form's secondary role instead of reading as a second
- *  body paragraph. */
-const CONFIRM_NOTE_STYLE: CSSProperties = {
-  margin: "var(--space-3) 0 0",
-  fontSize: "var(--text-sm)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--fg-3)",
+/** Holds the info trigger where the footnote paragraph used to sit: the same
+ *  left edge and the same top gap, so the sheet's layout does not shift. The
+ *  trigger's own 44px box supplies the vertical rhythm (myne-md/myne#960). */
+const CONFIRM_NOTE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  margin: "var(--space-1) 0 0",
 };
 
 // ── On-design helpers (local, mirroring src/screens/unlock/index.tsx) ─────────
@@ -986,10 +985,15 @@ export function UnlockFlow(props: UnlockFlowProps) {
           {/* myne-md/myne#761: iOS destroys the per-vault keychain item, Android
               keeps no such key, and the sentence names both halves, so it is
               rendered on both rather than gated into disagreement with the
-              desktop twin. */}
-          <p data-testid="unlock-delete-keychain-note" style={CONFIRM_NOTE_STYLE}>
-            {t("settings.deleteVault.keychainNote")}
-          </p>
+              desktop twin. Since myne-md/myne#960 it is behind an info control
+              rather than a standing grey paragraph; the claim is unchanged, and
+              the same sentence still reaches the user on both platforms. */}
+          <div style={CONFIRM_NOTE_ROW_STYLE}>
+            <InfoNote
+              testId="unlock-delete-keychain-note"
+              paragraphs={[t("settings.deleteVault.keychainNote")]}
+            />
+          </div>
           {deleteFailed && (
             <div data-testid="unlock-delete-error" style={{ marginTop: 14 }}>
               <Banner kind="danger">

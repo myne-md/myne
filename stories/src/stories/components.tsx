@@ -91,7 +91,6 @@ import { PhraseEntryStep } from "@app/screens/vault-recover/PhraseEntryStep";
 import { ProvisioningStep } from "@app/screens/vault-creation/ProvisioningStep";
 import { QuickPicker } from "@app/components/QuickPicker";
 import { QuickUnlockEntry } from "@app/components/QuickUnlockEntry";
-import { ReadyLocalArtefacts } from "@app/screens/vault-creation/ReadyLocalArtefacts";
 import { ReadyStep } from "@app/screens/vault-creation/ReadyStep";
 import { ReconcileBanner } from "@app/components/sync/ReconcileBanner";
 import { RecoveredNotes } from "@app/components/sync/RecoveredNotes";
@@ -2177,17 +2176,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     description:
       "The final step of vault creation: confirmation that the vault is ready, whose Done triggers the auto-unlock chain into the editor rather than leaving the user at the unlock screen.",
     tags: ["components", "vault-creation", "ready", "step", "auto-unlock", "ceremony"],
-    render: () => <ReadyStep onDone={action("onDone")} vaultId={FIXTURE_VAULT_ID} />,
-  },
-  {
-    id: "components/readylocalartefacts/default",
-    group: "components",
-    surface: "ReadyLocalArtefacts",
-    state: "default",
-    description:
-      "The block on the ready step listing the device-local artefacts a sync-enrolled vault creates, with a pending state while they are written. Look for it naming what exists on this device after creation.",
-    tags: ["components", "vault-creation", "local-artefacts", "ready", "sync", "pending"],
-    render: () => <ReadyLocalArtefacts pending={false} vaultId={FIXTURE_VAULT_ID} />,
+    render: () => <ReadyStep onDone={action("onDone")} />,
   },
 
   // ── Vault-recover flow steps ─────────────────────────────────────────────

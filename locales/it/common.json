@@ -3028,10 +3028,6 @@
       "writesHeading": "Campi che può cambiare",
       "writesNote": "Myne controlla ogni modifica rispetto a questo elenco prima di scriverne una, e rifiuta una modifica a un campo che è stato modificato altrove da quando la vista lo ha letto."
     },
-    "welcome": {
-      "body": "Benvenuto in Myne, il tuo spazio privato per pensare e scrivere.\n\nTutto ciò che salvi qui è crittografato e resta sul tuo dispositivo. La tua **password** e la tua **frase di recupero** sono le uniche chiavi per accedervi, quindi conservale in un luogo sicuro. Se le perdi entrambe, nessuno potrà recuperare le tue note, nemmeno noi.\n\n**Puoi collegare le note tra loro.** Digita `[[` e Myne ti propone le note che hai già; scegline una e diventa un collegamento. La nota a cui hai collegato mostra da dove arriva il collegamento, in un suo pannello dei backlink, così un insieme di note è qualcosa che puoi seguire in entrambe le direzioni.\n\nQuesta è solo una normale nota, quindi rendila tua. Modificala, rinominala o eliminala quando vuoi, e aggiungi nuove note man mano che le tue idee crescono.\n\nPer saperne di più su Myne, visita https://myne.md\n",
-      "title": "Benvenuto in Myne"
-    },
     "workspace": {
       "defaultSlotName": "Predefinito"
     },
@@ -3280,9 +3276,9 @@
       "legalLabel": "Note legali",
       "legalHelper": "Si apre su myne.md nel tuo browser. In tedesco dove l'interfaccia è in tedesco.",
       "legalPrivacy": "Informativa sulla privacy",
-      "licenseBody": "Pre-alpha · documentazione CC-BY-4.0 · codice dell'app AGPL-3.0 al rilascio della Fase 1.",
+      "licenseBody": "documentazione CC-BY-4.0 · codice dell'app AGPL-3.0.",
       "licenseLabel": "Licenza",
-      "tagline": "Pre-alpha · client desktop della Fase 1",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Apri il documento pubblico del modello di minaccia nel browser.",
       "threatModelLabel": "Modello di minaccia",
       "version": "Versione",
@@ -4155,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Cassaforte",
         "data": "Dati",
-        "diagnostics": "Diagnostica"
+        "diagnostics": "Diagnostica",
+        "extensions": "Estensioni del browser"
       },
       "passwordUpdatedToast": "Password aggiornata",
       "title": "Impostazioni"
@@ -4187,7 +4184,6 @@
       "importLabel": "Importa",
       "importObsidian": "Importa note…",
       "locationHelper": "Ogni cassaforte è una cartella di file crittografati sotto questo percorso. Preferisci il pulsante Backup qui sotto alle copie manuali: verifica il file scritto.",
-      "locationLabel": "Posizione della cassaforte",
       "openInFiles": "Apri nei file",
       "webLocationHelper": "Le tue note risiedono nell'archivio che questo browser riserva a questo sito, gestito dal browser. Non c'è alcuna cartella da aprire. Cancellare i dati di questo sito rimuove la copia locale; poiché questo client si sincronizza, al successivo accesso la copia viene riscaricata.",
       "webLocationLabel": "Dove sono archiviate le tue note",
@@ -4550,7 +4546,6 @@
       "devicesNote": "Dispositivi, membri delle casseforti condivise e la tua identità sono gestiti in Sincronizzazione.",
       "groupingError": "Impossibile leggere il raggruppamento dell'account su questo dispositivo. Nulla è cambiato.",
       "sections": {
-        "extensions": "Estensioni del browser",
         "grouping": "Questo account"
       },
       "vaultsCount_many": "{{count}} casseforti"

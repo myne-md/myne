@@ -40,6 +40,32 @@ afterEach(() => {
   hasMock.mockReset();
 });
 
+/** The delete disclosure's own text: the mechanics that moved behind the
+ *  question mark with myne-md/myne#960. Present while collapsed, which is what
+ *  lets a claim about the copy be asserted without opening anything. */
+function disclosureText(): string {
+  return screen.getByTestId("delete-vault.details-explanation").textContent ?? "";
+}
+
+/**
+ * The label the disclosure's trigger shows, and the assertion that it is
+ * VISIBLE text rather than only the trigger's accessible name.
+ *
+ * A bare question mark is the right shape in Settings, where it rides directly
+ * after a setting's title and the icon means "more about THIS". In this dialog
+ * there is no such title, and the icon-only trigger shipped a lone glyph under
+ * the warning with nothing on screen saying what it explained: a control whose
+ * subject exists only in its accessible name, which no audit catches and which
+ * fails every reader who is looking rather than listening. Found from the
+ * before/after capture on myne-md/myne#960, not by a test.
+ */
+function expectTriggerShowsItsLabel(): void {
+  const trigger = screen.getByRole("button", {
+    name: i18n.t("settings.deleteVault.detailsLabel"),
+  });
+  expect(trigger.textContent).toContain(i18n.t("settings.deleteVault.detailsLabel"));
+}
+
 /** Render the idle-mode form with `localOnlyVault` answered by `only`. */
 function renderForm(only: boolean, variant?: "owner" | "member", keychain = true) {
   hasMock.mockImplementation((cap: string) => {
@@ -86,6 +112,34 @@ describe("the delete-vault promise", () => {
     );
   });
 
+  /**
+   * The disclosure's trigger says on screen what it is for. Asserted inside a
+   * test that already renders the form, because `visibleLabel` is a property of
+   * the shape this dialog chose, not of the primitive.
+   */
+  it("labels its disclosure trigger on screen, not only for a screen reader", () => {
+    renderForm(true);
+    expectTriggerShowsItsLabel();
+  });
+
+  /**
+   * The trigger sits on the HEADING's line, at its trailing edge.
+   *
+   * A labelled button parked under the warning reads as a step in the flow (the
+   * thing to do next) rather than as an annotation on the title, which is the
+   * one thing a question mark means. The assertion is structural on purpose: no
+   * layout runs here, so "is it in the heading row" is the only property jsdom
+   * can honestly hold, and it is the property that decides what the eye reads.
+   */
+  it("puts the disclosure on the heading's own line", () => {
+    renderForm(true);
+    const heading = screen.getByTestId("delete-vault.heading");
+    const trigger = screen.getByRole("button", {
+      name: i18n.t("settings.deleteVault.detailsLabel"),
+    });
+    expect(heading.parentElement?.contains(trigger)).toBe(true);
+  });
+
   it("keeps the desktop copy where it is true", () => {
     renderForm(true);
     const body = document.body.textContent ?? "";
@@ -121,16 +175,25 @@ describe("the delete-vault promise", () => {
     // The Tauri client: it HAS the provider and therefore an item to erase. The
     // gate is the capability, not `localOnlyVault`: asserting this on the web arm
     // is what certified the inversion this test now guards against.
+    //
+    // The sentence moved into the disclosure's description element with
+    // myne-md/myne#960 (it was a standing grey paragraph). The CLAIM is
+    // unchanged, so the assertion reads the description element rather than a
+    // paragraph testid of its own, and the description element is in the
+    // document while collapsed, which is `HelperDisclosure`'s contract, and the
+    // reason this still works without opening anything.
     renderForm(true);
-    expect(screen.getByTestId("delete-vault.keychain-note").textContent).toBe(
-      i18n.t("settings.deleteVault.keychainNote"),
-    );
+    expect(disclosureText()).toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 
   it("does not claim a keychain cleanup on a client that has no keychain", () => {
-    // The browser: no provider, no item, no sentence.
+    // The browser: no provider, no item, no sentence. The zeroization sentence
+    // it DOES carry is asserted alongside, so a disclosure that rendered nothing
+    // at all could not pass this by being empty.
     renderForm(false, undefined, false);
-    expect(screen.queryByTestId("delete-vault.keychain-note")).toBeNull();
+    const text = disclosureText();
+    expect(text).toContain(i18n.t("settings.deleteVault.copySecondary"));
+    expect(text).not.toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 
   it("answers the gate with the capability, not with `onlyCopy`", () => {
@@ -140,7 +203,7 @@ describe("the delete-vault promise", () => {
     // them green. This case is the disagreement: a copy that is NOT the only one,
     // on a client that still has a keychain item to erase.
     renderForm(false, undefined, true);
-    expect(screen.getByTestId("delete-vault.keychain-note")).toBeTruthy();
+    expect(disclosureText()).toContain(i18n.t("settings.deleteVault.keychainNote"));
   });
 });
 

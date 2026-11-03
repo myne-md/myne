@@ -2917,10 +2917,6 @@
       "writesHeading": "Felder, die sie ändern kann",
       "writesNote": "Myne prüft jede Änderung gegen diese Liste, bevor sie eine schreibt, und lehnt eine Änderung an einem Feld ab, das woanders bearbeitet wurde, seit die Ansicht es zuletzt gelesen hat."
     },
-    "welcome": {
-      "body": "Willkommen bei Myne, Ihrem privaten Raum zum Denken und Schreiben.\n\nAlles, was Sie hier speichern, ist verschlüsselt und bleibt auf Ihrem Gerät. Ihr **Passwort** und Ihre **Wiederherstellungsphrase** sind die einzigen Schlüssel dazu, bewahren Sie sie also an einem sicheren Ort auf. Wenn beide jemals verloren gehen, kann niemand Ihre Notizen zurückholen, nicht einmal wir.\n\n**Sie können Notizen miteinander verknüpfen.** Geben Sie `[[` ein, und Myne schlägt Ihnen die Notizen vor, die Sie bereits haben; wählen Sie eine aus, und sie wird zu einem Link. Die Notiz, auf die Sie verlinkt haben, zeigt in ihrem eigenen Backlink-Bereich, woher der Link kam, sodass Sie einer Sammlung von Notizen in beide Richtungen folgen können.\n\nDies ist nur eine ganz normale Notiz, also machen Sie sie zu Ihrer eigenen. Bearbeiten Sie sie, benennen Sie sie um oder löschen Sie sie, wann immer Sie möchten, und fügen Sie neue Notizen hinzu, wenn Ihre Ideen wachsen.\n\nUm mehr über Myne zu erfahren, besuchen Sie https://myne.md\n",
-      "title": "Willkommen bei Myne"
-    },
     "workspace": {
       "defaultSlotName": "Standard"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Rechtliches",
       "legalHelper": "Öffnet myne.md in Ihrem Browser. Auf Deutsch, wenn die Oberfläche auf Deutsch ist.",
       "legalPrivacy": "Datenschutzerklärung",
-      "licenseBody": "Pre-Alpha · CC-BY-4.0-Dokumentation · AGPL-3.0-Anwendungscode mit dem Phase-1-Release.",
+      "licenseBody": "CC-BY-4.0-Dokumentation · AGPL-3.0-Anwendungscode.",
       "licenseLabel": "Lizenz",
-      "tagline": "Pre-Alpha · Phase-1-Desktop-Client",
+      "tagline": "Pre-Alpha",
       "threatModelHelper": "Öffnen Sie das öffentliche Bedrohungsmodell-Dokument in Ihrem Browser.",
       "threatModelLabel": "Bedrohungsmodell",
       "version": "Version",
@@ -4022,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Tresor",
         "data": "Daten",
-        "diagnostics": "Diagnose"
+        "diagnostics": "Diagnose",
+        "extensions": "Browser-Erweiterungen"
       },
       "passwordUpdatedToast": "Passwort aktualisiert",
       "title": "Einstellungen"
@@ -4054,7 +4051,6 @@
       "importLabel": "Importieren",
       "importObsidian": "Notizen importieren…",
       "locationHelper": "Jeder Tresor ist ein Ordner mit verschlüsselten Dateien unter diesem Pfad. Bevorzugen Sie die Sicherungs-Schaltfläche unten gegenüber manuellen Kopien: Sie verifiziert die geschriebene Datei.",
-      "locationLabel": "Tresorspeicherort",
       "openInFiles": "In Dateien öffnen",
       "webLocationHelper": "Ihre Notizen liegen im Speicher, den dieser Browser für diese Website verwaltet. Es gibt keinen Ordner zum Öffnen. Wenn Sie die Daten dieser Website löschen, verschwindet die lokale Kopie; da dieser Client synchronisiert, wird sie beim erneuten Anmelden wieder heruntergeladen.",
       "webLocationLabel": "Wo Ihre Notizen gespeichert sind",
@@ -4412,7 +4408,6 @@
       "devicesNote": "Geräte, Mitglieder gemeinsamer Tresore und Ihre Identität werden unter Synchronisierung verwaltet.",
       "groupingError": "Die Kontogruppierung auf diesem Gerät konnte nicht gelesen werden. Es wurde nichts geändert.",
       "sections": {
-        "extensions": "Browser-Erweiterungen",
         "grouping": "Dieses Konto"
       }
     },

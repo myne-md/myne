@@ -709,7 +709,15 @@
     "that batch, and neither was quarantined: `describeE2E.flaky` is for a",
     "contention victim, not for a real failure."
   ],
-  "stable": 378,
+  "stable": 377,
+  "_comment_378_to_377": [
+    "LOWERED 378 -> 377 (myne-md/myne#960). ONE scenario is REMOVED, never",
+    "quarantined: sp1 in `e2e/storage-panel.e2e.ts` drove Settings -> Storage's",
+    "vault-location row, and the branch deletes that row because the vault path is",
+    "not something a user acts on. Deleting a scenario is the one kind of entry that",
+    "moves this number down, and the number is the count of scenarios that must",
+    "pass."
+  ],
   "stable_max_failures": 0,
   "_comment_382_to_381": [
     "LOWERED 382 -> 381 for the retirement of the MYR1 AI-embeddings family",

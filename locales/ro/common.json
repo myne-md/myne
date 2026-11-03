@@ -3028,10 +3028,6 @@
       "writesHeading": "Câmpuri pe care le poate schimba",
       "writesNote": "Myne verifică fiecare modificare față de această listă înainte de a scrie una și refuză o modificare la un câmp care a fost editat altundeva de când vizualizarea a citit ultima dată."
     },
-    "welcome": {
-      "body": "Bine ai venit în Myne, spațiul tău privat pentru a gândi și a scrie.\n\nTot ce salvezi aici este criptat și rămâne pe dispozitivul tău. **Parola** și **fraza de recuperare** sunt singurele chei către el, așa că păstrează-le undeva în siguranță. Dacă le pierzi pe amândouă, nimeni nu îți poate recupera notele, nici măcar noi.\n\n**Poți lega notele între ele.** Tastează `[[` și Myne îți oferă notele pe care le ai deja; alege una și devine un link. Nota către care ai făcut legătura arată de unde a venit linkul, în propriul panou de legături inverse, așa că un set de note poate fi urmărit în ambele direcții.\n\nAceasta este doar o notă obișnuită, așa că fă-o a ta. Editeaz-o, redenumește-o sau șterge-o oricând dorești și adaugă note noi pe măsură ce ideile tale cresc.\n\nPentru a afla mai multe despre Myne, vizitează https://myne.md\n",
-      "title": "Bine ai venit în Myne"
-    },
     "workspace": {
       "defaultSlotName": "Implicit"
     },
@@ -3280,9 +3276,9 @@
       "legalLabel": "Juridic",
       "legalHelper": "Se deschide pe myne.md în browserul tău. În germană acolo unde interfața este în germană.",
       "legalPrivacy": "Politica de confidențialitate",
-      "licenseBody": "Pre-alfa · documentație CC-BY-4.0 · cod de aplicație AGPL-3.0 la lansarea Fazei 1.",
+      "licenseBody": "documentație CC-BY-4.0 · cod de aplicație AGPL-3.0.",
       "licenseLabel": "Licență",
-      "tagline": "Pre-alfa · Client desktop Faza 1",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Deschide documentul public al modelului de amenințare în browser.",
       "threatModelLabel": "Model de amenințare",
       "version": "Versiune",
@@ -4155,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Seif",
         "data": "Date",
-        "diagnostics": "Diagnostic"
+        "diagnostics": "Diagnostic",
+        "extensions": "Extensii de browser"
       },
       "passwordUpdatedToast": "Parolă actualizată",
       "title": "Setări"
@@ -4187,7 +4184,6 @@
       "importLabel": "Import",
       "importObsidian": "Importă note…",
       "locationHelper": "Fiecare seif este un folder de fișiere criptate sub această cale. Preferă butonul Copie de rezervă de mai jos în locul copiilor manuale: el verifică fișierul scris.",
-      "locationLabel": "Locația seifului",
       "openInFiles": "Deschide în Fișiere",
       "webLocationHelper": "Notele tale se află în spațiul de stocare pe care acest browser îl alocă acestui site, gestionat de browser. Nu există niciun folder de deschis. Ștergerea datelor acestui site elimină copia locală; deoarece acest client se sincronizează, o nouă conectare o descarcă înapoi.",
       "webLocationLabel": "Unde sunt stocate notele tale",
@@ -4550,7 +4546,6 @@
       "devicesNote": "Dispozitivele, membrii seifurilor partajate și identitatea ta sunt gestionate în Sincronizare.",
       "groupingError": "Gruparea contului nu a putut fi citită pe acest dispozitiv. Nimic nu s-a schimbat.",
       "sections": {
-        "extensions": "Extensii de browser",
         "grouping": "Acest cont"
       },
       "vaultsCount_few": "{{count}} seifuri"

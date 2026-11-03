@@ -146,9 +146,14 @@ describe("UnlockFlow member-vault removal copy (audit K2-i)", () => {
     // 2. The owner's permanent-deletion copy is absent, not corrected after.
     expect(screen.queryByText("unlock.deleteConfirmTitle")).toBeNull();
     // myne-md/myne#761: the same command destroys the per-vault keychain item.
-    expect(screen.getByTestId("unlock-delete-keychain-note").textContent).toBe(
+    // One press away since myne-md/myne#960 (the info sheet), so this opens it:
+    // the claim is that the sentence is REACHABLE on this arm, and a trigger that
+    // opened nothing would satisfy a reading of the trigger alone.
+    fireEvent.click(screen.getByTestId("unlock-delete-keychain-note-trigger"));
+    expect(screen.getByTestId("unlock-delete-keychain-note-sheet").textContent).toBe(
       "settings.deleteVault.keychainNote",
     );
+    fireEvent.click(screen.getByText("common.close"));
     expect(document.body.textContent ?? "").not.toContain(LOST_BOTH_SECRETS_SENTENCE);
 
     // 3. The action carries the member sentence, not "Delete vault".
@@ -165,7 +170,8 @@ describe("UnlockFlow member-vault removal copy (audit K2-i)", () => {
 
     expect(screen.getByText("unlock.deleteConfirmTitle")).toBeTruthy();
     expect(document.body.textContent ?? "").toContain(LOST_BOTH_SECRETS_SENTENCE);
-    expect(screen.getByTestId("unlock-delete-keychain-note").textContent).toBe(
+    fireEvent.click(screen.getByTestId("unlock-delete-keychain-note-trigger"));
+    expect(screen.getByTestId("unlock-delete-keychain-note-sheet").textContent).toBe(
       "settings.deleteVault.keychainNote",
     );
     // The member arm did NOT leak into an owner vault.
