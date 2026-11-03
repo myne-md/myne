@@ -1,8 +1,9 @@
 // Task-reminder settings (MYND-618).
 //
 // The reminder block became a reachable user-facing flow when it was rendered
-// into Settings → Editor and its scheduler mounted, so it owes a scenario on this
-// harness (root `AGENTS.md`: a new user-facing flow ships WITH its E2E coverage).
+// into Settings → Editor and its scheduler mounted, so it is worth a scenario on
+// this harness. No flow owes one in the change that adds it (myne-md/myne#996);
+// this one was written by hand afterwards.
 //
 // Two things here are structurally out of reach of the unit suite, and they are
 // the whole reason for this file:

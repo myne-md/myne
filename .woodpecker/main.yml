@@ -421,24 +421,9 @@ steps:
     commands:
       - node scripts/check-twin-inventory.mjs --check
 
-  # myne#548: the manual half of a release, gated the way the automated half is.
-  #
-  # UNFILTERED, and for the same two reasons `twin-inventory` above is. First, it
-  # `--check`s a GENERATED document (`docs/dev/manual-test-roster.md`), so a hand
-  # edit to it is a docs-only commit that the `code-paths` filter would skip.
-  # Second, the roster records what a human must verify before a tag, and a
-  # docs-only commit is exactly when a procedure document moves.
-  #
-  # It is its own step rather than a line inside `pnpm-build` so it needs no
-  # `pnpm install` and can go red on a commit that touches nothing else.
-  manual-test-roster:
-    image: node:25
-    commands:
-      - node scripts/check-manual-test-roster.mjs --check
-
   # ─── F-Droid store metadata against the Android build it describes ───────────
-  # No `when:` filter, and the reason is the same one bundle-record,
-  # twin-inventory and manual-test-roster carry: its inputs include `fastlane/**`,
+  # No `when:` filter, and the reason is the same one bundle-record and
+  # twin-inventory carry: its inputs include `fastlane/**`,
   # which no `code-paths` glob covers, so a listing-only commit is exactly when
   # it can go red. What it catches is arithmetic that no compiler and no test can
   # see: the version in `mobile/src-tauri/tauri.conf.json` against the four
@@ -447,17 +432,17 @@ steps:
   # Drift does not fail anything, it just publishes an empty "What's new" tab and
   # drops three of four architectures from the repository.
   #
-  # Its own step rather than a line inside `pnpm-build` for the same reason
-  # manual-test-roster is: it needs no `pnpm install`, and it must be able to go
-  # red on a commit that touches nothing else.
+  # Its own step rather than a line inside `pnpm-build`: it needs no
+  # `pnpm install`, and it must be able to go red on a commit that touches
+  # nothing else.
   fdroid-metadata:
     image: node:25
     commands:
       - node scripts/check-fdroid-metadata.mjs
 
   # ─── Every vault.prefs command says which client surfaces it (#880) ──────────
-  # No `when:` filter, and it is the same reason bundle-record, twin-inventory and
-  # manual-test-roster carry none: the `--check` half compares the GENERATED
+  # No `when:` filter, and it is the same reason bundle-record and twin-inventory
+  # carry none: the `--check` half compares the GENERATED
   # docs/dev/settings-parity.md against what `--emit` would write, so a docs/**
   # file is one of its inputs. A hand edit to that document is a docs-only commit,
   # and under the filter CI would never look, leaving only the
@@ -497,7 +482,7 @@ steps:
 
   # ─── A deferral must name an issue, and the roster must match the tree ──────
   # No `when:` filter, for the reason bundle-record, twin-inventory,
-  # manual-test-roster and i18n-coverage carry none: the properties that rot here
+  # i18n-coverage carries none: the properties that rot here
   # are a `#[ignore = "unfixed: … see myne-md/myne#N"]` reason that stops naming
   # an OPEN issue, and a roster that stops matching the tree. Both arrive with a
   # commit that touches only a decision entry, and `*code-paths` excludes
@@ -1939,22 +1924,15 @@ steps:
       # which is precisely the commit that hand-edits its generated projection.
       - name: twin-inventory
         optional: true
-      # myne#548. Unfiltered like `twin-inventory` above and red for the same two
-      # reasons: a stale generated projection, or a feature surface that entered
-      # the tree with no manual-test verdict. This file is the only thing that
-      # pushes a failure to the maintainer, so a step added without a slot here
-      # is a gate that goes quiet.
-      - name: manual-test-roster
-        optional: true
-      # Unfiltered like `manual-test-roster` above and red for the same shape of
+      # Unfiltered like `fdroid-metadata` and red for the same shape of
       # reason: its inputs include `fastlane/**`, which no `code-paths` glob
       # covers, so a listing-only commit is when it can go red. This file is the
       # only thing that pushes a failure to the maintainer, so a step added
       # without a slot here is a gate that goes quiet.
       - name: fdroid-metadata
         optional: true
-      # myne#880. Unfiltered like `twin-inventory` and `manual-test-roster` above
-      # and listed for the same reason: a stale generated projection is a
+      # myne#880. Unfiltered like `twin-inventory` above and listed for the same
+      # reason: a stale generated projection is a
       # docs-only commit away, and a gate nobody is paged for is a gate that stays
       # red.
       - name: prefs-parity

@@ -153,21 +153,16 @@
   the merge gate: the drill still runs at m=256 MiB, t=3, p=2, but no push runs
   it.
 
-- **A new `*.e2e.ts` file owes a line in the manual test roster.**
-  `scripts/check-manual-test-roster.mjs` fails the commit until some entry in
-  `scripts/manual-test-roster.mjs` names the file in its `automatedBy`. The rule
-  is not bookkeeping: this suite runs only in a Linux container against
-  WebKitGTK, so a scenario proves one of the eight client surfaces the roster
-  counts, and the roster is
-  where what it does NOT prove is written down. Naming it is also what stops a
-  human from re-walking, every release, what you just automated. **Naming the
-  file is enough**: a new scenario needs a mention in an existing entry's
-  `automatedBy`, not an entry of its own, and a new SURFACE can be discharged
-  either by a roster entry or by a `NOT_A_SURFACE` record carrying its reason.
+- **A new `*.e2e.ts` file no longer owes a roster line.** Nothing fails a commit
+  for a missing verdict, and a new flow owes no scenario at all: the owner writes
+  the coverage by hand, later (myne-md/myne#996, decision `0780`). What the
+  roster still does is record which of the eight client surfaces this Linux-only
+  suite proves, so naming your scenario in an entry's `automatedBy` is worth
+  doing when you write one, and deleting the item it now covers is worth doing
+  with it.
 
   When a scenario you add covers an observation a roster item currently carries,
-  delete that item in the same change and run
-  `node scripts/check-manual-test-roster.mjs --record`. That lowers
+  delete that item and run `node scripts/check-manual-test-roster.mjs --record`. That lowers
   `totalMinutesCeiling` and nothing else: the gate POLICY (`gatedTiers`,
   `gatedClients`) is untouched by an item deletion, so there is nothing to
   narrow and nothing to argue for. Deleting the item is the ratchet moving, and
