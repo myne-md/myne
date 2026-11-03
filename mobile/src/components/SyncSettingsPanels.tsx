@@ -1195,39 +1195,55 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                     data-testid="sync.device-name-input"
                   />
                 ) : (
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
-                    <span style={rowLabel} data-testid="sync.device-name">
-                      {deviceName(d, names, t)}
-                    </span>
-                    {d.is_current && (
-                      <span
-                        style={{
-                          padding: "1px 7px",
-                          fontSize: 11,
-                          fontWeight: 600,
-                          color: "var(--fg-2)",
-                          border: "1px solid var(--line-1)",
-                          borderRadius: 999,
-                        }}
-                        data-testid="sync.this-device"
-                      >
-                        {t("sync.devices.thisDevice")}
-                      </span>
-                    )}
-                  </div>
-                )}
-                {/* The demoted device code, only where the title is NOT the code
-                    (myne-md/myne#973). Permanent rather than a hover affordance
-                    (mobile has no hover); its job is to tell two same-named
-                    devices apart, so it is absent exactly where it repeats. */}
-                {hasDeviceName(names, d.device_id_hex) && (
+                  // **The name gets its own line, and everything about the
+                  // device stacks beneath it** (myne-md/myne#970 item 23). The
+                  // row used to be `[name] [This device]` on the left and
+                  // `[Rename] [Syncing here]` on the right, four items across
+                  // one phone-width line: the name was the only flexible one, so
+                  // it ellipsised to "Pixel 7…" while a 100px status sentence sat
+                  // in the action row and wrapped. A name is the thing the user
+                  // came to read and rename, so it takes the width it needs and
+                  // the metadata becomes a quieter line under it.
                   <span
-                    style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}
-                    data-testid="sync.device-code"
+                    style={{ ...rowLabel, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                    data-testid="sync.device-name"
                   >
-                    {d.device_id_hex.slice(0, 6)}
+                    {deviceName(d, names, t)}
                   </span>
                 )}
+                {/* One meta line: the current-device chip and the demoted device
+                    code. All of it is about the device rather than about what
+                    you can do to it, which is why it reads as one row and why
+                    none of it belongs beside a button. The code is permanent
+                    rather than a hover affordance (mobile has no hover), and it
+                    is absent exactly where it would repeat the title, which is
+                    the unnamed-device case (myne-md/myne#973). There is no
+                    syncing-here line: "this device" is the chip's job. */}
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", minWidth: 0 }}>
+                  {d.is_current && (
+                    <span
+                      style={{
+                        padding: "1px 7px",
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: "var(--fg-2)",
+                        border: "1px solid var(--line-1)",
+                        borderRadius: 999,
+                      }}
+                      data-testid="sync.this-device"
+                    >
+                      {t("sync.devices.thisDevice")}
+                    </span>
+                  )}
+                  {hasDeviceName(names, d.device_id_hex) && (
+                    <span
+                      style={{ fontFamily: "var(--font-mono)", fontSize: 12, color: "var(--fg-3)" }}
+                      data-testid="sync.device-code"
+                    >
+                      {d.device_id_hex.slice(0, 6)}
+                    </span>
+                  )}
+                </div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                 {/* Rename is offered on EVERY approved row: devices enrolled

@@ -497,9 +497,15 @@ describe("the preview reflects the settings the requester named", () => {
       document.querySelector(`[data-testid="settings.editor-preview-toolbar-${id}"]`);
     expect(shown("italic"), "a default-shown button is missing from the specimen").not.toBeNull();
     expect(shown("bold"), "a hidden button is still drawn in the specimen").toBeNull();
-    // The five not-yet-renderable ids are pinned hidden by the resolver, so they
-    // are absent whatever the stored layout says.
-    expect(shown("checklist")).toBeNull();
+    // **Every id in the vocabulary renders now** (myne-md/myne#970 item 1): the
+    // five controls the editor could not draw were pinned hidden by the resolver,
+    // so the specimen dropped them whatever the stored layout said and a user who
+    // reordered them saw a list the preview disagreed with. `checklist` is one of
+    // those five, so its presence here is the pin's absence.
+    expect(
+      shown("checklist"),
+      "a control the vocabulary carries is missing from the specimen",
+    ).not.toBeNull();
 
     // And un-hiding one puts it back: the specimen reads the resolved set rather
     // than a frozen default.

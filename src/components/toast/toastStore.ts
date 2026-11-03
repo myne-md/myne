@@ -13,6 +13,11 @@ export type ToastVariant = "neutral" | "success" | "error" | "info";
 export interface ToastActionSpec {
   label: string;
   onAction: () => void;
+  /** Optional `data-testid` override for the action button. Defaults to the
+   *  shared `editor.toast-action`; a surface whose action has its own identity in
+   *  E2E (the auto-tag undo, `editor.auto-tag-undo`) sets its own, so a scenario
+   *  presses the button it means rather than whichever toast is on screen. */
+  testId?: string;
 }
 
 export interface ToastInput {

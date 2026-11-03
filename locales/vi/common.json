@@ -1330,10 +1330,6 @@
           "copyFailed": "Không sao chép được",
           "copyYourMessage": "Sao chép tin nhắn của bạn",
           "emptyTitle": "Hỏi về ghi chú của bạn",
-          "noticeLeaves": "Các từ bạn gõ, các ghi chú một lượt đọc, tiêu đề, định danh và đường dẫn thư mục của mọi ghi chú lượt chạy có thể đọc (toàn bộ kho trừ các thư mục bạn loại trừ, trừ khi bạn thu hẹp), văn bản Myne trích từ các tệp bạn đính kèm vào tin nhắn (tối đa bốn, mỗi cái cắt ở 20.000 ký tự; tệp vẫn ở đây), và những gì AI nhớ về bạn được gửi đến bên đang trả lời. Không có gì khác trên thiết bị này được gửi.",
-          "noticeReceiver": "Đang trả lời: {{provider}}, bên mà Myne không vận hành.",
-          "noticeReceiverLocal": "Đang trả lời: một chương trình chạy trên thiết bị này. Không có gì rời khỏi máy, nhưng chương trình đó không thuộc Myne và Myne không thể thấy nó làm gì với chúng.",
-          "noticeRevoke": "Để dừng lại, hãy tắt AI trong Cài đặt, hoặc đổi thứ đang trả lời ở đó. Gỡ khóa của nhà cung cấp sẽ dừng nhà cung cấp đó ngay lập tức.",
           "noticeSettingsCta": "Mở cài đặt AI",
           "viewDiff": "Xem thay đổi",
           "revertRun": "Hoàn tác lượt chạy này",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Không có ghi chú phù hợp",
       "noNotesYet": "Chưa có ghi chú nào",
       "noMatchBody": "Không có gì khớp với “{{name}}”. Chỉnh sửa chế độ xem hoặc xóa nó để xem tất cả ghi chú.",
-      "emptyBody": "Chạm “Ghi chú mới” để viết ghi chú đầu tiên của bạn. Mọi thứ được mã hóa trên thiết bị này trước khi được lưu.",
       "unarchive": "Bỏ lưu trữ"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "Di chuyển {{count}} ghi chú đến…",
       "caseMergeBody": "Đã có một thư mục tên “{{name}}”. Chúng sẽ được hợp nhất. Đổi tên một thư mục để tách riêng?",
       "color": "Màu sắc…",
-      "createFirstNote": "Tạo ghi chú đầu tiên của bạn",
       "createFolderNote": "Tạo ghi chú thư mục",
       "customize": "Tùy chỉnh…",
       "delete": "Xóa",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Ghi chú và thư mục",
       "selectionAnnouncement": "Đã chọn: {{title}}",
       "untitled": "Không tiêu đề",
-      "emptyBody": "Ghi chú là markdown thuần, được mã hóa trên thiết bị này trước khi đi bất cứ đâu. Hãy tạo một ghi chú để bắt đầu, hoặc nhấn vào hàng tìm kiếm ở trên để chạy bất kỳ lệnh nào.",
       "search": "Tìm kiếm"
     },
     "newFromTemplate": {
@@ -4330,17 +4323,11 @@
         "rebuildConfirm": "Thay thế gieo từ {{date}} ({{count}} mục)?",
         "title": "Dạy Myne về kho của bạn",
         "candidatesTitle": "Xem lại điều Myne học được",
-        "doneTitle": "Đã lưu",
         "close": "Đóng",
         "loading": "Đang đọc kho của bạn…",
         "scopeIntro": "Myne đọc hình dạng kho của bạn trước: tiêu đề ghi chú, thư mục và thẻ. Nó chỉ yêu cầu văn bản ghi chú khi cần, và không bao giờ phần đính kèm.",
         "provider": "Nhà cung cấp: {{provider}}",
-        "providerRemote": "từ xa",
-        "providerLocal": "trên thiết bị này",
-        "counts": "{{notes}} ghi chú · {{folders}} thư mục · {{tags}} thẻ",
         "estimatedChars": "Khoảng {{chars}} ký tự",
-        "excluded": "{{count}} ghi chú bị bỏ qua vì thư mục của chúng bị loại trừ khỏi AI",
-        "omitted": "{{count}} tiêu đề bị lược để vừa ngữ cảnh mô hình",
         "showPayload": "Hiện chính xác điều sẽ được gửi",
         "hidePayload": "Ẩn payload",
         "consentLabel": "Gửi phác thảo này đến {{provider}} (khoảng {{chars}} ký tự). Tôi hiểu nhà cung cấp nhận được nó.",
@@ -4356,9 +4343,6 @@
         "apply": "Lưu {{count}} mục",
         "applying": "Đang lưu…",
         "applied": "Đã lưu {{count}} mục vào bộ nhớ.",
-        "appliedHelper": "Tìm chúng dưới phần Từ kho của bạn trong mục này. Trợ lý đọc chúng từ giờ.",
-        "finish": "Xong",
-        "appliedToast": "Đã xây bộ nhớ từ kho của bạn.",
         "refusals": {
           "empty": "Mục này trống.",
           "textTooLong": "Mục này vượt giới hạn 2000 ký tự.",
@@ -4391,7 +4375,11 @@
         "removeAll": "Gỡ tất cả",
         "removeConfirm": "Gỡ tất cả mục từ gieo này?",
         "removedToast": "Đã gỡ mục từ kho của bạn.",
-        "rowStale": "Kho đã thay đổi từ gieo này"
+        "rowStale": "Kho đã thay đổi từ gieo này",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_other": "{{count}} folders",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "Chưa ghi nhớ gì cả",
       "count": "{{used}} trên {{cap}}",
@@ -5122,7 +5110,9 @@
       "unlockWithTouchId": "Mở khóa bằng Touch ID",
       "wrongCredential": "Không chính xác. Còn {{remaining}} lần thử.",
       "showPin": "Hiện mã PIN",
-      "hidePin": "Ẩn mã PIN"
+      "hidePin": "Ẩn mã PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Quá trình khôi phục đã bị gián đoạn. Hãy đặt mật khẩu mới trước.",
     "recoveryInterruptedBody": "Hãy đặt mật khẩu mới trước, rồi niêm phong lại kho của bạn.",

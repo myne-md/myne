@@ -46,25 +46,14 @@ import { prefsRead, setEditorToolbarHidden, setEditorToolbarOrder } from "../../
 import { resolveBarOrder } from "../../notes/barItemsOrder";
 import {
   EDITOR_TOOLBAR_DEFAULT_ORDER,
-  EDITOR_TOOLBAR_PENDING_IDS,
   resolveToolbarHidden,
   toolbarItemLabelKey,
 } from "../../notes/toolbarItems";
-
-// Ids the floating toolbar cannot render yet (MYND-336 follow-up): pinned
-// hidden, so their rows are visibly disabled and non-toggleable.
-const PENDING_SET = new Set(EDITOR_TOOLBAR_PENDING_IDS);
 
 // `CUSTOMIZE_LIST_STYLE` is the shared column; this list is a fixed-width
 // control inside a settings block, so it keeps the width it shipped with.
 const LIST_STYLE: CSSProperties = { ...CUSTOMIZE_LIST_STYLE, minWidth: 240 };
 
-// A pinned (not-yet-renderable) row keeps its real label + hint, dimmed + inert.
-const PENDING_HINT_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  color: "var(--fg-3)",
-  flexShrink: 0,
-};
 // The native checkbox is kept for behaviour + a11y + the E2E testid, but visually
 // hidden (absolute, opacity 0) over a custom box so the CHECK MARK colour is
 // ours: `--accent` fill + an `--accent-on` tick. `--accent-on` is black on a
@@ -98,6 +87,13 @@ function checkboxBoxStyle(checked: boolean, disabled: boolean): CSSProperties {
       "background var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard)",
   };
 }
+// The hint on the row that may not be switched off (issue #970): dimmed like a
+// disabled control, because that is what its checkbox is.
+const LAST_SHOWN_HINT_STYLE: CSSProperties = {
+  fontSize: "var(--text-xs)",
+  color: "var(--fg-3)",
+  flexShrink: 0,
+};
 const ARROWS_STYLE: CSSProperties = {
   display: "inline-flex",
   alignItems: "center",
@@ -125,6 +121,12 @@ export function ToolbarCustomizeSettings() {
   const [order, setOrder] = useState<string[]>([...EDITOR_TOOLBAR_DEFAULT_ORDER]);
   const [hidden, setHidden] = useState<string[]>(resolveToolbarHidden([]));
   const [error, setError] = useState<string | null>(null);
+  // Whether `hidden` holds what is on disk. A failed `prefsRead` leaves the
+  // defaults in state, and those defaults are NOT the user's layout: persisting
+  // them would write a layout over one that was never read, silently and with
+  // no undo. So a write is refused until a read has actually succeeded, and the
+  // rows say why rather than looking live (myne-md/myne#970 review, D8).
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -137,9 +139,13 @@ export function ToolbarCustomizeSettings() {
             : [...EDITOR_TOOLBAR_DEFAULT_ORDER],
         );
         setHidden(resolveToolbarHidden(p.editor_toolbar_hidden));
+        setLoaded(true);
       })
       .catch(() => {
-        /* locked / no vault — leave defaults */
+        /* locked / no vault — leave defaults, and refuse to write over them */
+        if (cancelled) return;
+        setLoaded(false);
+        setError(t("settings.toolbarCustomize.errorLoad"));
       });
     return () => {
       cancelled = true;
@@ -175,11 +181,27 @@ export function ToolbarCustomizeSettings() {
       setError(t("settings.toolbarCustomize.errorSave"));
     }
   }
+  // Every vocabulary id renders now (issue #970), so the only remaining guard is
+  // the one that keeps `resolveToolbarHidden` unambiguous: the last VISIBLE
+  // control cannot be hidden, because "hide everything" would persist `[]`, which
+  // reads back as "never customized". A formatting toolbar with no formatting is
+  // also not a state worth a schema change to support.
+  const shownCount = fullOrder.filter((id) => !hiddenSet.has(id)).length;
   function toggleShown(id: string) {
-    if (PENDING_SET.has(id)) return; // pinned hidden — non-toggleable
-    void persistHidden(hiddenSet.has(id) ? hidden.filter((h) => h !== id) : [...hidden, id]);
+    if (!loaded) return;
+    const shown = !hiddenSet.has(id);
+    if (shown && shownCount <= 1) return;
+    const next = shown ? [...hidden, id] : hidden.filter((h) => h !== id);
+    // Un-hiding the LAST hidden control would persist `[]`, and `[]` reads back
+    // as "never customized" (`resolveToolbarHidden`), so the stored layout would
+    // silently revert to the default set on the next read (myne-md/myne#972
+    // review, D8). The hidden set therefore always keeps one id: hide is bounded
+    // by `shownCount` above, un-hide by this line.
+    if (next.length === 0) return;
+    void persistHidden(next);
   }
   function move(id: string, delta: number) {
+    if (!loaded) return;
     const idx = fullOrder.indexOf(id);
     const to = idx + delta;
     if (to < 0 || to >= fullOrder.length) return;
@@ -191,7 +213,9 @@ export function ToolbarCustomizeSettings() {
   // Drag, drop indication and the Alt+↑/↓ fallback all live in the shared hook.
   // `fullOrder` rather than `order`: the roster is self-healed before it is
   // reordered, so a drop writes the complete vocabulary.
-  const reorder = useDragReorder(fullOrder, (next) => void persistOrder(next));
+  const reorder = useDragReorder(fullOrder, (next) => {
+    if (loaded) void persistOrder(next);
+  });
 
   return (
     <>
@@ -201,13 +225,15 @@ export function ToolbarCustomizeSettings() {
         control={
           <div data-testid="settings.toolbar-customize" style={LIST_STYLE} role="list">
             {fullOrder.map((id, i) => {
-              const isPending = PENDING_SET.has(id);
               // The row's own label, reused for the checkbox below: the two
               // lists either side of this one name their trailing show/hide
               // control with the item's label too (`BarCustomizeSettings`'s
               // `Switch ariaLabel`), and a list of twelve boxes whose names are
               // all "Show" is a list of twelve identical controls.
               const label = t(toolbarItemLabelKey(id) ?? id);
+              // The one row that may not be switched off: see `toggleShown`.
+              const isLastShown = !hiddenSet.has(id) && shownCount <= 1;
+              const isLastHidden = hiddenSet.has(id) && hiddenSet.size <= 1;
               return (
                 <CustomizeRow
                   key={id}
@@ -218,9 +244,13 @@ export function ToolbarCustomizeSettings() {
                   reorder={reorder}
                   testId={`settings.toolbar-customize.row.${id}`}
                   note={
-                    isPending ? (
-                      <span style={PENDING_HINT_STYLE}>
-                        {t("settings.toolbarCustomize.pendingHint")}
+                    isLastShown ? (
+                      <span style={LAST_SHOWN_HINT_STYLE}>
+                        {t("settings.toolbarCustomize.lastShownHint")}
+                      </span>
+                    ) : isLastHidden ? (
+                      <span style={LAST_SHOWN_HINT_STYLE}>
+                        {t("settings.toolbarCustomize.lastHiddenHint")}
                       </span>
                     ) : undefined
                   }
@@ -233,7 +263,7 @@ export function ToolbarCustomizeSettings() {
                           type="checkbox"
                           checked={!hiddenSet.has(id)}
                           onChange={() => toggleShown(id)}
-                          disabled={isPending}
+                          disabled={isLastShown || !loaded}
                           // `role="list"` above and this name are the two things
                           // axe reported as critical on this story: a
                           // `role="listitem"` whose parent is a plain div, and a
@@ -247,7 +277,7 @@ export function ToolbarCustomizeSettings() {
                         />
                         <span
                           aria-hidden="true"
-                          style={checkboxBoxStyle(!hiddenSet.has(id), isPending)}
+                          style={checkboxBoxStyle(!hiddenSet.has(id), isLastShown)}
                         >
                           {!hiddenSet.has(id) && <Icon name="check" size={12} strokeWidth={3} />}
                         </span>
@@ -256,7 +286,7 @@ export function ToolbarCustomizeSettings() {
                         <button
                           type="button"
                           aria-label={t("settings.toolbarCustomize.moveUp")}
-                          disabled={i === 0}
+                          disabled={i === 0 || !loaded}
                           onClick={() => move(id, -1)}
                           {...interactiveSurface({ disabled: i === 0 })}
                           style={i === 0 ? ARROW_DISABLED_STYLE : ARROW_STYLE}
@@ -268,7 +298,7 @@ export function ToolbarCustomizeSettings() {
                         <button
                           type="button"
                           aria-label={t("settings.toolbarCustomize.moveDown")}
-                          disabled={i === fullOrder.length - 1}
+                          disabled={i === fullOrder.length - 1 || !loaded}
                           onClick={() => move(id, 1)}
                           {...interactiveSurface({ disabled: i === fullOrder.length - 1 })}
                           style={

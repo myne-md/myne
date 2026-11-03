@@ -178,18 +178,36 @@ export function QuickUnlockEntry({
       data-vault-id={vaultId}
     >
       {method === "biometric" ? (
-        <button
-          type="button"
-          onClick={() => void attemptBiometric()}
-          disabled={busy}
-          style={ctaStyle(busy)}
-          data-testid="unlock.quick-touchid"
-        >
-          {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
-          <span>
-            {busy ? t("unlock.decrypting") : t("unlock.quickUnlock.unlockWithTouchId")}
-          </span>
-        </button>
+        <>
+          <button
+            type="button"
+            onClick={() => void attemptBiometric()}
+            disabled={busy}
+            style={ctaStyle(busy)}
+            data-testid="unlock.quick-touchid"
+          >
+            {busy && <Spinner size={14} style={{ borderWidth: 2 }} />}
+            <span>
+              {busy
+                ? t("unlock.quickUnlock.waitingForTouchId")
+                : t("unlock.quickUnlock.unlockWithTouchId")}
+            </span>
+          </button>
+          {/* **Myne states the wait; the OS prompt cannot be replaced** (issue
+              #970, item 16). The system sheet is the security boundary. An
+              app-drawn fingerprint dialog is the attack this exists to prevent,
+              so what the app owns is the state around it. Before this, pressing
+              the button said "Decrypting…": wrong (nothing has been decrypted
+              while a prompt is up) and silent about the one thing the user has
+              to do, which is answer a dialog that may be behind another window.
+              The line names the prompt and the way out, and it is a `status`
+              rather than an alert because it is not a failure. */}
+          {busy && (
+            <p style={HINT_STYLE} role="status" data-testid="unlock.quick-touchid-waiting">
+              {t("unlock.quickUnlock.waitingForTouchIdHint")}
+            </p>
+          )}
+        </>
       ) : (
         <form onSubmit={attemptPin}>
           {/* The same deboxed row the password takes (myne-md/myne#773). The PIN

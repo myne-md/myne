@@ -147,6 +147,44 @@ describe("MYND-558 unlock screen shows one credential surface at a time", () => 
     expect(back.textContent).toBe("Use Touch ID instead");
   });
 
+  // Issue #970, item 16. The OS sheet is the security boundary and cannot be
+  // replaced: an app-drawn fingerprint prompt is the attack it exists to
+  // prevent. What Myne owns is the state around it: before this, pressing the
+  // button said "Decrypting…", which is false while a prompt is up (nothing has
+  // been decrypted) and says nothing about the one act the user has to perform.
+  it("says it is waiting for Touch ID, not that it is decrypting", async () => {
+    let releasePrompt: () => void = () => {};
+    invokeMock.mockImplementation((cmd) => {
+      if (cmd === STATUS_CMD) {
+        return Promise.resolve({ configured: true, method: "biometric", available: true });
+      }
+      if (cmd === "plugin:quick-unlock|quick_unlock_with_biometric") {
+        return new Promise<undefined>((resolve) => {
+          releasePrompt = () => resolve(undefined);
+        });
+      }
+      return otherIpc(cmd);
+    });
+    renderUnlock();
+
+    fireEvent.click(await screen.findByTestId("unlock.quick-touchid"));
+
+    const button = screen.getByTestId("unlock.quick-touchid");
+    expect(button.textContent).toBe("Waiting for Touch ID…");
+    expect(button.textContent).not.toBe("Decrypting…");
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    // The line names the prompt and the way out, because the prompt can be
+    // behind another window and the screen would otherwise sit silent.
+    const waiting = screen.getByTestId("unlock.quick-touchid-waiting");
+    expect(waiting.getAttribute("role")).toBe("status");
+    expect(waiting.textContent).toContain("system prompt");
+    // The escape hatch is already on screen: quick-unlock is a convenience
+    // gate, so a user who never gets a prompt is never stuck.
+    expect(screen.getByTestId("unlock.use-password-link")).toBeTruthy();
+
+    releasePrompt();
+  });
+
   it("no quick-unlock configured → the password form is the only surface, as before", async () => {
     withStatus({ configured: false, method: null, available: false });
     renderUnlock();

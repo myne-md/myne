@@ -77,8 +77,14 @@ async function runWizardToApplied(s: Session): Promise<void> {
   );
   expect(await s.byTestIdAll("settings.memory.seed.candidate")).toHaveLength(3);
   await (await s.byTestId("settings.memory.seed.apply")).click();
-  await s.waitForElement(testIdSelector("settings.memory.seed.done"), { timeoutMs: 30_000 });
-  await (await s.byTestId("settings.memory.seed.finish")).click();
+  // Issue #970, item 11: there is no "Saved" step. The wizard closes itself and
+  // the outcome is a toast, so the applied state is the wizard being gone plus
+  // the toast naming the count.
+  await s.waitForElement(testIdSelector("editor.toast"), { timeoutMs: 30_000 });
+  await s.waitUntil(
+    async () => (await s.byTestIdAll("settings.memory.seed.wizard")).length === 0,
+    { label: "the wizard closes after saving", timeoutMs: 15_000 },
+  );
 }
 
 aiDescribe("seed1 the once-only card seeds memory through the reviewed wizard", () => {
@@ -115,6 +121,23 @@ aiDescribe("seed1 the once-only card seeds memory through the reviewed wizard", 
         });
         expect(await payload.textContent()).toContain("VAULT OUTLINE");
         expect(await s.byTestIdAll("settings.memory.seed.consent")).toHaveLength(0);
+        // Issue #970, item 8. The counts are chips, and the provider line names
+        // the provider: it read "Provider: remote · remote" because the engine
+        // reports its own id ("remote") and the class was appended after it.
+        // Both are asserted on the real screen because both are copy defects no
+        // unit test can see rendered.
+        expect(
+          await (await s.byTestId("settings.memory.seed.count-notes")).textContent(),
+        ).toContain("notes");
+        expect(
+          await (await s.byTestId("settings.memory.seed.count-folders")).textContent(),
+        ).toContain("folders");
+        expect(
+          await (await s.byTestId("settings.memory.seed.count-tags")).textContent(),
+        ).toContain("tags");
+        expect(
+          await (await s.byTestId("settings.memory.seed.provider")).textContent(),
+        ).toBe("Provider: on this device");
         await runWizardToApplied(s);
 
         // ── The entries are grouped under From your vault ──

@@ -250,6 +250,13 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
       return "Ollama Cloud";
     case "openrouter":
       return "OpenRouter";
+    // Two products, one host (myne-md/myne#970): Zen is the pay-as-you-go
+    // gateway and Go the subscription plan, so the label carries the product
+    // rather than the company twice.
+    case "opencode-zen":
+      return "OpenCode Zen";
+    case "opencode-go":
+      return "OpenCode Go";
     default:
       return wire;
   }

@@ -57,6 +57,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::cancellable_io::{CancellableStream, CancelledFn, POLL_INTERVAL};
+use super::provider_registry::RemoteProvider;
 use crate::http::codec::{build_http_request_ext, read_http_response};
 use crate::http::HttpMethod;
 use rustls::pki_types::ServerName;
@@ -202,6 +203,13 @@ pub struct ProviderHost {
 pub const PROVIDER_HOSTS: &[(&str, &str)] = &[
     ("ollama-cloud", "ollama.com"),
     ("openrouter", "openrouter.ai"),
+    // Two entries, one host: OpenCode Zen and Go are the same destination
+    // reached by different paths, and `RemoteProvider::chat_path` is what tells
+    // them apart. Collapsing them into one wire name would lose the header set
+    // Go requires; inventing a second host would be a destination that does not
+    // exist.
+    ("opencode-zen", "opencode.ai"),
+    ("opencode-go", "opencode.ai"),
 ];
 
 impl ProviderHost {
@@ -393,11 +401,11 @@ impl ProviderTransport {
     /// **never** logged, echoed into an error, or retained past this call.
     pub fn post_json(
         &self,
-        path: &str,
+        provider: RemoteProvider,
         body: &[u8],
         bearer: &str,
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Post, path, body, bearer)
+        self.exchange(HttpMethod::Post, provider, body, bearer)
     }
 
     /// The read-side round trip — today exactly one caller, the model list
@@ -410,8 +418,12 @@ impl ProviderTransport {
     /// (`src-tauri/scripts/ai-no-network-check.sh`) records sites, and a
     /// parameterised verb would hide a second kind of request behind a name
     /// that says "post".
-    pub fn get_json(&self, path: &str, bearer: &str) -> Result<Vec<u8>, ProviderTransportError> {
-        self.exchange(HttpMethod::Get, path, &[], bearer)
+    pub fn get_json(
+        &self,
+        provider: RemoteProvider,
+        bearer: &str,
+    ) -> Result<Vec<u8>, ProviderTransportError> {
+        self.exchange(HttpMethod::Get, provider, &[], bearer)
     }
 
     /// Distinguish "the user stood this down" from "the far side broke". The
@@ -440,21 +452,67 @@ impl ProviderTransport {
         }
     }
 
+    /// The request head's header list: this arm's own `content-type` first,
+    /// then whatever the provider asked for.
+    ///
+    /// Its own function rather than three lines inside [`Self::exchange`] so
+    /// the assembled list is reachable from a test. The header set is the entire
+    /// mechanism that makes an OpenCode Go request routable, and a test that
+    /// stops at `RemoteProvider::extra_headers()` cannot see whether those
+    /// values ever reach the wire: deleting the `extend_from_slice` below left
+    /// every test in this file green while every Go request would have been
+    /// refused by the far side.
+    fn request_headers<'a>(extra_headers: &[(&'a str, &'a str)]) -> Vec<(&'a str, &'a str)> {
+        let mut headers: Vec<(&str, &str)> = Vec::with_capacity(1 + extra_headers.len());
+        headers.push(("content-type", "application/json"));
+        headers.extend_from_slice(extra_headers);
+        headers
+    }
+
+    /// The request head, byte for byte: `content-type` first, then whatever
+    /// the provider asked for.
+    ///
+    /// **The provider is the argument rather than a header slice**, and that is
+    /// the point of the signature (myne-md/myne#972 review, D7). With a slice,
+    /// `exchange` and its callers were two places the headers could be dropped
+    /// independently: a caller passing `&[]`, or the assembly forgetting the
+    /// `extend_from_slice`, each left every test green while every OpenCode Go
+    /// request was refused by the far side for a missing `x-opencode-session`.
+    /// Taking `RemoteProvider` removes the caller half of that class by type:
+    /// there is no way to name a provider and still send it without its
+    /// headers. The remaining half is the test below.
+    fn request_head(
+        &self,
+        method: HttpMethod,
+        provider: RemoteProvider,
+        body: &[u8],
+        bearer: &str,
+    ) -> Vec<u8> {
+        let headers = Self::request_headers(&provider.extra_headers());
+        // The path follows the verb because the provider owns both: a POST is a
+        // chat turn and a GET is the model list (SYNC-24). Neither is read from
+        // configuration, for the same reason the host is not.
+        let path = match method {
+            HttpMethod::Post => provider.chat_path(),
+            HttpMethod::Get => provider.models_path(),
+            // Unreachable from this crate: `post_json` and `get_json` are the
+            // only callers and each names its own verb. The arms exist because
+            // `HttpMethod` is shared with the sync transport, and mapping them
+            // to the chat path keeps a hypothetical third caller inside the
+            // header set rather than silently outside it.
+            HttpMethod::Put | HttpMethod::Head | HttpMethod::Delete => provider.chat_path(),
+        };
+        build_http_request_ext(method, path, self.host.host(), &headers, body, Some(bearer))
+    }
+
     fn exchange(
         &self,
         method: HttpMethod,
-        path: &str,
+        provider: RemoteProvider,
         body: &[u8],
         bearer: &str,
     ) -> Result<Vec<u8>, ProviderTransportError> {
-        let req = build_http_request_ext(
-            method,
-            path,
-            self.host.host(),
-            &[("content-type", "application/json")],
-            body,
-            Some(bearer),
-        );
+        let req = self.request_head(method, provider, body, bearer);
         // **How long the exchange took and how it ended** (myne-md/myne#546).
         // Without it, a request that is still in flight and a request that
         // completed are the same observation from outside the process: an
@@ -547,6 +605,96 @@ mod tests {
         // The socket wakes far more often than the deadline, which is what
         // makes a cancel observable while the provider is still thinking.
         assert!(POLL_INTERVAL < Duration::from_secs(1));
+    }
+
+    /// The provider's own headers reach the request BYTES, not just the list
+    /// `RemoteProvider::extra_headers()` returns.
+    ///
+    /// Asserted through [`ProviderTransport::request_head`], which is the exact
+    /// function `exchange` sends: the same call, not a reconstruction of it.
+    /// This is the guard the first version of this test was not (myne-md/myne#972
+    /// review, D7): it called `request_headers` and the head codec side by side,
+    /// so replacing the assembly with `Self::request_headers(&[])` left the
+    /// whole `remote-ai` suite green while every OpenCode Go request would have
+    /// been refused for a missing `x-opencode-session`.
+    ///
+    /// Two injections prove this one fails on the defect it names. Dropping the
+    /// `extend_from_slice` in `request_headers` reddens it, and so does
+    /// hardcoding `&[]` at the call below inside `request_head`. The third path,
+    /// a caller passing an empty slice, no longer exists: `post_json` and
+    /// `get_json` take a `RemoteProvider` rather than a header slice, so there is
+    /// nothing for a caller to leave out.
+    #[test]
+    fn the_providers_headers_reach_the_request_head() {
+        let body = b"{}";
+        let head_for = |provider: RemoteProvider| {
+            let transport = ProviderTransport::new(
+                ProviderHost::resolve(provider.wire_name()).expect("a known provider"),
+            );
+            let head = transport.request_head(HttpMethod::Post, provider, body, "k");
+            String::from_utf8(head).expect("a request head is ASCII")
+        };
+
+        let go = head_for(RemoteProvider::OpenCodeGo);
+        assert!(
+            go.to_ascii_lowercase().contains("x-opencode-session: myne"),
+            "Go's session header must be on the wire; head was:\n{go}"
+        );
+        assert!(
+            go.to_ascii_lowercase().contains("user-agent: myne\r\n"),
+            "Go's user agent must be on the wire, and must name the product \
+             rather than one client; head was:\n{go}"
+        );
+        assert!(
+            go.contains("content-type: application/json"),
+            "the arm's own header must survive the provider's; head was:\n{go}"
+        );
+
+        // And a provider that needs nothing extra sends nothing extra: the
+        // negative half, which is what makes the positive half mean something.
+        let cloud = head_for(RemoteProvider::OllamaCloud);
+        let lower = cloud.to_ascii_lowercase();
+        assert!(!lower.contains("x-opencode-session"));
+        assert!(!lower.contains("user-agent"));
+    }
+
+    /// The head is built from the PROVIDER, so the path follows the verb: a POST
+    /// is a chat turn and a GET is the model list. Asserted rather than implied,
+    /// because the two-verb split is the reason the path is chosen inside the
+    /// assembly instead of being passed in by a caller.
+    #[test]
+    fn the_request_path_follows_the_verb_and_the_provider() {
+        let transport = ProviderTransport::new(
+            ProviderHost::resolve(RemoteProvider::OpenCodeZen.wire_name()).expect("known"),
+        );
+        let post = String::from_utf8(transport.request_head(
+            HttpMethod::Post,
+            RemoteProvider::OpenCodeZen,
+            b"{}",
+            "k",
+        ))
+        .expect("a request head is ASCII");
+        let get = String::from_utf8(transport.request_head(
+            HttpMethod::Get,
+            RemoteProvider::OpenCodeZen,
+            &[],
+            "k",
+        ))
+        .expect("a request head is ASCII");
+        assert!(
+            post.starts_with(&format!(
+                "POST {} HTTP/1.1",
+                RemoteProvider::OpenCodeZen.chat_path()
+            )),
+            "a POST must reach the chat path; head was:\n{post}"
+        );
+        assert!(
+            get.starts_with(&format!(
+                "GET {} HTTP/1.1",
+                RemoteProvider::OpenCodeZen.models_path()
+            )),
+            "a GET must reach the models path; head was:\n{get}"
+        );
     }
 
     /// A provider that accepts and then never answers must fail **within the

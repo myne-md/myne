@@ -63,6 +63,14 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language: "en" } }),
 }));
 
+// The desktop caveat is gated on the runtime, so the flag has to be drivable.
+const { env } = vi.hoisted(() => ({ env: { tauri: false } }));
+vi.mock("../../src/lib/app-window", () => ({
+  get HAS_TAURI() {
+    return env.tauri;
+  },
+}));
+
 import { DiagnosticsPanel } from "../../src/components/settings/DiagnosticsPanel";
 
 beforeEach(() => {
@@ -83,6 +91,28 @@ describe("DiagnosticsPanel — the report block", () => {
     expect(preview.style.whiteSpace).toBe("pre-wrap");
     expect(preview.style.overflowWrap).toBe("anywhere");
     expect(preview.style.resize).toBe("");
+  });
+
+  // Issue #970 item 15, second attempt. The first fix answered the desktop
+  // readings that looked broken (`bundleHash: unknown`, `storageUsedMb: 0`) with
+  // a two-line paragraph explaining them, which is an apology in a settings
+  // panel and was rejected on sight. The block now omits a reading it cannot
+  // take, so there is nothing to explain and no desktop-only text at all: one
+  // helper sentence, on every client.
+  it("describes the block in one sentence, with no desktop-only explanation", () => {
+    for (const tauri of [true, false]) {
+      env.tauri = tauri;
+      render(<DiagnosticsPanel />);
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("settings.about.diagnosticBlockHelper");
+      expect(
+        text.includes("diagnosticBlockHelperDesktop"),
+        "a desktop-only caveat is back. The block carries no placeholders, so " +
+          "it does not owe an explanation of them either.",
+      ).toBe(false);
+      cleanup();
+    }
+    env.tauri = false;
   });
 
   it("keeps the preview's settings-search anchor on the canon block root", () => {

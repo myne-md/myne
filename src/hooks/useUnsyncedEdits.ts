@@ -25,9 +25,10 @@
 // exactly when the answer changes, and waiting a whole interval after a push
 // would leave the marker lit on a note that is already safe.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "../platform/core";
 import { subscribeToEvents } from "../lib/subscribe";
+import { isSyncActive, useSyncStatus } from "./useSyncStatus";
 
 /** Mirrors the Rust `UnsyncedEdits`. */
 export interface UnsyncedEdits {
@@ -136,5 +137,25 @@ export function useUnsyncedEdits(): UnsyncedEditsHook {
     };
   }, [tick]);
 
-  return { unsyncedIds, tracking, credentialPending, refresh: tick };
+  // **A mark on a client that is not syncing is noise** (myne-md/myne#970, from
+  // the owner's screenshot of a sync-less vault with every row marked). The
+  // command answers `tracking: false` only when NO endpoint is configured; a
+  // vault with an endpoint whose device is not enrolled still derives "no
+  // baseline" for every note and marks the whole column, which teaches the user
+  // to ignore the mark before it has ever meant anything. The gate is here
+  // rather than at the three call sites so the sidebar, the save readout and the
+  // editor panes cannot disagree about the same note.
+  const { status } = useSyncStatus();
+  const active = isSyncActive(status);
+  const visibleIds = useMemo(
+    () => (active ? unsyncedIds : (EMPTY as Set<string>)),
+    [active, unsyncedIds],
+  );
+
+  return {
+    unsyncedIds: visibleIds,
+    tracking: tracking && active,
+    credentialPending,
+    refresh: tick,
+  };
 }

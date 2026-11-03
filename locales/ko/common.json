@@ -1330,10 +1330,6 @@
           "copyFailed": "복사하지 못했습니다",
           "copyYourMessage": "내 메시지 복사",
           "emptyTitle": "노트에 대해 물어보세요",
-          "noticeLeaves": "입력한 문장, 한 턴에서 읽는 노트, 실행이 읽을 수 있는 모든 노트의 제목·식별자·폴더 경로(제외 폴더를 빼면 보관함 전체, 범위를 좁히면 그 범위), 메시지에 첨부한 파일에서 Myne이 추출한 텍스트(파일당 최대 20,000자, 최대 4개; 파일 자체는 이 기기에 남음), 그리고 AI가 당신에 대해 기억하는 내용이 응답을 맡은 곳으로 전송됩니다. 이 기기의 다른 것은 전송되지 않습니다.",
-          "noticeReceiver": "응답하는 대상: {{provider}}. Myne가 운영하지 않습니다.",
-          "noticeReceiverLocal": "응답하는 대상: 이 기기에서 실행 중인 프로그램. 기기를 벗어나는 것은 없지만, 그 프로그램은 Myne의 일부가 아니며 Myne는 그 프로그램이 이 내용으로 무엇을 하는지 볼 수 없습니다.",
-          "noticeRevoke": "중단하려면 설정에서 AI를 끄거나 응답 대상을 바꾸세요. 제공업체 키를 폐기하면 그 제공업체가 즉시 중단됩니다.",
           "noticeSettingsCta": "AI 설정 열기",
           "viewDiff": "변경 사항 보기",
           "revertRun": "이 실행 되돌리기",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "일치하는 노트가 없습니다",
       "noNotesYet": "아직 노트가 없습니다",
       "noMatchBody": "“{{name}}”과(와) 일치하는 항목이 없습니다. 뷰를 편집하거나 지워서 모든 노트를 보세요.",
-      "emptyBody": "“새 노트”를 눌러 첫 노트를 작성하세요. 모든 것은 저장되기 전에 이 기기에서 암호화됩니다.",
       "unarchive": "보관 해제"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "노트 {{count}}개를 이동…",
       "caseMergeBody": "“{{name}}”(이)라는 폴더가 이미 있습니다. 병합됩니다. 따로 유지하려면 하나의 이름을 바꿀까요?",
       "color": "색상…",
-      "createFirstNote": "첫 노트 만들기",
       "createFolderNote": "폴더 노트 만들기",
       "customize": "사용자 지정…",
       "delete": "삭제",
@@ -2523,7 +2517,6 @@
       "treeLabel": "노트와 폴더",
       "selectionAnnouncement": "{{title}} 선택됨",
       "untitled": "제목 없음",
-      "emptyBody": "노트는 일반 마크다운이며, 어디로든 가기 전에 이 기기에서 암호화됩니다. 하나 만들어 시작하거나, 위의 검색 줄을 눌러 아무 명령이나 실행하세요.",
       "search": "검색"
     },
     "newFromTemplate": {
@@ -4330,17 +4323,11 @@
         "rebuildConfirm": "{{date}}의 시드({{count}}개 항목)를 교체하시겠습니까?",
         "title": "Myne에게 보관함 가르치기",
         "candidatesTitle": "Myne이 배운 것 검토",
-        "doneTitle": "저장됨",
         "close": "닫기",
         "loading": "보관함 읽는 중…",
         "scopeIntro": "Myne은 먼저 보관함의 모양을 읽습니다: 노트 제목, 폴더, 태그. 필요할 때만 노트 텍스트를 요청하고, 첨부 파일은 요청하지 않습니다.",
         "provider": "제공업체: {{provider}}",
-        "providerRemote": "원격",
-        "providerLocal": "이 기기에서",
-        "counts": "노트 {{notes}}개 · 폴더 {{folders}}개 · 태그 {{tags}}개",
         "estimatedChars": "약 {{chars}}자",
-        "excluded": "폴더가 AI에서 제외되어 노트 {{count}}개가 빠졌습니다",
-        "omitted": "모델의 컨텍스트에 맞추려고 제목 {{count}}개가 빠졌습니다",
         "showPayload": "보낼 내용 정확히 보기",
         "hidePayload": "페이로드 숨기기",
         "consentLabel": "이 개요를 {{provider}}로 보냅니다(약 {{chars}}자). 제공업체가 받는다는 것을 이해합니다.",
@@ -4356,9 +4343,6 @@
         "apply": "항목 {{count}}개 저장",
         "applying": "저장 중…",
         "applied": "기억에 항목 {{count}}개를 저장했습니다.",
-        "appliedHelper": "이 섹션의 '보관함에서' 아래에서 찾으세요. 이제부터 보조가 읽습니다.",
-        "finish": "완료",
-        "appliedToast": "보관함에서 기억을 만들었습니다.",
         "refusals": {
           "empty": "이 항목은 비어 있습니다.",
           "textTooLong": "이 항목이 2000자 제한을 넘었습니다.",
@@ -4391,7 +4375,11 @@
         "removeAll": "모두 제거",
         "removeConfirm": "이 시드의 모든 항목을 제거하시겠습니까?",
         "removedToast": "보관함에서 가져온 항목이 제거되었습니다.",
-        "rowStale": "이 시드 이후 보관함이 바뀌었습니다"
+        "rowStale": "이 시드 이후 보관함이 바뀌었습니다",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_other": "{{count}} folders",
+        "countTags_other": "{{count}} tags"
       },
       "emptyTitle": "아직 기억한 내용이 없습니다",
       "count": "{{used}} / {{cap}}",
@@ -5122,7 +5110,9 @@
       "unlockWithTouchId": "Touch ID로 잠금 해제",
       "wrongCredential": "올바르지 않습니다. {{remaining}}회 남았습니다.",
       "showPin": "PIN 표시",
-      "hidePin": "PIN 숨기기"
+      "hidePin": "PIN 숨기기",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "복구 과정이 중단되었습니다. 먼저 새 비밀번호를 설정하세요.",
     "recoveryInterruptedBody": "먼저 새 비밀번호를 설정한 후 보관함을 다시 봉인하세요.",

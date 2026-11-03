@@ -231,6 +231,25 @@ describe("the per-provider consent screen", () => {
     expect(providerCall).toBeLessThan(consentCall);
   });
 
+  it("keeps the two OpenCode products apart, one host or not", async () => {
+    // myne-md/myne#970. Zen and Go are two products of one operator sharing one
+    // host, separated by PATH in the registry. What this pins is the half a
+    // path cannot cover: the row the user picks decides the wire name that is
+    // stored, so a mistake here would send Go's requests down Zen's path (or
+    // bill the wrong subscription) while every registry test stayed green.
+    render(<AiPanel />);
+    await chooseProvider("opencode-go");
+    await screen.findByTestId("ai-consent.screen");
+    // The screen names the recipient from the wire value, so the label is the
+    // proof that the choice survived the picker.
+    expect(screen.getByTestId("ai-consent.who").textContent).toBe(
+      consentToWhom("OpenCode Go"),
+    );
+    fireEvent.click(screen.getByTestId("ai-consent.accept"));
+    await waitFor(() => expect(setAiProviderConsent).toHaveBeenCalledWith("opencode-go"));
+    expect(setAiProvider).toHaveBeenCalledWith("opencode-go");
+  });
+
   it("shows the pending choice on the control behind the dialog, and reverts it on cancel", async () => {
     // The dialog leaves the panel standing, so the picker is still visible
     // while the question is being asked. Its trigger shows the provider

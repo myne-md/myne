@@ -519,6 +519,26 @@ missed.
   leave the test module, so a `const _: () = assert!(...)` comparing two duplicated constants runs on
   every build rather than only under `cargo test`.
 
+- **A signature change in `core/` is a two-client change, and `clippy -p myne-core` is not the gate
+  that sees it.** `myne-mobile` compiles the same crate (`mobile/src-tauri/Cargo.toml` enables
+  `remote-ai` itself), so an added parameter on a `core/` method breaks the mobile crate while the
+  core crate, the desktop crate and every JS test stay green. myne-md/myne#970 shipped exactly that:
+  `ProviderTransport::get_json` grew an `extra_headers` argument, only
+  `src-tauri/src/plugins/local_inference/commands.rs` was updated, and
+  `cargo clippy --workspace --all-targets -- -D warnings` exited 101 on `myne-mobile` (E0061) while
+  the branch's own test suites passed. Run the workspace-wide clippy, not `-p`, whenever a `core/`
+  or `protocol/` signature moves, and treat "the mobile crate is a separate tree" as the reason it
+  is easy to miss rather than as a reason it is safe to skip.
+
+- **`check-prefs-nonce.mjs` matches the IPC LITERAL, so a doc comment that quotes one turns the
+  guard red.** The rule is textual (`plugin:prefs|<command>` outside `PREFS_MODULES`), which is what
+  makes it work on a tree it has never seen; the cost is that prose is scanned as if it were code. A
+  comment explaining why a component refuses to write a pref, quoting the command name to be
+  precise, reports as "invokes a prefs write from outside a prefs module" and fails
+  `tests/lib/prefsNonce.test.ts`. Describe the write in words ("the prefs write command for this
+  field") instead of pasting the literal, and if the guard fires on a file you only documented, the
+  fix is the comment rather than the guard.
+
 **A fixture that cannot hold the defective state is not a test, and injection alone does not
 catch that.** The rule above says to inject the defect and watch the guard name it. That leaves one
 way for a test to be vacuous and still look rigorous: the injection lands, the test passes anyway,

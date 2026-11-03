@@ -129,9 +129,10 @@ export function SeedMemoryCard() {
       </div>
     </div>
       ) : null}
-      {/* Mounted OUTSIDE the card so the applied step survives the eligibility
-          re-check: a successful apply makes the card ineligible (memory is no
-          longer empty) while the wizard is still showing what landed. */}
+      {/* Mounted OUTSIDE the card so the wizard's own unmount is not tied to the
+          eligibility re-check: a successful apply makes the card ineligible
+          (memory is no longer empty) at the same moment the wizard closes
+          itself and reports the count as a toast (issue #970, item 11). */}
       <SeedMemoryWizard
         open={open}
         onClose={() => {
