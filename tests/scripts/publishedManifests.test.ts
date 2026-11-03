@@ -44,7 +44,27 @@ const SIG_TEXT = [
 ].join("\n");
 const SIG = Buffer.from(SIG_TEXT, "utf8").toString("base64");
 
-function manifest(version: string, url = ARTIFACT, signature = SIG) {
+/** The same envelope with a trusted comment of the caller's choosing. */
+function signatureWithTrustedComment(comment: string): string {
+  return Buffer.from(
+    SIG_TEXT.split("\n")
+      .map((line, index) =>
+        index === 2 ? `trusted comment: ${comment}` : line,
+      )
+      .join("\n"),
+    "utf8",
+  ).toString("base64");
+}
+
+/** A signature that names `version`, which is what `tauri build` writes. */
+const sig = (version: string) =>
+  signatureWithTrustedComment(`timestamp:1793526600\tfile:Myne.app.tar.gz\tversion:${version}`);
+
+/** Both limits of the client's own contract, spelled rather than read. */
+const CLIENT_REQUIRES_VERSION = { ok: true, requireSignedVersion: true };
+const CLIENT_ALLOWS_UNVERSIONED = { ok: true, requireSignedVersion: false };
+
+function manifest(version: string, url = ARTIFACT, signature = sig(version)) {
   return {
     version,
     platforms: { "darwin-aarch64": { signature, url } },
@@ -60,7 +80,8 @@ function same(): Record<string, Route> {
   };
 }
 
-const run = (routes: Record<string, Route>) => audit({ fetchImpl: fetcher(routes), base: ORIGIN });
+const run = (routes: Record<string, Route>, extra: Record<string, unknown> = {}) =>
+  audit({ fetchImpl: fetcher(routes), base: ORIGIN, ...extra });
 
 describe("check-published-manifests", () => {
   it("passes when both channels carry the same version and their artefacts resolve", async () => {
@@ -143,6 +164,79 @@ describe("check-published-manifests", () => {
     routes[`${ORIGIN}latest-beta.json`] = { json: manifest("latest") };
     const { failures } = await run(routes);
     expect(failures.join("\n")).toMatch(/is not a `X\.Y\.Z` semver/);
+  });
+
+  it("fails when a signature names no version while the client refuses one, which is the v0.11.4 macOS defect", async () => {
+    // Reproduced from the live v0.11.4 origin on 2026-11-03: the artefact, its hash and the
+    // envelope were all correct, the trusted comment was `timestamp:…\tfile:Myne.app.tar.gz`,
+    // and every macOS install failed with MissingSignedVersion AFTER a 208 MB download.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = {
+      json: manifest("0.10.0", ARTIFACT, signatureWithTrustedComment("timestamp:1793610073\tfile:Myne.app.tar.gz")),
+    };
+    const { failures, verdict } = await run(routes, { contract: CLIENT_REQUIRES_VERSION });
+    expect(verdict).toBe("failed");
+    const joined = failures.join("\n");
+    expect(joined).toMatch(/names no version/);
+    expect(joined).toMatch(/MissingSignedVersion/);
+    expect(joined).toMatch(/--app-version 0\.10\.0/);
+  });
+
+  it("accepts the same unversioned signature when the client does not demand one", async () => {
+    // The arm that proves the failure above is the CLIENT's contract and not the comment's shape:
+    // same bytes, same manifest, one flag apart.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = {
+      json: manifest("0.10.0", ARTIFACT, signatureWithTrustedComment("timestamp:1793610073\tfile:Myne.app.tar.gz")),
+    };
+    const { failures, verdict } = await run(routes, { contract: CLIENT_ALLOWS_UNVERSIONED });
+    expect(failures).toEqual([]);
+    expect(verdict).toBe("ok");
+  });
+
+  it("fails when the signature names a version the manifest does not, whatever the config says", async () => {
+    // SignedVersionMismatch is raised by the plugin regardless of `requireSignedVersion`: the
+    // comment is covered by the signature, and a mismatch is the substitution that binding exists
+    // to catch. It is also the rollback: an old artefact announced as a new version.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = { json: manifest("0.10.0", ARTIFACT, sig("0.9.4")) };
+    const { failures, verdict } = await run(routes, { contract: CLIENT_ALLOWS_UNVERSIONED });
+    expect(verdict).toBe("failed");
+    const joined = failures.join("\n");
+    expect(joined).toMatch(/names version "0\.9\.4"/);
+    expect(joined).toMatch(/SignedVersionMismatch/);
+  });
+
+  it("fails when the signed version carries whitespace the client will not parse", async () => {
+    // The plugin compares `trim_start_matches('v')` of the signed version against the announced one
+    // with no whitespace trimming, so ` 0.10.0` is not semver and fails the literal comparison. The
+    // guard trimmed, which accepted a manifest the client refuses, and every fixture here was clean
+    // enough that no test noticed. This case exists to make that specific regression go red.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = { json: manifest("0.10.0", ARTIFACT, sig(" 0.10.0")) };
+    const { failures, verdict } = await run(routes, { contract: CLIENT_REQUIRES_VERSION });
+    expect(verdict).toBe("failed");
+    expect(failures.join("\n")).toMatch(/names version " 0\.10\.0"/);
+  });
+
+  it("accepts a `v`-prefixed spelling of the version the manifest announces", async () => {
+    // The plugin compares as semver after trimming a leading `v`, so this pair is one version. A
+    // guard that compared the strings would fail an artefact the client installs happily.
+    const routes = same();
+    routes[`${ORIGIN}latest.json`] = { json: manifest("0.10.0", ARTIFACT, sig("v0.10.0")) };
+    const { failures, verdict } = await run(routes);
+    expect(failures).toEqual([]);
+    expect(verdict).toBe("ok");
+  });
+
+  it("reports a client configuration it cannot read instead of passing the binding", async () => {
+    // A moved `tauri.conf.json` must not turn this rule into a green tick: the guard stops asking
+    // its question, so it says the binding is unverified.
+    const { failures, verdict } = await run(same(), {
+      contract: { ok: false, error: "ENOENT: no such file or directory" },
+    });
+    expect(verdict).toBe("failed");
+    expect(failures.join("\n")).toMatch(/UNKNOWN/);
   });
 
   it("reports an unreachable origin as not-a-verdict rather than as a pass", async () => {
