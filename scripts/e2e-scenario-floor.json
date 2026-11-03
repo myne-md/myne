@@ -709,23 +709,15 @@
     "that batch, and neither was quarantined: `describeE2E.flaky` is for a",
     "contention victim, not for a real failure."
   ],
-  "_comment_380_to_379": [
-    "380 -> 379 (myne-md/myne#960). ONE scenario REMOVED, which is the only kind",
-    "of entry in this file that moves the number down: sp1",
-    "(`e2e/storage-panel.e2e.ts`) drove Settings -> Storage's vault-location row,",
-    "the \"Open in Files\" handoff and the no-file-manager branch. The section was",
-    "deleted outright, so the file went with it and the panel keeps its remaining",
-    "coverage through `backup-restore`, `scheduled-backup`, `vault-export`,",
-    "`importer-source-picker` and `files-settings`.",
-    "",
-    "Arithmetic on a CI-measured base, not a new measurement, which is the same",
-    "basis the +N entries above used: a removed scenario cannot execute, and",
-    "leaving the floor at 380 would fail the very next run on a count that is now",
-    "unreachable by construction. Nothing was raised to make a red run green.",
-    "",
-    "`stable_max_failures` stays 0."
+  "stable": 377,
+  "_comment_378_to_377": [
+    "LOWERED 378 -> 377 (myne-md/myne#960). ONE scenario is REMOVED, never",
+    "quarantined: sp1 in `e2e/storage-panel.e2e.ts` drove Settings -> Storage's",
+    "vault-location row, and the branch deletes that row because the vault path is",
+    "not something a user acts on. Deleting a scenario is the one kind of entry that",
+    "moves this number down, and the number is the count of scenarios that must",
+    "pass."
   ],
-  "stable": 379,
   "stable_max_failures": 0,
   "_comment_382_to_381": [
     "LOWERED 382 -> 381 for the retirement of the MYR1 AI-embeddings family",
@@ -1055,5 +1047,47 @@
     "tolerance somebody has to choose and defend rather than a measurement to copy."
   ],
   "ai": 41,
-  "ai_max_failures": 0
+  "ai_max_failures": 0,
+  "_comment_380_to_379": [
+    "LOWERED 380 -> 379 for myne-md/myne#956 (the device-admission ceremony",
+    "surface is withdrawn; `design-notes/protocol/0764`). ONE scenario is",
+    "removed with the surface it drove: `e2e/device-admission.e2e.ts` carried",
+    "exactly one test (dm1), the two-sided exchange with a mismatched safety code",
+    "followed by a matching one. The buttons it clicked no longer exist, so the",
+    "scenario has no subject, and the arithmetic is the file's single `it` rather",
+    "than a measured run: it is a subtraction, and the thing subtracted is gone",
+    "from the tree.",
+    "",
+    "This is the LOWERING half of the ratchet, the half that is always legitimate:",
+    "the work was removed deliberately and the commit message says why. Nothing",
+    "was raised to make a red pipeline green."
+  ],
+  "_comment_publish_button_removed": [
+    "378, down from 379, for myne-md/myne#974 (publishing moved from a button to",
+    "the sync cycle).",
+    "",
+    "The floor moves DOWN by exactly one, and the arithmetic is what makes that a",
+    "measurement rather than a guess: no scenario was added anywhere in this",
+    "branch, and `publish-vault` lost one net scenario (three of its `it(` blocks",
+    "became two). Two of the three were about PRESSING the button: \"a publish that",
+    "cannot reach the server leaves the vault intact, and a retry completes\" has no",
+    "press left to fail (the attempt belongs to the loop now, and a transport",
+    "failure surfaces as the ordinary sync-status error other scenarios already",
+    "drive), and \"a legacy vault publishes through its own credential\" lost its",
+    "subject with the button. What replaced them is one scenario that presses",
+    "NOTHING and waits on the durable record, plus a negative that a legacy vault",
+    "is never given a namespace.",
+    "",
+    "Those replacements DO run: both are server-gated (`syncServerSupported()`),",
+    "and `.woodpecker/e2e.yml` builds `myne-server` for them",
+    "(`myne-server-build`), so a full stable run executes them and they counted",
+    "towards the 379 recorded on the day it was measured. A floor left at 379",
+    "would therefore fail the very run it exists for, which is the failure this",
+    "file's own comments keep recording.",
+    "",
+    "The button's claims did not vanish with it, they moved: their failure paths",
+    "are held in `core/src/plugins/sync/publish.rs`, where they are testable",
+    "without a server, including the status table the old button could reach only",
+    "by being pressed."
+  ]
 }

@@ -69,28 +69,15 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "screens",
     "titlebar",
   ),
-  // Unreachable on web AND undesirable to ship (task 70). `Welcome` offers the
-  // desktop one-door first run, and `RestoreBackup` drives backup commands the
-  // web dispatcher answers `Unsupported`. Boot routing already sends web
-  // elsewhere in both cases, so leaving them in the bundle would ship surfaces
-  // nothing can reach.
+  // `Welcome` LEFT this list with `decisions/sync/0767`. It was substituted
+  // because boot routing never sent web there (`account-entry` did), and the
+  // screen offered the desktop one-door first run. The account-number form that
+  // stage rendered is gone, so `account-entry` now renders this screen, and the
+  // substitution would have shipped a stub as the browser's entry.
   //
-  // **`VaultPicker` left this list with myne-md/myne#911 task 13.** It was
-  // substituted because an origin held exactly one container, so the ≥2-vault
-  // branch was unreachable; the walk that landed there makes two containers
-  // real, and the shared picker already answers the one thing a browser lacks
-  // (the account grouping is skipped when the keychain answers unavailable).
-  //
-  // What remains here ships two flows that can only be reached by a routing
-  // bug, and would make "excluded" mean "unreachable", which is the weaker claim
-  // this feature keeps refusing to settle for.
-  [path.join(repoRoot, "src", "screens", "Welcome")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "screens",
-    "Welcome",
-  ),
+  // `RestoreBackup` stays: it drives backup commands the web dispatcher answers
+  // `Unsupported`, and the welcome row that opens it is omitted there by
+  // capability rather than by a stubbed screen.
   [path.join(repoRoot, "src", "screens", "RestoreBackup")]: path.join(
     repoRoot,
     "web",
@@ -107,23 +94,6 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "src",
     "components",
     "PairingDialog",
-  ),
-  // Globally mounted by `App.tsx` for the same reason and with the same
-  // consequence (myne#221). The device-join modal used to be reachable only
-  // from `Welcome`, so substituting that screen kept it out of the bundle as a
-  // side effect — which the welcome stub's own comment relied on. Hoisting the
-  // mount so the picker and the account-chip switcher can open it too removes
-  // that accident, and this entry replaces it with a stated exclusion: a browser
-  // holds one container per origin under a constant vault id (task 85), so there
-  // is no second vault to bootstrap, and the join a browser DOES perform is
-  // `AccountBootstrap`.
-  [path.join(repoRoot, "src", "components", "sync", "JoinDeviceModal")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "components",
-    "sync",
-    "JoinDeviceModal",
   ),
   // Rendered behind `has("clipper")` already, but the IMPORT still shipped the
   // block and `src/lib/clipper-pairing.ts` with it (task 96).
@@ -182,26 +152,13 @@ const SUBSTITUTED_MODULES: Record<string, string> = {
     "backup",
     "BackupExportModal",
   ),
-  // The creation flow's ReadyStep used to carry two LOCAL-DISK affordances
-  // behind a substituted module (`ReadyLocalArtefacts`, 2026-08-15): a
-  // `.myne-backup` save dialog and an OS file-manager reveal, both absent here.
-  // myne-md/myne#960 deleted those two controls outright, so the module and its
-  // substitution edge are gone rather than rendering `null`; the
-  // `plugin:backup|*` names they pulled in stay out of the served bundle by
-  // construction, and `check-web-surfaces.mjs` still asserts that.
-  // The device-attribution panel (myne-md/myne#852 story 11). Substituted
-  // because the store it reads is `NTV6`-only and group-tier sealed, its two
-  // commands are `Class::Unsupported` on web, and `memberSharing` is absent here
-  // anyway. Left in the graph it would be member-sharing surface no route can
-  // reach, at a cost in first-load budget.
-  [path.join(repoRoot, "src", "components", "sync", "DeviceAttributionPanel")]: path.join(
-    repoRoot,
-    "web",
-    "src",
-    "components",
-    "sync",
-    "DeviceAttributionPanel",
-  ),
+  // The creation flow's ReadyStep used to carry two LOCAL-DISK affordances behind a
+  // substituted module (`ReadyLocalArtefacts`, 2026-08-15): a `.myne-backup` save
+  // dialog and an OS file-manager reveal, both absent here. myne-md/myne#960 deleted
+  // those two controls outright, so the module and its substitution edge are gone
+  // rather than rendering `null`; the `plugin:backup|*` names they pulled in stay out
+  // of the served bundle by construction, and `check-web-surfaces.mjs` still asserts
+  // that.
   // Whole-vault migration is a desktop flow (`MigrateVaultForm` drives
   // `plugin:vault-migrate|*`, which the web dispatcher answers `Unsupported`),
   // so this is a decided absence rather than a port that is owed. It used to be

@@ -4305,14 +4305,10 @@
       "importHelper": "Bring notes in from Obsidian, Notion, Evernote, HTML files or a CSV. Everything is imported and encrypted on the spot; your original files are left untouched.",
       "importLabel": "Import",
       "importObsidian": "Import notes…",
-      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies: it verifies the written file.",
-      "openInFiles": "Open in Files",
       "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser. There is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
       "webLocationLabel": "Where your notes are stored",
-      "pathUnavailable": "Path unavailable",
       "restoreBackup": "Restore from backup…",
       "sections": {
-        "location": "Where the vault lives",
         "backup": "Backup and restore",
         "transfer": "Import and export"
       }
