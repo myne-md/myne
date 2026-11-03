@@ -1,0 +1,1 @@
+Myne 0.12.0. A vault created under your identity now reaches your server from the sync cycle: the publish switch is gone, so pointing the app at a server publishes the vault, and there is no per-vault switch yet. The browser clipper has its own panel, the notes tree and find bar are rebuilt, and a device with no name names itself.
