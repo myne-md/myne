@@ -115,7 +115,7 @@ describe("AccountPanel — the account this vault belongs to", () => {
   /**
    * The browser clipper used to sit here as the panel's last section, on the
    * argument that a pairing token is account-scoped. The scope was right and the
-   * panel was wrong (`docs/decisions/ui/0767`, myne-md/myne#960): Account answers
+   * panel was wrong (`docs/decisions/ui/0778`, myne-md/myne#960): Account answers
    * "who am I on this device", and a browser the user connected is software. The
    * panel owns that surface now (`browserExtensionsPanel.test.tsx`), so what this
    * suite holds is the ABSENCE, which is the half a move can silently undo.
