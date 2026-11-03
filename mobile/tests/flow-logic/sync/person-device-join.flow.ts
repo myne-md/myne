@@ -115,10 +115,87 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
     await fillPhraseField(page, "identity-flow.person-join-cell");
     await page.getByTestId("identity-flow.person-join-submit").click();
 
-    // The join listed the account's vaults, so the shell's re-probe is what decides
+    // The join listed the account's vaults, so the shell's landing is what decides
     // where the user lands. The wizard is gone either way: what this asserts is
     // that it is not still sitting on the phrase step.
     await expect(page.getByTestId("identity-flow.person-join-pending")).toHaveCount(0);
     await expect(page.getByTestId("identity-flow.person-join-cell")).toHaveCount(0);
+  });
+
+  test("an approved join owes the compare, and the vault's own unlock is what reaches it", async ({
+    page,
+  }) => {
+    // The end of the ceremony the whole feature exists for, and the half that had
+    // no surface: a person join writes the vault's FRAME and installs no key, so
+    // the approval wait cannot run until this device opens the vault with its own
+    // password. The wait was therefore never entered at all.
+    //
+    // `headFingerprint` answers immediately, which is the case that used to be
+    // skipped even by a client that did reach the wait: the first pull lands a head
+    // on the locked→unlocked edge, and a verdict that read the baseline first
+    // called that "approved" and retired the marker that owed the compare.
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScan: { value: "MYQR3|p|https://sync.example.com|" + PERSON_ID_HEX },
+      qrDecode: {
+        kind: "person",
+        endpoint_url: "https://sync.example.com",
+        person_id_hex: PERSON_ID_HEX,
+        fresh: true,
+      },
+      personJoinApproved: true,
+      personVaults: [
+        { vault_id: "vault-a", account_hash_hex: "a".repeat(64), role: "owner" },
+      ],
+      headFingerprint: ["TYRS-N318", "TYRS-N318", "TYRS-N318"],
+      syncStatus: { state: "idle" },
+      devicePlatform: "ios",
+    });
+    await openJoinDoor(page);
+
+    await fillPhraseField(page, "identity-flow.person-join-cell");
+    await page.getByTestId("identity-flow.person-join-submit").click();
+
+    // The frame landed locked, so the probe lands on that vault's unlock form —
+    // the password screen the reporter saw, and the right screen: this VAULT's
+    // password is the only key to it (the join installs none).
+    await expect(page.getByTestId("unlock-submit")).toBeVisible();
+    await page.getByTestId("unlock-password").fill("correct horse battery staple");
+    await page.getByTestId("unlock-submit").click();
+
+    // …and the compare the device owes is what opens, not the editor, even though
+    // a head already exists by now.
+    await expect(page.getByTestId("sync.join.verify")).toBeVisible();
+    await expect(page.getByTestId("sync.join.sas-fingerprint")).toHaveText("TYRS-N318");
+  });
+
+  test("a join whose frames did not land says so and stays put", async ({ page }) => {
+    // The other end of the same read: the device is admitted, and not one vault
+    // arrived. Continuing would land on Welcome with a correct account number and
+    // no vaults and no explanation, which is the report this covers.
+    await installMockIpc(page, {
+      freshDevice: true,
+      qrScan: { value: "MYQR3|p|https://sync.example.com|" + PERSON_ID_HEX },
+      qrDecode: {
+        kind: "person",
+        endpoint_url: "https://sync.example.com",
+        person_id_hex: PERSON_ID_HEX,
+        fresh: true,
+      },
+      personJoinApproved: true,
+      personVaults: [
+        { vault_id: null, account_hash_hex: "b".repeat(64), role: "member" },
+      ],
+    });
+    await openJoinDoor(page);
+
+    await fillPhraseField(page, "identity-flow.person-join-cell");
+    await page.getByTestId("identity-flow.person-join-submit").click();
+
+    await expect(page.getByTestId("identity-flow.person-join-list-error")).toBeVisible();
+    await expect(page.getByTestId("identity-flow.person-join-list-retry")).toBeVisible();
+    // Not the unlock form and not the editor: there is no vault, so there is
+    // nothing to unlock and the retry is the only way forward.
+    await expect(page.getByTestId("unlock-submit")).toHaveCount(0);
   });
 });

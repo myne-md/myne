@@ -20,9 +20,11 @@
 //   * an unenrolled or disabled container is waiting for nothing;
 //   * no host at all answers `false` rather than logging a read failure per boot.
 //
-// The ORDER is asserted too. Status-first would let the sync loop claim a token
-// before the baseline is read, and an early return on that would skip the compare
-// entirely — the one thing this whole change exists to prevent.
+// The ORDER is asserted too, and it has two halves. Status-first would let the
+// sync loop claim a token before the baseline is read, and an early return on that
+// would skip the compare entirely. And the join's own marker outranks the baseline
+// (myne#957 follow-up): a head is not a comparison, and a joined vault's first pull
+// lands before this verdict runs.
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -130,31 +132,37 @@ describe("awaitingApprovalVerdict", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  // The marker half (#535). The join writes down the `pending` it was told,
-  // because the derived status answered `not_enrolled` for a phone that had just
-  // joined and this verdict therefore never fired on the device that shipped it.
+  // The marker half (#535), and the order it holds against the baseline (myne#957
+  // follow-up). The join writes down the answer it was told, because the derived
+  // status answered `not_enrolled` for a phone that had just joined and this verdict
+  // therefore never fired on the device that shipped it.
   describe("the join's own answer", () => {
-    it("routes to the wait from the marker without asking the status", async () => {
+    it("routes to the wait from the marker without asking anything", async () => {
       markApprovalWait("vault-a");
-      // `answers` throws on any command it was not given, so a status read here
-      // fails the case rather than being merely unasserted: the status is the
-      // inference that answered `not_enrolled` about a device the server had
-      // already called pending.
+      // `answers` throws on any command it was not given, so a read here fails the
+      // case rather than being merely unasserted: the marker is the only one of the
+      // three facts that is known without inference, so it costs nothing to trust.
       answers({ baseline: null });
       await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(true);
-      expect(invoke.mock.calls.map(([cmd]) => cmd)).toEqual([
-        "plugin:sync|sync_head_fingerprint",
-      ]);
+      expect(invoke).not.toHaveBeenCalled();
     });
 
-    it("retires the marker once an approval is observed", async () => {
+    it("keeps the marker when a head already exists, because a head is not a comparison", async () => {
+      // The case that was silently skipped before this order: the first pull lands
+      // on the locked→unlocked edge, so by the time this verdict runs the baseline
+      // is non-null and the compare has still never happened. Retiring the marker
+      // here is the skip `threat-model.md` §7 cannot absorb.
       markApprovalWait("vault-a");
       answers({ baseline: "ABCD-1234" });
-      await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(false);
-      // Left behind, the marker would send this device to the wait on every
-      // later unlock, which is the failure it exists to prevent pointing the
-      // other way.
-      expect(isApprovalWait("vault-a")).toBe(false);
+      await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(true);
+      // Retired by the compare ("they match"), by a local un-enrol, or by the
+      // wait's own Cancel — never by the passage of a head.
+      expect(isApprovalWait("vault-a")).toBe(true);
+    });
+
+    it("stays in the editor when a head exists and no join wrote a marker", () => {
+      answers({ baseline: "ABCD-1234" });
+      return expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(false);
     });
 
     it("is per vault, so one pending join does not route another vault", async () => {

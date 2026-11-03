@@ -23,11 +23,20 @@
 //
 // That objection is about a stored COPY of a server fact going stale while the
 // server moves on, leaving two places that claim to know and one of them wrong.
-// This marker is not that. It is a local note that says "the join answered
-// pending", it is cleared the moment the approval is observed (a non-null head
-// fingerprint, or a self-approved join), and a stale one costs an extra compare
-// screen the user can leave with one tap rather than a skipped mitigation. The
-// failure direction is the one `threat-model.md` §7 can absorb.
+// This marker is not that. It is a local note that says "the join put a vault on
+// this device and its compare has not been answered", and what retires it is named
+// per client rather than guessed:
+//
+//   - desktop and web retire it when an approval is observed (a non-null head
+//     fingerprint), which is the reading that shipped with myne-md/myne#535;
+//   - mobile retires it when the compare screen has SHOWN a code and the user
+//     leaves, and keeps it when they leave before that, because a head is not a
+//     comparison: a joined vault's first pull lands one on the locked-to-unlocked
+//     edge, and retiring the marker on that reads as "approved" for a device whose
+//     compare never happened.
+//
+// A stale one therefore costs an extra compare screen rather than a skipped
+// mitigation, which is the failure direction `threat-model.md` §7 can absorb.
 //
 // # Storage
 //
