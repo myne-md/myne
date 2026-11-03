@@ -2,7 +2,7 @@
 //
 // Component tests for `src/components/settings/BrowserExtensionsPanel.tsx`, the
 // rail panel the browser clipper moved into (myne-md/myne#960,
-// `design-notes/ui/0767`).
+// `design-notes/ui/0778`).
 //
 // What this suite is for, given `ConnectedExtensions` has its own: the MOVE, and
 // the gate that travels with it. A panel split out of another one is exactly the
