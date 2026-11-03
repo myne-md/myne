@@ -1281,13 +1281,10 @@ async fn write_ntv6_invite(
         account_number_hash,
         epoch,
     );
-    let own_device =
-        super::device_identity::load_for_fallback("roster_verify").map(|key| key.public_half());
     let owner_devices = super::roster_trust::device_halves_for_owner(
         io,
         root,
         Some(&bindings_key.borrow()),
-        own_device.as_ref(),
         None,
         &owner_public,
     )
@@ -1667,15 +1664,10 @@ pub async fn sync_list_roster<R: Runtime>(
             b2b.base.account_number_hash,
             b2b.group_key_epoch,
         );
-        let own_device = is_owner
-            .then(|| super::device_identity::load_for_fallback("invite_verify"))
-            .flatten()
-            .map(|key| key.public_half());
         let owner_devices = super::roster_trust::device_halves_for_owner(
             &io,
             &root,
             Some(&bindings_key.borrow()),
-            own_device.as_ref(),
             sync_state.owner_device.as_ref(),
             &owner_public,
         )

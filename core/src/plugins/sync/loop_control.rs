@@ -105,6 +105,12 @@ pub enum FailureClass {
     /// retrying cannot help until someone frees something — but they are
     /// different sentences to the user, and only one of them is fixable here.
     StorageFull,
+    /// A binding row publishes this device's signing key and the key store does not hold it
+    /// (myne-md/myne#983). Distinct from [`FailureClass::IdentityLocked`] because the sentence
+    /// and the repair differ: opening the identity DOES fix it, but saying "unlock your identity
+    /// to sync" without naming the missing key is what sent users to the wrong fix for a week,
+    /// and the state survives every lock until a claim runs.
+    DeviceKeyMissing,
     /// An `NTV6` vault whose head cannot be signed because no person identity is
     /// held in this session — the third defect in the same NTV6/identity
     /// intersection as myne-md/myne#790 and #791. The cycle refuses to author a
@@ -143,6 +149,9 @@ impl FailureClass {
             // Its own tag: the fix is a specific user action (unlock the person
             // identity), which "sync_failed" would never say.
             FailureClass::IdentityLocked => "identity_locked",
+            // Its own tag: the whole point is that "the identity is closed" and "the key this
+            // device published is gone" are different sentences (myne-md/myne#983).
+            FailureClass::DeviceKeyMissing => "device_key_missing",
             // Not "sync_failed": this is the one transport failure the user can
             // act on, and the action is specific (fix the server's certificate, or
             // point the client at a host a public CA will issue for).
@@ -184,7 +193,12 @@ fn retry_delay_ms(class: FailureClass, consecutive_failures: u32) -> u64 {
         }
         // The person-unlock that clears this has no scheduler edge, so it must
         // NOT park: the ladder's cap bounds the wait after the user acts.
-        FailureClass::IdentityLocked => (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS),
+        // `DeviceKeyMissing` rides the same ladder for the same reason: the repair is the
+        // identity phrase entry, and a manual open has no scheduler edge either
+        // (myne-md/myne#983).
+        FailureClass::IdentityLocked | FailureClass::DeviceKeyMissing => {
+            (FAILURE_RETRY_START_MS, FAILURE_RETRY_CAP_MS)
+        }
     };
     // 2^(n-1) with a shift guard; n counts from 1 (first failure).
     let n = consecutive_failures.saturating_sub(1).min(16);

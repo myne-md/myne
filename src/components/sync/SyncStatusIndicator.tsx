@@ -111,6 +111,16 @@ function present(status: SyncStatus | null, notRegistered: boolean): Presentatio
           label: i18n.t("sync.status.errorIdentityLocked"),
         };
       }
+      // The key this device PUBLISHED is gone (myne-md/myne#983). Not folded into
+      // `identity_locked`: the repair is still the identity phrase entry, but the sentence has to
+      // name the missing key, because "unlock your identity" was shown for this state for a week
+      // and sent people to a fix that only sometimes applied.
+      if (status.detail === "device_key_missing") {
+        return {
+          dotColor: "var(--warning)",
+          label: i18n.t("sync.status.errorDeviceKeyMissing"),
+        };
+      }
       // Task 94. NOT folded into `auth_failed`: that copy says the sign-in
       // expired and points at re-enrolling, which is the wrong instruction for a
       // device the account owner deliberately removed from another client. The
@@ -164,8 +174,13 @@ export function SyncStatusIndicator({
   const { t } = useTranslation();
   const { status, syncNow, busy } = useSyncStatus();
   const { dotColor, label } = present(status, notRegistered);
+  // Both causes whose repair IS the identity phrase entry: the identity is closed, or the key this
+  // device published is not at rest. Everything else (a generation mismatch, an unreadable store,
+  // no device id) is deliberately excluded: offering that button there would promise a fix the
+  // claim cannot deliver (myne-md/myne#983).
   const identityLocked =
-    status?.state === "error" && status.detail === "identity_locked";
+    status?.state === "error" &&
+    (status.detail === "identity_locked" || status.detail === "device_key_missing");
   // Hide "Sync now" when there is nothing to trigger: no endpoint (disabled) OR this
   // device is not enrolled — a cycle there returns NotReady (→ not_enrolled), not a
   // real sync, so the button would be a false promise (and would flash "Synced").
@@ -191,7 +206,9 @@ export function SyncStatusIndicator({
           onClick={onUnlockIdentity}
           data-testid="sync.unlock-identity"
         >
-          {t("sync.status.unlockIdentityCta")}
+          {status?.detail === "device_key_missing"
+            ? t("sync.status.repairDeviceCta")
+            : t("sync.status.unlockIdentityCta")}
         </Button>
       )}
       {!hideSyncNow && (
