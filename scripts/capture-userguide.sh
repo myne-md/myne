@@ -64,7 +64,9 @@ RUN_FLAGS=(
   --user root
   # Passed through for the marketing re-shoot: the capture sets the app's theme
   # before its first content frame, and the two runs (dark, light) are the same
-  # script with this variable changed. Unset means dark.
+  # script with this variable changed. Unset means light, which is what the user
+  # guide's canon asks for (`myne-website/src/content/user-guide/_authoring.md`);
+  # the marketing pass sets CAPTURE_THEME=dark explicitly.
   -e CAPTURE_THEME
 )
 
