@@ -24,6 +24,7 @@ import { useDateTimeDisplaySync } from "../lib/useDateTimeDisplaySync";
 
 import { WelcomeFlow } from "./flows/WelcomeFlow";
 import { IdentityFlow } from "./flows/IdentityFlow";
+import type { JoinLanding } from "./flows/types";
 import { ApprovalWaitFlow } from "./flows/ApprovalWaitFlow";
 import { CreateVaultFlow } from "./flows/CreateVaultFlow";
 import { UnlockFlow } from "./flows/UnlockFlow";
@@ -184,32 +185,51 @@ function StageSwitch() {
   /**
    * Where an identity-flow accept or join lands.
    *
-   * The flow hands back the vault it installed, and that id is the whole
-   * difference between two landings. Without one, re-probe: the flow wrote
-   * nothing and the stage machine decides what is on screen.
+   * The landing is the flow's answer, not a guess: it names the vaults the wizard
+   * put on this device, and whether it left them OPEN.
    *
-   * WITH one, the wait: a freshly installed member vault carries a device the
-   * owner still has to admit, so this device cannot pull yet and its §6.3 compare
-   * code is owed. Re-probing here was the reported defect — the vault is on disk
-   * and unlocked either way, so the probe answered "editor" (or, after a slot
-   * race, the unlock form) and the approving desktop sat on "this code appears
-   * once the new device finishes its first sync" forever, because the phone was
-   * never going to run the cycle that makes it appear.
+   * WITH vaults, this device owes its §6.3 compare: a freshly installed vault
+   * carries a device the owner still has to admit, so re-probing would land on an
+   * ordinary editor (or the unlock form) with the compare never made, and the
+   * approving device would sit on "this code appears once the new device finishes
+   * its first sync" waiting for a cycle this device was never going to run. That was
+   * the reported defect for the accept, and it was still true for the person join
+   * because the flow handed nothing back.
    *
-   * The marker is written BEFORE the stage so a later unlock re-enters the wait
-   * instead of showing an empty editor (the join's own pending answer is the only
-   * moment that fact is known without inference). The stage holds the unlocked
-   * vault deliberately: the wait exists so a cycle can claim, and the claim needs
-   * `root_key`.
+   * The wait is only ENTERED when the join left a vault open, because the wait's
+   * poll claims a token and the claim needs `root_key` (see `JoinLanding`). A locked
+   * joining vault (every person join) is OWED the wait rather than put in front of
+   * it: the marker is written now, the probe lands on that vault's unlock form, and
+   * the post-unlock verdict (`lib/pending-approval.ts`) routes to the wait as soon
+   * as the vault is open. Entering it against a locked vault is an endless spinner,
+   * which is the one thing this must not do.
+   *
+   * Several vaults are all marked and none is entered: the probe answers the picker,
+   * and whichever one the user opens carries its own marker into the wait.
+   *
+   * A second join on a device that already holds these vaults marks them again, and
+   * that is deliberate rather than overlooked: the wait retires its marker once a
+   * code has been shown and left, and a vault this device already synced has a
+   * baseline, so its wait shows the code on the first poll instead of a spinner. The
+   * cost of a repeat join is therefore one screen and one tap, which is the same
+   * cost the marker's own doc accepts for a stale marker. Probing each id here to
+   * skip them would buy nothing else.
    */
-  const landOnInstalledVault = useCallback(
-    (vaultId?: string) => {
-      if (vaultId === undefined) {
+  const landOnJoinedVaults = useCallback(
+    (landing?: JoinLanding) => {
+      if (landing === undefined || landing.vaultIds.length === 0) {
         reprobe();
         return;
       }
-      markApprovalWait(vaultId);
-      void enterStage({ name: "pending-approval", vaultId });
+      // Written BEFORE the stage, so a later unlock re-enters the wait instead of
+      // showing an editor (the join's own answer is the only moment this fact is
+      // known without inference).
+      for (const vaultId of landing.vaultIds) markApprovalWait(vaultId);
+      if (landing.holding === "locked" || landing.vaultIds.length > 1) {
+        reprobe();
+        return;
+      }
+      void enterStage({ name: "pending-approval", vaultId: landing.vaultIds[0] });
     },
     [enterStage, reprobe],
   );
@@ -382,12 +402,12 @@ function StageSwitch() {
           fromQr={identityFromQr}
           onCancel={() => setIdentityFromQr(null)}
           // The member vault is on disk and unlocked by the time the join wizard
-          // completes. The wait is owed, so the wizard's vault id routes there
-          // (`landOnInstalledVault`); with no id there is nothing to wait on and
+          // completes. The wait is owed, so the wizard's landing routes there
+          // (`landOnJoinedVaults`); with no vault there is nothing to wait on and
           // the probe decides where the user lands.
-          onAccepted={(vaultId) => {
+          onAccepted={(landing) => {
             setIdentityFromQr(null);
-            landOnInstalledVault(vaultId);
+            landOnJoinedVaults(landing);
           }}
         />
       </PhoneColumn>
@@ -407,12 +427,13 @@ function StageSwitch() {
           fromPersonQr={personJoinFrom}
           onCancel={() => setPersonJoinFrom(null)}
           // The join listed the account's vaults and wrote their frames locally.
-          // One id means one vault, and that vault's device still owes its
-          // approval wait; several means the picker, which is what the probe
-          // answers.
-          onAccepted={(vaultId) => {
+          // One vault means one wait, entered after that vault is unlocked (the
+          // frames carry no key, so the wait cannot run yet); several means the
+          // picker, and each of them is marked so the wait follows whichever is
+          // opened.
+          onAccepted={(landing) => {
             setPersonJoinFrom(null);
-            landOnInstalledVault(vaultId);
+            landOnJoinedVaults(landing);
           }}
         />
       </PhoneColumn>
@@ -453,14 +474,14 @@ function StageSwitch() {
               }}
               // An invite was accepted, this device named itself, and the
               // member vault is on disk and unlocked. The flow hands back the
-              // vault it installed, and that id decides the landing: the approval
-              // wait with the §6.3 compare, never a re-probe, because a freshly
-              // installed member vault is a device the owner has not admitted yet
-              // (`landOnInstalledVault`). The name step withholds this until a
-              // name is saved, so a vault cannot arrive here unnamed.
-              onAccepted={(vaultId) => {
+              // vaults it installed, and that landing decides the destination: the
+              // approval wait with the §6.3 compare, never a re-probe, because a
+              // freshly installed member vault is a device the owner has not
+              // admitted yet (`landOnJoinedVaults`). The name step withholds this
+              // until a name is saved, so a vault cannot arrive here unnamed.
+              onAccepted={(landing) => {
                 setIdentityOpen(false);
-                landOnInstalledVault(vaultId);
+                landOnJoinedVaults(landing);
               }}
             />
           </PhoneColumn>
@@ -598,7 +619,7 @@ function StageSwitch() {
     case "pending-approval":
       // The wait (#535). Two ways in, one screen: the post-unlock verdict above
       // (a device that lost its wait), and a join that just installed a vault
-      // (`landOnInstalledVault`). Never by boot routing — the question needs
+      // (`landOnJoinedVaults`). Never by boot routing: the question needs
       // `root_key` in the slot, so it is asked after unlock.
       return (
         <PhoneColumn>

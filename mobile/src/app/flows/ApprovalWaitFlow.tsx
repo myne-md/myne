@@ -26,7 +26,7 @@
 // `root_key`. That is why the idle auto-lock is armed here, the one post-unlock
 // screen that is not the editor.
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Screen, Title, FooterBar, Button, Banner } from "../../components";
 import { syncResetLocal } from "../../lib/sync";
@@ -57,11 +57,41 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
    *  so instead of closing (`design-notes/ui/0482`). */
   const [abortFailed, setAbortFailed] = useState(false);
 
+  /**
+   * The one exit that decides the marker, and the rule is one sentence: leaving
+   * retires it once the code has been SHOWN, and keeps it otherwise.
+   *
+   * Both halves are load-bearing, and they came from two reviewers pulling in
+   * opposite directions. Retiring the marker on arrival at this screen makes the
+   * only out-of-band compare in the product optional, and `threat-model.md` §7 keeps
+   * a phone's wait across a relaunch precisely so it does not become optional. Not
+   * retiring it at all leaves a marker that no path can clear: a user who presses
+   * Cancel could then only leave by answering a compare, and the reject answer is a
+   * local un-enrol.
+   *
+   * With the rule below the compare has been OFFERED before the marker goes (the code
+   * was on screen, so `step === "verify"`), and nothing is skipped. A user who leaves
+   * before that keeps the marker and meets the wait again on the next unlock, which is
+   * the behaviour §7 describes, and that screen's own approval poll is what turns the
+   * wait into a code.
+   *
+   * A `useCallback` rather than a plain function because `useIdleAutoLock` names it in
+   * an effect dependency: a fresh identity per render would tear the timer down and
+   * re-arm it, and the list behind this screen re-renders about once a second.
+   */
+  const leave = useCallback(() => {
+    if (vaultId !== undefined && step === "verify") clearApprovalWait(vaultId);
+    onCancel();
+  }, [vaultId, step, onCancel]);
+
   // Idle re-lock for the one post-unlock screen that is not the editor. It locks
-  // and then re-probes, which lands on the unlock form for this vault — the same
-  // destination `onCancel` chooses, because a locked vault is a locked vault
-  // whoever asked.
-  useIdleAutoLock(onCancel, prefs.auto_lock_seconds);
+  // and then re-probes, which lands on the unlock form for this vault, the same
+  // destination `leave` chooses, because a locked vault is a locked vault whoever
+  // asked.
+  //
+  // Both exits go through `leave`, which is the one place that decides whether the
+  // marker that owes this compare is retired. See its comment.
+  useIdleAutoLock(leave, prefs.auto_lock_seconds);
 
   // Armed for both steps: the head can arrive while the spinner is up (that is
   // the ordinary case) and it must keep being watched once the compare is
@@ -77,7 +107,7 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
   }, [fingerprint]);
 
   // SAS mismatch → ABORT the join: un-enrol this device so it stops trusting the
-  // (possibly forked) synced data, then back out. Stay put if the abort failed —
+  // (possibly forked) synced data, then back out. Stay put if the abort failed:
   // the device is still enrolled, and a screen that closed would have told the
   // user it was not.
   async function onMismatch() {
@@ -90,6 +120,10 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
       setAbortFailed(true);
       return;
     }
+    // The join is abandoned, so the marker has nothing left to ask for. The
+    // un-enrol above already cleared the enrolment, and this clears the question
+    // that pointed at it.
+    if (vaultId !== undefined) clearApprovalWait(vaultId);
     onCancel();
   }
 
@@ -125,9 +159,10 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
         </div>
         {/* Cancel leaves the wait. What that means is the CALLER's answer: the
             stage locks the vault and re-probes, because this screen has no
-            overlay underneath to close back to. */}
+            overlay underneath to close back to. `leave` also decides the marker,
+            and on this arm nothing has been presented yet, so it keeps it. */}
         <FooterBar style={{ padding: "14px 20px calc(14px + env(safe-area-inset-bottom, 0px))", borderTop: "none" }}>
-          <Button variant="ghost" onClick={onCancel} data-testid="sync.join.cancel">
+          <Button variant="ghost" onClick={leave} data-testid="sync.join.cancel">
             {t("common.prompt.cancel")}
           </Button>
         </FooterBar>

@@ -36,35 +36,47 @@
 // the ceremony — and a still-pending device has no notes to be evicted from,
 // since it cannot pull any.
 //
-// # The two reads, and why neither asks the server
+// # The three reads, and why none asks the server
 //
-// Identical to the desktop twin, deliberately: `try_claim_token` collapses a
-// refused approval, an unreachable server and a transport that will not build
-// into one `None`, so "the server refused" is not an answer this client can get.
-// Both facts below are device-local, and neither can be made to lie by a network
+// A twin of `src/lib/pending-approval.ts`, and the ORDER is where the two differ:
+// this file answers the join's marker before it reads the baseline, and the desktop
+// one does not. The divergence is deliberate and one-sided: since
+// `decisions/sync/0767` deleted the desktop join, nothing on desktop writes a marker
+// at all, so there the question cannot arise; here the join is the only door in.
+// Everything else is shared and kept identical on purpose: `try_claim_token`
+// collapses a refused approval, an unreachable server and a transport that will not
+// build into one `None`, so "the server refused" is not an answer this client can get.
+// Every fact below is device-local, and none can be made to lie by a network
 // that is down.
 //
-// 1. Has this device ever adopted a head? `sync_head_fingerprint` reads the last
+// 1. Did a JOIN say this device owes the compare? `@myne/client-core/approval-wait`
+//    is written by the flow that installed the vault and holds the server's own
+//    `pending`/`joined` answer, so it is the only one of the three that is known
+//    without inference. Asked FIRST, because a head is not a comparison.
+// 2. Has this device ever adopted a head? `sync_head_fingerprint` reads the last
 //    recorded head observation, and §6.2 names exactly that as the "has a
-//    persisted baseline" discriminator. Non-null means it synced, so it was
-//    approved, and it belongs in the editor whatever the network is doing. Asked
-//    FIRST, and the order is a correctness property: the sync loop arms its own
-//    cycle on the locked-to-unlocked edge, so a status read placed first could
-//    find the token already claimed, return early, and skip the compare.
-// 2. Is this device enrolled at all? `not_enrolled` and `disabled` are not
+//    persisted baseline" discriminator. Non-null means it synced, so it belongs in
+//    the editor whatever the network is doing.
+// 3. Is this device enrolled at all? `not_enrolled` and `disabled` are not
 //    waiting for anything, and `sync_reset_local` leaves exactly that state, so
 //    routing it to a wait would re-ask a question the user already answered.
 //
 // A failed read counts as no baseline, which routes toward the compare: the
 // compare is the mitigation, so an unreadable answer must not route past it.
 //
-// One residual, stated rather than papered over and shared with the desktop
-// twin: if the sync loop both claims AND completes its pull before the baseline
-// read lands, the baseline is already non-null and the compare is skipped. The
-// window is one local read against a network round trip.
+// **Why the marker outranks the baseline (this used to be the other way round).**
+// The baseline is read on the locked-to-unlocked edge, and the sync loop arms its own
+// cycle there too, so a joined vault's first pull could land a head before this
+// verdict ran. Reading the baseline first answered "an approval has been
+// observed" for a device whose compare had never happened, and retired the marker
+// that owed it. That is the exact skip this file exists to prevent, on the one path
+// where the device is a phone nobody can read a code off. The cost of the new order
+// is a wait screen on every unlock until the compare is answered, which is the
+// direction `threat-model.md` §7 can absorb and the direction the marker's own doc
+// already claims.
 
 import { invoke } from "../platform/core";
-import { clearApprovalWait, isApprovalWait } from "@myne/client-core/approval-wait";
+import { isApprovalWait } from "@myne/client-core/approval-wait";
 import { HAS_TAURI } from "./app-window";
 import type { SyncStatus } from "./use-sync-status";
 
@@ -78,8 +90,8 @@ import type { SyncStatus } from "./use-sync-status";
  * reports the real state.
  *
  * `vaultId` is optional only for the tests that drive the two reads alone; the
- * shell always passes it. With it, the join's own answer is checked FIRST (see
- * `@myne/client-core/approval-wait`): a join that came back `pending` wrote that
+ * shell always passes it. With it, the join's own answer decides FIRST (see
+ * `@myne/client-core/approval-wait`): a join that installed a vault wrote that
  * down, and the derived status below is the read that answered `not_enrolled`
  * on a device that had just joined, which is how myne-md/myne#535 shipped a fix
  * that never fired on the phone.
@@ -90,6 +102,16 @@ export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean
   // quiet rather than logging a verdict read failure on every boot.
   if (!HAS_TAURI) return false;
   try {
+    // The join's own answer first, and BEFORE the baseline read (myne#957
+    // follow-up). A baseline is not a comparison: a joined vault's first pull can
+    // land a head before this verdict runs, because the sync loop arms its own cycle
+    // on the locked-to-unlocked edge, and reading the baseline first therefore
+    // answered "an approval has been observed" for a device whose compare had never
+    // happened and silently retired the marker that owed it. The marker is cleared by
+    // the compare itself ("they match") and by a local un-enrol; never by a head
+    // appearing.
+    if (vaultId !== undefined && isApprovalWait(vaultId)) return true;
+
     let baseline: string | null = null;
     try {
       baseline = await invoke<string | null>("plugin:sync|sync_head_fingerprint");
@@ -97,18 +119,11 @@ export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean
       /* stays null: fail toward showing the compare */
     }
     if (baseline !== null) {
-      // An approval has been observed: the marker has done its job and would
-      // otherwise send this device to the wait on every later unlock.
-      if (vaultId !== undefined) clearApprovalWait(vaultId);
+      // A baseline with no marker: an approved device (or one that joined before
+      // markers existed). Nothing to retire, since the marker was already absent, and
+      // that is why the check above answered first.
       return false;
     }
-
-    // The join's own answer, checked AFTER the baseline and BEFORE the status.
-    // After the baseline because a non-null head is an observed approval and has
-    // to retire the marker, which it cannot do if the marker answers first; before
-    // the status because the status is the read that answered `not_enrolled` for
-    // a device that had just joined.
-    if (vaultId !== undefined && isApprovalWait(vaultId)) return true;
 
     const status = await invoke<SyncStatus>("plugin:sync|sync_status");
     return status.state !== "not_enrolled" && status.state !== "disabled";

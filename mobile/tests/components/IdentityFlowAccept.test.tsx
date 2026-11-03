@@ -397,10 +397,14 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(onAccepted).not.toHaveBeenCalled();
     await typeName(MEMBER_NAME);
     await vi.waitFor(() => expect(setMyMemberName).toHaveBeenCalledWith(MEMBER_NAME));
-    // The installed vault's id travels with the callback: the shell addresses the
+    // The installed vault travels with the callback: the shell addresses the
     // approval wait with it, and a fresh member device owes that wait before it can
-    // pull (`AppShell`'s `landOnInstalledVault`).
-    expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id);
+    // pull (`AppShell`'s `landOnJoinedVaults`). `unlocked` because the accept
+    // installed the keys with the vault.
+    expect(onAccepted).toHaveBeenCalledWith({
+      vaultIds: [ACCEPTED_VIEW.vault_id],
+      holding: "unlocked",
+    });
   });
 
   it("keeps the credential behind the project's floor", async () => {
@@ -550,7 +554,12 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     // The roster's answer IS the question here, and a member re-invited to a vault
     // they already named in reads as named: the step is passed through rather than
     // asked again, and the callback fires without a second write.
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
     expect(setMyMemberName).not.toHaveBeenCalled();
     // Non-vacuity: the step did render (the test harness never unmounts the flow, so
     // it is still on screen) and the member was released THROUGH it rather than the
