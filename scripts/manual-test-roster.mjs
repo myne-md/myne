@@ -1649,7 +1649,7 @@ export const ROSTER = Object.freeze([
     ],
     manual: [
       {
-        see: "Pair two different browsers (say Chrome and Firefox) with the same vault. Confirm Settings → Account → Connected extensions lists exactly two rows, each showing the correct browser name and icon and a pairing age that matches when you actually paired it. Press Revoke on one: that browser must stop clipping while the other keeps working.",
+        see: "Pair two different browsers (say Chrome and Firefox) with the same vault. Confirm Settings → Browser extensions → Connected extensions lists exactly two rows, each showing the correct browser name and icon and a pairing age that matches when you actually paired it. Press Revoke on one: that browser must stop clipping while the other keeps working.",
         whyNotAutomated: "Two real browsers must be paired through the native-messaging host, which no lane launches, and the observable effect of a revoke is on the extension's side inside a browser no harness runs.",
         clients: ["clipper", "desktop-macos", "desktop-linux"],
         estimateMin: 10,
