@@ -853,11 +853,11 @@ describe("MemberRosterPanel device claims", () => {
 
   it("survives a view that carries no unverified list at all", () => {
     // The story host answers an UNHANDLED command with its benign `[]`, so
-    // `view` is a truthy array with no `unverified_device_ids` on it, and the
-    // read took the whole Settings surface down with `undefined.length`
-    // (myne-md/myne#972 review, and it was red on develop before the branch).
-    // A real backend always sends the field, which is exactly why this needs a
-    // fixture that leaves it out: the type cannot be trusted at an IPC edge.
+    // `view` is a truthy array with no `unverified_device_ids` on it, and this
+    // read took the whole Settings surface down with `undefined.length` while
+    // every production path was fine. A real backend always sends the field,
+    // which is exactly why the fixture has to leave it out: a type cannot be
+    // trusted at an IPC edge.
     mockBindingsView = { rows: [] } as unknown as DeviceAttributionView;
     render(<MemberRosterPanel />);
     try {
