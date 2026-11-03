@@ -836,13 +836,10 @@ pub async fn rotate_group_from_host(
         account_number_hash,
         b2b_meta.group_key_epoch,
     );
-    let own_device = crate::plugins::sync::device_identity::load_for_fallback("member_removal")
-        .map(|key| key.public_half());
     let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
         io,
         &vault_root,
         Some(&bindings_key.borrow()),
-        own_device.as_ref(),
         None,
         &owner_public,
     )
@@ -1360,20 +1357,31 @@ pub async fn member_person_id_from_host(
     .ok_or(MemberRemovalError::InvalidVaultMeta)?;
     // Either class, for the same reason the rotation accepts both: the roster of a vault
     // whose owner signs with a device key is a `v2`-class roster.
+    //
+    // The candidate set comes from `roster_trust`, NOT from the key this machine happens to
+    // be holding: a device key at rest outlives every vault on the machine
+    // (`decisions/protocol/0759`), and `verify_group_roster` accepts a `v2` signature from
+    // ANY entry in the set it is handed, so an unverified half here would let a key from a
+    // previous person's vault authenticate a roster, and the `person_id` such a roster yields
+    // is what the caller revokes on the sync server (myne-md/myne#983 review, D3 and D4).
     let owner_public = owner.public_half();
-    let mut owner_devices: Vec<protocol::device_key::DevicePublicHalf> = Vec::new();
-    if let Ok(sync_state) = crate::plugins::sync::state::read_sync_state(io, &vault_root).await {
-        if let Some(attestation) = sync_state.owner_device.as_ref() {
-            if attestation.verifies_against(&owner_public) {
-                if let Some(half) = attestation.device_public_half() {
-                    owner_devices.push(half);
-                }
-            }
-        }
-    }
-    if let Some(key) = crate::plugins::sync::device_identity::load_for_fallback("rotation_verify") {
-        owner_devices.push(key.public_half());
-    }
+    let pinned = crate::plugins::sync::state::read_sync_state(io, &vault_root)
+        .await
+        .ok()
+        .and_then(|sync_state| sync_state.owner_device.clone());
+    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
+        &group_key,
+        account_number_hash,
+        b2b_meta.group_key_epoch,
+    );
+    let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
+        io,
+        &vault_root,
+        Some(&bindings_key.borrow()),
+        pinned.as_ref(),
+        &owner_public,
+    )
+    .await;
     let roster = protocol::person_invite::verify_group_roster(
         crate::plugins::sync::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,

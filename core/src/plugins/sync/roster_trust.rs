@@ -27,16 +27,24 @@ use protocol::person_invite::{OwnerDeviceAttestation, RosterTrust};
 /// The device halves that may have signed `owner`'s roster for this vault.
 ///
 /// `bindings` is the family's KEK+epoch borrow, `None` for a caller that has no group
-/// key yet (creation, migration, a locked slot). `own` is the caller's own device half
-/// and is only passed by an OWNER path. `pinned` is a member's stored attestation.
+/// key yet (creation, migration, a locked slot). `pinned` is a member's stored attestation.
 ///
-/// Order matters only for wall clock: the pinned attestation and the own key are checked
-/// first, so the common case costs no store read.
+/// There used to be an `own` parameter: the caller's own device half, passed on the owner
+/// path. It was removed because the check it was supposed to rest on ("the caller owns
+/// that check") cannot exist here without circularity: the caller does not know whether
+/// its device is bound until the roster it is verifying resolves the binding, and a device
+/// key at rest outlives every vault on the machine (`decisions/protocol/0759`), so an
+/// unverified `own` let a key from a PREVIOUS person's vault authenticate a roster. The
+/// verified rows below already contain this device's own row, for both signing and
+/// verifying: `own_device_signing_pair` refuses to sign with a device whose row does not
+/// verify, so a device that can author a device-signed roster can also read one.
+///
+/// Order matters only for wall clock: the pinned attestation is checked first, so a
+/// member's common case costs no store read.
 pub async fn device_halves_for_owner(
     io: &dyn crate::vault_io::VaultIo,
     vault_dir: &Path,
     bindings: Option<&crate::plugins::device_binding::DeviceBindingKey<'_>>,
-    own: Option<&DevicePublicHalf>,
     pinned: Option<&OwnerDeviceAttestation>,
     owner: &protocol::person_key::PersonPublicHalf,
 ) -> Vec<DevicePublicHalf> {
@@ -62,14 +70,9 @@ pub async fn device_halves_for_owner(
         }
     }
 
-    // 2. This device's own key, which an owner path supplies after checking that the
-    //    device really is bound to this person (the caller owns that check: `cycle.rs`
-    //    only authors `0x03` once its own row verifies).
-    if let Some(half) = own {
-        push(*half);
-    }
-
-    // 3. The verified rows of the binding store that name this owner.
+    // 2. The verified rows of the binding store that name this owner. This is also where
+    //    an owner's own device enters, and it enters only through a row that verifies
+    //    against this owner's own public half.
     if let Some(bindings) = bindings {
         match crate::plugins::device_binding::read_device_bindings_in_dir(io, vault_dir, bindings)
             .await
@@ -196,9 +199,15 @@ pub async fn own_device_signing_pair(
     protocol::device_key::DeviceKeyPair,
     protocol::person_invite::OwnerDeviceAttestation,
 )> {
-    // No device key means no device signature, so there is nothing to attest.
-    let device_key =
-        crate::plugins::sync::device_identity::load_for_fallback("device_attestation")?;
+    // No device key means no device signature, so there is nothing to attest. The ladder's
+    // three outcomes are told apart in `sync::authority`, so a store that REFUSED is reported
+    // as a fault there rather than read here as "this device has no key"
+    // (myne-md/myne#983).
+    let device_key = match crate::plugins::sync::authority::load_key("device_attestation") {
+        crate::plugins::sync::authority::KeyAtRest::Present(key) => *key,
+        crate::plugins::sync::authority::KeyAtRest::Absent
+        | crate::plugins::sync::authority::KeyAtRest::Unreadable => return None,
+    };
     own_device_signing_pair_for_key(
         host,
         io,
@@ -239,7 +248,10 @@ pub(crate) async fn own_device_signing_pair_for_key(
         epoch,
     );
     let attestation = own_attestation(io, root, &bindings_key.borrow(), owner, &device_id).await?;
-    (attestation.device_public_half() == Some(device_key.public_half()))
+    // ONE spelling of "the row publishes the key we hold", in `sync::authority`: a row naming
+    // a different key would have the recipient resolve a signer that never signed
+    // (myne-md/myne#983).
+    crate::plugins::sync::authority::publishes_key(attestation.device_public_half(), &device_key)
         .then_some((device_key, attestation))
 }
 

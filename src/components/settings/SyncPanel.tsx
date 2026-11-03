@@ -105,6 +105,17 @@ export interface SyncPanelProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
+/**
+ * The named authority causes, in the indicator's own vocabulary. `undefined` for every other
+ * detail, which is what keeps the raw failure tag out of product copy. Module scope because it
+ * does not vary with props or state, so rebuilding it inside the render body only gives a later
+ * edit somewhere to drift from.
+ */
+const AUTHORITY_CAUSES: Record<string, string> = {
+  identity_locked: "sync.panel.status.authorityIdentityClosed",
+  device_key_missing: "sync.panel.status.authorityKeyMissing",
+};
+
 export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
@@ -143,6 +154,10 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
+  const authorityCauseLine =
+    syncStatus?.state === "error" && syncStatus.detail
+      ? AUTHORITY_CAUSES[syncStatus.detail]
+      : undefined;
   // The shared person-identity store: the roster's Lock/Forget and this panel's
   // own unlock all write it, so it is the one "is the identity ready for this
   // session" signal.
@@ -717,6 +732,17 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         />
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
+        {/* One line naming WHICH authority problem this is, from the same status the indicator
+            derives, so the two cannot disagree (myne-md/myne#983). Only the two causes whose
+            repair is the identity phrase are named here: every other detail already has its own
+            sentence in the status row above, and rendering the raw tag would put `identity_locked`
+            in front of a user. The generation and key-at-rest halves need a command that reads the
+            vault from the backend, which is its own change. */}
+        {authorityCauseLine && (
+          <p style={HELPER_STYLE} data-testid="sync.authority-verdict">
+            {t(authorityCauseLine)}
+          </p>
+        )}
       </div>
 
       {/* The plane has to be KNOWN before either label is chosen: `unknown` would

@@ -589,7 +589,67 @@ pub(crate) async fn run_post_unlock_pipeline(
                 host, io, state, &vault_dir,
             )
             .await;
+            // The ORPHAN, named where the user can be told and the log can be read
+            // (myne-md/myne#983). This is the state the reported defect lived in: the row says
+            // this device holds a signing key and the store holds nothing, so the cycle refuses
+            // every round under "unlock your identity to sync" while the cause was never the
+            // identity. Detected here rather than in the cycle because the cycle cannot ask the
+            // user anything, and `root_key` and `group_key` are both in hand at this point.
+            report_orphaned_binding_best_effort(host, io, state, &vault_dir).await;
         }
+    }
+}
+
+/// Warn once, at unlock, when this device's binding row claims a key the store cannot produce.
+///
+/// Best effort and silent about WHY it stood down (no slot, no group key, no device id, an
+/// unreadable meta): those are the ordinary states of a single-user vault and of a cold start,
+/// and the claim already logged its own reason one line above.
+async fn report_orphaned_binding_best_effort(
+    host: &dyn HostCtx,
+    io: &dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+    vault_dir: &std::path::Path,
+) {
+    let Some(shared) = state.peek_unlocked_shared_singleton_key().await else {
+        return;
+    };
+    let Some(group_key) = shared.group_bytes() else {
+        return;
+    };
+    let Ok(bytes) = io.read(&vault_dir.join("vault.meta")).await else {
+        return;
+    };
+    let Some(b2b) = crate::plugins::sync::meta_kind::b2b_tail(&bytes) else {
+        return;
+    };
+    let Some(device_id) =
+        crate::plugins::sync::device_actor::durable_device_id(host, io, vault_dir).await
+    else {
+        return;
+    };
+    if crate::plugins::sync::authority::bound_without_key(
+        io,
+        vault_dir,
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+        &group_key,
+        device_id,
+    )
+    .await
+    {
+        tracing::warn!(
+            stage = "vault_unlock",
+            event = "device_binding_orphan_suspected",
+            cause =
+                crate::plugins::sync::authority::AuthorityMissing::KeyMissingWhileBound.as_str(),
+            identity_unlock_would_fix = true,
+            "a binding row NAMING this device publishes a signing key that the key store does not \
+             hold. Suspected rather than verified: rows are group-sealed, so any member can write \
+             one naming any device id under their own fingerprint, and the roster this line would \
+             need to tell them apart is not in hand at unlock. The vault's own resolution, which \
+             does verify, decides whether sync can author (myne-md/myne#983)"
+        );
     }
 }
 

@@ -562,6 +562,12 @@ steps:
       # one of them and disagreed. Both wrong reads compiled and produced no error;
       # the symptom was a device rendering its own caret as "Device 000000".
       - node scripts/check-device-actor.mjs
+      # Sync-authority chokepoint (myne-md/myne#983): ONE resolver decides whether
+      # this device may sign a head and with what key. Three places answered it
+      # differently and all three compiled; the symptom was "Unlock your identity
+      # to sync" after every lock, on a vault whose binding row published a key
+      # the store did not hold. Backstop for the pre-commit hook.
+      - node scripts/check-sync-authority.mjs
       # Date/time display publisher (myne-md/myne#609): a client tree that reads
       # the shared display store must also write to it. One publisher served
       # three readers, so mobile printed defaults while holding a synced value,

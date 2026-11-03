@@ -1,0 +1,166 @@
+{
+  "sites": {
+    "core/src/plugins/device_binding/commands.rs": {
+      ".clone_person_identity()": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      },
+      "crate::plugins::sync::device_actor::durable_device_id(host, io, vault_dir)": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      },
+      "let pair = match crate::plugins::sync::device_identity::load_or_create() {": {
+        "count": 1,
+        "reason": "This IS the binding claim: it mints the key and reads it back, and only a read-back of the key just written is allowed to publish halves. The resolver consumes what this call establishes, so it cannot be the thing that asks."
+      },
+      "let session_person = state.clone_person_identity().await;": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/member_names/commands.rs": {
+      ".clone_person_identity()": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/notes/commands.rs": {
+      "Some(root) => crate::plugins::sync::device_actor::durable_device_id(host, io, root).await,": {
+        "count": 3,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      },
+      "crate::plugins::sync::device_actor::durable_device_id(host, io, vault_root).await": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/sync/authority/mod.rs": {
+      "classify_key_load(crate::plugins::sync::device_identity::load(), site)": {
+        "count": 1,
+        "reason": "The resolver's own single read of the key at rest. If this line moves out of sync::authority the guard fires, which is the whole rule."
+      }
+    },
+    "core/src/plugins/sync/commands.rs": {
+      ".clone_person_identity()": {
+        "count": 3,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      },
+      "let held = state.inner().clone_person_identity().await;": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      },
+      "let local_identity = state.inner().clone_person_identity().await;": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      },
+      "super::device_identity::load(),": {
+        "count": 1,
+        "reason": "Invite verification runs before a sync cycle exists and needs the raw key to build the roster candidate list; the verdict form needs roster_publics, which do not exist at this point."
+      }
+    },
+    "core/src/plugins/sync/cycle.rs": {
+      "let person = state.clone_person_identity().await;": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      },
+      "super::device_actor::durable_device_id(host, io, vault_dir).await,": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/sync/device_actor.rs": {
+      "durable_device_id(&f.host, &f.io, &f.vault_root()).await": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      },
+      "pub async fn durable_device_id(": {
+        "count": 1,
+        "reason": "The accessor's definition: this is the one place `device_actor` answers 'which device is this' (scripts/check-device-actor.mjs owns that question)."
+      },
+      "super::crdt_doc::note_actor_bytes(durable_device_id(host, io, vault_root).await)": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/sync/device_admission.rs": {
+      "let public = match crate::plugins::sync::device_identity::load_or_create() {": {
+        "count": 1,
+        "reason": "Admission mints the key BEFORE any vault or person session exists (a device joins by proving itself to the server first), so there is no roster and no binding map for a resolver to read yet; the claim that follows is what records it."
+      }
+    },
+    "core/src/plugins/sync/devices.rs": {
+      "let device_id_hex = super::device_actor::durable_device_id(host, io, &dir)": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/sync/identity_resolver.rs": {
+      "let person = state.clone_person_identity().await;": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/sync/person_account.rs": {
+      ".clone_person_identity()": {
+        "count": 2,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/sync/person_vault_carrier.rs": {
+      "assert!(state.clone_person_identity().await.is_none());": {
+        "count": 2,
+        "reason": "Test fixture: asserts what the slot holds, and decides nothing."
+      },
+      "let held = state.clone_person_identity().await.expect(\"installed\");": {
+        "count": 1,
+        "reason": "Test fixture: asserts what the slot holds, and decides nothing."
+      }
+    },
+    "core/src/plugins/sync/roster_trust.rs": {
+      "let device_id = super::device_actor::durable_device_id(host, io, root).await?;": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/vault_creation/commands.rs": {
+      "(state.clone_person_identity().await, status.person_id_hex)": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/vault_migrate/mod.rs": {
+      "crate::plugins::sync::device_actor::durable_device_id(host, io, &vault_root).await;": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      }
+    },
+    "core/src/plugins/vault_migrate/ntv7.rs": {
+      ".clone_person_identity()": {
+        "count": 2,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/vault_migrate/ntv8.rs": {
+      "state.clone_person_identity().await.is_some(),": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/vault_unlock/commands.rs": {
+      "crate::plugins::sync::device_actor::durable_device_id(host, io, vault_dir).await": {
+        "count": 1,
+        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
+      },
+      "if state.clone_person_identity().await.is_none() {": {
+        "count": 1,
+        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
+      }
+    },
+    "core/src/plugins/vault_unlock/state.rs": {
+      "pub async fn clone_person_identity(&self) -> Option<protocol::PersonKeyPair> {": {
+        "count": 1,
+        "reason": "The accessor's definition: the session slot is read here and nowhere else, and the resolver takes its answer as an input."
+      }
+    }
+  }
+}

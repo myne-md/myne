@@ -342,17 +342,53 @@ async fn index_fallback_written_note(
         reindex_pulled_notes(io, state, hooks, notes_dir, &[note_id.to_string()]).await;
     }
 }
-
-/// Build the signed (`0x02`) head context for an `NTV6` vault, or `None` for a
-/// pre-B2B (`NTV5`) vault (decisions 0603, Q2 revised: the head format is keyed
-/// off the vault generation). The live roster rows' public halves let a peer
-/// resolve a head's signer.
+/// What one cycle's authority resolution produced.
 ///
-/// A head is signed by the held person keypair (the owner's or a member's own)
-/// and verified against the roster, so a member authors heads under its own
-/// identity. The roster itself is **owner-signed**, so verifying it needs the
-/// owner's public half: the owner holds it as their identity, a member holds only
-/// the out-of-band identity code recorded at accept (`owner_identity_code`).
+/// The context and the reason sit together because they are one answer: `ctx` is what the
+/// engine signs and verifies with, and `device` is why it cannot sign when it cannot. Before
+/// myne-md/myne#983 the reason was recomputed at the guard from two booleans, so five causes
+/// collapsed into one sentence.
+struct HeadAuthority {
+    ctx: Option<super::head_authority::SignedHeadCtx>,
+    device: super::authority::DeviceResolution,
+    person_held: bool,
+}
+
+impl HeadAuthority {
+    fn no_context(person_held: bool) -> Self {
+        Self {
+            ctx: None,
+            device: super::authority::DeviceResolution::Unbound {
+                cause: super::authority::AuthorityMissing::NoHeadContext,
+                signers: Vec::new(),
+            },
+            person_held,
+        }
+    }
+
+    fn can_author(&self) -> bool {
+        self.ctx
+            .as_ref()
+            .is_some_and(super::head_authority::SignedHeadCtx::can_author)
+    }
+
+    fn missing(&self) -> super::authority::AuthorityMissing {
+        super::authority::missing_for_cycle(self.ctx.is_some(), self.person_held, &self.device)
+    }
+}
+
+/// Build the signed head context for a vault that carries the B2B tail, and resolve the
+/// device half through `sync::authority` (myne-md/myne#983).
+///
+/// A head is signed by the held person keypair (the owner's or a member's own) and verified
+/// against the roster, so a member authors heads under its own identity. The roster itself is
+/// **owner-signed**, so verifying it needs the owner's public half: the owner holds it as
+/// their identity, a member holds only the out-of-band identity code recorded at accept.
+///
+/// Every early exit is `HeadAuthority::no_context`, which reports `NoHeadContext` rather than
+/// a credential cause: an unreadable meta, a missing group key or an unverifiable roster is
+/// not something a user can fix by opening their identity, and saying so was part of the
+/// defect this function was rewritten for.
 async fn signed_head_ctx(
     // The device id is read through `sync::device_actor`, which needs the host for the
     // person credential's path (myne-md/myne#958). Before that reader, this function
@@ -364,81 +400,95 @@ async fn signed_head_ctx(
     state: &VaultRuntimeState,
     shared: &crate::plugins::vault_unlock::state::SharedSingletonKey,
     is_owner: bool,
-) -> Option<super::head_authority::SignedHeadCtx> {
-    let bytes = io.read(&vault_dir.join("vault.meta")).await.ok()?;
-    // The head format follows the GENERATION (decisions 0603), and there are now
-    // two generations that carry the B2B tail. `NTV7` needs no new mechanism: it
-    // IS `NTV6` plus a person wrap, so the tail accessor is the whole difference.
-    // Reading only `NTV6` here would have authored an HMAC (`0x01`) head for every
-    // vault born under an identity, i.e. a downgrade the `NTV6` guard below
-    // already refuses and no compiler can see (myne-md/myne#911 task 8).
-    // EVERY generation that carries the tail, asked through the classifier rather than
-    // by magic. This match listed `NTV6` and `NTV7` by hand, so an `NTV8` vault, which
-    // every person-born vault becomes on its first unlock since myne-md/myne#938, fell
-    // into the `_` arm and got NO head context at all: the cycle stopped authoring heads
-    // instead of signing them. `parse_b2b_tail_any` is the same tail for all three.
-    let b2b = super::meta_kind::b2b_tail(&bytes)?;
-    let group_key = shared.group_bytes()?;
-    let envelope = protocol::person_invite::open_group_roster(
+) -> HeadAuthority {
+    // The held identity is NOT required to build this context any more. It is required to
+    // author a `0x02` head, and `SignedHeadCtx::sign` refuses that arm without it, but a
+    // cold start has to be able to VERIFY heads and the roster it is verified through, and a
+    // device key authors `0x03` without the phrase at all (`0731` stage 1).
+    let person = state.clone_person_identity().await;
+    let person_held = person.is_some();
+
+    let Ok(bytes) = io.read(&vault_dir.join("vault.meta")).await else {
+        return HeadAuthority::no_context(person_held);
+    };
+    // EVERY generation that carries the tail, asked through the classifier rather than by
+    // magic: this match used to list `NTV6` and `NTV7` by hand, so an `NTV8` vault got NO
+    // head context at all and the cycle stopped authoring heads instead of signing them.
+    let Some(b2b) = super::meta_kind::b2b_tail(&bytes) else {
+        return HeadAuthority::no_context(person_held);
+    };
+    let Some(group_key) = shared.group_bytes() else {
+        return HeadAuthority::no_context(person_held);
+    };
+    let Some(envelope) = protocol::person_invite::open_group_roster(
         &group_key,
         &b2b.base.account_number_hash,
         b2b.group_key_epoch,
         &b2b.signed_roster_envelope,
-    )?;
-    // The held identity is NOT required to build this context any more. It is required to
-    // author a `0x02` head, and `SignedHeadCtx::sign` refuses that arm without it, but a
-    // cold start has to be able to VERIFY heads and the roster it is verified through,
-    // and a device key authors `0x03` without the phrase at all (`0731` stage 1). Requiring
-    // the phrase here is what kept the phrase in the sync path after the device key had
-    // already removed it from signing.
-    let person = state.clone_person_identity().await;
-    let sync_state = super::state::read_sync_state(io, vault_dir).await.ok()?;
+    ) else {
+        return HeadAuthority::no_context(person_held);
+    };
+    let Ok(sync_state) = super::state::read_sync_state(io, vault_dir).await else {
+        return HeadAuthority::no_context(person_held);
+    };
     let owner_public = match (&person, is_owner) {
         (Some(held), true) => held.public_half(),
-        // An OWNER's cold start: this device cached its own code the last time the phrase
-        // was entered (public material only, refreshed on every unlock).
+        // An OWNER's cold start: this device cached its own code the last time the phrase was
+        // entered (public material only, refreshed on every unlock).
         (None, true) => {
-            let code = sync_state.own_identity_code.as_deref()?;
-            super::invite::decode_person_identity_code(code)
-                .ok()?
-                .public
+            let Some(code) = sync_state
+                .own_identity_code
+                .as_deref()
+                .and_then(|code| super::invite::decode_person_identity_code(code).ok())
+            else {
+                return HeadAuthority::no_context(person_held);
+            };
+            code.public
         }
         // A member holds the owner's half only as the code pinned out of band at accept.
         (_, false) => {
-            let code = sync_state.owner_identity_code.as_deref()?;
-            super::invite::decode_person_identity_code(code)
-                .ok()?
-                .public
+            let Some(code) = sync_state
+                .owner_identity_code
+                .as_deref()
+                .and_then(|code| super::invite::decode_person_identity_code(code).ok())
+            else {
+                return HeadAuthority::no_context(person_held);
+            };
+            code.public
         }
     };
-    // The roster may have been signed by the owner's PERSON key or by one of the
-    // owner's DEVICES (`decisions/protocol/0731` stage 2). Candidates come from the
-    // pinned attestation (a member), this device's own key (the owner) and the
-    // verified rows of the binding store.
-    let bindings_key = crate::plugins::device_binding::bindings_key_for_group(
-        &group_key,
-        b2b.base.account_number_hash,
-        b2b.group_key_epoch,
-    );
-    let own_device = is_owner
-        .then(|| super::device_identity::load_for_fallback("sync_cycle"))
-        .flatten()
-        .map(|key| key.public_half());
+    // ONE read of the key at rest, whose public half the roster verification needs below. It
+    // used to be two reads with two error policies (`load_for_fallback` here, `load` further
+    // down), which is how a store refusal could read as "no key" at one site and as a fault
+    // at the other.
+    let key_at_rest = super::authority::load_key("signed_head_ctx");
+    // The roster may have been signed by the owner's PERSON key or by one of the owner's
+    // DEVICES (`decisions/protocol/0731` stage 2). Candidates come from the pinned
+    // attestation (a member), this device's own key (the owner) and the verified rows of
+    // the binding store.
     let owner_devices = super::roster_trust::device_halves_for_owner(
         io,
         vault_dir,
-        Some(&bindings_key.borrow()),
-        own_device.as_ref(),
+        Some(
+            &crate::plugins::device_binding::bindings_key_for_group(
+                &group_key,
+                b2b.base.account_number_hash,
+                b2b.group_key_epoch,
+            )
+            .borrow(),
+        ),
         sync_state.owner_device.as_ref(),
         &owner_public,
     )
     .await;
-    let roster = protocol::person_invite::verify_group_roster(
+    let Some(roster) = protocol::person_invite::verify_group_roster(
         super::roster_trust::trust(&owner_public, &owner_devices),
         &envelope,
         &b2b.base.account_number_hash,
     )
-    .ok()?;
+    .ok() else {
+        return HeadAuthority::no_context(person_held);
+    };
     let roster_publics: Vec<protocol::person_key::PersonPublicHalf> = roster
         .members
         .iter()
@@ -452,160 +502,56 @@ async fn signed_head_ctx(
             .ok()
         })
         .collect();
-    let ctx = super::head_authority::SignedHeadCtx::new(
-        person,
-        b2b.base.account_number_hash,
-        roster_publics.clone(),
-    );
 
-    // The device half (`decisions/protocol/0731` + `0733`): this device authors `0x03`
-    // only when BOTH halves of the binding are in place: a device key at rest, and a
-    // VERIFIED binding row for this device that publishes the same public half. Either
-    // half missing means the phrase path (`0x02`), which every peer already accepts, so
-    // a half-finished rollout never authors a head its peers cannot resolve.
-    let Some(device_id) = super::device_actor::durable_device_id(host, io, vault_dir).await else {
-        return Some(ctx);
-    };
-    // Three states, told apart on purpose. `Ok(None)` is first run; `Unsupported` is
-    // rung 4 of the ladder (no storage on this platform), which is the ordinary state
-    // on everything but Apple. Anything else is a FAULT: a keychain that refused or an
-    // item that would not decode is not "this device has no key", and reading it as
-    // that would leave the phrase path in place for ever with one trace line as the
-    // only clue. It is still not fatal here: sync must run, and a `0x02` head is a
-    // head every peer accepts.
-    let Some(device_key) = device_key_for_signing(super::device_identity::load()) else {
-        return Some(ctx);
-    };
-    let signers =
-        verified_device_head_signers(io, vault_dir, &b2b, &roster_publics, &group_key).await;
-    if !own_device_is_a_signer(&signers, device_id, &device_key.public_half()) {
-        // A device key with no verified binding row is not a signer: peers would answer
-        // `AuthorUnknown` for its heads, and a head nobody can verify is worse than an
-        // `0x02` one everybody can.
-        return Some(ctx);
-    }
-    Some(ctx.with_device(
-        super::head_authority::DeviceSigner {
-            device_id,
-            key: device_key,
-        },
-        signers,
-    ))
-}
-
-/// Whether this device may author a `0x03` head: a VERIFIED binding row must name THIS
-/// device id AND carry the SAME public half the loaded key has.
-///
-/// Both clauses are load-bearing and they fail differently. A row for another device would
-/// let this device sign under an id peers resolve to somebody else; a row for this device
-/// that publishes a different key would make peers verify a signer that never signed
-/// anything. Either way the head is unverifiable, so the phrase path (`0x02`, which every
-/// peer already accepts) is the correct answer rather than a partial rollout.
-///
-/// Split from [`signed_head_ctx`] so the rule can be asserted without a full `vault.meta`,
-/// a group roster and a keychain: the device id it is handed comes from
-/// `device_actor::durable_device_id`, which is pinned in that module and in `roster_trust`.
-fn own_device_is_a_signer(
-    signers: &[protocol::vault_head::DeviceHeadSigner],
-    device_id: [u8; 16],
-    public: &protocol::device_key::DevicePublicHalf,
-) -> bool {
-    signers
-        .iter()
-        .any(|s| s.device_id == device_id && &s.public == public)
-}
-
-/// The device key this cycle may sign a `0x03` head with, or `None` for the person
-/// path (`0x02`), which every peer already accepts.
-///
-/// The three states are told apart on purpose and this is the one place that does it.
-/// `Ok(None)` is first run; `Unsupported` is rung 4 of the storage ladder (no key store
-/// on this platform), which is the ordinary state on everything but Apple and is NOT a
-/// fault. Anything else is: a key store that refused or an item that would not decode is
-/// not "this device has no key", and reading it as that would leave the phrase path in
-/// place for ever with one trace line as the only clue. It is still not fatal: sync must
-/// run, and a `0x02` head is a head every peer accepts.
-fn device_key_for_signing(
-    load: Result<
-        Option<protocol::device_key::DeviceKeyPair>,
-        super::device_identity::DeviceKeyStoreError,
-    >,
-) -> Option<protocol::device_key::DeviceKeyPair> {
-    match load {
-        Ok(key) => key,
-        Err(super::device_identity::DeviceKeyStoreError::Unsupported) => None,
-        Err(err) => {
-            tracing::warn!(
-                stage = "sync_head_device_key",
-                error = ?err,
-                "device key could not be read; authoring a person-signed head"
-            );
-            None
-        }
-    }
-}
-
-/// The device public halves a `0x03` head may be verified against: the LIVE,
-/// VERIFIED rows of `vault.device-bindings`, resolved through the signed roster.
-///
-/// "Verified" is the load-bearing word rather than tidiness. The map is group-sealed,
-/// so any member can write it; an unverified row would let a member holding the group
-/// key point a binding at a key they control and then sign heads as that person's
-/// device. The partition checks each row against the public half of the person the row
-/// NAMES, taken from the signed roster.
-async fn verified_device_head_signers(
-    io: &dyn crate::vault_io::VaultIo,
-    vault_dir: &std::path::Path,
-    b2b: &protocol::B2bVaultMeta,
-    roster_publics: &[protocol::person_key::PersonPublicHalf],
-    group_key: &[u8; 32],
-) -> Vec<protocol::vault_head::DeviceHeadSigner> {
-    let bindings_key = super::super::device_binding::bindings_key_for_group(
-        group_key,
-        b2b.base.account_number_hash,
-        b2b.group_key_epoch,
-    );
-    let map = match super::super::device_binding::read_device_bindings_in_dir(
+    // The device half, resolved in ONE place (myne-md/myne#983): a key at rest, a VERIFIED
+    // binding row for this device, and that row publishing exactly this key. Any other state
+    // is `Unbound(cause)`, and the cause is what the caller reports.
+    let device = super::authority::resolve_device(
         io,
         vault_dir,
-        &bindings_key.borrow(),
+        b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+        &group_key,
+        &roster_publics,
+        super::device_actor::durable_device_id(host, io, vault_dir).await,
+        &key_at_rest,
     )
-    .await
-    {
-        Ok(map) => map,
-        // An empty signer set and an unreadable store are different states with the
-        // same effect here, so the difference is at least recorded: a corrupt store
-        // silently reading as "no device is bound" is how a binding problem hides for
-        // a release.
-        Err(err) => {
-            tracing::warn!(
-                stage = "sync_head_device_signers",
-                error = ?err,
-                "device-binding store unreadable; no device signer is resolvable"
-            );
-            return Vec::new();
+    .await;
+    // Not bound still builds the context: the phrase path (`0x02`) is a head every peer
+    // accepts, and a cold start has to be able to READ heads it cannot author.
+    let ctx = match &device {
+        super::authority::DeviceResolution::Bound(bound) => {
+            super::head_authority::SignedHeadCtx::new(
+                person,
+                b2b.base.account_number_hash,
+                roster_publics,
+            )
+            .with_device(
+                super::head_authority::DeviceSigner {
+                    device_id: bound.device_id,
+                    key: bound.key.clone(),
+                },
+                bound.signers.clone(),
+            )
+        }
+        // An unbound device still READS: the verified rows are what a peer's `0x03` head is
+        // checked against, and those belong to the vault rather than to this device's
+        // binding. Dropping them here made `accepts_format` claim `0x03` while every
+        // verification answered `AuthorUnknown` (myne-md/myne#983 review, D4).
+        super::authority::DeviceResolution::Unbound { signers, .. } => {
+            super::head_authority::SignedHeadCtx::new(
+                person,
+                b2b.base.account_number_hash,
+                roster_publics,
+            )
+            .with_readers(signers.clone())
         }
     };
-    let (verified, _unverified) = protocol::partition_verified_bindings(
-        &map,
-        |fingerprint_hex| {
-            roster_publics
-                .iter()
-                .find(|p| protocol::hex::encode_lower(p.fingerprint()) == fingerprint_hex)
-                .cloned()
-        },
-        None,
-    );
-    verified
-        .iter()
-        .filter(|(_, entry)| !entry.tombstone)
-        .filter_map(|(device_hex, entry)| {
-            Some(protocol::vault_head::DeviceHeadSigner {
-                device_id: super::devices::hex16(device_hex)?,
-                public: protocol::device_public_half_from_entry(entry)?,
-            })
-        })
-        .collect()
+    HeadAuthority {
+        ctx: Some(ctx),
+        device,
+        person_held,
+    }
 }
 
 /// The person session's device token, as raw bytes (myne-md/myne#911 task 8).
@@ -614,6 +560,28 @@ async fn verified_device_head_signers(
 /// a person-key rotation, and a cached copy would outlive the credential it
 /// names. `None` on an absent file (no identity on this device), an all-zero or
 /// unparseable one, or an empty token (an identity that never registered).
+/// Which `FailureClass` a missing authority becomes, in one place.
+///
+/// The mapping is the whole point of myne-md/myne#983: the class, the log and the UI sentence
+/// must not disagree, and before this the choice was an inline expression nothing could assert.
+/// `KeyMissingWhileBound` gets its own class because the repair IS the identity entry but the
+/// sentence has to name what is actually missing; every other cause either parks as `Other` or
+/// asks for the identity.
+fn class_for_missing_authority(
+    cause: super::authority::AuthorityMissing,
+    person_held: bool,
+) -> super::loop_control::FailureClass {
+    if !cause.identity_unlock_would_fix() || person_held {
+        return super::loop_control::FailureClass::Other;
+    }
+    match cause {
+        super::authority::AuthorityMissing::KeyMissingWhileBound => {
+            super::loop_control::FailureClass::DeviceKeyMissing
+        }
+        _ => super::loop_control::FailureClass::IdentityLocked,
+    }
+}
+
 async fn person_token_bytes(
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
@@ -993,10 +961,12 @@ pub async fn run_active_cycle_from_host(
     // deferred live pull, so the merge keeps its own clone of the key.
     let live_merge_keys = (items_key.clone(), items_key_id);
 
-    // Signed `0x02` head authority for an `NTV6` vault (`None` keeps the `NTV5`
-    // HMAC head). Built before the blocking closure so the person keypair and the
-    // roster are gathered on the executor, not the blocking thread.
-    let signed_ctx = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
+    // The head authority for a vault that carries the B2B tail: the context to sign with,
+    // and the cause when this device cannot. Built before the blocking closure so the person
+    // keypair, the roster and the binding store are gathered on the executor, not the blocking
+    // thread. A vault with no tail keeps the `NTV5` HMAC head and resolves to `no_context`
+    // here, which the guard never consults because it only fires on a tail-carrying vault.
+    let authority = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
     // An `NTV6` vault's head is signature-authenticated. If no person identity is
     // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
@@ -1029,30 +999,22 @@ pub async fn run_active_cycle_from_host(
                 return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
             }
         };
-        let can_author = signed_ctx
-            .as_ref()
-            .is_some_and(super::head_authority::SignedHeadCtx::can_author);
-        if needs_signed_head && !can_author {
-            // Unlocking the person identity is one cause the user can fix in place, so it
-            // gets its own class and the UI its own sentence. It is no longer the only
-            // way to author a head (`0731` stage 1: a device key authors `0x03` with no
-            // phrase), so the class is chosen by asking what this device is actually
-            // missing rather than by whether an identity happens to be held. Any OTHER
-            // reason (roster, group key, an unverified binding row) stays a generic
-            // failure, because that fix is not something to ask of them.
-            let has_person = state.clone_person_identity().await.is_some();
-            let has_device_key =
-                super::device_identity::load_for_fallback("cycle_can_author").is_some();
-            let class = if !has_person && !has_device_key {
-                super::loop_control::FailureClass::IdentityLocked
-            } else {
-                super::loop_control::FailureClass::Other
-            };
+        if needs_signed_head && !authority.can_author() {
+            // The cause comes from `sync::authority`, which is the only place that knows
+            // which half is missing (myne-md/myne#983). The class is derived from whether
+            // opening the identity would FIX it, not from whether an identity happens to be
+            // held: a vault whose row publishes a key nothing can load reported
+            // `identity_locked` for exactly as long as the two were conflated, and the
+            // sentence sent the user to a fix that only sometimes applied.
+            let cause = authority.missing();
+            let class = class_for_missing_authority(cause, authority.person_held);
             tracing::warn!(
                 stage = "sync_cycle",
-                event = "ntv6_head_unsigned",
-                person_identity_held = has_person,
-                "NTV6 vault whose signed head context could not be built; refusing to author a downgraded head"
+                event = "b2b_head_authority_missing",
+                cause = cause.as_str(),
+                person_identity_held = authority.person_held,
+                identity_unlock_would_fix = cause.identity_unlock_would_fix(),
+                "this device cannot sign the vault head; refusing to author a downgraded head"
             );
             return CycleOutcome::Failed(class);
         }
@@ -1113,7 +1075,7 @@ pub async fn run_active_cycle_from_host(
             }),
             // Signed `0x02` heads when the vault is `NTV6` and a person identity
             // is held; `None` keeps the `NTV5` `root_key` HMAC head.
-            signed_ctx.as_ref(),
+            authority.ctx.as_ref(),
             // The live-session snapshot captured above (task 7).
             &live_note_ids,
         )
@@ -1753,6 +1715,40 @@ mod tests {
     //! two disagree — is decided here, and the rest of the gather is a host, a
     //! runtime slot and a live server.
 
+    /// The failure class a missing authority becomes, asserted for the four shapes that matter.
+    ///
+    /// The regression this guards is exact: `KeyMissingWhileBound` used to fold into
+    /// `IdentityLocked`, so the app said "unlock your identity" for a vault whose PUBLISHED key
+    /// was gone, and typing the phrase helped for one session (myne-md/myne#983). A future edit
+    /// that collapses the two again compiles and passes every other test in the crate.
+    #[test]
+    fn a_missing_authority_maps_to_one_failure_class() {
+        use super::class_for_missing_authority;
+        use crate::plugins::sync::authority::AuthorityMissing;
+        use crate::plugins::sync::loop_control::FailureClass;
+
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyMissingWhileBound, false),
+            FailureClass::DeviceKeyMissing,
+            "a key this device published and no longer holds is its own class"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::NoPersonSession, false),
+            FailureClass::IdentityLocked,
+            "no session and no key is the one cause the identity phrase fixes"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyUnreadable, false),
+            FailureClass::Other,
+            "a store fault is not something the user's identity entry repairs"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyMissingWhileBound, true),
+            FailureClass::Other,
+            "with the person held, opening the identity again is not the missing step"
+        );
+    }
+
     use super::*;
 
     /// The party-ness gate on the binding repair, tested for the ONE mistake that would
@@ -1789,85 +1785,6 @@ mod tests {
     }
     use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
 
-    /// **A device with no key store keeps signing `0x02`**, and every other reason the
-    /// key is unavailable does too, which is the whole point of the three-state split.
-    ///
-    /// `Unsupported` is rung 4 of the ladder and the ordinary state on every platform
-    /// but Apple; `Ok(None)` is a first run; `Backend`/`Corrupt` are faults that must
-    /// still fall back rather than strand a device whose key store is merely locked. The
-    /// risk this task introduced is specific: the person-plane device id is now adopted
-    /// into every person-born vault's sync state, so a device WITHOUT a key store reaches
-    /// this branch instead of returning before it. Reading `Unsupported` as "no device"
-    /// is right; reading `Backend` as "no device" is the silent degradation this arm
-    /// warns about.
-    #[test]
-    fn a_device_without_a_key_store_signs_with_the_person_key() {
-        use crate::plugins::sync::device_identity::DeviceKeyStoreError;
-        assert!(
-            device_key_for_signing(Err(DeviceKeyStoreError::Unsupported)).is_none(),
-            "rung 4 must fall back to the person key, silently"
-        );
-        assert!(
-            device_key_for_signing(Ok(None)).is_none(),
-            "a first run has no key yet and must not block sync"
-        );
-        assert!(
-            device_key_for_signing(Err(DeviceKeyStoreError::Backend)).is_none(),
-            "a refused key store still falls back: refusing outright would strand a \
-             device whose store is merely locked"
-        );
-        assert!(
-            device_key_for_signing(Err(DeviceKeyStoreError::Corrupt)).is_none(),
-            "a corrupt item is re-created on the next claim, not signed with"
-        );
-        let pair = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
-        let expected = pair.public_half();
-        let got = device_key_for_signing(Ok(Some(pair))).expect("a key at rest is a signer");
-        assert_eq!(got.public_half(), expected);
-    }
-
-    /// A `0x03` head needs BOTH halves: this device's id on the row, and this key's public
-    /// half on it. Each clause is pinned separately because each fails toward a head peers
-    /// cannot verify, and the pre-existing code path had neither a test nor a name.
-    #[test]
-    fn a_device_signed_head_needs_a_row_naming_both_this_device_and_this_key() {
-        let key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
-        let other_key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x51; 32], &[0x52; 32]);
-        let device_id = [0x33u8; 16];
-        let row = |device_id: [u8; 16], public: protocol::device_key::DevicePublicHalf| {
-            protocol::vault_head::DeviceHeadSigner { device_id, public }
-        };
-
-        assert!(
-            !own_device_is_a_signer(&[], device_id, &key.public_half()),
-            "a key with no verified row signs `0x02`, not a head nobody can resolve"
-        );
-        assert!(
-            own_device_is_a_signer(
-                &[row(device_id, key.public_half())],
-                device_id,
-                &key.public_half()
-            ),
-            "this device, this key: the one case that may author a `0x03` head"
-        );
-        assert!(
-            !own_device_is_a_signer(
-                &[row(device_id, other_key.public_half())],
-                device_id,
-                &key.public_half()
-            ),
-            "a row for this device naming ANOTHER key would have peers verify a signer that \
-             never signed"
-        );
-        assert!(
-            !own_device_is_a_signer(
-                &[row([0x99; 16], key.public_half())],
-                device_id,
-                &key.public_half()
-            ),
-            "a row for another device publishing this key is not this device's binding"
-        );
-    }
     // Method resolution for `IO`'s inherent-looking calls (`create_dir_all`,
     // `write`): the trait is the only place they exist.
     use crate::vault_io::VaultIo as _;
