@@ -104,25 +104,56 @@ export class Element {
    *  with it — while `clickBySelector` in `flows.ts`, which scrolls per poll,
    *  was green on the same tree. */
   async click(): Promise<void> {
-    await this.session.waitUntil(
-      async () => {
-        try {
-          await this.session.send("POST", this.path("/click"));
-          return true;
-        } catch (e) {
-          if (
-            e instanceof WebDriverError &&
-            (e.code === "element not interactable" ||
-              e.code === "element click intercepted")
-          ) {
-            await this.scrollIntoViewBestEffort();
-            return null; // not hit-testable yet — keep polling
+    try {
+      await this.session.waitUntil(
+        async () => {
+          try {
+            await this.session.send("POST", this.path("/click"));
+            return true;
+          } catch (e) {
+            if (
+              e instanceof WebDriverError &&
+              (e.code === "element not interactable" ||
+                e.code === "element click intercepted")
+            ) {
+              await this.scrollIntoViewBestEffort();
+              return null; // not hit-testable yet — keep polling
+            }
+            throw e;
           }
-          throw e;
-        }
-      },
-      { label: "element interactable + clicked", timeoutMs: 10_000 },
-    );
+        },
+        { label: "element interactable + clicked", timeoutMs: 10_000 },
+      );
+    } catch (raw) {
+      // **Name the node and what is on top of it.** "element interactable +
+      // clicked timed out" cannot distinguish the four explanations this has — a
+      // zero-sized node, a node under an `inert` ancestor (the importer offer
+      // registers the whole page inert, `useOverlayInert`), a node covered by a
+      // real overlay, and a node the driver simply will not hit-test. Measured
+      // 2026-11-03: four specs failed on this message and none of them could say
+      // which of the four it was.
+      let seen = "<unreadable>";
+      try {
+        seen = await this.session.execute<string>(
+          "const el = arguments[0]; if (!el) return 'gone';" +
+            "const r = el.getBoundingClientRect();" +
+            "const t = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);" +
+            "return JSON.stringify({ testid: el.getAttribute('data-testid')," +
+            " rect: [Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]," +
+            " top: t ? (t.getAttribute('data-testid') || t.className || t.tagName) : 'none'," +
+            " stack: Array.prototype.slice.call(document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2), 0, 4)" +
+            "   .map(function (n) { return n.getAttribute('data-testid') || String(n.className || n.tagName).slice(0, 24); })," +
+            " sameId: document.querySelectorAll('[data-testid=\"editor.tab\"]').length," +
+            " inert: el.closest('[inert]') ? (el.closest('[inert]').getAttribute('data-testid') || 'yes') : null," +
+            " pointerEvents: getComputedStyle(el).pointerEvents," +
+            " visible: getComputedStyle(el).visibility });",
+          [{ [ELEMENT_KEY]: this.elementId }],
+        );
+      } catch {
+        /* the session may be wedged; the timeout is still the failure */
+      }
+      throw new Error(`${(raw as Error).message} | node: ${seen}`);
+    }
   }
 
   /** Centre this element in whatever scroll container holds it, best-effort:
