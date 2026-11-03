@@ -2852,6 +2852,54 @@ fn a_joining_device_ends_up_authenticating_with_its_own_credential() {
             "no phrase, no account credential: this token is its own"
         );
         assert_eq!(login.device_id, device_id);
+
+        // ---- 6. a second phrase entry keeps the same credential ------------------
+        // Registering builds a FRESH record, so the triple has to be carried for the mint's
+        // non-rotation to be a property of the path rather than of the function alone: a
+        // second salt derives a second verifier, and the server answers `409 already_installed`
+        // for the device it already holds one on. This arm is also the population the threat
+        // model names: a registration that supplies an existing phrase declares `recovery`,
+        // so it self-approves and installs without anyone's tap.
+        let again = crate::plugins::sync::person_account::person_register_from_host(
+            &joining.host,
+            &io,
+            &joining.state,
+            JOINING_PHRASE.to_string(),
+        )
+        .await
+        .expect("a second registration against the real server");
+        assert!(again.approved, "the recovery declaration self-approves");
+        let reread = read_person_auth(
+            &io,
+            &person_auth_path_for_read(&joining.host).expect("joining auth path"),
+        )
+        .await
+        .expect("joining auth reads")
+        .expect("the joining device holds a credential");
+        assert_eq!(
+            reread.device_secret_hex.as_deref(),
+            Some(minted.as_str()),
+            "the secret is carried, never re-minted"
+        );
+        assert_eq!(
+            reread.device_salt_hex, after.device_salt_hex,
+            "and so is the salt: a second one would derive a second verifier"
+        );
+        assert_ne!(
+            reread.device_id_hex, after.device_id_hex,
+            "the new registration is a new device row, which is why the triple must travel"
+        );
+        let new_device_id = crate::plugins::sync::devices::hex16(&reread.device_id_hex)
+            .expect("the new device id parses");
+        let relogin = crate::plugins::sync::enroll::device_login(
+            transport.as_ref(),
+            &person_id,
+            new_device_id,
+            &protocol::hex::decode_lower::<32>(&minted).expect("32-byte secret"),
+            "e0000000000000000000000000000003",
+        )
+        .expect("the carried credential authenticates the new row");
+        assert!(relogin.approved && !relogin.token.is_empty());
     });
 }
 
