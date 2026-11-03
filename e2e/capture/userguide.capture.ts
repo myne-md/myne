@@ -290,7 +290,7 @@ async function openNoteByTitle(session: Session, title: string): Promise<string>
   // `palettePick` types the title through W3C element-send-keys, and under CPU
   // load on this host WebKit intermittently drops the SHIFT of the FIRST
   // character, so the input ends up holding the same NUMBER of characters in
-  // the wrong case ("reading list" for "Reading list"). The helper's own nudge
+  // the wrong case ("papers on local-first" for "Papers on local-first"). The helper's own nudge
   // retypes it the same way, the row never matches, and the frame dies on a
   // 45 s palette wait that reports "held 12 of 12 typed characters" — lengths
   // only, by design (SYNC-13), which is why the case never showed up in the
@@ -376,6 +376,9 @@ runner(
   async () => {
     mkdirSync(OUT_DIR, { recursive: true });
     let password = "";
+    // Which palette this run produces. Read here rather than at the theme step
+    // because the manifest is written after the walk and reports it.
+    const captureTheme = process.env.CAPTURE_THEME === "dark" ? "dark" : "light";
     const app = await launchApp({
       // Production KDF: the weak-KDF fixture's m_kib=8 is below the
       // validate_kdf_params 8 MiB floor (protocol, 2026-06-17) and the binary
@@ -441,106 +444,112 @@ runner(
       await safe("folder Projects", () => createFolder(s, "Projects"));
       await safe("folder Research", () => createFolder(s, "Research"));
 
-      await safe("note Roadmap", () =>
+      await safe("note Field notes", () =>
         createNoteWithBody(
           s,
-          "Roadmap",
-          "\nThings we want to ship next:\n\n" +
-            "- [ ] Encrypted attachments\n" +
-            "- [ ] Full-text search across the vault\n" +
+          "Field notes from the beta",
+          "\nWhat is still rough, in the order it bites:\n\n" +
+            "- [ ] Attachments on a locked vault\n" +
+            "- [x] Full-text search across the vault\n" +
             "- [x] Markdown editor with live preview\n\n" +
-            "Tagged #planning #shipping\n\n" +
-            "Background reading lives in the [[Reading list]].\n",
+            "Tagged #beta #shipping\n\n" +
+            "The reading behind it is in the [[Papers on local-first]].\n",
         ),
       );
-      await safe("note Reading list", () =>
+      await safe("note Papers", () =>
         createNoteWithBody(
           s,
-          "Reading list",
-          "\nArticles and papers to get through:\n\n" +
-            "1. End-to-end encryption for everyone\n" +
-            "2. Designing for local-first software\n" +
-            "3. The case against cloud lock-in\n",
+          "Papers on local-first",
+          "\nWhat to read before the next design pass:\n\n" +
+            "1. Local-first software: the seven ideals\n" +
+            "2. Convergent replicated data types, in practice\n" +
+            "3. Why a server that cannot read is cheaper to trust\n",
         ),
       );
-      await safe("note Weekly review", () =>
+      await safe("note Friday log", () =>
         createNoteWithBody(
           s,
-          "Weekly review",
-          "\nWhat went well this week:\n\n" +
-            "- Shipped the new editor\n" +
-            "- Cleaned up the sidebar\n\n" +
-            "Next week: focus on backups. See the [[Roadmap]].\n",
-        ),
-      );
-
-      // Spell / comment / folding sample notes — small, single-purpose
-      // bodies so the matching frames have an unambiguous subject.
-      await safe("note Spelling sample", () =>
-        createNoteWithBody(
-          s,
-          "Spelling sample",
-          "\nThis sentance has a few mispelled wrods to triger the checker.\n",
-        ),
-      );
-      await safe("note Comment sample", () =>
-        createNoteWithBody(
-          s,
-          "Comment sample",
-          "\nVisible text %%this is an editor comment%% more visible text.\n",
-        ),
-      );
-      await safe("note Folding sample", () =>
-        createNoteWithBody(
-          s,
-          "Folding sample",
-          "\n## Project notes\n\n" +
-            "First detail under the heading.\n" +
-            "Second detail under the heading.\n" +
-            "Third detail under the heading.\n" +
-            "Fourth detail under the heading.\n",
+          "Friday log",
+          "\nWhat moved this week:\n\n" +
+            "- The editor lost its last toolbar\n" +
+            "- The sidebar stopped shouting\n\n" +
+            "Next week: the migration, on a real vault. See the [[Field notes from the beta]],\n" +
+            "and the [[Start here]] note if you are new to this vault.\n",
         ),
       );
 
-      // Outline sample — several headings (one nested) so the Outline tab in
-      // the right panel has a legible heading structure to render.
-      await safe("note Outline sample", () =>
+      // Small, single-purpose notes so the frames that photograph one behaviour
+      // have an unambiguous subject: the spellchecker, an inline comment, and a
+      // heading long enough to fold.
+      await safe("note Letter", () =>
         createNoteWithBody(
           s,
-          "Outline sample",
-          "\n## Introduction\n\nWhy this note exists.\n\n" +
-            "## Background\n\nThe context behind the work.\n\n" +
-            "### Prior art\n\nWhat came before.\n\n" +
-            "## Plan\n\nWhat we will do next.\n\n" +
-            "## Conclusion\n\nWrapping up.\n",
+          "Letter to the landlord",
+          "\nDear Mr Aldridge,\n\nThe raddiator in the back room has been cold since Tuesday and the\n" +
+            "boiler makes a noise I can only descibe as resigned. Could somebody\nlook at it this week?\n",
+        ),
+      );
+      await safe("note Recipe", () =>
+        createNoteWithBody(
+          s,
+          "Recipe notes",
+          "\nSourdough, third attempt. Mix at 68% hydration and leave it overnight.\n\n" +
+            "%%the oven runs 15C hot, so drop everything by a notch%%\n\n" +
+            "Score deep, bake 20 minutes with steam, then leave it alone for an hour.\n",
+        ),
+      );
+      await safe("note Server budget", () =>
+        createNoteWithBody(
+          s,
+          "Server budget",
+          "\n## What it costs to run\n\n" +
+            "A small instance is enough for two people.\n" +
+            "Storage grows with attachments, not with notes.\n" +
+            "Bandwidth is the whole bill once the blobs are sealed.\n" +
+            "Everything else is a rounding error.\n",
         ),
       );
 
-      // Unlinked-mention seed: a note that names "Roadmap" in PLAIN TEXT (not a
-      // [[wikilink]]) so the Unlinked mentions panel has a candidate to surface.
-      await safe("note Meeting notes", () =>
+      // The onboarding note carries several headings, one nested, so the Outline
+      // tab in the right panel has a legible structure to render.
+      await safe("note Onboarding call", () =>
         createNoteWithBody(
           s,
-          "Meeting notes",
-          "\nWe walked through the Roadmap at standup and agreed on the next milestone.\n",
+          "Onboarding call",
+          "\n## Who was on it\n\nTwo of us, and the new hire.\n\n" +
+            "## What we covered\n\nWhere the vault lives, and what sync does.\n\n" +
+            "### The part people ask about\n\nLosing the phrase, and what it costs.\n\n" +
+            "## What happens next\n\nA second device, paired on Friday.\n\n" +
+            "## Open questions\n\nWhether the export is readable without the app.\n",
+        ),
+      );
+
+      // Unlinked-mention seed: a note that names the roadmap note in PLAIN TEXT
+      // (not a [[wikilink]]) so the Unlinked mentions panel has a candidate.
+      await safe("note Standup", () =>
+        createNoteWithBody(
+          s,
+          "Standup, Tuesday",
+          "\nWe walked through Field notes from the beta at standup and picked the next milestone.\n",
         ),
       );
 
       // Hub note LAST so it stays open + selected for the first frames.
       // Its wikilinks give the graph real edges (otherwise all nodes are
-      // isolated and the graph reads as blank) and seed Roadmap's backlinks.
-      await safe("note Welcome to Myne", () =>
+      // isolated and the graph reads as blank) and seed the roadmap note's
+      // backlinks.
+      await safe("note Start here", () =>
         createNoteWithBody(
           s,
-          "Welcome to Myne",
-          "\nMyne keeps your notes encrypted on this device. Sync is off for " +
-            "this vault; Myne does not send it to a sync server until you turn " +
-            "sync on.\n\n" +
+          "Start here",
+          "\nThis vault lives on this device and nowhere else until you turn sync " +
+            "on. Every note, every title and every folder name is sealed before it " +
+            "touches the disk, and the key never leaves this machine.\n\n" +
             "Start here:\n\n" +
-            "- [[Roadmap]] — what we're shipping next\n" +
-            "- [[Reading list]] — articles to get through\n" +
-            "- [[Weekly review]] — notes from the last review\n\n" +
-            "Everything you type is saved automatically and encrypted at rest.\n",
+            "- [[Field notes from the beta]]: what is still rough\n" +
+            "- [[Papers on local-first]]: the reading behind it\n" +
+            "- [[Friday log]]: how the week went\n\n" +
+            "Nothing is uploaded, indexed or backed up anywhere unless you ask for it.\n",
         ),
       );
 
@@ -584,6 +593,39 @@ runner(
       // after capture so the next editor frame starts from Live + one pane).
       // =====================================================================
 
+      // ---- Theme, once, before the first content frame ----
+      // The marketing shots need a dark set and a light set, and the app's own
+      // default is light, so a run without this step can only ever produce one
+      // of the two. Set through the real preference command rather than by
+      // clicking through Settings: `theme` is an AS3-low cosmetic pref with no
+      // protective envelope, `plugin:prefs|set_theme` is what the panel calls,
+      // and a console call cannot be thrown off by a moved tab or a rail that
+      // is not mounted yet. `CAPTURE_THEME=light` reproduces the default.
+      const themeSet = await pageSeatInvoke(
+        s,
+        "plugin:prefs|set_theme",
+        { theme: captureTheme },
+        15_000,
+      );
+      // `pageSeatInvoke` reports `{ ok }` on success and `{ err }` on failure,
+      // and `set_theme` returns unit, so a successful call is `{ ok: null }`
+      // and testing `.ok` for truthiness reads success as failure.
+      if ("err" in themeSet) {
+        throw new Error(`theme did not take: ${JSON.stringify(themeSet.err)}`);
+      }
+      // `setTheme` in `src/lib/prefs.ts` only PERSISTS the choice; the caller is
+      // what applies it to `<html data-theme>` (`applyTheme`, `src/lib/theme.ts`),
+      // and the Appearance panel is that caller. Invoking the command alone
+      // therefore wrote the pref and left the screen on the app's default. The
+      // first run of this pass produced a full light set under
+      // `CAPTURE_THEME=dark` and nothing said so. Set the attribute too, which
+      // is exactly what `applyTheme` does for an explicit choice.
+      await s.execute(
+        "document.documentElement.setAttribute('data-theme', arguments[0]);",
+        [captureTheme],
+      );
+      await settle(s, 400);
+
       // ---- Frame: interface tour (populated editor) ----
       await frame(
         s,
@@ -591,7 +633,7 @@ runner(
         "getting-started/interface-tour",
         "The Myne editor with the note sidebar on the left, a note open in the centre, and the bottom bar.",
         async () => {
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await s.byTestId("editor.root");
         },
       );
@@ -605,7 +647,7 @@ runner(
         "editor-and-writing/view-modes",
         "A note shown in reading mode, where Markdown is rendered for reading rather than editing.",
         async () => {
-          await openNoteByTitle(s, "Reading list");
+          await openNoteByTitle(s, "Papers on local-first");
           const cta = await s.byTestId("editor.view-mode-cta");
           await cta.click();
           await s.waitUntil(
@@ -641,7 +683,7 @@ runner(
         "editor-and-writing/focus-mode",
         "The editor in focus mode, with surrounding panels dimmed so only the current note stands out.",
         async () => {
-          await openNoteByTitle(s, "Weekly review");
+          await openNoteByTitle(s, "Friday log");
           await settle(s, 500); // let the note + palette infra settle before the action
           await runPaletteAction(s, "view.toggle-focus", "focus");
           // Focus activates on the action; the data-focus-active attribute
@@ -668,7 +710,7 @@ runner(
         async () => {
           await pressKey(s, ESCAPE); // ensure no lingering focus mode / overlay
           await settle(s, 300);
-          await openNoteByTitle(s, "Folding sample");
+          await openNoteByTitle(s, "Server budget");
           await settle(s, 600);
           // Fold via the palette action (heading-list-folding.e2e.ts hlf2) —
           // robust and coordinate-free. The prior synthetic `.click()` fired at
@@ -690,10 +732,10 @@ runner(
         "editor-and-writing/find-and-replace",
         "The find and replace bar open over a note, with a search term entered.",
         async () => {
-          await openNoteByTitle(s, "Reading list");
+          await openNoteByTitle(s, "Papers on local-first");
           await settle(s, 400);
           await ctrlChord(s, "f");
-          await (await s.byTestId("find.input", { timeoutMs: 10000 })).sendKeys("encryption");
+          await (await s.byTestId("find.input", { timeoutMs: 10000 })).sendKeys("local");
           await safe("reveal replace row", async () => {
             await (await s.byTestId("find.toggle-replace")).click();
             await (await s.byTestId("find.replace-input")).sendKeys("E2EE");
@@ -715,7 +757,7 @@ runner(
         "editor-and-writing/slash-commands",
         "The slash command menu open in a note, listing insertable blocks and actions.",
         async () => {
-          await openNoteByTitle(s, "Weekly review");
+          await openNoteByTitle(s, "Friday log");
           await settle(s, 400);
           await typeSlashCommand(s, "/");
           await settle(s, 400);
@@ -735,7 +777,7 @@ runner(
         "editor-and-writing/comments",
         "A note containing an inline comment, shown dimmed between the surrounding visible text.",
         async () => {
-          await openNoteByTitle(s, "Comment sample");
+          await openNoteByTitle(s, "Recipe notes");
           await s.waitForElement(".cm-comment", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -749,7 +791,7 @@ runner(
         "editor-and-writing/document-statistics",
         "The bottom bar of the editor showing the current note's word and character counts.",
         async () => {
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await s.byTestId("editor.doc-stats", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -764,15 +806,15 @@ runner(
         "editor-and-writing/spell-check",
         "A note with a misspelled word underlined by the spell checker.",
         async () => {
-          await openNoteByTitle(s, "Spelling sample");
+          await openNoteByTitle(s, "Letter to the landlord");
           const squiggle = await s.waitUntil(
             async () => {
               for (const el of await s.byTestIdAll("editor.spell-error")) {
-                if ((await el.textContent()).trim() === "sentance") return el;
+                if ((await el.textContent()).trim() === "raddiator") return el;
               }
               return null;
             },
-            { label: 'squiggle for "sentance"', timeoutMs: 15000 },
+            { label: 'squiggle for "raddiator"', timeoutMs: 15000 },
           );
           // Best-effort: open the suggestion menu so the frame shows the fix UI.
           await safe("open spell suggestion menu", async () => {
@@ -882,7 +924,7 @@ runner(
         "markdown/frontmatter-properties",
         "The Properties panel at the top of a note, showing its title and frontmatter fields.",
         async () => {
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await s.waitForElement(".cm-fm-properties", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -890,14 +932,14 @@ runner(
 
       // ---- Frame: wikilinks (rendered [[wikilink]] pills) ----
       // wikilink/chip-widget.ts renders .cm-wikilink-chip when the caret is off
-      // that line. "Welcome to Myne" already contains three wikilinks.
+      // that line. "Start here" already contains three wikilinks.
       await frame(
         s,
         "wikilinks",
         "find-and-connect/wikilinks",
         "A note with rendered wikilink pills that link to other notes in the vault.",
         async () => {
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await s.waitForElement(".cm-wikilink-chip", { timeoutMs: 8000 });
           await settle(s, 400);
         },
@@ -988,7 +1030,7 @@ runner(
         "safety-and-recovery/note-snapshots",
         "The note snapshots panel listing earlier saved versions of a note, with a preview of the selected one.",
         async () => {
-          const noteId = await openNoteByTitle(s, "Roadmap");
+          const noteId = await openNoteByTitle(s, "Field notes from the beta");
           await pageSeatInvoke(s, "plugin:notes|note_snapshot_flush", { noteId }, 15000);
           await runPaletteAction(s, "snapshots.open", "snap");
           await s.byTestId("snapshots.panel", { timeoutMs: 8000 });
@@ -1025,7 +1067,7 @@ runner(
         "The sidebar with notes organized into folders alongside loose top-level notes.",
         async () => {
           await pressKey(s, ESCAPE);
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await s.byTestId("editor.root");
           await settle(s, 400);
         },
@@ -1112,7 +1154,7 @@ runner(
       // stray "Templates" tab through every later frame.
       await safe("close templates tab", async () => {
         await runPaletteAction(s, "tab.close", "close tab");
-        await openNoteByTitle(s, "Roadmap");
+        await openNoteByTitle(s, "Field notes from the beta");
       });
 
       // ---- Frame: trash (a soft-deleted note in the Trash panel) ----
@@ -1229,16 +1271,16 @@ runner(
       // Dismiss the context menu and clear the multi-selection.
       await safe("clear bulk selection", async () => {
         await pressKey(s, ESCAPE);
-        await openNoteByTitle(s, "Welcome to Myne");
+        await openNoteByTitle(s, "Start here");
       });
 
       // ---- Frame: pinned and stacked tabs (a pinned tab + multiple tabs) ----
       // Use the rows' context-menu Open in new tab action, then the tab's own
       // context menu to pin it.
       //
-      // The pin targets the FIRST TAB IN THE STRIP rather than the "Roadmap"
+      // The pin targets the FIRST TAB IN THE STRIP rather than the "Field notes from the beta"
       // tab by id. `createNote` reuses the focused pane's active tab, so by the
-      // time the two "Tab …" notes exist the Roadmap tab has already been
+      // time the two "Tab …" notes exist the tab has already been
       // replaced and a lookup by its id can only time out. That is what this
       // frame shipped with: the article is about pinned tabs and the screenshot
       // had none, while every gate in the frame passed.
@@ -1248,7 +1290,7 @@ runner(
         "notes-and-organization/pinned-and-stacked-tabs",
         "The editor tab strip with several note tabs open and one tab pinned.",
         async () => {
-          await openNoteByTitle(s, "Roadmap");
+          await openNoteByTitle(s, "Field notes from the beta");
           await safe("open extra tabs from row menus", async () => {
             await createNote(s, "Tab reading");
             const readingId = capturedNoteIds.get("Tab reading");
@@ -1315,7 +1357,7 @@ runner(
           await createNote(s, "Split target");
           const splitTargetId = capturedNoteIds.get("Split target");
           if (!splitTargetId) throw new Error("split target note id was not recorded");
-          await openNoteByTitle(s, "Roadmap");
+          await openNoteByTitle(s, "Field notes from the beta");
           await rowMenuPick(s, splitTargetId, "open-to-side");
           await s.waitUntil(
             async () => ((await s.byTestIdAll("editor.pane")).length >= 2 ? true : null),
@@ -1336,14 +1378,14 @@ runner(
           async () => ((await s.byTestIdAll("editor.pane")).length <= 1 ? true : null),
           { label: "back to a single editor pane", timeoutMs: 10_000 },
         );
-        await openNoteByTitle(s, "Welcome to Myne");
+        await openNoteByTitle(s, "Start here");
       });
 
       // =====================================================================
       // FIND-AND-CONNECT FRAMES
       // =====================================================================
 
-      // ---- Frame: backlinks (the right-sidebar backlinks for Roadmap) ----
+      // ---- Frame: backlinks (the right-sidebar backlinks for "Field notes from the beta") ----
       // search-palette.e2e.ts: backlink rows are editor.backlink-row.
       // Open in a single pane first so the layout is clean.
       await frame(
@@ -1352,7 +1394,7 @@ runner(
         "find-and-connect/backlinks",
         "A note's backlinks panel listing the other notes that link to it.",
         async () => {
-          await openNoteByTitle(s, "Roadmap");
+          await openNoteByTitle(s, "Field notes from the beta");
           await s.byTestId("editor.backlink-row", { timeoutMs: 10000 });
           await settle(s, 500);
         },
@@ -1367,7 +1409,7 @@ runner(
         "find-and-connect/outline",
         "The Outline tab in the right panel, listing a note's headings so you can jump to any section.",
         async () => {
-          await openNoteByTitle(s, "Outline sample");
+          await openNoteByTitle(s, "Onboarding call");
           await settle(s, 400);
           await (
             await s.waitForElement(
@@ -1381,8 +1423,8 @@ runner(
       );
 
       // ---- Frame: unlinked mentions (the right-panel Unlinked tab) ----
-      // Same right-panel-tab idiom as outline (tab id "unlinked"). Open Roadmap,
-      // which "Meeting notes" names in plain text (an unlinked mention). Rows
+      // Same right-panel-tab idiom as outline (tab id "unlinked"). Open "Field notes from the beta",
+      // which "Standup, Tuesday" names in plain text (an unlinked mention). Rows
       // carry no testid, so gate on the tab + a settle (best-effort).
       await frame(
         s,
@@ -1390,7 +1432,7 @@ runner(
         "find-and-connect/unlinked-mentions",
         "The Unlinked mentions tab listing other notes that name this note without linking it.",
         async () => {
-          await openNoteByTitle(s, "Roadmap");
+          await openNoteByTitle(s, "Field notes from the beta");
           await settle(s, 400);
           await (
             await s.waitForElement(
@@ -1411,7 +1453,7 @@ runner(
         "The command palette open with a search term entered and matching note results listed.",
         async () => {
           await ctrlChord(s, "k");
-          await (await s.byTestId("palette.input", { timeoutMs: 10000 })).sendKeys("road");
+          await (await s.byTestId("palette.input", { timeoutMs: 10000 })).sendKeys("field");
           await s.byTestId("palette.option", { timeoutMs: 8000 });
           await settle(s, 500);
         },
@@ -1476,7 +1518,7 @@ runner(
         "safety-and-recovery/multiple-vaults",
         "The vault switcher menu open from the sidebar, listing your vaults with an option to create or switch to another.",
         async () => {
-          await openNoteByTitle(s, "Welcome to Myne");
+          await openNoteByTitle(s, "Start here");
           await (await s.byTestId("switcher.chip")).click();
           await s.byTestId("switcher.vault-row", { timeoutMs: 6000 });
           await settle(s, 400);
@@ -2028,7 +2070,7 @@ runner(
       );
       // Leave the attachments library by reopening a note from the sidebar.
       await safe("leave attachments library", async () => {
-        await openNoteByTitle(s, "Welcome to Myne");
+        await openNoteByTitle(s, "Start here");
       });
 
       // ---- Frame: voice notes (the recording bar) ----
@@ -2042,7 +2084,7 @@ runner(
         "attachments-and-import/voice-notes",
         "The voice-note recording bar shown while a voice note is being recorded into the editor.",
         async () => {
-          await openNoteByTitle(s, "Weekly review");
+          await openNoteByTitle(s, "Friday log");
           await settle(s, 400);
           // Wait for the menu to open + filter to the Voice note command BEFORE
           // committing, else Enter fires on an unrendered/unfiltered menu.
@@ -2121,8 +2163,8 @@ runner(
             generatedBy: "e2e/capture/userguide.capture.ts",
             window:
               process.env.GDK_SCALE === "2"
-                ? "2200x1440 (@2x), light theme"
-                : "1100x720 (tauri.conf.json), light theme",
+                ? `2200x1440 (@2x), ${captureTheme} theme`
+                : `1100x720 (tauri.conf.json), ${captureTheme} theme`,
             frames,
           },
           null,
