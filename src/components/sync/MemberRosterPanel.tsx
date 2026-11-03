@@ -180,7 +180,12 @@ export function MemberRosterPanel({
     const fingerprint = row.person_fingerprint_hex.toLowerCase();
     devicesPerPerson.set(fingerprint, (devicesPerPerson.get(fingerprint) ?? 0) + 1);
   }
-  const unverifiedClaims = claims.view?.unverified_device_ids.length ?? 0;
+  // `?.length` rather than `.length`: the view arrives over IPC, and a shape
+  // mismatch there must not take the whole Settings surface down with it. A
+  // truthy value that is not a `DeviceAttributionView` is reachable, which is
+  // what the story host's benign `[]` default demonstrated: it crashed this
+  // render and, behind it, every story the a11y gate measures after it.
+  const unverifiedClaims = claims.view?.unverified_device_ids?.length ?? 0;
   const [inviteOpen, setInviteOpen] = useState(false);
   // The NTV5→NTV6 confirmation, shown before the invite form on an unshared
   // vault (myne-md/myne#783). The migration is permanent, so it is an explicit
