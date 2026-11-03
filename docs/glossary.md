@@ -2737,20 +2737,25 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
-**device admission.** **Surface withdrawn** on 2026-10-31 (`decisions/protocol/0764`, myne-md/myne#956): the
-codec, the SAS class, the five `myne-core` commands and `POST /auth/devices/credential` all remain, and no client
-mounts a control for them, so the definition below is what the protocol does rather than what a user can reach
-today. The revival is myne-md/myne#957, which folds the per-device credential into the ordinary **Approve**
-action. The act itself: adding a device to a person account without typing the recovery phrase
-(`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
-has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
-them, compares a short authentication string between the two screens, and installs the credential
-(`POST /auth/devices/credential`, which also approves the device) and binds the newcomer's row in
-`vault.device-bindings`. The phrase keeps two jobs and loses the routine one: it is still the account's own
-credential and still the only path when no working device is left. A device that joined this way holds no person
-keypair, so it signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display
-name; the admitting device is the one that signs. Not to be confused with **device join**, the older flow that
-scans a QR carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
+**device admission.** Adding a device to a person account with its own server credential rather than the recovery
+phrase (`decisions/protocol/0735`). Since `decisions/protocol/0783` it is part of the ordinary **Approve**, with no
+separate surface: the joining device mints a SCRAM secret, a device id and, where the platform has a storage rung,
+a device key when the phrase is submitted, and installs its own verifier
+(`POST /auth/devices/credential`) once an already-approved device of the same account has approved its pending row.
+The joining device is therefore the installer, and `0783` records why (it holds an account session from the phrase,
+and only a pending device's lack of a token keeps that off the self-approval path). The three facts it needs on
+disk are the **credential triple**: `device_secret_hex`, `device_salt_hex` and `device_iterations` in
+`<app_config_dir>/person-auth.json`, the fields a verifier is rebuilt from, stored beside the device token they
+replace. Nothing is minted where the credential would not survive the session, which is the browser
+(`web/wasm/src/person_io.rs`), and it asks that of the IO seam rather than of the target architecture.
+The withdrawn two-sided ceremony (`0764`, myne-md/myne#956) is what `0783` supersedes: the `MYNE-DEVICE-1:` codec
+and the SAS class remain in `protocol/` as a codec no client exercises, so no code and no short authentication
+string travels on any shipped path, and the one human comparison in the join is the vault-head fingerprint
+eye-compare. The phrase keeps two jobs and loses the routine one: it is still the account's own credential and
+still the only path when no working device is left. A device that joined this way holds no person keypair, so it
+signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display name; the
+admitting device is the one that signs. Not to be confused with **device join**, the older flow that scans a QR
+carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
 
 
 Used in: `docs/decisions/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
