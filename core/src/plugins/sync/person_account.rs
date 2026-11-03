@@ -220,8 +220,14 @@ fn stored_device_credential(auth: &PersonAuth) -> Option<(Zeroizing<[u8; 32]>, D
     let secret = Zeroizing::new(protocol::hex::decode_lower::<32>(
         auth.device_secret_hex.as_deref()?,
     )?);
+    // The salt is VALIDATED rather than passed through, because `DeviceCredential::verifier`
+    // decodes it with `unwrap_or_default`: an undecodable salt would derive the verifier from
+    // an EMPTY one while the install forwards the corrupt string, so the server would hold a
+    // verifier this device can never produce a proof for.
+    let salt_hex = auth.device_salt_hex.as_deref()?;
+    protocol::hex::decode_lower::<16>(salt_hex)?;
     let mut credential = DeviceCredential {
-        salt_hex: auth.device_salt_hex.clone()?,
+        salt_hex: salt_hex.to_string(),
         iterations: auth.device_iterations?,
         stored_key_hex: String::new(),
         server_key_hex: String::new(),
@@ -241,6 +247,12 @@ fn stored_device_credential(auth: &PersonAuth) -> Option<(Zeroizing<[u8; 32]>, D
 /// exactly as it was — authenticated by the account credential it arrived with, working —
 /// and the next claim or phrase entry retries. Turning any of them into a failed
 /// registration would make an invisible improvement break a join.
+///
+/// **Attempted ONCE per registration, not retried on a claim.** The claim answers early once a
+/// token is stored, so a device that fell back here keeps the account credential until the next
+/// phrase entry (which registers again). That is stated rather than promised away: the benefit
+/// of the credential is invisible to the user, and the fallback is exactly the behaviour that
+/// shipped before it, so a retry loop on every claim would buy a round trip and no legibility.
 ///
 /// Nothing is installed on the browser: `ensure_device_credential` mints nothing there, so
 /// there is no credential to install and this returns the account token like any device that
@@ -280,20 +292,40 @@ async fn adopt_own_credential(
         .map_err(SyncDeviceError::from)
     })
     .await;
+    // `run_blocking` answers `Err` only when the blocking task itself died, which is the same
+    // class as a transport failure for this decision: keep the account token.
+    let decision = match outcome {
+        Ok(Ok(outcome)) => Ok(outcome),
+        Ok(Err(err)) => Err(err),
+        Err(_) => Err(SyncDeviceError::Internal),
+    };
+    token_after_install(decision, account_token_hex)
+}
+
+/// Which token to persist, given what the install answered. A free function so the arms can be
+/// tested without a server: an arm that answered an empty string instead of the account token
+/// would log the device out of its account on any install failure, and that is not a thing to
+/// leave to the one live-server lane.
+///
+/// Three answers, two of them "keep what you have": approved with a token (the device's own),
+/// a typed refusal (a `404` from a server predating the route, a `409`, a `401`), and an
+/// approved row with no token, which a real server does not answer here but the arm exists.
+fn token_after_install(
+    outcome: Result<EnrollOutcome, SyncDeviceError>,
+    account_token_hex: String,
+) -> String {
     match outcome {
-        Ok(Ok(outcome)) if outcome.approved && !outcome.token.is_empty() => {
+        Ok(outcome) if outcome.approved && !outcome.token.is_empty() => {
             crate::account::person_identity::hex_lower(&outcome.token)
         }
-        Ok(Ok(_)) => {
-            // Not approved yet. The account credential admitted this device, so the row
-            // exists and is pending; the credential lands on a later claim.
+        Ok(_) => {
             tracing::debug!(
                 stage = "person_device_credential",
                 "device credential installed but the row is not approved yet"
             );
             account_token_hex
         }
-        Ok(Err(err)) => {
+        Err(err) => {
             tracing::warn!(
                 stage = "person_device_credential",
                 error = ?err,
@@ -301,7 +333,6 @@ async fn adopt_own_credential(
             );
             account_token_hex
         }
-        Err(_) => account_token_hex,
     }
 }
 
@@ -528,6 +559,12 @@ pub async fn person_recover_identity_from_host(
                 a.token_hex.clear();
                 a.device_id_hex.clear();
                 a.registered = false;
+                // The credential triple goes with them, for the reason above and one worse:
+                // a leftover secret would be installed as person B's, so the device would
+                // authenticate to A's account under B's id.
+                a.device_secret_hex = None;
+                a.device_salt_hex = None;
+                a.device_iterations = None;
             }
             a.person_id_hex = person_id_hex.clone();
             a.kem_ek_hex = crate::account::person_identity::hex_lower(public.kem_ek());
@@ -679,6 +716,52 @@ pub async fn person_register_with_path(
     let public = pair.public_half();
     let fingerprint_hex = crate::account::person_identity::hex_lower(pair.fingerprint());
     let identity_code = super::invite::encode_person_identity_code(&person_id, &public);
+
+    // Everything that can fail WITHOUT touching the session happens first, so the only failure
+    // left after the installation is the write, and that one drops the session. The order
+    // matters twice over: a credential written after a session that then failed to persist is
+    // a live identity whose disk disagrees with it, and a verifier installed before its secret
+    // is on disk is residue this device cannot undo (`/auth/devices/revoke` is the only thing
+    // that deletes one) that costs the account a slot nobody can name.
+    let path = person_auth_path(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let person_id_hex = crate::account::person_identity::hex_lower(&person_id);
+    // A device that already holds THIS person's credential keeps the same triple. Carrying it
+    // forward is what makes the mint's non-rotation real rather than theoretical: this
+    // function builds a fresh record every time, so without this every registration would
+    // derive a second verifier for the same secret, and the server answers
+    // `409 already_installed` for a device that already holds one. A triple belonging to a
+    // DIFFERENT person is never carried, for the reason `person_setup_from_host` clears the
+    // token: a stale secret installed under a new identity authenticates as the old one.
+    let carried = read_person_auth(io, &path)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?
+        .filter(|a| a.person_id_hex == person_id_hex);
+    let mut auth = PersonAuth {
+        person_id_hex,
+        device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
+        registered: true,
+        // Assigned below, after the credential exists: the token this device ends up with
+        // may be the one its OWN credential minted.
+        token_hex: String::new(),
+        kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+        ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+        mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: carried.as_ref().and_then(|a| a.device_secret_hex.clone()),
+        device_salt_hex: carried.as_ref().and_then(|a| a.device_salt_hex.clone()),
+        device_iterations: carried.as_ref().and_then(|a| a.device_iterations),
+    };
+    // Minted whatever the gate answered, so a device that lands pending already holds the
+    // secret its credential will be derived from the moment an existing device approves it
+    // (`decisions/protocol/0783`). Nothing is installed here for a pending row: it has no
+    // token, and a pending device that could install one would be self-approving.
+    ensure_device_credential(&mut auth)?;
+    let approved = outcome.approved && !outcome.token.is_empty();
+    if approved {
+        auth.token_hex = crate::account::person_identity::hex_lower(&outcome.token);
+    }
+
     let generation = state.person_session_generation().await;
     // The installation refreshes the public halves and any migrated transition,
     // so a register call made with the identity locked leaves it unlocked.
@@ -696,49 +779,32 @@ pub async fn person_register_with_path(
         return Err(SyncDeviceError::Transport);
     }
 
-    let mut auth = PersonAuth {
-        person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-        device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
-        registered: true,
-        // Assigned below, after the credential exists: the token this device ends up with
-        // may be the one its OWN credential minted.
-        token_hex: String::new(),
-        kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
-        ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
-        mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
-        device_secret_hex: None,
-        device_salt_hex: None,
-        device_iterations: None,
-    };
-    // Minted whatever the gate answered, so a device that lands pending already holds the
-    // secret its credential will be derived from the moment an existing device approves it
-    // (`decisions/protocol/0783`). Nothing is installed here for a pending row: it has no
-    // token, and a pending device that could install one would be self-approving.
-    ensure_device_credential(&mut auth)?;
-    auth.token_hex = match (outcome.approved, outcome.token.is_empty()) {
-        (true, false) => {
-            adopt_own_credential(
-                &auth,
-                person_id,
-                outcome.device_id,
-                &endpoint_for_install,
-                crate::account::person_identity::hex_lower(&outcome.token),
-            )
-            .await
-        }
-        _ => String::new(),
-    };
-    let path = person_auth_path(host, io).await.map_err(|_| {
-        // The credential write is the only act that could leave the device
-        // claiming a registration it did not record; drop the session rather
-        // than leave a live identity whose state disagrees with disk.
-        SyncDeviceError::Internal
-    })?;
+    // The record is written BEFORE the verifier is installed: a verifier that exists on the
+    // server for a secret that is not yet on this disk cannot be undone from here.
     if write_person_auth(io, &path, &auth).await.is_err() {
         let _ = state
             .clear_person_session_if_generation(installed_generation)
             .await;
         return Err(SyncDeviceError::Internal);
+    }
+    if approved {
+        let adopted = adopt_own_credential(
+            &auth,
+            person_id,
+            outcome.device_id,
+            &endpoint_for_install,
+            auth.token_hex.clone(),
+        )
+        .await;
+        if adopted != auth.token_hex {
+            auth.token_hex = adopted;
+            if write_person_auth(io, &path, &auth).await.is_err() {
+                let _ = state
+                    .clear_person_session_if_generation(installed_generation)
+                    .await;
+                return Err(SyncDeviceError::Internal);
+            }
+        }
     }
 
     // The durable "an identity exists here" record, written only after the
@@ -4812,6 +4878,75 @@ mod tests {
         assert!(
             stored_device_credential(&auth).is_none(),
             "a record missing its iteration count cannot rebuild a verifier"
+        );
+
+        // A corrupt SALT must answer None rather than be substituted. `verifier()` decodes it
+        // with `unwrap_or_default`, so a record whose salt does not decode would otherwise
+        // derive the verifier from an EMPTY salt while the install forwarded the corrupt
+        // string: the server would hold a verifier this device can never prove.
+        let mut corrupt = empty_person_auth();
+        ensure_device_credential(&mut corrupt).expect("mint");
+        corrupt.device_salt_hex = Some("zz".repeat(16));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a salt that does not decode is not a credential"
+        );
+        corrupt.device_salt_hex = Some("00".repeat(8));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a 8-byte salt is not the 16-byte salt the mint wrote"
+        );
+        corrupt.device_salt_hex = Some("00".repeat(16));
+        corrupt.device_secret_hex = Some("00".repeat(16));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a 16-byte secret is not the 32-byte secret the mint wrote"
+        );
+    }
+
+    // The four answers the install can give, and what each one persists. `token_after_install`
+    // is a free function for exactly this reason: an arm that answered an empty string would
+    // log the device out of its account on any install failure, and no other lane would notice.
+    #[test]
+    fn the_install_answer_decides_which_token_is_kept() {
+        let account = || "account-token".to_string();
+        let approved = |token: &[u8]| EnrollOutcome {
+            approved: true,
+            token: token.to_vec(),
+            device_id: [0x11; 16],
+        };
+
+        assert_eq!(
+            token_after_install(Ok(approved(&[0xca, 0xfe])), account()),
+            "cafe",
+            "the token the device's own secret minted replaces the account token"
+        );
+        assert_eq!(
+            token_after_install(Ok(approved(&[])), account()),
+            "account-token",
+            "an approved row with no token keeps the account token"
+        );
+        assert_eq!(
+            token_after_install(
+                Ok(EnrollOutcome {
+                    approved: false,
+                    token: vec![0xaa],
+                    device_id: [0x11; 16],
+                }),
+                account()
+            ),
+            "account-token",
+            "a pending row installs nothing and keeps the account token"
+        );
+        assert_eq!(
+            token_after_install(Err(SyncDeviceError::BadRequest), account()),
+            "account-token",
+            "a refused install keeps the account token the device arrived with"
+        );
+        assert_eq!(
+            token_after_install(Err(SyncDeviceError::Internal), account()),
+            "account-token",
+            "a dead blocking task keeps the account token"
         );
     }
 
