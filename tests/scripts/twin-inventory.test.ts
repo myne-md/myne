@@ -207,25 +207,27 @@ describe("check-twin-inventory", () => {
     // as trivial precisely because it is the place a client could quietly stop
     // delegating and start retyping a command name.
     //
-    // 134 to 133: myne-md/myne#960 deleted the first-run Welcome note on BOTH
-    // clients (`src/dialect/welcomeNote.ts`, `mobile/src/lib/welcomeNote.ts` and
-    // their shared builder) and both now seed the shared `exampleVault` set, so
-    // the two curated pairs that described it left the tree. The net is one DOWN
-    // rather than two because `src/dialect/exampleVault.ts` gained its same-path
-    // mobile shim in the same change. A number that only ever goes up is a
-    // number nobody has argued about; this one has a reason recorded.
+    // 134, unchanged, after myne-md/myne#960: the branch deleted the first-run
+    // Welcome note on both clients (`src/dialect/welcomeNote.ts`,
+    // `mobile/src/dialect/welcomeNote.ts` and their shared builder) and both now
+    // seed the shared `exampleVault` set. Two pairs left and two arrived, which is
+    // why the number did not move: `src/dialect/exampleVault.ts` gained its
+    // same-path mobile shim, and `src/notes/exampleVault.ts` gained a curated
+    // partner in `mobile/src/lib/exampleVault.ts`. The branch's own comment
+    // claimed 133; the sweep says 134, and the sweep is what this assertion
+    // measures.
     //
     // Then 108 to 109 when this branch met myne-md/myne#622 at a merge:
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -235,7 +237,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -316,7 +318,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -513,10 +515,13 @@ describe("check-twin-inventory", () => {
     // is a cross-path pair like the two above. Both are `stays per-client` rather than
     // shared code, which is why they are rostered instead of converged.
     //
-    // 134 to 133: myne-md/myne#960 took the Welcome note off both clients. Two
-    // curated pairs went out, and the `src/dialect/exampleVault.ts` /
-    // `mobile/src/dialect/exampleVault.ts` shim pair in, which the sweep DOES see.
-    expect(ROSTER.length).toBe(133);
+    // 133 to 134: myne-md/myne#960 took the Welcome note off both clients AND gave
+    // the seeded example vault a mobile partner at `mobile/src/lib/exampleVault.ts`.
+    // Two curated pairs went out with the Welcome note; two arrived, the
+    // `src/dialect/exampleVault.ts` / `mobile/src/dialect/exampleVault.ts` shim
+    // pair the sweep sees, and the `src/notes/exampleVault.ts` partner the roster
+    // carries. The branch wrote 133; the measurement is 134.
+    expect(ROSTER.length).toBe(134);
   });
 
   it("keeps `screen` narrow", () => {
