@@ -37,6 +37,15 @@ function mount(doc = DOC): { view: EditorView; host: HTMLElement } {
       extensions: [markdown({ base: { parser } as never }), taskQueryBlockDecorations()],
     }),
   });
+  // Every test in this file reads `syntaxTree`, directly or through the
+  // decorations built from it, and CodeMirror parses incrementally: the initial
+  // pass is time-budgeted, so a tree that has not reached the fence is
+  // indistinguishable from a document with no fence. Forced here rather than in
+  // each test because the two `describe` blocks below both read it, and the
+  // cost of forgetting is not a wrong answer but an empty one: CI on a loaded
+  // runner returned `[]` for the nine-line document above and reported it as a
+  // block that does not exist.
+  assertParsed(view);
   return { view, host };
 }
 
@@ -229,7 +238,6 @@ describe("an all-dropped query refuses, visibly", () => {
 describe("reveal is whole-block (buildTaskQueryDecorations)", () => {
   function parsedState(doc = DOC): { state: EditorState; done: () => void } {
     const { view, host } = mount(doc);
-    assertParsed(view);
     return { state: view.state, done: () => teardown(view, host) };
   }
 
