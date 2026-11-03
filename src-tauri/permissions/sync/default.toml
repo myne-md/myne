@@ -27,6 +27,7 @@ permissions = [
     "allow-sync-get-endpoint",
     "allow-sync-set-endpoint",
     "allow-sync-status",
+    "allow-sync-vault-doctor",
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
@@ -142,6 +143,11 @@ commands.allow = ["sync_set_endpoint"]
 identifier = "allow-sync-status"
 description = "Allow invoking sync:sync_status (read-only current sync status for the status indicator: disabled / idle / syncing / error / conflicts). No vault access."
 commands.allow = ["sync_status"]
+
+[[permission]]
+identifier = "allow-sync-vault-doctor"
+description = "Allow invoking sync:sync_vault_doctor (read-only ONE verdict over the five facts behind \"sync is not working\": vault.meta generation, authority, the device-binding row, the key at rest and the session). It reads vault.meta, the device-binding store and the device-key store, and reports bounded enum tokens only: no key material, no identifier, no path, no network. NOT granted to the detached note window: its subject is the vault, and that seat exists for one note's marker."
+commands.allow = ["sync_vault_doctor"]
 
 [[permission]]
 identifier = "allow-sync-unsynced-edits"

@@ -3,14 +3,16 @@
 // Split from `src/lib/diagnostics.ts` on purpose: that module is PURE, so its
 // allowlist can be tested without a DOM, a build define or a storage estimate.
 // This one does the reading, and does nothing else — every value it gathers maps
-// to exactly one allowlisted field, so there is no place for an extra one to
-// enter.
+// to an allowlisted field, so there is no place for an extra one to enter. The
+// vault doctor (myne-md/myne#1003) is the one read that fills five fields, and
+// each of those is a closed enum token the allowlist names one by one.
 //
 // Nothing is transmitted. The only consumer is a copy-to-clipboard button the
 // user presses; there is no endpoint, no beacon and no automatic send, which is
 // why task 60's zero-third-party request-log assertion is unaffected.
 
 import { buildDiagnostics, engineLabel, type HostWebView } from "./diagnostics";
+import { authorityToken, readVaultDoctor, sessionToken } from "./vault-doctor";
 import { servedBuildInfo } from "../platform/build-info";
 import { HAS_TAURI } from "./app-window";
 
@@ -59,8 +61,40 @@ function desktopWebView(): HostWebView | null {
   return "WebKitGTK";
 }
 
+/**
+ * How long the vault read may take before the block is built without it.
+ *
+ * The doctor verifies the vault's roster and reads the OS key store, and this block is what
+ * a user hands over when the app has already failed closed. A wedged key store must cost the
+ * five vault lines, never the whole report: this block was assembled from local facts before
+ * that command existed, and it stays that way.
+ */
+const DOCTOR_DEADLINE_MS = 2000;
+
+/** Settle with the work's value, or with `null` at the deadline (or on a rejection). */
+function withinDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    void work.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(null);
+      },
+    );
+  });
+}
+
 export async function collectDiagnostics(failureCode: string): Promise<string> {
   const served = await servedBuildInfo().catch(() => null);
+  // The vault's five facts (myne-md/myne#1003), from the same command the sync panel asks.
+  // One read, one verdict: a second derivation here would be a second answer to a question
+  // whose whole point is that it has one. A refusal, a missing vault and a read that never
+  // settles all leave `null`, and the five lines are then ABSENT rather than placeholdered.
+  const doctor = await withinDeadline(readVaultDoctor(), DOCTOR_DEADLINE_MS);
   let usage: StorageEstimate | null = null;
   try {
     usage = (await navigator.storage?.estimate?.()) ?? null;
@@ -81,6 +115,11 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     commit: served?.commit ?? (__BUILD_COMMIT__ === "unknown" ? null : __BUILD_COMMIT__),
     bundleHash: served?.bundleHash ?? null,
     failureCode,
+    vaultGeneration: doctor?.generation ?? null,
+    vaultAuthority: doctor ? authorityToken(doctor.authority) : null,
+    vaultBinding: doctor?.binding ?? null,
+    vaultKeyAtRest: doctor?.key_at_rest ?? null,
+    vaultSession: doctor ? sessionToken(doctor.session) : null,
     // The engine and major version only — never the full UA string, whose tail
     // carries device models, OEM tokens and extension markers.
     engine: engineLabel(navigator.userAgent, desktopWebView()),

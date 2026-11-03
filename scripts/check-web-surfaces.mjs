@@ -282,6 +282,13 @@ const V = {
       "the bundle.",
   ],
   "src/lib/commandRecency.ts": ["ported", "Session-only, in-memory command recency for the new-tab surface; no host call, runs as written."],
+  "src/lib/vault-doctor.ts": [
+    "ported",
+    "The one verdict over generation / authority / binding / key at rest / session (myne-md/myne#1003). " +
+      "Its one command is DISPATCHED on web, not refused: a browser's key at rest genuinely is `absent`, " +
+      "and reporting that is the truthful verdict rather than an absence marker. Read on a failure and on " +
+      "a copy-diagnostics press, never on a poll: one call is an ML-DSA roster verification.",
+  ],
   "src/lib/close-request.ts": [
     "adapted",
     "The app's ONE window-close path (myne-md/myne#945 item 05). On web it installs nothing, and that is the correct answer rather than a gap: a browser tab has no close request to intercept, so the presence check on the substituted handle fails and the module returns. `adapted` rather than `ported` because the desktop half - the single listener, the guard registry, the deadline and the `destroy()` - has no browser equivalent to run, and `excluded` would be wrong twice over: the module ships in the bundle and `App`'s boot effect calls it on every client.",
