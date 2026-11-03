@@ -290,7 +290,7 @@ async function openNoteByTitle(session: Session, title: string): Promise<string>
   // `palettePick` types the title through W3C element-send-keys, and under CPU
   // load on this host WebKit intermittently drops the SHIFT of the FIRST
   // character, so the input ends up holding the same NUMBER of characters in
-  // the wrong case ("reading list" for "Papers on local-first"). The helper's own nudge
+  // the wrong case ("papers on local-first" for "Papers on local-first"). The helper's own nudge
   // retypes it the same way, the row never matches, and the frame dies on a
   // 45 s palette wait that reports "held 12 of 12 typed characters" — lengths
   // only, by design (SYNC-13), which is why the case never showed up in the
@@ -378,7 +378,7 @@ runner(
     let password = "";
     // Which palette this run produces. Read here rather than at the theme step
     // because the manifest is written after the walk and reports it.
-    const captureTheme = process.env.CAPTURE_THEME === "light" ? "light" : "dark";
+    const captureTheme = process.env.CAPTURE_THEME === "dark" ? "dark" : "light";
     const app = await launchApp({
       // Production KDF: the weak-KDF fixture's m_kib=8 is below the
       // validate_kdf_params 8 MiB floor (protocol, 2026-06-17) and the binary
@@ -546,9 +546,9 @@ runner(
             "on. Every note, every title and every folder name is sealed before it " +
             "touches the disk, and the key never leaves this machine.\n\n" +
             "Start here:\n\n" +
-            "- [[Field notes from the beta]] — what is still rough\n" +
-            "- [[Papers on local-first]] — the reading behind it\n" +
-            "- [[Friday log]] — how the week went\n\n" +
+            "- [[Field notes from the beta]]: what is still rough\n" +
+            "- [[Papers on local-first]]: the reading behind it\n" +
+            "- [[Friday log]]: how the week went\n\n" +
             "Nothing is uploaded, indexed or backed up anywhere unless you ask for it.\n",
         ),
       );
@@ -608,7 +608,7 @@ runner(
         15_000,
       );
       // `pageSeatInvoke` reports `{ ok }` on success and `{ err }` on failure,
-      // and `set_theme` returns unit — so a successful call is `{ ok: null }`
+      // and `set_theme` returns unit, so a successful call is `{ ok: null }`
       // and testing `.ok` for truthiness reads success as failure.
       if ("err" in themeSet) {
         throw new Error(`theme did not take: ${JSON.stringify(themeSet.err)}`);
@@ -616,7 +616,7 @@ runner(
       // `setTheme` in `src/lib/prefs.ts` only PERSISTS the choice; the caller is
       // what applies it to `<html data-theme>` (`applyTheme`, `src/lib/theme.ts`),
       // and the Appearance panel is that caller. Invoking the command alone
-      // therefore wrote the pref and left the screen on the app's default — the
+      // therefore wrote the pref and left the screen on the app's default. The
       // first run of this pass produced a full light set under
       // `CAPTURE_THEME=dark` and nothing said so. Set the attribute too, which
       // is exactly what `applyTheme` does for an explicit choice.
@@ -735,7 +735,7 @@ runner(
           await openNoteByTitle(s, "Papers on local-first");
           await settle(s, 400);
           await ctrlChord(s, "f");
-          await (await s.byTestId("find.input", { timeoutMs: 10000 })).sendKeys("encryption");
+          await (await s.byTestId("find.input", { timeoutMs: 10000 })).sendKeys("local");
           await safe("reveal replace row", async () => {
             await (await s.byTestId("find.toggle-replace")).click();
             await (await s.byTestId("find.replace-input")).sendKeys("E2EE");
@@ -1280,7 +1280,7 @@ runner(
       //
       // The pin targets the FIRST TAB IN THE STRIP rather than the "Field notes from the beta"
       // tab by id. `createNote` reuses the focused pane's active tab, so by the
-      // time the two "Tab …" notes exist the Roadmap tab has already been
+      // time the two "Tab …" notes exist the tab has already been
       // replaced and a lookup by its id can only time out. That is what this
       // frame shipped with: the article is about pinned tabs and the screenshot
       // had none, while every gate in the frame passed.
@@ -1385,7 +1385,7 @@ runner(
       // FIND-AND-CONNECT FRAMES
       // =====================================================================
 
-      // ---- Frame: backlinks (the right-sidebar backlinks for Roadmap) ----
+      // ---- Frame: backlinks (the right-sidebar backlinks for "Field notes from the beta") ----
       // search-palette.e2e.ts: backlink rows are editor.backlink-row.
       // Open in a single pane first so the layout is clean.
       await frame(
@@ -1423,7 +1423,7 @@ runner(
       );
 
       // ---- Frame: unlinked mentions (the right-panel Unlinked tab) ----
-      // Same right-panel-tab idiom as outline (tab id "unlinked"). Open Roadmap,
+      // Same right-panel-tab idiom as outline (tab id "unlinked"). Open "Field notes from the beta",
       // which "Standup, Tuesday" names in plain text (an unlinked mention). Rows
       // carry no testid, so gate on the tab + a settle (best-effort).
       await frame(
