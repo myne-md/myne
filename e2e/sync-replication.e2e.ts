@@ -17,12 +17,16 @@ import { join } from "node:path";
 import { harnessSupported } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
+  adoptedHeadFingerprint,
+  joinAccountDevice,
   launchDevice,
   migrateFleetToV02,
   noteBlobCount,
   noteBlobMagics,
   setupTwoSyncedDevices,
+  settleApproverCompare,
   syncConfigSeed,
+  landInJoinedVault,
   withTwoDevices,
 } from "./support/multi-device";
 import { type Session, testIdSelector } from "./support/webdriver";
@@ -126,7 +130,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   // helper closes A's verify screen (`multi-device.ts`, the `closeSettings`
   // right after approve) — this scenario needs to be in exactly the state the
   // helper leaves behind.
-  it("both devices show the SAME verification code, and keep agreeing across a mid-ceremony write", async () => {
+  it("both devices agree on the verification code, and keep agreeing across a mid-ceremony write", async () => {
     const srv = await startSyncServer();
     let account = "";
     let password = "";
@@ -157,31 +161,31 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await waitForSaved(a.session);
         await ipcOk(a.session, "plugin:sync|sync_now", {});
 
-        // B joins and waits.
-        await (await b.session.byTestId("welcome.join-cta", { timeoutMs: 30_000 })).click();
-        await b.session.byTestId("join.modal", { timeoutMs: 30_000 });
-        await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
-        await (await b.session.byTestId("join.account-input")).sendKeys(account);
-        await (await b.session.byTestId("join.password-input")).sendKeys(password);
-        await (await b.session.byTestId("join.submit")).click();
-        await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
+        // B joins and waits. The join form is gone (0767); the command is not, and
+        // `joinAccountDevice` drives it from the page seat — its header says why.
+        await joinAccountDevice(b, { serverUrl: srv.url, accountNumber: account, password });
 
         // A approves and STAYS on the verify screen — the state `sr1` leaves.
         await openSyncDevices(a.session);
         await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
         await a.session.byTestId("sync.approve-verify", { timeoutMs: 30_000 });
-        await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
+        // **B's half is not a screen any more, and that is the product, not a
+        // harness gap.** The wait screen that prints `pending-approval.sas` is
+        // gated out on a client that may hold a vault's only copy
+        // (`src/lib/pending-approval.ts`), so a desktop joiner shows no code
+        // anywhere; the compare is the APPROVING device's screen. What the claim
+        // here is about — that both devices feed the fingerprint the SAME head —
+        // is read from B over production IPC (`adoptedHeadFingerprint`).
+        await landInJoinedVault(b, password);
 
-        // Both codes, read from the two live screens. Polled to convergence
-        // rather than compared on first read: the assertion is that they AGREE,
-        // not that they agree within one particular millisecond.
+        // Both codes. Polled to convergence rather than compared on first read:
+        // the assertion is that they AGREE, not that they agree within one
+        // particular millisecond.
         const readBoth = async () => {
           const sa = (
             await (await a.session.byTestId("sync.sas-fingerprint", { timeoutMs: 30_000 })).textContent()
           ).trim();
-          const sb = (
-            await (await b.session.byTestId("join.sas-fingerprint", { timeoutMs: 30_000 })).textContent()
-          ).trim();
+          const sb = await adoptedHeadFingerprint(b);
           return [sa, sb] as const;
         };
         let [sasA, sasB] = await readBoth();
@@ -190,7 +194,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
           [sasA, sasB] = await readBoth();
         }
         expect(sasA.length, "A shows a code").toBeGreaterThan(0);
-        expect(sasB, "both devices show the same verification code").toBe(sasA);
+        expect(sasB, "both devices agree on the verification code").toBe(sasA);
 
         // The reproducer: a vault write DURING the ceremony. Before the fix this
         // authored a new head, one screen followed it and the other did not, and
@@ -201,13 +205,10 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         const [afterA, afterB] = await readBoth();
         expect(afterB, "the two codes still agree after a mid-ceremony sync").toBe(afterA);
 
-        // Close the compare on both sides, and prove the hold RELEASED: the note
-        // A wrote must still reach B.
+        // Close the compare — the approving device is the side that holds it —
+        // and prove the hold RELEASED: the note A wrote must still reach B.
         await clickByTestId(a.session, "sync.sas-match");
         await closeSettings(a.session);
-        await clickByTestId(b.session, "join.sas-match");
-        await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-        await dismissImporterOffer(b.session);
 
         let replicated = false;
         for (let i = 0; i < 12 && !replicated; i++) {
@@ -225,7 +226,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
     }
   });
 
-  it("A enrolls + writes a note; B joins, A approves, B verifies the SAS, and the note replicates to B", async () => {
+  it("A enrolls + writes a note; B joins, A approves and closes the compare, and the note replicates to B", async () => {
     const srv = await startSyncServer();
     let account = "";
     let password = "";
@@ -263,34 +264,23 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // e2e/AGENTS.md).
         await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 20_000);
 
-        // --- B: join the account (account# + password) → waits on the approval gate ---
-        await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
-        await (await b.session.byTestId("welcome.join-cta")).click();
-        await b.session.byTestId("join.modal");
-        await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
-        await (await b.session.byTestId("join.account-input")).sendKeys(account);
-        await (await b.session.byTestId("join.password-input")).sendKeys(password);
-        await (await b.session.byTestId("join.submit")).click();
-        // The join goes straight to approval: no certificate-fingerprint step.
-        await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
+        // --- B: join the account → waits on the approval gate ---
+        // The join modal is gone on every client (0767); the command it called is
+        // not, and `joinAccountDevice` drives that command from the page seat.
+        await joinAccountDevice(b, { serverUrl: srv.url, accountNumber: account, password });
 
-        // --- A: approve B while it is pending (its row appears via the roster poll) ---
+        // --- A: approve B while it is pending (its row appears via the roster poll),
+        // then close the compare the approval opens. Leaving it open holds A's
+        // pushes, and the replication assertion below would read a sync defect.
         await openSyncDevices(a.session);
-        await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
-        await closeSettings(a.session);
+        await settleApproverCompare(a);
 
-        // --- B: the pending screen auto-claims its token + pulls, then advances to
-        // the mandatory head-fingerprint SAS eye-compare (SYNC-40). The fingerprint
-        // surfaces as soon as the pulled head MAC-verifies — before the note bodies
-        // finish downloading (the join-SAS latency fix) — so verify appears promptly. ---
-        await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
-        const sas = (await (await b.session.byTestId("join.sas-fingerprint")).textContent()).trim();
-        expect(sas.length, "B shows a non-empty head-fingerprint SAS").toBeGreaterThan(0);
-
-        // B confirms the eye-compare match → routes into the editor.
-        await (await b.session.byTestId("join.sas-match")).click();
-        await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-        await dismissImporterOffer(b.session);
+        // --- B: unlock the vault the join materialized and adopt A's head. The
+        // desktop joiner shows no compare screen (see `adoptedHeadFingerprint`), so
+        // its side of SYNC-40 is asserted against the very head it adopted.
+        await landInJoinedVault(b, password);
+        const sas = await adoptedHeadFingerprint(b);
+        expect(sas.length, "B adopted a head with a non-empty fingerprint").toBeGreaterThan(0);
 
         // A's note was pulled during the claim; confirm it landed on B's disk (a few
         // extra cycles cover any body download still in flight).
@@ -742,7 +732,14 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         // FIRST pane in DOM order, so the shared typing helper (which targets
         // the first CodeMirror surface, and whose click also moves pane focus
         // there) lands in it. Autosave, then push.
-        await typeIntoEditor(b.session, `\n${LOCAL_MARKER}\n`);
+        // Scoped to X's own pane: the shared helper drives the FIRST CodeMirror
+        // surface in document order, and after `open-to-side` that is the SIDE
+        // note's pane. Measured 2026-11-03 — unscoped, the marker landed in the
+        // wrong note and `waitForSaved` timed out with the badge at its pre-edit
+        // value, which read as a stuck autosave.
+        await typeIntoEditor(b.session, `\n${LOCAL_MARKER}\n`, {
+          scope: testIdSelector("editor.pane", { "data-pane-id": xPaneId }),
+        });
         await waitForSaved(b.session);
         await ipcOk(b.session, "plugin:sync|sync_now", {});
 

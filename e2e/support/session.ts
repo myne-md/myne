@@ -522,6 +522,29 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
         // (SYNC-13) covers dataHome, so point every tmp class at it.
         XDG_RUNTIME_DIR: runtimeDir,
         TMPDIR: tmpDir,
+        // **This seat declares a Wayland-only session, and it is a measurement
+        // rather than a ruse.** Desktop idle-lock reads MACHINE idle where the OS
+        // exposes it, and on Linux that is X11's ScreenSaver
+        // `ms_since_user_input` (`src-tauri/src/auto_lock.rs::machine_idle`).
+        // WebDriver's synthetic keystrokes and clicks are injected into the
+        // WebView, so they never reach the X server: that counter only grows, the
+        // vault auto-locks mid-scenario on the 300 s default, and every scenario
+        // whose steps straddle that line lands on the unlock screen.
+        //
+        // Measured 2026-11-03 on a single-shard full run: the FIRST failing file
+        // sits at cumulative 336 s of suite time, and 121 of 127 failure captures
+        // read `stage=[unlock]` with nothing else mounted. Before 336 s the same
+        // specs pass.
+        //
+        // `XDG_SESSION_TYPE=wayland` is the product's own documented escape from
+        // that arm (`machine_idle` returns `None` there, deliberately, because an
+        // XWayland session reports no X11 input from native Wayland clients — the
+        // same situation this seat is in). It then falls back to the WINDOW-level
+        // heartbeat, which WebDriver input DOES reset, so the timer measures what
+        // it is meant to measure. It also exercises a real shipped arm rather than
+        // a test-only one; `WAYLAND_DISPLAY` is deliberately NOT set, since GDK
+        // would try to open a Wayland connection that does not exist here.
+        XDG_SESSION_TYPE: "wayland",
       },
     },
   );

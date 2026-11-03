@@ -76,20 +76,20 @@ async function importTxt(s: Session): Promise<string> {
 }
 
 
-// QUARANTINED (flaky-test epic): the #1 cross-branch flake — the
-// `attachment-text-preview` widget mount timed out on a contended CI runner
-// across 6 unrelated branches (none touching attachments), i.e. host
-// resource starvation, not a preview bug. Runs in the non-blocking
-// `e2e-quarantine` step until the contention fix lands. See scenario.ts's gate note.
-// DE-QUARANTINED (myne-md/myne#555). The quarantine reason was
-// runner contention, and it was wrong for the same reason it was wrong for
-// `nav1`: the first seeding test in a vitest process builds `e2e-fixture-gen`
-// with `cargo build --release` INSIDE its own budget, ~171 s against a 180 s
-// `testTimeout`. Which spec paid it depended only on which one seeded first,
-// which is why the victim moved between runs and read as a loaded host.
-// `e2e/support/global-setup.ts` now pays that build once per vitest invocation,
-// before any worker starts. Measured after the fix, `--retry=0`, warm
-// container: 16 consecutive clean runs, which is the bar `e2e/AGENTS.md` sets.
+// **NOT quarantined, and the history is kept because it is the lesson.** It ran
+// in `e2e-quarantine` once, as "the #1 cross-branch flake": the widget mount
+// timed out on a contended CI runner across six unrelated branches, which read
+// as host starvation. DE-QUARANTINED (myne-md/myne#555) — the reason was wrong
+// for the same reason it was wrong for `nav1`: the first seeding test in a vitest
+// process built `e2e-fixture-gen` with `cargo build --release` INSIDE its own
+// budget, ~171 s against a 180 s `testTimeout`. Which spec paid it depended only
+// on which one seeded first, which is why the victim moved between runs and read
+// as a loaded host. `e2e/support/global-setup.ts` now pays that build once per
+// vitest invocation, before any worker starts. Measured after the fix,
+// `--retry=0`, warm container: 16 consecutive clean runs, which is the bar
+// `e2e/AGENTS.md` sets. Measured again 2026-11-03 in a full single-shard run: the
+// only red was the stale `welcome.join-cta` this suite's helpers were waiting
+// for, not this scenario.
 describeE2E("tp1 inline txt attachment preview decrypts read-only (MYND-268)", () => {
   // Vault-count precondition: 1 (weak KDF).
   it("a form-C .txt embed renders the decrypted text inline, non-editable", async () => {
@@ -128,12 +128,29 @@ describeE2E("tp1 inline txt attachment preview decrypts read-only (MYND-268)", (
         );
 
         // Header chrome carries the filename (the file-card chrome the
-        // preview extends), and the widget is READ-ONLY: CM6 stamps
-        // non-editable widget DOM contenteditable=false, so the decrypted
-        // text is inert — not part of the editable document surface.
+        // preview extends), and the widget is READ-ONLY: CM6 marks its widget
+        // DOM non-editable, so the decrypted text is inert — not part of the
+        // editable document surface.
+        //
+        // **The attribute is asserted on the nearest `[contenteditable]`
+        // ANCESTOR, not on the card.** CodeMirror stamps `contenteditable=false`
+        // on the widget holder it generates around `toDOM`'s node
+        // (`widgets.ts::AttachmentTextPreviewWidget.toDOM` returns a plain
+        // `<span>` carrying this testid), so `card.attribute("contenteditable")`
+        // answers `null` while the card is, correctly, not editable — measured
+        // 2026-11-03 in a full single-shard run and reproduced on the file alone.
+        // `isContentEditable` is the property the claim is about; the ancestor's
+        // attribute is what makes it so.
         const card = await s.byTestId("attachment-text-preview");
         expect((await card.textContent()).includes(FILENAME)).toBe(true);
-        expect(await card.attribute("contenteditable")).toBe("false");
+        const editability = await s.execute<{ holder: string | null; editable: boolean }>(
+          "const el = document.querySelector('[data-testid=\"attachment-text-preview\"]');" +
+            "if (!el) return null; const holder = el.closest('[contenteditable]');" +
+            "return { holder: holder ? holder.getAttribute('contenteditable') : null," +
+            " editable: el.isContentEditable };",
+        );
+        expect(editability.holder, "the widget lives inside non-editable widget DOM").toBe("false");
+        expect(editability.editable, "the card's own content is not editable").toBe(false);
       },
     );
   });

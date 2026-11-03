@@ -2171,8 +2171,23 @@ export const ESCAPE_KEY = String.fromCharCode(0xe00c);
 export async function typeIntoEditor(
   session: Session,
   text: string,
-  opts?: { landedText?: string },
+  opts?: {
+    landedText?: string;
+    /**
+     * A CSS selector prefix that narrows every lookup to ONE pane, for a split
+     * layout. Without it this helper drives the FIRST CodeMirror surface in
+     * document order — which in a split is whichever pane the workspace put
+     * first, and `open-to-side` puts the SIDE note there: measured 2026-11-03 in
+     * `sync-replication`'s stale-pane scenario, where the payload landed in the
+     * wrong note and the follow-up `waitForSaved` timed out with the badge still
+     * reading its pre-edit value.
+     */
+    scope?: string;
+  },
 ): Promise<void> {
+  const cmContent = opts?.scope ? `${opts.scope} ${CM_CONTENT}` : CM_CONTENT;
+  const readText = async (): Promise<string> =>
+    opts?.scope ? ((await session.findElements(cmContent))[0]?.textContent() ?? "") : editorText(session);
   // Focus the editor. When a double-click CREATES+opens a note (folder index
   // note, MYND-370), the editor re-renders asynchronously and REPLACES the
   // .cm-content node — a handle located once then clicked goes genuinely stale
@@ -2201,8 +2216,8 @@ export async function typeIntoEditor(
       // `sendKeys` on it fails with "Element is not focusable". `.cm-content` is
       // the focusable one and keeps the caret the click placed.
       const target =
-        (await session.findElements(`${CM_CONTENT} .cm-line`)).at(-1) ??
-        (await session.findElements(CM_CONTENT))[0];
+        (await session.findElements(`${cmContent} .cm-line`)).at(-1) ??
+        (await session.findElements(cmContent))[0];
       if (!target) return null;
       try {
         await target.clickOnce();
@@ -2219,14 +2234,14 @@ export async function typeIntoEditor(
       }
       // Re-found, not reused: the click can replace the content node (see the
       // header), and `sendKeys` needs the live one.
-      return (await session.findElements(CM_CONTENT))[0] ?? null;
+      return (await session.findElements(cmContent))[0] ?? null;
     },
     { label: "editor located + focused", timeoutMs: 10_000 },
   );
   await session.waitUntil(
     async () => {
       await content.sendKeys("q");
-      return (await editorText(session)).includes("q") || null;
+      return (await readText()).includes("q") || null;
     },
     { label: "keystroke pipeline established", timeoutMs: 10_000 },
   );
@@ -2252,7 +2267,7 @@ export async function typeIntoEditor(
   // true "did the words land, in order" proof, robust to Live-mode decoration.
   const norm = (s: string): string => s.replace(/[^a-z0-9]/gi, "").toLowerCase();
   const flat = norm(opts?.landedText ?? text);
-  const landed = async () => norm(await editorText(session)).includes(flat) || null;
+  const landed = async () => norm(await readText()).includes(flat) || null;
   // A literal "\n" in a sendKeys payload is delivered as U+000A, which WebKit's
   // driver does NOT translate into an Enter keypress — CM6 stays on one line
   // (cm-line count = 1), breaking every multi-line scenario (vertical
@@ -2275,8 +2290,8 @@ export async function typeIntoEditor(
   if (structural && !text.includes("\n")) {
     const inserted = await session
       .execute<boolean>(
-        "const el = document.querySelector('.cm-content'); if (!el) return false; el.focus(); return document.execCommand('insertText', false, arguments[0]);",
-        [text],
+        "const el = document.querySelector(arguments[1]); if (!el) return false; el.focus(); return document.execCommand('insertText', false, arguments[0]);",
+        [text, cmContent],
       )
       .catch(() => false);
     if (inserted) {
@@ -2506,12 +2521,29 @@ export async function waitForSaved(session: Session): Promise<void> {
   // The post-edit saved state renders "Saved·<rel>" (separator + relative
   // time) — distinguishable from the pre-edit clean state's bare "Saved",
   // so this can't pass before the edit's own save actually landed.
-  await session.waitUntil(
-    async () =>
-      (await (await session.byTestId("editor.save-status")).textContent()).includes("Saved·") ||
-      null,
-    { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
-  );
+  //
+  // **A timeout names what the badge actually said.** "autosave settled on
+  // Saved·<rel> timed out" cannot distinguish a save that never started (the
+  // keystrokes went to a pane whose document did not change), a save stuck in
+  // `Saving…`, and a save that failed — three different fixes. Measured
+  // 2026-11-03 in `sync-replication`'s stale-pane scenario, where this was the
+  // only red in twenty-one scenarios and the message named none of them.
+  try {
+    await session.waitUntil(
+      async () =>
+        (await (await session.byTestId("editor.save-status")).textContent()).includes("Saved·") ||
+        null,
+      { label: "autosave settled on Saved·<rel>", timeoutMs: 15_000 },
+    );
+  } catch (raw) {
+    let seen = "<unreadable>";
+    try {
+      seen = (await (await session.byTestId("editor.save-status")).textContent()).trim();
+    } catch {
+      /* the badge went away mid-read; the timeout below is still the failure */
+    }
+    throw new Error(`${(raw as Error).message} | the save badge read ${JSON.stringify(seen)}`);
+  }
 }
 
 /**
