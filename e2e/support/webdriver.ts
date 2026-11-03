@@ -104,6 +104,7 @@ export class Element {
    *  with it — while `clickBySelector` in `flows.ts`, which scrolls per poll,
    *  was green on the same tree. */
   async click(): Promise<void> {
+    let refreshed = false;
     try {
       await this.session.waitUntil(
         async () => {
@@ -117,6 +118,12 @@ export class Element {
                 e.code === "element click intercepted")
             ) {
               await this.scrollIntoViewBestEffort();
+              // Once, not per poll: a stale hit-test map is a one-shot repair
+              // and the retry loop is the budget, not the cure.
+              if (!refreshed) {
+                refreshed = true;
+                await this.refreshHitTestMap();
+              }
               return null; // not hit-testable yet — keep polling
             }
             throw e;
@@ -152,8 +159,119 @@ export class Element {
       } catch {
         /* the session may be wedged; the timeout is still the failure */
       }
-      throw new Error(`${(raw as Error).message} | node: ${seen}`);
+      throw new Error(`${(raw as Error).message} | node: ${seen} | refresh: ${this.lastRefresh}`);
     }
+  }
+
+  /** Repair a STALE hit-test map around this element, best-effort.
+   *
+   *  WebKitGTK does not always invalidate a scrolling layer's hit-test data when
+   *  the overflow APPEARS — content grew, a long name landed, a control was added
+   *  — so `POST /click` answers `element not interactable` for a control that is
+   *  painted, unobstructed and `pointer-events: auto`, and
+   *  `document.elementsFromPoint` at its own centre does not list it at all while
+   *  listing its ANCESTORS. A real pointer rarely sees it, because moving onto the
+   *  surface repaints it and `/click` goes straight to the hit test.
+   *
+   *  Measured 2026-11-03, and the scope here is what it actually cured. The
+   *  identity-setup phrase step (`vault-format-upgrade`) is GREEN with this
+   *  repair and was red on every attempt before it. The overflowing tab strip is
+   *  NOT cured: two resident tabs make the strip 446 px wide inside a 428 px row,
+   *  after which `editor.tab` is unreachable, and a probe showed the hit map
+   *  refreshing only when the row's own `overflow` is released INSIDE one page
+   *  task and re-read before the next — the same release split across two round
+   *  trips still answers `hit:no`. So the tab case stays open on its own; do not
+   *  read this helper as covering it.
+   *
+   *  Two repairs, in the order a user performs them: a pointer MOVE over the node
+   *  at viewport coordinates the page computed (element origin would ask the
+   *  driver to resolve the element, which is the very hit test that is stale),
+   *  then a no-op release-and-restore of the nearest scrollable ancestor's own
+   *  `overflow`. Both are idempotent: nothing is dispatched and no scroll
+   *  position changes. */
+
+  private async refreshHitTestMap(): Promise<void> {
+    let hover = "not-sent";
+    let toggle = "none";
+    let hit = "?";
+    const centre = async (): Promise<{ x: number; y: number } | null> => {
+      try {
+        const raw = await this.session.execute<string>(
+          "var el = arguments[0]; if (!el) return 'null';" +
+            "var r = el.getBoundingClientRect();" +
+            "return JSON.stringify({ x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) });",
+          [{ [ELEMENT_KEY]: this.elementId }],
+        );
+        return JSON.parse(raw) as { x: number; y: number };
+      } catch {
+        return null;
+      }
+    };
+    // 1. A pointer MOVE over the node, at VIEWPORT coordinates the page computed.
+    //    Element-origin would ask the driver to resolve the element, which is the
+    //    very hit test that is stale.
+    const pt = await centre();
+    if (pt !== null) {
+      try {
+        await this.session.send("POST", "/actions", {
+          actions: [
+            {
+              type: "pointer",
+              id: "mouse",
+              parameters: { pointerType: "mouse" },
+              actions: [
+                { type: "pointerMove", duration: 0, origin: "viewport", x: pt.x, y: pt.y },
+              ],
+            },
+          ],
+        });
+        await this.session.send("DELETE", "/actions");
+        hover = "sent";
+      } catch {
+        hover = "refused";
+      }
+    }
+    // 2. Re-establish the nearest scrollable ancestor's OWN overflow, in two
+    //    round trips so a frame passes with it released: the layer teardown that
+    //    refreshes the hit map is committed by the next paint, not inside the
+    //    task that asked for it (measured: a single-task toggle leaves the map
+    //    stale, the same toggle split across two evaluates cures it).
+    const toggleScript = (mode: string) =>
+      "var el = arguments[0], mode = arguments[1];" +
+      "var n = el;" +
+      "while (n && n !== document.body) {" +
+      "  var cs = getComputedStyle(n);" +
+      "  if (cs.overflowX !== 'visible' || cs.overflowY !== 'visible') {" +
+      "    if (mode === 'remember') {" +
+      "      n.dataset.e2eOverflow = (n.style.overflow || '');" +
+      "      n.style.overflow = 'visible';" +
+      "      void n.offsetHeight;" +
+      "      return 'released';" +
+      "    }" +
+      "    n.style.overflow = n.dataset.e2eOverflow || '';" +
+      "    delete n.dataset.e2eOverflow;" +
+      "    void n.offsetHeight;" +
+      "    return 'restored';" +
+      "  }" +
+      "  n = n.parentElement;" +
+      "}" +
+      "return 'none';";
+    try {
+      const args = [{ [ELEMENT_KEY]: this.elementId }];
+      toggle = await this.session.execute<string>(toggleScript("remember"), args);
+      if (toggle === "released") {
+        await this.session.execute<string>(toggleScript("restore"), args);
+      }
+      hit = await this.session.execute<string>(
+        "var el = arguments[0]; if (!el) return 'gone';" +
+          "var r = el.getBoundingClientRect();" +
+          "return document.elementsFromPoint(r.x + r.width / 2, r.y + r.height / 2).indexOf(el) === -1 ? 'no' : 'yes';",
+        args,
+      );
+    } catch {
+      // Best-effort by design; the timeout below is still the failure.
+    }
+    this.lastRefresh = `hover:${hover} toggle:${toggle} hit:${hit}`;
   }
 
   /** Centre this element in whatever scroll container holds it, best-effort:
