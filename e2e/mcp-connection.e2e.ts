@@ -235,9 +235,19 @@ async function approveLeavingOut(session: Session, folder: string): Promise<void
   await (await session.byTestId("settings.mcp-grant-name")).sendKeys(CONNECTION_NAME);
 
   await (await session.byTestId("settings.mcp-grant-exclude")).click();
-  const option = await session.waitForElement(
-    testIdSelector("settings.mcp-grant-exclude-option", { "data-value": folder }),
-    { timeoutMs: 10_000 },
+  // The picker's option value is the HOST's folder path, and the host writes
+  // paths with a trailing slash (`e2eptrivate/` — what every other sidebar spec
+  // matches). Accept either spelling rather than encode one: this spec's subject
+  // is the exclusion rule, not the separator.
+  const option = await session.waitUntil(
+    async () => {
+      const [found] = await session.findElements(
+        `${testIdSelector("settings.mcp-grant-exclude-option")}[data-value="${folder}"], ` +
+          `${testIdSelector("settings.mcp-grant-exclude-option")}[data-value="${folder}/"]`,
+      );
+      return found ?? null;
+    },
+    { label: `the exclusion picker offering ${folder}`, timeoutMs: 10_000 },
   );
   await option.click();
 
@@ -273,7 +283,7 @@ async function seedFoldersAndNotes(session: Session): Promise<void> {
   // from `new_note_location` (vault root by default), not from the selected
   // folder. The folder's own context menu is the route a user has.
   const row = await session.waitForElement(
-    testIdSelector("notes.folder-row", { "data-folder-path": LEFT_OUT_FOLDER }),
+    testIdSelector("notes.folder-row", { "data-folder-path": `${LEFT_OUT_FOLDER}/` }),
     { timeoutMs: UI_TIMEOUT_MS },
   );
   await contextMenuPick(session, row, "new-note");
@@ -329,7 +339,16 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
         ]);
 
         const state = answers[1].result?.structuredContent ?? {};
-        expect(answers[1].result?.isError).toBe(false);
+        // The answer is printed on failure: a bare `expected true to be false`
+        // says an assertion flipped and nothing about why the server refused,
+        // which is the whole question when the door and the grant both look open.
+        // The answer is printed on failure: a bare `expected true to be false`
+        // says an assertion flipped and nothing about why the server refused,
+        // which is the whole question when the door and the grant both look open.
+        expect(
+          answers[1].result?.isError,
+          `vault_state refused: ${JSON.stringify(answers[1].result?.structuredContent ?? answers[1].result?.content ?? answers[1].error ?? null)}`,
+        ).toBe(false);
         expect(state.unlocked).toBe(true);
         expect(state.external_access).toBe(true);
         // The exclusion the user named is live, so it is counted as an exclusion

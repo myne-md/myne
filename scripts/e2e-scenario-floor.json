@@ -1126,5 +1126,26 @@
     "two-sided device-admission ceremony whose surface decisions/protocol/0764",
     "withdrew and whose replacement (myne-md/myne#957) is not built. The floor",
     "still clears the executed count without it."
+  ],
+  "_comment_2026_11_03_two_scenarios_left_the_lane": [
+    "Recorded with the numbers above rather than folded into them, so a reader who",
+    "compares this file against a junit knows why two scenarios stopped executing.",
+    "",
+    "  e2e/person-device-enrolment.e2e.ts - its subject is the two-sided",
+    "    device-admission ceremony, whose surface decisions/protocol/0764 withdrew",
+    "    and whose replacement (myne-md/myne#957) is not built.",
+    "",
+    "  e2e/device-join-qr.e2e.ts - the QR door it drives is rendered only for an",
+    "    ENROLLED device on a PERSON-BORN vault. `SyncPanel` asks",
+    "    `publishState.person_born === true`, which `core/src/plugins/sync/devices.rs`",
+    "    answers from the vault.meta generation via `meta_kind::is_person_born`, and",
+    "    the e2e fixture generator writes `NTV5` - the account-keyed v0.2 frame - so",
+    "    no seeded vault can carry that door. Its one assertion beyond the DOM wiring",
+    "    (the Myne mark composed into the SVG at the literal ink colour) is already",
+    "    unit-tested in src-tauri/src/plugins/sync/qr.rs, so nothing unique is lost.",
+    "",
+    "Neither deletion is a re-baseline: the floor is a MINIMUM, the executed count",
+    "still clears it, and both subjects would have to be rebuilt rather than",
+    "unquarantined if the surfaces return."
   ]
 }
