@@ -348,10 +348,14 @@ async fn index_fallback_written_note(
 /// engine signs and verifies with, and `device` is why it cannot sign when it cannot. Before
 /// myne-md/myne#983 the reason was recomputed at the guard from two booleans, so five causes
 /// collapsed into one sentence.
-struct HeadAuthority {
-    ctx: Option<super::head_authority::SignedHeadCtx>,
-    device: super::authority::DeviceResolution,
-    person_held: bool,
+///
+/// `pub(crate)` for the vault doctor (myne-md/myne#1003), which reports this decision as five
+/// facts instead of resolving a second time: one builder, one answer, so the report cannot
+/// disagree with the cycle it describes.
+pub(crate) struct HeadAuthority {
+    pub(crate) ctx: Option<super::head_authority::SignedHeadCtx>,
+    pub(crate) device: super::authority::DeviceResolution,
+    pub(crate) person_held: bool,
 }
 
 impl HeadAuthority {
@@ -389,7 +393,7 @@ impl HeadAuthority {
 /// a credential cause: an unreadable meta, a missing group key or an unverifiable roster is
 /// not something a user can fix by opening their identity, and saying so was part of the
 /// defect this function was rewritten for.
-async fn signed_head_ctx(
+pub(crate) async fn signed_head_ctx(
     // The device id is read through `sync::device_actor`, which needs the host for the
     // person credential's path (myne-md/myne#958). Before that reader, this function
     // consulted the vault's enrolment record ONLY and bailed to the `0x02` phrase path

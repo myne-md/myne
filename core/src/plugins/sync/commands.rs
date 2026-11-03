@@ -228,6 +228,33 @@ pub async fn sync_status<R: Runtime>(
     .await
 }
 
+/// Report the five facts that decide whether this device can sync, as one verdict
+/// (myne-md/myne#1003).
+///
+/// A sibling of [`sync_status`] and READ-ONLY in the same way, but it answers the
+/// question `sync_status` cannot: that one reports a device-level state, and this one
+/// names which of generation / authority / binding / key at rest / session is the
+/// missing half. Nothing polls it: the cycle's roster verification is an ML-DSA verify
+/// and belongs on a user action, not on a five-second beat.
+///
+/// `None` means there is no active vault to diagnose, which every caller renders as
+/// nothing at all. The error type is `()`, the house spelling for a command with no
+/// failure of its own (`vault_migrate_progress` states it the same way): Tauri requires a
+/// `Result` from an async command that borrows state, and the unreadable cases are FACTS
+/// the report carries rather than errors a caller would act on.
+#[tauri::command]
+pub async fn sync_vault_doctor<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+) -> Result<Option<super::doctor::VaultDoctor>, ()> {
+    Ok(super::doctor::read(
+        &crate::host::tauri_host::TauriHost::new(app),
+        &crate::vault_io::StdVaultIo,
+        state.inner(),
+    )
+    .await)
+}
+
 /// Report which notes the server has **not** acknowledged (phase3-web-client
 /// task 23).
 ///

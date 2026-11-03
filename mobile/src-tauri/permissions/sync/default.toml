@@ -30,6 +30,9 @@ permissions = [
     "allow-sync-get-endpoint",
     "allow-sync-set-endpoint",
     "allow-sync-status",
+    # myne-md/myne#1003: the vault doctor. No mobile surface asks it yet; the grant
+    # exists so the surface stays one list across both clients.
+    "allow-sync-vault-doctor",
     "allow-sync-now",
     "allow-sync-person-unlock",
     "allow-sync-person-setup",
@@ -110,6 +113,11 @@ commands.allow = ["sync_set_endpoint"]
 identifier = "allow-sync-status"
 description = "Allow invoking sync:sync_status (read-only current sync status for the status indicator: disabled / idle / syncing / error / conflicts). No vault access."
 commands.allow = ["sync_status"]
+
+[[permission]]
+identifier = "allow-sync-vault-doctor"
+description = "Allow invoking sync:sync_vault_doctor (read-only ONE verdict over the five facts behind a sync that will not run: the vault.meta generation, the signing authority, the device-binding row, the key at rest and the session). Reports bounded enum tokens only: no key material, no identifier, no path, no network. Mirrors the desktop grant, which is the same command body."
+commands.allow = ["sync_vault_doctor"]
 
 [[permission]]
 identifier = "allow-sync-now"
