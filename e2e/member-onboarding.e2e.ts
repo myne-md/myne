@@ -231,7 +231,13 @@ describeCanary("MO-1 member onboarding (myne-md/myne#851)", () => {
   // The accept gate's whole claim: an accepted vault cannot reach the editor
   // unnamed, and the name the gate saved is what the other members read.
   // Vault-count precondition: 1 seeded vault on the owner, 0 on the member.
-  it("accepts an invite through the password step and the name gate, and the name reaches the owner's list", async () => {
+  // EXPLICIT BUDGET, measured rather than guessed: on the 8-core Linux seat this
+  // pair takes ~212 s and ~216 s per scenario (two apps, an invite ceremony, a
+  // server round-trip and a password re-unlock each), against the lane's 180 s
+  // default - so the default timed out on a ceremony that had finished the work
+  // and was writing it up. `member-devices` already declares 600 s for the same
+  // reason; this is the same measurement, not a looser bar.
+  it("accepts an invite through the password step and the name gate, and the name reaches the owner's list", { timeout: 420_000 }, async () => {
     await withAcceptedMember(async (owner, member) => {
       // The claim in one assertion: a row on the OWNER's list carries the name the
       // member typed into the gate. Nothing on the member's own device could show it,
@@ -265,7 +271,7 @@ describeCanary("MO-1 member onboarding (myne-md/myne#851)", () => {
   // own row and clear it back to the fingerprint. Both are things the OTHER members
   // must see, which is the half one device cannot test.
   // Vault-count precondition: 1 seeded vault on the owner, 0 on the member.
-  it("renames from the member's own row and clears it again, and the owner sees both", async () => {
+  it("renames from the member's own row and clears it again, and the owner sees both", { timeout: 420_000 }, async () => {
     await withAcceptedMember(async (owner, member) => {
       // Baseline, so the rename below is a CHANGE rather than a first write.
       const baseline = await waitForName(

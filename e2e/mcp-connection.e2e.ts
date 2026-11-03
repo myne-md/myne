@@ -51,6 +51,7 @@
 // Vault-count precondition: 1 (weak KDF).
 
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { expect, it } from "vitest";
@@ -65,6 +66,7 @@ import {
   enableDeveloperMode,
   nameNewNote,
   openSettings,
+  pageSeatInvoke,
   selectSettingsTopic,
   unlockToEditor,
 } from "./support/flows";
@@ -282,12 +284,53 @@ async function seedFoldersAndNotes(session: Session): Promise<void> {
   // The sidebar's `+ New note` button cannot do this: it resolves the target
   // from `new_note_location` (vault root by default), not from the selected
   // folder. The folder's own context menu is the route a user has.
+  // **A note INSIDE the in-scope folder too**, because `vault_list` reports
+  // folders derived from NOTES (`ConnectionScope::folder_counts` walks the index,
+  // and an empty folder has no count to report). Leaving it empty made the "the
+  // in-scope sibling stays" half of mcp2 assert a folder the answer cannot
+  // contain, and the failure read as the exclusion being too wide.
+  const inScopeRow = await session.waitForElement(
+    testIdSelector("notes.folder-row", { "data-folder-path": `${IN_SCOPE_FOLDER}/` }),
+    { timeoutMs: UI_TIMEOUT_MS },
+  );
+  await contextMenuPick(session, inScopeRow, "new-note");
+  await nameNewNote(session, "e2epublicnote");
+
   const row = await session.waitForElement(
     testIdSelector("notes.folder-row", { "data-folder-path": `${LEFT_OUT_FOLDER}/` }),
     { timeoutMs: UI_TIMEOUT_MS },
   );
   await contextMenuPick(session, row, "new-note");
   await nameNewNote(session, HIDDEN_NEEDLE);
+}
+
+/**
+ * Wait until the desktop's OWN door marker reads Open.
+ *
+ * `myne-mcp` decides `door_disabled` from the `cli-status` marker and never from
+ * the socket (`mcp/src/transport.rs::classify_closed_door`), and the desktop
+ * writes that marker from a 1 s supervisor tick that fires on a state CHANGE
+ * only (`src-tauri/src/cli_bridge/mod.rs`). A Settings switch is therefore
+ * visible to the panel immediately and to the sidecar up to a tick later:
+ * measured 2026-11-03 in one session, three seconds apart, `at-failure=D,
+ * +3s=O`. Waiting for the marker is waiting for a real state - it is the one the
+ * user's own `myne` CLI depends on - not a sleep in disguise.
+ */
+async function waitForDoorOpen(app: AppSession, timeoutMs = 15_000): Promise<void> {
+  const marker = join(app.dataHome, "md.myne.desktop", "cli-status");
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      if (readFileSync(marker, "utf8").trim() === "O") return;
+    } catch {
+      /* not written yet */
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error(
+    `the desktop never marked its door Open (${marker}): the Settings switch reads on, ` +
+      "so the supervisor that publishes the door state has not caught up",
+  );
 }
 
 describeE2E("mcp1 External access opens the door and approves a deny-list grant (myne-md/myne#923)", () => {
@@ -315,6 +358,7 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
         expect(refusalReason(shut[1], "door shut")).toBe("door_disabled");
 
         await enableExternalAccess(s);
+        await waitForDoorOpen(app);
         await approveLeavingOut(s, LEFT_OUT_FOLDER);
         await closeSettings(s);
 
@@ -342,19 +386,23 @@ describeE2E("mcp1 External access opens the door and approves a deny-list grant 
         // The answer is printed on failure: a bare `expected true to be false`
         // says an assertion flipped and nothing about why the server refused,
         // which is the whole question when the door and the grant both look open.
-        // The answer is printed on failure: a bare `expected true to be false`
-        // says an assertion flipped and nothing about why the server refused,
-        // which is the whole question when the door and the grant both look open.
         expect(
           answers[1].result?.isError,
           `vault_state refused: ${JSON.stringify(answers[1].result?.structuredContent ?? answers[1].result?.content ?? answers[1].error ?? null)}`,
         ).toBe(false);
-        expect(state.unlocked).toBe(true);
-        expect(state.external_access).toBe(true);
+        expect(
+          state.unlocked,
+          `vault_state answered without a state: ${JSON.stringify(answers[1]).slice(0, 400)}`,
+        ).toBe(true);
+        // CAMEL CASE, because `VaultState` is `#[serde(rename_all = "camelCase")]`
+        // and this reads the WIRE, not the Rust field names. Written snake_case,
+        // every key here is `undefined` - and `expect(undefined).toBe(true)` reads
+        // as "the door is not open" when the door is fine and the key was.
+        expect(state.externalAccess).toBe(true);
         // The exclusion the user named is live, so it is counted as an exclusion
         // and not as a stale entry naming a folder the vault no longer has.
-        expect(state.excluded_folder_count).toBe(1);
-        expect(state.stale_exclusion_count).toBe(0);
+        expect(state.excludedFolderCount).toBe(1);
+        expect(state.staleExclusionCount).toBe(0);
       },
     );
   });
@@ -376,6 +424,7 @@ describeE2E("mcp2 a left-out folder is unreadable through the connection (myne-m
         await enableDeveloperMode(s);
         await openExternalAccess(s);
         await enableExternalAccess(s);
+        await waitForDoorOpen(app);
         await approveLeavingOut(s, LEFT_OUT_FOLDER);
         await closeSettings(s);
 
@@ -419,6 +468,7 @@ describeE2E("mcp3 revoke and lock are refusals rather than protocol errors (myne
         await enableDeveloperMode(s);
         await openExternalAccess(s);
         await enableExternalAccess(s);
+        await waitForDoorOpen(app);
         await approveLeavingOut(s, LEFT_OUT_FOLDER);
 
         // Revoke through the row, then close Settings: the grant is re-read on
