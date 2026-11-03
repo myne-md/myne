@@ -225,6 +225,22 @@ describe("refusal classes render distinct copy", () => {
     expect(screen.queryByText("Sync error")).toBeNull();
   });
 
+  // The key this device published is gone (myne-md/myne#983). Its own label AND its own call to
+  // action: the repair is still the identity phrase entry, but "unlock your identity" was shown
+  // for this state for a week and named the wrong thing.
+  it('maps "device_key_missing" to its own label, apart from identity_locked', async () => {
+    statusFixture({ state: "error", detail: "device_key_missing" } as SyncStatus);
+    render(<SyncStatusIndicator onUnlockIdentity={() => {}} />);
+    await waitFor(() => {
+      expect(
+        screen.getByText("This device's signing key is missing, so sync cannot run"),
+      ).toBeTruthy();
+    });
+    expect(screen.queryByText("Unlock your identity to sync")).toBeNull();
+    expect(screen.getByText("Repair this device")).toBeTruthy();
+    expect(screen.queryByText("Sync error")).toBeNull();
+  });
+
   it("still falls back to the generic label for an unknown detail", async () => {
     statusFixture({ state: "error", detail: "sync_failed" } as SyncStatus);
     render(<SyncStatusIndicator />);

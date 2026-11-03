@@ -108,6 +108,16 @@ impl SignedHeadCtx {
         self
     }
 
+    /// The same context with the vault's verified device signers and no key of its own, so
+    /// a device that cannot AUTHOR a `0x03` head can still VERIFY one. `decisions/protocol/0773`
+    /// rule 1 is "every reader accepts both", and a verifier set derived from this device's
+    /// own binding rather than from the vault is what made an unbound reader refuse a peer.
+    #[must_use]
+    pub fn with_readers(mut self, device_signers: Vec<DeviceHeadSigner>) -> Self {
+        self.device_signers = device_signers;
+        self
+    }
+
     /// The format this device AUTHORS: `0x03` with a device key, else `0x02`.
     ///
     /// `0x02` is reported even when no identity is held, because the question is which

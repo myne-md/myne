@@ -214,21 +214,32 @@ async fn write_own_binding_with_dir(
     // hand: the row's signature is the person's, so creating the key anywhere else would
     // need the phrase again. `load_or_create` is `Unsupported` on a platform with no
     // storage rung (`0733`'s rung 4), and `None` then keeps today's `v1` row.
-    let device_public = match crate::plugins::sync::device_identity::load_or_create() {
-        Ok(pair) => Some(pair.public_half()),
-        // Rung 4: this platform has no place to keep one, so the row is written exactly
-        // as it was before the device-key change. Expected, not a fault.
-        Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => None,
+    let halves = match mint_and_confirm_at_rest() {
+        Ok(confirmed) => confirmed,
+        // Rung 4 and every fault. None of them is evidence that this device has no key: a
+        // platform with no store never had one, and a store that refused may still hold it.
+        // `None` used to mean "write a v1 row", which was harmless until `None` started
+        // repairing an orphan, at which point it became a DEMOTION of a synced and
+        // person-signed row that `beats` (version-first) then wins the merge with
+        // (myne-md/myne#983 review, D8).
         Err(err) => {
-            // A keychain that refused is not a reason to refuse the BINDING (the row is
-            // valid without the halves and the next unlock retries), but it IS a fault
-            // rather than a platform fact, so it is logged as one and named.
             tracing::warn!(
                 stage = "device_binding_claim",
                 error = ?err,
-                "device key could not be created; the binding is written without its halves"
+                "device key could not be created; the binding is left untouched"
             );
-            None
+            ConfirmedHalves::Unknown
+        }
+    };
+    let device_public = match halves {
+        ConfirmedHalves::Publish(public) => Some(*public),
+        // The store positively holds no key for this device: the row is written the way it
+        // was before the device-key change, or demoted from a row that did publish halves.
+        ConfirmedHalves::Withdraw => None,
+        // No decision was possible, so nothing is written at all.
+        ConfirmedHalves::Unknown => {
+            let map = read_device_bindings_in_dir(io, vault_dir, &resolved.borrow()).await?;
+            return Ok((map, ClaimOutcome::Deferred));
         }
     };
     let mut rng = rand_core::UnwrapErr(crate::rng::OsRng);
@@ -258,6 +269,103 @@ async fn write_own_binding_with_dir(
     Ok((protocol::live_device_bindings(&map), outcome))
 }
 
+/// Mint the device key and prove it can be read back, or answer `None`.
+///
+/// **This is the half that was missing** (myne-md/myne#983). The row is a claim about a key
+/// at rest, so it may publish only halves that the store RETURNS: a `format_version 0x02`
+/// row naming this device while the store held nothing is exactly the state that made sync
+/// refuse every cycle under "unlock your identity to sync", and it survived every lock,
+/// relaunch and rebuild because nothing ever compared the two.
+///
+/// `Ok(None)` is the two legitimate shapes: rung 4 of the ladder (no store on this platform)
+/// and a store that refused, which the caller keeps writing a `0x01` row for. `Err` is
+/// unreachable and kept out of the signature on purpose: a failure is a downgrade to the
+/// person path, never an error that blocks a claim.
+fn mint_and_confirm_at_rest(
+) -> Result<ConfirmedHalves, crate::plugins::sync::device_identity::DeviceKeyStoreError> {
+    let pair = match crate::plugins::sync::device_identity::load_or_create() {
+        Ok(pair) => pair,
+        // Rung 4 is a platform fact: the row is written exactly as it was before the
+        // device-key change, and that is not a fault.
+        Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => {
+            return Ok(ConfirmedHalves::Withdraw)
+        }
+        Err(err) => return Err(err),
+    };
+    Ok(confirm_read_back(
+        pair.public_half(),
+        crate::plugins::sync::authority::load_key("device_binding_claim"),
+    ))
+}
+
+/// The read-back's decision, split from the store so all four outcomes are testable.
+///
+/// A store that reports a successful write and cannot return the item is the failure this
+/// whole slice exists for, and it is logged at `ERROR` because nothing else in the tree will
+/// notice: the row it would have published is a promise no peer can resolve.
+fn confirm_read_back(
+    written: protocol::device_key::DevicePublicHalf,
+    stored: crate::plugins::sync::authority::KeyAtRest,
+) -> ConfirmedHalves {
+    use crate::plugins::sync::authority::KeyAtRest;
+    match stored {
+        KeyAtRest::Present(key) if key.public_half() == written => {
+            ConfirmedHalves::Publish(Box::new(written))
+        }
+        KeyAtRest::Present(_) => {
+            tracing::error!(
+                stage = "device_binding_claim",
+                event = "device_key_read_back_mismatch",
+                "the device key store returned a DIFFERENT key than the one just written; the \
+                 binding is written without halves, because a row publishing a key this device \
+                 does not hold is a claim no peer can resolve"
+            );
+            // The store holds something else, so it definitely does not hold a key this
+            // device can sign with: withdrawing the published halves is right.
+            ConfirmedHalves::Withdraw
+        }
+        KeyAtRest::Absent => {
+            tracing::error!(
+                stage = "device_binding_claim",
+                event = "device_key_read_back_missing",
+                "the device key was written and cannot be read back; the binding is written \
+                 without halves. This is the state that makes sync demand the identity phrase \
+                 after every lock (myne-md/myne#983)"
+            );
+            ConfirmedHalves::Withdraw
+        }
+        // A store that REFUSED is not a store that is empty, and this distinction decides
+        // whether the row is rewritten. Withdrawing the halves here would let one transient
+        // keychain refusal rewrite a synced, person-signed row and strip a public key the
+        // device still holds, so a peer that is itself bound could no longer resolve a
+        // `0x03` head this device already pushed (myne-md/myne#983 review, D3 and D4). The
+        // row is left exactly as it is and the next unlock asks again.
+        KeyAtRest::Unreadable => {
+            tracing::warn!(
+                stage = "device_binding_claim",
+                event = "claim_deferred",
+                reason = "key_store_unreadable",
+                "the device key store refused the read-back; the binding is left untouched                  rather than demoted, because a refusal is not an absence"
+            );
+            ConfirmedHalves::Unknown
+        }
+    }
+}
+
+/// What the read-back after a device-key write authorises.
+///
+/// Three answers, because two collapsed a keychain refusal into an absence and that
+/// collapse reached a synced write.
+#[derive(Debug, PartialEq, Eq)]
+enum ConfirmedHalves {
+    /// The store returns the key that was just written: publish these halves.
+    Publish(Box<protocol::device_key::DevicePublicHalf>),
+    /// The store positively holds no such key: the row must stop publishing halves.
+    Withdraw,
+    /// The store would not answer: leave the row alone and retry on the next unlock.
+    Unknown,
+}
+
 /// Claim this device's binding, best effort, from the unlock pipeline and from the
 /// invite-accept tail.
 ///
@@ -281,10 +389,42 @@ pub async fn claim_own_binding_best_effort(
     vault_dir: &Path,
 ) {
     match claim_own_binding_with_dir(host, io, state, vault_dir).await {
-        Ok((_map, _outcome)) => {}
-        Err(DeviceBindingError::SlotNotUnlocked)
-        | Err(DeviceBindingError::NotASharedVault)
-        | Err(DeviceBindingError::NoDeviceId) => {}
+        // One line per unlock naming what the claim DID (myne-md/myne#983). Before this, a
+        // claim that stood down and a claim that wrote a row were indistinguishable from the
+        // outside, which is why an orphaned binding took a week of forensics to find.
+        Ok((_map, outcome)) => tracing::info!(
+            stage = "device_binding_claim",
+            event = "claim_completed",
+            outcome = match outcome {
+                ClaimOutcome::AlreadyCurrent => "already_current",
+                ClaimOutcome::Written => "written",
+                // The row was NOT settled: the key store refused. Saying "in place" here
+                // would report the opposite of the state on the one line that exists to
+                // end this defect class' forensics.
+                ClaimOutcome::Deferred => "deferred",
+            },
+            "this device's binding claim finished"
+        ),
+        // The ordinary stand-down states, named rather than silent for the same reason: each
+        // one is a different answer to "why does sync not work".
+        Err(DeviceBindingError::SlotNotUnlocked) => tracing::info!(
+            stage = "device_binding_claim",
+            event = "claim_stood_down",
+            reason = "no_person_session",
+            "no person session is held, so this device cannot claim its binding"
+        ),
+        Err(DeviceBindingError::NotASharedVault) => tracing::info!(
+            stage = "device_binding_claim",
+            event = "claim_stood_down",
+            reason = "not_a_shared_vault",
+            "this vault carries no binding store"
+        ),
+        Err(DeviceBindingError::NoDeviceId) => tracing::info!(
+            stage = "device_binding_claim",
+            event = "claim_stood_down",
+            reason = "no_device_id",
+            "this device has no durable id, so no row can name it"
+        ),
         Err(error) => {
             tracing::warn!(
                 event = "device_binding_claim_failed",
@@ -484,5 +624,40 @@ mod tests {
                 "a never-enrolled vault has no device id, and the list must say so"
             );
         });
+    }
+
+    /// The read-back, in all four states. The ones that matter are the states that were
+    /// impossible before this slice: a store that reports success and returns nothing, one
+    /// that returns a DIFFERENT key, and one that refuses to answer at all.
+    #[test]
+    fn a_row_publishes_only_halves_the_store_returns() {
+        use crate::plugins::sync::authority::KeyAtRest as K;
+
+        let key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x31; 32], &[0x32; 32]);
+        let other = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
+
+        assert_eq!(
+            super::confirm_read_back(key.public_half(), K::Present(Box::new(key.clone()))),
+            super::ConfirmedHalves::Publish(Box::new(key.public_half())),
+            "the one case that may publish halves"
+        );
+        assert_eq!(
+            super::confirm_read_back(key.public_half(), K::Present(Box::new(other))),
+            super::ConfirmedHalves::Withdraw,
+            "a different key at rest means one of the two is stale, and neither may be published"
+        );
+        assert_eq!(
+            super::confirm_read_back(key.public_half(), K::Absent),
+            super::ConfirmedHalves::Withdraw,
+            "a store that cannot return the item it just accepted must stop publishing"
+        );
+        // The distinction that reaches a WRITE: a refusal is not an absence, so the row is
+        // not rewritten. Folding these two together let one transient keychain refusal strip
+        // a public key the device still held, from a synced and person-signed row.
+        assert_eq!(
+            super::confirm_read_back(key.public_half(), K::Unreadable),
+            super::ConfirmedHalves::Unknown,
+            "a fault leaves the row alone rather than demoting it"
+        );
     }
 }

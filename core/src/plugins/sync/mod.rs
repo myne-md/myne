@@ -47,6 +47,7 @@
 // belongs with task 84, which is what will define what the browser side of each
 // actually does.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+pub mod authority;
 pub mod commands;
 pub mod config;
 // "Does this device hold the whole vault?" (phase3-web-client task 89) — the

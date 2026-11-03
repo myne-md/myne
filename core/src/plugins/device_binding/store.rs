@@ -73,6 +73,13 @@ pub enum ClaimOutcome {
     /// A row was written: the device had no row, its row named a different person (an
     /// identity change), or its row was tombstoned.
     Written,
+    /// **Nothing was decided, and nothing was written.** The key store refused to answer, so
+    /// the claim could not tell "this device has no key" from "this device's key is
+    /// unreachable", and either write would be a guess. Distinct from `AlreadyCurrent`
+    /// because the logs are the whole forensic trail for this defect class: reporting
+    /// "already current" for a device with no row at all is the opposite of the state
+    /// (myne-md/myne#983 review, D8).
+    Deferred,
 }
 
 /// Lowercase hex, the rendering every id in this family uses. The device id and the
@@ -242,8 +249,15 @@ async fn claim_self_in_dir_with(
         // an upgraded device re-sign itself ONCE: a `v1` row that names the right
         // person is otherwise "current" forever, and its device key would never be
         // published, so the device could never author a `0x03` head that peers resolve.
+        // `None` means this device CANNOT publish halves: either the platform keeps no
+        // device key at all, or the store would not give back the one it was asked for. A
+        // row that already publishes halves is therefore NOT current, which is the whole
+        // repair: it is rewritten as a `v1` row one version up, so peers stop resolving a
+        // signer that no longer exists and this device falls back to the person signature
+        // until a later unlock can publish again (myne-md/myne#983). Treating `None` as a
+        // match made that repair a no-op on exactly the state it exists for.
         let halves_match = match device_public {
-            None => true,
+            None => !crate::plugins::sync::authority::row_publishes_halves(existing),
             Some(public) => {
                 existing.device_ed_pk.as_deref() == Some(public.ed_pk_hex().as_str())
                     && existing.device_mldsa_vk.as_deref() == Some(public.mldsa_vk_hex().as_str())
@@ -302,6 +316,12 @@ pub async fn admit_other_in_dir(
     let mine = fingerprint_hex(person.fingerprint());
     if let Some(existing) = map.get(&id) {
         let halves_match = match device_public {
+            // Deliberately NOT the self-claim's rule. The self-claim knows whether its OWN
+            // store answered, because it just read it; this path only knows what the joining
+            // device chose to SEND, and "sent no halves" cannot be told from "has no halves".
+            // Demoting another device's published key on that basis would strip it with the
+            // admitting owner's signature, one version up, so the row is left alone and that
+            // device repairs itself on its own next claim (myne-md/myne#983 review, D4+D8).
             None => true,
             Some(public) => {
                 existing.device_ed_pk.as_deref() == Some(public.ed_pk_hex().as_str())
@@ -1185,6 +1205,89 @@ mod tests {
                 "the retired device is still bound to its person"
             );
             assert_eq!(live_row_count(&reread), 1);
+        });
+    }
+
+    /// **The repair this whole change exists for, on the store side.**
+    ///
+    /// A live `v2` row publishes this device's halves, and then the device loses them (a
+    /// keychain item removed, a store that stopped answering, a platform that never had
+    /// one). The next claim hands the writer `None`, and that must NOT read as "current":
+    /// with `None` treated as a match the row stayed published, peers kept resolving a
+    /// signer that no longer existed, and the sync cycle kept refusing with
+    /// `device_key_missing` while the repair button did nothing at all. The row is
+    /// rewritten one version up, without halves, so the device falls back to the person
+    /// signature honestly.
+    #[test]
+    fn a_device_that_lost_its_key_unpublishes_the_halves_it_left_behind() {
+        let dir = ScopedTempDir::new("device-binding-orphan").unwrap();
+        let io = StdVaultIo;
+        let owner = pair(b"orphan-owner");
+        let halves = protocol::device_key::DeviceKeyPair::generate_raw(&[0x71; 32], &[0x72; 32])
+            .public_half();
+        let mut rng = SeededRng(23);
+
+        with_key(|k| {
+            block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &DEV_A,
+                Some(&halves),
+                &mut rng,
+            ))
+            .expect("the first claim publishes the halves");
+            let published =
+                block_on(read_device_bindings_in_dir(&io, dir.path(), k)).expect("the store");
+            let before = published.get(&device_id_hex(&DEV_A)).expect("the v2 row");
+            assert!(
+                crate::plugins::sync::authority::row_publishes_halves(before),
+                "fixture check: the row really does publish halves"
+            );
+            let published_version = before.version;
+
+            // The same device claims again, and this time the store has nothing to give back.
+            let (map, outcome) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("the repair claim");
+            assert_eq!(
+                outcome,
+                ClaimOutcome::Written,
+                "a row publishing halves we cannot honour is stale, not current"
+            );
+            let row = map.get(&device_id_hex(&DEV_A)).expect("the row");
+            assert_eq!(
+                row.version,
+                published_version + 1,
+                "the rewrite climbs, so a peer's merge adopts it"
+            );
+            assert!(
+                !crate::plugins::sync::authority::row_publishes_halves(row),
+                "the row must stop publishing halves this device cannot sign with"
+            );
+            assert!(verify_device_binding(&owner.public_half(), &DEV_A, row));
+
+            // And it settles: claiming again with nothing to publish is a genuine no-op, so
+            // the repair does not climb the version on every unlock.
+            let (_, outcome2) = block_on(claim_self_in_dir(
+                &io,
+                dir.path(),
+                k,
+                &owner,
+                &DEV_A,
+                None,
+                &mut rng,
+            ))
+            .expect("the next unlock");
+            assert_eq!(outcome2, ClaimOutcome::AlreadyCurrent);
         });
     }
 

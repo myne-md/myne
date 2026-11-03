@@ -836,13 +836,10 @@ pub async fn rotate_group_from_host(
         account_number_hash,
         b2b_meta.group_key_epoch,
     );
-    let own_device = crate::plugins::sync::device_identity::load_for_fallback("member_removal")
-        .map(|key| key.public_half());
     let owner_devices = crate::plugins::sync::roster_trust::device_halves_for_owner(
         io,
         &vault_root,
         Some(&bindings_key.borrow()),
-        own_device.as_ref(),
         None,
         &owner_public,
     )
