@@ -605,6 +605,12 @@ pub(crate) async fn run_post_unlock_pipeline(
 /// Best effort and silent about WHY it stood down (no slot, no group key, no device id, an
 /// unreadable meta): those are the ordinary states of a single-user vault and of a cold start,
 /// and the claim already logged its own reason one line above.
+///
+/// Gated with its caller's own gate, and the gate is load-bearing rather than tidy: the call site
+/// sits inside a `not(target_arch = "wasm32")` arm, so without it this compiles on wasm32 with no
+/// caller and the wasm clippy fails the build on `-D dead-code`. `cargo check` never compiles that
+/// arm, which is why the wasm lane is the one that sees it.
+#[cfg(not(target_arch = "wasm32"))]
 async fn report_orphaned_binding_best_effort(
     host: &dyn HostCtx,
     io: &dyn crate::vault_io::VaultIo,
