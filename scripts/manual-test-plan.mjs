@@ -32,8 +32,9 @@
 // reverse of what was planned, which is worth naming: for the window between
 // that merge and this one, the runbook instructed a maintainer to run a script
 // that was not on `develop` yet.
-// `scripts/check-manual-test-roster.mjs` beside it is the half that gates a
-// commit and needs no caller of its own.
+// `scripts/check-manual-test-roster.mjs` beside it is the half that used to gate a
+// commit and needs no caller of its own. It is hand-runnable only since
+// myne-md/myne#996: the guard left `pre-commit` and CI, and this generator stayed.
 //
 // WHAT IT DOES NOT DECIDE FOR ITSELF. Which rows gate, how many minutes a row
 // costs and how minutes render as hours all come from

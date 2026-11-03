@@ -338,6 +338,24 @@ The Tor client Myne bundles to serve [Tor routing mode](#tor-routing-mode): [art
 
 Used in: `decisions.md` 2026-07-31; `threat-model.md` §7; `dependency-policy.md`
 
+### **ASD-STE100 (Simplified Technical English)** &nbsp; 🛠️ *Tooling*
+
+The writing standard every sentence an agent produces follows: **ASD-STE100 Issue 9 (2025-01-15)**,
+the current issue, owned by ASD (Aerospace, Security and Defence Industries Association of Europe).
+It is a controlled language, meaning a dictionary of approved words plus a numbered set of writing
+rules, and its official copy is free from <https://www.asd-ste100.org/>. `myne-agents/reference/writing-rules.md`
+is the file that binds this repository to it, and it names the surfaces the standard covers: commit
+messages, issue and PR bodies, code comments, `AGENTS.md`, `reference/`, `skills/`, `docs/spec/`,
+`docs/threat-model.md`, `docs/decisions/` and `docs/glossary.md`. **Text a user reads is the one
+exception** (the user guide, the website, release notes, UI strings, store listings and legal
+drafts), because a controlled language is the wrong register for a guide; that text keeps its normal
+voice under three rules (no em-dash, a humanizing pass, and never inventing a fact or a guarantee the
+threat model does not make). It replaced about 545 lines of house style instruction in
+`decisions/process/0779`, and the standard constrains how a sentence is built, never what it may
+claim: a security, crypto, spec or data-loss finding is stated in full.
+
+Used in: `myne-agents/reference/writing-rules.md`; `AGENTS.md` "Session conventions"; `decisions/process/0779`
+
 ### **asset** &nbsp; ⚠️ *Threat*
 
 A resource that the threat model identifies as worth protecting, classified by sensitivity (Critical / Sensitive / Pseudonymous / Metadata) and by visibility (client only, encrypted blob on server, plaintext on server, transient). The catalogued set grows with the product — AS18 and AS19 arrived with the pending-capture and share-import queues — so `threat-model.md` §2 is the table of record; read it there rather than tracking a count here.
@@ -2183,7 +2201,7 @@ Used in: `spec/protocol.md` §9.1, §9.2, §9.3, §10.3, §10.7
 
 ### **manual test roster** &nbsp; 🛠️ *Tooling*
 
-The recorded answer to "what must a human verify before this release, and why can no machine verify it instead". One entry per feature surface, each carrying the paths that implement it, the clients it ships on, the `e2e/` scenarios that already automate it, and the observations a person must make. It lives in `scripts/manual-test-roster.mjs` and IS the gate, so the record and the check cannot disagree; `docs/dev/manual-test-roster.md` is a generated projection of it and never a second source. Coverage is compared both ways against six directories, `src/screens/`, `src/components/settings/`, `web/src/screens/`, `web/src/components/settings/`, `mobile/src/app/flows/` and `e2e/*.e2e.ts`, so a surface entering the tree fails by name and a verdict whose files are gone fails as stale. Which six is checked too: a shared tree that grows a surface directory outside that list fails by name rather than being skipped. The rule that decides membership is that **an item earns a place only if a machine cannot honestly judge it**: an observation an `e2e/` scenario could assert is [automation debt](#automation-debt-manual-test-roster), not a manual item.
+The recorded answer to "what must a human verify before this release, and why can no machine verify it instead". One entry per feature surface, each carrying the paths that implement it, the clients it ships on, the `e2e/` scenarios that already automate it, and the observations a person must make. It lives in `scripts/manual-test-roster.mjs`; `docs/dev/manual-test-roster.md` is a generated projection of it and never a second source. **Nothing compares it against the tree any more.** `scripts/check-manual-test-roster.mjs` left `pre-commit` and CI in `decisions/process/0780`: no feature surface owes an entry, and a verdict whose files have gone stale fails nothing. `/release` still generates the manual half from the roster, so the list survives as a release input and a frozen snapshot rather than as a gate. The rule that decides membership is that **an item earns a place only if a machine cannot honestly judge it**: an observation an `e2e/` scenario could assert is [automation debt](#automation-debt-manual-test-roster), not a manual item.
 
 Used in: `scripts/manual-test-roster.mjs`, `scripts/check-manual-test-roster.mjs`, `docs/dev/manual-test-roster.md`, `myne-ops/runbooks/release-checklist.md` phase 1, `decisions.md` 2026-08-21 (manual test roster, myne-md/myne#548)
 
