@@ -14,7 +14,7 @@
 > (`docs/decisions.md` 2026-07-26 "Web E2E policy"; procedure for both:
 > `docs/dev/e2e.md`.)
 
-> Subdirectory AGENTS.md. Loaded when OpenCode works in this directory. Operating
+> Subdirectory AGENTS.md. Loaded when pi works in this directory. Operating
 > manual (platform constraints, local container loop, env knobs, version pins):
 > `docs/dev/e2e.md`. Policy provenance: `docs/decisions.md` 2026-06-10 "E2E
 > harness" entry + `myne-agents/epics/e2e-testing/sync-ledger.md`.
