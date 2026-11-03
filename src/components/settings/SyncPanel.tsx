@@ -105,6 +105,17 @@ export interface SyncPanelProps {
   onDialogOpenChange?: (open: boolean) => void;
 }
 
+/**
+ * The named authority causes, in the indicator's own vocabulary. `undefined` for every other
+ * detail, which is what keeps the raw failure tag out of product copy. Module scope because it
+ * does not vary with props or state, so rebuilding it inside the render body only gives a later
+ * edit somewhere to drift from.
+ */
+const AUTHORITY_CAUSES: Record<string, string> = {
+  identity_locked: "sync.panel.status.authorityIdentityClosed",
+  device_key_missing: "sync.panel.status.authorityKeyMissing",
+};
+
 export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
@@ -143,12 +154,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
-  // The named authority causes, in the indicator's own vocabulary. `undefined` for every other
-  // detail, which is what keeps the raw failure tag out of product copy.
-  const AUTHORITY_CAUSES: Record<string, string> = {
-    identity_locked: "sync.panel.status.authorityIdentityClosed",
-    device_key_missing: "sync.panel.status.authorityKeyMissing",
-  };
   const authorityCauseLine =
     syncStatus?.state === "error" && syncStatus.detail
       ? AUTHORITY_CAUSES[syncStatus.detail]

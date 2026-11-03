@@ -68,6 +68,10 @@ const ROOTS = ["core/src"];
 const PATTERNS = [
   { re: /\bdevice_identity::load\s*\(/g, what: "key at rest" },
   { re: /\bdevice_identity::load_for_fallback\s*\(/g, what: "key at rest, errors swallowed" },
+  // The MINT is the fourth answer to the authority question: the first `Some` out of it is a
+  // key this device will sign with, so a site that mints outside the resolver has decided the
+  // question without asking it (myne-md/myne#983 review, D9).
+  { re: /\bdevice_identity::load_or_create\s*\(/g, what: "minting the key at rest" },
   { re: /\bclone_person_identity\s*\(/g, what: "held person identity" },
   { re: /\bdurable_device_id\s*\(/g, what: "which device is this" },
 ];

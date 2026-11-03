@@ -47,8 +47,12 @@
 // belongs with task 84, which is what will define what the browser side of each
 // actually does.
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
-pub mod authority;
 pub mod commands;
+// Ungated: the authority resolver reads a vault through `VaultIo` and `protocol` only, and
+// its consumers (`roster_trust`, `cycle`, `device_binding::store`) are compiled on every
+// target. Gating it would break the wasm core, which resolves `myne-core` with
+// `default-features = false`.
+pub mod authority;
 pub mod config;
 // "Does this device hold the whole vault?" (phase3-web-client task 89) — the
 // gate on whole-corpus destructive sweeps, whose signal is the vault head's own

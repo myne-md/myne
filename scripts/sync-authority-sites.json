@@ -9,6 +9,10 @@
         "count": 1,
         "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
       },
+      "let pair = match crate::plugins::sync::device_identity::load_or_create() {": {
+        "count": 1,
+        "reason": "This IS the binding claim: it mints the key and reads it back, and only a read-back of the key just written is allowed to publish halves. The resolver consumes what this call establishes, so it cannot be the thing that asks."
+      },
       "let session_person = state.clone_person_identity().await;": {
         "count": 1,
         "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
@@ -78,6 +82,12 @@
         "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
       }
     },
+    "core/src/plugins/sync/device_admission.rs": {
+      "let public = match crate::plugins::sync::device_identity::load_or_create() {": {
+        "count": 1,
+        "reason": "Admission mints the key BEFORE any vault or person session exists (a device joins by proving itself to the server first), so there is no roster and no binding map for a resolver to read yet; the claim that follows is what records it."
+      }
+    },
     "core/src/plugins/sync/devices.rs": {
       "let device_id_hex = super::device_actor::durable_device_id(host, io, &dir)": {
         "count": 1,
@@ -88,12 +98,6 @@
       "let person = state.clone_person_identity().await;": {
         "count": 1,
         "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
-      }
-    },
-    "core/src/plugins/sync/member_removal.rs": {
-      "if let Some(key) = crate::plugins::sync::device_identity::load_for_fallback(\"rotation_verify\") {": {
-        "count": 1,
-        "reason": "Member rotation re-wraps the group key for every remaining device and needs the key itself; a store that refuses must not abort a removal that has already dropped the member."
       }
     },
     "core/src/plugins/sync/person_account.rs": {

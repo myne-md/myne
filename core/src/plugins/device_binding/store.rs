@@ -249,15 +249,21 @@ async fn claim_self_in_dir_with(
         // an upgraded device re-sign itself ONCE: a `v1` row that names the right
         // person is otherwise "current" forever, and its device key would never be
         // published, so the device could never author a `0x03` head that peers resolve.
-        // `None` means this device CANNOT publish halves: either the platform keeps no
-        // device key at all, or the store would not give back the one it was asked for. A
-        // row that already publishes halves is therefore NOT current, which is the whole
-        // repair: it is rewritten as a `v1` row one version up, so peers stop resolving a
-        // signer that no longer exists and this device falls back to the person signature
-        // until a later unlock can publish again (myne-md/myne#983). Treating `None` as a
-        // match made that repair a no-op on exactly the state it exists for.
+        // `None` means this device cannot publish halves THIS TIME: either the platform keeps
+        // no device key at all, or the store would not give back the one it was asked for. It
+        // is not evidence that the halves already on the row are wrong, so the row is left as
+        // it is.
         let halves_match = match device_public {
-            None => !crate::plugins::sync::authority::row_publishes_halves(existing),
+            // A device that cannot publish keeps whatever the row already says. Withdrawing
+            // the published halves was tried and reverted: a row is also the verification
+            // material for the `0x03` heads this device already pushed, so demoting it makes
+            // the next pull answer `AuthorUnknown` for our own current head, and push needs
+            // the pull, so the device could never author the person-signed head that would
+            // replace it (myne-md/myne#983 review, D8). The private key is gone either way,
+            // so a published public half grants nobody a capability; the local store's
+            // `Absent` already drives `AuthorityMissing::KeyMissingWhileBound`, which is what
+            // names the fault to the user.
+            None => true,
             Some(public) => {
                 existing.device_ed_pk.as_deref() == Some(public.ed_pk_hex().as_str())
                     && existing.device_mldsa_vk.as_deref() == Some(public.mldsa_vk_hex().as_str())
@@ -1219,7 +1225,7 @@ mod tests {
     /// rewritten one version up, without halves, so the device falls back to the person
     /// signature honestly.
     #[test]
-    fn a_device_that_lost_its_key_unpublishes_the_halves_it_left_behind() {
+    fn a_device_that_lost_its_key_keeps_the_halves_it_published() {
         let dir = ScopedTempDir::new("device-binding-orphan").unwrap();
         let io = StdVaultIo;
         let owner = pair(b"orphan-owner");
@@ -1257,21 +1263,21 @@ mod tests {
                 None,
                 &mut rng,
             ))
-            .expect("the repair claim");
+            .expect("the second claim");
             assert_eq!(
                 outcome,
-                ClaimOutcome::Written,
-                "a row publishing halves we cannot honour is stale, not current"
+                ClaimOutcome::AlreadyCurrent,
+                "a device with nothing to publish leaves the row alone, and never rewrites it"
             );
             let row = map.get(&device_id_hex(&DEV_A)).expect("the row");
             assert_eq!(
-                row.version,
-                published_version + 1,
-                "the rewrite climbs, so a peer's merge adopts it"
+                row.version, published_version,
+                "no version bump: a rewrite would reach every peer as a withdrawn half"
             );
             assert!(
-                !crate::plugins::sync::authority::row_publishes_halves(row),
-                "the row must stop publishing halves this device cannot sign with"
+                crate::plugins::sync::authority::row_publishes_halves(row),
+                "the published halves are the verification material for the 0x03 head this \
+                 device already pushed, so they stay even though the private key is gone"
             );
             assert!(verify_device_binding(&owner.public_half(), &DEV_A, row));
 
@@ -1287,7 +1293,11 @@ mod tests {
                 &mut rng,
             ))
             .expect("the next unlock");
-            assert_eq!(outcome2, ClaimOutcome::AlreadyCurrent);
+            assert_eq!(
+                outcome2,
+                ClaimOutcome::AlreadyCurrent,
+                "and claiming again stays a no-op, so an unlock never climbs the version"
+            );
         });
     }
 
