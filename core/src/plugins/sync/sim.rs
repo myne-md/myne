@@ -2722,7 +2722,7 @@ async fn person_device(name: &str, url: &str, phrase: &str) -> PersonDevice {
 /// The story, in order, with the gate asserted at the point where it holds:
 ///
 ///   1. an existing device of the account (registered, admitted);
-///   2. a joining device that has typed the phrase and NOTHING else — identity sealed, endpoint
+///   2. a joining device that has typed the phrase and NOTHING else: identity sealed, endpoint
 ///      configured, nothing sent (`person_device_unregistered`);
 ///   3. the join lands `pending`, and the credential it minted is NOT installed yet, which is
 ///      checked the only way that means anything: a device-credential login is refused;

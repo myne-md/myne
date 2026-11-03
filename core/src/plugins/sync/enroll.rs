@@ -1041,7 +1041,7 @@ mod tests {
     // A refused install stops the flow rather than going on to a handshake that could only
     // fail: the caller then keeps the account token it already holds (`adopt_own_credential`).
     // 409 is the one refusal worth its own arm, because it is the only one that says THIS
-    // device id already holds a different verifier — i.e. a second salt was minted somewhere,
+    // device id already holds a different verifier, i.e. a second salt was minted somewhere,
     // which is the mistake the mint's non-rotation exists to prevent.
     #[test]
     fn a_refused_install_does_not_reach_the_handshake() {

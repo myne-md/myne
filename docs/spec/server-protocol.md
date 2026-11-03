@@ -180,8 +180,8 @@ account session its phrase derived, AFTER an already-approved device of the acco
 a self-approval and it is not a new authority: a device whose row is pending is issued no token by `/auth/scram/final`,
 so it cannot reach an authed route at all, and what admits it is the other device's approval of a registry record.
 The route's own approval step is idempotent for a row that is already approved, which is why the caller does not
-have to know which state it is in. What the caller gains is PERSISTENCE rather than reach — the reachability change
-`0735` recorded and `threat-model.md` §7 states — and the sequence is pinned end to end in
+have to know which state it is in. What the caller gains is PERSISTENCE rather than reach: the reachability change
+`0735` recorded and `threat-model.md` §7 states, and the sequence is pinned end to end in
 `core/src/plugins/sync/sim.rs`. `POST /auth/devices/revoke` now deletes the device's verifier as well as
 retiring its registry row: retiring the row refuses the TOKEN, and an unauthenticated device would otherwise run
 the handshake again and mint a new one, which would make "removed" mean "sign in again".
