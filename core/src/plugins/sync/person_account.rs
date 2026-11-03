@@ -244,7 +244,7 @@ fn stored_device_credential(auth: &PersonAuth) -> Option<(Zeroizing<[u8; 32]>, D
 /// **Best-effort, and the reason is the user's, not the code's.** A self-hosted server that
 /// predates `/auth/devices/credential` answers `404`, a network blip answers nothing, and a
 /// `409` says this device id already holds a different verifier; all three leave the device
-/// exactly as it was — authenticated by the account credential it arrived with, working —
+/// exactly as it was: authenticated by the account credential it arrived with, working,
 /// and the next claim or phrase entry retries. Turning any of them into a failed
 /// registration would make an invisible improvement break a join.
 ///
@@ -1126,7 +1126,7 @@ pub async fn person_claim_device_from_host(
     let mut next = auth;
     // The approval is what this poll was waiting for, so THIS is where the device stops
     // authenticating as the account: install the credential it minted at join time and take
-    // the token its own secret minted instead (`decisions/protocol/0783`). Best-effort — the
+    // the token its own secret minted instead (`decisions/protocol/0783`). Best-effort: the
     // account token is a working answer, and `adopt_own_credential` keeps it when the
     // install cannot land.
     next.token_hex = adopt_own_credential(
