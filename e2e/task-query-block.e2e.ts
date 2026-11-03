@@ -16,6 +16,7 @@ import {
   dismissImporterOffer,
   editorText,
   pressInEditor,
+  seedEmbedIntoNote,
   typeIntoEditor,
   unlockToEditor,
   waitForSaved,
@@ -144,12 +145,22 @@ describeE2E("tq2 unreadable clauses are reported in the block, permanently (MYND
         await waitForSaved(s);
 
         await createNote(s, "Review");
-        await typeIntoEditor(
+        // The block is SEEDED, not typed, and the difference is the whole test.
+        // Typing a fence into CodeMirror lets the editor auto-close the backticks,
+        // so the body that reached the note held ONE line — the understood clause
+        // — and the unknown second clause landed outside the block entirely. The
+        // understood clause ran, no clause was dropped, and the spec failed on a
+        // notice that was right not to exist (measured 2026-11-03). `seedEmbed`
+        // writes the bytes through the same IPC a paste uses and reloads.
+        await seedEmbedIntoNote(
           s,
           ["```tasks", "not done", "group by heading", "```"].join("\n"),
         );
-        await waitForSaved(s);
-        await pressInEditor(s, ENTER_KEY); // caret out of the fence — see tq1
+        // No `waitForSaved` here: the seed is a WRITE, not an edit, so the badge
+        // settles at a bare "Saved" with no relative stamp and the helper's
+        // "Saved·<rel>" shape never arrives (measured 2026-11-03, 15 s). The
+        // assertions below wait on the block and its rows, which is what the
+        // scenario is about.
 
         // The understood clause still runs…
         await s.waitForElement(testIdSelector("editor.task-query"));
