@@ -195,17 +195,6 @@ const VERDICTS = {
   "vault-creation/SessionLostStep.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/step-shell.tsx": { verdict: "ported", via: "CreateVault.tsx" },
   "vault-creation/stepOrder.ts": { verdict: "ported", via: "CreateVault.tsx" },
-  "vault-creation/ReadyLocalArtefacts.tsx": {
-    verdict: "excluded",
-    marker: "create.ready-backup-now",
-    note:
-      "The creation flow's two local-disk affordances: a `.myne-backup` write through a native " +
-      "save dialog, and revealing the vault directory in an OS file manager. Both need a disk this " +
-      "client does not have (`backup` and `nativeSaveAs` absent; OPFS has no path to reveal). " +
-      "Extracted into its own module on 2026-08-15 for exactly this substitution — creation now " +
-      "ships here, so its transitive imports are served code, and `src/lib/vault-backup.ts` is " +
-      "itself an `excluded` surface.",
-  },
   "vault-creation/ProvisioningStep.tsx": {
     verdict: "web-only",
     note:

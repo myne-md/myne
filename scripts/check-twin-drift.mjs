@@ -34,8 +34,11 @@
 //     workspace reads and writes both failed while every other plugin worked.
 //     `scripts/check-version-routing.mjs` is the guard for that class and its
 //     `ROOTS` did not include `mobile/src-tauri/src`; it does now.
-//   - `mobile/src/lib/welcomeNote.ts` is still English-only after
-//     `@myne/i18n` went live on mobile
+//   - `mobile/src/lib/welcomeNote.ts` was still English-only after
+//     `@myne/i18n` went live on mobile. (It and its desktop counterpart are now
+//     gone: myne-md/myne#960 deleted the Welcome note and both clients seed the
+//     shared `exampleVault` set, which is a resolved twin rather than a watched
+//     one.)
 //
 // Every one of those was found by hand, because until the mobile client moved
 // in-repo this check could not run where it mattered: the mobile tree was a

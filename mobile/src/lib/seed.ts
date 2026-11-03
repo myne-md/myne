@@ -10,7 +10,7 @@
 
 import { noteCreate, noteUpdate, noteList, noteRead } from "./notes";
 import { frontmatterTitle } from "./note-organize";
-import { welcomeNoteTitle } from "./welcomeNote";
+import { resolveExampleNotes } from "./exampleVault";
 import { mutateDeliberateFolders, setFavorites, upsertSavedView, setViewOrder, type SavedView } from "./prefs";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { attachmentImport } from "./attachments";
@@ -447,14 +447,19 @@ export async function maybeSeedTestData(): Promise<void> {
   if (!import.meta.env.DEV) return;
   try {
     const existing = await noteList();
-    if (existing.length > 1) return;
-    // A vault created through the real flow carries exactly one note — the
-    // onboarding Welcome note (lib/welcomeNote.ts). Treat that as still
-    // empty so the dev spread keeps seeding on freshly-created vaults; any
-    // OTHER single note is real user data — leave it alone.
-    if (existing.length === 1) {
-      const only = await noteRead(existing[0]);
-      if (frontmatterTitle(only) !== welcomeNoteTitle()) return;
+    // A vault created through the real flow carries ONLY the first-run example
+    // vault (lib/exampleVault.ts, myne-md/myne#960). Treat that set as still
+    // empty so the dev spread keeps seeding on freshly-created vaults; anything
+    // else is real user data, and one unrelated note is enough to call it that.
+    if (existing.length > 0) {
+      const seeded = new Set(resolveExampleNotes().map((n) => n.title));
+      const titles = await Promise.all(
+        existing.map((id) => noteRead(id).then(frontmatterTitle)),
+      );
+      // A note with no frontmatter title reads as `null` and is real user data
+      // (`frontmatterTitle` answers null, never a placeholder), so it counts as
+      // "not seeded" rather than being coerced into the set.
+      if (titles.some((title) => title === null || !seeded.has(title))) return;
     }
     await seedTestData();
   } catch (e) {

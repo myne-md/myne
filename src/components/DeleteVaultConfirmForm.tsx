@@ -37,10 +37,11 @@
 // irreversible thing the web erase does — and the last sentence of the
 // disclosure is exactly that sentence.
 
-import { useState, type CSSProperties } from "react";
+import { useId, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "./primitives/Button";
 import { Input } from "./primitives/Input";
+import { HelperDisclosure } from "./settings/HelperDisclosure";
 import { DestructiveBanner } from "./DestructiveBanner";
 import { has } from "../platform/capabilities";
 import {
@@ -113,7 +114,8 @@ interface DeleteVaultConfirmFormProps {
 const HEADING_ROW_STYLE: CSSProperties = {
   display: "flex",
   flexDirection: "row",
-  alignItems: "baseline",
+  alignItems: "center",
+  justifyContent: "space-between",
   gap: "var(--space-3)",
 };
 
@@ -140,13 +142,7 @@ const COPY_PRIMARY_STYLE: CSSProperties = {
   margin: 0,
 };
 
-const COPY_SECONDARY_STYLE: CSSProperties = {
-  fontSize: "var(--text-sm)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--fg-3)",
-  margin: 0,
-};
-
+/** The disclosure trigger's row, on the primary paragraph's left edge. */
 const INPUT_LABEL_STYLE: CSSProperties = {
   fontSize: 12,
   fontWeight: "var(--weight-semibold)",
@@ -187,6 +183,7 @@ export function DeleteVaultConfirmForm({
   variant = "owner",
 }: DeleteVaultConfirmFormProps) {
   const { t } = useTranslation();
+  const detailsId = useId();
   const [typed, setTyped] = useState("");
   const submitReady = typed === CONFIRM_PHRASE && !inFlight;
   // Read once per render, not memoised: the seam is a synchronous constant
@@ -257,6 +254,33 @@ export function DeleteVaultConfirmForm({
         <h3 style={HEADING_STYLE} data-testid="delete-vault.heading">
           {copy.heading}
         </h3>
+        {/* The mechanics, one press away (myne-md/myne#960), on the heading's own
+            line and pushed to its trailing edge: the icon means "more about
+            THIS", so it has to sit beside the title it explains rather than
+            floating below the warning with nothing to attach to.
+
+            Both claims are unchanged and both are still made. The erase
+            destroys the per-vault keychain item on the platforms that have one
+            (myne-md/myne#761, `docs/decisions/security/0709`), and the note is
+            gated on the provider capability rather than on `onlyCopy`: the
+            browser has no per-vault keychain item and its copy is a different
+            claim about a different store, so the sentence is omitted there.
+
+            Absent in the partial-failure branch, where the copy above it is
+            about recovering from a half-finished erase rather than about what
+            the erase destroys. */}
+        {partialFailContext === null && (
+          <HelperDisclosure
+            paragraphs={[
+              t("settings.deleteVault.copySecondary"),
+              ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
+            ]}
+            descriptionId={detailsId}
+            testId="delete-vault.details"
+            triggerLabel={t("settings.deleteVault.detailsLabel")}
+            visibleLabel
+          />
+        )}
       </div>
 
       {partialFailContext === null ? (
@@ -270,27 +294,6 @@ export function DeleteVaultConfirmForm({
           >
             {copy.primary}
           </p>
-          <p style={COPY_SECONDARY_STYLE}>
-            {t("settings.deleteVault.copySecondary")}
-          </p>
-
-          {/* myne-md/myne#761: the erase destroys the per-vault keychain item on
-              the platforms that have one, and there is no such item on the
-              others. Saying so here rather than implying a cleanup that cannot
-              happen is the non-Apple half of the class rule
-              (`docs/decisions/security/0709`). Gated on the provider capability
-              rather than on `onlyCopy`: the browser has no per-vault keychain
-              item and its copy is a different claim about a different store, so
-              the line is omitted there. */}
-          {hasKeychainItem && (
-            <p
-              style={COPY_SECONDARY_STYLE}
-              data-testid="delete-vault.keychain-note"
-            >
-              {t("settings.deleteVault.keychainNote")}
-            </p>
-          )}
-
           <div
             style={{
               display: "flex",
@@ -315,6 +318,7 @@ export function DeleteVaultConfirmForm({
               onChange={(e) => setTyped(e.target.value)}
               disabled={inFlight}
               autoFocus
+              aria-describedby={detailsId}
               data-testid="delete-vault.confirm-input"
             />
             <div style={INPUT_HINT_STYLE}>

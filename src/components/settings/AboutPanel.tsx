@@ -194,11 +194,6 @@ export function AboutPanel() {
     };
   }, []);
 
-  const buildChannelLabel =
-    import.meta.env.MODE === "development"
-      ? t("settings.about.buildChannelDevelopment")
-      : t("settings.about.buildChannelStable");
-
   // The manual update check. Idle until the user presses the button; a failure
   // is a calm line, never an error dialog.
   const [check, setCheck] = useState<CheckState>({ kind: "idle" });
@@ -288,9 +283,18 @@ export function AboutPanel() {
   return (
     <div style={PANEL_ROOT_STYLE}>
       {/* Four sections (myne-md/myne#885). The build-commit block moves up to sit
-          with the version and the build channel, so "what am I running" is one
-          group and the update machinery is another; the only order the grouping
-          changed is that block, which used to sit between the two. */}
+          with the version, so "what am I running" is one group and the update
+          machinery is another; the only order the grouping changed is that
+          block, which used to sit between the two.
+
+          The BUILD-channel row is gone (myne-md/myne#960). It was
+          `import.meta.env.MODE === "development" ? "Development build" :
+          "Stable"`, so in every shipped build it read a constant "Stable" and
+          sat directly above an Update-channel row that reads the real channel
+          from `__UPDATE_CHANNEL__`; two rows saying "Stable" make a reader
+          wonder which one is theirs. The update channel is the one that can
+          differ, and `scripts/check-update-channel.mjs` requires this panel to
+          name every non-default channel, so it is the one kept. */}
       <SettingsSection title={t("settings.about.sections.version")}>
         <Block>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
@@ -300,11 +304,6 @@ export function AboutPanel() {
               <p style={VERSION_SUBTITLE_STYLE}>{t("settings.about.tagline")}</p>
             </div>
           </div>
-        </Block>
-
-        <Block data-setting-anchor="about.build-channel" data-setting-row="true">
-          <span style={LABEL_STYLE}>{t("settings.about.buildChannelLabel")}</span>
-          <p style={VALUE_STYLE}>{buildChannelLabel}</p>
         </Block>
 
         <Block>

@@ -2921,10 +2921,6 @@
       "writesHeading": "Fields it can change",
       "writesNote": "Myne checks every change against this list before it writes one, and refuses a change to a field that was edited elsewhere since the view last read it."
     },
-    "welcome": {
-      "body": "Welcome to Myne, your private space to think and write.\n\nEverything you save here is encrypted and stays on your device. Your **password** is the only key to it, so keep it somewhere safe. If you ever lose it, no one can get your notes back, not even us.\n\n**You can link notes to each other.** Type `[[` and Myne offers the notes you already have; pick one and it becomes a link. The note you linked TO shows where the link came from, in its own backlinks panel, so a set of notes is something you can follow in either direction.\n\nThis is just a regular note, so make it your own. Edit it, rename it, or delete it whenever you like, and add new notes as your ideas grow.\n\nTo learn more about Myne, visit https://myne.md\n",
-      "title": "Welcome to Myne"
-    },
     "workspace": {
       "defaultSlotName": "Default"
     },
@@ -3223,9 +3219,9 @@
       "legalLabel": "Legal",
       "legalHelper": "Opens on myne.md in your browser. German where the interface is German.",
       "legalPrivacy": "Privacy policy",
-      "licenseBody": "Pre-alpha · CC-BY-4.0 docs · AGPL-3.0 application code on Phase 1 release.",
+      "licenseBody": "CC-BY-4.0 docs · AGPL-3.0 application code.",
       "licenseLabel": "License",
-      "tagline": "Pre-alpha · Phase 1 desktop client",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Open the public threat-model document in your browser.",
       "threatModelLabel": "Threat model",
       "updateAutoCheckHelper": "Myne downloads a small signed file from myne.md to see whether a newer version exists, then tells you. It sends your current version and platform, and nothing else. You can still check by hand with the button above.",
@@ -3254,7 +3250,6 @@
     },
     "account": {
       "sections": {
-        "extensions": "Browser extensions",
         "grouping": "This account"
       },
       "vaultsLabel": "Vaults in this account",
@@ -3614,7 +3609,8 @@
       "vaultPath": "Vault path: {{path}}",
       "deleteError": "Couldn't fully delete the vault. Please try again.",
       "warning": "This permanently deletes this vault and all of its notes from this device. This cannot be undone.",
-      "deleteButton": "Delete this vault"
+      "deleteButton": "Delete this vault",
+      "detailsLabel": "More about deleting this vault"
     },
     "files": {
       "newNote": {
@@ -4277,7 +4273,8 @@
         "privacy": "Privacy",
         "storage": "Storage",
         "sync": "Sync",
-        "vault": "Vault"
+        "vault": "Vault",
+        "extensions": "Browser extensions"
       },
       "passwordUpdatedToast": "Password updated",
       "title": "Settings"
@@ -4308,15 +4305,10 @@
       "importHelper": "Bring notes in from Obsidian, Notion, Evernote, HTML files or a CSV. Everything is imported and encrypted on the spot; your original files are left untouched.",
       "importLabel": "Import",
       "importObsidian": "Import notes…",
-      "locationHelper": "Each vault is a folder of encrypted files under this path. Prefer the Backup button below over manual copies: it verifies the written file.",
-      "locationLabel": "Vault location",
-      "openInFiles": "Open in Files",
       "webLocationHelper": "Your notes live in this browser's storage for this site, managed by the browser. There is no folder to open. Clearing this site's data removes the local copy; because this client syncs, signing in again downloads it back.",
       "webLocationLabel": "Where your notes are stored",
-      "pathUnavailable": "Path unavailable",
       "restoreBackup": "Restore from backup…",
       "sections": {
-        "location": "Where the vault lives",
         "backup": "Backup and restore",
         "transfer": "Import and export"
       }
@@ -5472,17 +5464,10 @@
       "footerHint": "This takes a moment. Leave this tab open until it finishes, so it can clean up after itself if something goes wrong."
     },
     "ready": {
-      "backedUp": "Backed up",
-      "backingUp": "Backing up…",
-      "backupDefaultFilename": "Myne backup.myne-backup",
-      "backupError": "Backup didn't complete. No file was left behind. You can back up any time from Settings → Storage.",
-      "backupFilterName": "Myne backup",
-      "backUpNow": "Back up now",
       "body": "Your notes are encrypted and stored on this device. Keep your password and recovery kit somewhere safe: they are the only way back in.",
       "decrypting": "Decrypting…",
       "done": "Open vault",
-      "heading": "Your vault is ready",
-      "showFolder": "Show vault folder"
+      "heading": "Your vault is ready"
     },
     "sessionLost": {
       "startOver": "Start over"
@@ -5979,8 +5964,7 @@
     "readyTitle": "Your vault is ready",
     "readyBody": "Everything you write from here is encrypted on this device before it's stored or synced.",
     "personalLabel": "Personal",
-    "openVault": "Open vault",
-    "backUpNow": "Back up now"
+    "openVault": "Open vault"
   },
   "web": {
     "openElsewhere": {

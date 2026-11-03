@@ -1,6 +1,7 @@
 // Browser-clipper host-install toggle suite (installer wiring, decisions.md
-// 2026-07-05; default flipped to OFF by MYND-549). Drives Settings → Account →
-// "Browser clipper" through the REAL editor UI on the tauri-driver harness.
+// 2026-07-05; default flipped to OFF by MYND-549). Drives Settings → Browser
+// extensions → "Browser clipper" through the REAL editor UI on the tauri-driver
+// harness.
 //
 //   ci1 — TOGGLE ROUND-TRIP: the toggle renders OFF by default (absent flag ⇒
 //         disabled, the privacy-preserving default), flips to ON, then back OFF.
@@ -72,15 +73,16 @@ describeE2E("ci1 browser-clipper host-install toggle (decisions.md 2026-07-05)",
         await unlockToEditor(s, password);
         await dismissImporterOffer(s);
 
-        // Settings → Account (the default panel) hosts the toggle.
-        await openSettings(s, "account");
+        // Settings → Browser extensions hosts the toggle since myne-md/myne#960,
+        // where the clipper left the Account panel.
+        await openSettings(s, "extensions");
         await s.byTestId("settings.clipper-install");
 
         // Default: absent flag ⇒ NOT registered ⇒ toggle OFF (MYND-549).
         await waitEnabled(s, "false");
 
         // Flip ON — writes the flag + installs the manifests, returns enabled=true.
-        // Centre the toggle first: the Account panel scrolls and this row sits
+        // Centre the toggle first: a settings panel scrolls and this row can sit
         // below its fold, where W3C `/click`'s scroll-into-view under
         // WebKitGTK leaves it reporting "element not interactable" forever.
         // Same discipline as `pickSelect` / `enableDeveloperModeInSettings`.

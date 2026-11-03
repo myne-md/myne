@@ -2917,10 +2917,6 @@
       "writesHeading": "Fält den kan ändra",
       "writesNote": "Myne kontrollerar varje ändring mot den här listan innan den skriver en, och avvisar en ändring av ett fält som redigerats någon annanstans sedan vyn senast läste det."
     },
-    "welcome": {
-      "body": "Välkommen till Myne, ditt privata utrymme för att tänka och skriva.\n\nAllt du sparar här är krypterat och stannar på din enhet. Ditt **lösenord** och din **återställningsfras** är de enda nycklarna till det, så förvara dem på ett säkert ställe. Om båda någonsin går förlorade kan ingen få tillbaka dina anteckningar, inte ens vi.\n\n**Du kan länka anteckningar till varandra.** Skriv `[[` och Myne föreslår de anteckningar du redan har; välj en och den blir en länk. Anteckningen du länkade TILL visar var länken kom ifrån, i sin egen panel för bakåtlänkar, så en uppsättning anteckningar är något du kan följa i båda riktningarna.\n\nDet här är bara en vanlig anteckning, så gör den till din egen. Redigera den, byt namn på den eller ta bort den när du vill, och lägg till nya anteckningar i takt med att dina idéer växer.\n\nFör att lära dig mer om Myne, besök https://myne.md\n",
-      "title": "Välkommen till Myne"
-    },
     "workspace": {
       "defaultSlotName": "Standard"
     },
@@ -3163,9 +3159,9 @@
       "legalLabel": "Juridik",
       "legalHelper": "Öppnas på myne.md i din webbläsare. På tyska där gränssnittet är på tyska.",
       "legalPrivacy": "Integritetspolicy",
-      "licenseBody": "Pre-alpha · CC-BY-4.0-dokument · AGPL-3.0 för programkoden vid fas 1-lansering.",
+      "licenseBody": "CC-BY-4.0-dokument · AGPL-3.0 för programkoden.",
       "licenseLabel": "Licens",
-      "tagline": "Pre-alpha · Fas 1 skrivbordsklient",
+      "tagline": "Pre-alpha",
       "threatModelHelper": "Öppna det offentliga hotmodelldokumentet i din webbläsare.",
       "threatModelLabel": "Hotmodell",
       "version": "Version",
@@ -4022,7 +4018,8 @@
         "cli": "CLI",
         "vault": "Valv",
         "data": "Data",
-        "diagnostics": "Diagnostik"
+        "diagnostics": "Diagnostik",
+        "extensions": "Webbläsartillägg"
       },
       "passwordUpdatedToast": "Lösenord uppdaterat",
       "title": "Inställningar"
@@ -4054,7 +4051,6 @@
       "importLabel": "Importera",
       "importObsidian": "Importera anteckningar…",
       "locationHelper": "Varje valv är en mapp med krypterade filer under den här sökvägen. Använd hellre knappen Säkerhetskopiera nedan än manuella kopior: den verifierar den skrivna filen.",
-      "locationLabel": "Valvplats",
       "openInFiles": "Öppna i Filer",
       "webLocationHelper": "Dina anteckningar ligger i den här webbläsarens lagring för den här webbplatsen, som webbläsaren sköter. Det finns ingen mapp att öppna. Att rensa webbplatsens data tar bort den lokala kopian; eftersom den här klienten synkroniserar hämtas den tillbaka när du loggar in igen.",
       "webLocationLabel": "Var dina anteckningar lagras",
@@ -4412,7 +4408,6 @@
       "devicesNote": "Enheter, medlemmar i delade valv och din identitet hanteras under Synkronisering.",
       "groupingError": "Kunde inte läsa kontogrupperingen på den här enheten. Ingenting ändrades.",
       "sections": {
-        "extensions": "Webbläsartillägg",
         "grouping": "Det här kontot"
       }
     },

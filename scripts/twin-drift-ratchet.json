@@ -94,7 +94,6 @@
     "src/App.tsx::mobile/src/App.tsx",
     "src/App.tsx::mobile/src/app/AppShell.tsx",
     "src/components/settings/MemorySection.tsx::mobile/src/app/flows/MemorySection.tsx",
-    "src/dialect/welcomeNote.ts::mobile/src/lib/welcomeNote.ts",
     "src/editor-host.ts::mobile/src/editor-host.ts",
     "src/hooks/useDateTimeDisplaySync.ts::mobile/src/lib/useDateTimeDisplaySync.ts",
     "src/hooks/useHeadFingerprintCompare.ts::mobile/src/hooks/useHeadFingerprintCompare.ts",

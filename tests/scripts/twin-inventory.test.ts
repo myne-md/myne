@@ -207,30 +207,25 @@ describe("check-twin-inventory", () => {
     // as trivial precisely because it is the place a client could quietly stop
     // delegating and start retyping a command name.
     //
+    // 134 to 133: myne-md/myne#960 deleted the first-run Welcome note on BOTH
+    // clients (`src/dialect/welcomeNote.ts`, `mobile/src/lib/welcomeNote.ts` and
+    // their shared builder) and both now seed the shared `exampleVault` set, so
+    // the two curated pairs that described it left the tree. The net is one DOWN
+    // rather than two because `src/dialect/exampleVault.ts` gained its same-path
+    // mobile shim in the same change. A number that only ever goes up is a
+    // number nobody has argued about; this one has a reason recorded.
+    //
     // Then 108 to 109 when this branch met myne-md/myne#622 at a merge:
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    //
-    // Then 134 to 133: the device-admission ceremony's pair of client bindings
-    // went with the surface (myne-md/myne#956), so the sweep discovers one pair
-    // fewer. This number tracks what is left to classify, which is why it comes
-    // back down without ceremony when work leaves the tree.
-    //
-    // Then 133 to 135, and this one was shipped RED rather than argued: the
-    // approval-wait fix added `src/lib/pending-approval.ts` and
-    // `src/hooks/useIdleAutoLock.ts` with their mobile counterparts, the guard's
-    // projection was regenerated, and these literals were not moved with it, so
-    // the suite failed on a number nobody re-measured. Both new pairs are
-    // `decision` verdicts in the roster and both files exist on both sides;
-    // the count is right and the comment is the part that was missing.
-    expect(full.out).toContain("135 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("135 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -240,7 +235,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("135 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -321,7 +316,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("135 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -510,19 +505,18 @@ describe("check-twin-inventory", () => {
     // derived, because this one is what fails when an entry is added to the TREE
     // without one being added here.
     //
-    // 132 to 133: the device-key rungs (myne-md/myne#938 tasks 9 and 10) put the same
-    // dispatch file in two hosts. The sweep cannot see the pair: the two files share a
-    // path only below different crate roots, which is why it is rostered rather than
-    // converged. The ceremony-binding pair that raised this to 134 went with the
-    // surface (myne-md/myne#956), and the count comes back down with it: a ratchet on
-    // the roster is a count of what is left to decide, so it is allowed to shrink.
+    // 132 to 134: the device-key rungs (myne-md/myne#938 tasks 9 and 10) put the same
+    // dispatch file in two hosts and the same ceremony binding in two clients. The
+    // sweep cannot see either pair: `src-tauri/src/device_key.rs` and
+    // `mobile/src-tauri/src/device_key.rs` share a path only below different crate
+    // roots, and `src/lib/deviceAdmission.ts` against `mobile/src/lib/deviceAdmission.ts`
+    // is a cross-path pair like the two above. Both are `stays per-client` rather than
+    // shared code, which is why they are rostered instead of converged.
     //
-    // 133 to 135: the approval-wait fix (`src/lib/pending-approval.ts`,
-    // `src/hooks/useIdleAutoLock.ts` and their mobile counterparts). This literal
-    // was left at 133 while the roster and the projection both moved, which is
-    // the one direction this pair exists to make loud: a verdict added to the
-    // tree without the roster noticing.
-    expect(ROSTER.length).toBe(135);
+    // 134 to 133: myne-md/myne#960 took the Welcome note off both clients. Two
+    // curated pairs went out, and the `src/dialect/exampleVault.ts` /
+    // `mobile/src/dialect/exampleVault.ts` shim pair in, which the sweep DOES see.
+    expect(ROSTER.length).toBe(133);
   });
 
   it("keeps `screen` narrow", () => {

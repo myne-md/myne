@@ -15,10 +15,14 @@
 // from `@myne/copy` rather than merely unrendered, so the two clients cannot
 // drift back apart about a sentence neither shows.
 //
-// Account is its home (decisions.md 2026-06-21, moved from Privacy): connected
-// extensions are account-level paired devices, sitting alongside the vault label,
-// change-password, and danger-zone controls. It is an inline section, NOT a 7th
-// Settings rail panel.
+// **Its home is the Browser extensions panel since myne-md/myne#960**: the block
+// used to be an inline section at the bottom of Account (decisions.md 2026-06-21
+// moved it there from Privacy, `decisions/ui/0693` recorded the placement as
+// deliberate). The account scope was the right half of that reasoning, the
+// destination was the wrong half: Account answers "who am I on this device", and
+// a browser the user has connected is software rather than an identity fact, so
+// it now has a rail panel of its own. This file stays the block; the panel
+// (`BrowserExtensionsPanel`) is the composition root.
 //
 // The list/Revoke wrappers are mocked in tests; in a non-Tauri context (dev)
 // `invoke` rejects — treat that as "no connected extensions", never throw.

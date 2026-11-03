@@ -104,6 +104,36 @@ describe("check-web-screens", () => {
 });
 
 describe("check-web-surfaces", () => {
+  /**
+   * An unrecognised verdict used to count in NONE of the totals and leave the
+   * run green: every figure in the exit line is a filter on the verdict string,
+   * so a typo dropped the file out of the arithmetic instead of failing. Found
+   * by injecting exactly that into this guard's own StoragePanel entry while
+   * myne-md/myne#960 edited it, and the run printed `ok` with 12 excluded
+   * instead of 13.
+   *
+   * The map is injected rather than written into the guard, because the roster
+   * is what a future edit gets wrong and the check has to read it.
+   */
+  it("names a verdict outside the vocabulary", async () => {
+    const { verdictGaps, SURFACE_VERDICTS } = await import("../../scripts/check-web-surfaces.mjs");
+    expect(verdictGaps()).toEqual([]);
+    expect(
+      verdictGaps({
+        "src/components/settings/StoragePanel.tsx": ["nonsense-verdict", "reason"],
+        "src/lib/shipped.ts": ["ported", "reason"],
+      }),
+    ).toEqual(["src/components/settings/StoragePanel.tsx"]);
+    // The closed list itself, so a verdict added to a future entry without a
+    // word here fails rather than being tolerated by the guard it extends.
+    expect([...SURFACE_VERDICTS].sort()).toEqual([
+      "adapted",
+      "excluded",
+      "ported",
+      "typed-unsupported",
+    ]);
+  });
+
   it("catches the person-account absence marker", () => {
     const result = runSurfaces('const marker = "person-account-binding";');
     expect(result.code).not.toBe(0);

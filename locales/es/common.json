@@ -3028,10 +3028,6 @@
       "writesHeading": "Campos que puede cambiar",
       "writesNote": "Myne comprueba cada cambio contra esta lista antes de escribir uno, y rechaza un cambio a un campo que se haya editado en otra parte desde la última lectura de la vista."
     },
-    "welcome": {
-      "body": "Te damos la bienvenida a Myne, tu espacio privado para pensar y escribir.\n\nTodo lo que guardas aquí está cifrado y permanece en tu dispositivo. Tu **contraseña** y tu **frase de recuperación** son las únicas claves para acceder a ello, así que guárdalas en un lugar seguro. Si llegaras a perder ambas, nadie podrá recuperar tus notas, ni siquiera nosotros.\n\n**Puedes enlazar notas entre sí.** Escribe `[[` y Myne te ofrece las notas que ya tienes; elige una y se convierte en un enlace. La nota a la que enlazaste muestra de dónde vino el enlace, en su propio panel de vínculos entrantes, así que un conjunto de notas es algo que puedes seguir en cualquiera de las dos direcciones.\n\nEsto es solo una nota normal, así que hazla tuya. Edítala, cámbiale el nombre o elimínala cuando quieras, y añade nuevas notas a medida que tus ideas crezcan.\n\nPara saber más sobre Myne, visita https://myne.md\n",
-      "title": "Te damos la bienvenida a Myne"
-    },
     "workspace": {
       "defaultSlotName": "Predeterminado"
     },
@@ -3280,9 +3276,9 @@
       "legalLabel": "Legal",
       "legalHelper": "Se abre en myne.md en tu navegador. En alemán cuando la interfaz está en alemán.",
       "legalPrivacy": "Política de privacidad",
-      "licenseBody": "Pre-alfa · Documentación CC-BY-4.0 · Código de la aplicación AGPL-3.0 en la versión de la Fase 1.",
+      "licenseBody": "Documentación CC-BY-4.0 · Código de la aplicación AGPL-3.0.",
       "licenseLabel": "Licencia",
-      "tagline": "Pre-alfa · Cliente de escritorio de la Fase 1",
+      "tagline": "Pre-alfa",
       "threatModelHelper": "Abre el documento público del modelo de amenazas en tu navegador.",
       "threatModelLabel": "Modelo de amenazas",
       "version": "Versión",
@@ -4155,7 +4151,8 @@
         "cli": "CLI",
         "vault": "Bóveda",
         "data": "Datos",
-        "diagnostics": "Diagnóstico"
+        "diagnostics": "Diagnóstico",
+        "extensions": "Extensiones del navegador"
       },
       "passwordUpdatedToast": "Contraseña actualizada",
       "title": "Ajustes"
@@ -4187,7 +4184,6 @@
       "importLabel": "Importar",
       "importObsidian": "Importar notas…",
       "locationHelper": "Cada bóveda es una carpeta de archivos cifrados en esta ruta. Es preferible usar el botón Copia de seguridad de abajo en lugar de copias manuales: verifica el archivo escrito.",
-      "locationLabel": "Ubicación de la bóveda",
       "openInFiles": "Abrir en Archivos",
       "webLocationHelper": "Tus notas se guardan en el almacenamiento que este navegador reserva para este sitio, gestionado por el propio navegador. No hay ninguna carpeta que abrir. Borrar los datos de este sitio elimina la copia local; como este cliente se sincroniza, al iniciar sesión de nuevo se vuelve a descargar.",
       "webLocationLabel": "Dónde se guardan tus notas",
@@ -4550,7 +4546,6 @@
       "devicesNote": "Los dispositivos, los miembros de las bóvedas compartidas y tu identidad se gestionan en Sincronización.",
       "groupingError": "No se pudo leer la agrupación de cuentas en este dispositivo. No cambió nada.",
       "sections": {
-        "extensions": "Extensiones del navegador",
         "grouping": "Esta cuenta"
       },
       "vaultsCount_many": "{{count}} bóvedas"

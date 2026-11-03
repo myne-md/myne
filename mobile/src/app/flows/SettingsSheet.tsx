@@ -5,7 +5,7 @@ import { strengthLevel } from "../../lib/password-strength";
 import type { TFunction } from "i18next";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
-import { Sheet, Banner, Button, Icon, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
+import { Sheet, Banner, Button, Icon, InfoNote, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
 import { remindersReachTheOs } from "../../lib/reminders";
 import { spellCheckingAvailable } from "../../lib/spellSupport";
 import { FOLDER_ICON_NAMES } from "@myne/decorations/folderIcons";
@@ -189,14 +189,11 @@ const HINT_STYLE: CSSProperties = {
   color: "var(--fg-3)",
 };
 
-/** The per-vault keychain note under the delete panel (myne-md/myne#761): a
- *  footnote that qualifies the danger banner rather than a second warning.
- *  Hoisted and token-bound so it cannot re-grow inline literals. */
-const DELETE_KEYCHAIN_NOTE_STYLE: CSSProperties = {
-  marginTop: "var(--space-3)",
-  fontSize: "var(--text-sm)",
-  lineHeight: "var(--leading-normal)",
-  color: "var(--fg-3)",
+/** The info trigger's row, in the footnote's place (myne-md/myne#960). */
+const DELETE_KEYCHAIN_NOTE_ROW_STYLE: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  marginTop: "var(--space-1)",
 };
 
 /** The member-removal panel's eyebrow and disclosure — the member arm of the
@@ -3136,13 +3133,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             {/* myne-md/myne#761: the same sentence the desktop form carries. iOS
                 destroys the per-vault keychain item and Android keeps no such key,
                 which is the sentence's own second clause; it is rendered on both so
-                the two Tauri clients do not disagree about the same constant. */}
-            <p
-              data-testid="settings.delete-vault.keychain-note"
-              style={DELETE_KEYCHAIN_NOTE_STYLE}
-            >
-              {t("settings.deleteVault.keychainNote")}
-            </p>
+                the two Tauri clients do not disagree about the same constant.
+                Behind an info control since myne-md/myne#960, with the sentence
+                unchanged. */}
+            <div style={DELETE_KEYCHAIN_NOTE_ROW_STYLE}>
+              <InfoNote
+                testId="settings.delete-vault.keychain-note"
+                paragraphs={[t("settings.deleteVault.keychainNote")]}
+              />
+            </div>
             {deleteError && (
               <Banner kind="danger" style={{ marginBottom: 14 }}>
                 {deleteError}
