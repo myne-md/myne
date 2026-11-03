@@ -38,9 +38,13 @@ calendar. `stories/README.md` is the human-facing copy of the same material.
 
 ## Session conventions (pointer)
 
-OpenCode loads `.opencode/skills/diverge/SKILL.md` through `opencode.json`. It shapes how an answer is
-arrived at, not how it is worded: widen before you narrow, then commit, inline and spawning nothing.
-`.opencode/plugins/compaction.ts` carries mutable session state through compaction.
+**This repository has one harness: pi.** OpenCode was removed on 2026-11-03 and `opencode.json` with
+it, so there is nothing to keep in step between two front-ends.
+
+`myne-conventions.ts` in `myne-pi-plugin` appends the body of `.pi/conventions/diverge/SKILL.md` to the
+system prompt on `before_agent_start`. It shapes how an answer is arrived at, not how it is worded:
+widen before you narrow, then commit, inline and spawning nothing. `myne-compaction.ts` carries mutable
+session state through compaction.
 
 **How an answer is written is one rule**: ASD-STE100, through
 [`agent-tooling/reference/writing-rules.md`](agent-tooling/reference/writing-rules.md), which names the
@@ -50,7 +54,8 @@ stated in full. Each artefact-producing skill keeps its own output format.
 
 `WORK DISCIPLINE` is preserved as compaction state: after a repository change, the next action is `/pr-review`, then `/done`.
 
-The convention applies to interactive OpenCode sessions. CI classifiers run their dedicated skills through `opencode run` and do not load this project configuration.
+The convention applies to interactive pi sessions. CI classifiers run their dedicated skills headless
+and do not load this project configuration.
 
 ## How work runs here (pointer)
 
@@ -61,7 +66,7 @@ those files are read only through a skill's standing-obligations block: a sessio
 skill reads none of them, which is exactly the session that then skips them. This file is loaded for
 every session in this tree, so the lane is stated here and the mechanics stay there.
 
-**Three craft rules sit above the lane, and they are not style preferences.** They are why a change
+**Four craft rules sit above the lane, and they are not style preferences.** They are why a change
 here is smaller than the same change elsewhere, and each one has already been paid for:
 
 1. **The least code that does the work, which is a search before it is a principle.** Before writing
@@ -97,6 +102,13 @@ here is smaller than the same change elsewhere, and each one has already been pa
    say (a load-bearing identifier, an ordering constraint, a measured behaviour of somebody else's
    system). Do not narrate what the next line plainly does, do not restate the signature, and do
    not leave a paragraph where a sentence works. The same rule for the reply to the owner.
+4. **Nothing is written under `~`, ever.** Scratch goes to `$TMPDIR` or a path the session created
+   for it, and anything worth keeping becomes a file in the repository (`scripts/`, a runbook, a
+   fixture) in the same change that produced it. The owner said "bi daha benim /Users/omer klasorumu
+   hic kirletme" after finding wrapper scripts and probe output scattered through his home
+   directory, and the same walk produced a runbook step pointing at `~/operations`, a directory that
+   has never existed on this machine. A path that only works on the machine that wrote it is a
+   broken instruction wearing a green tick.
 
 **The lane spans sessions; starting is not a promise to finish today.** These five obligations are
 on the work, not a single-session checklist. Never refuse, defer, or hand off a job because it looks
@@ -108,18 +120,28 @@ to an implementation request is a failed turn. The user-owned decision gate in i
 work; that is authority, not size.
 
 1. **No issue, no work, and the setup is asked for.** Work that changes a repository binds to a
-   tracked issue (`issue: myne-md/<repo>#<n>`), and when none exists the issue is filed through the
-   `issue-pm` subagent. But before either the issue or the worktree is created, the skill asks a
+   tracked issue (`issue: myne-md/<repo>#<n>`), and when none exists the issue is filed with
+   `gh issue create` from the main session. But before either the issue or the worktree is created, the skill asks a
    single yes/no question and takes no action until it has the answer: `"No tracker issue exists for
    this and I would work in a fresh worktree. File an issue and create the worktree? (y/n)"`. When
    the issue already exists it asks only about the worktree. The only exception to the gate is the
    user answering `n` to that question: silence is not it, "this is tiny" is not it, and neither is
    "we are in a hurry". Reading, explaining, reviewing, researching and answering a question are
    outside the gate, since none of them change anything. Move the issue to `status: in progress`
-   through `issue-pm` when you start: on this lane nothing else will, because that transition
+   with `gh` when you start: on this lane nothing else will, because that transition
    belongs to `/do-work` and this lane skips it, so the issue would jump from `triage` straight to
    `ready to merge` and no second session would ever see it as taken.
    `agent-tooling/reference/github-issues.md`.
+
+   **That question is the only one the lane asks, and it is asked once.** After the answer there is
+   no second gate: not per task, not per risk tier, not "shall I continue", not "which one first".
+   Approvals are collected at the top (the issue/worktree answer, and for a release the channel
+   question `0769` asks), and the rest of the run executes. A turn that ends by offering the owner a
+   choice is a stalled turn, and the measurement behind this paragraph is 335 of 4 846 assistant
+   turns that ended in exactly that offer, against 99 one-word "devam" replies it cost him. If
+   something genuinely blocks, say what blocks and do everything the block does not cover. Only a
+   red gate, a destructive or outward-facing act, and a decision the owner owns (item 5) stop the
+   run, and each says so in one sentence naming the decision rather than offering a menu.
 2. **A session that changes a repository works in a worktree of it, never in the shared checkout.**
    The section below is that rule in full, including where a worktree lives and what it branches from.
 3. **The planning front-half is sized, the tail is not.** Work that is large, contested or unclear
@@ -145,6 +167,34 @@ work; that is authority, not size.
    spec reversal (stop and ask). The full table, including what an unattended run does with a
    distinct discovery, is in `agent-tooling/reference/github-issues.md`, "A discovery is implemented,
    not filed".
+
+## Releases (pointer)
+
+`agent-tooling/skills/release/SKILL.md` owns the order and `operations/runbooks/release-checklist.md` owns
+the ticks. The rules below are the owner's and bind any session that touches a release, including one
+that skips the skill.
+
+- **The tracker is cleaned BEFORE the freeze, not after the publish.** Exactly one milestone is open
+  at a time, and a new one takes the next number: no `v0.13` while the release before it is still
+  open. A milestone whose version has shipped carries no open issue, so what is left is moved to the
+  next milestone (or closed) as part of starting the release. The state this rule exists to prevent
+  was measured on 2026-11-03: `v0.10` open with 24 issues five releases after it shipped, `v0.11`
+  open with one, and `v0.13` open with eight while `v0.12` had been opened and closed for a single
+  issue.
+- **Closing the release's issues and clearing their labels is part of the release.** An issue the
+  release verified closes, and `status: ready to test` comes off it in the same act; a closed issue
+  never keeps that label, because a label that survives its issue tells the next reader nothing.
+  Again measured: 220 closed issues carried it on 2026-11-03.
+- **A release opens no issue, no PR and no worktree.** Its record is
+  `agent-tooling/releases/v<X.Y.Z>.md`, written as the run goes. The worktree rule in item 2 of the
+  lane does not apply here: a release runs on `develop` in the main checkout, because every build,
+  tag and pin it produces is about that tree.
+- **Publishing is the last act.** Builds, artefact verification, the downloads origin and its
+  signature, the four downstream pins, the website, the server and web images all finish first.
+  Then, in one pass at the end: the TestFlight upload and the GitHub release publish. A release that
+  published before its own verification is a release nobody can withdraw.
+- **Tracker writes are inline.** `gh issue`/`gh api` from the session, never a subagent: the
+  `issue-pm` agent was removed on 2026-11-03 after hanging on every invocation.
 
 ## Worktrees (pointer)
 
@@ -200,15 +250,16 @@ the fix and its `SKIP_DIRS` comment is the worked example, and the injection pro
 (a violation planted in the sibling worktree does not fire, the same violation planted here does).
 Deleting the worktree removes the exposure but not the trap, since the next session creates one.
 
-## OpenCode and pi harnesses
+## The harness
 
-Two front-ends read these rules: OpenCode through `opencode.json`, and pi through `.pi/` plus its plugin. `AGENTS.md` stays the single rulebook for both; `.pi/` carries only what differs.
+`AGENTS.md` is the single rulebook, read by pi. Nothing else reads these files: OpenCode was removed
+from this repository on 2026-11-03, together with `opencode.json`, `.opencode/plugins/`,
+`.opencode/skills/`, `.opencode/agents/` and `.opencode/package.json`.
 
 - **`AGENTS.md` is the single source of repository rules.** Subdirectory `AGENTS.md` files add their domain guidance when work enters that directory.
-- **The agent tooling is clone-local, not tracked.** `workspace/link-skills.sh` symlinks every skill in the private `agent-tooling` companion into `.opencode/skills/`, and the command wrappers in `.opencode/commands/` and the agent mirrors in `.opencode/agents/` are the same idea by hand: each one either points at, or carries the body of, a file in a repository this one does not publish, so `.opencode/.gitignore` excludes all three groups. A fresh clone therefore has no slash commands and no subagents until `./workspace/setup.sh` has cloned `agent-tooling` and `link-skills.sh` has run. **One exception is tracked and must stay that way**: `.opencode/skills/diverge/SKILL.md` is authored here and loaded as `instructions` by `opencode.json` in every session, and `.opencode/agents/subworker.md` has no source in `agent-tooling` and no second copy anywhere, so gitignoring it would delete the agent rather than de-publish somebody else's file.
-- **Subagents are mirrored, not shared.** `.opencode/agents/issue-pm.md` and `.opencode/agents/legal-work.md` are body-copies of `agent-tooling/agents/*.md` with an OpenCode `description` + `mode: subagent` frontmatter in place of the canonical `name`/`color`. Edit the canonical source, then re-copy the body. That refresh is a hand procedure with no machine check, and it had already rotted once: the `issue-pm` mirror had lost twenty lines of prose rules before the mirrors were untracked.
-- **The diverge convention** is loaded by `opencode.json`; `.opencode/plugins/compaction.ts` preserves mutable state through compaction.
-- **Permissions** are declared only in `opencode.json`. It deliberately configures no MCP servers.
+- **The agent tooling is clone-local, not tracked.** `workspace/link-skills.sh` symlinks every skill in the private `agent-tooling` companion into `.pi/skills/`, and `.pi/.gitignore` excludes them. A fresh clone therefore has no slash commands and no subagents until `./workspace/setup.sh` has cloned `agent-tooling` and `link-skills.sh` has run. **Two files are authored here and stay tracked**: `.pi/conventions/diverge/SKILL.md` (the convention the plugin injects, with `.pi/skills/diverge` a symlink to it) and `.pi/agents/subworker.md`, which has no source in `agent-tooling` and no second copy anywhere, so gitignoring it would delete the agent rather than de-publish somebody else's file.
+- **`.opencode/` survives as a PATH, not as a product.** It holds the worktree root `.opencode/worktrees/<n>-<slug>` and the `dev:two`/`web:local` sync store, because the pi plugin's guard refuses a worktree anywhere else and eight scripts, a dozen documents and every runbook name that path. Renaming it is a change to the plugin and the guard, not a tidy-up, and it buys nothing.
+- **No MCP servers are configured by this repository.** pi registers Woodpecker's through its own package (`myne-mcp.ts`) when a token is present.
 
 ## pi harness
 
@@ -216,14 +267,14 @@ pi is a second front-end over the same rules, not a second rulebook. Everything 
 
 - **Two packages, both pinned.** `.pi/settings.json` declares our own `git:github.com/myne-md/myne-pi-plugin@<40-character sha>` (private, AGPL-3.0-only) and `npm:pi-btw@0.8.0` (MIT, a readable TypeScript `/btw` side-conversation extension with no outbound calls of its own). The single-package rule was about not accumulating a pile of third-party behaviour, and it still holds: vendoring 3k lines of someone else's overlay into our package would mean tracking their releases by hand, which is the cost vendoring exists to avoid. Update ours with `pi install git:github.com/...@<full sha> -l --approve` and theirs by bumping the npm version, both committed. pi's git source resolves only the **full** SHA: a short one fails with `couldn't find remote ref`.
 
-- **Conventions arrive by injection, because pi has no `instructions` key.** `myne-conventions.ts` appends the body of `.opencode/skills/diverge/SKILL.md` to the system prompt on `before_agent_start`, read from that tracked file. A skill would not do: pi only applies a skill the model chooses to load, and a convention that applies to every answer cannot be optional. Edit the files in place; there is no second copy to keep in sync.
+- **Conventions arrive by injection, because pi has no `instructions` key.** `myne-conventions.ts` appends the body of `.pi/conventions/diverge/SKILL.md` to the system prompt on `before_agent_start`, read from that tracked file. A skill would not do: pi only applies a skill the model chooses to load, and a convention that applies to every answer cannot be optional. Edit the files in place; there is no second copy to keep in sync.
 - **The model and its provider are both named here, on purpose.** `enabledModels` pins `ollama-cloud/deepseek-v4.1-flash:high` with `defaultThinkingLevel: "high"`, and `.pi/settings.json` still carries no key: the credential stays in `~/.pi/agent`. The provider used to be a glob (`*/deepseek-v4.1-flash:high`) so each developer could reach the same model through their own account. That broke the moment a second provider started serving the same model id: pi takes the first match, OpenCode Go sorts before Ollama Cloud, and every session silently moved onto a paid Go model that then answered `GoUsageLimitError`. A default that changes because an unrelated credential was added is not a default. Pin the provider; a developer who runs a different one edits this one line.
 
-- **Requests are routed, not answered in place.** The injected conventions carry a dispatch ladder: a research request goes to a `general-purpose` subagent told to load the `deep-research` skill and to return a cited report; issue bookkeeping goes to `issue-pm`; CI state is read from the Woodpecker MCP tools. Each lane needs a context or a tool the main session would otherwise guess at, and the three failures the ladder prevents are the ones that cost most: a research answer with no sources, an issue filed by hand and triaged twice, and a build diagnosis invented instead of read from the failing step's log.
+- **Requests are routed, not answered in place.** The injected conventions carry a dispatch ladder: a research request goes to a `general-purpose` subagent told to load the `deep-research` skill and to return a cited report; CI state is read from the Woodpecker MCP tools; tracker writes are done inline with `gh`, not delegated, because the `issue-pm` agent was removed on 2026-11-03 after hanging on every invocation. Each lane needs a context or a tool the main session would otherwise guess at, and the three failures the ladder prevents are the ones that cost most: a research answer with no sources, an issue filed by hand and triaged twice, and a build diagnosis invented instead of read from the failing step's log.
 - **CI access ships with the package, not with a machine.** Woodpecker's MCP server (`@ni-c/woodpecker-ci-mcp`, MIT) is a dependency of `myne-pi-plugin`, and `myne-mcp.ts` registers it with `pi.registerMcpServer` when a token can be found: `WOODPECKER_TOKEN` from the environment, else the line of that name in `~/.hermes/.env`. No token means no registration, which costs the CI tools and nothing else. `WOODPECKER_URL` overrides the instance for anyone whose CI lives elsewhere. The old shape - a clone under `~/.local/share/mcp-servers` and an absolute path in `~/.pi/agent/mcp.json` - was unreproducible for a teammate and could be moved out from under the config by a reinstall, so it is gone.
 
 - **`.pi/MEMORY.md` is the learning loop, and it is a tracked file.** A correction stated in a session is appended by the `remember` tool - or by hand - as one rule with its reason; `myne-memory.ts` injects the whole file into every session's system prompt under `## Repository memory`. Being tracked, a correction is a reviewable diff rather than a private habit. It infers nothing on its own: if no one calls `remember`, nothing is learned, and a wrong lesson is deleted by editing the file.
-- **Agents are derived, not hand-mirrored.** `node scripts/sync-agents.mjs` in the plugin writes `.pi/agents/*.md` from `agent-tooling/agents/*.md` plus the twelve `review-*` definitions, and `--check` exits non-zero on drift. pi needs `name` in the frontmatter, which is why these cannot be symlinks as the skills are. The derived files are gitignored except `subworker.md` and `general-purpose.md`, mirroring the `.opencode/agents` policy.
+- **Agents are derived, not hand-mirrored.** `node scripts/sync-agents.mjs` in the plugin writes `.pi/agents/*.md` from `agent-tooling/agents/*.md` plus the twelve `review-*` definitions, and `--check` exits non-zero on drift. pi needs `name` in the frontmatter, which is why these cannot be symlinks as the skills are. The derived files are gitignored except `subworker.md` and `general-purpose.md`, mirroring the `.pi/agents` policy.
 - **Delegation needs `agentScope: "both"`.** pi's default of `"user"` hides project agents entirely, so the injected conventions carry that sentence - without it the whole subagent layer exists and is unreachable.
 - **Compaction is asked for at 45% and forced at 75%, and it resumes the run.** `myne-compaction.ts` calls `ctx.compact({ customInstructions })`, and the instructions tell the summariser to keep a numbered state block - bound issue, worktree and branch, feature tasks, changed files with their purpose, decisions with reasons, the next lane step - rather than folding it into prose. When the compaction completes, the extension posts a resume message with `triggerTurn: true`, so the session carries on from the preserved state instead of waiting for a prompt. `/compact-now` does the same on demand. **The two thresholds are the point**: at 45% (`MYNE_COMPACT_AT`) the extension steers ONE message into the running turn and the agent calls the `compact_context` tool when it reaches a clean boundary, because a forced compaction lands wherever the percentage happens to cross and a summary written mid-step describes half a step; at 75% (`MYNE_COMPACT_FORCE_AT`, clamped so it never sits below the ask) the context is compacted whatever the agent decided. An absolute token ceiling is available as `MYNE_COMPACT_MAX_TOKENS` and is OFF by default: a 200k default compacted a 1M-token window at 20%, four times per window, which is the constant-compaction the owner reported. Note the API shape that makes this work: `session_before_compact` cannot do it (its event carries `customInstructions`, but the caller keeps its own variable, and the hook's only results are `cancel` and a full replacement summary), whereas `ctx.compact()` passes the instructions to the request.
 - **pi asks for attention through a desktop notification.** `myne-notify.ts` fires on `ui_prompt_start` (a blocking question) and on `agent_settled` (a run finished with nothing queued), with the title `myne`, the subtitle `pi · <repo>` and one line saying what is waiting. It runs `osascript` directly rather than depending on terminal-notifier, only in interactive sessions (`print`/`json`/`rpc` are driven by other programs), and honours `MYNE_PI_NOTIFY=0`. Long runs here are the normal case, so without this the session sits finished in an unfocused window and nobody notices.

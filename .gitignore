@@ -70,7 +70,19 @@ coverage/
 
 # OpenCode configuration. Commands, agents, plugins and skills are shared.
 # Worktrees remain local machine state.
+# `.opencode/` is a PATH now, not a product (decision 0781): OpenCode left this
+# repository and only the worktree root and the dev sync store remain under it.
+# These patterns are the belt for a stale clone that still regenerates the old
+# directories, whose contents came from the private companion and must never be
+# committed here.
 /.opencode/worktrees/
+/.opencode/goals/
+/.opencode/node_modules/
+/.opencode/skills/
+/.opencode/commands/
+/.opencode/agents/
+/.opencode/package-lock.json
+/.opencode/.gitignore
 
 # The local sync server's store for `pnpm dev:two` and `pnpm web:local`
 # (scripts/dev-web.sh): the accounts and vaults those commands create, kept so a

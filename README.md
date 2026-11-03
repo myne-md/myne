@@ -86,7 +86,7 @@ Almost every file at the root is there because a tool looks for it **by name**, 
 | `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml` | the pnpm workspace root; `pnpm` resolves its members from here |
 | `index.html`, `pdf-export.html`, `vite.config.ts`, `vitest.config.ts`, `tsconfig.json`, `tsconfig.node.json` | Vite's root is the current directory, so its HTML entry points must sit here; `vitest.config.ts` is discovered by name, which is what every bare `vitest run` in this tree depends on |
 | `tsconfig.tests.json` | the typecheck for the trees the shipped-code `tsconfig.json` deliberately excludes (`tests/`, `e2e/`, `e2e-web/`) |
-| `lefthook.yml`, `opencode.json`, `i18next.config.js` | git-hook, agent-harness and i18n-extractor configuration, each discovered by filename |
+| `lefthook.yml`, `i18next.config.js` | git-hook and i18n-extractor configuration, each discovered by filename |
 | `flake.nix`, `flake.lock` | the Nix devshell; `nix develop` reads a flake from the repository root |
 | `README.md`, `LICENSE`, `LICENSING.md`, `SECURITY.md`, `AGENTS.md` | the files GitHub and contributor tooling render or look for at a root |
 | `PRODUCT.md`, `DESIGN.md`, `DESIGN.json` | the strategy and the visual system, read from the root by the design workflow and projected against [`docs/design/`](docs/design/) |

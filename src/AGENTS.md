@@ -1,6 +1,6 @@
 # src/ — React UI (Tauri WebView)
 
-> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for project-wide context.
+> Subdirectory AGENTS.md. Loaded when pi reads files here. See repo-root `AGENTS.md` for project-wide context.
 
 ## Stack
 
