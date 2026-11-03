@@ -54,8 +54,9 @@ import { type EditorHost, getHost, setEditorHost } from "@myne/editor/host";
 const ID = "a".repeat(64);
 
 // A minimal EditorView stand-in: the file-card / audio widgets only touch the
-// `view` inside menu-action callbacks, which these tests do not fire.
-const fakeView = {} as never;
+// `view` inside menu-action callbacks, which these tests do not fire, and the
+// media widgets ask it to re-measure once their box changes (myne-md/myne#990).
+const fakeView = { requestMeasure: () => {} } as never;
 
 beforeEach(() => {
   // jsdom has no IntersectionObserver — stub a no-op so the audio widget takes
@@ -103,12 +104,26 @@ describe("AttachmentImageWidget", () => {
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
   });
 
-  it("drops the loading chip but keeps the <img> on error (native broken-image affordance)", () => {
+  it("replaces a failed <img> with the broken chip, in place, so the frame cannot collapse to 0x0", () => {
+    // The defect this pins (myne-md/myne#990): the chip was removed and the
+    // `<img>` stayed `display: none`, so the frame measured 0x0 and the only
+    // thing left painted was the "⋯" overlay, hanging outside the content
+    // column. Measured in Chromium: frame 0x0 with the menu at x=-34, in a note
+    // that looked like it had never finished loading.
     const dom = new AttachmentImageWidget(ID, "p.png", emptyEmbedLayout(), [], false).toDOM(fakeView);
     const img = dom.querySelector("img.cm-attachment-img") as HTMLImageElement;
     img.dispatchEvent(new Event("error"));
     expect(dom.querySelector(".cm-attachment-progress")).toBeNull();
-    expect(dom.querySelector("img.cm-attachment-img")).not.toBeNull();
+    expect(dom.querySelector("img.cm-attachment-img")).toBeNull();
+    const chip = dom.querySelector('[data-testid="attachment-image.failed"]') as HTMLElement;
+    expect(chip).not.toBeNull();
+    // The same chip the tombstone widget renders, so one surface treatment, and
+    // the filename is on screen rather than only in a tooltip.
+    expect(chip.className).toBe("cm-attachment-tombstone cm-attachment-tombstone-broken");
+    expect(chip.getAttribute("role")).toBe("img");
+    expect(chip.querySelector(".cm-attachment-tombstone-label")?.textContent).toBe("p.png");
+    // The embed's own controls survive: the note still offers a way out of it.
+    expect(dom.querySelector(".cm-attachment-embed-menu")).not.toBeNull();
   });
 
   it("opens the lightbox with the decrypted source on image click", () => {

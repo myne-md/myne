@@ -36,7 +36,7 @@ import {
   EditorView,
   ViewPlugin,
   type ViewUpdate,
-  type WidgetType,
+  WidgetType,
 } from "@codemirror/view";
 import type { SyntaxNode } from "@lezer/common";
 import { parseAttachmentTarget } from "@myne/editor/host/notes/attachmentRef";
@@ -184,6 +184,78 @@ function resolveEmbedNode(
   // target (a "broken" reference) never reaches here: `parseAttachmentTarget`
   // rejects it, so the raw `![[…]]` stays plain (wikilink chip renders).
   return new AttachmentTombstoneWidget("deleted", filename);
+}
+
+/**
+ * The measured box around a whole-line embed (myne-md/myne#990).
+ *
+ * # Why a wrapper at all
+ *
+ * A block widget's DOM IS the box CodeMirror measures, and the measurement is a
+ * `getBoundingClientRect()`, which does not include MARGINS. So the 3px/10px
+ * block rhythm these cards carry rendered as 13px per embed that the height map
+ * never learned about. The error is cumulative and in one direction, and it was
+ * measured twice against Chromium: a synthetic theme with five block widgets
+ * drifted 13px each and `posAtCoords` landed up to three rows below the pointer;
+ * this real extension, in a 22-line note with two embeds, painted 37px more than
+ * CodeMirror believed and put twenty painted rows on doc lines
+ * 1..8, 10, 11, 13, 13, 15, 16, 16, 18, 21, 22, 22, 22: two rows sharing a doc
+ * line and three sharing another, which is also how a selection ends up
+ * highlighting a row nobody dragged over. `theme.ts`'s `.cm-math-block` records
+ * the same defect being fixed for math, mermaid, tables and embedded HTML; this
+ * family was missed.
+ *
+ * Padding is inside the measured box, so the same rhythm expressed as padding is
+ * counted. It cannot go on the cards themselves: three of them have a hairline
+ * border and a surface, so padding would grow the visible card instead of the
+ * space around it. Hence one wrapper that owns the vertical rhythm, and the card
+ * loses its margin while it lives inside it (`.cm-attachment-block` rules in
+ * `theme.ts`).
+ *
+ * # What it delegates, and what it deliberately does not
+ *
+ * `eq()` compares the inner widget by class first: every widget here implements
+ * `eq` against its own fields, so asking one to compare itself with a different
+ * class is not a question it can answer. `destroy` and `ignoreEvent` are the
+ * inner widget's, handed the inner DOM.
+ *
+ * `estimatedHeight` is NOT adjusted for the wrapper's padding. That would put a
+ * second copy of the 13px in TypeScript where the stylesheet already owns it, and
+ * the estimate exists only until the first measure corrects it.
+ */
+class BlockEmbedFrame extends WidgetType {
+  constructor(private readonly inner: WidgetType) {
+    super();
+  }
+
+  eq(other: BlockEmbedFrame): boolean {
+    return other.inner.constructor === this.inner.constructor && this.inner.eq(other.inner);
+  }
+
+  get estimatedHeight(): number {
+    return this.inner.estimatedHeight;
+  }
+
+  toDOM(view: EditorView): HTMLElement {
+    const wrap = document.createElement("div");
+    wrap.className = "cm-attachment-block";
+    wrap.appendChild(this.inner.toDOM(view));
+    return wrap;
+  }
+
+  destroy(dom: HTMLElement): void {
+    // The inner widget's teardown is written against ITS dom (the card), not this
+    // wrapper: an overflow menu and the resize handles both hang their window
+    // listeners off it. Falling back to the wrapper rather than skipping keeps a
+    // widget that returned something unexpected from leaking its listeners for as
+    // long as the view lives.
+    const inner = dom.firstElementChild;
+    this.inner.destroy(inner instanceof HTMLElement ? inner : dom);
+  }
+
+  ignoreEvent(event: Event): boolean {
+    return this.inner.ignoreEvent(event);
+  }
 }
 
 function buildAttachmentEmbedDecorations(
@@ -399,10 +471,14 @@ function buildBlockEmbedDecorations(
     enter: (node) => {
       if (node.name !== "Wikilink") return undefined;
       if (!embedIsAlone(state, node.from, node.to)) return false;
-      const widget = resolveEmbedNode(state, catalog, node, true);
-      if (widget === null) return false;
+      const inner = resolveEmbedNode(state, catalog, node, true);
+      if (inner === null) return false;
       const line = state.doc.lineAt(node.from);
-      builder.add(line.from, line.to, Decoration.replace({ widget, block: true }));
+      builder.add(
+        line.from,
+        line.to,
+        Decoration.replace({ widget: new BlockEmbedFrame(inner), block: true }),
+      );
       return false;
     },
   });
