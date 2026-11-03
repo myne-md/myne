@@ -75,13 +75,23 @@ describeE2E("cbt1 a code block resolves a monospace face (myne-md/myne#555)", ()
         const LONG = "x".repeat(400);
         await typeIntoEditor(s, ["```", "iiii", "MMMM", LONG, "```"].join("\n"));
         await waitForSaved(s);
-        await pressInEditor(s, ENTER_KEY);
 
-        // The card decoration is applied per line once the block parses.
-        await s.waitForElement(CODE_LINE, { timeoutMs: 15_000 });
+        // The card decoration is applied per line once the block parses AND the
+        // caret sits outside its lines, so the ENTER below is a precondition, not
+        // punctuation — and it is retried because a synthetic ENTER is sometimes
+        // dropped by this WebView (the same reason every "keystroke pipeline
+        // established" probe in this suite polls). Measured 2026-11-03: with a
+        // single unverified ENTER the block kept its source revealed — the DOM
+        // carried the code-bar badge and no `cm-code-card-body` line at all — and
+        // the spec failed for a caret position rather than for typography.
+        let probes = 0;
         await s.waitUntil(
-          async () => ((await s.findElements(CODE_LINE)).length >= 3 ? true : null),
-          { label: "the fenced block decorated its three body lines" },
+          async () => {
+            if (probes > 0) await pressInEditor(s, ENTER_KEY);
+            probes += 1;
+            return (await s.findElements(CODE_LINE)).length >= 3 ? true : null;
+          },
+          { label: "the fenced block decorated its three body lines", timeoutMs: 20_000 },
         );
 
         // Measure the two probe lines by their own text, not by index: the

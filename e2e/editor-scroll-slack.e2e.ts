@@ -5,8 +5,9 @@
 //        instead of flush against it.
 //
 // Verified as a discriminator, not assumed to be one: built with the extension
-// removed, this scenario fails with `expected 36 to be greater than or equal to
-// 120` — 36px being all the pre-fix layout leaves below the last line.
+// removed, this scenario fails — 36px is all the layout leaves below the last line
+// (32px of pane-scroller bottom padding + 4px of content padding), against a
+// 64 px floor.
 //
 // What is NOT asserted here (and why):
 //   - How much slack a viewport earns, and which element is treated as the
@@ -53,12 +54,22 @@ const BODY = [
   `last line ${TAIL_MARKER}`,
 ].join("\n");
 
-// The smallest gap that proves slack exists. Measured on the pre-fix binary the
-// gap settles at 36px (32px of pane-scroller bottom padding + 4px of content
-// padding); the fix reserves 60% of the pane height, capped at 480 — ~430px on
-// this harness. 120 sits far from both, so neither a layout tweak nor a window
-// size makes this ambiguous.
-const MIN_GAP_PX = 120;
+// The gap must exist and must stay SMALL, and both halves are the product
+// decision rather than a layout coincidence.
+//
+// `editor/src/scroll-slack.ts` reserves a fixed `SLACK_PX = 48` below the last
+// line (`slackFor` returns it for every host height), which measures ~80 px here
+// against the pane scroller's own 32 px bottom padding. It used to reserve 60% of
+// the viewport, capped at 480 — ~430 px on this harness — and that read as a
+// broken scrollbar rather than breathing room, so myne-md/myne#908 item 10
+// replaced it. This spec still asserted the old 120 px floor until 2026-11-03 and
+// was red about a deliberate product change.
+//
+// The UPPER bound is what keeps the trade honest: it fails if the fixed two-line
+// allowance ever slides back to a fraction of the viewport, which is the
+// regression nobody would notice now that the lower bound is small.
+const MIN_GAP_PX = 64;
+const MAX_GAP_PX = 200;
 
 interface TailMeasure {
   /** px from the bottom of the last rendered line to the scroller's bottom edge. */
@@ -252,6 +263,10 @@ describeE2E("ss1 the last line can be scrolled clear of the bottom edge (#375)",
           settled.gap,
           `slack below "${settled.tail}" at max scroll`,
         ).toBeGreaterThanOrEqual(MIN_GAP_PX);
+        expect(
+          settled.gap,
+          `slack below "${settled.tail}" is the fixed two-line allowance, not a fraction of the viewport`,
+        ).toBeLessThanOrEqual(MAX_GAP_PX);
       },
     );
   });

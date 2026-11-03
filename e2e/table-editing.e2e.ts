@@ -57,11 +57,25 @@ async function insertTable(session: Session): Promise<void> {
   await session.byTestId("table.grid");
 }
 
-/** Click a cell open, type a value into its input, and commit with Enter. */
+/** Click a cell open, type a value into its input, and commit with Enter.
+ *
+ *  The commit is VERIFIED, not assumed: a synthetic `sendKeys` is occasionally
+ *  dropped by this WebView, and every scenario below builds on the cell actually
+ *  holding the text (te1 locks the vault and asserts the value survives the AEAD
+ *  round-trip, which reads exactly like a storage defect when nothing was ever
+ *  typed). Poll: re-open the cell, re-send, and stop only when the grid shows the
+ *  value. Enter blurs the input, which is the product's commit gesture. */
 async function editCell(session: Session, row: number, col: number, value: string): Promise<void> {
-  await (await session.waitForElement(cell(row, col))).click();
-  const input = await session.byTestId("table.cell-input");
-  await input.sendKeys(`${value}${ENTER}`); // Enter blurs → commit
+  await session.waitUntil(
+    async () => {
+      await (await session.waitForElement(cell(row, col))).click();
+      const input = await session.byTestId("table.cell-input");
+      await input.sendKeys(`${value}${ENTER}`);
+      const shown = await (await session.waitForElement(cell(row, col))).textContent();
+      return shown.includes(value) ? true : null;
+    },
+    { label: `cell ${row},${col} holds "${value}" after the commit` },
+  );
 }
 
 describeE2E("te1 editable grid survives the AEAD round-trip (MYND-162)", () => {

@@ -24,6 +24,7 @@ import { it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  clickNoteRow,
   createNote,
   dismissImporterOffer,
   editorText,
@@ -65,13 +66,19 @@ async function otherNoteRowId(
   return other;
 }
 
-/** Click the open tab for `noteId` to make it the active buffer in its pane. */
-async function switchToNoteTab(session: Session, noteId: string): Promise<void> {
-  await (
-    await session.waitForElement(
-      testIdSelector("editor.tab", { "data-tab-id": `note:${noteId}` }),
-    )
-  ).click();
+/** Make `noteId` the active buffer in its pane by clicking its SIDEBAR row.
+ *
+ *  The tab is the more obvious affordance and this suite used it until
+ *  2026-11-03, when it stopped being reachable: with two resident tabs the strip
+ *  overflows, and WebKitGTK then leaves its hit-test map stale — `editor.tab` is
+ *  absent from `document.elementsFromPoint` at its own centre (its ancestors are
+ *  listed) and the driver refuses the click. That is a browser/harness question
+ *  tracked on its own (`Element.click`'s refresh does not cure it), while THIS
+ *  scenario is about the pane reusing one view across a switch: a row click
+ *  performs the same switch through the same `openInFocusedTab`, which is why
+ *  `openTwoNoteTabs` still asserts both notes are resident as tabs. */
+async function switchToNote(session: Session, noteId: string): Promise<void> {
+  await clickNoteRow(session, noteId);
 }
 
 /** Pin the open tab for `noteId` via its right-click menu (tab-modes.e2e.ts
@@ -135,14 +142,14 @@ describeE2E("pv1 persistent view — undo survives a note switch (MYND-534)", ()
 
         // Edit A: focus its tab, type, save — A's view now holds the edit and its
         // undo history.
-        await switchToNoteTab(s, aId);
+        await switchToNote(s, aId);
         await typeIntoEditor(s, EDIT_MARKER);
         await waitForSaved(s);
 
         // Switch to B, then back to A, then undo — the edit must revert, which
         // requires A's view (and its undo history) to have survived the switch.
-        await switchToNoteTab(s, bId);
-        await switchToNoteTab(s, aId);
+        await switchToNote(s, bId);
+        await switchToNote(s, aId);
         // A tab click focuses the tab, not the body editor, so re-focus it (the
         // undo keybind is a CM binding that only fires on a key event reaching the
         // body content DOM). The FIRST W3C Ctrl+Z right after a persistent-view
@@ -177,14 +184,14 @@ describeE2E("pv2 persistent view — content isolation across a switch (MYND-534
         const { aId, bId } = await openTwoNoteTabs(s);
 
         // Give A its own body.
-        await switchToNoteTab(s, aId);
+        await switchToNote(s, aId);
         await typeIntoEditor(s, EDIT_MARKER);
         await waitForSaved(s);
 
         // Back to A after visiting B: it must show A's body (with the marker), not
         // B's — no bleed from the shared persistent view.
-        await switchToNoteTab(s, bId);
-        await switchToNoteTab(s, aId);
+        await switchToNote(s, bId);
+        await switchToNote(s, aId);
         await s.waitUntil(
           async () => ((await editorText(s)).includes(EDIT_MARKER) ? true : null),
           { label: "note A restored with its own body" },

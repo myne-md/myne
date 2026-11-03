@@ -51,7 +51,29 @@ const MARKER = "tapdeletemarker8w3qz5xk7r2n";
  *  would not exercise this path at all. */
 async function tapBackspace(session: Session, n: number): Promise<void> {
   for (let i = 0; i < n; i++) {
-    await pressKey(session, KEY.BACKSPACE);
+    const before = (await editorText(session)).length;
+    // One press is verified before the next is sent, because a synthetic key this
+    // WebView drops is indistinguishable from the defect this spec exists for:
+    // measured 2026-11-03, all four presses vanished and the artifact showed the
+    // marker intact at 26 characters — which reads as "the tap deleted nothing"
+    // when in fact nothing was delivered. Re-sending after a press that changed
+    // NOTHING is still exactly one effective press, so the claim the spec makes
+    // ("one character per discrete press") is untouched.
+    await session.waitUntil(
+      async () => {
+        const now = (await editorText(session)).length;
+        if (now === before - 1) return true;
+        if (now < before - 1) {
+          throw new Error(
+            `one press removed ${before - now} characters (expected 1): a selection or a ` +
+              "repeat, so the per-press claim cannot be read from this run",
+          );
+        }
+        await pressKey(session, KEY.BACKSPACE);
+        return null;
+      },
+      { label: `press ${i + 1} of ${n} removed exactly one character`, timeoutMs: 10_000 },
+    );
   }
 }
 

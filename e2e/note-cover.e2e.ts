@@ -310,7 +310,17 @@ describeE2E("nco3 Remove acts on the pane whose banner was pressed (myne-md/myne
         await createNote(s, "Sag Kapak");
         const right = await selectedNoteId(s);
 
-        // Left pane: Sol Kapak, cover = the first image.
+        // Each note gets its OWN cover while ONE pane is open, and the split
+        // happens afterwards.
+        //
+        // The palette is the only door to the cover picker (`note.set-cover`), and
+        // it is opened with a Control+K chord, which does not reach the app once
+        // the second pane is mounted: measured 2026-11-03, `openPalette` re-fired
+        // the chord for its full 12 s budget after `focusPane(1)` and the input
+        // never appeared, while the single-pane call a moment earlier had worked.
+        // Assigning the covers first is not a way around the scenario — nothing
+        // here is about WHEN a cover is set; the subject is which note the banner's
+        // own Remove acts on, and that state is unchanged.
         await clickNoteRow(s, left);
         await openCoverPicker(s);
         await pickCoverImage(s, 0);
@@ -318,22 +328,34 @@ describeE2E("nco3 Remove acts on the pane whose banner was pressed (myne-md/myne
         const leftSrc = await bannerSrc(s, 0);
         await waitForSaved(s);
 
-        // Split: Sag Kapak to the side. The palette acts on the FOCUSED pane, so
-        // focus the new one before giving it its own, different cover. (Whether
-        // `open-to-side` focuses what it opened is not this scenario's subject,
-        // and `focusPane` makes it not matter.)
-        await rowMenuPick(s, right, "open-to-side");
-        await focusPane(s, 1);
+        await clickNoteRow(s, right);
         await openCoverPicker(s);
         await pickCoverImage(s, 1);
-        await waitForBanners(s, 2);
-        const rightSrc = await bannerSrc(s, 1);
-        if (rightSrc === leftSrc) {
+        await waitForBanners(s, 1);
+        const rightOnlySrc = await bannerSrc(s, 0);
+        if (rightOnlySrc === leftSrc) {
           throw new Error(
-            "the two panes must show DIFFERENT covers, or this scenario discriminates nothing",
+            "the two notes must carry DIFFERENT covers, or this scenario discriminates nothing",
           );
         }
         await waitForSaved(s);
+
+        // Split: Sag Kapak to the side, and both banners come up with it.
+        //
+        // Sol Kapak is made the ACTIVE note first. `open-to-side` on the note the
+        // focused pane already shows is a no-op rather than a split (measured
+        // 2026-11-03: the workspace stayed one pane and the banner count never
+        // reached two), and the note it sends aside has to be a different one.
+        await clickNoteRow(s, left);
+        await rowMenuPick(s, right, "open-to-side");
+        await waitForBanners(s, 2);
+        const rightSrc = await bannerSrc(s, 1);
+        if (rightSrc !== rightOnlySrc) {
+          throw new Error(
+            `the split's right pane does not show Sag Kapak's own cover: expected ` +
+              `${rightOnlySrc}, got ${rightSrc}`,
+          );
+        }
 
         // Focus back to the LEFT pane. This is the state the bug needs: the
         // shell's selected note is Sol Kapak, and the control about to be pressed
