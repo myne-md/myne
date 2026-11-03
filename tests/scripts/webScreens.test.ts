@@ -114,14 +114,24 @@ describe("check-web-surfaces", () => {
    *
    * The map is injected rather than written into the guard, because the roster
    * is what a future edit gets wrong and the check has to read it.
+   *
+   * The injection SPREADS the roster instead of naming two of its rows, and that
+   * is the fix for a real failure rather than tidiness. It used to carry
+   * `src/lib/shipped.ts` as its clean half; `0898f7cf5` removed that screen from
+   * the roster, so the literal named a row that no longer existed and the test
+   * stopped typechecking while asserting nothing at all about the guard. A
+   * fixture that pins a roster row is a fixture that goes red when the roster
+   * changes for a good reason, so the clean half is now the roster itself.
    */
   it("names a verdict outside the vocabulary", async () => {
-    const { verdictGaps, SURFACE_VERDICTS } = await import("../../scripts/check-web-surfaces.mjs");
+    const { verdictGaps, SURFACE_VERDICTS, VERDICTS } = await import(
+      "../../scripts/check-web-surfaces.mjs"
+    );
     expect(verdictGaps()).toEqual([]);
     expect(
       verdictGaps({
+        ...VERDICTS,
         "src/components/settings/StoragePanel.tsx": ["nonsense-verdict", "reason"],
-        "src/lib/shipped.ts": ["ported", "reason"],
       }),
     ).toEqual(["src/components/settings/StoragePanel.tsx"]);
     // The closed list itself, so a verdict added to a future entry without a

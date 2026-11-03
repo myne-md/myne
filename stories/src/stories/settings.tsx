@@ -153,15 +153,6 @@ const SEED_FIXTURE: Fixture = {
     // command, and a fixture that answers only the status left every chip
     // rendering its raw i18n key (`count: undefined`), which is what the
     // catalogue showed until this was added.
-    "plugin:local-inference|seed_memory_payload": () => ({
-      notes: 24,
-      folders: 4,
-      tags: 7,
-      excludedNotes: 3,
-      titlesOmitted: 24,
-      payload: "Prefer short, decision-first answers.\nFolders are organised by area.",
-      chars: 1_284,
-    }),
     "plugin:local-inference|seed_memory_generate": () => ({
       candidates: [
         { text: "Projects: Myne, including the roadmap and the release checklist." },

@@ -46,12 +46,27 @@
 // What it does check is the ENVELOPE the updater parses, because that is the half
 // that fails silently. See `signatureEnvelope` below: v0.11.3 published every
 // platform's signature one encoding too deep and every other gate was green.
-// It also does not check the `.sig` files beside the artefacts, which nothing
-// fetches: the signature travels INSIDE the manifest.
+//
+// And what it does check is the VERSION the signature was signed for
+// (`signedVersion` below), a different question from the envelope and one that was
+// green for two releases without being asked. This client ships
+// `requireSignedVersion: true`, so `tauri-plugin-updater` refuses an artefact whose
+// trusted comment names no version: `MissingSignedVersion`, raised AFTER the whole
+// download. `tauri build` embeds the field itself; `tauri signer sign` omits it
+// unless given `--app-version`, and prints only a warning, so a hand-signed
+// artefact verifies cryptographically and is still un-installable. v0.11.3 shipped
+// that on every platform and v0.11.4 on macOS alone (208 MB re-downloaded per
+// retry, and the update screen states no cause by design).
+//
+// It does not read the `.sig` files beside the artefacts, which nothing fetches:
+// the signature travels INSIDE the manifest.
 //
 // Zero dependencies, hand-runnable:
 //   node scripts/check-published-manifests.mjs
 //   MYNE_DOWNLOADS_BASE=https://… node scripts/check-published-manifests.mjs
+
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 import { manifestFilename } from "./emit-update-manifest.mjs";
 
@@ -135,14 +150,95 @@ export function signatureEnvelope(signature) {
   return text;
 }
 
+/**
+ * The version the artefact behind this signature was signed for, or null.
+ *
+ * `tauri signer sign --app-version <v>` appends `version:<v>` to the trusted comment as a
+ * tab-separated field, and the signature's own global signature covers that comment. That is what
+ * makes the binding meaningful: it stops a substituted manifest from pairing a new version number
+ * with an older release's bytes. The field is read back exactly as
+ * `tauri-plugin-updater` reads it (`signed_version` in its `updater.rs`): the third line, split on
+ * tabs, the field that starts with `version:`. Anything else is invisible to the updater and so is
+ * invisible here, whether it is a field on the second line or a space where a tab belongs.
+ */
+function signedVersion(envelope) {
+  const line = envelope.split("\n")[2] ?? "";
+  const comment = line.slice("trusted comment: ".length);
+  const field = comment.split("\t").find((part) => part.startsWith("version:"));
+  return field === undefined ? null : field.slice("version:".length);
+}
+
+/**
+ * Whether this build's client DEMANDS a signed version.
+ *
+ * Read from `src-tauri/tauri.conf.json` rather than assumed: the failure this rule exists for is
+ * a client that refuses the artefact, so the guard has to state the contract the client actually
+ * ships (`plugins.updater.requireSignedVersion`, `true` since the updater landed), not a copy of
+ * what the release assumed.
+ *
+ * A configuration this cannot read is a FAILURE, not a pass, and it is reported as one: a guard
+ * that stops asking its question when a path moves is a guard that reports green while checking
+ * nothing.
+ */
+function clientContract() {
+  const path = fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url));
+  try {
+    const config = JSON.parse(readFileSync(path, "utf8"));
+    return { ok: true, requireSignedVersion: config?.plugins?.updater?.requireSignedVersion === true };
+  } catch (error) {
+    return { ok: false, error: error?.message ?? String(error) };
+  }
+}
+
+/**
+ * Compare two version spellings the way the updater's own `verify_signed_version` does.
+ *
+ * Semver when both sides are one, so `1.2.3` and `v1.2.3` agree, with a literal fallback for a
+ * version that is not semver (the plugin does the same, which is why a date-stamped version still
+ * fails honestly rather than crashing the comparison).
+ *
+ * Two details are copied rather than tidied, because each one is a case where a tidier comparison
+ * would ACCEPT an artefact the client refuses, which is the one direction this guard cannot be
+ * wrong in. The plugin strips EVERY leading `v` (`trim_start_matches('v')`) and performs no
+ * whitespace trimming at all, so `version: 0.10.0` with a space after the colon, or `vv0.10.0`,
+ * parses as nothing on the client side and then fails the literal comparison. Trimming here made
+ * the guard answer "fine" to a manifest the client rejects, and no test noticed, because every
+ * fixture was clean.
+ */
+function versionsAgree(signed, announced) {
+  const strip = (value) => (typeof value === "string" ? value.replace(/^v+/, "") : "");
+  const a = strip(signed);
+  const b = strip(announced);
+  const ma = VERSION_RE.exec(a);
+  const mb = VERSION_RE.exec(b);
+  if (ma !== null && mb !== null) {
+    return (
+      ma[1] === mb[1] &&
+      ma[2] === mb[2] &&
+      ma[3] === mb[3] &&
+      (ma[4] ?? null) === (mb[4] ?? null)
+    );
+  }
+  return a === b;
+}
+
 export async function audit({
   fetchImpl = fetch,
   base = BASE,
   channels = CHANNELS,
+  contract = clientContract(),
 } = {}) {
   const failures = [];
   const seen = new Map();
   let reached = 0;
+
+  if (!contract.ok) {
+    failures.push(
+      `could not read src-tauri/tauri.conf.json (${contract.error}), so whether this client ` +
+        `refuses a signature that names no version is UNKNOWN. Nothing was verified about the ` +
+        `version binding.`,
+    );
+  }
 
   for (const channel of channels) {
     const url = `${base}${manifestFilename(channel)}`;
@@ -189,13 +285,42 @@ export async function audit({
           `${url}: platform ${target} carries no signature. The updater refuses an unsigned ` +
             `artefact, so the offer would be a dead end for that platform.`,
         );
-      } else if (signatureEnvelope(entry.signature) === null) {
-        failures.push(
-          `${url}: platform ${target}'s signature is not the .sig file's content. The updater ` +
-            `base64-decodes this field once and then parses a four-line minisign blob, so an ` +
-            `extra encoding layer (or the decoded blob pasted in) fails at install on every ` +
-            `platform with "Untrusted signature comment too long".`,
-        );
+      } else {
+        const envelope = signatureEnvelope(entry.signature);
+        if (envelope === null) {
+          failures.push(
+            `${url}: platform ${target}'s signature is not the .sig file's content. The updater ` +
+              `base64-decodes this field once and then parses a four-line minisign blob, so an ` +
+              `extra encoding layer (or the decoded blob pasted in) fails at install on every ` +
+              `platform with "Untrusted signature comment too long".`,
+          );
+        } else if (contract.ok) {
+          // The version binding. A different question from the envelope above, and the one that
+          // was green for two releases without being asked.
+          const signed = signedVersion(envelope);
+          if (signed === null) {
+            if (contract.requireSignedVersion) {
+              failures.push(
+                `${url}: platform ${target}'s signature names no version. This client ships ` +
+                  `\`requireSignedVersion: true\` (src-tauri/tauri.conf.json), so ` +
+                  `tauri-plugin-updater refuses the artefact with MissingSignedVersion AFTER the ` +
+                  `whole download, and the update screen states no cause. \`tauri build\` embeds ` +
+                  `the field; a hand \`tauri signer sign\` omits it unless given ` +
+                  `\`--app-version ${manifest.version}\`, which is how v0.11.3 shipped it on every ` +
+                  `platform and v0.11.4 on macOS only. Re-sign the published artefact and ` +
+                  `re-publish both manifests.`,
+              );
+            }
+          } else if (!versionsAgree(signed, manifest.version)) {
+            failures.push(
+              `${url}: platform ${target}'s signature names version ${JSON.stringify(signed)} but ` +
+                `the manifest announces ${JSON.stringify(manifest.version)}. The updater refuses ` +
+                `this with SignedVersionMismatch whatever the config says, because the comment is ` +
+                `covered by the signature and a mismatch is the substitution it exists to catch. ` +
+                `Re-sign with \`--app-version ${manifest.version}\`.`,
+            );
+          }
+        }
       }
       const artifact = entry?.url;
       if (typeof artifact !== "string" || !artifact.startsWith(base)) {
