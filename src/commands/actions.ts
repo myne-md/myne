@@ -690,13 +690,19 @@ const lockVaultAction: CommandAction = {
  * roster is derived from `COMMAND_ACTIONS` entries carrying a `ribbon` block,
  * so it was not absent from the default rail — it could not be pinned to it.
  *
- * `visibility` is the interesting half. The action hides while the palette is
- * open, because a palette row that opens the palette is a no-op that reads as a
- * broken command, and the rule at the top of this file is that the palette
- * never exposes an action unavailable in the current state. The RAIL is not
- * affected: the rail renders a pinned id whatever the palette is doing, and
- * pressing it while the palette is up re-focuses rather than toggling shut,
- * which is what a search affordance should do when you press it twice.
+ * `visibility` is the interesting half. The action hides from the PALETTE while
+ * the palette is open, because a palette row that opens the palette is a no-op
+ * that reads as a broken command, and the rule at the top of this file is that
+ * the palette never exposes an action unavailable in the current state.
+ *
+ * The RAIL gets its own answer (`railVisibility`), and the first version of this
+ * entry did not: it reused `visibility`, which the rail reads, so pressing the
+ * sidebar's search row made the rail's own search glyph disappear for as long as
+ * the palette was up and reappear when it closed. That is the flicker the user
+ * reported (issue #970, item 5): a pinned rail entry is furniture, and it must
+ * not blink because another surface opened. Pressing it while the palette is up
+ * re-focuses rather than toggling shut, which is what a search affordance should
+ * do when you press it twice.
  */
 const openPaletteAction: CommandAction = {
   id: "palette.open",
@@ -709,6 +715,10 @@ const openPaletteAction: CommandAction = {
   },
   visibility: (ctx) =>
     ctx.stageName === "editor" && !ctx.paletteOpen ? "show" : "hidden",
+  // Never hidden by the palette's own state: the rail is where this affordance
+  // was missing for the longest, and it is the one entry that must not blink
+  // while the palette it opens is on screen.
+  railVisibility: editorOnly,
   run: (ctx) => {
     ctx.onOpenPalette();
   },

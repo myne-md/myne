@@ -952,6 +952,28 @@ describe("the chat-history budget control", () => {
     expect((input() as HTMLInputElement).disabled).toBe(true);
     aiEnabled = true;
   });
+
+  it("names the default an empty field means (issue #970, item 3)", () => {
+    // Unset renders as "": a blank box with a native stepper and no text, which
+    // reads as a control that failed to load. The placeholder is greyed by the
+    // browser, so it cannot be mistaken for a stored value, and the helper's
+    // "leave empty for the default" stops being a promise about a mystery.
+    chatHistoryBudget = null;
+    selectAiTopic("limits");
+    render(<AiPanel onShowToast={() => {}} />);
+    const el = input() as HTMLInputElement;
+    expect(el.value).toBe("");
+    expect(el.placeholder).toBe("3000");
+    expect(el.inputMode).toBe("numeric");
+    expect(el.step).toBe("1");
+  });
+
+  it("does not use the placeholder as a value when the user has set one", () => {
+    chatHistoryBudget = 500;
+    selectAiTopic("limits");
+    render(<AiPanel onShowToast={() => {}} />);
+    expect((input() as HTMLInputElement).value).toBe("500");
+  });
 });
 
 // ---------------------------------------------------------------------------

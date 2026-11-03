@@ -4139,7 +4139,12 @@ function CommandPaletteHost({
   useEffect(() => {
     ribbonCommands.run = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
-      if (action === undefined || action.visibility(commandCtx) !== "show") return;
+      // The rail's own predicate, matching the one `visibility` below uses: a
+      // button the rail is SHOWING must be runnable, or the entry renders and
+      // then swallows the click (`palette.open` while the palette is up, the
+      // palette re-focuses instead of toggling shut).
+      const railVisible = (action?.railVisibility ?? action?.visibility)?.(commandCtx);
+      if (action === undefined || railVisible !== "show") return;
       recordCommandRun(id);
       // A rail click that fails must say so: the button already acted pressed.
       // `run` may be sync or async; normalizing lets one catch cover both.
@@ -4149,7 +4154,10 @@ function CommandPaletteHost({
     };
     ribbonCommands.visibility = (id) => {
       const action = COMMAND_ACTIONS.find((a) => a.id === id);
-      return action?.visibility(commandCtx) ?? "hidden";
+      // `railVisibility` first (issue #970, item 5): an action may hide from the
+      // palette in a state where the rail must keep showing it, which is the one
+      // thing a single predicate cannot express.
+      return (action?.railVisibility ?? action?.visibility)?.(commandCtx) ?? "hidden";
     };
     return () => {
       ribbonCommands.run = undefined;

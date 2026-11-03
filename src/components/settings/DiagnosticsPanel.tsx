@@ -228,6 +228,11 @@ export function DiagnosticsPanel() {
       <SettingsSection title={t("settings.about.sections.diagnostics")}>
         <ControlBlock
           label={t("settings.about.diagnosticBlockLabel")}
+          /* No desktop caveat, because there is nothing left to explain: a
+             reading the build cannot take is absent from the block rather than
+             printed as `unknown` (issue #970, item 15). The paragraph that used
+             to sit here described the app's own output back to the user, which
+             is the shape of an apology rather than a measurement. */
           helper={t("settings.about.diagnosticBlockHelper")}
           anchorId="about.diagnostic-report"
           control={

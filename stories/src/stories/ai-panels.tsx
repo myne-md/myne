@@ -451,6 +451,16 @@ export const AI_STORIES: StoryDescriptor[] = [
     render: () => <SeededCard width={420} />,
   },
   {
+    id: "ai-panel/agentreview/narrow-footer",
+    group: "components",
+    surface: "AgentReview",
+    state: "narrow-footer",
+    description:
+      "The review card at the width the AI chat panel actually gives it, where the two closing acts and their counts have to share one line. The pair of them wrapping is the bug this state exists to hold shut.",
+    tags: ["notes", "ai", "agent", "review", "footer", "narrow", "wrap"],
+    render: () => <SeededCard width={340} />,
+  },
+  {
     id: "ai-panel/agentreview/in-a-centre-pane",
     group: "components",
     surface: "AgentReview",

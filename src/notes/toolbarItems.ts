@@ -57,8 +57,9 @@ export const EDITOR_TOOLBAR_DEFAULT_ORDER: readonly string[] = [
   "wikilink",
 ];
 
-/** Ids HIDDEN by default, so an un-customized toolbar shows today's set
- *  (bold/italic/strike/code/highlight/heading/link). The rest are addable. */
+/** Ids HIDDEN by default, so an un-customized toolbar shows the inline marks and
+ *  the block-type control (bold/italic/strike/code/highlight/heading/link). The
+ *  rest are addable. */
 export const EDITOR_TOOLBAR_DEFAULT_HIDDEN: readonly string[] = [
   "bulletList",
   "numberedList",
@@ -68,34 +69,29 @@ export const EDITOR_TOOLBAR_DEFAULT_HIDDEN: readonly string[] = [
 ];
 
 /**
- * Vocabulary ids the floating toolbar cannot render yet — the addable
- * list/quote/wikilink cluster is the MYND-336 follow-up on the editor side
- * (`editor/src/toolbar/plugin.ts` skips them). Until that lands they are
- * PINNED hidden: Settings shows them as disabled, non-toggleable rows, and
- * {@link resolveToolbarHidden} forces them into every resolved hidden set, so
- * a stored layout can never demand a button the toolbar would silently drop.
- * When the follow-up renders one, remove it here — the pin lifts and the
- * Settings row becomes toggleable, no migration needed.
- */
-export const EDITOR_TOOLBAR_PENDING_IDS: readonly string[] = [
-  "bulletList",
-  "numberedList",
-  "checklist",
-  "quote",
-  "wikilink",
-];
-
-/**
  * Resolve the EFFECTIVE hidden set from the stored `editor_toolbar_hidden`
- * pref: the stored ids (empty = unset → {@link EDITOR_TOOLBAR_DEFAULT_HIDDEN})
- * unioned with the pinned {@link EDITOR_TOOLBAR_PENDING_IDS}. The
- * empty-means-unset fallback is unambiguous BECAUSE of the pin: every
- * legitimately persisted value contains at least the pending ids, so a stored
- * `[]` can only mean "never customized" — never "show everything".
+ * pref. An empty stored list means "never customized" and falls back to
+ * {@link EDITOR_TOOLBAR_DEFAULT_HIDDEN}.
+ *
+ * **`[]` means "unset" only because THIS client refuses to write it** (issue
+ * #970). Until the lists, quote and wikilink learned to render, this resolution
+ * also unioned in `EDITOR_TOOLBAR_PENDING_IDS`, which made every persisted value
+ * non-empty by construction, so `[]` was unambiguously "unset" for every reader
+ * of the field. With the pin gone the guarantee is a rule in
+ * `ToolbarCustomizeSettings` (the last visible control cannot be hidden), and a
+ * rule in one component is not a guarantee about the field: the prefs write
+ * command for this field is reachable from every client, and
+ * the mobile client documents the opposite reading of the same value ("empty =
+ * show everything", `mobile/src/app/flows/editor/chrome/FormatBar.tsx`). What
+ * makes that tolerable is that the field is `PrefClass::DeviceLocal`, so a
+ * `[]` written on a phone cannot reach a desktop vault; what would NOT be
+ * tolerable is this comment claiming the stronger thing. Making `[]`
+ * unwritable everywhere is the alternative, and it would break the mobile
+ * reading; a nullable pref would have been a schema change to buy a state ("a
+ * formatting toolbar with no formatting") nobody wants.
  */
 export function resolveToolbarHidden(stored: readonly string[]): string[] {
-  const base = stored.length > 0 ? stored : EDITOR_TOOLBAR_DEFAULT_HIDDEN;
-  return [...new Set([...base, ...EDITOR_TOOLBAR_PENDING_IDS])];
+  return stored.length > 0 ? [...new Set(stored)] : [...EDITOR_TOOLBAR_DEFAULT_HIDDEN];
 }
 
 /** Label-key lookup for a toolbar item id (the Settings customization list). */

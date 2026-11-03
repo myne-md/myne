@@ -1607,6 +1607,47 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "components/toast/auto-tag-report",
+    group: "components",
+    surface: "Toast",
+    state: "auto-tag-report",
+    description:
+      "Automatic tagging's own report, in the shared stack where it now lives: the tags it wrote and the action that removes exactly those. The copy is the catalogue's, `notes.autoTag.applied` with `notes.autoTag.undo` as the action.",
+    tags: ["components", "toast", "auto-tag", "tags", "undo", "report", "transient"],
+    render: () => (
+      <ToastWithStack>
+        <Toast
+          message="Tags added: Notes, account, delete"
+          testId="editor.auto-tag-applied"
+          action={{
+            label: "Undo",
+            onAction: action("undoAutoTag"),
+            testId: "editor.auto-tag-undo",
+          }}
+          onDone={action("onDone")}
+        />
+      </ToastWithStack>
+    ),
+  },
+  {
+    id: "components/toast/seed-saved-report",
+    group: "components",
+    surface: "Toast",
+    state: "seed-saved-report",
+    description:
+      "What the memory seed says once it has written, as the toast it is now: the count in the message, the entries in the panel behind it (myne-md/myne#970, item 11). The copy is the catalogue's `settings.memory.seed.applied`.",
+    tags: ["components", "toast", "memory", "seed", "saved", "success", "report"],
+    render: () => (
+      <ToastWithStack>
+        <Toast
+          message="Saved 3 entries to memory."
+          variant="success"
+          onDone={action("onDone")}
+        />
+      </ToastWithStack>
+    ),
+  },
+  {
     id: "components/toaster/default",
     group: "components",
     surface: "Toaster",
@@ -1973,6 +2014,46 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       <QuickUnlockEntry
         vaultId={FIXTURE_VAULT_ID}
         method="pin"
+        onUnlocked={action("onUnlocked")}
+        onUnavailable={action("onUnavailable")}
+      />
+    ),
+  },
+  {
+    // The biometric arm, which the PIN-primary story above cannot reach: with
+    // `method="pin"` the Touch ID button is not mounted at all, so the app's own
+    // wait (myne-md/myne#970, item 16) had no picture. The prompt never resolves in the
+    // fake host, which is exactly the state worth photographing.
+    id: "components/quickunlockentry/biometric",
+    group: "components",
+    surface: "QuickUnlockEntry",
+    state: "biometric",
+    description:
+      "The biometric arm of the same entry. The fake host answers the prompt immediately, so the catalogue shows the resting state; the wait the app states while the system sheet is up is asserted in unlock-quick-unlock-precedence.test.tsx rather than photographed here.",
+    tags: ["components", "quick-unlock", "biometric", "touch-id", "waiting", "locked"],
+    fixture: "locked",
+    render: () => (
+      <QuickUnlockEntry
+        vaultId={FIXTURE_VAULT_ID}
+        method="biometric"
+        onUnlocked={action("onUnlocked")}
+        onUnavailable={action("onUnavailable")}
+      />
+    ),
+  },
+  {
+    id: "components/quickunlockentry/waiting",
+    group: "components",
+    surface: "QuickUnlockEntry",
+    state: "waiting",
+    description:
+      "The same entry with the system biometric sheet up and unanswered. Myne states the wait and the way out, because the sheet is the security boundary and cannot be replaced; press the button to reach it, since the state only exists while a prompt is in flight.",
+    tags: ["components", "quick-unlock", "biometric", "touch-id", "waiting", "locked"],
+    fixture: "locked-biometric-pending",
+    render: () => (
+      <QuickUnlockEntry
+        vaultId={FIXTURE_VAULT_ID}
+        method="biometric"
         onUnlocked={action("onUnlocked")}
         onUnavailable={action("onUnavailable")}
       />

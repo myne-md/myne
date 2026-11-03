@@ -965,6 +965,24 @@ function PanelHint({ children }: { children: ReactNode }) {
  */
 const PROVIDER_OPENROUTER = providerLabelOf("openrouter") ?? "OpenRouter";
 const PROVIDER_OLLAMA_CLOUD = providerLabelOf("ollama-cloud") ?? "Ollama Cloud";
+// Two products of one operator, added with the desktop rows (myne-md/myne#970).
+// They share a host and differ by path, so the label names the PRODUCT.
+const PROVIDER_OPENCODE_ZEN = providerLabelOf("opencode-zen") ?? "OpenCode Zen";
+const PROVIDER_OPENCODE_GO = providerLabelOf("opencode-go") ?? "OpenCode Go";
+
+/** The wire names this build knows, and the one place the summary decides.
+ *
+ *  A stored provider outside this set reads as "None": the host treats it as no
+ *  provider, and a summary naming it would describe a selection the request path
+ *  ignores. Kept as one list so a new provider is one edit rather than two that
+ *  can disagree.
+ */
+const KNOWN_PROVIDERS: readonly string[] = [
+  "ollama-cloud",
+  "openrouter",
+  "opencode-zen",
+  "opencode-go",
+];
 
 /** What the root row says about AI without opening the panel.
  *
@@ -980,7 +998,7 @@ function aiSummary(prefs: PrefsView, t: TFunction): string {
   // A stored provider this build does not know reads as "None", not as its raw
   // wire value: the host treats it as no provider rather than guessing, and a
   // summary that named it would describe a selection the request path ignores.
-  if (provider !== "openrouter" && provider !== "ollama-cloud") {
+  if (!KNOWN_PROVIDERS.includes(provider)) {
     return t("settings.ai.providerNone");
   }
   return providerLabelOf(provider) ?? t("settings.ai.providerNone");
@@ -1089,6 +1107,18 @@ function AiPanel({
               on={provider === "ollama-cloud"}
               onToggle={() => onProvider(provider === "ollama-cloud" ? null : "ollama-cloud")}
               testId="settings.ai-provider-ollama-cloud"
+            />
+            <ToggleRow
+              title={PROVIDER_OPENCODE_ZEN}
+              on={provider === "opencode-zen"}
+              onToggle={() => onProvider(provider === "opencode-zen" ? null : "opencode-zen")}
+              testId="settings.ai-provider-opencode-zen"
+            />
+            <ToggleRow
+              title={PROVIDER_OPENCODE_GO}
+              on={provider === "opencode-go"}
+              onToggle={() => onProvider(provider === "opencode-go" ? null : "opencode-go")}
+              testId="settings.ai-provider-opencode-go"
             />
           </Group>
           <PanelHint>{t("settings.ai.providerHelper")}</PanelHint>

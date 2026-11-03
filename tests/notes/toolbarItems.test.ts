@@ -3,8 +3,7 @@ import {
   EDITOR_TOOLBAR_DEFAULT_HIDDEN,
   EDITOR_TOOLBAR_DEFAULT_ORDER,
   EDITOR_TOOLBAR_ITEMS,
-  EDITOR_TOOLBAR_PENDING_IDS,
-  resolveToolbarHidden,
+    resolveToolbarHidden,
   resolveToolbarOrder,
   toolbarItemLabelKey,
 } from "../../src/notes/toolbarItems";
@@ -32,13 +31,12 @@ describe("resolveToolbarOrder", () => {
     expect(order).not.toContain("quote"); // hidden by default
   });
 
-  it("dropping a RENDERABLE id from `hidden` reveals it (add a button)", () => {
+  it("dropping an id from `hidden` reveals it (add a button)", () => {
     // Hide `italic`, then drop it from the stored hidden set again — through the
-    // normalization helper, as both consumers do. The pending (not-yet-rendered)
-    // ids are pinned and can NOT be revealed this way; see the pinning suite.
-    const withItalicHidden = resolveToolbarHidden([...EDITOR_TOOLBAR_PENDING_IDS, "italic"]);
+    // normalization helper, as both consumers do.
+    const withItalicHidden = resolveToolbarHidden(["italic", "quote"]);
     expect(resolveToolbarOrder([], withItalicHidden)).not.toContain("italic");
-    const revealed = resolveToolbarHidden([...EDITOR_TOOLBAR_PENDING_IDS]);
+    const revealed = resolveToolbarHidden(["quote"]);
     expect(resolveToolbarOrder([], revealed)).toContain("italic");
   });
 
@@ -55,33 +53,26 @@ describe("resolveToolbarOrder", () => {
   });
 });
 
-// The MYND-336 follow-up gap: five vocabulary ids the floating toolbar cannot
-// render yet are PINNED hidden by `resolveToolbarHidden`, so no stored layout
-// can demand a button the toolbar would silently drop — and the empty-means-
-// unset prefs fallback stays unambiguous (a real stored value always carries
-// at least the pinned ids, so `[]` can only mean "never customized").
-describe("resolveToolbarHidden (pinned not-yet-renderable ids)", () => {
+// The pin is GONE (issue #970, item 1): all five list/quote/wikilink commands
+// render now, so a stored layout that reveals one is honoured rather than
+// overridden. What replaced the pin's second job (keeping the empty-means-unset
+// fallback unambiguous) is Settings refusing to hide the last visible control,
+// asserted in `tests/settings/toolbarCustomize.test.tsx`.
+describe("resolveToolbarHidden", () => {
   it("empty stored value = unset → the default hidden set", () => {
     expect(resolveToolbarHidden([])).toEqual([...EDITOR_TOOLBAR_DEFAULT_HIDDEN]);
   });
 
-  it("unions a stored value with the pending ids (no duplicates)", () => {
-    const resolved = resolveToolbarHidden(["italic", "quote"]);
-    expect(resolved).toContain("italic");
-    for (const id of EDITOR_TOOLBAR_PENDING_IDS) {
-      expect(resolved.filter((x) => x === id)).toHaveLength(1);
-    }
-  });
-
-  it("a stored value that tries to reveal a pending id does NOT lift the pin", () => {
+  it("a stored value that reveals a formerly-pending id IS honoured", () => {
     const stored = EDITOR_TOOLBAR_DEFAULT_HIDDEN.filter((id) => id !== "quote");
     const shown = resolveToolbarOrder([], resolveToolbarHidden(stored));
-    expect(shown).not.toContain("quote");
+    expect(shown).toContain("quote");
   });
 
-  it("every pending id is in the vocabulary", () => {
-    const ids = new Set(EDITOR_TOOLBAR_ITEMS.map((i) => i.id));
-    for (const id of EDITOR_TOOLBAR_PENDING_IDS) expect(ids.has(id)).toBe(true);
+  it("de-duplicates a stored value", () => {
+    const resolved = resolveToolbarHidden(["italic", "italic", "quote"]);
+    expect(resolved.filter((x) => x === "italic")).toHaveLength(1);
+    expect(resolved).toContain("quote");
   });
 });
 

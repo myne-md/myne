@@ -499,12 +499,13 @@ export function AgentReview({
           // pieces read as one row.
           alignItems: "center",
           gap: "var(--space-3)",
-          // **Even insets, and a little more of them.** The first compact pass
-          // used `space-3` on the top and bottom against `space-4` on the sides,
-          // which reads as a header that was squeezed rather than laid out; this
-          // is the same padding on all four sides, matching the rows and the
-          // footer so the card has one vertical rhythm instead of three.
-          padding: "var(--space-4)",
+          // **One inset for the whole card** (issue #970, on the user's read:
+          // "the side padding is too much, it should match the top and the
+          // bottom"). The header had space-4 while the rows and the footer had
+          // space-2 vertically and space-3 on the sides, which is why the card
+          // read as three different margins stacked. Every block now carries
+          // space-3 on all four sides; the only asymmetry left is inside a row.
+          padding: "var(--space-3)",
           borderBottom: "1px solid var(--line-1)",
         }}
       >
@@ -687,9 +688,22 @@ export function AgentReview({
         className="myne-review-region"
         style={{
           display: "flex",
+          // **The two acts share one line, and they shrink before they stack**
+          // (issue #970, item 13, twice). The first pass forbade a break inside a
+          // label, which stopped "Reject / all 2" but only moved the problem: the
+          // row still exceeded the panel's width, so `flexWrap` put the whole
+          // primary act on a line of its own and the user read the pair as
+          // stacked, not side by side. A footer with exactly two closing acts
+          // does not wrap at all: the row is `nowrap`, both buttons may shrink
+          // (`minWidth: 0` and a content basis), and the space between them is a
+          // spacer that absorbs the slack rather than a `space-between` that
+          // keeps the gap fixed while the labels fight for the rest.
+          flexWrap: "nowrap",
           alignItems: "center",
           gap: "var(--space-2)",
-          padding: "var(--space-2) var(--space-3)",
+          // Equal on all four sides, per the same read: the side inset was wider
+          // than the vertical one, which pushed the pair in from the card's edge.
+          padding: "var(--space-3)",
           borderTop: "1px solid var(--line-1)",
         }}
       >
@@ -710,7 +724,10 @@ export function AgentReview({
             {t("agent.review.undo")}
           </Button>
         ) : null}
-        <span style={{ flex: 1 }} />
+        {/* `flex: 1` with a zero basis, so it eats the slack when there is room
+            and disappears when there is not (a `flex: 1` spacer with a content
+            basis keeps a line of its own and pushes both acts down). */}
+        <span style={{ flex: "1 1 0", minWidth: 0 }} />
         <Button
           variant="ghost"
           // **Gated on "the proposal holds anything", not on the edit rows**
@@ -745,6 +762,7 @@ export function AgentReview({
             onClose();
           }}
           data-testid="agentReview.rejectAll"
+          style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
         >
           {/* **The count, like the sibling control has** (myne-md/myne#894, from
               review). This is the one act that drops the whole proposal, it is
@@ -765,6 +783,7 @@ export function AgentReview({
           disabled={busy || !hasApprovedWork}
           onClick={() => void approveAll()}
           data-testid="agentReview.approveAll"
+          style={{ whiteSpace: "nowrap", flex: "0 1 auto", minWidth: 0 }}
         >
           {t("agent.review.approveAll", { count: approveAllCount })}
         </Button>
@@ -933,6 +952,12 @@ function EditRowView({
             flex: 1,
             minWidth: 0,
             fontSize: "var(--text-sm)",
+            // Medium, not regular (issue #970, on the user's read: "the Replace
+            // 2 lines part is not very legible"). This span and the recessed diff
+            // under it are the two halves of one sentence, and at regular weight
+            // beside a ghost button the row read as a control group whose caption
+            // happened to be text.
+            fontWeight: "var(--weight-medium)",
             color: "var(--fg-1)",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -1045,6 +1070,24 @@ function EditRowView({
             mode={narrow ? "unified" : "split"}
             leftLabel={t("agent.review.diffCurrent")}
             rightLabel={t("agent.review.diffProposed")}
+            // **The narrow card gives the diff its width back** (issue #970, on
+            // the user's read: "the Replace 2 lines part is not very legible").
+            // The component's own inset is `space-3 space-5`, which is right in a
+            // full-width snapshot panel and eats 40 of a 340px chat column's
+            // pixels on a surface whose whole job is showing a wrapped sentence.
+            // A recessed block rather than bare text, so the old and the new line
+            // read as one change instead of two lines drifting between rules.
+            style={
+              narrow
+                ? {
+                    padding: "var(--space-2) var(--space-3)",
+                    background: "var(--bg-2)",
+                    border: "1px solid var(--line-1)",
+                    borderRadius: "var(--radius-2)",
+                    lineHeight: 1.6,
+                  }
+                : undefined
+            }
           />
         )
       ) : null}

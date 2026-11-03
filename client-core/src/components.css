@@ -1204,6 +1204,16 @@
   background: transparent;
 }
 
+/* `frame={false}` (issue #970, item 4): the state sits inside a surface that is
+   already a bordered region, so the card's own border drew a rounded box inside
+   a panel, which reads as a dialog nobody can dismiss. The WASH stays: it is
+   what keeps the state reading as a destination rather than as a caption. */
+.myne-empty[data-frame="false"] {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
 .myne-empty[data-size="lg"] { padding: var(--space-8) var(--space-5); }
 .myne-empty[data-size="lg"] .myne-empty__glyph { width: 56px; height: 56px; }
 .myne-empty[data-size="lg"] .myne-empty__title { font-size: var(--text-xl); }

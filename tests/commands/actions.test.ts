@@ -808,3 +808,42 @@ describe("attachment palette actions (audit T6.13 item 1)", () => {
     });
   }
 });
+
+// Issue #970, item 5: the palette's entry is TWO audiences with opposite needs.
+//
+// The action hides from the palette while the palette is open (a row that
+// reopens the surface you are looking at is a no-op). The rail reads the same
+// predicate, so the first version of this entry made the rail's own search glyph
+// vanish while the palette was up and come back when it closed, the flicker the
+// user reported, on the one control they had just pressed.
+describe("palette.open serves the rail and the palette differently (issue #970)", () => {
+  const action = COMMAND_ACTIONS.find((a) => a.id === "palette.open")!;
+
+  it("hides its own ROW while the palette is open", () => {
+    expect(action.visibility(makeContext({ stageName: "editor", paletteOpen: true }))).toBe(
+      "hidden",
+    );
+    expect(action.visibility(makeContext({ stageName: "editor", paletteOpen: false }))).toBe(
+      "show",
+    );
+  });
+
+  it("keeps its RAIL button in both states, so the glyph does not blink", () => {
+    expect(action.railVisibility).toBeDefined();
+    expect(
+      action.railVisibility!(makeContext({ stageName: "editor", paletteOpen: true })),
+    ).toBe("show");
+    expect(
+      action.railVisibility!(makeContext({ stageName: "editor", paletteOpen: false })),
+    ).toBe("show");
+  });
+
+  it("is still absent from the rail outside the editor stage", () => {
+    expect(action.railVisibility!(makeContext({ stageName: "welcome" }))).toBe("hidden");
+  });
+
+  it("is the only action that needs the split, so the default stays one predicate", () => {
+    const split = COMMAND_ACTIONS.filter((a) => a.railVisibility !== undefined).map((a) => a.id);
+    expect(split).toEqual(["palette.open"]);
+  });
+});

@@ -32,9 +32,12 @@ import {
   openPalette,
   openSettings,
   runPaletteAction,
+  selectSettingsTopic,
+  typeIntoEditor,
   unlockToEditor,
 } from "./../support/flows";
 import { testIdSelector, type Session } from "./../support/webdriver";
+import { KEY, pressKey } from "./../support/keyboard";
 
 const OUT_DIR = join(REPO_ROOT, "e2e", "artifacts", "ui-pass");
 interface FrameRecord {
@@ -42,9 +45,48 @@ interface FrameRecord {
   what: string;
   ok: boolean;
   note?: string;
+  /**
+   * Set when the frame could not be photographed in THIS build for a reason that
+   * is not a defect, and the reason is stated. It is deliberately not `ok: true`:
+   * a pass whose summary claims a frame that does not exist is how a PR ends up
+   * citing evidence nobody can open. `skipped` frames are named in the PR body
+   * with their reason.
+   */
+  skipped?: string;
 }
 
 const frames: FrameRecord[] = [];
+
+/**
+ * Why the reviewed-vault seed frames (60 to 63) cannot be photographed in this
+ * build, or `null` when they can. The card is gated on the same `ready` the chat
+ * notice is (AI on and a model resolved), so a build with no inference stub
+ * never draws it, and four red frames would say "broken" about a surface that is
+ * correctly absent.
+ */
+let seedUnavailable: string | null = null;
+
+/**
+ * `MYNE_UI_PASS_FRAMES=70,71` runs only the frames whose name starts with one of
+ * those tokens, and skips every other frame's SETUP too.
+ *
+ * It exists because iterating on one stubborn frame otherwise costs the whole
+ * pass: the run is ~6 minutes of app driving before the frame under repair is
+ * even reached, which turns a two-line fix into an afternoon. Empty (the
+ * default, and what CI and a release run) means "every frame".
+ */
+// `process` is read through a narrow cast rather than typed: this file is inside
+// `tsconfig.tests.json`'s trees, which carry no `@types/node`, and importing the
+// node typings for one environment variable would move every other error in the
+// tree with it (`scripts/check-test-typecheck.mjs` counts per file).
+const RAW_FRAME_FILTER: string =
+  (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+    ?.MYNE_UI_PASS_FRAMES ?? "";
+const ONLY: string[] = RAW_FRAME_FILTER.split(",")
+  .map((t: string) => t.trim())
+  .filter((t: string) => t.length > 0);
+const wanted = (name: string): boolean =>
+  ONLY.length === 0 || ONLY.some((prefix) => name.startsWith(prefix));
 
 async function capture(session: Session, name: string, what: string): Promise<void> {
   const png = await session.screenshot();
@@ -61,18 +103,68 @@ async function frame(
   what: string,
   build: () => Promise<void>,
 ): Promise<void> {
+  if (!wanted(name)) return;
   try {
     await build();
     await capture(session, name, what);
   } catch (e) {
-    frames.push({ name, what, ok: false, note: String(e).slice(0, 200) });
+    // A frame that already recorded itself as skipped (see `skipFrame`) must not
+    // also land as a red entry: the summary would then claim a failure the run
+    // explained.
+    const message = String(e);
+    if (message.startsWith("Error: skip:")) return;
+    frames.push({ name, what, ok: false, note: message.slice(0, 200) });
     // eslint-disable-next-line no-console
-    console.warn(`[ui-pass] FAIL ${name} — ${String(e).slice(0, 160)}`);
+    console.warn(`[ui-pass] FAIL ${name}: ${message.slice(0, 160)}`);
   }
+}
+
+/**
+ * A frame the build cannot show, with the reason recorded rather than a failure.
+ *
+ * Only for a surface whose ABSENCE is a property of the capture build (a model
+ * the build does not define, an AI opt-in the harness cannot perform), never for
+ * a frame that is merely hard to reach, and those must stay red so somebody fixes
+ * them.
+ */
+function skipFrame(name: string, what: string, reason: string): void {
+  if (!wanted(name)) return;
+  frames.push({ name, what, ok: false, skipped: reason });
+  // eslint-disable-next-line no-console
+  console.warn(`[ui-pass] SKIP ${name}: ${reason}`);
+}
+
+/**
+ * Put the AI chat panel on screen, for real.
+ *
+ * The palette's `ai.open-chat` only sets the ACTIVE right-panel tab, so on a
+ * collapsed rail it changes a preference nothing is drawing and the frame
+ * photographs the editor with the panel's DOM still in the tree: the wait then
+ * passes on a hidden element and the frame is a false pass (this happened, and
+ * `72-ai-chat-notice` shipped a picture of the selection toolbar). So open the
+ * rail through its own toggle first, then click the tab that only exists once the
+ * rail is open, then wait for the panel's body.
+ */
+async function openAiChat(s: Session): Promise<void> {
+  const toggle = await s.waitForElement(
+    testIdSelector("editor.sidebar-toggle", { "data-side": "right" }),
+    { timeoutMs: 15_000 },
+  );
+  if ((await toggle.attribute("data-collapsed")) === "true") await toggle.click();
+  const tab = await s.waitForElement(
+    testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "ai-chat" }),
+    { timeoutMs: 15_000 },
+  );
+  await tab.click();
+  await s.byTestId("ai.chat-tab", { timeoutMs: 20_000 });
 }
 
 /** Best-effort setup step: richness, never a blocker. */
 async function safe(label: string, run: () => Promise<void>): Promise<void> {
+  // A setup step can be tagged with the frame it exists for (`"70: open a
+  // note"`), and then it is skipped with that frame under MYNE_UI_PASS_FRAMES.
+  const tag = label.split(":")[0].trim();
+  if (ONLY.length > 0 && /^\d/.test(tag) && !wanted(tag)) return;
   try {
     await run();
   } catch (e) {
@@ -162,6 +254,19 @@ runner(
       );
 
       await dismissImporterOffer(s);
+
+      // ── The sidebar's zero state (issue #970, item 4) ─────────────────
+      // Seeded vault, nothing written yet: this is the one moment the list is
+      // empty, and it is reachable only here, before any frame creates a note.
+      await frame(
+        s,
+        "02a-sidebar-empty",
+        "The notes sidebar on a vault with no notes: the icon, the accent wash " +
+          "and two words, with no card, no paragraph and no button.",
+        async () => {
+          await sleep(900);
+        },
+      );
 
       // ── The shell ─────────────────────────────────────────────────────
       // Through the palette rather than the sidebar's create menu: the same
@@ -273,6 +378,19 @@ runner(
           await sleep(1200);
         },
       );
+      // The Limits topic, where the chat-history budget lives (issue #970,
+      // item 3). Its own frame because the unset state of that field is the
+      // whole complaint: a blank box with a native stepper and no reading.
+      await frame(
+        s,
+        "11b-ai-limits",
+        "Settings → AI → Limits: the chat-history budget field, whose unset " +
+          "state names the number it stands for instead of rendering empty.",
+        async () => {
+          await selectSettingsTopic(s, "ai", "limits");
+          await sleep(900);
+        },
+      );
       await safe("close settings", async () => {
         await closeSettings(s);
         await sleep(500);
@@ -348,6 +466,172 @@ runner(
       );
 
 
+      // ── The polish pass (myne-md/myne#970) ────────────────────────────
+      //
+      // What this section can and cannot photograph is stated here rather than
+      // discovered in a PR body. Reachable in this container: the floating
+      // toolbar, the customize list, the chat notice, the provider picker and
+      // the diagnostics panel. NOT reachable, with the mechanism that blocks a
+      // driver rather than an excuse: the Touch ID waiting state (no biometric
+      // device in a headless WebKitGTK seat), the agent approval card's footer
+      // (needs a model that proposes an edit), and the auto-tag toast (needs the
+      // same model). Those three are covered by their unit specs and named in
+      // the PR body as not photographed.
+      // **The palette frame above leaves the palette OPEN**, and every click
+      // below it would land on the overlay: the first run of this block timed
+      // out on five frames in a row for exactly that reason, starting with
+      // "no editor content node" on a tab that was there. Close it, then put a
+      // real note on screen, because the tab left active is the empty start
+      // page (frame 07).
+      await safe("70: close the palette and open a note", async () => {
+        await pressKey(s, KEY.ESCAPE);
+        await sleep(300);
+        await runPaletteAction(s, "note.new", "new note");
+        await s.byTestId("editor.content", { timeoutMs: 15_000 });
+        await sleep(600);
+      });
+
+      await frame(
+        s,
+        "70-selection-toolbar",
+        "The floating selection toolbar as a fresh vault draws it: block type, the " +
+          "four inline marks, highlight, link and export-as-image, grouped and icon-led. " +
+          "The list and wikilink controls start switched OFF (they are addable in " +
+          "Settings), which is what `71-settings-toolbar` is about.",
+        async () => {
+          // **`typeIntoEditor`, not a click plus `sendKeys`.** A note created by
+          // `note.new` is empty, and since myne-md/myne#945 the promoted title is
+          // a `<textarea>` that grows to the wrapped title, so the CENTRE of
+          // `.cm-content` falls inside the title field on a short note: the raw
+          // click focused the title, the payload became the note's NAME, the
+          // body stayed empty, and the selection below was empty too. That is
+          // why this frame waited out its budget for a `.cm-toolbar` that was
+          // correctly absent. `typeIntoEditor` clicks a body LINE and probes the
+          // keystroke pipeline, which is the same lesson its own header records.
+          await typeIntoEditor(s, "Selected text for the toolbar.");
+          const [content] = await s.findElements(
+            testIdSelector("editor.content") + " .cm-content",
+          );
+          if (content === undefined) throw new Error("no editor content node");
+          await content.sendKeys(KEY.HOME);
+          await content.sendKeys(KEY.SHIFT + KEY.END);
+          await s.waitForElement(".cm-toolbar", { timeoutMs: 20_000 });
+          await sleep(600);
+        },
+      );
+
+      await frame(
+        s,
+        "71-settings-toolbar",
+        "Settings → Editor → Formatting toolbar: every control in the vocabulary " +
+          "is a live toggle, and the last visible one refuses to switch off.",
+        async () => {
+          // **Escape FIRST, in the editor, and never inside the modal.** The
+          // selection toolbar from frame 70 is still up and paints over the
+          // settings modal, so it has to go; but Escape inside the modal closes
+          // the MODAL, which is how the previous version of this frame left
+          // `settings.toolbar-customize` stale and took frame 72 down with it.
+          await pressKey(s, KEY.ESCAPE);
+          await sleep(300);
+          await openSettings(s, "editor");
+          // The list lives in the panel's `editing` TOPIC, not on the tab's
+          // default one, so a bare `openSettings("editor")` photographs a
+          // different section entirely.
+          await selectSettingsTopic(s, "editor", "editing");
+          let list;
+          try {
+            list = await s.waitForElement(testIdSelector("settings.toolbar-customize"), {
+              timeoutMs: 20_000,
+            });
+          } catch (e) {
+            // The list is unconditional in `EditorPanel`'s `editing` topic, so
+            // its absence means the topic body rendered something ELSE (or threw).
+            // Dump what the modal actually holds rather than re-running blind.
+            const ids = await s.execute<string>(
+              "return JSON.stringify(Array.from(document.querySelectorAll('[data-testid]'))" +
+                ".map(function (n) { return n.getAttribute('data-testid'); })" +
+                ".filter(function (v) { return v.indexOf('settings.') === 0; }));",
+            );
+            console.log(`[ui-pass] 71 settings testids: ${ids}`);
+            throw e;
+          }
+          // **The list sits far below the fold on this topic**, so the frame used
+          // to photograph Vim mode and the preview while its caption described a
+          // list that was not in the picture. Centring it is what makes the
+          // picture match the caption.
+          await list.scrollIntoView();
+          await sleep(700);
+        },
+      );
+
+      await frame(
+        s,
+        "72-ai-chat-notice",
+        "The chat panel's privacy notice as one line plus a link to the full text.",
+        async () => {
+          await closeSettings(s);
+          // The palette action, not the right-panel tab. The tab only exists
+          // while the rail is OPEN and AI is enabled, and the frame before this
+          // one left Settings over the editor: clicking a tab the rail has not
+          // drawn is what timed out here, twice, while the panel was fine.
+          // `ai.open-chat` is the route `e2e/ai-chat.e2e.ts` takes.
+          await openAiChat(s);
+          // The notice and its CTA are gated on `ready` (AI on AND a model
+          // resolved), which this capture build does not reach: it defines no
+          // `local-inference-stub` and has no real model, so the panel opens in
+          // its degraded state and the sentence is correctly absent. Recorded as
+          // skipped with that reason rather than as a red frame, because the
+          // product is behaving and the evidence is what is unavailable here.
+          try {
+            await s.waitForElement(testIdSelector("ai.honesty-note"), { timeoutMs: 8_000 });
+          } catch {
+            skipFrame(
+              "72-ai-chat-notice",
+              "The chat panel's privacy notice as one line plus a link to the full text.",
+              "the notice renders only when AI is enabled and no model is degraded; " +
+                "this capture build defines no inference stub, so the panel is in its degraded state",
+            );
+            throw new Error("skip: no ready AI surface in this build");
+          }
+          await sleep(600);
+        },
+      );
+
+      await frame(
+        s,
+        "73-ai-providers",
+        "Settings → AI: the provider picker open, showing all four rows, two of " +
+          "them the OpenCode products that share one host.",
+        async () => {
+          await openSettings(s, "ai");
+          const trigger = await s.waitForElement(testIdSelector("ai.provider-choice"), {
+            timeoutMs: 20_000,
+          });
+          await trigger.scrollIntoView();
+          await trigger.click();
+          await s.waitForElement(
+            testIdSelector("ai.provider-choice-option", { "data-value": "opencode-go" }),
+            { timeoutMs: 10_000 },
+          );
+          await sleep(400);
+        },
+      );
+
+      await frame(
+        s,
+        "74-diagnostics",
+        "Settings → Diagnostics: the engine label resolved from the real user agent, " +
+          "and the desktop caveat on the storage figures.",
+        async () => {
+          await openSettings(s, "diagnostics");
+          await sleep(1200);
+        },
+      );
+      await safe("close settings", async () => {
+        await closeSettings(s);
+        await sleep(400);
+      });
+
       // ── The reviewed vault seed (myne-md/myne#915) ────────────────────
       // The card needs the floor of ten live notes, so the frames come last.
       // They are gated on the earlier AI opt-in because the card's own gate
@@ -358,10 +642,19 @@ runner(
       // the scope screen and the candidate frame is skipped rather than
       // failing the pass. The E2E suite runs the same path against the stub.
       if (aiReady) {
-      await safe("ten notes for the card's floor", async () => {
+      // **Titled, not just created.** `createNote` (the E2E helper) is not
+      // available to this spec: it goes through `clickNewItem`, which the merge
+      // base this pass also photographs does not have. The palette verb exists on
+      // both. Each note then gets a body line, so the note is real content rather
+      // than an empty tab and its title is not "Untitled" ten times over. The
+      // sidebar collapses identical titles into one row, and a vault whose ten
+      // notes render as one row reads as one note to anything counting them.
+      await safe("60: ten notes for the card's floor", async () => {
         for (let i = 0; i < 10; i += 1) {
           await runPaletteAction(s, "note.new", "new note");
-          await sleep(120);
+          await sleep(300);
+          await typeIntoEditor(s, `seed note ${i} alpha7k2m9qx4w8e5rj0`);
+          await sleep(200);
         }
       });
 
@@ -370,12 +663,26 @@ runner(
         "60-seed-card",
         "The chat zero state's once-only offer: AI on, memory empty, enough notes to distil.",
         async () => {
-          const tab = await s.waitForElement(
-            testIdSelector("editor.right-panel-tab", { "data-panel-tab-id": "ai-chat" }),
-            { timeoutMs: 20_000 },
-          );
-          await tab.click();
-          await s.byTestId("ai.seed-card", { timeoutMs: 25_000 });
+          await openAiChat(s);
+          // Measure the floor rather than assume it: the card's gate is AI on, no
+          // degraded model, memory empty AND at least ten live notes, and three of
+          // those four are the pass's own doing. A skip that says "the build" when
+          // the pass created nine notes sends the next reader to the wrong file.
+          const notes = (await s.byTestIdAll("notes.row")).length;
+          try {
+            await s.byTestId("ai.seed-card", { timeoutMs: 25_000 });
+          } catch {
+            seedUnavailable =
+              `the seed card renders only when AI is on, no model is degraded, memory is ` +
+              `empty and the vault holds at least ten live notes; this pass left ${notes} ` +
+              `note row(s) on screen and the card did not appear`;
+            skipFrame(
+              "60-seed-card",
+              "The chat zero state's once-only offer: AI on, memory empty, enough notes to distil.",
+              seedUnavailable,
+            );
+            throw new Error("skip: seed card unavailable in this build");
+          }
           await sleep(500);
         },
       );
@@ -385,7 +692,15 @@ runner(
         "61-seed-scope",
         "Teach Myne your vault, step one: provider, counts, excluded notes and the real payload.",
         async () => {
-          await (await s.byTestId("ai.seed-card-start")).click();
+          // **The Settings door, not the once-only card.** Both open the same
+          // wizard, and the card is gated on four things at once (AI on, no
+          // degraded model, memory empty, ten live notes) of which the pass only
+          // controls two. These three frames are the evidence for the wizard's own
+          // surfaces, so they enter through the door that has no such gate:
+          // Settings → AI → Advanced → "Teach Myne your vault".
+          await openSettings(s, "ai");
+          await selectSettingsTopic(s, "ai", "advanced");
+          await (await s.byTestId("settings.memory.seed.open", { timeoutMs: 20_000 })).click();
           await s.byTestId("settings.memory.seed.scope", { timeoutMs: 20_000 });
           await (await s.byTestId("settings.memory.seed.toggle-payload")).click();
           await sleep(600);
@@ -406,15 +721,27 @@ runner(
       await frame(
         s,
         "63-seed-memory",
-        "The Memory panel after a reviewed seed: the From your vault group and its date.",
+        "The Memory panel after a reviewed seed: the From your vault group and its date, " +
+          "with the count reported by a toast instead of a Saved step.",
         async () => {
           await (await s.byTestId("settings.memory.seed.apply")).click();
-          await s.byTestId("settings.memory.seed.done", { timeoutMs: 30_000 });
-          await (await s.byTestId("settings.memory.seed.finish")).click();
+          // myne-md/myne#970 item 11: the wizard closes on apply and the count
+          // is a toast, so the frame waits for the wizard to be GONE rather
+          // than for a `done` step that no longer exists.
+          await s.waitUntil(
+            async () => ((await s.byTestIdAll("settings.memory.seed.scope")).length === 0 ? true : null),
+            { label: "the seed wizard to close on apply", timeoutMs: 30_000 },
+          );
           await openSettings(s, "ai");
-          await s.waitForElement(testIdSelector("settings.memory.seed-group"), {
+          await selectSettingsTopic(s, "ai", "advanced");
+          const group = await s.waitForElement(testIdSelector("settings.memory.seed-group"), {
             timeoutMs: 20_000,
           });
+          // The Memory group sits below the fold on this topic, so the frame
+          // photographed the toast and left the thing the frame is ABOUT off
+          // screen. Centring it is what makes the picture match its caption: the
+          // toast is transient, the group and its date are the evidence.
+          await group.scrollIntoView();
           await sleep(600);
         },
       );

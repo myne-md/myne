@@ -1344,10 +1344,6 @@
           "empty": "Summaries, answers and suggestions appear here as you ask for them.",
           "error": "The AI request could not be completed.",
           "errorTurn": "The assistant could not answer.",
-          "noticeLeaves": "The words you type, the notes a turn reads, the titles, identifiers and folder paths of every note the run may read (the whole vault minus your excluded folders, unless you narrow it), the text Myne extracted from any files you attach to a message (up to four, each cut at 20,000 characters; the file itself stays here), and what the AI remembers about you are sent to whatever is answering. Nothing else on this device is sent.",
-          "noticeReceiver": "It is answering: {{provider}}, which Myne does not run.",
-          "noticeReceiverLocal": "It is answering: a program running on this device. Nothing leaves the machine, but that program is not part of Myne and Myne cannot see what it does with them.",
-          "noticeRevoke": "To stop it, switch AI off in Settings, or change what is answering there. Revoking a provider key stops that provider immediately.",
           "noticeSettingsCta": "Open AI settings",
           "insert": "Insert into note",
           "noAnswer": "No answer. Try rephrasing.",
@@ -1656,6 +1652,7 @@
     "toolbar": {
       "apply": "Apply",
       "exportImageTitle": "Export selection as image",
+      "label": "Formatting",
       "customize": {
         "bold": "Bold",
         "bulletList": "Bullet list",
@@ -1693,7 +1690,8 @@
         "brown": "Brown",
         "grey": "Grey",
         "indigo": "Indigo",
-        "remove": "Remove highlight"
+        "remove": "Remove highlight",
+        "colours": "Highlight colour"
       },
       "urlPlaceholder": "Paste link URL"
     },
@@ -1803,7 +1801,6 @@
       "noMatchingNotes": "No matching notes",
       "noNotesYet": "No notes yet",
       "noMatchBody": "Nothing matches “{{name}}”. Edit the view or clear it to see all notes.",
-      "emptyBody": "Tap “New note” to write your first note. Everything is encrypted on this device before it is stored.",
       "unarchive": "Unarchive"
     },
     "filterSheet": {
@@ -2465,7 +2462,6 @@
       "bulkMove_other": "Move {{count}} notes to…",
       "caseMergeBody": "A folder named “{{name}}” already exists. These will merge. Rename one to keep them separate?",
       "color": "Color…",
-      "createFirstNote": "Create your first note",
       "createFolderNote": "Create folder note",
       "customize": "Customize…",
       "delete": "Delete",
@@ -2476,7 +2472,6 @@
       "deleteFolderWarning": "The notes move to Trash. You can restore them later.",
       "duplicate": "Duplicate",
       "editFilterTitle": "Edit filter",
-      "emptyBody": "Notes are plain markdown, encrypted on this device before they go anywhere. Create one to start, or press the search row above to run any command.",
       "emptyState": "No notes yet",
       "favoritesHeading": "Favorites",
       "icon": "Icon…",
@@ -3760,12 +3755,14 @@
       "on": "On"
     },
     "toolbarCustomize": {
+      "errorLoad": "Could not read your current toolbar layout, so these rows are read-only until you reopen this panel.",
       "errorSave": "Could not save the toolbar layout.",
       "helper": "Choose which formatting buttons appear on the selection toolbar, and their order.",
       "label": "Toolbar buttons",
+      "lastShownHint": "Keep at least one",
+      "lastHiddenHint": "Keep at least one hidden",
       "moveDown": "Move down",
-      "moveUp": "Move up",
-      "pendingHint": "Coming soon"
+      "moveUp": "Move up"
     },
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion, unless you turn on the row below.",
@@ -4044,17 +4041,13 @@
         "rebuildConfirm": "Replace the seed from {{date}} ({{count}} entries)?",
         "title": "Teach Myne your vault",
         "candidatesTitle": "Review what Myne learned",
-        "doneTitle": "Saved",
         "close": "Close",
         "loading": "Reading your vault…",
         "scopeIntro": "Myne reads the shape of your vault first: note titles, folders and tags. It asks for note text only if it needs it, and never for attachments.",
         "provider": "Provider: {{provider}}",
-        "providerRemote": "remote",
-        "providerLocal": "on this device",
-        "counts": "{{notes}} notes · {{folders}} folders · {{tags}} tags",
         "estimatedChars": "About {{chars}} characters",
-        "excluded": "{{count}} notes left out because their folder is excluded from AI",
-        "omitted": "{{count}} titles omitted to fit the model's context",
+        "excluded_one": "{{count}} note left out because its folder is excluded from AI",
+        "excluded_other": "{{count}} notes left out because their folder is excluded from AI",
         "showPayload": "Show exactly what will be sent",
         "hidePayload": "Hide the payload",
         "consentLabel": "Send this outline to {{provider}} (about {{chars}} characters). I understand the provider receives it.",
@@ -4070,9 +4063,6 @@
         "apply": "Save {{count}} entries",
         "applying": "Saving…",
         "applied": "Saved {{count}} entries to memory.",
-        "appliedHelper": "Find them under From your vault in this section. The assistant reads them from now on.",
-        "finish": "Done",
-        "appliedToast": "Memory built from your vault.",
         "refusals": {
           "empty": "This entry is empty.",
           "textTooLong": "This entry is over the 2000-character limit.",
@@ -4105,7 +4095,14 @@
         "removeAll": "Remove all",
         "removeConfirm": "Remove all entries from this seed?",
         "removedToast": "Entries from your vault removed.",
-        "rowStale": "Vault changed since this seed"
+        "rowStale": "Vault changed since this seed",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_other": "{{count}} tags"
       }
     },
     "network": {
@@ -5212,7 +5209,9 @@
       "unlockWithTouchId": "Unlock with Touch ID",
       "wrongCredential": "Incorrect. {{remaining}} attempt(s) left.",
       "showPin": "Show PIN",
-      "hidePin": "Hide PIN"
+      "hidePin": "Hide PIN",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Recovery flow was interrupted. Set a new password first.",
     "recoveryInterruptedBody": "Set a new password first, then re-seal your vault.",

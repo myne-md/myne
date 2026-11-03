@@ -37,6 +37,27 @@ export type SyncStatus =
 /** Status-poll cadence for the indicator (ms). Cheap read-only command. */
 const STATUS_POLL_MS = 5000;
 
+/** Whether this device is actually syncing notes.
+ *
+ *  `disabled` (no endpoint) and `not_enrolled` (an endpoint, this device not on
+ *  it) both mean nothing is being pushed, so a per-note "the server does not
+ *  have this" mark says nothing about the note and a screenful of them says
+ *  nothing about the vault (myne-md/myne#970, from review of the sidebar
+ *  screenshots). `pending` DOES count: the device is enrolled and waiting on an
+ *  approval, so its edits really are not on the server yet, which is exactly
+ *  what the mark claims. `null` (no read yet) counts as inactive for the same
+ *  reason the §11.3 conflict guard treats it that way: fail toward showing
+ *  nothing rather than lighting a column of marks at boot.
+ *
+ *  Lives beside the status union rather than inside a consumer because three
+ *  surfaces ask the question (`NoteList`, and twice in `Editor`), and the day
+ *  one of them answers it differently is the day the sidebar and the save
+ *  readout disagree about the same note. */
+export function isSyncActive(status: SyncStatus | null): boolean {
+  if (status === null) return false;
+  return status.state !== "disabled" && status.state !== "not_enrolled";
+}
+
 export interface SyncStatusHook {
   /** The current status; `null` until the first read resolves. */
   status: SyncStatus | null;

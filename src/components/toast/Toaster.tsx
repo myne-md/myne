@@ -194,7 +194,7 @@ function ToastRow({
             type="button"
             className="myne-toast__action"
             onClick={item.action.onAction}
-            data-testid="editor.toast-action"
+            data-testid={item.action.testId ?? "editor.toast-action"}
           >
             {item.action.label}
           </button>

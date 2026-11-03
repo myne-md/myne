@@ -65,14 +65,27 @@ describe("diagnostic block", () => {
     expect(text).not.toMatch(/message|stack|at .*\(/i);
   });
 
-  it("reports an absent value as `unknown` rather than as an empty field", () => {
-    // A blank after a colon reads as "there is nothing there"; `unknown` reads
-    // as "this client could not tell you", which is the true statement on a
-    // desktop build with no served bundle.
-    const text = buildDiagnostics({ ...INPUTS, commit: null, bundleHash: null, storageUsedMb: null });
-    expect(text).toContain("commit: unknown");
-    expect(text).toContain("bundleHash: unknown");
-    expect(text).toContain("storageUsedMb: unknown");
+  // Issue #970, item 15. A desktop block carried four `unknown`s out of nine
+  // lines, which reads as an app that cannot read its own state. A reading the
+  // client cannot take is now ABSENT: the absence says the same thing once, and
+  // the panel no longer owes a paragraph explaining its own output.
+  it("omits a reading the client cannot take, rather than printing a placeholder", () => {
+    const text = buildDiagnostics({
+      ...INPUTS,
+      commit: null,
+      bundleHash: null,
+      storageUsedMb: null,
+      storageQuotaMb: null,
+      engine: null,
+    });
+    for (const gone of ["commit", "bundleHash", "storageUsedMb", "storageQuotaMb", "engine"]) {
+      expect(text, `${gone} is a placeholder, not a measurement`).not.toContain(`${gone}:`);
+    }
+    expect(text).not.toContain("unknown");
+    // The rest of the block is untouched: a dropped reading is not a dropped
+    // report, and the failure code is the line a maintainer came for.
+    expect(text).toContain("failureCode: worker-fatal");
+    expect(text.split("\n")).toHaveLength(4);
   });
 
   it("is a flat readable list, not JSON", () => {
@@ -113,7 +126,60 @@ describe("engine label", () => {
     expect(label).not.toContain("Android");
   });
 
-  it("says `unknown` rather than guessing", () => {
-    expect(engineLabel("some-crawler/1.0")).toBe("unknown");
+  // Issue #970, item 14. The block said `engine: unknown` on BOTH desktop
+  // hosts, because neither UA carries a `Version/… Safari` pair or a Chrome
+  // token: macOS WKWebView and Linux WebKitGTK send `AppleWebKit/<ver>` and
+  // nothing else the five rules above recognise. The app's two primary desktop
+  // surfaces reported no engine at all.
+  it("names the WebView a desktop build runs in, not the browser whose UA it borrows", () => {
+    const WKWEBVIEW =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+    const WEBKITGTK =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko)";
+    expect(engineLabel(WKWEBVIEW, "WKWebView")).toBe("WKWebView 605");
+    expect(engineLabel(WEBKITGTK, "WebKitGTK")).toBe("WebKitGTK 605");
+    // iOS WKWebView, which adds a `Mobile/… Safari/604.1` tail but still no
+    // `Version/`.
+    expect(
+      engineLabel(
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Safari/604.1",
+        "WKWebView",
+      ),
+    ).toBe("WKWebView 605");
+  });
+
+  // The first attempt at this item named the WebView only as a LAST rule, so a
+  // WebKitGTK view (which sends a real `Version/… Safari/…` tail) still matched
+  // the Safari rule first and the desktop app reported itself as Safari. The
+  // host argument is checked before every UA rule for that reason.
+  it("does not call a WebKitGTK build Safari, whatever its UA claims", () => {
+    const GTK_SAFARI_SHAPED =
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/60.0 Safari/605.1.15";
+    expect(engineLabel(GTK_SAFARI_SHAPED, "WebKitGTK")).toBe("WebKitGTK 605");
+    expect(engineLabel(GTK_SAFARI_SHAPED)).toBe("Safari 60");
+  });
+
+  it("names WebView2 for the Windows host, from the Chromium token", () => {
+    const WEBVIEW2 =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36 Edg/140.0.0.0";
+    expect(engineLabel(WEBVIEW2, "WebView2")).toBe("WebView2 140");
+    expect(engineLabel(WEBVIEW2, "Android WebView")).toBe("Android WebView 537");
+  });
+
+  it("still prefers the specific engine over WebKit", () => {
+    // The rule above is last on purpose: every Chromium UA carries
+    // `AppleWebKit/537.36`, so a WebKit rule placed anywhere earlier would
+    // relabel every Chrome and Edge user.
+    expect(
+      engineLabel(
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36",
+      ),
+    ).toBe("Chrome 140");
+  });
+
+  it("returns null rather than guessing", () => {
+    // `null`, not the word "unknown": the caller omits the line, so a pasted
+    // block never carries a field that says nothing (issue #970, item 15).
+    expect(engineLabel("some-crawler/1.0")).toBeNull();
   });
 });

@@ -59,7 +59,8 @@ export type IconName =
   | "download"
   | "link"
   | "columns-2"
-  | "rotate-ccw";
+  | "rotate-ccw"
+  | "archive";
 
 // Stroke-based 24×24 paths (Lucide-style), drawn with currentColor so callers
 // set colour via `color`. Matches the design's thin-stroke icon language.
@@ -111,6 +112,11 @@ const PATHS: Record<IconName, string> = {
   link: "M10 13a5 5 0 007 0l3-3a5 5 0 00-7-7l-1 1|M14 11a5 5 0 00-7 0l-3 3a5 5 0 007 7l1-1",
   "columns-2": "M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z|M12 3v18",
   "rotate-ccw": "M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8|M3 3v5h5",
+  // The Archive list's zero state (myne-md/myne#970 item 25). The desktop draws
+  // Lucide's `archive`; this registry stores stroke `d` strings only, so the
+  // box's rounded `<rect>` is expressed as its four sides. Same shape, same
+  // 24-grid, so the two clients name the absent thing with the same glyph.
+  archive: "M3 6h18|M8 6V4h8v2|M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8|M10 12h4",
 };
 
 export function Icon({

@@ -1324,10 +1324,6 @@
           "copyFailed": "Kopyalanamadı",
           "copyYourMessage": "Mesajınızı kopyala",
           "emptyTitle": "Notlarınız hakkında sorun",
-          "noticeLeaves": "Yazdığınız sözcükler, bir turun okuduğu notlar, çalışmanın okuyabileceği her notun başlıkları, kimlikleri ve klasör yolları (dışarıda bıraktığınız klasörler hariç tüm kasa), bir mesaja eklediğiniz dosyalardan Myne’in çıkardığı metin (en fazla dört, her biri 20.000 karakterde kesilir; dosyanın kendisi burada kalır) ve yapay zekann sizin hakkınızda hatırladıkları, yanıt veren şeye gönderilir. Bu cihazdaki başka hiçbir şey gönderilmez.",
-          "noticeReceiver": "Yanıtlayan: {{provider}}; bunu Myne işletmez.",
-          "noticeReceiverLocal": "Yanıtlayan: bu cihazda çalışan bir program. Makineden hiçbir şey çıkmaz, ancak bu program Myne'in bir parçası değildir ve Myne onlarla ne yaptığını göremez.",
-          "noticeRevoke": "Durdurmak için Ayarlar'dan yapay zekayı kapatın ya da orada yanıtlayanı değiştirin. Bir sağlayıcı anahtarını iptal etmek o sağlayıcıyı hemen durdurur.",
           "noticeSettingsCta": "Yapay zeka ayarlarını aç",
           "viewDiff": "Değişiklikleri görüntüle",
           "revertRun": "Bu çalıştırmayı geri al",
@@ -1743,7 +1739,6 @@
       "noMatchingNotes": "Eşleşen not yok",
       "noNotesYet": "Henüz not yok",
       "noMatchBody": "“{{name}}” ile hiçbir şey eşleşmiyor. Tüm notları görmek için görünümü düzenleyin ya da temizleyin.",
-      "emptyBody": "İlk notunuzu yazmak için “Yeni not”a dokunun. Her şey saklanmadan önce bu cihazda şifrelenir.",
       "unarchive": "Arşivden çıkar"
     },
     "filterSheet": {
@@ -2465,7 +2460,6 @@
       "bulkMove_other": "{{count}} notu şuraya taşı…",
       "caseMergeBody": "“{{name}}” adında bir klasör zaten var. Bunlar birleşecek. Ayrı tutmak için birini yeniden adlandırmak ister misiniz?",
       "color": "Renk…",
-      "createFirstNote": "İlk notunuzu oluşturun",
       "createFolderNote": "Klasör notu oluştur",
       "customize": "Özelleştir…",
       "delete": "Sil",
@@ -2523,7 +2517,6 @@
       "treeLabel": "Notlar ve klasörler",
       "selectionAnnouncement": "{{title}} seçildi",
       "untitled": "Adsız",
-      "emptyBody": "Notlar düz markdown'dır ve bir yere gitmeden önce bu cihazda şifrelenir. Başlamak için bir tane oluşturun ya da herhangi bir komutu çalıştırmak için yukarıdaki arama satırına basın.",
       "search": "Ara"
     },
     "newFromTemplate": {
@@ -4306,17 +4299,11 @@
         "rebuildConfirm": "{{date}} tarihli seed ({{count}} kayıt) değiştirilsin mi?",
         "title": "Myne'e vault'ını öğret",
         "candidatesTitle": "Myne'in öğrendiklerini gözden geçir",
-        "doneTitle": "Kaydedildi",
         "close": "Kapat",
         "loading": "Vault'ın okunuyor…",
         "scopeIntro": "Myne önce vault'ının şeklini okur: not başlıkları, klasörler ve etiketler. Not metnini yalnızca ihtiyaç duyarsa ister; ekleri hiç istemez.",
         "provider": "Sağlayıcı: {{provider}}",
-        "providerRemote": "uzak",
-        "providerLocal": "bu cihazda",
-        "counts": "{{notes}} not · {{folders}} klasör · {{tags}} etiket",
         "estimatedChars": "Yaklaşık {{chars}} karakter",
-        "excluded": "Klasörü AI'dan hariç tutulduğu için {{count}} not dışarıda bırakıldı",
-        "omitted": "Modelin bağlamına sığsın diye {{count}} başlık atlandı",
         "showPayload": "Tam olarak ne gönderileceğini göster",
         "hidePayload": "Yükü gizle",
         "consentLabel": "Bu taslağı {{provider}} sağlayıcısına gönder (yaklaşık {{chars}} karakter). Sağlayıcının bunu alacağını anlıyorum.",
@@ -4332,9 +4319,6 @@
         "apply": "{{count}} kaydı kaydet",
         "applying": "Kaydediliyor…",
         "applied": "{{count}} kayıt hafızaya kaydedildi.",
-        "appliedHelper": "Bunları bu bölümdeki Vault'ından bölümünde bulacaksın. Asistan bundan sonra onları okur.",
-        "finish": "Tamam",
-        "appliedToast": "Vault'ından hafıza oluşturuldu.",
         "refusals": {
           "empty": "Bu kayıt boş.",
           "textTooLong": "Bu kayıt 2000 karakter sınırını aşıyor.",
@@ -4367,7 +4351,14 @@
         "removeAll": "Tümünü kaldır",
         "removeConfirm": "Bu seed'den gelen tüm kayıtlar kaldırılsın mı?",
         "removedToast": "Vault'ından gelen kayıtlar kaldırıldı.",
-        "rowStale": "Bu seed'den sonra vault değişti"
+        "rowStale": "Bu seed'den sonra vault değişti",
+        "providerLocalName": "Provider: on this device",
+        "countNotes_one": "{{count}} note",
+        "countNotes_other": "{{count}} notes",
+        "countFolders_one": "{{count}} folder",
+        "countFolders_other": "{{count}} folders",
+        "countTags_one": "{{count}} tag",
+        "countTags_other": "{{count}} tags"
       }
     },
     "account": {
@@ -5100,7 +5091,9 @@
       "unlockWithTouchId": "Touch ID ile kilidi aç",
       "wrongCredential": "Yanlış. {{remaining}} deneme kaldı.",
       "showPin": "PIN'i göster",
-      "hidePin": "PIN'i gizle"
+      "hidePin": "PIN'i gizle",
+      "waitingForTouchId": "Waiting for Touch ID…",
+      "waitingForTouchIdHint": "Answer the system prompt to unlock. If no prompt appears, use your password instead."
     },
     "recoveryInterruptedBanner": "Kurtarma akışı yarıda kesildi. Önce yeni bir parola belirleyin.",
     "recoveryInterruptedBody": "Önce yeni bir parola belirleyin, ardından kasanızı yeniden mühürleyin.",

@@ -575,8 +575,8 @@ pub struct PrefsView {
 
     /// The **remote AI provider** the user named, or `None` for the default — which is not "off"
     /// but **unreachable**: with no provider selected there is no remote code path to reach
-    /// (`decisions.md` 2026-08-09). A closed value, stored as its wire string: `"ollama-cloud"` or
-    /// `"openrouter"`. Kept as a `String` rather than an enum because this codec is `no_std`
+    /// (`decisions.md` 2026-08-09). A closed value, stored as its wire string: `"ollama-cloud"`,
+    /// `"openrouter"`, `"opencode-zen"` or `"opencode-go"` (`decisions/ai/0773`). Kept as a `String` rather than an enum because this codec is `no_std`
     /// canonical JSON and an unknown value must decode to *something* a newer client wrote; the
     /// host validates it against its own registry and treats an unrecognized name as no provider.
     ///
@@ -12024,6 +12024,177 @@ mod tests {
             dump.as_bytes(),
         )
         .expect("write consent-scope prefs vectors dump");
+    }
+
+    /// Generator for the OpenCode provider pair (appended to the companion
+    /// repo's `vault-prefs` family; per-feature generator, keeps the published
+    /// cases byte-stable), pinning the two wire values `decisions/ai/0773` added
+    /// to the CLOSED `ai_provider` set, `"opencode-zen"` and `"opencode-go"`.
+    ///
+    /// The set is closed and an independent port enumerates it, so a value that
+    /// exists only in the reference implementation's `from_wire` is a value a
+    /// port cannot accept. `encrypt-ai-provider-opencode` carries the `go`
+    /// value with its device-scoped consent, and its predicate block answers
+    /// the two gate questions for BOTH new names plus a cross-provider negative,
+    /// so "one host, two providers" is pinned as behaviour rather than as prose.
+    ///
+    /// Nonce `0xFC`: not used by any other generator in this module, so this
+    /// case's ciphertext shares no byte with theirs. (The parenthetical this
+    /// comment used to carry claimed `0x77..0xFB` were all taken, which is
+    /// arithmetically false: 36 nonces are in use here and the range has 133
+    /// values. The claim that matters is the one above.)
+    ///
+    /// `cargo test -p protocol --lib emit_opencode_provider_prefs_vectors -- --ignored`
+    #[test]
+    #[ignore]
+    fn emit_opencode_provider_prefs_vectors() {
+        extern crate std;
+
+        let root_a: [u8; 32] = [0x42; 32];
+        let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+        let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+        let nonce: [u8; AEAD_NONCE_LEN] = [0xFC; AEAD_NONCE_LEN];
+
+        // Built by the grammar function, not written as a literal: change the
+        // suffix and this fixture changes with it instead of asserting a string
+        // nothing produces any more (the `emit_ai_consent_scope_prefs_vectors`
+        // discipline, applied to the new wire name).
+        let consent = device_scoped_consent("opencode-go");
+        assert_eq!(consent.as_str(), "opencode-go@device");
+        assert!(consent_is_device_scoped(
+            Some(consent.as_str()),
+            "opencode-go"
+        ));
+        assert!(!consent_is_legacy(Some(consent.as_str()), "opencode-go"));
+
+        // Same neighbours as the `openrouter` pair, so a port can diff the two
+        // DECRYPTED views and account for every difference: THREE values move
+        // (`ai_provider`, `ai_provider_consent` and `ai_provider_model`), and the
+        // sealed blobs share nothing at all because each is sealed under its own
+        // nonce. Stated precisely because the earlier wording claimed the provider
+        // name was the only value that moved, which a port that diffed the
+        // plaintext would find untrue (myne-md/myne#972 review, D4).
+        let view = PrefsView {
+            ai_excluded_folders: alloc::vec![String::from("Private/")],
+            ai_provider: Some(String::from("opencode-go")),
+            ai_provider_consent: Some(consent.clone()),
+            ai_provider_key: Some(Zeroizing::new(String::from("sk-vector-fixture-000"))),
+            ai_provider_model: Some(String::from("kimi-k3")),
+            archive_disabled: Some(true),
+            ..PrefsView::default()
+        };
+        let canonical = canonical_json_encode(&view);
+        assert_eq!(
+            canonical.as_slice(),
+            br#"{"ai_excluded_folders":["Private/"],"ai_provider":"opencode-go","ai_provider_consent":"opencode-go@device","ai_provider_key":"sk-vector-fixture-000","ai_provider_model":"kimi-k3","archive_disabled":true,"screen_capture_protection":true}"#.as_slice(),
+            "a longer wire name must not move the field out of its canonical slot",
+        );
+        let blob = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &view, &nonce)
+            .expect("encode opencode-go provider");
+        let back = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob).expect("decode");
+        assert_eq!(back, view);
+
+        let mut dump = alloc::string::String::new();
+        dump.push_str("[\n");
+        dump.push_str("  {\n");
+        dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/encrypt-ai-provider-opencode\",\n");
+        dump.push_str("    \"description\": \"The two OpenCode wire values (myne-md/myne#970, decisions/ai/0773). `ai_provider` is a CLOSED set, so a value the reference implementation accepts but this enum omits is a value an independent port cannot accept at all; the case carries `opencode-go`, the subscription plan, with its device-scoped consent. Zen and Go are products of one operator that share the host `opencode.ai` and are told apart by base PATH alone, so the destination is still not in the blob: both are compiled-in client constants. Neighbours are the ones encrypt-ai-provider pins, so a port can diff the two DECRYPTED views and account for every difference: exactly three values move (`ai_provider`, `ai_provider_consent`, `ai_provider_model`), while the sealed blobs share no byte because each is sealed under its own nonce. Generated by `cargo test -p protocol --lib emit_opencode_provider_prefs_vectors -- --ignored` (in protocol/src/prefs.rs).\",\n");
+        dump.push_str("    \"case_kind\": \"encrypt\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_prefs_nonce_hex\": \"{}\",\n",
+            hex_lower(&nonce)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"informational_prefs_key_hex\": \"{}\",\n",
+            hex_lower(&*prefs_key_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_prefs_blob_hex\": \"{}\"\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str("  },\n");
+        dump.push_str("  {\n");
+        dump.push_str("    \"vector_id\": \"vault-prefs/v0.1/decrypt-ai-provider-opencode\",\n");
+        dump.push_str("    \"description\": \"Round-trip with encrypt-ai-provider-opencode, plus the consent PREDICATE for both new names. The gate compares the stored value against the provider about to receive the text, so `opencode-zen@device` is not a consent for `opencode-go` even though one host serves both: an approval for one product must not open the other, which is the whole reason they are two wire values rather than one. The bare `opencode-go` entry is the legacy shape the gate refuses.\",\n");
+        dump.push_str("    \"case_kind\": \"decrypt_ok\",\n");
+        dump.push_str(&alloc::format!(
+            "    \"input_blob_hex\": \"{}\",\n",
+            hex_lower(&blob)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_root_key_hex\": \"{}\",\n",
+            hex_lower(&root_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"input_account_number_hash_hex\": \"{}\",\n",
+            hex_lower(&account_hash_a)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_plaintext_canonical_utf8_hex\": \"{}\",\n",
+            hex_lower(&canonical)
+        ));
+        dump.push_str(&alloc::format!(
+            "    \"expected_consent_device_suffix\": \"{}\",\n",
+            CONSENT_DEVICE_SUFFIX
+        ));
+        dump.push_str("    \"expected_consent_predicate\": [\n");
+        for (stored, provider) in [
+            (consent.as_str(), "opencode-go"),
+            ("opencode-go", "opencode-go"),
+            ("opencode-zen@device", "opencode-go"),
+            ("opencode-go@device", "opencode-zen"),
+        ] {
+            dump.push_str("      {\n");
+            dump.push_str(&alloc::format!(
+                "        \"stored\": \"{}\",\n        \"provider_wire\": \"{}\",\n",
+                stored,
+                provider
+            ));
+            dump.push_str(&alloc::format!(
+                "        \"expected_consent_is_device_scoped\": {},\n        \"expected_consent_is_legacy\": {}\n",
+                consent_is_device_scoped(Some(stored), provider),
+                consent_is_legacy(Some(stored), provider)
+            ));
+            dump.push_str("      },\n");
+        }
+        // Trim the trailing comma of the last predicate entry.
+        while dump.ends_with(",\n") {
+            dump.truncate(dump.len() - 2);
+            dump.push('\n');
+        }
+        dump.push_str("    ],\n");
+        dump.push_str("    \"expected_prefs_view\": {\n");
+        dump.push_str("      \"ai_excluded_folders\": [\"Private/\"],\n");
+        dump.push_str("      \"ai_provider\": \"opencode-go\",\n");
+        dump.push_str(&alloc::format!(
+            "      \"ai_provider_consent\": \"{}\",\n",
+            consent
+        ));
+        dump.push_str("      \"ai_provider_key\": \"sk-vector-fixture-000\",\n");
+        dump.push_str("      \"ai_provider_model\": \"kimi-k3\",\n");
+        dump.push_str("      \"archive_disabled\": true,\n");
+        dump.push_str("      \"screen_capture_protection\": true\n");
+        dump.push_str("    }\n");
+        dump.push_str("  }\n");
+        dump.push_str("]\n");
+
+        std::fs::write(
+            "/tmp/myne_vault_prefs_opencode_provider_vectors.json",
+            dump.as_bytes(),
+        )
+        .expect("write opencode-provider prefs vectors dump");
     }
 
     /// Generator for the `device_names` vector pair (appended to the companion

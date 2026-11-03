@@ -2675,37 +2675,39 @@ export function PaneView({
         panelId={panelDomId}
       />
       {/* Automatic tagging reports what it wrote, and offers the inverse
-          (myne-md/myne#908). It sits above the note, in the band's own row of
-          the layout, because an automatic write must never be invisible: the
-          row names the tags and the undo removes exactly those. RAM-only and
-          note-scoped, so switching notes drops it, matching the suggestion
-          set's lifetime. */}
-      {autoAppliedRow !== null && autoAppliedRow.noteId === activeId ? (
-        <div
-          data-testid="editor.auto-tag-applied"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "var(--space-2)",
-            padding: "var(--space-1) var(--space-3)",
-            fontFamily: "var(--font-sans)",
-            fontSize: "var(--text-xs)",
-            color: "var(--fg-3)",
-            borderBottom: "1px solid var(--line-1)",
-          }}
-        >
-          <span>
-            {t("notes.autoTag.applied", { tags: autoAppliedRow.tags.join(", ") })}
-          </span>
-          <Button
-            variant="ghost"
-            onClick={handleUndoAutoApplied}
-            data-testid="editor.auto-tag-undo"
-          >
-            {t("notes.autoTag.undo")}
-          </Button>
-        </div>
-      ) : null}
+          (myne-md/myne#908).
+
+          **As a toast, not a bar** (issue #970, item 7). It used to be a strip
+          in the band's own layout row, above the note: a 28px band that pushed
+          the whole document down for six seconds and then pulled it back, on a
+          surface whose entire job is holding a caret in place. The report is
+          transient feedback with an action, which is exactly what the shared
+          toast stack exists for: the same surface that reports a failed write
+          two hundred lines below, in the same place on screen, with the same
+          pause-on-hover and dismissal rules.
+
+          The report itself is not weakened: the row names the tags and the
+          action removes exactly those, and the tags remain visible in the note's
+          properties afterwards, so the write is not invisible when the toast
+          leaves. RAM-only and note-scoped, so switching notes drops it, matching
+          the suggestion set's lifetime. */}
+      <Toast
+        message={
+          autoAppliedRow !== null && autoAppliedRow.noteId === activeId
+            ? t("notes.autoTag.applied", { tags: autoAppliedRow.tags.join(", ") })
+            : null
+        }
+        // `editor.auto-tag-applied` and `editor.auto-tag-undo` are kept as the
+        // ids the scenario and the specs already reach for: the surface moved,
+        // its identity in a test did not.
+        testId="editor.auto-tag-applied"
+        action={{
+          label: t("notes.autoTag.undo"),
+          onAction: handleUndoAutoApplied,
+          testId: "editor.auto-tag-undo",
+        }}
+        onDone={() => setAutoAppliedRow(null)}
+      />
       <div
         ref={outlineScrollerRef}
         // The pane body is the strip's `role="tabpanel"` (myne#728). Without

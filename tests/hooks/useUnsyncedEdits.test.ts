@@ -33,6 +33,14 @@ vi.mock("../../src/platform/event", () => ({
     return () => listeners.delete(ev);
   },
 }));
+/** The device's sync state, driven per test. `isSyncActive` stays the shipped
+ *  function: the rule under test is which states count, and re-implementing it
+ *  here would pin a copy of the rule rather than the rule. */
+const syncState = { value: { state: "idle" } as { state: string } };
+vi.mock("../../src/hooks/useSyncStatus", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/hooks/useSyncStatus")>()),
+  useSyncStatus: () => ({ status: syncState.value, syncNow: async () => {}, busy: false }),
+}));
 
 async function mount() {
   const { useUnsyncedEdits } = await import("../../src/hooks/useUnsyncedEdits");
@@ -43,6 +51,7 @@ beforeEach(() => {
   invoke.mockReset();
   listeners.clear();
   vi.resetModules();
+  syncState.value = { state: "idle" };
 });
 
 afterEach(() => {
@@ -131,5 +140,34 @@ describe("useUnsyncedEdits", () => {
     await waitFor(() => expect(invoke).toHaveBeenCalled());
     expect(result.current.unsyncedIds.size).toBe(0);
     expect(result.current.tracking).toBe(false);
+  });
+});
+
+describe("useUnsyncedEdits on a client that is not syncing (myne-md/myne#970)", () => {
+  it("marks nothing while sync is disabled, even though every note has no baseline", async () => {
+    syncState.value = { state: "disabled" };
+    invoke.mockResolvedValue({ note_ids: ["a", "b", "c"], tracking: true });
+    const { result } = await mount();
+    await waitFor(() => expect(invoke).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.unsyncedIds.size).toBe(0);
+    expect(result.current.tracking).toBe(false);
+  });
+
+  it("marks nothing while the device is not enrolled, which is the screenful of marks the owner reported", async () => {
+    syncState.value = { state: "not_enrolled" };
+    invoke.mockResolvedValue({ note_ids: ["a", "b"], tracking: true });
+    const { result } = await mount();
+    await waitFor(() => expect(invoke).toHaveBeenCalled());
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.unsyncedIds.size).toBe(0);
+  });
+
+  it("still marks them once sync is on, because that is when the claim is true", async () => {
+    syncState.value = { state: "idle" };
+    invoke.mockResolvedValue({ note_ids: ["a", "b"], tracking: true });
+    const { result } = await mount();
+    await waitFor(() => expect(result.current.unsyncedIds.size).toBe(2));
+    expect(result.current.tracking).toBe(true);
   });
 });
