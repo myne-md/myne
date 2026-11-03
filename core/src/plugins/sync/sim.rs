@@ -29,6 +29,13 @@
 //! and the `NTV6` vault this one builds is deliberately not a template for
 //! widening the harness.
 //!
+//! The second is `a_joining_device_ends_up_authenticating_with_its_own_credential`
+//! (myne-md/myne#957). It builds **no vault at all**: it drives the person plane only, and every
+//! fact it asserts is a server one. A pending device is issued no token, the approval is a registry
+//! state, the credential is installed over an authed route, and the login that follows is a real
+//! SCRAM handshake whose verifier the server must already hold. A stub could answer all four and
+//! prove nothing, which is the failure this harness exists to avoid.
+//!
 //! WHY THIS EXISTS. The pre-existing two-device tests (`orchestrator.rs` tests,
 //! `e2e/sync-replication.e2e.ts`) feed the engine its *idealized* inputs — a
 //! direct `note_update`, the *correct* `deleted:`-marker tombstone encoding — and

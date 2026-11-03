@@ -107,9 +107,17 @@
         "count": 1,
         "reason": "Test fixture asserting the vault record after adoption carries the person credential's id."
       },
+      "assert!(cleared.device_id_hex.is_empty());": {
+        "count": 1,
+        "reason": "Test fixture for carry_device_facts: asserts a DIFFERENT person's record is cleared, which is the security half of that function. No identity is chosen here."
+      },
       "assert!(st.device_id_hex.is_none(), \"the fixture starts unseeded\");": {
         "count": 1,
         "reason": "Test fixture asserting its own starting state: the vault record is empty so the adoption has something to do."
+      },
+      "assert_eq!(kept.device_id_hex, a.device_id_hex);": {
+        "count": 1,
+        "reason": "Test fixture for carry_device_facts: asserts the SAME person keeps the credential's device id. It compares two records the test built itself and decides nothing about which device this is."
       },
       "if st.device_id_hex.is_none() {": {
         "count": 1,
