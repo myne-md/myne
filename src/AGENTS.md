@@ -30,7 +30,7 @@ Self-hosted fonts: Inter Variable + JetBrains Mono in `public/fonts/` (commit 40
 User-facing strings go through **react-i18next**, not hardcoded JSX. Source language is **English**; catalogs live at repo-root `locales/<lang>/common.json` and are bundled by `src/i18n/index.ts` (no HTTP backend). Translations are **authored in-repo, by hand** — the repository owns every catalog; the self-hosted Weblate instance was retired in `docs/decisions/ui/0629`. See `docs/dev/i18n.md` for the full workflow and `decisions.md` 2026-06-25 for the rationale.
 
 - In components: `const { t } = useTranslation();` → `t("welcome.createCta")`. Outside React: `import i18n from "src/i18n"` → `i18n.t(...)`.
-- Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. The non-English catalogs are edited in this repo too; a new English string lands absent in them and renders the English fallback until it is translated (`docs/dev/i18n.md` "Adding a translation").
+- Add a key → `pnpm i18n:extract` → fill the **English** value in `locales/en/common.json`. **Stop there.** Translation is the owner's own later pass, never part of the change that added the key (myne-md/myne#996); a new English string lands absent in the other catalogs and renders the English fallback until then (`docs/dev/i18n.md` "Adding a translation").
 - **Catalogs load lazily** — `import.meta.glob` without `eager`, so a session fetches only English plus the active locale. 31 full translations are ~7 MB of JSON; eager put all of them in the web client's first load. `src/i18n/index.ts` uses a **top-level await** to keep `main.tsx`'s "i18n initialises before any other module body runs" ordering; do not convert it to an exported promise.
 - **`locales/*/common.json` is NOT alphabetically ordered, and sorting it is never a cleanup.** Keys sit where the feature that added them put them, so a new key is inserted POSITIONALLY (next to its siblings) and the diff is additions-only. Sorting produces a whole-file rewrite across 32 catalogs, buries the actual change, and makes every later `git blame` on a string useless. When editing a catalog programmatically, parse with an order-preserving reader (`json.load(..., object_pairs_hook=OrderedDict)` or equivalent) and write back with the same 2-space indent, or the round trip alone reorders it.
 - **Do NOT i18n load-bearing copy** (`src/lib/load-bearing-copy.ts`): its exact English wording is a privacy property and is E2E-pinned by literal equality. Render the constant verbatim in every locale.
@@ -254,8 +254,10 @@ The real-IPC E2E suites (`e2e/`, tauri-driver — see `e2e/AGENTS.md` +
 `docs/dev/e2e.md`; and the deliberately thin browser lane `e2e-web/`)
 locate everything by `data-testid`. **A screen without testids is invisible to
 E2E — adding a user-facing flow means adding its testid pass in the same
-change.** Which lane owes a scenario is the root `AGENTS.md`'s call, not this
-file's: shared-tree flows go to `e2e/`, web-specific behaviour to `e2e-web/`.
+change.** A scenario is a separate, manual step the owner takes later, so the
+change owes the testids and not the scenario (myne-md/myne#996). Which lane a
+scenario belongs to when it is written is in `docs/dev/e2e.md`: shared-tree flows
+go to `e2e/`, web-specific behaviour to `e2e-web/`.
 
 - Naming: `<screen>.<element>` (`unlock.password-input`, `picker.vault-row`,
   `create.phrase-grid`). Repeated rows carry a discriminator attribute
