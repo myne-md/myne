@@ -126,15 +126,25 @@ aiDescribe("seed1 the once-only card seeds memory through the reviewed wizard", 
         // reports its own id ("remote") and the class was appended after it.
         // Both are asserted on the real screen because both are copy defects no
         // unit test can see rendered.
-        expect(
-          await (await s.byTestId("settings.memory.seed.count-notes")).textContent(),
-        ).toContain("notes");
-        expect(
-          await (await s.byTestId("settings.memory.seed.count-folders")).textContent(),
-        ).toContain("folders");
-        expect(
-          await (await s.byTestId("settings.memory.seed.count-tags")).textContent(),
-        ).toContain("tags");
+        //
+        // **The noun's NUMBER is not asserted, and that is the fix, not a
+        // weakening.** `i18next` picks the plural from the count
+        // (`countFolders_one` = "1 folder", `_other` = "2 folders"), so
+        // `.toContain("folders")` was an assertion about this fixture's payload
+        // rather than about the chip: with one folder in it the product said
+        // "1 folder" — correctly — and the spec went red
+        // (measured 2026-11-03, `MYNE_E2E_AI=1`, the seed card's first paint).
+        // Each chip is asserted as "a count and its noun", which is the claim the
+        // wizard actually makes.
+        const countChip = async (id: string, noun: string): Promise<void> => {
+          const text = (await (await s.byTestId(id)).textContent()).trim();
+          expect(text, `${id} states a count and its noun`).toMatch(
+            new RegExp(`^[\\d.,\\s\\u00a0]+ ?${noun}s?$`),
+          );
+        };
+        await countChip("settings.memory.seed.count-notes", "note");
+        await countChip("settings.memory.seed.count-folders", "folder");
+        await countChip("settings.memory.seed.count-tags", "tag");
         expect(
           await (await s.byTestId("settings.memory.seed.provider")).textContent(),
         ).toBe("Provider: on this device");

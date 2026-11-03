@@ -19,6 +19,7 @@ import { appendFileSync } from "node:fs";
 // element refs use the `element-6066-11e4-a52e-4f735466cecf` key.
 
 import { setTimeout as sleep } from "node:timers/promises";
+import { missingTestIdHint } from "./testid-census";
 
 const ELEMENT_KEY = "element-6066-11e4-a52e-4f735466cecf";
 
@@ -160,20 +161,14 @@ export class Element {
    *  hover-gated affordances `/click` rejects; prefer `click()` (which retries on
    *  transient non-interactability) for ordinary buttons/rows. */
   async actionClick(offsetX = 0, offsetY = 0): Promise<void> {
-    await this.session.send("POST", "/actions", {
+    const sequence = (origin: unknown, x: number, y: number) => ({
       actions: [
         {
           type: "pointer",
           id: "mouse",
           parameters: { pointerType: "mouse" },
           actions: [
-            {
-              type: "pointerMove",
-              duration: 0,
-              origin: { [ELEMENT_KEY]: this.elementId },
-              x: offsetX,
-              y: offsetY,
-            },
+            { type: "pointerMove", duration: 0, origin, x, y },
             { type: "pause", duration: 200 },
             { type: "pointerDown", button: 0 },
             { type: "pointerUp", button: 0 },
@@ -181,6 +176,44 @@ export class Element {
         },
       ],
     });
+    try {
+      await this.session.send(
+        "POST",
+        "/actions",
+        sequence({ [ELEMENT_KEY]: this.elementId }, offsetX, offsetY),
+      );
+    } catch (raw) {
+      // **WebKit 2.54 applies the interactability check to an ELEMENT origin's
+      // pointer move too**, which is the check this method exists to bypass
+      // (`element not interactable` raised by `/actions`, measured 2026-11-03 in
+      // `e2e/Dockerfile`'s seat against `heading-list-folding`). The W3C route
+      // that carries no element reference is a VIEWPORT coordinate, so the same
+      // gesture is re-sent from the element's own rect. Opacity was never the
+      // obstacle: a hover-revealed gutter marker is hit-testable, its centre is
+      // simply computed here instead of being looked up by the driver.
+      if (!/not interactable/i.test((raw as Error).message)) throw raw;
+      // The rect comes from the PAGE, not from `GET /rect`: the driver answers
+      // that one with the same refusal it gave the sequence above, so a fallback
+      // built on it fails one call later with the identical message (measured
+      // 2026-11-03: `element not interactable` from both the element-origin
+      // `/actions` and `GET /rect`, while the viewport-origin sequence the page's
+      // own rect feeds SUCCEEDS on the same node).
+      const rect = await this.session.execute<{ x: number; y: number; width: number; height: number }>(
+        "const el = arguments[0]; if (!el) return null; const r = el.getBoundingClientRect();" +
+          "return { x: r.x, y: r.y, width: r.width, height: r.height };",
+        [{ [ELEMENT_KEY]: this.elementId }],
+      );
+      if (rect === null || rect === undefined) throw raw;
+      await this.session.send(
+        "POST",
+        "/actions",
+        sequence(
+          "viewport",
+          Math.round(rect.x + rect.width / 2 + offsetX),
+          Math.round(rect.y + rect.height / 2 + offsetY),
+        ),
+      );
+    }
   }
 
   /** Double-click via the W3C Actions API — pointer move to the in-view centre,
@@ -629,19 +662,31 @@ export class Session {
     return value.map((v) => new Element(this, v[ELEMENT_KEY]));
   }
 
-  /** Poll until the selector matches; the harness's default lookup. */
-  waitForElement(cssSelector: string, opts?: FindOptions): Promise<Element> {
-    return this.waitUntil(
-      async () => {
-        try {
-          return await this.findElement(cssSelector);
-        } catch (e) {
-          if (e instanceof WebDriverError && e.code === "no such element") return null;
-          throw e;
-        }
-      },
-      { ...opts, label: `waitForElement(${cssSelector})` },
-    );
+  /** Poll until the selector matches; the harness's default lookup.
+   *
+   *  A timeout here appends {@link missingTestIdHint}: when the id is named
+   *  nowhere in the shared tree, the wait could never have succeeded and the
+   *  failure is a withdrawn affordance rather than a slow render. That hint is
+   *  what turns "45 s timeout on `welcome.join-cta`" into a one-line diagnosis
+   *  (measured: two days of red, 2026-11-01 to 2026-11-03). */
+  async waitForElement(cssSelector: string, opts?: FindOptions): Promise<Element> {
+    try {
+      return await this.waitUntil(
+        async () => {
+          try {
+            return await this.findElement(cssSelector);
+          } catch (e) {
+            if (e instanceof WebDriverError && e.code === "no such element") return null;
+            throw e;
+          }
+        },
+        { ...opts, label: `waitForElement(${cssSelector})` },
+      );
+    } catch (raw) {
+      const hint = missingTestIdHint(cssSelector);
+      if (hint === "") throw raw;
+      throw new Error(`${(raw as Error).message}${hint}`);
+    }
   }
 
   /** Poll until the selector matches nothing. */

@@ -110,8 +110,15 @@ describeE2E("ne1 no-attachments export is byte-verbatim (MYND-116)", () => {
         const exportParent = await s.waitForElement(
           testIdSelector("notes.context-menu-item", { "data-item-id": "export" }),
         );
-        expect(await exportParent.text()).toBe("Export…");
-        expect(await item.text()).toBe("Markdown");
+        // `textContent()`, not `text()`: WebDriver's `/text` reads the element's
+        // own text nodes through WebKit's render tree, which for a menu that has
+        // just opened answers `""` on the first read (the same split
+        // `e2e/AGENTS.md` records for a just-inserted banner, and the reason
+        // `waitForBannerText` exists). Measured 2026-11-03: `text()` returned
+        // `""` for a row whose `textContent` was `Export…`, in isolation and in a
+        // full run, on a menu that had opened milliseconds earlier.
+        expect(await exportParent.textContent()).toBe("Export…");
+        expect(await item.textContent()).toBe("Markdown");
         // Esc-dismiss WITHOUT selecting: clicking would open the native
         // save dialog WebDriver cannot drive (ne3 covers the UI path
         // with the dialog stubbed).

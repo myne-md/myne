@@ -12,9 +12,11 @@ import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { BETA_TERMS_VERSION } from "../../src/lib/load-bearing-copy";
 import { join } from "node:path";
 import { type AppSession, type LaunchOptions, launchApp } from "./session";
+import { testIdSelector } from "./webdriver";
 import type { EphemeralServer } from "./sync-server";
 import { seedVault } from "./fixtures";
 import {
+  clickByTestId,
   closeSettings,
   createNote,
   dismissImporterOffer,
@@ -75,7 +77,134 @@ export function syncConfigSeed(
   };
 }
 
-/** A saved HTTPS URL for UI-only scenarios. No server is contacted on read. */
+/**
+ * The joining device's half of a two-device fleet: join an existing account,
+ * then wait for the §6.3 compare.
+ *
+ * **The UI door this drives is gone, and the command behind it is not.**
+ * `welcome.join-cta` and the whole `join.*` modal were withdrawn on every client
+ * (`decisions/sync/0767`, commit 5624c67a), while `sync_join_account` survives on
+ * desktop for exactly the generations these suites seed — the ones with no person
+ * to invite (`MYV1`, `NTV5`, `NTV6`; `0767`'s "population rather than an
+ * oversight"). So the join goes through the same production IPC the deleted form
+ * called, from the page seat: real command, real ACL, no test hook — the shape
+ * `e2e/AGENTS.md` sanctions for a path whose affordance was withdrawn.
+ *
+ * Waiting for `welcome.join-cta` instead is what took every caller of
+ * `setupTwoSyncedDevices` down for two days: the id renders nowhere in `src/`,
+ * and `tests/screens/welcomeOneDoor.test.tsx` ASSERTS it is absent.
+ */
+export async function joinAccountDevice(
+  b: AppSession,
+  args: { serverUrl: string; accountNumber: string; password: string },
+): Promise<{ deviceIdHex: string }> {
+  await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
+  const join = await pageSeatInvoke(
+    b.session,
+    "plugin:sync|sync_join_account",
+    {
+      serverUrl: args.serverUrl,
+      accountNumber: args.accountNumber,
+      password: args.password,
+      confirmedFingerprint: null,
+    },
+    300_000,
+  );
+  if (join.err !== undefined) {
+    throw new Error(`setup: the join was refused: ${JSON.stringify(join.err)}`);
+  }
+  const result = join.ok as { device_id_hex?: string };
+  if (typeof result.device_id_hex !== "string") {
+    throw new Error("setup: the join returned no device id");
+  }
+  // The join materializes the account's real vault on this device. **It does not
+  // route this device to a compare screen, and it never did on desktop**: the
+  // awaiting-approval wait is gated out wherever a vault may be the only copy
+  // (`src/lib/pending-approval.ts`), because awaiting sync approval does not
+  // block local use there. The §6.3 compare is the APPROVING device's screen
+  // (`sync.approve-verify`), which `settleApproverCompare` closes.
+  await b.session.refresh();
+  return { deviceIdHex: result.device_id_hex };
+}
+
+/**
+ * Unlock the vault a join just materialized and land in its editor.
+ *
+ * A reload first, because the page-seat join changed the disk under a running
+ * boot probe: the app was on `welcome` and its stage knows nothing about a vault
+ * it did not create. The probe then routes to unlock, and the join's own password
+ * is the credential (the account join never holds the recovery phrase).
+ */
+/**
+ * Land in the vault a join just materialized.
+ *
+ * **Two states are correct, and the second one is not a workaround.** The join
+ * runs in the crash-free path and leaves the vault UNLOCKED: measured on this
+ * seat (2026-11-03), the reloaded device comes up straight in the editor of the
+ * joined vault, with the importer offer over it. A device that reloads later boot
+ * routes to unlock instead, which is the state a returning user sees. So this
+ * accepts whichever arrived rather than asserting one of them, and the
+ * assertion the suites actually need — that B holds A's vault — is the editor
+ * either way.
+ */
+export async function landInJoinedVault(b: AppSession, password: string): Promise<void> {
+  const screen = `${testIdSelector("editor.root")}, ${testIdSelector("unlock.password-input")}`;
+  await b.session.waitForElement(screen, { timeoutMs: 120_000 });
+  if ((await b.session.byTestIdAll("unlock.password-input")).length > 0) {
+    await unlockToEditor(b.session, password);
+  }
+  await b.session.byTestId("editor.root", { timeoutMs: 120_000 });
+  await dismissImporterOffer(b.session);
+}
+
+/**
+ * The approving device's half of the ceremony: approve B, then close the compare
+ * it opens.
+ *
+ * **Closing it is not tidiness.** An unconfirmed compare holds the joiner's
+ * pushes (`sync-replication`'s ceremony scenario proves the hold), so a fleet
+ * that leaves the code on screen replicates nothing and the wait would read as a
+ * sync defect.
+ */
+export async function settleApproverCompare(a: AppSession): Promise<void> {
+  await (await a.session.byTestId("sync.approve-device", { timeoutMs: 60_000 })).click();
+  await a.session.byTestId("sync.approve-verify", { timeoutMs: 60_000 });
+  await a.session.byTestId("sync.sas-fingerprint", { timeoutMs: 60_000 });
+  await clickByTestId(a.session, "sync.sas-match", { timeoutMs: 30_000 });
+  await closeSettings(a.session);
+}
+
+/**
+ * This device's view of the head it adopted, as the compare code renders it.
+ *
+ * A production read rather than a screen scrape, and on desktop it is the ONLY
+ * way to see the joining device's side of the compare: the wait screen that shows
+ * `pending-approval.sas` is gated out on a client that may hold the only copy
+ * (`src/lib/pending-approval.ts`), so a desktop joiner shows no code anywhere.
+ * The claim `sync-replication` makes is about the two devices reading the SAME
+ * head, and this is that fact without inventing a surface for it.
+ */
+export async function adoptedHeadFingerprint(b: AppSession, timeoutMs = 90_000): Promise<string> {
+  // Polled, because the head arrives on the joiner's FIRST cycle after approval
+  // and that cycle is armed by the unlock edge rather than by anything this
+  // helper can click.
+  const deadline = Date.now() + timeoutMs;
+  let last = "";
+  while (Date.now() < deadline) {
+    // A cycle per poll, because the head is adopted by one and the joiner's own
+    // scheduler is armed on an edge this helper cannot reach on every path.
+    await ipcOk(b.session, "plugin:sync|sync_now", {});
+    const value = (await ipcOk(b.session, "plugin:sync|sync_head_fingerprint", {})) as string | null;
+    last = (value ?? "").trim();
+    if (last !== "") return last;
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+  }
+  throw new Error(`setup: this device adopted no head within ${timeoutMs} ms, so there is nothing to compare`);
+}
+
+/**
+ * A saved HTTPS URL for UI-only scenarios. No server is contacted on read.
+ */
 export function httpsConfigSeed(endpointUrl = "https://sync.invalid"): (appConfigDir: string) => void {
   return (appConfigDir: string) => {
     const body = JSON.stringify({ endpoint_url: endpointUrl }, null, 2);
@@ -153,11 +282,19 @@ export type TwoSyncedDevices = {
  *  suites. Returns both devices, the synced note id, the shared vault password
  *  (for re-unlock scenarios), and a teardown.
  *
+ *  **What the pair IS, since 2026-11-01.** B joins by ACCOUNT (the surviving
+ *  `sync_join_account` command, driven from the page seat because its UI door was
+ *  withdrawn — see `joinAccountDevice`), is approved by A, and then opens the
+ *  vault with the same password. There is no compare step on B's side: the
+ *  desktop client is gated out of the wait screen that would show one
+ *  (`src/lib/pending-approval.ts`), so the §6.3 compare is A's screen and this
+ *  helper closes it. A fleet that needs the two devices to AGREE on a head reads
+ *  B's side over IPC instead (`adoptedHeadFingerprint`).
+ *
  *  `seedNote: false` skips the note-creation block AND B's note-replication
  *  wait, for variants whose scenario seeds its own synced state. A's explicit
  *  `sync_now` still runs — an empty vault authors a genesis head on push
- *  (§6.1 genesis-on-empty), which B's join gate needs: `join.verify` surfaces
- *  only once `sync_head_fingerprint` observes a pulled head. */
+ *  (§6.1 genesis-on-empty), and the head is what B adopts on its first cycle. */
 /** Options shared by every `setupTwoSyncedDevices` overload. */
 interface SetupOptions {
   /**
@@ -248,22 +385,19 @@ export async function setupTwoSyncedDevices(
         noteId = ids[0];
       }
 
-      // B: join (account# + password) → pending (waits on the approval gate).
-      await b.session.byTestId("welcome.root", { timeoutMs: 20_000 });
-      await (await b.session.byTestId("welcome.join-cta")).click();
-      await b.session.byTestId("join.modal");
-      await (await b.session.byTestId("join.server-input")).sendKeys(srv.url);
-      await (await b.session.byTestId("join.account-input")).sendKeys(account);
-      if (opts.deviceNames) {
-        await (
-          await b.session.byTestId("join.device-name-input")
-        ).replaceText(opts.deviceNames.b);
-      }
-      await (await b.session.byTestId("join.password-input")).sendKeys(password);
-      await (await b.session.byTestId("join.submit")).click();
-      await b.session.byTestId("join.pending", { timeoutMs: 30_000 });
+      // B: join the account → pending (waits on the approval gate). The join is
+      // `joinAccountDevice`'s subject, and its header carries why this is the
+      // page seat rather than a click: the affordance was withdrawn by
+      // `decisions/sync/0767`, the command was not.
+      const joined = await joinAccountDevice(b, {
+        serverUrl: srv.url,
+        accountNumber: account,
+        password,
+      });
 
-      // A: approve B while it is pending.
+      // A: approve B while it is pending, then CLOSE the compare the approval
+      // opens — an unconfirmed compare holds the joiner's pushes, so leaving it
+      // on screen would make every replication wait below read as a sync defect.
       await openSettings(a.session);
       await (await a.session.byTestId("settings.tab-sync")).click();
       await selectSettingsTopic(a.session, "sync", "devices");
@@ -275,15 +409,39 @@ export async function setupTwoSyncedDevices(
         await a.session.byTestId("sync.pending-row", { timeoutMs: 30_000 });
         await opts.whilePending({ a, b });
       }
-      await (await a.session.byTestId("sync.approve-device", { timeoutMs: 30_000 })).click();
-      await closeSettings(a.session);
+      await settleApproverCompare(a);
 
-      // B: auto-claim + pull → the mandatory SAS verify step → confirm the match →
-      // editor (SYNC-40).
-      await b.session.byTestId("join.verify", { timeoutMs: 30_000 });
-      await (await b.session.byTestId("join.sas-match")).click();
-      await b.session.byTestId("editor.root", { timeoutMs: 30_000 });
-      await dismissImporterOffer(b.session);
+      // B: unlock the vault the join materialized, then pull. There is no compare
+      // step here and there cannot be one: see `alignedHeadFingerprint`'s header.
+      await landInJoinedVault(b, password);
+      // A named fleet is applied HERE rather than typed into a join form: the
+      // form's "Name this device" field went with the modal, and an approved
+      // device adopts the platform suggestion on its own
+      // (`decisions/sync/0770`). This is the same prefs write the Devices panel
+      // makes when a user renames a row, so a named fleet is still the real
+      // surface and not a seeded value.
+      if (opts.deviceNames) {
+        // **B is named BY THE PEER, because that is the path the product has.**
+        // The join form's "Name this device" field went with the modal (0767), and
+        // the unattended self-name write refuses on exactly this device: the
+        // backend will not create a joiner's `vault.prefs` (the enrollment seed is
+        // keyed on that file being absent), so `selfName: true` answers `false` and
+        // names nobody — measured, ten attempts over fifteen seconds. What lands is
+        // the peer's write, which is the same call the Devices panel makes when a
+        // user renames a row from the approving device (`decisions/sync/0770`).
+        const written = await pageSeatInvoke(
+          a.session,
+          "plugin:prefs|set_device_name",
+          { deviceIdHex: joined.deviceIdHex, name: opts.deviceNames.b, selfName: false },
+          30_000,
+        );
+        if (written.err !== undefined || written.ok !== true) {
+          throw new Error(`setup: A could not name B: ${JSON.stringify(written.err ?? written.ok)}`);
+        }
+        // Push it, so the pairwise rename below has a peer-held entry to overwrite
+        // and the caller's own name reads happen against a settled prefs blob.
+        await ipcOk(a.session, "plugin:sync|sync_now", {});
+      }
 
       if (seedNote) {
         // B: pull until A's note replicates (the synced-baseline precondition).
