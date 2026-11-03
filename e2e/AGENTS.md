@@ -155,7 +155,7 @@
 
 - **A new `*.e2e.ts` file no longer owes a roster line.** Nothing fails a commit
   for a missing verdict, and a new flow owes no scenario at all: the owner writes
-  the coverage by hand, later (myne-md/myne#996, decision `0774`). What the
+  the coverage by hand, later (myne-md/myne#996, decision `0780`). What the
   roster still does is record which of the eight client surfaces this Linux-only
   suite proves, so naming your scenario in an entry's `automatedBy` is worth
   doing when you write one, and deleting the item it now covers is worth doing

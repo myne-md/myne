@@ -20,10 +20,10 @@ on-disk format, sync, a capability ACL or the egress allowlist is never small, h
 diff, because [`docs/threat-model.md`](docs/threat-model.md) has to change in the same commit.
 
 **A change to `protocol/` ships with its vectors** in
-[`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors), and a user-facing change ships
-with its user-guide page in [`myne-website`](https://github.com/myne-md/myne-website). The two
-obligations are not advice; they are what makes a protocol change verifiable by someone who does
-not trust this repository.
+[`myne-test-vectors`](https://github.com/myne-md/myne-test-vectors). That obligation is not advice:
+it is what makes a protocol change verifiable by someone who does not trust this repository. A change
+a user can notice does not owe a user-guide page in the same session; the guide is brought up to date
+on its own pass (`design-notes/process/0780`).
 
 ## Developer Certificate of Origin
 

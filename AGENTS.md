@@ -132,7 +132,7 @@ work; that is authority, not size.
    enforced. And skipping the front half discharges none of the standing obligations: a protocol
    change still ships with its `myne-test-vectors` change
    (`agent-tooling/reference/github-issues.md`). Nothing else rides along: the user guide, the E2E
-   scenario and the translation are the owner's own later pass (decision `0774`).
+   scenario and the translation are the owner's own later pass (decision `0780`).
 4. **The tail is `/pr-review`, then `/done`.** `/done` is the only committer and
    the only PR-opener, in every repo the work touched. A branch with commits on it and no PR is
    unfinished work, not finished work, and so is a clean checklist. `/pr-review` and `/done` both run
@@ -287,7 +287,7 @@ reasoning. The one live proof today is `.github`, the only public repo: its rule
 and a direct push to `main` is refused, verified by removing the admin bypass and watching GitHub
 reject the push.
 
-**A flow no longer owes its E2E scenario in the same change** (decision `0774`). The owner writes
+**A flow no longer owes its E2E scenario in the same change** (decision `0780`). The owner writes
 that coverage by hand, later, so a PR that adds a flow with no scenario is not rejected, and review
 does not report it. The `data-testid` pass still belongs in the change (`src/AGENTS.md` "Test
 observability"), because it is what makes a scenario possible at all.
@@ -307,7 +307,7 @@ client surfaces have no automated UI coverage: every desktop scenario runs in a 
 against WebKitGTK, and `e2e-web/` reaches the web client in Chromium. `scripts/manual-test-roster.mjs`
 still records what a human must verify on the rest, and `/release` still generates the manual half
 from it, but `scripts/check-manual-test-roster.mjs` no longer runs in `pre-commit` or CI, so a new
-file under one of its six surfaces owes no verdict (decision `0774`). The roster is frozen at what it
+file under one of its six surfaces owes no verdict (decision `0780`). The roster is frozen at what it
 recorded the day the gate came off, so an entry can name a file that moved and nothing reports it.
 
 `pnpm` is the canonical package manager (Tauri's `beforeDevCommand`/`beforeBuildCommand` invoke it). Pinned versions: Node `.nvmrc`, Rust `rust-toolchain.toml`. **Do not bypass the pinning** — CI and reproducible-build rely on it.

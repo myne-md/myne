@@ -2,6 +2,12 @@
 // Every feature surface carries a pre-release manual-test verdict, and no verdict
 // outlives the files it describes.
 //
+// HAND-RUNNABLE ONLY since myne-md/myne#996 (`design-notes/process/0780`): it
+// left `pre-commit` and CI, so nothing fails a change for a missing or stale entry.
+// It still checks the roster and still regenerates `docs/dev/manual-test-roster.md`,
+// and `/release` still generates the manual half from it. An entry is worth writing
+// for the release it gates, not for a commit.
+//
 // THE FAILURE THIS PREVENTS. A release has two halves. CI runs one of them and
 // says so out loud; the other one exists only if a human runs it, and nothing in
 // this repository has ever been able to answer "what did a human look at before

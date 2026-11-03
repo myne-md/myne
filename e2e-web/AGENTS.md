@@ -8,8 +8,8 @@
 
 **Web-specific behaviour only.** Both clients compile the same `src/` tree; the
 only thing that differs is the platform seam (`src/platform/`), which the web
-build substitutes. So a flow in the shared tree owes **one** scenario to the
-desktop `e2e/` suite and **nothing** here — and the premise that makes that
+build substitutes. So a flow in the shared tree gets its one scenario from the
+desktop `e2e/` suite when one is written, and nothing here — and the premise that makes that
 legitimate is verified by the platform-seam contract tests
 (`tests/platform/seam-contract.ts`), one assertion suite run against every seam
 implementation in both CI lanes. `design-notes.md` 2026-07-26 "Web E2E policy".
