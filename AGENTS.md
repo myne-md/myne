@@ -258,7 +258,7 @@ from this repository on 2026-11-03, together with `opencode.json`, `.opencode/pl
 
 - **`AGENTS.md` is the single source of repository rules.** Subdirectory `AGENTS.md` files add their domain guidance when work enters that directory.
 - **The agent tooling is clone-local, not tracked.** `workspace/link-skills.sh` symlinks every skill in the private `agent-tooling` companion into `.pi/skills/`, and `.pi/.gitignore` excludes them. A fresh clone therefore has no slash commands and no subagents until `./workspace/setup.sh` has cloned `agent-tooling` and `link-skills.sh` has run. **Two files are authored here and stay tracked**: `.pi/conventions/diverge/SKILL.md` (the convention the plugin injects, with `.pi/skills/diverge` a symlink to it) and `.pi/agents/subworker.md`, which has no source in `agent-tooling` and no second copy anywhere, so gitignoring it would delete the agent rather than de-publish somebody else's file.
-- **`.opencode/` survives as a PATH, not as a product.** It holds the worktree root `.opencode/worktrees/<n>-<slug>` and the `dev:two`/`web:local` sync store, because the pi plugin's guard refuses a worktree anywhere else and eight scripts, a dozen documents and every runbook name that path. Renaming it is a change to the plugin and the guard, not a tidy-up, and it buys nothing.
+- **`.opencode/` survives as a PATH, not as a product.** It holds the worktree root `.opencode/worktrees/<n>-<slug>` and the `pnpm start` sync store, because the pi plugin's guard refuses a worktree anywhere else and eight scripts, a dozen documents and every runbook name that path. Renaming it is a change to the plugin and the guard, not a tidy-up, and it buys nothing.
 - **No MCP servers are configured by this repository.** pi registers Woodpecker's through its own package (`myne-mcp.ts`) when a token is present.
 
 ## pi harness
@@ -295,6 +295,9 @@ pi is a second front-end over the same rules, not a second rulebook. Everything 
 ## Common commands
 
 ```bash
+pnpm start              # ONE command, interactive: Android, iOS, desktop (x2) and web against one local sync server (scripts/dev-menu.mjs)
+pnpm dev:reset          # wipe the dev instances + the sync store (macOS only; never the real md.myne.desktop vault)
+
 pnpm tauri dev          # full Tauri dev (spawns Vite on :1420 + Rust core)
 pnpm dev                # Vite only — port fixed via strictPort, fails if 1420 is taken
 pnpm tauri build        # production desktop bundle
@@ -302,7 +305,6 @@ pnpm tauri build        # production desktop bundle
 pnpm sidecar            # build + stage ALL THREE externalBin sidecars — `myne` (CLI), `myne-mcp` (MCP front-end) and `myne-tor` (arti) — debug
 pnpm sidecar:release    # same, release profile — both tauri lifecycle hooks run these
 
-pnpm web:local          # ONE command: web dev client on :1421 + a local sync server (scripts/dev-web.sh)
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
 pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
 pnpm web:preview        # serve the built web bundle

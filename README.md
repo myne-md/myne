@@ -98,12 +98,12 @@ Pinned toolchains: Node ([`.nvmrc`](.nvmrc)), Rust ([`rust-toolchain.toml`](rust
 
 ```bash
 pnpm install            # install JS toolchain
+pnpm start              # ONE command: any mix of Android, iOS, desktop (x2) and web, against one local sync server
 pnpm tauri dev          # full Tauri dev (Vite on :1420 + Rust core)
 pnpm dev                # Vite only (strictPort — fails if 1420 is taken)
 pnpm tauri build        # production desktop bundle
 pnpm sidecar            # build + stage all three externalBin sidecars (myne CLI, myne-mcp, myne-tor)
 
-pnpm web:local          # web client on :1421 + a local sync server, in one command
 pnpm web:dev            # web client dev server on :1421 (runs alongside the desktop one)
 pnpm web:build          # typecheck web/ against the shared src/ tree + production web bundle
 
