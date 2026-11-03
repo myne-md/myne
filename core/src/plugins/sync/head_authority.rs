@@ -109,7 +109,7 @@ impl SignedHeadCtx {
     }
 
     /// The same context with the vault's verified device signers and no key of its own, so
-    /// a device that cannot AUTHOR a `0x03` head can still VERIFY one. `decisions/protocol/0773`
+    /// a device that cannot AUTHOR a `0x03` head can still VERIFY one. `decisions/protocol/0774`
     /// rule 1 is "every reader accepts both", and a verifier set derived from this device's
     /// own binding rather than from the vault is what made an unbound reader refuse a peer.
     #[must_use]

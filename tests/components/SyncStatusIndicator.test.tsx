@@ -233,7 +233,9 @@ describe("refusal classes render distinct copy", () => {
     render(<SyncStatusIndicator onUnlockIdentity={() => {}} />);
     await waitFor(() => {
       expect(
-        screen.getByText("This device's signing key is missing, so sync cannot run"),
+        screen.getByText(
+          "The signing key this device published is not here, so sync cannot run",
+        ),
       ).toBeTruthy();
     });
     expect(screen.queryByText("Unlock your identity to sync")).toBeNull();
@@ -275,6 +277,39 @@ describe("identity_locked unlock affordance", () => {
     render(<SyncStatusIndicator />);
     await waitFor(() =>
       expect(screen.getByText("Unlock your identity to sync")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("sync.unlock-identity")).toBeNull();
+  });
+});
+
+// The repair for a lost device key IS the identity entry (`decisions/protocol/0774`), so the
+// affordance has to be the same one, and the test has to be its own: a single `identity_locked`
+// case passes whether or not `device_key_missing` reaches this branch.
+describe("device_key_missing repair affordance", () => {
+  it("offers the identity entry and calls it, and hides Sync now", async () => {
+    const onUnlockIdentity = vi.fn();
+    statusFixture({ state: "error", detail: "device_key_missing" } as SyncStatus);
+    render(<SyncStatusIndicator onUnlockIdentity={onUnlockIdentity} />);
+    await waitFor(() =>
+      expect(screen.getByTestId("sync.unlock-identity")).toBeTruthy(),
+    );
+    expect(screen.queryByTestId("sync.sync-now")).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("sync.unlock-identity"));
+    });
+    expect(onUnlockIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers no action when the host passed no handler", async () => {
+    statusFixture({ state: "error", detail: "device_key_missing" } as SyncStatus);
+    render(<SyncStatusIndicator />);
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "The signing key this device published is not here, so sync cannot run",
+        ),
+      ).toBeTruthy(),
     );
     expect(screen.queryByTestId("sync.unlock-identity")).toBeNull();
   });

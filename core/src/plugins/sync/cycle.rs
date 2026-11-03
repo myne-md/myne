@@ -560,6 +560,28 @@ async fn signed_head_ctx(
 /// a person-key rotation, and a cached copy would outlive the credential it
 /// names. `None` on an absent file (no identity on this device), an all-zero or
 /// unparseable one, or an empty token (an identity that never registered).
+/// Which `FailureClass` a missing authority becomes, in one place.
+///
+/// The mapping is the whole point of myne-md/myne#983: the class, the log and the UI sentence
+/// must not disagree, and before this the choice was an inline expression nothing could assert.
+/// `KeyMissingWhileBound` gets its own class because the repair IS the identity entry but the
+/// sentence has to name what is actually missing; every other cause either parks as `Other` or
+/// asks for the identity.
+fn class_for_missing_authority(
+    cause: super::authority::AuthorityMissing,
+    person_held: bool,
+) -> super::loop_control::FailureClass {
+    if !cause.identity_unlock_would_fix() || person_held {
+        return super::loop_control::FailureClass::Other;
+    }
+    match cause {
+        super::authority::AuthorityMissing::KeyMissingWhileBound => {
+            super::loop_control::FailureClass::DeviceKeyMissing
+        }
+        _ => super::loop_control::FailureClass::IdentityLocked,
+    }
+}
+
 async fn person_token_bytes(
     io: &dyn crate::vault_io::VaultIo,
     host: &dyn HostCtx,
@@ -985,21 +1007,7 @@ pub async fn run_active_cycle_from_host(
             // `identity_locked` for exactly as long as the two were conflated, and the
             // sentence sent the user to a fix that only sometimes applied.
             let cause = authority.missing();
-            let class = if cause.identity_unlock_would_fix() && !authority.person_held {
-                if matches!(
-                    cause,
-                    super::authority::AuthorityMissing::KeyMissingWhileBound
-                ) {
-                    // The key this device published is gone. The repair IS the identity entry,
-                    // but the sentence has to say what is actually missing, so it gets its own
-                    // class (myne-md/myne#983).
-                    super::loop_control::FailureClass::DeviceKeyMissing
-                } else {
-                    super::loop_control::FailureClass::IdentityLocked
-                }
-            } else {
-                super::loop_control::FailureClass::Other
-            };
+            let class = class_for_missing_authority(cause, authority.person_held);
             tracing::warn!(
                 stage = "sync_cycle",
                 event = "b2b_head_authority_missing",
@@ -1707,6 +1715,40 @@ mod tests {
     //! two disagree — is decided here, and the rest of the gather is a host, a
     //! runtime slot and a live server.
 
+    /// The failure class a missing authority becomes, asserted for the four shapes that matter.
+    ///
+    /// The regression this guards is exact: `KeyMissingWhileBound` used to fold into
+    /// `IdentityLocked`, so the app said "unlock your identity" for a vault whose PUBLISHED key
+    /// was gone, and typing the phrase helped for one session (myne-md/myne#983). A future edit
+    /// that collapses the two again compiles and passes every other test in the crate.
+    #[test]
+    fn a_missing_authority_maps_to_one_failure_class() {
+        use super::class_for_missing_authority;
+        use crate::plugins::sync::authority::AuthorityMissing;
+        use crate::plugins::sync::loop_control::FailureClass;
+
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyMissingWhileBound, false),
+            FailureClass::DeviceKeyMissing,
+            "a key this device published and no longer holds is its own class"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::NoPersonSession, false),
+            FailureClass::IdentityLocked,
+            "no session and no key is the one cause the identity phrase fixes"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyUnreadable, false),
+            FailureClass::Other,
+            "a store fault is not something the user's identity entry repairs"
+        );
+        assert_eq!(
+            class_for_missing_authority(AuthorityMissing::KeyMissingWhileBound, true),
+            FailureClass::Other,
+            "with the person held, opening the identity again is not the missing step"
+        );
+    }
+
     use super::*;
 
     /// The party-ness gate on the binding repair, tested for the ONE mistake that would
@@ -1743,16 +1785,6 @@ mod tests {
     }
     use crate::test_support::{block_on, seed_real_vault_meta, ScopedTempDir};
 
-    /// **A device with no key store keeps signing `0x02`**, and every other reason the
-    /// key is unavailable does too, which is the whole point of the three-state split.
-    ///
-    /// `Unsupported` is rung 4 of the ladder and the ordinary state on every platform
-    /// but Apple; `Ok(None)` is a first run; `Backend`/`Corrupt` are faults that must
-    /// still fall back rather than strand a device whose key store is merely locked. The
-    /// risk this task introduced is specific: the person-plane device id is now adopted
-    /// into every person-born vault's sync state, so a device WITHOUT a key store reaches
-    /// this branch instead of returning before it. Reading `Unsupported` as "no device"
-    /// is right; reading `Backend` as "no device" is the silent degradation this arm
     // Method resolution for `IO`'s inherent-looking calls (`create_dir_all`,
     // `write`): the trait is the only place they exist.
     use crate::vault_io::VaultIo as _;

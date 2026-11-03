@@ -237,7 +237,7 @@ pub enum DeviceResolution {
     /// A device that cannot AUTHOR still has to be able to READ. The verifier set travels
     /// with the decision for that reason: a peer's `0x03` head is checked against the
     /// vault's verified rows, not against this device's own binding
-    /// (`decisions/protocol/0773` rule 1, "every reader accepts both").
+    /// (`decisions/protocol/0774` rule 1, "every reader accepts both").
     Unbound {
         cause: AuthorityMissing,
         signers: Vec<DeviceHeadSigner>,

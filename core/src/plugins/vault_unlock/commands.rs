@@ -640,13 +640,15 @@ async fn report_orphaned_binding_best_effort(
     {
         tracing::warn!(
             stage = "vault_unlock",
-            event = "device_binding_orphaned",
+            event = "device_binding_orphan_suspected",
             cause =
                 crate::plugins::sync::authority::AuthorityMissing::KeyMissingWhileBound.as_str(),
             identity_unlock_would_fix = true,
-            "this device's binding row publishes a signing key that the key store does not hold: \
-             sync cannot author a head until the identity is opened once and the binding is \
-             re-claimed (myne-md/myne#983)"
+            "a binding row NAMING this device publishes a signing key that the key store does not \
+             hold. Suspected rather than verified: rows are group-sealed, so any member can write \
+             one naming any device id under their own fingerprint, and the roster this line would \
+             need to tell them apart is not in hand at unlock. The vault's own resolution, which \
+             does verify, decides whether sync can author (myne-md/myne#983)"
         );
     }
 }

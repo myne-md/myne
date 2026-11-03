@@ -4815,8 +4815,8 @@
       "status": {
         "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
         "label": "Sync status",
-        "authorityIdentityClosed": "This device's sync authority is the identity, and it is closed on this device",
-        "authorityKeyMissing": "This device's sync authority is a signing key that is no longer on this device"
+        "authorityIdentityClosed": "Sync resumes once you open your identity on this device",
+        "authorityKeyMissing": "Sync resumes once you open your identity and this device is repaired"
       },
       "usage": {
         "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
@@ -4867,7 +4867,7 @@
       "errorIdentityLocked": "Unlock your identity to sync",
       "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "unlockIdentityCta": "Unlock identity",
-      "errorDeviceKeyMissing": "This device's signing key is missing, so sync cannot run",
+      "errorDeviceKeyMissing": "The signing key this device published is not here, so sync cannot run",
       "repairDeviceCta": "Repair this device"
     },
     "usage": {

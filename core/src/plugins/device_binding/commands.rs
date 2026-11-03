@@ -233,10 +233,8 @@ async fn write_own_binding_with_dir(
     };
     let device_public = match halves {
         ConfirmedHalves::Publish(public) => Some(*public),
-        // The store positively holds no key for this device: the row is written the way it
-        // was before the device-key change, or demoted from a row that did publish halves.
-        ConfirmedHalves::Withdraw => None,
-        // No decision was possible, so nothing is written at all.
+        // No verified key, so nothing about the row may change: not its halves, not its
+        // version. See `confirm_read_back` for why withdrawing was tried and reverted.
         ConfirmedHalves::Unknown => {
             let map = read_device_bindings_in_dir(io, vault_dir, &resolved.borrow()).await?;
             return Ok((map, ClaimOutcome::Deferred));
@@ -277,10 +275,11 @@ async fn write_own_binding_with_dir(
 /// refuse every cycle under "unlock your identity to sync", and it survived every lock,
 /// relaunch and rebuild because nothing ever compared the two.
 ///
-/// `Ok(None)` is the two legitimate shapes: rung 4 of the ladder (no store on this platform)
-/// and a store that refused, which the caller keeps writing a `0x01` row for. `Err` is
-/// unreachable and kept out of the signature on purpose: a failure is a downgrade to the
-/// person path, never an error that blocks a claim.
+/// Three outcomes, and none of them is an error that blocks a claim. `Publish` is the store
+/// returning the key just written. `Unknown` is everything else (rung 4 of the ladder, a store
+/// that refused, a store that cannot return what it accepted), and its meaning is the same in
+/// all three: leave the row exactly as it is and ask again on the next unlock. `Err` is a real
+/// fault, returned rather than swallowed so the caller can log it.
 fn mint_and_confirm_at_rest(
 ) -> Result<ConfirmedHalves, crate::plugins::sync::device_identity::DeviceKeyStoreError> {
     let pair = match crate::plugins::sync::device_identity::load_or_create() {
@@ -288,7 +287,7 @@ fn mint_and_confirm_at_rest(
         // Rung 4 is a platform fact: the row is written exactly as it was before the
         // device-key change, and that is not a fault.
         Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => {
-            return Ok(ConfirmedHalves::Withdraw)
+            return Ok(ConfirmedHalves::Unknown)
         }
         Err(err) => return Err(err),
     };
@@ -317,22 +316,21 @@ fn confirm_read_back(
                 stage = "device_binding_claim",
                 event = "device_key_read_back_mismatch",
                 "the device key store returned a DIFFERENT key than the one just written; the \
-                 binding is written without halves, because a row publishing a key this device \
-                 does not hold is a claim no peer can resolve"
+                 binding is left untouched, because neither half can be shown to be the one at \
+                 rest"
             );
-            // The store holds something else, so it definitely does not hold a key this
-            // device can sign with: withdrawing the published halves is right.
-            ConfirmedHalves::Withdraw
+            ConfirmedHalves::Unknown
         }
         KeyAtRest::Absent => {
             tracing::error!(
                 stage = "device_binding_claim",
                 event = "device_key_read_back_missing",
-                "the device key was written and cannot be read back; the binding is written \
-                 without halves. This is the state that makes sync demand the identity phrase \
-                 after every lock (myne-md/myne#983)"
+                "the device key was written and cannot be read back; the binding is left \
+                 untouched. This is the state that makes sync demand the identity phrase after \
+                 every lock (myne-md/myne#983), and it is reported as AuthorityMissing rather \
+                 than repaired by a write here"
             );
-            ConfirmedHalves::Withdraw
+            ConfirmedHalves::Unknown
         }
         // A store that REFUSED is not a store that is empty, and this distinction decides
         // whether the row is rewritten. Withdrawing the halves here would let one transient
@@ -345,7 +343,8 @@ fn confirm_read_back(
                 stage = "device_binding_claim",
                 event = "claim_deferred",
                 reason = "key_store_unreadable",
-                "the device key store refused the read-back; the binding is left untouched                  rather than demoted, because a refusal is not an absence"
+                "the device key store refused the read-back; the binding is left untouched, because a \
+                 refusal is not an absence"
             );
             ConfirmedHalves::Unknown
         }
@@ -354,15 +353,16 @@ fn confirm_read_back(
 
 /// What the read-back after a device-key write authorises.
 ///
-/// Three answers, because two collapsed a keychain refusal into an absence and that
-/// collapse reached a synced write.
+/// Two answers. There used to be a third, `Withdraw`, which rewrote a synced row one version
+/// up with its halves removed. It is gone because a row's halves are also the verification
+/// material for the `0x03` head that device already pushed: withdrawing them left the device
+/// unable to verify its own current head, and therefore unable to author the person-signed
+/// head that would replace it (myne-md/myne#983 review, D8).
 #[derive(Debug, PartialEq, Eq)]
 enum ConfirmedHalves {
     /// The store returns the key that was just written: publish these halves.
     Publish(Box<protocol::device_key::DevicePublicHalf>),
-    /// The store positively holds no such key: the row must stop publishing halves.
-    Withdraw,
-    /// The store would not answer: leave the row alone and retry on the next unlock.
+    /// No verified key: leave the row exactly as it is and retry on the next unlock.
     Unknown,
 }
 
@@ -643,13 +643,20 @@ mod tests {
         );
         assert_eq!(
             super::confirm_read_back(key.public_half(), K::Present(Box::new(other))),
-            super::ConfirmedHalves::Withdraw,
-            "a different key at rest means one of the two is stale, and neither may be published"
+            super::ConfirmedHalves::Unknown,
+            "a different key at rest leaves the row alone: neither half can be shown to be \
+             the one at rest, and a rewrite would strip the material that verifies this \
+             device's signed heads"
         );
         assert_eq!(
             super::confirm_read_back(key.public_half(), K::Absent),
-            super::ConfirmedHalves::Withdraw,
-            "a store that cannot return the item it just accepted must stop publishing"
+            super::ConfirmedHalves::Unknown,
+            "a store that cannot return the item it just accepted leaves the row alone"
+        );
+        assert_eq!(
+            super::confirm_read_back(key.public_half(), K::Absent),
+            super::confirm_read_back(key.public_half(), K::Unreadable),
+            "absence and refusal reach the same non-write, because a write here would demote"
         );
         // The distinction that reaches a WRITE: a refusal is not an absence, so the row is
         // not rewritten. Folding these two together let one transient keychain refusal strip
