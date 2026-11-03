@@ -2155,7 +2155,7 @@ export const myneThemeSpec = {
     // Small top margin so the block widget's top lines up with the top-aligned
     // line number (a full --space-3 top margin floated the number above the
     // widget); the bottom keeps the --space-3 block rhythm.
-    // INLINE form only — see `.cm-attachment-frame` above (myne-md/myne#990).
+    // INLINE form only; see `.cm-attachment-frame` above (myne-md/myne#990).
     margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
@@ -2346,7 +2346,7 @@ export const myneThemeSpec = {
     // Small top margin so the block widget's top lines up with the top-aligned
     // line number (a full --space-3 top margin floated the number above the
     // widget); the bottom keeps the --space-3 block rhythm.
-    // INLINE form only — see `.cm-attachment-frame` above (myne-md/myne#990).
+    // INLINE form only; see `.cm-attachment-frame` above (myne-md/myne#990).
     margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
