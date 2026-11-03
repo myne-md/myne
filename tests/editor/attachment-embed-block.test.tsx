@@ -243,5 +243,33 @@ describe("ownLineInsertion", () => {
     mounted.view.requestMeasure();
     expect(placement(mounted.host), "typing `!` should promote it").toBe("block");
   });
+});
 
+// What the wrapper exists for is a browser measurement, so the numbers live in
+// the issue and in `theme.ts`: with the rhythm as a MARGIN on the card, five
+// block embeds made the painted content 37px taller than CodeMirror's height map,
+// every coordinate below them resolved one to three rows low, and a click landed
+// that far from the pointer. These pin the decidable half: that the box
+// CodeMirror measures is the one carrying the spacing.
+describe("a block embed's spacing lives inside the measured box", () => {
+  it("wraps the card in .cm-attachment-block rather than placing it in .cm-content", async () => {
+    mounted = await mount(EMBED);
+    const frame = mounted.host.querySelector(".cm-attachment-frame") as HTMLElement;
+    expect(frame).not.toBeNull();
+    // A wrapper is the whole fix: `getBoundingClientRect()` excludes margins,
+    // so a margin on the card is height CodeMirror never counts. Padding on a
+    // parent it does measure is counted. A card that IS the widget's DOM has
+    // nowhere to put that padding without growing its own border.
+    expect(frame.parentElement?.className).toBe("cm-attachment-block");
+  });
+
+  it("leaves the INLINE form unwrapped", async () => {
+    // An inline widget's margin is inside its line's box, which CodeMirror does
+    // measure, so wrapping it would add a level for nothing and could break the
+    // line box it sits in.
+    mounted = await mount(`- [ ] text before ${EMBED} and after`);
+    const frame = mounted.host.querySelector(".cm-attachment-frame") as HTMLElement;
+    expect(frame).not.toBeNull();
+    expect(frame.closest(".cm-attachment-block")).toBeNull();
+  });
 });

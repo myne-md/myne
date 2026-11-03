@@ -11,7 +11,10 @@ import { EditorView } from "@codemirror/view";
 import { tagChipCmTheme } from "@myne/editor/host/notes/tagPillToken";
 import { taskChipCmTheme } from "@myne/editor/host/notes/taskChipToken";
 
-export const myneTheme = EditorView.theme({
+// The rule sheet, exported so a test can hold the rules that only a browser can
+// measure (tests/editor/block-widget-geometry.test.ts). `EditorView.theme` only
+// prefixes and installs it, so the object here is the whole stylesheet.
+export const myneThemeSpec = {
   "&": {
     backgroundColor: "transparent",
     color: "var(--fg-1)",
@@ -1788,6 +1791,49 @@ export const myneTheme = EditorView.theme({
       "calc((100cqi - 100%) / -2 - var(--pane-gutter-inline, 0px))",
   },
 
+  // The measured box around a whole-line embed (myne-md/myne#990).
+  //
+  // CodeMirror builds its height map from `getBoundingClientRect()`, which
+  // excludes MARGINS. The block rhythm below used to be a margin on the cards
+  // themselves, so every block embed contributed 13px the editor never counted:
+  // the error accumulates down the note, and every coordinate probe past an
+  // embed resolves to a row that far off: a click lands rows below the pointer
+  // and the arrow keys walk into it. Measured in Chromium: five block widgets
+  // drifted 13px each and landed up to three rows low, and the same defect in
+  // this real extension is recorded in `decorations/attachment-embed.ts`.
+  //
+  // Padding IS inside the measured box, so the rhythm lives here instead, and the
+  // card loses its margin while it sits inside (rules directly below). On the
+  // cards themselves it cannot go: three of them carry a hairline border and a
+  // surface, so padding would grow the card rather than the space around it.
+  //
+  // `flex-start` rather than the default stretch, because the card's own
+  // `marginLeft: auto` is what aligns it left/centre/right and an item already
+  // stretched to the column has nothing left to push against. A column flex
+  // container, not `display: block`: a block-level child would be laid out in an
+  // anonymous line box, and the inline leading around it is height nobody asked
+  // for.
+  ".cm-attachment-block": {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    boxSizing: "border-box",
+    // 3px so the widget's top lines up with the top-aligned line number (a full
+    // --space-3 top margin floated the number above the widget); the bottom keeps
+    // the --space-3 block rhythm.
+    padding: "3px 0 var(--space-3, 10px)",
+  },
+  ".cm-attachment-block > .cm-attachment-frame, .cm-attachment-block > .cm-attachment-file-card, .cm-attachment-block > .cm-attachment-audio, .cm-attachment-block > .cm-attachment-tombstone":
+    {
+      // VERTICAL only, and as longhands. The align classes below distribute the
+      // horizontal margins (`marginLeft`/`marginRight: auto`) to place an aligned
+      // embed, and this selector is more specific than they are. A `margin: 0`
+      // shorthand here would silently pin every centred or right-aligned block
+      // embed to the left edge.
+      marginTop: "0",
+      marginBottom: "0",
+    },
+
   // Attachment embeds (MYND-164 / 147 / 149) — decorations/attachment-embed.ts,
   // decorations/image-url.ts, attachments/widgets.ts. The design pass uses raw
   // hex (not tokens) for the chip palette; matched exactly here.
@@ -1810,6 +1856,11 @@ export const myneTheme = EditorView.theme({
     // Small top margin so the block widget's top lines up with the top-aligned
     // line number (a full --space-3 top margin floated the number above the
     // widget); the bottom keeps the --space-3 block rhythm.
+    //
+    // INLINE form only (myne-md/myne#990). A whole-line embed is wrapped by
+    // `.cm-attachment-block`, which zeroes this and carries the rhythm as
+    // padding, because a block widget's margin is outside the box CodeMirror
+    // measures. An inline widget's margin is inside its line's box, so it stays.
     margin: "3px 0 var(--space-3, 10px)",
   },
   ".cm-attachment-img": {
@@ -2060,6 +2111,32 @@ export const myneTheme = EditorView.theme({
   ".cm-attachment-tombstone-label": {
     whiteSpace: "nowrap",
   },
+  // A failure chip that lives INSIDE an embed's frame: the image whose bytes
+  // never arrived (myne-md/myne#990). Three things differ from the free-standing
+  // chip the `att:` reference path renders:
+  //
+  // 1. It has to keep its own tail clear of the "⋯" overlay, which is absolutely
+  //    positioned in the frame's top-right corner. The file card can let the menu
+  //    sit over its meta line; a one-line failure label cannot, because the label
+  //    IS the message. Same token arithmetic as the unreadable-segment marker's
+  //    `right` above, since the two sit beside each other.
+  // 2. It is bounded by the frame (an embed carries a width, and `320px` is the
+  //    default), so a long filename has to ellipsize instead of widening the
+  //    note's content column.
+  // 3. `border-box`, so the reserved space is inside the frame's width rather
+  //    than added to it.
+  ".cm-attachment-frame > .cm-attachment-tombstone": {
+    maxWidth: "100%",
+    boxSizing: "border-box",
+    paddingRight: "calc(var(--space-2, 8px) + var(--space-6, 32px))",
+  },
+  ".cm-attachment-frame > .cm-attachment-tombstone .cm-attachment-tombstone-label": {
+    // `minWidth: 0` is what lets a nowrap flex child shrink at all; without it
+    // the ellipsis never engages and the label overflows the chip.
+    minWidth: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+  },
 
   // Generic file-card (MYND-173): a non-renderable attachment (.docx/.zip/…)
   // shown as a compact, export-only card — icon + filename + "type · size" +
@@ -2078,6 +2155,7 @@ export const myneTheme = EditorView.theme({
     // Small top margin so the block widget's top lines up with the top-aligned
     // line number (a full --space-3 top margin floated the number above the
     // widget); the bottom keeps the --space-3 block rhythm.
+    // INLINE form only; see `.cm-attachment-frame` above (myne-md/myne#990).
     margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
@@ -2268,6 +2346,7 @@ export const myneTheme = EditorView.theme({
     // Small top margin so the block widget's top lines up with the top-aligned
     // line number (a full --space-3 top margin floated the number above the
     // widget); the bottom keeps the --space-3 block rhythm.
+    // INLINE form only; see `.cm-attachment-frame` above (myne-md/myne#990).
     margin: "3px 0 var(--space-3, 10px)",
     fontFamily: "var(--font-sans)",
     cursor: "default",
@@ -2560,4 +2639,6 @@ export const myneTheme = EditorView.theme({
   // document.body to escape ancestor containing-block context, so CM6's
   // theme scoping (which prefixes all selectors with the editor's theme
   // class) doesn't reach them.
-});
+};
+
+export const myneTheme = EditorView.theme(myneThemeSpec);
