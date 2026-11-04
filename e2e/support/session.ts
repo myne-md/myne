@@ -416,7 +416,17 @@ function ownedProcessIds(): number[] {
     if (pid === self) continue;
     try {
       const environ = readFileSync(`/proc/${entry}/environ`, "latin1");
-      if (environ.split("\0").some((entry) => entry.startsWith(needle))) ids.push(pid);
+      // **The data dir must be GONE.** This is what separates a leftover from a
+      // live sibling. A multi-device scenario launches its devices one after
+      // another, so the second launch sees the first device's tree carrying the
+      // same prefix - and reaping it would kill the peer this scenario is about
+      // to sync with. A tree whose temp dir has been removed (by teardown's own
+      // `rmSync`) has nothing left to serve, so it is the leak, and only it.
+      const dir = environ
+        .split("\0")
+        .find((entry) => entry.startsWith(needle))
+        ?.slice("XDG_DATA_HOME=".length);
+      if (dir !== undefined && !existsSync(dir)) ids.push(pid);
     } catch {
       // Gone between readdir and read, or another user's process: not ours.
     }
@@ -699,17 +709,18 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       // mask the scenario's own error; the launch-side check is the one that
       // refuses to proceed.
       await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS);
-      // The group kill above only reaches the tree it OWNS. A tree whose driver
-      // died first is orphaned rather than killed, and reaping by data-directory
-      // ownership is the only handle on it — so the scenario that leaked it pays
-      // for it here, in its own log, instead of the ninth scenario downstream.
-      await reapOwnedProcesses();
       try {
         if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });
       } catch {
         // Cleanup failure must never mask the scenario's own error
         // (teardown runs in finally) — the tmpdir reaps eventually.
       }
+      // The group kill above only reaches the tree it OWNS. A tree whose driver
+      // died first is orphaned rather than killed, and "its data dir is gone" is
+      // the only handle on it - which is why the removal above comes FIRST. The
+      // scenario that leaked pays for it here, in its own log, instead of the
+      // ninth scenario downstream.
+      await reapOwnedProcesses();
     };
 
     // See the `hardKill` doc on `AppSession`. Deliberately does NOT call
