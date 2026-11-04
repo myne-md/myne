@@ -1,7 +1,7 @@
 // The sidebar's BACKGROUND context menu (right-click under the tree) is glyphed
 // like the rest of the tree's menus (myne-md/myne#1020).
 //
-// The defect: three label-only rows — "New folder", "New note", "New drawing" —
+// The defect: three label-only rows ("New folder", "New note", "New drawing")
 // while the SAME three actions, reached by right-clicking a folder row, each
 // carried a glyph. Two menus for one vocabulary, drawn as if they belonged to two
 // different products.

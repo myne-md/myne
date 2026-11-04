@@ -115,7 +115,7 @@ interface DeleteVaultConfirmFormProps {
    *
    * `"panel"` (default) is the two-step shape: the caller shows a button, the
    * press replaces the panel with this form, and the form therefore has to
-   * introduce itself — its own heading, its eyebrow, and a Cancel that goes
+   * introduce itself: its own heading, its eyebrow, and a Cancel that goes
    * back to whatever the press came from. That is right for `Unlock` and
    * `VaultRecover`, where the form arrives as its own screen.
    *
@@ -266,7 +266,7 @@ export function DeleteVaultConfirmForm({
   /* The mechanics, one press away (myne-md/myne#960): the erase destroys the
      per-vault keychain item on the platforms that have one (myne-md/myne#761,
      `design-notes/security/0709`), and the note is gated on the provider
-     capability rather than on `onlyCopy` — the browser has no per-vault keychain
+     capability rather than on `onlyCopy`. The browser has no per-vault keychain
      item and its copy is a different claim about a different store, so the
      sentence is omitted there.
 
