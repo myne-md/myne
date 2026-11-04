@@ -23,6 +23,7 @@
 import { load as parseYaml } from "js-yaml";
 
 import { locateFrontmatter } from "../../dialect/lezer/frontmatter";
+import { isTagBody } from "../../dialect/lezer/inline-tag";
 import { formatYamlStringScalar } from "../../dialect/surgery";
 import { foldSegment } from "../../dialect/folderPath";
 import {
@@ -119,17 +120,23 @@ export function planTagAccept(doc: string): TagAcceptPlan | null {
 /**
  * Compute the edit that adds `newTag` to the note's frontmatter `tags:` list.
  *
- * Returns `null` when there is nothing to write — an empty accept, a tag the
- * note already carries under the fold (in `tags:`, in `tag:`, or as an inline
- * `#tag` in the body), or frontmatter {@link planTagAccept} refuses to touch.
- * Pure.
+ * Returns `null` when there is nothing to write: an empty accept, a tag that is
+ * not a legal §3.7.2 body, a tag the note already carries under the fold (in
+ * `tags:`, in `tag:`, or as an inline `#tag` in the body), or frontmatter
+ * {@link planTagAccept} refuses to touch. Pure.
  */
 export function computeTagAcceptEdit(
   doc: string,
   newTag: string,
 ): TagAcceptEdit | null {
   const cleaned = cleanTagToken(newTag);
-  if (cleaned.length === 0) return null;
+  // The writer's half of the gate the reader already applies (myne-md/myne#1025):
+  // `rankTagCandidates` drops a candidate that is not a legal tag body, so this
+  // refuses only a caller that went around it. Writing `(#Writing with Markdown`
+  // would land a tag that no inline `#tag` can ever match, and the note then
+  // carries a tag its author cannot type. The removal path below stays ungated,
+  // deliberately: cleaning up a junk tag a note already has must remain possible.
+  if (!isTagBody(cleaned)) return null;
   const plan = planTagAccept(doc);
   if (plan === null || plan.existingFolds.has(foldSegment(cleaned))) return null;
   // The tag must read back as the exact string it was written as: an unquoted
