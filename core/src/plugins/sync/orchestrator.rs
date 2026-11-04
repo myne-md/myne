@@ -106,10 +106,13 @@ pub struct SyncSummary {
     /// cycle (MYND-486) — a theme added, edited or deleted on a peer. Reported
     /// for the same reason as `prefs_applied_remote` (the orchestrator stays
     /// AppHandle-free, so any refresh choreography lives at the command
-    /// boundary). NOTE: no listener is wired yet — a same-name concurrent edit
-    /// resolves silently by LWW (a theme is not a note: no keep-both, no
-    /// conflict surface), and the WebView re-reads themes over IPC on demand.
-    /// The live-refresh event is a follow-on that needs a frontend listener.
+    /// boundary).
+    ///
+    /// The cycle emits `THEMES_CHANGED_EVENT` off this flag (myne#943), which is
+    /// what re-reads an open Appearance panel's list and repaints the palette;
+    /// before that the list kept showing the pre-sync set until the panel was
+    /// remounted. A same-name concurrent edit still resolves silently by LWW (a
+    /// theme is not a note: no keep-both, no conflict surface).
     pub themes_applied_remote: bool,
     /// A remote `vault.chats` change was merged onto the on-disk catalog this
     /// cycle (myne-md/myne#675): a conversation added, renamed or deleted on
