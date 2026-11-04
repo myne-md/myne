@@ -46,6 +46,10 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_get_endpoint,
             commands::sync_set_endpoint,
             commands::sync_status,
+            // myne-md/myne#1003: the one verdict over the five facts behind "sync is not
+            // working". Registered beside `sync_status` because it is the same read-only
+            // sibling surface, not because it shares its shape.
+            commands::sync_vault_doctor,
             commands::sync_unsynced_edits,
             commands::sync_materialisation_progress,
             commands::sync_now,

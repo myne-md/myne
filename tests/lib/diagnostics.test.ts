@@ -24,6 +24,11 @@ const INPUTS = {
   commit: "c1cf94a",
   bundleHash: "sha256:03ef5d60",
   failureCode: "worker-fatal",
+  vaultGeneration: "NTV8",
+  vaultAuthority: "missing:no_key_at_rest",
+  vaultBinding: "orphaned",
+  vaultKeyAtRest: "absent",
+  vaultSession: "person=closed device=adopted",
   engine: "Chrome 140",
   crossOriginIsolated: true,
   storageUsedMb: 12,
@@ -70,22 +75,51 @@ describe("diagnostic block", () => {
   // client cannot take is now ABSENT: the absence says the same thing once, and
   // the panel no longer owes a paragraph explaining its own output.
   it("omits a reading the client cannot take, rather than printing a placeholder", () => {
-    const text = buildDiagnostics({
-      ...INPUTS,
+    const unreadable = {
       commit: null,
       bundleHash: null,
       storageUsedMb: null,
       storageQuotaMb: null,
       engine: null,
-    });
-    for (const gone of ["commit", "bundleHash", "storageUsedMb", "storageQuotaMb", "engine"]) {
+    };
+    const text = buildDiagnostics({ ...INPUTS, ...unreadable });
+    for (const gone of Object.keys(unreadable)) {
       expect(text, `${gone} is a placeholder, not a measurement`).not.toContain(`${gone}:`);
     }
     expect(text).not.toContain("unknown");
     // The rest of the block is untouched: a dropped reading is not a dropped
-    // report, and the failure code is the line a maintainer came for.
+    // report, and the failure code is the line a maintainer came for. The count is
+    // DERIVED from the allowlist rather than written down, so adding a field does not
+    // leave a stale number asserting the old size of the block.
     expect(text).toContain("failureCode: worker-fatal");
-    expect(text.split("\n")).toHaveLength(4);
+    expect(text.split("\n")).toHaveLength(
+      DIAGNOSTIC_FIELDS.length - Object.keys(unreadable).length,
+    );
+  });
+
+  // myne-md/myne#1003. The five vault facts are the reason a pasted block can now
+  // answer "why will this device not sync" without a week of forensics, and they are
+  // absent (never placeholdered) when there is no vault to diagnose. This is the same
+  // rule the case above pins, stated for the fields that carry the most information.
+  it("omits the vault verdict when there is no vault to diagnose", () => {
+    const text = buildDiagnostics({
+      ...INPUTS,
+      vaultGeneration: null,
+      vaultAuthority: null,
+      vaultBinding: null,
+      vaultKeyAtRest: null,
+      vaultSession: null,
+    });
+    for (const gone of [
+      "vaultGeneration",
+      "vaultAuthority",
+      "vaultBinding",
+      "vaultKeyAtRest",
+      "vaultSession",
+    ]) {
+      expect(text, `${gone} is a placeholder, not a reading`).not.toContain(`${gone}:`);
+    }
+    expect(text).not.toContain("unknown");
   });
 
   it("is a flat readable list, not JSON", () => {
