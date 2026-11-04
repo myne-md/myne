@@ -97,8 +97,10 @@ function cursorInside(state: EditorState, from: number, to: number): boolean {
   return false;
 }
 
-/** Carries fresh misspelled ranges from the async IPC result into the field. */
-const setSpellErrors = StateEffect.define<SpellRange[]>();
+/** Carries fresh misspelled ranges from the async IPC result into the field.
+ *  Exported for the test that pins the out-of-range clamp below: a caller
+ *  outside this module cannot otherwise put a stale range into the field. */
+export const setSpellErrors = StateEffect.define<SpellRange[]>();
 
 /** Forces an immediate re-scan (after add-to-dictionary / ignore, which change
  * the engine's verdicts without changing the doc). The scanner listens for it. */
@@ -182,22 +184,45 @@ export function spellErrorAt(state: EditorState, pos: number): SpellRange | null
  * (SYNC-9) without re-running the IPC. */
 type SpellFieldValue = { ranges: SpellRange[]; deco: DecorationSet };
 
-const spellField = StateField.define<SpellFieldValue>({
+export const spellField = StateField.define<SpellFieldValue>({
   create: () => ({ ranges: [], deco: Decoration.none }),
   update(value, tr) {
     for (const e of tr.effects) {
       if (e.is(setSpellErrors)) {
-        return { ranges: e.value, deco: buildSpellDecorations(tr.state, e.value) };
+        // **Clamp on the way IN.** The scan is asynchronous: it is dispatched from
+        // a completed IPC round trip against the document the scan STARTED on, and
+        // the document can have shrunk before the result lands (a note whose body
+        // is replaced on switch, a remote edit applied under the caret). Ranges
+        // past the end are then out of range for the NEXT changeset, and
+        // `ChangeSet.mapPos` throws `RangeError` — which escaped as a render
+        // crash and put the whole app on the fail-closed card. Measured
+        // 2026-11-03, from `data-render-error`: `RangeError@mapPos`, both
+        // scenarios of `editor-persistent-view`, at boot.
+        const limit = tr.state.doc.length;
+        const clamped = e.value
+          .map((r) => ({
+            word: r.word,
+            from: Math.min(r.from, limit),
+            to: Math.min(r.to, limit),
+          }))
+          .filter((r) => r.to > r.from);
+        return { ranges: clamped, deco: buildSpellDecorations(tr.state, clamped) };
       }
     }
     if (tr.docChanged) {
       // Map the ranges through the edit + rebuild; the debounced re-scan will
       // refresh shortly, but mapping keeps marks aligned in the meantime.
+      //
+      // Clamped against the START state as well, because a range can also predate
+      // this transaction (an older revision's value surviving a reconfiguration):
+      // `mapPos` refuses a position its own start document does not have, and a
+      // thrown `RangeError` here is a crash rather than a mis-drawn squiggle.
+      const startLimit = tr.startState.doc.length;
       const mapped = value.ranges
         .map((r) => ({
           word: r.word,
-          from: tr.changes.mapPos(r.from),
-          to: tr.changes.mapPos(r.to),
+          from: tr.changes.mapPos(Math.min(r.from, startLimit)),
+          to: tr.changes.mapPos(Math.min(r.to, startLimit)),
         }))
         .filter((r) => r.to > r.from);
       return { ranges: mapped, deco: buildSpellDecorations(tr.state, mapped) };
