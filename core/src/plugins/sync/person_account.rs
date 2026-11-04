@@ -597,6 +597,31 @@ pub async fn person_register_with_path(
     // persist would send a later session to the phrase prompt for nothing.
     mark_identity_created(host, io).await;
 
+    // ---- myne-md/myne#1001: this is the moment this device gets a durable id ----
+    //
+    // A reserved identity carries none: `person_create_identity_from_host` writes
+    // `device_id_hex` empty because the server issues it at enrolment, and the write above
+    // is what records it. A binding row is keyed by that id, so a vault created under a
+    // reserved identity could not claim at creation (`NoDeviceId`), and no later unlock can
+    // retry for it: an `NTV7`/`NTV8` vault's unlock can never install a person session
+    // (`person_vault_carrier::carrier_applies` excludes those generations, `0774`). So the
+    // claim moves to the moment it becomes possible, which is here, with the person session
+    // the install above just put in the slot.
+    //
+    // Best effort like every other claim site: the registration the user just completed is
+    // not undone by a binding that failed to be written, and the next claim retries it.
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(active) = state.active_vault_id().await {
+        if let Ok(base) = host.app_data_dir() {
+            let vault_dir = crate::paths::vault_root_for_id_from_base(&base, active);
+            adopt_person_device_identity_best_effort(host, io, &vault_dir).await;
+            crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                host, io, state, &vault_dir,
+            )
+            .await;
+        }
+    }
+
     Ok(PersonSetupView {
         phrase: None,
         fingerprint_hex,
