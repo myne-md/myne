@@ -199,7 +199,31 @@ async function withMemberFleet(
     // their own revisions and their own presence through.
     await acceptInvite(first, ownerCode, MEMBER_NAME);
 
-    await fn({ owner, first, second, firstCode });
+    try {
+      await fn({ owner, first, second, firstCode });
+    } catch (e) {
+      // **Artifacts, because this fleet is the one place a red arrives blind.**
+      // The `scenario()` wrapper saves a screenshot and the DOM on failure; these
+      // devices are launched by the fleet helpers instead, so a red here used to
+      // say only which wait starved — with three live WebViews and no picture of
+      // any of them. Saved for all three, labelled by role, so the failing side is
+      // readable rather than guessed.
+      for (const [role, session] of [
+        ["owner", owner],
+        ["member-first", first],
+        ["member-second", second],
+      ] as const) {
+        try {
+          await session.saveArtifacts(`md1-${role}`);
+        } catch (artifactError) {
+          // Said out loud: an artifact that silently failed to save is the same
+          // blind red this block exists to prevent.
+          // eslint-disable-next-line no-console
+          console.warn(`[e2e] ${role} artifact save failed: ${(artifactError as Error).message}`);
+        }
+      }
+      throw e;
+    }
   } finally {
     if (second) await second.teardown();
     if (first) await first.teardown();
