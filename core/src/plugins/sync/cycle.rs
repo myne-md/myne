@@ -374,6 +374,39 @@ impl HeadAuthority {
             .is_some_and(super::head_authority::SignedHeadCtx::can_author)
     }
 
+    /// A context that can VERIFY a head but not sign one (myne-md/myne#1000).
+    ///
+    /// Built when the roster or its signer cannot be resolved from local state, which is the
+    /// state of every device that has just joined a vault: the roster's signer lives in
+    /// `vault.device-bindings`, and the only thing that downloads that file is the cycle this
+    /// context lets run. The head it can still verify is the owner's person-signed one, against
+    /// a half this device derived from the phrase or pinned out of band.
+    fn person_reader(
+        person: Option<protocol::PersonKeyPair>,
+        account_number_hash: [u8; protocol::vault_head::VAULT_HEAD_ACCOUNT_HASH_LEN],
+        owner_public: protocol::person_key::PersonPublicHalf,
+        person_held: bool,
+    ) -> Self {
+        Self {
+            ctx: Some(super::head_authority::SignedHeadCtx::person_only_reader(
+                person,
+                account_number_hash,
+                owner_public,
+            )),
+            device: super::authority::DeviceResolution::Unbound {
+                cause: super::authority::AuthorityMissing::NoHeadContext,
+                signers: Vec::new(),
+            },
+            person_held,
+        }
+    }
+
+    /// Whether this device can OPEN a head at all, which is a weaker question than
+    /// [`Self::can_author`] and the one the cycle's guard asks before refusing to run.
+    fn can_read(&self) -> bool {
+        self.ctx.is_some()
+    }
+
     fn missing(&self) -> super::authority::AuthorityMissing {
         super::authority::missing_for_cycle(self.ctx.is_some(), self.person_held, &self.device)
     }
@@ -419,17 +452,12 @@ pub(crate) async fn signed_head_ctx(
     let Some(b2b) = super::meta_kind::b2b_tail(&bytes) else {
         return HeadAuthority::no_context(person_held);
     };
-    let Some(group_key) = shared.group_bytes() else {
-        return HeadAuthority::no_context(person_held);
-    };
-    let Some(envelope) = protocol::person_invite::open_group_roster(
-        &group_key,
-        &b2b.base.account_number_hash,
-        b2b.group_key_epoch,
-        &b2b.signed_roster_envelope,
-    ) else {
-        return HeadAuthority::no_context(person_held);
-    };
+    // The OWNER's public half is resolved BEFORE the roster, because it is the one thing
+    // every later failure can still verify a head against. A device that has just joined
+    // has no copy of `vault.device-bindings`, so the roster's signer cannot be resolved and
+    // the whole cycle used to be refused before the pull that would deliver that file
+    // (myne-md/myne#1000). The person half is derived from the phrase or from the pinned
+    // identity code, so it is available in exactly that state.
     let Ok(sync_state) = super::state::read_sync_state(io, vault_dir).await else {
         return HeadAuthority::no_context(person_held);
     };
@@ -458,6 +486,31 @@ pub(crate) async fn signed_head_ctx(
             };
             code.public
         }
+    };
+    // The group key and the roster, which is where a joined device runs out of state: the
+    // envelope is sealed under the group key and its SIGNER is resolved from the binding
+    // store below. Both failures build a READ-ONLY context instead of refusing, so the pull
+    // that delivers the missing file can run (myne-md/myne#1000).
+    let Some(group_key) = shared.group_bytes() else {
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
+    };
+    let Some(envelope) = protocol::person_invite::open_group_roster(
+        &group_key,
+        &b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+        &b2b.signed_roster_envelope,
+    ) else {
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
     };
     // ONE read of the key at rest, whose public half the roster verification needs below. It
     // used to be two reads with two error policies (`load_for_fallback` here, `load` further
@@ -489,7 +542,12 @@ pub(crate) async fn signed_head_ctx(
         &b2b.base.account_number_hash,
     )
     .ok() else {
-        return HeadAuthority::no_context(person_held);
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
     };
     let roster_publics: Vec<protocol::person_key::PersonPublicHalf> = roster
         .members
@@ -562,6 +620,47 @@ pub(crate) async fn signed_head_ctx(
 /// a person-key rotation, and a cached copy would outlive the credential it
 /// names. `None` on an absent file (no identity on this device), an all-zero or
 /// unparseable one, or an empty token (an identity that never registered).
+/// What a cycle does about a B2B vault whose head this device may not author.
+///
+/// The refusal this replaced was one boolean, and it cost the only route out of
+/// `myne-md/myne#1000`: a device that had just joined could not resolve the roster's signer,
+/// so the whole cycle was refused BEFORE the pull — and the pull is the only thing that
+/// downloads `vault.device-bindings`, which is what resolves that signer. The state could not
+/// repair itself, and the user met an approval screen whose code never arrives.
+///
+/// `ReadOnly` is the arm that breaks the loop, and it is safe because the property the refusal
+/// protects is "never AUTHOR the downgraded `0x01` HMAC head": `PushGate::PollOnly` denies both
+/// the content push and the genesis head, so no head is authored at all. What the device may
+/// still do is verify and adopt a head its peer signed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HeadAuthorityVerdict {
+    /// Authoring works, or this vault needs no signed head: an ordinary cycle.
+    Author,
+    /// A head can be READ but not signed: run pull-only and report nothing as broken.
+    ReadOnly,
+    /// No head context at all, so not even a signature can be checked: refuse.
+    Refuse,
+}
+
+/// The one decision the cycle makes about a missing authoring authority.
+///
+/// A function rather than three lines in the middle of a 700-line builder because the three
+/// answers are the whole of `myne-md/myne#1000`, and a caller would otherwise have to stand up
+/// a server to see which arm it took.
+fn head_authority_verdict(
+    needs_signed_head: bool,
+    authority: &HeadAuthority,
+) -> HeadAuthorityVerdict {
+    if !needs_signed_head || authority.can_author() {
+        return HeadAuthorityVerdict::Author;
+    }
+    if authority.can_read() {
+        HeadAuthorityVerdict::ReadOnly
+    } else {
+        HeadAuthorityVerdict::Refuse
+    }
+}
+
 /// Which `FailureClass` a missing authority becomes, in one place.
 ///
 /// The mapping is the whole point of myne-md/myne#983: the class, the log and the UI sentence
@@ -695,7 +794,7 @@ pub async fn run_active_cycle_from_host(
     // screens fire `sync_now` about once a second and `useConflictMaterializer`
     // fires one on every `sync://changed`, which is precisely when a joining
     // device's first pull lands and the ceremony opens.
-    let gate = if !allow_push {
+    let mut gate = if !allow_push {
         super::orchestrator::PushGate::PollOnly
     } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
         super::orchestrator::PushGate::VerifyHold
@@ -1028,7 +1127,8 @@ pub async fn run_active_cycle_from_host(
                 return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
             }
         };
-        if needs_signed_head && !authority.can_author() {
+        let verdict = head_authority_verdict(needs_signed_head, &authority);
+        if verdict != HeadAuthorityVerdict::Author {
             // The cause comes from `sync::authority`, which is the only place that knows
             // which half is missing (myne-md/myne#983). The class is derived from whether
             // opening the identity would FIX it, not from whether an identity happens to be
@@ -1036,16 +1136,33 @@ pub async fn run_active_cycle_from_host(
             // `identity_locked` for exactly as long as the two were conflated, and the
             // sentence sent the user to a fix that only sometimes applied.
             let cause = authority.missing();
-            let class = class_for_missing_authority(cause, authority.person_held);
-            tracing::warn!(
-                stage = "sync_cycle",
-                event = "b2b_head_authority_missing",
-                cause = cause.as_str(),
-                person_identity_held = authority.person_held,
-                identity_unlock_would_fix = cause.identity_unlock_would_fix(),
-                "this device cannot sign the vault head; refusing to author a downgraded head"
-            );
-            return CycleOutcome::Failed(class);
+            match verdict {
+                HeadAuthorityVerdict::ReadOnly => {
+                    tracing::warn!(
+                        stage = "sync_cycle",
+                        event = "b2b_head_authority_missing",
+                        cause = cause.as_str(),
+                        person_identity_held = authority.person_held,
+                        identity_unlock_would_fix = cause.identity_unlock_would_fix(),
+                        "this device cannot sign the vault head; running a pull-only cycle to \
+                         fetch the state that would let it"
+                    );
+                    gate = super::orchestrator::PushGate::PollOnly;
+                }
+                HeadAuthorityVerdict::Refuse => {
+                    let class = class_for_missing_authority(cause, authority.person_held);
+                    tracing::warn!(
+                        stage = "sync_cycle",
+                        event = "b2b_head_authority_missing",
+                        cause = cause.as_str(),
+                        person_identity_held = authority.person_held,
+                        identity_unlock_would_fix = cause.identity_unlock_would_fix(),
+                        "this device has no head context at all; refusing to run the cycle"
+                    );
+                    return CycleOutcome::Failed(class);
+                }
+                HeadAuthorityVerdict::Author => {}
+            }
         }
     }
 
@@ -2101,5 +2218,63 @@ mod tests {
                 "a pulled tombstone must not be re-indexed, got {tail:?}"
             );
         });
+    }
+
+    /// `myne-md/myne#1000`'s three answers, asserted where they are decided.
+    ///
+    /// The defect was one boolean: a device that could not SIGN was refused a cycle, and the
+    /// pull that would have given it the state to sign with never ran. The middle arm is the
+    /// fix, and it is the one a future edit collapses by accident: `can_read` and `can_author`
+    /// differ only for a context built without the roster, so an edit that asks the louder
+    /// question here restores the deadlock while every other test in the crate stays green.
+    #[test]
+    fn a_cycle_reads_what_it_cannot_sign_and_refuses_only_without_a_context() {
+        use super::{head_authority_verdict, HeadAuthority, HeadAuthorityVerdict};
+        use protocol::PersonKeyPair;
+
+        // No context at all: nothing can be verified, so the cycle must not run.
+        assert_eq!(
+            head_authority_verdict(true, &HeadAuthority::no_context(true)),
+            HeadAuthorityVerdict::Refuse,
+            "without a head context not even a signature can be checked"
+        );
+
+        // A context that reads but cannot sign: the joined device's state.
+        let account = [0x61u8; 16];
+        let owner = PersonKeyPair::generate_raw(&[0x71; 64], &[0x72; 32], &[0x73; 32]);
+        let reader =
+            HeadAuthority::person_reader(Some(owner.clone()), account, owner.public_half(), true);
+        assert!(
+            !reader.can_author(),
+            "the fixture must be the state the arm exists for"
+        );
+        assert_eq!(
+            head_authority_verdict(true, &reader),
+            HeadAuthorityVerdict::ReadOnly,
+            "a device that cannot sign still pulls the state that lets it"
+        );
+
+        // And the ordinary vault, where the whole block is skipped.
+        let authoring = HeadAuthority {
+            ctx: Some(super::super::head_authority::SignedHeadCtx::new(
+                Some(owner.clone()),
+                account,
+                vec![owner.public_half()],
+            )),
+            device: super::super::authority::DeviceResolution::Unbound {
+                cause: super::super::authority::AuthorityMissing::NoHeadContext,
+                signers: Vec::new(),
+            },
+            person_held: true,
+        };
+        assert_eq!(
+            head_authority_verdict(true, &authoring),
+            HeadAuthorityVerdict::Author
+        );
+        assert_eq!(
+            head_authority_verdict(false, &reader),
+            HeadAuthorityVerdict::Author,
+            "an NTV5 vault needs no signed head, so the authority is never consulted"
+        );
     }
 }
