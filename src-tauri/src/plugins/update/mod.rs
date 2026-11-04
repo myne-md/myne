@@ -40,12 +40,12 @@ use tauri_plugin_updater::{Updater, UpdaterExt};
 /// resolution, three readers.
 fn updater_for<R: Runtime>(app: &AppHandle<R>) -> Result<Updater, UpdateCheckError> {
     let endpoint = Url::parse(&crate::update::Channel::from_env().endpoint())
-        .map_err(|_| UpdateCheckError::Other)?;
+        .map_err(|_| config_failed(FailureKind::Other, None))?;
     app.updater_builder()
         .endpoints(vec![endpoint])
-        .map_err(|_| UpdateCheckError::Unsupported)?
+        .map_err(|_| config_failed(FailureKind::Unsupported, None))?
         .build()
-        .map_err(|_| UpdateCheckError::Unsupported)
+        .map_err(|_| config_failed(FailureKind::Unsupported, None))
 }
 
 /// Resolve `<app_config_dir>/update-prefs.json`, creating the directory.
@@ -53,9 +53,27 @@ fn prefs_path<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, Upda
     let dir = app
         .path()
         .app_config_dir()
-        .map_err(|_| UpdateCheckError::Other)?;
-    std::fs::create_dir_all(&dir).map_err(|_| UpdateCheckError::Other)?;
+        .map_err(|_| config_failed(FailureKind::Other, None))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| config_failed(FailureKind::Other, Some(from_io_error_kind(e.kind()))))?;
     Ok(crate::update::prefs::update_prefs_path(dir))
+}
+
+/// Record a failure that has no updater error behind it.
+///
+/// Building the updater and resolving this device's prefs are the two steps before
+/// the updater's own error type exists, so they have nothing to classify and a stage
+/// of their own. They were silent until review: both commands could return to the
+/// page from `updater_for`'s three arms and from `prefs_path` without writing a line,
+/// which is the same dead end this module's records exist to close.
+fn config_failed(failure: FailureKind, io_kind: Option<IoFailureKind>) -> UpdateCheckError {
+    tracing::warn!(
+        event = "update_step_failed",
+        stage = "config",
+        kind = ?failure,
+        io_kind = ?io_kind
+    );
+    map_kind(failure)
 }
 
 /// Why a step failed, in the vocabulary the diagnostic log records.
@@ -74,13 +92,16 @@ fn prefs_path<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, Upda
 /// having, and the log is not an IPC surface.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FailureKind {
-    /// The manifest could not be fetched, or named no release for this platform.
+    /// The manifest could not be fetched, or was not a release document this build
+    /// can read. A `TargetsNotFound` is NOT here: the network is fine when a manifest
+    /// carries no entry for this platform, and telling that user to check their
+    /// connection would send them at the wrong thing.
     Unreachable,
     /// The artifact is present but its signature, hash or version will not verify.
     Verification,
     /// The updater cannot work on this target at all (no endpoints, wrong arch/OS).
     Unsupported,
-    /// A filesystem or process failure while replacing the bundle — the step after
+    /// A filesystem or process failure while replacing the bundle, the step after
     /// a successful download and verification, and the one with no second chance.
     Install,
     Other,
@@ -121,33 +142,64 @@ fn io_kind_of(error: &tauri_plugin_updater::Error) -> Option<IoFailureKind> {
     }
 }
 
-/// Record a failed step, then hand the error to the IPC projection.
+/// Record a failed step, then hand the failure to the IPC projection.
 ///
-/// One call site per failure, so the log line and the value the page sees can never
-/// disagree about what happened.
-fn failed(step: &'static str, error: tauri_plugin_updater::Error) -> UpdateCheckError {
+/// **One call site per recorded failure, so the log line and the value the page sees
+/// can never disagree about what happened.** `measured` carries the numbers only a
+/// multi-step failure has: the bytes that moved and how long the attempt took.
+fn failed(
+    step: &'static str,
+    error: tauri_plugin_updater::Error,
+    measured: Option<(u64, u64)>,
+) -> UpdateCheckError {
     let kind = classify(&error);
-    tracing::warn!(
-        event = "update_step_failed",
-        stage = step,
-        kind = ?kind,
-        io_kind = ?io_kind_of(&error)
-    );
-    map_error(error)
+    let io_kind = io_kind_of(&error);
+    match measured {
+        Some((bytes, elapsed_ms)) => tracing::warn!(
+            event = "update_step_failed",
+            stage = step,
+            kind = ?kind,
+            io_kind = ?io_kind,
+            bytes,
+            elapsed_ms
+        ),
+        None => tracing::warn!(
+            event = "update_step_failed",
+            stage = step,
+            kind = ?kind,
+            io_kind = ?io_kind
+        ),
+    }
+    map_kind(kind)
 }
 
-/// Map the classified failure onto the WebView's closed set.
+/// Map a classified failure onto the WebView's closed set.
 ///
 /// Coarse on purpose: the UI only needs "could not reach", "refused", "cannot
 /// update here", or "other".
-fn map_error(error: tauri_plugin_updater::Error) -> UpdateCheckError {
-    match classify(&error) {
+fn map_kind(failure: FailureKind) -> UpdateCheckError {
+    match failure {
         FailureKind::Unreachable => UpdateCheckError::Unreachable,
         FailureKind::Verification => UpdateCheckError::Verification,
         FailureKind::Unsupported => UpdateCheckError::Unsupported,
         // A local IO failure (disk full, permission denied) is NOT reachability, so
         // the user gets a line that does not point at the network for a disk problem.
         FailureKind::Install | FailureKind::Other => UpdateCheckError::Other,
+    }
+}
+
+/// Which of the three steps behind `download_and_install` the kind names.
+///
+/// The updater hands back one error type for the whole sequence, so a constant
+/// `stage` over it would file a dead download under the bundle swap. `classify`
+/// already knows which kind of thing happened; this is the same knowledge in the
+/// vocabulary a reader greps for.
+fn install_stage(failure: FailureKind) -> &'static str {
+    match failure {
+        FailureKind::Unreachable => "download",
+        FailureKind::Verification => "verify",
+        FailureKind::Install => "replace_bundle",
+        FailureKind::Unsupported | FailureKind::Other => "install",
     }
 }
 
@@ -175,7 +227,7 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
             tracing::info!(event = "update_check_outcome", outcome = "up_to_date");
             Ok(UpdateStatus::UpToDate)
         }
-        Err(error) => Err(failed("check", error)),
+        Err(error) => Err(failed("check", error, None)),
     }
 }
 
@@ -183,7 +235,7 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
 ///
 /// On Windows the installer exits the process itself; on macOS and Linux this
 /// returns and the relaunch below is what starts the new version.
-#[tauri::command]
+///
 /// # What the diagnostic log gets, and why the callback is not a no-op
 ///
 /// This path is the one place in the app where a failure leaves **no other
@@ -194,21 +246,22 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
 /// about to perform. A log that stops after the first one says the download died; a
 /// log that reaches the third says the bundle was replaced.
 ///
-/// The download's chunk callback was `|_, _| {}` — a no-op that made a 149 MiB
+/// The download's chunk callback was `|_, _| {}`, a no-op that made a 149 MiB
 /// transfer and a dead socket look identical. It now counts bytes for the outcome
 /// event, which is the cheapest honest progress signal there is: it costs a `+=` on
 /// a callback the plugin already calls, and it turns "did not finish" into a number.
+#[tauri::command]
 pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateCheckError> {
     let updater = updater_for(&app)?;
     let offer = updater
         .check()
         .await
-        .map_err(|error| failed("check", error))?;
+        .map_err(|error| failed("check", error, None))?;
     let Some(update) = offer else {
         // The offer vanished between the check and the install. Report it rather
         // than resolving, so the UI leaves its "installing" state instead of
         // hanging on it.
-        tracing::warn!(event = "update_offer_gone");
+        tracing::warn!(event = "update_offer_gone", stage = "check");
         return Err(UpdateCheckError::Other);
     };
 
@@ -225,26 +278,22 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
     let elapsed_ms = started.elapsed().as_millis() as u64;
 
     if let Err(error) = outcome {
-        // `stage="install"` plus the classified kind separates the three steps the
-        // updater hides behind one error type: `unreachable` is the download,
-        // `verification` is the signature, and `install` is the bundle swap, whose
-        // `io_kind` names a refusal (`PermissionDenied`), a full disk or a missing
-        // path.
-        let kind = classify(&error);
-        tracing::warn!(
-            event = "update_step_failed",
-            stage = "install",
-            kind = ?kind,
-            io_kind = ?io_kind_of(&error),
-            bytes = received,
-            elapsed_ms
-        );
-        return Err(map_error(error));
+        // The stage is derived from the classified kind, because the updater hides
+        // three steps behind one error type and a constant `stage` would file a dead
+        // download under the bundle swap. The `io_kind` is what makes a swap failure
+        // actionable: a refusal (`PermissionDenied`) and a full disk are one sentence
+        // on screen and two different repairs.
+        return Err(failed(
+            install_stage(classify(&error)),
+            error,
+            Some((received, elapsed_ms)),
+        ));
     }
 
     tracing::info!(event = "update_installed", bytes = received, elapsed_ms);
-    // The last line this process writes before it hands over. Its presence without a
-    // following startup entry is the one shape that proves the restart itself failed.
+    // The last line this process writes before it hands over. Nothing after it in the
+    // log means the restart itself did not reach the new build; the complement is the
+    // `app_started` record the logging install writes on every run.
     tracing::info!(event = "update_restarting", offered = ?update.version);
     tauri::process::restart(&app.env());
 }
@@ -271,7 +320,7 @@ pub async fn update_set_auto_check<R: Runtime>(
             auto_check: enabled,
         },
     )
-    .map_err(|_| UpdateCheckError::Other)
+    .map_err(|e| config_failed(FailureKind::Other, Some(from_io_error_kind(e.kind()))))
 }
 
 /// Build the `update` plugin: the four commands above, nothing else.
@@ -298,14 +347,14 @@ mod tests {
     ///
     /// `map_error` sent every `Error::Io` to `Other` for this reason, and the line
     /// explaining it could not stop a future edit from folding `Io` into
-    /// `Unreachable` — which would tell a user with a locked-down `/Applications` to
+    /// `Unreachable`, which would tell a user with a locked-down `/Applications` to
     /// check their connection. The classification is now read by two callers, so the
     /// distinction has somewhere to be asserted.
     #[test]
     fn a_bundle_swap_failure_is_not_reported_as_a_network_problem() {
         let refused = Error::Io(std::io::Error::from(ErrorKind::PermissionDenied));
         assert_eq!(classify(&refused), FailureKind::Install);
-        assert_eq!(map_error(refused), UpdateCheckError::Other);
+        assert_eq!(map_kind(classify(&refused)), UpdateCheckError::Other);
     }
 
     /// The IO kind is what makes "did not finish" actionable: a refusal and a full
@@ -326,6 +375,10 @@ mod tests {
 
     /// A variant this build has never seen lands on a closed kind rather than being
     /// guessed at, and the guess is not allowed to be `Unreachable`.
+    ///
+    /// `TargetNotFound` is here on purpose rather than by accident: the network is
+    /// fine when a manifest carries no entry for this platform, so routing it to
+    /// `Unreachable` would tell that user to check their connection.
     #[test]
     fn an_unclassified_failure_still_lands_on_a_closed_kind() {
         assert_eq!(classify(&Error::UnsupportedArch), FailureKind::Unsupported);
@@ -339,21 +392,54 @@ mod tests {
         );
     }
 
+    /// The three steps behind one error type get three stage names, so a report can
+    /// say that the download died rather than that "the install" did.
+    #[test]
+    fn the_stage_follows_the_step_the_kind_names() {
+        assert_eq!(install_stage(FailureKind::Unreachable), "download");
+        assert_eq!(install_stage(FailureKind::Verification), "verify");
+        assert_eq!(install_stage(FailureKind::Install), "replace_bundle");
+    }
+
     /// The record the 2026-11-04 report did not have: the step, the kind, and the IO
-    /// kind, on the one failure path that returns to the page.
+    /// kind, on the one shape every recorded failure now goes through.
     ///
-    /// `failed` is the whole call site for a failed step, so asserting its record is
-    /// asserting that `update_check` and `update_install` cannot return an error
-    /// without leaving a line — which is the property, not the text.
+    /// `failed` is that shape, so this asserts the record it writes. What it does
+    /// NOT prove is that every arm of `update_check` and `update_install` reaches
+    /// `failed`; the arms that bypassed it (`updater_for`, `prefs_path`) were silent
+    /// until review and are covered by `config_failed`'s own record, not by this.
     #[test]
     #[tracing_test::traced_test]
     fn a_failed_step_is_recorded_with_the_kind_it_classified() {
         let refused = Error::Io(std::io::Error::from(ErrorKind::PermissionDenied));
-        let mapped = failed("install", refused);
+        let mapped = failed("replace_bundle", refused, None);
         assert_eq!(mapped, UpdateCheckError::Other);
         assert!(logs_contain("event=\"update_step_failed\""));
-        assert!(logs_contain("stage=\"install\""));
+        assert!(logs_contain("stage=\"replace_bundle\""));
         assert!(logs_contain("kind=Install"));
+        assert!(logs_contain("io_kind=Some(PermissionDenied)"));
+    }
+
+    /// The two numbers only a download-and-install has, and the record that must
+    /// still fire when they are the only evidence the attempt moved anything.
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_failed_install_records_what_it_moved() {
+        let refused = Error::Io(std::io::Error::from(ErrorKind::PermissionDenied));
+        let _ = failed("replace_bundle", refused, Some((149_000_000, 61_000)));
+        assert!(logs_contain("bytes=149000000"));
+        assert!(logs_contain("elapsed_ms=61000"));
+    }
+
+    /// A step with no updater error behind it still gets a record, because these
+    /// are the arms that returned to the page silently.
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_configuration_failure_is_recorded_too() {
+        let mapped = config_failed(FailureKind::Other, Some(IoFailureKind::PermissionDenied));
+        assert_eq!(mapped, UpdateCheckError::Other);
+        assert!(logs_contain("event=\"update_step_failed\""));
+        assert!(logs_contain("stage=\"config\""));
         assert!(logs_contain("io_kind=Some(PermissionDenied)"));
     }
 }

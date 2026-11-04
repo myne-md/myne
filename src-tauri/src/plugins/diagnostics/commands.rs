@@ -214,9 +214,9 @@ pub async fn save_report<R: Runtime>(
     let captured = match report::write_bundle(&block, &sink, &destination) {
         Ok(captured) => captured,
         Err(e) => {
-            // A support bundle that could not be written is the case where the
-            // report the reporter wanted to send is itself the evidence, so this
-            // line is the only trace the failure leaves that is not on their screen.
+            // The report file that could not be written is the case where the
+            // artefact the user wanted to send is itself the evidence, so this line
+            // is the only trace the failure leaves that is not on their screen.
             let error = io(e);
             tracing::warn!(event = "diagnostic_report_failed", stage = "write", kind = ?error);
             return Err(error);
