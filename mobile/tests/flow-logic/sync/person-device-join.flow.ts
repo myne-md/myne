@@ -156,7 +156,7 @@ test.describe("person device join on the phone (myne-md/myne#911 task 12)", () =
     await fillPhraseField(page, "identity-flow.person-join-cell");
     await page.getByTestId("identity-flow.person-join-submit").click();
 
-    // The frame landed locked, so the probe lands on that vault's unlock form —
+    // The frame landed locked, so the probe lands on that vault's unlock form,
     // the password screen the reporter saw, and the right screen: this VAULT's
     // password is the only key to it (the join installs none).
     await expect(page.getByTestId("unlock-submit")).toBeVisible();

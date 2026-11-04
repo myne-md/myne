@@ -156,7 +156,7 @@ describe("awaitingApprovalVerdict", () => {
       answers({ baseline: "ABCD-1234" });
       await expect(awaitingApprovalVerdict("vault-a")).resolves.toBe(true);
       // Retired by the compare ("they match"), by a local un-enrol, or by the
-      // wait's own Cancel — never by the passage of a head.
+      // wait's own Cancel, and never by the passage of a head.
       expect(isApprovalWait("vault-a")).toBe(true);
     });
 

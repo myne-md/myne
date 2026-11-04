@@ -25,15 +25,22 @@
 // server moves on, leaving two places that claim to know and one of them wrong.
 // This marker is not that. It is a local note that says "the join put a vault on
 // this device and its compare has not been answered", and what retires it is named
-// per client rather than guessed:
+// rather than guessed:
 //
-//   - desktop and web retire it when an approval is observed (a non-null head
-//     fingerprint), which is the reading that shipped with myne-md/myne#535;
-//   - mobile retires it when the compare screen has SHOWN a code and the user
-//     leaves, and keeps it when they leave before that, because a head is not a
-//     comparison: a joined vault's first pull lands one on the locked-to-unlocked
-//     edge, and retiring the marker on that reads as "approved" for a device whose
-//     compare never happened.
+//   - mobile writes it, in the join, and retires it on three acts and no others: a
+//     match, a mismatch that un-enrols the device, or the user cancelling out of the
+//     compare after the code has been SHOWN. It keeps it when the user leaves
+//     before a code was shown, and an idle auto-lock keeps it too, because a head
+//     arriving is not a comparison: a joined vault's first pull lands one on the
+//     locked-to-unlocked edge, and retiring the marker on that reads as
+//     "approved" for a device whose compare never happened.
+//   - desktop and web neither write one nor read one. Their accept puts the vault on
+//     the `pending-approval` stage at the moment it is accepted (`decisions/sync/0767`
+//     names that route on both), so the question is answered by routing the user has
+//     already been through and nothing has to be remembered. Mobile is the exception
+//     because a person's vaults arrive LOCKED: the wait cannot be entered until the
+//     vault is open, so the fact has to outlive the unlock. Add the writer when a
+//     second client gains that shape, not a second retirement rule here.
 //
 // A stale one therefore costs an extra compare screen rather than a skipped
 // mitigation, which is the failure direction `threat-model.md` §7 can absorb.
@@ -70,7 +77,8 @@ export function markApprovalWait(vaultId: string): void {
   }
 }
 
-/** Record that an approval has been observed, or that there is nothing to wait for. */
+/** Retire the marker for this vault: the compare was answered, the device was
+ *  un-enrolled, or the user cancelled out of a compare that had shown a code. */
 export function clearApprovalWait(vaultId: string): void {
   try {
     store()?.removeItem(key(vaultId));

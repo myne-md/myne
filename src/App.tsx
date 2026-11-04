@@ -330,7 +330,7 @@ function App() {
   useEffect(() => {
     if (stage?.name !== "editor") return;
     let cancelled = false;
-    void awaitingApprovalVerdict(editorVaultId).then((awaiting) => {
+    void awaitingApprovalVerdict().then((awaiting) => {
       if (cancelled || !awaiting) return;
       setStage((prev) =>
         prev?.name === "editor" ? transition(prev, { type: "editor.awaiting-approval" }) : prev,

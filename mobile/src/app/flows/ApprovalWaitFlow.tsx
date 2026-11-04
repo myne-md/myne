@@ -58,40 +58,48 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
   const [abortFailed, setAbortFailed] = useState(false);
 
   /**
-   * The one exit that decides the marker, and the rule is one sentence: leaving
-   * retires it once the code has been SHOWN, and keeps it otherwise.
+   * The user's exit, and the one place that decides the marker. The rule is one
+   * sentence: a Cancel retires it once the code has been SHOWN, and keeps it
+   * otherwise.
    *
    * Both halves are load-bearing, and they came from two reviewers pulling in
    * opposite directions. Retiring the marker on arrival at this screen makes the
    * only out-of-band compare in the product optional, and `threat-model.md` §7 keeps
-   * a phone's wait across a relaunch precisely so it does not become optional. Not
-   * retiring it at all leaves a marker that no path can clear: a user who presses
-   * Cancel could then only leave by answering a compare, and the reject answer is a
-   * local un-enrol.
+   * a phone's wait across a relaunch so that it does not become optional. Not
+   * retiring it at all leaves a marker that no act of the user's can clear: a reader
+   * who does not want to compare could then only leave by answering one, and the
+   * reject answer is a local un-enrol.
    *
    * With the rule below the compare has been OFFERED before the marker goes (the code
    * was on screen, so `step === "verify"`), and nothing is skipped. A user who leaves
    * before that keeps the marker and meets the wait again on the next unlock, which is
    * the behaviour §7 describes, and that screen's own approval poll is what turns the
    * wait into a code.
-   *
-   * A `useCallback` rather than a plain function because `useIdleAutoLock` names it in
-   * an effect dependency: a fresh identity per render would tear the timer down and
-   * re-arm it, and the list behind this screen re-renders about once a second.
    */
   const leave = useCallback(() => {
     if (vaultId !== undefined && step === "verify") clearApprovalWait(vaultId);
     onCancel();
   }, [vaultId, step, onCancel]);
 
+  /**
+   * The idle re-lock's exit. Deliberately NOT `leave`: an auto-lock is not a
+   * comparison, so it must not retire the marker that owes one. A phone left on
+   * the compare screen goes back to the lock screen with the marker intact and
+   * meets the wait on the next unlock, which is the same hold §7 describes.
+   *
+   * Stable identity on purpose: `useIdleAutoLock` names it in an effect
+   * dependency, so a fresh one per render would tear the timer down and re-arm it.
+   * `step` is deliberately absent from the list for that reason, and `leave` is
+   * the callback that reads it.
+   */
+  const lock = useCallback(() => {
+    onCancel();
+  }, [onCancel]);
+
   // Idle re-lock for the one post-unlock screen that is not the editor. It locks
-  // and then re-probes, which lands on the unlock form for this vault, the same
-  // destination `leave` chooses, because a locked vault is a locked vault whoever
-  // asked.
-  //
-  // Both exits go through `leave`, which is the one place that decides whether the
-  // marker that owes this compare is retired. See its comment.
-  useIdleAutoLock(leave, prefs.auto_lock_seconds);
+  // and then re-probes, which lands on the unlock form for this vault, because a
+  // locked vault is a locked vault whoever asked.
+  useIdleAutoLock(lock, prefs.auto_lock_seconds);
 
   // Armed for both steps: the head can arrive while the spinner is up (that is
   // the ordinary case) and it must keep being watched once the compare is
@@ -120,11 +128,10 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
       setAbortFailed(true);
       return;
     }
-    // The join is abandoned, so the marker has nothing left to ask for. The
-    // un-enrol above already cleared the enrolment, and this clears the question
-    // that pointed at it.
-    if (vaultId !== undefined) clearApprovalWait(vaultId);
-    onCancel();
+    // The join is abandoned, so the marker has nothing left to ask for. `leave`
+    // owns that decision and answers the same way here, because this arm only
+    // renders once the code is on screen (`step === "verify"`).
+    leave();
   }
 
   if (step === "pending") {
@@ -249,6 +256,13 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
           data-testid="sync.join.sas-mismatch"
         >
           {aborting ? t("join.removing") : t("join.sasMismatch")}
+        </Button>
+        {/* The non-destructive exit. Without it the compare had exactly two
+            answers, and the refusing one un-enrols the device, so a reader who
+            did not want to answer had none. `leave` retires the marker here
+            because the code is on screen, which is the rule §7 states. */}
+        <Button variant="ghost" disabled={aborting} onClick={leave} data-testid="sync.join.cancel">
+          {t("common.prompt.cancel")}
         </Button>
       </FooterBar>
     </Screen>
