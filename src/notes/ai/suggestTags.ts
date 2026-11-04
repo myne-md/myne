@@ -52,6 +52,10 @@ const MAX_RAW_CANDIDATES = 64;
  * enforced here, not just requested in the prompt). Bounded to
  * `MAX_RAW_CANDIDATES`. The `#` is left on — `rankTagCandidates`' `cleanTagToken`
  * strips it. Pure.
+ *
+ * Legality is NOT decided here: whether a piece is a tag at all is §3.7.2's
+ * question, asked once, in `rankTagCandidates`. Adding a second gate in this
+ * function would be the fourth copy of one rule (myne-md/myne#983).
  */
 export function parseTagCandidates(modelOutput: string): string[] {
   return modelOutput
