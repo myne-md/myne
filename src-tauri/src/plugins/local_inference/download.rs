@@ -291,13 +291,59 @@ fn fetch_one<W: std::io::Write>(
     )
 }
 
+/// Fetch and install `artifact`, and record the attempt.
+///
+/// **One wrapper, three records, no scattered call sites.** A model download moves
+/// hundreds of megabytes in one attempt with no retry behind it, and until this
+/// wrapper existed it left no trace at all: the only evidence of a failed download
+/// was a typed error the page turned into a sentence. Recording it here rather than
+/// at each `return Err` in the body is what makes the coverage total — the body has
+/// four failure arms today and a fifth would be silent otherwise.
+///
+/// `expected_bytes` is the artefact's declared size, not a count of what moved: the
+/// body streams file by file and reports progress through `progress`, and re-deriving
+/// a byte count here would be a second measure of the same thing.
+pub fn download_and_install(
+    base: &Path,
+    artifact: &Artifact,
+    download_id: &str,
+    cancelled: &CancelledFn,
+    progress: &DownloadProgressFn,
+) -> Result<PathBuf, ModelDownloadCommandError> {
+    let started = std::time::Instant::now();
+    tracing::info!(
+        event = "model_download_started",
+        artifact = artifact.id,
+        expected_bytes = artifact.approx_total_bytes
+    );
+    let outcome = download_and_install_inner(base, artifact, download_id, cancelled, progress);
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    match &outcome {
+        Ok(_) => tracing::info!(
+            event = "model_download_installed",
+            artifact = artifact.id,
+            expected_bytes = artifact.approx_total_bytes,
+            elapsed_ms
+        ),
+        // `?error` on this pair of closed enums: neither variant set carries an
+        // `io::Error`, so no path and no OS message can reach the file.
+        Err(error) => tracing::warn!(
+            event = "model_download_failed",
+            artifact = artifact.id,
+            kind = ?error,
+            elapsed_ms
+        ),
+    }
+    outcome
+}
+
 /// Fetch and install `artifact`, streaming each file to a staging directory and
 /// registering only after every file verifies against its compiled-in digest.
 ///
 /// Blocking (sockets + fs); the caller runs it on a blocking task. On any
 /// failure the staging directory is removed, so no partial artefact is left for
 /// the loader to find.
-pub fn download_and_install(
+fn download_and_install_inner(
     base: &Path,
     artifact: &Artifact,
     download_id: &str,

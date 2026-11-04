@@ -53,6 +53,28 @@ pub async fn save_secret_text_from_host(
     path: String,
     contents: String,
 ) -> Result<(), SecretExportError> {
+    // **A bearer credential leaving the vault is the one write in the tree that
+    // deserves a record either way.** The user can lose this file, leave it in a
+    // synced folder, or hand the machine to someone else, and every one of those
+    // reports arrives after the fact with nothing to date it. The path is NOT
+    // logged (it names the user's directory layout); the act and its outcome are.
+    let outcome = write_secret_text(host, path, contents).await;
+    match &outcome {
+        Ok(()) => tracing::info!(event = "secret_export_written"),
+        // `?error` is safe here: `SecretExportError` carries only a closed
+        // `IoFailureKind`, never a path or an OS message.
+        Err(error) => tracing::warn!(event = "secret_export_failed", kind = ?error),
+    }
+    outcome
+}
+
+/// The command's body: validate the destination, then write the secret with the
+/// two properties this payload requires.
+async fn write_secret_text(
+    host: &dyn HostCtx,
+    path: String,
+    contents: String,
+) -> Result<(), SecretExportError> {
     // First non-doc statement: bound the secret's lifetime to a Zeroizing wrapper.
     let contents = Zeroizing::new(contents);
     let dest = std::path::PathBuf::from(&path);
