@@ -24,6 +24,30 @@ export type UpdateCheckError =
   | "unsupported"
   | "other";
 
+/**
+ * The event name `update_install` streams {@link UpdateProgress} on.
+ *
+ * Mirrors `PROGRESS_EVENT` in `src-tauri/src/update/mod.rs`, which a TypeScript
+ * constant cannot import. A rename on one side only is a progress bar that never
+ * moves and reports nothing about why: a `listen` on a name nobody emits is a
+ * subscription that simply never fires.
+ */
+export const UPDATE_PROGRESS_EVENT = "update:progress";
+
+/**
+ * One tick of an install in flight, as the host reports it.
+ *
+ * `downloading` carries byte counts rather than a percentage because `total` is
+ * genuinely optional: an origin that sends no `Content-Length` gives the host no
+ * denominator, and a percentage invented here would be a number nobody measured.
+ * `verifying` and `installing` carry nothing of their own; the screen derives its
+ * bar from the phase.
+ */
+export type UpdateProgress =
+  | { phase: "downloading"; downloaded: number; total: number | null }
+  | { phase: "verifying" }
+  | { phase: "installing" };
+
 /** Check for a signed update. Rejects with an {@link UpdateCheckError}. */
 export async function updateCheck(): Promise<UpdateStatus> {
   return await invoke<UpdateStatus>("plugin:update|update_check");
