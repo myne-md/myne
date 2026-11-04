@@ -270,7 +270,6 @@ export const ROSTER = Object.freeze([
       "src/lib/chats.ts",
       "src/lib/memory.ts",
       "src/notes/agent/agentStore.ts",
-      "src/notes/components/MemoryPopover.tsx",
       "src/components/settings/MemorySection.tsx",
       "src/components/settings/SeedMemoryWizard.tsx",
       "src/notes/components/SeedMemoryCard.tsx",
@@ -356,8 +355,8 @@ export const ROSTER = Object.freeze([
         tier: "core",
       },
       {
-        see: "On macOS and on Windows, with AI on and one memory entry present: open the AI chat tab and confirm the header carries a Memory button beside History; open it and confirm the popover lists the entry with a working per-entry Delete; open Settings > AI and confirm the Memory section lists the same entry with edit and delete plus the voice-preferences editor; edit the entry and confirm the popover shows the new text; delete it from the popover and confirm the settings list empties too. Then run one agent turn that writes memory and confirm the settled turn carries the memory-updated line with the entry count.",
-        whyNotAutomated: "The automated lane drives WebKitGTK in a Linux container, so the WKWebView (macOS) and WebView2 (Windows) renderings of the settings panel and the popover are never exercised; whether the popover positions beside the header, the marker paints on the settled turn, and the two surfaces show the same roster is a property of those engines.",
+        see: "On macOS and on Windows, with AI on and one memory entry present: open Settings > AI > Advanced and confirm the Memory section lists the entry with edit and delete plus the voice-preferences editor, and that the AI chat header offers NO memory button beside History (Settings is the only door since myne-md/myne#1020, and a second one would be a regression). Edit the entry, close Settings, reopen it and confirm the new text persisted. Then run one agent turn that writes memory and confirm the settled turn carries the memory-updated line with the entry count, and that no walk from the chat leads to a separate memory list.",
+        whyNotAutomated: "The automated lane drives WebKitGTK in a Linux container, so the WKWebView (macOS) and WebView2 (Windows) renderings of the settings panel are never exercised; whether the section paints, and whether the settled turn's marker paints beside it, is a property of those engines. The absence half is machine-checked (`e2e/memory.e2e.ts` asserts the button is gone), which is why this item is now about the one surface that remains rather than about two staying in step.",
         clients: ["desktop-macos", "desktop-windows"],
         estimateMin: 10,
         tier: "core",

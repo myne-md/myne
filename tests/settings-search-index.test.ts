@@ -134,9 +134,23 @@ describe("settings search-index — integrity", () => {
     // the six short ones) plus `AiPanel.test.tsx` and `EditorPanel.test.tsx`,
     // which mount the panel an entry CLAIMS and assert its target is on screen.
     // Kept because it is instant and still catches a testid deleted outright.
-    const blob = readPanelSources(
-      fileURLToPath(new URL("../src/components/settings", import.meta.url)),
-    );
+    const blob =
+      readPanelSources(
+        fileURLToPath(new URL("../src/components/settings", import.meta.url)),
+      ) +
+      // One named file outside the settings tree, not the whole tree: the danger
+      // zone's control is rendered by `DeleteVaultConfirmForm`, which moved out of
+      // the panel when the section stopped revealing it behind a CTA
+      // (myne-md/myne#1020). The entry points at that field because it is the
+      // thing the user came to find. Widening the walk instead would soften this
+      // into "the testid exists somewhere in `src/`", which is what its own
+      // header says it is not.
+      `\n${readFileSync(
+        fileURLToPath(
+          new URL("../src/components/DeleteVaultConfirmForm.tsx", import.meta.url),
+        ),
+        "utf8",
+      )}`;
     const missing = SETTINGS_SEARCH_INDEX.filter(
       (e) => e.testid && !blob.includes(e.testid),
     ).map((e) => `${e.id} → ${e.testid ?? ""}`);

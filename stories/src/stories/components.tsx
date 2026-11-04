@@ -1566,7 +1566,7 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "UpdatingScreen",
     state: "failed",
     description:
-      "The updating surface after a failed install: one sentence saying the running version is untouched, one saying retrying starts over, and the retry with the only honest way back, which is unlock.",
+      "The updating surface after a failed install: the heading, one sentence saying the running version is untouched, and the retry with the only honest way back, which is unlock. No cause is named, because the host cannot yet tell an install failure from a reachability one (myne-md/myne#864).",
     tags: ["components", "updatingscreen", "failed", "update"],
     fixture: "unlocked",
     render: () => (

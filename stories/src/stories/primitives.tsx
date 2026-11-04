@@ -388,6 +388,41 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "primitives/emptystate/fault",
+    group: "primitives",
+    surface: "EmptyState",
+    state: "fault",
+    description:
+      "The same zero state carrying a FAULT rather than an absence, inside a right-panel-width column: the glyph and the title name what is wrong, and the wash behind them tints the surface instead of flooding it. Look for the glow staying a tint at a third of the first-run strength, which is the retune in myne-md/myne#1020; a fault is not more urgent than a first run, it is smaller.",
+    tags: ["primitives", "emptystate", "zero-state", "error", "fault", "wash"],
+    render: () => (
+      <Row>
+        {/* A right-panel column, which is where this state actually lives: the
+            wash's whole complaint was that it flooded a NARROW pane, so a story
+            laid out at canvas width would show the retune as a smudge instead of
+            as the tint it is. `display: flex` on the column is what stops the
+            child stretching past the width. */}
+        <div
+          style={{
+            width: 320,
+            height: 420,
+            display: "flex",
+            background: "var(--bg-1)",
+          }}
+        >
+          <EmptyState
+            variant="error"
+            icon="circle-alert"
+            size="sm"
+            fill
+            title="No model"
+            body="There is no model here to run. Add one under Settings, AI, Models: download one from Myne's own origin, or point Myne at a file you already have."
+          />
+        </div>
+      </Row>
+    ),
+  },
+  {
     id: "primitives/skeleton/default",
     group: "primitives",
     surface: "Skeleton",

@@ -302,9 +302,18 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     agentWritability: WRITABILITY_NONE,
     panelId: "vault",
     topic: "danger",
-    testid: "settings.delete-vault-cta",
+    /* The typed-`DELETE` field is the anchor now that the section shows the
+       field itself (myne-md/myne#1020). It pointed at a CTA whose only job was
+       to reveal that field. */
+    testid: "delete-vault.confirm-input",
     titleKey: "settings.vault.dangerZoneHeading",
-    descriptionKey: "settings.vault.dangerZoneHelper",
+    /* The disclosure the section renders, rather than a helper paragraph beside
+       it: those two keys (`dangerZoneHelper`, `localEraseHelper`) are gone
+       because the sentence was already there once, in the form's own copy. The
+       rendered claim varies by client variant (owner erase, browser cache
+       sign-out, member departure) and only the owner one is a catalog key, so
+       that is the one search can resolve. */
+    descriptionKey: "settings.deleteVault.copyPrimary",
     keywordsKey: "settings.search.keywords.dangerZone",
   },
 

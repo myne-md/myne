@@ -388,7 +388,14 @@ export function McpSection({
         </div>
       )}
 
-      {!failed && view !== null && view.connections.length === 0 && (
+      {/* Only while the feature is ON. With the toggle off, "no connection is
+          approved" is a sentence about a list nobody could have added to, and the
+          helper above has already said the door is shut; the owner read it as one
+          redundant line too many under an obviously-off switch (myne-md/myne#1020).
+          It also used to carry "approving one is what lets a tool read this vault,
+          minus the folders you leave out", which is `helperOn`'s own sentence
+          restated. */}
+      {!failed && enabled && view !== null && view.connections.length === 0 && (
         <p style={HELPER_STYLE} data-testid="settings.mcp-empty">
           {t("settings.ai.externalAccess.empty")}
         </p>

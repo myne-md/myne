@@ -82,9 +82,9 @@ async function configurePin(s: Session): Promise<void> {
  */
 async function eraseFromSettings(s: Session): Promise<void> {
   await openSettings(s, "vault");
-  // The erase CTA is the Vault panel's `danger` topic (myne-md/myne#885).
+  // The erase field is the Vault panel's `danger` topic (myne-md/myne#885), on
+  // screen without a reveal step since myne-md/myne#1020.
   await selectSettingsTopic(s, "vault", "danger");
-  await (await s.byTestId("settings.delete-vault-cta")).click();
   const confirm = await s.byTestId("delete-vault.confirm-input", { timeoutMs: 10_000 });
   await confirm.sendKeys("DELETE");
   const submit = await s.byTestId("delete-vault.submit");

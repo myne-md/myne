@@ -129,7 +129,6 @@
     "src/lib/workspace-persist.ts::mobile/src/lib/workspace-persist.ts",
     "src/main.tsx::mobile/src/main.tsx",
     "src/notes/attachmentRef.ts::mobile/src/lib/attachmentRef.ts",
-    "src/notes/components/MemoryPopover.tsx::mobile/src/app/flows/MemorySheet.tsx",
     "src/notes/components/WhoIsHereTab.tsx::mobile/src/app/flows/editor/sheets/PresenceSheet.tsx",
     "src/notes/dailyNote.ts::mobile/src/lib/daily.ts",
     "src/notes/folderBackfill.ts::mobile/src/lib/folderBackfill.ts",

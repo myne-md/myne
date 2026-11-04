@@ -7,13 +7,14 @@
 // field a panel reads `undefined`); a panel that renders only inside a provider
 // gets that provider here.
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { Fixture, StoryDescriptor } from "../types";
 import { DEFAULT_PREFS, FIXTURE_VAULT_ID } from "../../fixtures";
 import { SidebarStateProvider } from "@app/notes/sidebarState";
 import { WorkspaceProvider } from "@app/notes/workspaceContext";
 
 import { AboutPanel } from "@app/components/settings/AboutPanel";
+import { setActiveSettingsTopic } from "@app/components/settings/SettingsTabs";
 import { DiagnosticsPanel } from "@app/components/settings/DiagnosticsPanel";
 import { BarCustomizeSettings } from "@app/components/settings/BarCustomizeSettings";
 import {
@@ -124,6 +125,69 @@ const PREFS_FIXTURE: Fixture = {
   },
 };
 
+
+/** Renders the Vault panel with its DANGER topic active, which is the only way
+ *  that section is mounted: the panel remembers one topic and renders one body. */
+function DangerTopicVaultPanel() {
+  // Before the panel mounts, so it reads the topic it is being given rather than
+  // switching to it after the fact.
+  useState(() => {
+    setActiveSettingsTopic("vault", "danger");
+    return null;
+  });
+  return (
+    <Frame>
+      <VaultPanel
+        vaultId={FIXTURE_VAULT_ID}
+        onChangePasswordSuccess={action("onChangePasswordSuccess")}
+        onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
+      />
+    </Frame>
+  );
+}
+
+/**
+ * One host answer that turns the About row's check into the install
+ * (myne-md/myne#1020): the row holds ONE control, and what that control is
+ * depends on what the check found.
+ *
+ * A fixture rather than a prop, because the state is the component's own: it
+ * starts idle and the press is what moves it. Pressing it in a story is the
+ * honest way to render the offered state, since a prop that seeded it would be
+ * a second path into a state only a real check can reach.
+ */
+const UPDATE_OFFER_FIXTURE: Fixture = {
+  description: "one unlocked vault whose update check finds a newer release",
+  handlers: {
+    ...PREFS_FIXTURE.handlers,
+    "plugin:update|update_check": () => ({
+      kind: "available",
+      version: "0.14.0",
+      notes: null,
+    }),
+  },
+};
+
+/** Renders `AboutPanel` and presses its update check once, so the row below is
+ *  the state that press produces rather than the idle one. */
+function OfferedUpdateAbout() {
+  const [host, setHost] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (host === null) return;
+    // The row's own control, found by the testid it renders whichever state it
+    // is in. Guarded: a story whose control moved must render the idle row and
+    // fail the catalogue's description check, not throw on mount.
+    const button = host.querySelector<HTMLButtonElement>(
+      '[data-testid="about.update-check"]',
+    );
+    button?.click();
+  }, [host]);
+  return (
+    <div ref={setHost}>
+      <AboutPanel />
+    </div>
+  );
+}
 
 /** The reviewed vault seed (myne-md/myne#915): AI on, an empty memory and a
  *  small vault outline, so the scope step has real counts to state. */
@@ -389,6 +453,21 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/aboutpanel/update-offered",
+    group: "settings",
+    surface: "AboutPanel",
+    state: "update-offered",
+    description:
+      "The same row after its check finds a release: the button that said \"Check for updates\" now says \"Restart to update\" and is the install, with the offered version in the status line beside it. Look for there being ONE control in the row rather than a new second button, and for the row's height not moving between the two states.",
+    tags: ["settings", "about", "update", "install", "restart", "one-control"],
+    fixture: UPDATE_OFFER_FIXTURE,
+    render: () => (
+      <Frame>
+        <OfferedUpdateAbout />
+      </Frame>
+    ),
+  },
+  {
     id: "settings/diagnosticspanel/default",
     group: "settings",
     surface: "DiagnosticsPanel",
@@ -420,6 +499,19 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
           onDeleteVaultSuccess={action("onDeleteVaultSuccess")}
         />
       </Frame>
+    ),
+  },
+  {
+    id: "settings/vaultpanel/danger",
+    group: "settings",
+    surface: "VaultPanel",
+    state: "danger",
+    description:
+      "The Vault panel's danger topic: what destroying this vault means, the typed `DELETE` field and the button it gates, all in one step. Look for there being no reveal press in front of the field, and for the disclosure being stated once rather than twice.",
+    tags: ["settings", "vault", "danger-zone", "delete-vault", "typed-confirm"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <DangerTopicVaultPanel />
     ),
   },
   {
@@ -687,6 +779,25 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
       <Frame>
         <McpSection
           enabled
+          onSetEnabled={action("onSetEnabled")}
+          onShowToast={action("onShowToast")}
+        />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/mcpsection/disabled",
+    group: "settings",
+    surface: "McpSection",
+    state: "disabled",
+    description:
+      "The same section with the master switch OFF: the switch, the line saying nothing is approved, and the setup snippet, with no connection rows and no second sentence restating that nothing can reach the vault. Look for the paragraph that used to sit under the Off switch being gone.",
+    tags: ["settings", "ai", "mcp", "external-access", "off", "developer-mode"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <McpSection
+          enabled={false}
           onSetEnabled={action("onSetEnabled")}
           onShowToast={action("onShowToast")}
         />

@@ -282,15 +282,14 @@ const CURATED_TWINS = [
       "while the desktop side uses the settings primitives; the commands, " +
       "testids and the ai_enabled gate are the shared answer both must keep.",
   },
-  {
-    a: "src/notes/components/MemoryPopover.tsx",
-    b: "mobile/src/app/flows/MemorySheet.tsx",
-    what: "the in-chat memory surface: the live roster beside the conversation, with delete (myne-md/myne#697)",
-    why:
-      "A popover has no phone posture, so the mobile twin is a bottom sheet " +
-      "opened from the AI flow's memory button. Same roster, same delete " +
-      "path, same report-don't-empty read; editing lives in Settings on both.",
-  },
+  // The in-chat memory surface used to be curated here as
+  // `src/notes/components/MemoryPopover.tsx` against
+  // `mobile/src/app/flows/MemorySheet.tsx` (myne-md/myne#697). **Removed on
+  // purpose**: the desktop half was DELETED in myne-md/myne#1020 at the owner's
+  // request, so there is no pair left to curate, and the phone's sheet is now a
+  // surface one client ships alone. That is a fact for the ROSTER, where it is
+  // recorded as `absent`, not for this list, which exists to name two files that
+  // both exist and cannot be paired by path.
   {
     a: "src/notes/dailyNote.ts",
     b: "mobile/src/lib/daily.ts",
@@ -588,14 +587,15 @@ const ROSTER = [
     reason:
       "Same surface, different client posture (myne-md/myne#697). Desktop uses the settings primitives; mobile owns its styles with stacked confirms and inline two-tap delete. Commands, testids and the ai_enabled gate are the shared answer; presentation is per-client by design.",
   },
-  {
-    a: "src/notes/components/MemoryPopover.tsx",
-    b: "mobile/src/app/flows/MemorySheet.tsx",
-    verdict: "screen",
-    destination: "undecided",
-    reason:
-      "Same surface, different client posture (myne-md/myne#697): a popover has no phone form, so the mobile twin is a bottom sheet. Roster, delete path and the report-don't-empty read are shared; the container is per-client by design.",
-  },
+  // The in-chat memory pair (`src/notes/components/MemoryPopover.tsx` against
+  // `mobile/src/app/flows/MemorySheet.tsx`) is DELETED from this roster, not
+  // re-verdicted (myne-md/myne#1020). The desktop half no longer exists, and a row
+  // naming it is a verdict about nothing: `absent` cannot stand in for it either,
+  // because this guard resolves BOTH paths and rejects an entry whose file is
+  // gone. What the removal changed is recorded where it belongs, in
+  // `docs/decisions/ui/0786-*.md`, and the surviving divergence is a one-line
+  // note there: memory on the desktop is Settings-only now, while the phone keeps
+  // its in-flow sheet.
   {
     a: "src/App.tsx",
     b: "mobile/src/App.tsx",
