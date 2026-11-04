@@ -107,9 +107,17 @@
         "count": 1,
         "reason": "Test fixture asserting the vault record after adoption carries the person credential's id."
       },
+      "assert!(cleared.device_id_hex.is_empty());": {
+        "count": 1,
+        "reason": "Test fixture for carry_device_facts: asserts a DIFFERENT person's record is cleared, which is the security half of that function. No identity is chosen here."
+      },
       "assert!(st.device_id_hex.is_none(), \"the fixture starts unseeded\");": {
         "count": 1,
         "reason": "Test fixture asserting its own starting state: the vault record is empty so the adoption has something to do."
+      },
+      "assert_eq!(kept.device_id_hex, a.device_id_hex);": {
+        "count": 1,
+        "reason": "Test fixture for carry_device_facts: asserts the SAME person keeps the credential's device id. It compares two records the test built itself and decides nothing about which device this is."
       },
       "if st.device_id_hex.is_none() {": {
         "count": 1,
@@ -150,6 +158,20 @@
       "attestation.device_id_hex,": {
         "count": 1,
         "reason": "Test fixture: asserts the attestation a person-born vault produces carries the id its binding row was claimed under. It reads the IDENTITY OF THE ROW, not this device's id."
+      }
+    },
+    "core/src/plugins/sync/sim.rs": {
+      "crate::plugins::sync::devices::hex16(&joining_auth.device_id_hex).expect(\"device id\");": {
+        "count": 1,
+        "reason": "Test fixture in the myne#957 scenario: it names the PENDING row the existing device approves, read from the joining device's own credential because that is the id the server registered for it in the handshake two lines above. Nothing here decides which device this is; the id is the one the join just used, and the scenario's next step proves the approval by logging in with it."
+      },
+      "let new_device_id = crate::plugins::sync::devices::hex16(&reread.device_id_hex)": {
+        "count": 1,
+        "reason": "Test fixture: names the row the second registration just created so the scenario can prove the carried secret authenticates it. The id comes from the registration two lines above, not from a second opinion about this device's identity."
+      },
+      "reread.device_id_hex, after.device_id_hex,": {
+        "count": 1,
+        "reason": "Test fixture in the myne#957 scenario: asserts the second registration produced a NEW device row, which is exactly why the credential triple has to be carried forward. It compares two records the scenario wrote itself and decides nothing about which device this is."
       }
     },
     "core/src/plugins/sync/state.rs": {

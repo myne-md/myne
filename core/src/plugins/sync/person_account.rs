@@ -18,7 +18,8 @@ use zeroize::Zeroizing;
 
 use super::devices::SyncDeviceError;
 use super::enroll::{
-    enroll, generate_device_id, register_verifier_with_code, EnrollError, EnrollOutcome, EnrollPath,
+    enroll, generate_device_id, register_verifier_with_code, DeviceCredential, EnrollError,
+    EnrollOutcome, EnrollPath,
 };
 use super::person_auth::{
     person_auth_path, person_auth_path_for_read, read_person_auth, write_person_auth, PersonAuth,
@@ -173,6 +174,243 @@ fn enroll_path_for(generated: bool) -> EnrollPath {
         EnrollPath::Password
     } else {
         EnrollPath::Recovery
+    }
+}
+
+/// This device's OWN SCRAM credential, minted here rather than carried in from another
+/// device (`decisions/protocol/0735`; installed on approval by `0784`).
+///
+/// **Idempotent and non-rotating**, and that is load-bearing rather than tidy: the verifier
+/// is a function of `(secret, salt, iterations)`, so minting a second salt for a device id
+/// that already has one derives a second verifier, and the server answers
+/// `409 already_installed` for it. The device would then hold a credential nobody can use,
+/// and nothing on screen would say so. So an existing triple is returned untouched.
+///
+/// The secret is CSPRNG bytes, not a password, which is why no KDF domain string appears
+/// here: `0735` records that there is nothing for one to separate.
+///
+/// **Nothing is minted where the credential would not survive the session**, which is the ONE
+/// gate for the whole client and sits here rather than at the install so there is only one place
+/// to read. The answer comes from the IO seam
+/// ([`VaultIo::keeps_person_credential_at_rest`](crate::vault_io::VaultIo)), not from
+/// `target_arch`: the browser holds `person-auth` in the Worker's memory and nowhere else, so a
+/// credential minted there would be one whose secret dies with the tab, a verifier on the account
+/// that nobody can authenticate with. It is the seam's job to answer that, and `myne-core`'s own
+/// rule is that it does not know which host it runs on.
+fn ensure_device_credential(
+    io: &dyn VaultIo,
+    auth: &mut PersonAuth,
+) -> Result<(), SyncDeviceError> {
+    if auth.device_secret_hex.is_some() || !io.keeps_person_credential_at_rest() {
+        return Ok(());
+    }
+    let mut secret = Zeroizing::new([0u8; 32]);
+    getrandom::getrandom(secret.as_mut()).map_err(|_| SyncDeviceError::Internal)?;
+    let credential =
+        super::enroll::mint_device_credential(secret.as_ref()).map_err(SyncDeviceError::from)?;
+    auth.device_secret_hex = Some(crate::account::person_identity::hex_lower(secret.as_ref()));
+    auth.device_salt_hex = Some(credential.salt_hex);
+    auth.device_iterations = Some(credential.iterations);
+    Ok(())
+}
+
+/// The credential this device holds, rebuilt from its stored triple, or `None` for a device
+/// that has none: every device registered before this shipped, and every browser session,
+/// which keeps no person credential at rest at all.
+///
+/// Rebuilt rather than stored, because the verifier is a pure function of the triple and a
+/// second copy of `stored_key`/`server_key` on disk would be a second thing that can drift
+/// from the salt beside it.
+fn stored_device_credential(auth: &PersonAuth) -> Option<(Zeroizing<[u8; 32]>, DeviceCredential)> {
+    let secret = Zeroizing::new(protocol::hex::decode_lower::<32>(
+        auth.device_secret_hex.as_deref()?,
+    )?);
+    // The salt is VALIDATED rather than passed through, because `DeviceCredential::verifier`
+    // decodes it with `unwrap_or_default`: an undecodable salt would derive the verifier from
+    // an EMPTY one while the install forwards the corrupt string, so the server would hold a
+    // verifier this device can never produce a proof for.
+    let salt_hex = auth.device_salt_hex.as_deref()?;
+    protocol::hex::decode_lower::<16>(salt_hex)?;
+    let mut credential = DeviceCredential {
+        salt_hex: salt_hex.to_string(),
+        iterations: auth.device_iterations?,
+        stored_key_hex: String::new(),
+        server_key_hex: String::new(),
+    };
+    let (stored_key_hex, server_key_hex) = credential.verifier(secret.as_ref());
+    credential.stored_key_hex = stored_key_hex;
+    credential.server_key_hex = server_key_hex;
+    Some((secret, credential))
+}
+
+/// The credential triple to CARRY into a new registration record, and the reason it is a
+/// function rather than three `and_then`s inline: the cross-person half is a security decision
+/// (a stale secret installed under a new identity authenticates as the old one) and it has to be
+/// testable without a server.
+///
+/// Carrying is what makes the mint's non-rotation real: a registration builds a fresh record, so
+/// without this every phrase entry would derive a second verifier for the same secret and the
+/// server would answer `409 already_installed` for the device it already holds one on.
+fn carried_credential(
+    existing: Option<&PersonAuth>,
+    person_id_hex: &str,
+) -> (Option<String>, Option<String>, Option<u32>) {
+    match existing.filter(|a| a.person_id_hex == person_id_hex) {
+        Some(a) => (
+            a.device_secret_hex.clone(),
+            a.device_salt_hex.clone(),
+            a.device_iterations,
+        ),
+        None => (None, None, None),
+    }
+}
+
+/// The facts about THIS DEVICE that survive a phrase entry, and the ones that must not.
+///
+/// The token, the device id, the `registered` flag and the credential triple all describe this
+/// device FOR this person, which is what makes carrying them correct when the phrase names the
+/// same person and wrong when it does not: `forget_person_from_host` can leave this file behind
+/// after the sealed keypair is gone, so a recovery with a DIFFERENT phrase would otherwise keep
+/// account A's token (and, since `0784`, A's credential, which is the worse half) under person
+/// B's id.
+fn carry_device_facts(a: &mut PersonAuth, person_id_hex: &str) {
+    if a.person_id_hex == person_id_hex {
+        return;
+    }
+    a.token_hex.clear();
+    a.device_id_hex.clear();
+    a.registered = false;
+    a.device_secret_hex = None;
+    a.device_salt_hex = None;
+    a.device_iterations = None;
+}
+
+/// The token to persist: this device's own after it has proved it holds the credential, or
+/// `account_token_hex` when it cannot.
+///
+/// **Best-effort, and the reason is the user's, not the code's.** A self-hosted server that
+/// predates `/auth/devices/credential` answers `404`, a network blip answers nothing, and a
+/// `409` says this device id already holds a different verifier; all three leave the device
+/// exactly as it was: authenticated by the account credential it arrived with, working,
+/// and the next claim or phrase entry retries. Turning any of them into a failed
+/// registration would make an invisible improvement break a join.
+///
+/// **Attempted ONCE per registration, not retried on a claim.** The claim answers early once a
+/// token is stored, so a device that fell back here keeps the account credential until the next
+/// phrase entry (which registers again). That is stated rather than promised away: the benefit
+/// of the credential is invisible to the user, and the fallback is exactly the behaviour that
+/// shipped before it, so a retry loop on every claim would buy a round trip and no legibility.
+///
+/// Nothing is installed on the browser: `ensure_device_credential` mints nothing there, so
+/// there is no credential to install and this returns the account token like any device that
+/// has none. The reason is on that function.
+async fn adopt_own_credential(
+    auth: &PersonAuth,
+    // The ids the caller just used in the handshake that produced the token, never re-read
+    // from the credential: `device_actor.rs` owns the one reader of "which device is this",
+    // and the id that matters here is the row the server just registered for this device.
+    person_id: [u8; 16],
+    device_id: [u8; 16],
+    endpoint_url: &str,
+    account_token_hex: String,
+) -> String {
+    let Some((secret, credential)) = stored_device_credential(auth) else {
+        return account_token_hex;
+    };
+    let token = Zeroizing::new(account_token_hex.clone());
+    let mut nonce_bytes = [0u8; 32];
+    if getrandom::getrandom(&mut nonce_bytes).is_err() {
+        return account_token_hex;
+    }
+    let client_nonce = crate::account::person_identity::hex_lower(&nonce_bytes);
+    let url = endpoint_url.to_string();
+    let outcome = crate::task::run_blocking(move || {
+        let transport =
+            super::http_transport::build_transport(&url).map_err(|_| SyncDeviceError::Transport)?;
+        install_and_authenticate(
+            transport.as_ref(),
+            token.as_str(),
+            person_id,
+            device_id,
+            secret.as_ref(),
+            &credential,
+            &client_nonce,
+        )
+    })
+    .await;
+    // `run_blocking` answers `Err` only when the blocking task itself died, which is the same
+    // class as a transport failure for this decision: keep the account token.
+    let decision = match outcome {
+        Ok(result) => result,
+        Err(_) => Err(SyncDeviceError::Internal),
+    };
+    token_after_install(decision, account_token_hex)
+}
+
+/// Install the verifier, then authenticate with it, over one transport.
+///
+/// The two halves are logged SEPARATELY, and that is not verbosity. A refused install leaves the
+/// server untouched; a refused login after an accepted install leaves a verifier on the account
+/// that this device cannot authenticate with, which the next registration answers `409` for and
+/// nothing here can undo. One message for both would tell an operator the wrong one of those.
+///
+/// A free function taking `&dyn SyncTransport` so the whole path is testable without a server,
+/// which matters more here than anywhere else in this file: this is the only place the client
+/// installs a credential at all.
+pub(crate) fn install_and_authenticate(
+    transport: &dyn SyncTransport,
+    account_token: &str,
+    person_id: [u8; 16],
+    device_id: [u8; 16],
+    secret: &[u8],
+    credential: &DeviceCredential,
+    client_nonce: &str,
+) -> Result<EnrollOutcome, SyncDeviceError> {
+    if let Err(err) =
+        super::enroll::install_device_credential(transport, account_token, &device_id, credential)
+    {
+        tracing::warn!(
+            stage = "person_device_credential",
+            error = ?err,
+            "the device credential could not be installed; staying on the account credential"
+        );
+        return Err(SyncDeviceError::from(err));
+    }
+    super::enroll::device_login(transport, &person_id, device_id, secret, client_nonce).map_err(
+        |err| {
+            tracing::warn!(
+                stage = "person_device_credential",
+                error = ?err,
+                "the credential IS installed and this device could not authenticate with it; the account now holds a verifier this device cannot prove, and a re-registration answers 409"
+            );
+            SyncDeviceError::from(err)
+        },
+    )
+}
+
+/// Which token to persist, given what the install answered. A free function so the arms can be
+/// tested without a server: an arm that answered an empty string instead of the account token
+/// would log the device out of its account on any install failure.
+///
+/// Three answers, two of them "keep what you have": a device token (the device's own), a row that
+/// is not approved after all (which a real server does not answer here, but the arm exists), and
+/// a typed refusal, which `install_and_authenticate` has already logged with its own reason.
+fn token_after_install(
+    outcome: Result<EnrollOutcome, SyncDeviceError>,
+    account_token_hex: String,
+) -> String {
+    match outcome {
+        Ok(outcome) => match outcome.approved_token() {
+            Some(token) => crate::account::person_identity::hex_lower(token),
+            None => {
+                tracing::debug!(
+                    stage = "person_device_credential",
+                    "device credential installed but the row is not approved yet"
+                );
+                account_token_hex
+            }
+        },
+        Err(_) => account_token_hex,
     }
 }
 
@@ -388,18 +626,9 @@ pub async fn person_recover_identity_from_host(
         .map_err(|_| SyncDeviceError::Internal)?;
     let auth = match existing {
         Some(mut a) => {
-            // The token, device id and `registered` flag are facts about THIS
-            // DEVICE, not about the phrase, which is what makes carrying them over
-            // correct when the phrase names the same person. It is wrong when it
-            // does not: `forget_person_from_host` can leave this file behind after
-            // the sealed keypair is gone, so a recovery with a DIFFERENT phrase
-            // would otherwise keep account A's token under person B's id, and every
-            // sync request would authenticate as A while `person_status` reported B.
-            if a.person_id_hex != person_id_hex {
-                a.token_hex.clear();
-                a.device_id_hex.clear();
-                a.registered = false;
-            }
+            // Every fact about THIS DEVICE survives only for the same person, including the
+            // credential triple since `0784`: see `carry_device_facts`.
+            carry_device_facts(&mut a, &person_id_hex);
             a.person_id_hex = person_id_hex.clone();
             a.kem_ek_hex = crate::account::person_identity::hex_lower(public.kem_ek());
             a.ed_pk_hex = crate::account::person_identity::hex_lower(public.ed_pk());
@@ -522,6 +751,10 @@ pub async fn person_register_with_path(
         .map_err(|_| SyncDeviceError::NotConfigured)?;
     let invite_code = cfg.invite_code.clone();
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
+    // Kept beside the closure rather than moved into it: the credential this device mints
+    // below is installed over the SAME endpoint right after the register lands, and a second
+    // config read for it would be a second place the answer can differ.
+    let endpoint_for_install = url.clone();
 
     let outcome: EnrollOutcome =
         crate::task::run_blocking(move || -> Result<EnrollOutcome, SyncDeviceError> {
@@ -546,6 +779,55 @@ pub async fn person_register_with_path(
     let public = pair.public_half();
     let fingerprint_hex = crate::account::person_identity::hex_lower(pair.fingerprint());
     let identity_code = super::invite::encode_person_identity_code(&person_id, &public);
+
+    // Everything that can fail WITHOUT touching the session happens first, so the only failure
+    // left after the installation is the write, and that one drops the session. The order
+    // matters twice over: a credential written after a session that then failed to persist is
+    // a live identity whose disk disagrees with it, and a verifier installed before its secret
+    // is on disk is residue this device cannot undo (`/auth/devices/revoke` is the only thing
+    // that deletes one) that costs the account a slot nobody can name.
+    let path = person_auth_path(host, io)
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
+    let person_id_hex = crate::account::person_identity::hex_lower(&person_id);
+    // A device that already holds THIS person's credential keeps the same triple. Carrying it
+    // forward is what makes the mint's non-rotation real rather than theoretical: this
+    // function builds a fresh record every time, so without this every registration would
+    // derive a second verifier for the same secret, and the server answers
+    // `409 already_installed` for a device that already holds one. A triple belonging to a
+    // DIFFERENT person is never carried, for the reason `person_setup_from_host` clears the
+    // token: a stale secret installed under a new identity authenticates as the old one.
+    let carried = carried_credential(
+        read_person_auth(io, &path)
+            .await
+            .map_err(|_| SyncDeviceError::Internal)?
+            .as_ref(),
+        &person_id_hex,
+    );
+    let mut auth = PersonAuth {
+        person_id_hex,
+        device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
+        registered: true,
+        // Assigned below, after the credential exists: the token this device ends up with
+        // may be the one its OWN credential minted.
+        token_hex: String::new(),
+        kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
+        ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
+        mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
+        device_secret_hex: carried.0,
+        device_salt_hex: carried.1,
+        device_iterations: carried.2,
+    };
+    // Minted whatever the gate answered, so a device that lands pending already holds the
+    // secret its credential will be derived from the moment an existing device approves it
+    // (`decisions/protocol/0784`). Nothing is installed here for a pending row: it has no
+    // token, and a pending device that could install one would be self-approving.
+    ensure_device_credential(io, &mut auth)?;
+    let approved = outcome.approved_token().is_some();
+    if approved {
+        auth.token_hex = crate::account::person_identity::hex_lower(&outcome.token);
+    }
+
     let generation = state.person_session_generation().await;
     // The installation refreshes the public halves and any migrated transition,
     // so a register call made with the identity locked leaves it unlocked.
@@ -563,33 +845,32 @@ pub async fn person_register_with_path(
         return Err(SyncDeviceError::Transport);
     }
 
-    let auth = PersonAuth {
-        person_id_hex: crate::account::person_identity::hex_lower(&person_id),
-        device_id_hex: crate::account::person_identity::hex_lower(&outcome.device_id),
-        registered: true,
-        token_hex: if outcome.approved && !outcome.token.is_empty() {
-            crate::account::person_identity::hex_lower(&outcome.token)
-        } else {
-            String::new()
-        },
-        kem_ek_hex: crate::account::person_identity::hex_lower(public.kem_ek()),
-        ed_pk_hex: crate::account::person_identity::hex_lower(public.ed_pk()),
-        mldsa_vk_hex: crate::account::person_identity::hex_lower(public.mldsa_vk()),
-        device_secret_hex: None,
-        device_salt_hex: None,
-        device_iterations: None,
-    };
-    let path = person_auth_path(host, io).await.map_err(|_| {
-        // The credential write is the only act that could leave the device
-        // claiming a registration it did not record; drop the session rather
-        // than leave a live identity whose state disagrees with disk.
-        SyncDeviceError::Internal
-    })?;
+    // The record is written BEFORE the verifier is installed: a verifier that exists on the
+    // server for a secret that is not yet on this disk cannot be undone from here.
     if write_person_auth(io, &path, &auth).await.is_err() {
         let _ = state
             .clear_person_session_if_generation(installed_generation)
             .await;
         return Err(SyncDeviceError::Internal);
+    }
+    if approved {
+        let adopted = adopt_own_credential(
+            &auth,
+            person_id,
+            outcome.device_id,
+            &endpoint_for_install,
+            auth.token_hex.clone(),
+        )
+        .await;
+        if adopted != auth.token_hex {
+            auth.token_hex = adopted;
+            if write_person_auth(io, &path, &auth).await.is_err() {
+                let _ = state
+                    .clear_person_session_if_generation(installed_generation)
+                    .await;
+                return Err(SyncDeviceError::Internal);
+            }
+        }
     }
 
     // The durable "an identity exists here" record, written only after the
@@ -728,10 +1009,19 @@ pub async fn person_join_device_from_host(
     let existing = read_person_auth(io, &auth_path)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-    let already_pending = existing
-        .filter(|a| a.registered && a.token_hex.is_empty())
-        .is_some_and(|a| a.person_id_hex == recovered.person_id_hex);
+    let already_pending = existing.as_ref().is_some_and(|a| {
+        a.registered && a.token_hex.is_empty() && a.person_id_hex == recovered.person_id_hex
+    });
     if already_pending {
+        // Minted HERE too, and that is the whole upgrade path: this arm returns before the
+        // register call, so a device that landed pending under an older build would otherwise
+        // never hold a credential, and the phrase entry the decision entry names as the retry
+        // would short-circuit. The claim installs it once the row is approved.
+        if let Some(mut a) = existing {
+            if a.device_secret_hex.is_none() && ensure_device_credential(io, &mut a).is_ok() {
+                let _ = write_person_auth(io, &auth_path, &a).await;
+            }
+        }
         state.set_pending_claim_secret(claim_secret).await;
         return Ok(PersonJoinView {
             person_id_hex: recovered.person_id_hex,
@@ -895,6 +1185,7 @@ pub async fn person_claim_device_from_host(
         .map_err(|_| SyncDeviceError::NotConfigured)?;
     let url = cfg.endpoint_url.ok_or(SyncDeviceError::NotConfigured)?;
     let invite_code = cfg.invite_code.clone();
+    let endpoint_for_install = url.clone();
 
     let outcome: super::enroll::EnrollOutcome = crate::task::run_blocking(
         move || -> Result<super::enroll::EnrollOutcome, SyncDeviceError> {
@@ -933,7 +1224,19 @@ pub async fn person_claim_device_from_host(
     }
 
     let mut next = auth;
-    next.token_hex = crate::account::person_identity::hex_lower(&outcome.token);
+    // The approval is what this poll was waiting for, so THIS is where the device stops
+    // authenticating as the account: install the credential it minted at join time and take
+    // the token its own secret minted instead (`decisions/protocol/0784`). Best-effort: the
+    // account token is a working answer, and `adopt_own_credential` keeps it when the
+    // install cannot land.
+    next.token_hex = adopt_own_credential(
+        &next,
+        person_id,
+        outcome.device_id,
+        &endpoint_for_install,
+        crate::account::person_identity::hex_lower(&outcome.token),
+    )
+    .await;
     next.device_id_hex = crate::account::person_identity::hex_lower(&outcome.device_id);
     next.registered = true;
     write_person_auth(io, &path, &next)
@@ -4590,6 +4893,252 @@ mod tests {
                 "expected NotEnrolled, got {refused:?}"
             );
         });
+    }
+
+    // The merged approval flow mints this device's own credential at the moment the phrase is
+    // in hand (`decisions/protocol/0784`), and the mint must be NON-ROTATING: the verifier is
+    // a function of (secret, salt, iterations), so a second salt derives a second verifier for
+    // one device id and the server answers `409 already_installed` for it. The device would
+    // then hold a credential nobody can use and nothing on screen would say so, which is why
+    // this is asserted rather than left to the comment beside the guard.
+    #[test]
+    fn the_device_credential_is_minted_once_and_never_rotated() {
+        let mut auth = empty_person_auth();
+        ensure_device_credential(&io(), &mut auth).expect("the first mint");
+        let first = (
+            auth.device_secret_hex.clone(),
+            auth.device_salt_hex.clone(),
+            auth.device_iterations,
+        );
+        assert_eq!(first.1.as_ref().map(String::len), Some(32), "16-byte salt");
+        assert_eq!(
+            first.2,
+            Some(crate::plugins::sync::enroll::SCRAM_REGISTER_ITERATIONS)
+        );
+        assert_eq!(
+            first.0.as_ref().map(String::len),
+            Some(64),
+            "32-byte secret"
+        );
+
+        ensure_device_credential(&io(), &mut auth).expect("the second call is a no-op");
+        assert_eq!(
+            (
+                auth.device_secret_hex.clone(),
+                auth.device_salt_hex.clone(),
+                auth.device_iterations,
+            ),
+            first,
+            "re-minting would derive a second verifier for one device id"
+        );
+    }
+
+    // What the install sends is rebuilt from the stored triple rather than kept beside it, so
+    // the rebuild has to produce byte-identical verifier halves on every call. A salt that
+    // decoded differently, or a `verifier()` that took the nonces into account, would send the
+    // server a verifier the device cannot authenticate with.
+    #[test]
+    fn the_rebuilt_verifier_is_stable_and_matches_the_mint() {
+        let mut auth = empty_person_auth();
+        ensure_device_credential(&io(), &mut auth).expect("mint");
+        let (secret, first) = stored_device_credential(&auth).expect("a stored credential");
+        let (_, second) = stored_device_credential(&auth).expect("a second rebuild");
+        // The salt is asserted FIRST, and that ordering is the test's whole value: a rebuild
+        // that invented its own salt would move both sides of the comparison below together
+        // and keep them equal, so the verifier assertion alone passes on the very defect it
+        // looks like it covers.
+        assert_eq!(Some(first.salt_hex.clone()), auth.device_salt_hex);
+        assert_eq!(Some(first.iterations), auth.device_iterations);
+        assert_eq!(first.stored_key_hex, second.stored_key_hex);
+        assert_eq!(first.server_key_hex, second.server_key_hex);
+
+        // What this test can prove, and what it does not claim: the rebuild is deterministic and
+        // uses the salt on disk (asserted above). Comparing it against a second `verifier()` call
+        // on the same inputs would be two identical computations, which is the defect this test's
+        // own comment says was caught once already, one block lower.
+        assert_eq!(
+            first.verifier(secret.as_ref()),
+            second.verifier(secret.as_ref()),
+            "the same triple derives the same verifier"
+        );
+    }
+
+    // The gate that keeps a credential off a host that cannot keep its secret, asked of the IO
+    // seam rather than of `target_arch`. The two answers are asserted because the failure is
+    // silent in the direction that matters: a verifier minted where the secret dies with the
+    // session is a credential on the account that nobody can authenticate with.
+    #[test]
+    fn the_mint_follows_the_hosts_answer_about_keeping_the_credential() {
+        let mut volatile = empty_person_auth();
+        ensure_device_credential(
+            &crate::vault_io::test_io::MemoryVaultIo::volatile_person_credential(),
+            &mut volatile,
+        )
+        .expect("the gate is not a failure");
+        assert!(
+            stored_device_credential(&volatile).is_none(),
+            "a host that keeps no person credential minted one anyway"
+        );
+
+        let mut persists = empty_person_auth();
+        ensure_device_credential(&io(), &mut persists).expect("mint");
+        assert!(stored_device_credential(&persists).is_some());
+    }
+
+    // The carry decision, both arms. The positive arm is what keeps a second registration from
+    // deriving a second verifier (the server answers 409 for one). The negative arm is the
+    // security half: a stale secret installed under a new identity authenticates as the old one,
+    // and a test that only proved the positive arm would pass with the filter deleted.
+    #[test]
+    fn only_the_same_person_carries_its_credential_across_a_registration() {
+        let mut mine = empty_person_auth();
+        ensure_device_credential(&io(), &mut mine).expect("mint");
+        let same = carried_credential(Some(&mine), &mine.person_id_hex);
+        assert_eq!(same.0, mine.device_secret_hex);
+        assert_eq!(same.1, mine.device_salt_hex);
+        assert_eq!(same.2, mine.device_iterations);
+
+        let other = carried_credential(Some(&mine), &"33".repeat(16));
+        assert_eq!(other, (None, None, None), "another person inherits nothing");
+        assert_eq!(carried_credential(None, &mine.person_id_hex), other);
+    }
+
+    // The same rule for the token, the device id and the `registered` flag, in one place because
+    // they now travel with the credential triple: a recovery with a DIFFERENT phrase must clear
+    // all six facts, or the device authenticates to A's account under B's id.
+    #[test]
+    fn a_different_person_clears_every_device_fact() {
+        let mut a = empty_person_auth();
+        ensure_device_credential(&io(), &mut a).expect("mint");
+        a.token_hex = "aa".repeat(16);
+
+        let mut kept = a.clone();
+        carry_device_facts(&mut kept, &a.person_id_hex);
+        assert_eq!(
+            kept.token_hex, a.token_hex,
+            "the same person keeps its token"
+        );
+        assert_eq!(kept.device_id_hex, a.device_id_hex);
+        assert!(kept.registered);
+        assert_eq!(kept.device_secret_hex, a.device_secret_hex);
+
+        let mut cleared = a.clone();
+        carry_device_facts(&mut cleared, &"44".repeat(16));
+        assert!(cleared.token_hex.is_empty());
+        assert!(cleared.device_id_hex.is_empty());
+        assert!(!cleared.registered);
+        assert!(cleared.device_secret_hex.is_none());
+        assert!(cleared.device_salt_hex.is_none());
+        assert!(cleared.device_iterations.is_none());
+    }
+
+    // A device that never minted one (every device registered before this shipped, and every
+    // browser session, which keeps no person credential at rest at all) answers `None` rather
+    // than fabricating one from a half-record. `adopt_own_credential` then keeps the account
+    // token, which is the working answer.
+    #[test]
+    fn a_partial_record_is_not_a_credential() {
+        let mut auth = empty_person_auth();
+        assert!(stored_device_credential(&auth).is_none());
+        ensure_device_credential(&io(), &mut auth).expect("mint");
+        assert!(stored_device_credential(&auth).is_some());
+        auth.device_iterations = None;
+        assert!(
+            stored_device_credential(&auth).is_none(),
+            "a record missing its iteration count cannot rebuild a verifier"
+        );
+
+        // A corrupt SALT must answer None rather than be substituted. `verifier()` decodes it
+        // with `unwrap_or_default`, so a record whose salt does not decode would otherwise
+        // derive the verifier from an EMPTY salt while the install forwarded the corrupt
+        // string: the server would hold a verifier this device can never prove.
+        let mut corrupt = empty_person_auth();
+        ensure_device_credential(&io(), &mut corrupt).expect("mint");
+        corrupt.device_salt_hex = Some("zz".repeat(16));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a salt that does not decode is not a credential"
+        );
+        corrupt.device_salt_hex = Some("00".repeat(8));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a 8-byte salt is not the 16-byte salt the mint wrote"
+        );
+        corrupt.device_salt_hex = Some("00".repeat(16));
+        corrupt.device_secret_hex = Some("00".repeat(16));
+        assert!(
+            stored_device_credential(&corrupt).is_none(),
+            "a 16-byte secret is not the 32-byte secret the mint wrote"
+        );
+    }
+
+    // The four answers the install can give, and what each one persists. `token_after_install`
+    // is a free function for exactly this reason: an arm that answered an empty string would
+    // log the device out of its account on any install failure, and no other lane would notice.
+    #[test]
+    fn the_install_answer_decides_which_token_is_kept() {
+        let account = || "account-token".to_string();
+        let approved = |token: &[u8]| EnrollOutcome {
+            approved: true,
+            token: token.to_vec(),
+            device_id: [0x11; 16],
+        };
+
+        assert_eq!(
+            token_after_install(Ok(approved(&[0xca, 0xfe])), account()),
+            "cafe",
+            "the token the device's own secret minted replaces the account token"
+        );
+        assert_eq!(
+            token_after_install(Ok(approved(&[])), account()),
+            "account-token",
+            "an approved row with no token keeps the account token"
+        );
+        assert_eq!(
+            token_after_install(
+                Ok(EnrollOutcome {
+                    approved: false,
+                    token: vec![0xaa],
+                    device_id: [0x11; 16],
+                }),
+                account()
+            ),
+            "account-token",
+            "a pending row installs nothing and keeps the account token"
+        );
+        assert_eq!(
+            token_after_install(Err(SyncDeviceError::BadRequest), account()),
+            "account-token",
+            "a refused install keeps the account token the device arrived with"
+        );
+        assert_eq!(
+            token_after_install(Err(SyncDeviceError::Internal), account()),
+            "account-token",
+            "a dead blocking task keeps the account token"
+        );
+    }
+
+    /// The fake a mint may write through. Its default answer is "the credential persists", which
+    /// is every filesystem; `volatile_person_credential()` is the browser.
+    fn io() -> crate::vault_io::test_io::MemoryVaultIo {
+        crate::vault_io::test_io::MemoryVaultIo::new()
+    }
+
+    /// A `PersonAuth` holding nothing but the two ids, i.e. the fields a credential mint
+    /// touches set to `None`.
+    fn empty_person_auth() -> PersonAuth {
+        PersonAuth {
+            person_id_hex: "11".repeat(16),
+            device_id_hex: "22".repeat(16),
+            registered: true,
+            token_hex: String::new(),
+            kem_ek_hex: String::new(),
+            ed_pk_hex: String::new(),
+            mldsa_vk_hex: String::new(),
+            device_secret_hex: None,
+            device_salt_hex: None,
+            device_iterations: None,
+        }
     }
 
     // The registration step runs BEFORE any handshake, and it registers under

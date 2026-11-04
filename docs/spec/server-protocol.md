@@ -154,8 +154,9 @@ The B2B access model (`decisions/protocol/0603`) makes server accounts **person-
 **A person account is an account in the §3.1 SCRAM namespace, keyed by `person_id_hash`.** The person's server credential derives CLIENT-side from the normalized recovery phrase under the domain `"myne.v0.2 argon2id-person-server-auth|"` (plus `person_id_hash`), exactly as a vault account's derives from `root_key` under `server-auth`; the server is handed only a SCRAM verifier and never the secret. It registers and authenticates through `/auth/register`, `/auth/scram/init` and `/auth/scram/final` with `account_hash_hex = person_id_hash` and `username` the canonical lowercase hex of that same id. **There is deliberately no separate person-auth route**: the two ids are both 16 opaque bytes and the server cannot tell them apart, because it is blind to the difference. The id-typed namespace **is** the person namespace.
 
 **A device may hold its OWN SCRAM credential on the person account** (`decisions/protocol/0735`). Beside the
-account's phrase-derived verifier, an account may carry one verifier per device, installed by a device that is
-already authenticated against that account: `POST /auth/devices/credential` with
+account's phrase-derived verifier, an account may carry one verifier per device, installed BY a device that is
+already authenticated against that account, and since `decisions/protocol/0784` also by the joining device itself
+once its row is approved: `POST /auth/devices/credential` with
 `{device_id_hex, username, salt_hex, iterations, stored_key_hex, server_key_hex}`. The account is taken from the
 session and never from the body, so a device installs only into its own account; and the username is NOT
 caller-chosen: it is `dev:<device_id_hex>`. The `dev:` prefix is what keeps the two namespaces apart, since an
@@ -171,7 +172,17 @@ at once cannot race into two credentials for one id.
 device pending and approves it in the same call, because a credential nobody approved is a device that
 authenticates and then syncs nothing while an approval of a device that cannot authenticate is a promise. The
 operator gates (`frozen`, the device cap) apply exactly as they do at `/auth/scram/final`, so neither can be
-reached by pre-approving around them. `POST /auth/devices/revoke` now deletes the device's verifier as well as
+reached by pre-approving around them.
+
+**The joining device may be the caller, and that installs nothing before the gate.** In the shipped flow
+(`decisions/protocol/0784`) the device that will hold the credential is the one that calls this route, under the
+account session its phrase derived, AFTER an already-approved device of the account approved its row. That is not
+a self-approval and it is not a new authority: a device whose row is pending is issued no token by `/auth/scram/final`,
+so it cannot reach an authed route at all, and what admits it is the other device's approval of a registry record.
+The route's own approval step is idempotent for a row that is already approved, which is why the caller does not
+have to know which state it is in. What the caller gains is PERSISTENCE rather than reach: the reachability change
+`0735` recorded and `threat-model.md` §7 states, and the sequence is pinned end to end in
+`core/src/plugins/sync/sim.rs`. `POST /auth/devices/revoke` now deletes the device's verifier as well as
 retiring its registry row: retiring the row refuses the TOKEN, and an unauthenticated device would otherwise run
 the handshake again and mint a new one, which would make "removed" mean "sign in again".
 
@@ -182,7 +193,11 @@ verifier, so it is handled as a one-time credential: the admitting device shows 
 derived over the whole code (class `"myne.device-admission-sas v1|"`, eight hex characters, displayed `XXXX-XXXX`)
 for a human to compare between the two screens, and the write is bound to the string the user confirmed, so the
 code cannot change between display and signature. The verifier is one-way over the joining device's secret, so
-the admitting device forwards a value it cannot authenticate with.
+the admitting device forwards a value it cannot authenticate with. **No client ships this exchange since
+`decisions/protocol/0764`, and `0784` does not reinstate it**: the shipped join installs the verifier from the
+device that owns it, so no code and no SAS travels, and the one human comparison is the vault-head fingerprint
+eye-compare `threat-model.md` §7 records. This paragraph describes the codec, which stays; it is not a
+description of a surface.
 
 **The device-approval gate governs a person account unchanged (member-devices).** A person account is an account in the §3.1 namespace, so its devices are admitted by the §3.1 gate (SYNC-9) and by nothing else: the **first** device on the person account and any **recovery-path** device self-approve, and a **password-path** device lands pending until an already-approved device of that same account calls `/auth/devices/approve` (§3.1). `path` selects the gate and changes no cryptographic input (§3.1), and because the server cannot tell a person id from a vault id it cannot verify the declaration, so **`path` is a client posture rather than an enforced rule**. Two shipped paths use it differently, deliberately. A person setup that supplies an existing phrase (the recovery-in-place path) declares `"recovery"` and self-approves. A device being ADDED to an account by a scanned code (`person_join_device_from_host`) declares `"password"`, so it lands pending until an already-approved device of that account calls `/auth/devices/approve`; the "no releaser" dead end is the FIRST-device case only, and it is why the join path never takes the recovery gate. A client is free to declare `"recovery"` instead, which is why `threat-model.md` §5 states the bound as "the phrase alone is enough": the gate is what an honest client honours, not what the server can demand. The exception grants the person plane no authority a vault account lacks, because the phrase is full account takeover on both (the accepted hole §3.1 records).
 
