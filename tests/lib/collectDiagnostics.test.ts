@@ -28,10 +28,25 @@
 // reads as a fact while being an artefact of formatting is worse than no value
 // — they will act on it.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../src/platform/build-info", () => ({
   servedBuildInfo: async () => ({ commit: "abc1234", bundleHash: "sha256:beef" }),
+}));
+
+/** What `sync_vault_doctor` answers, per case (myne-md/myne#1003). */
+const doctorAnswer = vi.hoisted(() => ({
+  impl: (async () => null) as () => Promise<unknown>,
+}));
+
+// The ONE seam the vault read crosses. Mocking `invoke` rather than the module under
+// test is what makes "the block carries what the backend said" an assertion instead of
+// a restatement of the mapper.
+vi.mock("../../src/platform/core", () => ({
+  invoke: (...args: unknown[]) => {
+    void args;
+    return doctorAnswer.impl();
+  },
 }));
 
 import { collectDiagnostics } from "../../src/lib/collect-diagnostics";
@@ -55,6 +70,11 @@ function field(text: string, key: string): string {
   if (line === undefined) throw new Error(`no ${key} line in:\n${text}`);
   return line.slice(key.length + 2);
 }
+
+beforeEach(() => {
+  // Default: no vault to diagnose. A case that wants facts sets them itself.
+  doctorAnswer.impl = async () => null;
+});
 
 afterEach(() => {
   Object.defineProperty(navigator, "storage", { value: undefined, configurable: true });
@@ -131,5 +151,81 @@ describe("the diagnostic block's storage reading (myne-md/myne#556)", () => {
         `the honest answer for an unusable reading is no line at all.`,
     ).toBe(false);
     expect(hasField(text, "storageQuotaMb")).toBe(false);
+  });
+});
+
+describe("the diagnostic block's vault verdict (myne-md/myne#1003)", () => {
+  // The five facts that decide whether this device can sync. Before this a pasted block
+  // could not say any of them, so "sync is not working" was answered by reading three
+  // separate surfaces, or, as myne-md/myne#983 measured, by a week of forensics.
+  it("carries the doctor's five facts as closed tokens", async () => {
+    doctorAnswer.impl = async () => ({
+      generation: "NTV8",
+      authority: { state: "missing", cause: "key_missing_while_bound" },
+      binding: "orphaned",
+      key_at_rest: "absent",
+      session: { person_held: false, device_id_adopted: true },
+    });
+    const text = await collectDiagnostics("sync_failed");
+    expect(field(text, "vaultGeneration")).toBe("NTV8");
+    // The cause is COMPOSED with its state: `missing` alone does not say which of the
+    // five halves is gone, which is the whole question the field answers.
+    expect(field(text, "vaultAuthority")).toBe("missing:key_missing_while_bound");
+    expect(field(text, "vaultBinding")).toBe("orphaned");
+    expect(field(text, "vaultKeyAtRest")).toBe("absent");
+    expect(field(text, "vaultSession")).toBe("person=closed device=adopted");
+  });
+
+  it("prints an unasked session fact as unknown rather than as a closed identity", async () => {
+    // A locked vault does not run the resolver, so `null` is "not asked". Printing
+    // `closed` there would be a claim about the user's credentials that nothing
+    // established, and it is the exact class of lie this feature exists to end.
+    doctorAnswer.impl = async () => ({
+      generation: "NTV8",
+      authority: { state: "locked" },
+      binding: "unknown",
+      key_at_rest: "unknown",
+      session: { person_held: null, device_id_adopted: null },
+    });
+    const text = await collectDiagnostics("sync_failed");
+    expect(field(text, "vaultAuthority")).toBe("locked");
+    expect(field(text, "vaultSession")).toBe("person=unknown device=unknown");
+  });
+
+  it("still produces the block when the doctor never answers", async () => {
+    // The primary caller is the fail-closed screen, and a backend wedged on the key store
+    // is exactly the state that screen exists for. A probe that can hang must cost the five
+    // vault lines and never the one artefact a stuck user can hand over.
+    vi.useFakeTimers();
+    try {
+      doctorAnswer.impl = () => new Promise<unknown>(() => {});
+      const pending = collectDiagnostics("sync_failed");
+      await vi.advanceTimersByTimeAsync(2_100);
+      const text = await pending;
+      expect(hasField(text, "version")).toBe(true);
+      expect(hasField(text, "failureCode")).toBe(true);
+      expect(hasField(text, "vaultGeneration")).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("omits all five when the doctor refuses, rather than failing the copy", async () => {
+    // The block's own rule: a reading the client cannot take is absent, and a copy the
+    // user pressed must never fail because one probe did.
+    doctorAnswer.impl = async () => {
+      throw new Error("refused");
+    };
+    const text = await collectDiagnostics("sync_failed");
+    for (const gone of [
+      "vaultGeneration",
+      "vaultAuthority",
+      "vaultBinding",
+      "vaultKeyAtRest",
+      "vaultSession",
+    ]) {
+      expect(hasField(text, gone), `${gone} is a placeholder, not a reading`).toBe(false);
+    }
+    expect(hasField(text, "failureCode")).toBe(true);
   });
 });
