@@ -53,9 +53,7 @@
       "scopeQuestion": "Wakala anaweza kusoma nini",
       "scopeFolders": "Folda",
       "scopeApplies": "Inahusu ujumbe wako ujao. Madokezo yaliyotupwa, yaliyowekwa kwenye kumbukumbu na violezo daima yanatengwa.",
-      "blockedScope": "Bado hakuna cha kufanyia kazi: kila dokezo limetengwa na AI, au kasha ni tupu.",
       "preparing": "Inajiandaa…",
-      "blockedScopeSidebar": "Bado hakuna cha kuuliza hapa: folda ya dokezo hili imetengwa na AI.",
       "needsScope": "Chagua folda hapa chini, au fungua dokezo, ili wakala awe na cha kufanyia kazi.",
       "scopeExcluded_one": "dokezo {{count}} limetengwa na AI",
       "scopeExcluded_other": "madokezo {{count}} yametengwa na AI"

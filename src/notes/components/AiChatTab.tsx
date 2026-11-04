@@ -617,7 +617,6 @@ export function AiChatTab({
       {aiEnabled ? (
         <ConversationSurface
           testId="ai.chat-panel-surface"
-          surface="sidebar"
           {...(onInsert === undefined ? {} : { onInsert })}
           openNoteId={openNoteId}
           openNoteTitle={openNoteTitle}

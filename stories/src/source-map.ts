@@ -49,7 +49,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "BuildingIndexState": { file: "src/components/sync/BuildingIndexState.tsx", line: 28 },
   "Button": { file: "src/components/primitives/Button.tsx", line: 37 },
   "CenteredCard": { file: "src/components/primitives/CenteredCard.tsx", line: 65 },
-  "ChatComposer": { file: "src/notes/components/ChatComposer.tsx", line: 364 },
+  "ChatComposer": { file: "src/notes/components/ChatComposer.tsx", line: 354 },
   "ChatHistoryModal": { file: "src/notes/components/ChatHistoryModal.tsx", line: 76 },
   "ChoiceList": { file: "src/components/ChoiceList.tsx", line: 1 },
   "CleanUnusedAttachmentsDialog": { file: "src/components/attachments/CleanUnusedAttachmentsDialog.tsx", line: 95 },

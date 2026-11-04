@@ -53,9 +53,7 @@
       "scopeQuestion": "Vad agenten kan läsa",
       "scopeFolders": "Mappar",
       "scopeApplies": "Gäller ditt nästa meddelande. Borttagna, arkiverade och mall-anteckningar lämnas alltid utanför.",
-      "blockedScope": "Inget för agenten att arbeta med ännu: varje anteckning är undantagen från AI, eller så är valvet tomt.",
       "preparing": "Förbereder…",
-      "blockedScopeSidebar": "Inget att fråga om här ännu: den här anteckningens mapp är undantagen från AI.",
       "needsScope": "Välj en mapp nedan, eller öppna en anteckning, så att agenten har något att arbeta med.",
       "scopeExcluded_one": "{{count}} undantagen från AI",
       "scopeExcluded_other": "{{count}} undantagna från AI"
