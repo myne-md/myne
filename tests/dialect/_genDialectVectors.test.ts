@@ -80,6 +80,16 @@ const SPECS: Record<string, Spec[]> = {
     { slug: "nested", kind: "recognize", desc: "A nested #parent/child tag.", source: "see #area/sub today" },
     { slug: "inert-atx-heading", kind: "inert", desc: "An ATX heading hash is not an inline tag.", source: "# Heading" },
     { slug: "inert-hash-space", kind: "inert", desc: "A hash followed by a space is not an inline tag.", source: "a # b" },
+    // myne-md/myne#1025 added the five below: §3.7.2's deny-list was normative
+    // and correct, but unmeasured for `(`, `)`, `+`, `#` and whitespace, so no
+    // vector told an independent implementation where a tag body stops.
+    { slug: "inert-paren-before-hash", kind: "inert", desc: "A # that follows a `(` is not a tag start: the boundary is line start or Unicode whitespace, so `a (#tag` recognizes nothing.", source: "a (#tag here" },
+    { slug: "inert-body-starts-with-denied", kind: "inert", desc: "A tag body needs at least one allowed code point, so a `#` followed immediately by a denied character (`#.hidden`) is not a tag.", source: "see #.hidden today" },
+    { slug: "stops-at-paren", kind: "recognize", desc: "A `(` ends the tag body: `#tag)` recognizes `tag` alone.", source: "a #tag) here" },
+    { slug: "stops-at-open-paren", kind: "recognize", desc: "A `(` ends the tag body on the way in too: `#tag(b` recognizes `tag` alone.", source: "a #tag(b here" },
+    { slug: "stops-at-plus", kind: "recognize", desc: "A `+` ends the tag body: `#c++` recognizes `c` alone.", source: "a #c++ here" },
+    { slug: "stops-at-hash", kind: "recognize", desc: "A second `#` cannot appear in a body: `#a#b` recognizes `a` alone.", source: "a #a#b here" },
+    { slug: "stops-at-space", kind: "recognize", desc: "Whitespace ends the tag body: `#two words` recognizes `two` alone.", source: "a #two words" },
   ],
   math: [
     { slug: "inline-basic", kind: "recognize", desc: "A simple $inline math$ span.", source: "$E=mc^2$" },
