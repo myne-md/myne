@@ -25,3 +25,18 @@ pub enum SecretExportError {
     #[error("io failure")]
     Io { io_error_kind: IoFailureKind },
 }
+
+impl SecretExportError {
+    /// Bounded, content-free tag for structured logging (DENY-list safe), the same
+    /// shape `ModelStoreError::kind` and `IoFailureKind` use.
+    ///
+    /// A `?error` Debug at the log site would carry a path the day a variant grows
+    /// one, and nothing would notice: the diagnostic log is a file users are invited
+    /// to publish. A closed tag makes that a compile error instead.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            SecretExportError::InvalidDestination => "invalid_destination",
+            SecretExportError::Io { .. } => "io",
+        }
+    }
+}
