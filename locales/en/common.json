@@ -5684,7 +5684,11 @@
       "finishingTitle": "Finishing this device",
       "finishingLead": "This phone is added to your account. Its vaults are being fetched now; each one still asks for its own password.",
       "listFailed": "This phone was added, but your account’s vaults did not arrive. Check your connection and try again.",
-      "listRetry": "Fetch the vaults again"
+      "listRetry": "Fetch the vaults again",
+      "noVaults": "This phone was added, but none of your vaults could be brought onto it. Open this account on a device that already has one, then try again.",
+      "vaultsNoneOnServer": "Your account has no vaults on the server yet. A vault appears here once the device that holds it has published it.",
+      "vaultsNotHere_one": "{{count}} vault of this account could not be brought onto this phone. Open this account once more to retry.",
+      "vaultsNotHere_other": "{{count}} vaults of this account could not be brought onto this phone. Open this account once more to retry."
     },
     "unlock": {
       "title": "Unlock your identity",
