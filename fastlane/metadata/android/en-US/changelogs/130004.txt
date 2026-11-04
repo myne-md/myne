@@ -1,0 +1,1 @@
+Two device-approval ceremonies became one flow, so a joining device lands on the approval it already owes. A vault claims its device binding at creation, so its first lock no longer asks for the identity phrase. The vault doctor answers with one verdict, and a theme that arrives by sync refreshes an open Appearance panel.

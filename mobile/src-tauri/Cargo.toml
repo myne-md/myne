@@ -8,7 +8,7 @@
 # desktop build and not this one.
 [package]
 name = "myne-mobile"
-version = "0.12.0"
+version = "0.13.0"
 description = "Myne — mobile client"
 authors = ["Myne"]
 edition = "2021"
