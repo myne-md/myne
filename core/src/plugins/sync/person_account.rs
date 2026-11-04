@@ -178,7 +178,7 @@ fn enroll_path_for(generated: bool) -> EnrollPath {
 }
 
 /// This device's OWN SCRAM credential, minted here rather than carried in from another
-/// device (`decisions/protocol/0735`; installed on approval by `0783`).
+/// device (`decisions/protocol/0735`; installed on approval by `0784`).
 ///
 /// **Idempotent and non-rotating**, and that is load-bearing rather than tidy: the verifier
 /// is a function of `(secret, salt, iterations)`, so minting a second salt for a device id
@@ -271,7 +271,7 @@ fn carried_credential(
 /// device FOR this person, which is what makes carrying them correct when the phrase names the
 /// same person and wrong when it does not: `forget_person_from_host` can leave this file behind
 /// after the sealed keypair is gone, so a recovery with a DIFFERENT phrase would otherwise keep
-/// account A's token (and, since `0783`, A's credential, which is the worse half) under person
+/// account A's token (and, since `0784`, A's credential, which is the worse half) under person
 /// B's id.
 fn carry_device_facts(a: &mut PersonAuth, person_id_hex: &str) {
     if a.person_id_hex == person_id_hex {
@@ -627,7 +627,7 @@ pub async fn person_recover_identity_from_host(
     let auth = match existing {
         Some(mut a) => {
             // Every fact about THIS DEVICE survives only for the same person, including the
-            // credential triple since `0783`: see `carry_device_facts`.
+            // credential triple since `0784`: see `carry_device_facts`.
             carry_device_facts(&mut a, &person_id_hex);
             a.person_id_hex = person_id_hex.clone();
             a.kem_ek_hex = crate::account::person_identity::hex_lower(public.kem_ek());
@@ -820,7 +820,7 @@ pub async fn person_register_with_path(
     };
     // Minted whatever the gate answered, so a device that lands pending already holds the
     // secret its credential will be derived from the moment an existing device approves it
-    // (`decisions/protocol/0783`). Nothing is installed here for a pending row: it has no
+    // (`decisions/protocol/0784`). Nothing is installed here for a pending row: it has no
     // token, and a pending device that could install one would be self-approving.
     ensure_device_credential(io, &mut auth)?;
     let approved = outcome.approved_token().is_some();
@@ -877,6 +877,31 @@ pub async fn person_register_with_path(
     // credential is on disk: a marker written for an identity that failed to
     // persist would send a later session to the phrase prompt for nothing.
     mark_identity_created(host, io).await;
+
+    // ---- myne-md/myne#1001: this is the moment this device gets a durable id ----
+    //
+    // A reserved identity carries none: `person_create_identity_from_host` writes
+    // `device_id_hex` empty because the server issues it at enrolment, and the write above
+    // is what records it. A binding row is keyed by that id, so a vault created under a
+    // reserved identity could not claim at creation (`NoDeviceId`), and no later unlock can
+    // retry for it: an `NTV7`/`NTV8` vault's unlock can never install a person session
+    // (`person_vault_carrier::carrier_applies` excludes those generations, `0774`). So the
+    // claim moves to the moment it becomes possible, which is here, with the person session
+    // the install above just put in the slot.
+    //
+    // Best effort like every other claim site: the registration the user just completed is
+    // not undone by a binding that failed to be written, and the next claim retries it.
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(active) = state.active_vault_id().await {
+        if let Ok(base) = host.app_data_dir() {
+            let vault_dir = crate::paths::vault_root_for_id_from_base(&base, active);
+            adopt_person_device_identity_best_effort(host, io, &vault_dir).await;
+            crate::plugins::device_binding::commands::claim_own_binding_best_effort(
+                host, io, state, &vault_dir,
+            )
+            .await;
+        }
+    }
 
     Ok(PersonSetupView {
         phrase: None,
@@ -1201,7 +1226,7 @@ pub async fn person_claim_device_from_host(
     let mut next = auth;
     // The approval is what this poll was waiting for, so THIS is where the device stops
     // authenticating as the account: install the credential it minted at join time and take
-    // the token its own secret minted instead (`decisions/protocol/0783`). Best-effort: the
+    // the token its own secret minted instead (`decisions/protocol/0784`). Best-effort: the
     // account token is a working answer, and `adopt_own_credential` keeps it when the
     // install cannot land.
     next.token_hex = adopt_own_credential(
@@ -4871,7 +4896,7 @@ mod tests {
     }
 
     // The merged approval flow mints this device's own credential at the moment the phrase is
-    // in hand (`decisions/protocol/0783`), and the mint must be NON-ROTATING: the verifier is
+    // in hand (`decisions/protocol/0784`), and the mint must be NON-ROTATING: the verifier is
     // a function of (secret, salt, iterations), so a second salt derives a second verifier for
     // one device id and the server answers `409 already_installed` for it. The device would
     // then hold a credential nobody can use and nothing on screen would say so, which is why

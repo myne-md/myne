@@ -64,7 +64,7 @@ import { setMyMemberName, memberNameErrorKey } from "../../lib/memberNames";
 import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
-import type { IdentityFlowProps } from "./types";
+import type { IdentityFlowProps, JoinLanding } from "./types";
 
 type Step =
   | "gate"
@@ -545,11 +545,22 @@ export function IdentityFlow({
    *  refused credential, the other is an admitted device whose vault list did not
    *  arrive. */
   const [personListError, setPersonListError] = useState<string | null>(null);
-  // The account's vaults did not arrive (myne-md/myne#932). Its own state rather
-  // than the flow's `error`, which is about the identity: a listing failure leaves
-  // the identity fine and only the picker short, and saying so beside the vaults is
-  // where a reader looks for it.
-  const [vaultListFailed, setVaultListFailed] = useState(false);
+  // What the account's vault listing answered on the home step (myne-md/myne#932).
+  // `null` = nothing to report, `"failed"` = the call did not answer, `"empty"` =
+  // the account is bound to no vault server-side, and a number = that many
+  // bindings came back WITHOUT a local container (`PersonVaultRow.vault_id: null`:
+  // an unreachable frame, or a generation this device cannot hold).
+  //
+  // Its own state rather than the flow's `error`, which is about the identity: a
+  // listing that fell short leaves the identity fine and only the vaults short. A
+  // triage rather than a list, because the vault surface is the picker. What this
+  // step owes is the answer to "my account is right and my vaults are missing",
+  // which silence used to give.
+  const [vaultIssue, setVaultIssue] = useState<"failed" | "empty" | number | null>(null);
+  // Is this the first-run door (the only caller that passes `onCreateVault`)? Read
+  // through a ref by the listing effect below, for the reason given there.
+  const createAction = useRef(onCreateVault !== undefined);
+  createAction.current = onCreateVault !== undefined;
   // Forget-this-identity acknowledgement (myne-md/myne#782).
   const [forgetAck, setForgetAck] = useState(false);
 
@@ -739,15 +750,36 @@ export function IdentityFlow({
         // account to ask, and the command would refuse.
         if (s.state !== "enrolled") return;
         void personListVaults()
-          .then(() => {
-            if (!cancelled) setVaultListFailed(false);
+          .then((rows) => {
+            if (cancelled) return;
+            const missing = rows.filter((row) => row.vault_id === null).length;
+            // An account bound to nothing is a fact about the SERVER's index, not
+            // about this device, and it is the difference between "the vault is not
+            // published yet" (act on the device that holds it) and "the frame did
+            // not arrive" (retry here). Reporting neither is what a phone showed
+            // while its owner looked at a correct account number and no vaults.
+            //
+            // Except on the first-run door, which passes `onCreateVault`: an account
+            // with no vaults is exactly the state that door exists to leave, and its
+            // action is already on the screen, so a warning there is noise about
+            // nothing being wrong. Read through a ref, because the prop is an inline
+            // arrow in the shell and naming it in the dependency list would re-run
+            // this fetch on every parent render.
+            const firstRun = createAction.current;
+            setVaultIssue(
+              missing > 0
+                ? missing
+                : rows.length === 0 && !firstRun
+                  ? "empty"
+                  : null,
+            );
           })
           .catch(() => {
             // A listing failure is not a wrong phrase and not a lost vault: the
             // frames simply did not arrive, and the retry is reopening this step.
             // Said rather than swallowed, because the alternative is a picker that
             // looks merely empty (myne-md/myne#932 review).
-            if (!cancelled) setVaultListFailed(true);
+            if (!cancelled) setVaultIssue("failed");
           });
       })
       .catch(() => {
@@ -970,7 +1002,29 @@ export function IdentityFlow({
     setStep("person-finishing");
     setPersonListError(null);
     void personListVaults()
-      .then(() => onAccepted())
+      .then((rows) => {
+        // The listing's own answer decides the landing, and until this read it had
+        // none: the rows were dropped and `onAccepted()` was called with nothing,
+        // so the shell re-probed and a joined vault landed on its unlock form with
+        // the §6.3 compare it owed unreachable, and the approving device then
+        // waited on a code this device was never going to show (myne#957 follow-up).
+        const here = rows.flatMap((row) => (row.vault_id === null ? [] : [row.vault_id]));
+        if (rows.length === 0) {
+          // The account is bound to nothing on the server, so there is nothing to
+          // bring across and the remedy is on another device: publish from the one
+          // that holds the vault.
+          setPersonListError(t("identityFlow.personJoin.vaultsNoneOnServer"));
+          return;
+        }
+        if (here.length === 0) {
+          // Bound to something, and not one frame landed here. "No vaults" would be
+          // a claim about the account; the truth is that this device could not hold
+          // what the server sent, and the retry is the one control this step has.
+          setPersonListError(t("identityFlow.personJoin.noVaults"));
+          return;
+        }
+        onAccepted({ vaultIds: here, holding: "locked" });
+      })
       .catch(() => setPersonListError(t("identityFlow.personJoin.listFailed")));
   }, [onAccepted, t]);
 
@@ -1251,7 +1305,7 @@ export function IdentityFlow({
         acceptWords.join(" "),
         password,
       );
-      acceptedVaultId.current = view.vault_id;
+      joined.current = { vaultIds: [view.vault_id], holding: "unlocked" };
       setAcceptInvite(null);
       clearAcceptSecrets();
       setError(null);
@@ -1292,10 +1346,10 @@ export function IdentityFlow({
         joinWords.join(" "),
         joinPassword,
       );
-      acceptedVaultId.current = view.vault_id;
+      joined.current = { vaultIds: [view.vault_id], holding: "unlocked" };
       setJoinInvite(null);
       clearJoinSecrets();
-      accepted.current(acceptedVaultId.current);
+      accepted.current(joined.current);
     } catch (e) {
       // Which failure it was, not only "could not be added": the kinds are a shared
       // closed enum and carry no secret (myne-md/myne#794). `Transport` is the arm a
@@ -1386,15 +1440,15 @@ export function IdentityFlow({
   const accepted = useRef(onAccepted);
   accepted.current = onAccepted;
   /**
-   * The vault this flow just installed, handed to `onAccepted` so the shell can
-   * address the approval wait.
+   * The vaults this flow put on this device, handed to `onAccepted` so the shell
+   * can address the approval wait.
    *
    * A ref rather than a state because the accept lands on the NAME step and the
-   * callback runs from there: the id has to survive that hop without a re-render
-   * depending on it. `undefined` until a vault actually lands, which is what keeps
-   * the shell's other `onAccepted` callers (a plain re-probe) unchanged.
+   * callback runs from there: the landing has to survive that hop without a
+   * re-render depending on it. `undefined` until a vault actually lands, which is
+   * what keeps the shell's other `onAccepted` callers (a plain re-probe) unchanged.
    */
-  const acceptedVaultId = useRef<string | undefined>(undefined);
+  const joined = useRef<JoinLanding | undefined>(undefined);
   const nameChecked = useRef(false);
 
   /**
@@ -1438,7 +1492,7 @@ export function IdentityFlow({
       // future mount change reopens it.
       nameChecked.current = true;
       setNameChecking(false);
-      if (named) accepted.current(acceptedVaultId.current);
+      if (named) accepted.current(joined.current);
     })();
     return () => {
       cancelled = true;
@@ -1452,7 +1506,7 @@ export function IdentityFlow({
     setNameError(null);
     try {
       await setMyMemberName(name);
-      accepted.current(acceptedVaultId.current);
+      accepted.current(joined.current);
     } catch (e) {
       // Which refusal it was: `NameTooLong`, `StoreUnreadable` and `SlotNotUnlocked`
       // are three different remedies, and the mapping is shared with the desktop
@@ -2236,6 +2290,28 @@ export function IdentityFlow({
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.home.title")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
+          {/* What the account's vault listing answered (myne-md/myne#932 review).
+              OUTSIDE the create block below, which is the half this moved out of:
+              the create action belongs to the first-run door, while "my account is
+              right and my vaults are missing" is a question a device asks on every
+              entry, including the Settings one, which is offered no create action
+              and so used to be offered no answer either. Three answers, because they
+              have three remedies: retry here, publish from the device that holds the
+              vault, or fetch the frame this device could not hold. */}
+          {vaultIssue !== null ? (
+            <div
+              style={{ marginTop: "var(--space-4)" }}
+              data-testid="identity-flow.home-vault-issue"
+            >
+              <Banner kind="warning">
+                {vaultIssue === "failed"
+                  ? t("identityFlow.personJoin.listFailed")
+                  : vaultIssue === "empty"
+                    ? t("identityFlow.personJoin.vaultsNoneOnServer")
+                    : t("identityFlow.personJoin.vaultsNotHere", { count: vaultIssue })}
+              </Banner>
+            </div>
+          ) : null}
           {/* **The action comes first** (myne-md/myne#970 item 22). This block
               used to sit fourth, under the account number, the identity code and
               the invitation list: a person who arrived here from onboarding
@@ -2248,11 +2324,6 @@ export function IdentityFlow({
               <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
                 {t("identityFlow.home.vaultHint")}
               </div>
-              {vaultListFailed ? (
-                <div data-testid="identity-flow.home-vault-list-failed" style={HINT_STYLE}>
-                  <Banner kind="warning">{t("identityFlow.personJoin.listFailed")}</Banner>
-                </div>
-              ) : null}
               {/* The action is WITHHELD while the identity is sealed, not shown
                   disabled: creating a vault signs its first member list with the
                   identity, so the sealed state makes the command answer

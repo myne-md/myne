@@ -425,6 +425,11 @@ fn main() {
                     "sync_get_endpoint",
                     "sync_set_endpoint",
                     "sync_status",
+                    // myne-md/myne#1003: the vault doctor, the one verdict over generation,
+                    // authority, binding, key at rest and session. Registered here so the
+                    // command surface stays one list across both clients, even though no
+                    // mobile surface asks it yet.
+                    "sync_vault_doctor",
                     "sync_now",
                     "sync_published_state",
                     "sync_person_list_vaults",

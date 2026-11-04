@@ -739,9 +739,9 @@ mod tests {
     /// slot rung 3 installs into, and the host-provider `OnceLock`. `cargo test`
     /// runs a suite in threads inside one process, so two tests mutating either
     /// slot interleave, and the failure reads as a logic bug in the code under
-    /// test rather than as shared state. Taken by `a_rung_three_unlock_...` and
-    /// `a_host_registered_store_...`, which are the only two.
-    static SLOT_LOCK: Mutex<()> = Mutex::new(());
+    /// test rather than as shared state. The lock lives in `test_support` now, because
+    /// the creation-time binding claim installs a session key too (myne-md/myne#1001).
+    use crate::test_support::device_key_slot_guard;
 
     #[test]
     #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -819,7 +819,7 @@ mod tests {
     /// the key it returns is the one this provider minted.
     #[test]
     fn a_host_registered_store_answers_for_the_crate() {
-        let _serialized = SLOT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _serialized = device_key_slot_guard();
         clear_session_key();
         struct FakeProvider {
             inner: Mutex<Option<DeviceKeyPair>>,
@@ -920,7 +920,7 @@ mod tests {
     /// cycle and lost.
     #[test]
     fn a_rung_three_unlock_answers_before_the_os_store() {
-        let _serialized = SLOT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _serialized = device_key_slot_guard();
         let pair = DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
         install_session_key(pair.clone());
 

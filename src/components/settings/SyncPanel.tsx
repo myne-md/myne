@@ -16,6 +16,11 @@ import { BetaTermsConsent } from "../sync/BetaTermsConsent";
 import { useBetaTermsGate } from "../../hooks/useBetaTermsGate";
 import { IdentitySetupDialog } from "../IdentitySetupDialog";
 import { readPublishState, type PublishState } from "../../lib/sync-publish";
+import {
+  readVaultDoctor,
+  type AuthorityCause,
+  type VaultDoctor,
+} from "../../lib/vault-doctor";
 import { personStatus, type PersonStatusView } from "../../lib/personAccount";
 import { setPersonIdentityState, usePersonIdentityState } from "../sync/personIdentityState";
 import { DeviceManagementPanel } from "../sync/DeviceManagementPanel";
@@ -110,10 +115,34 @@ export interface SyncPanelProps {
  * detail, which is what keeps the raw failure tag out of product copy. Module scope because it
  * does not vary with props or state, so rebuilding it inside the render body only gives a later
  * edit somewhere to drift from.
+ *
+ * This is the FALLBACK since myne-md/myne#1003, not the source: the failure class is a lossy
+ * projection of `AuthorityMissing` and names two of its causes, while the vault doctor reports
+ * the cause itself. It stays for the one case the doctor cannot serve, a failed read, so the
+ * panel never goes silent about a failure it can still partly name.
  */
 const AUTHORITY_CAUSES: Record<string, string> = {
   identity_locked: "sync.panel.status.authorityIdentityClosed",
   device_key_missing: "sync.panel.status.authorityKeyMissing",
+};
+
+/**
+ * One sentence per cause the report can name (myne-md/myne#1003).
+ *
+ * Partial on purpose, and the gaps are two different facts. `no_person_session` is a cycle-level
+ * cause that cannot reach a report: a bound device key authors without the phrase, so the
+ * verdict names the device instead. `key_missing_while_bound` reuses the sentence the indicator
+ * already renders for that class, because it IS that state and one fact gets one sentence.
+ */
+const AUTHORITY_CAUSE_COPY: Partial<Record<AuthorityCause, string>> = {
+  no_head_context: "sync.panel.status.authorityNoHeadContext",
+  no_device_id: "sync.panel.status.authorityNoDeviceId",
+  no_key_at_rest: "sync.panel.status.authorityNoKeyAtRest",
+  key_unreadable: "sync.panel.status.authorityKeyUnreadable",
+  no_binding_row: "sync.panel.status.authorityNoBindingRow",
+  row_names_different_key: "sync.panel.status.authorityRowNamesDifferentKey",
+  row_unverified: "sync.panel.status.authorityRowUnverified",
+  key_missing_while_bound: "sync.panel.status.authorityKeyMissing",
 };
 
 export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
@@ -154,9 +183,48 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
   // the answer from disk — identity persisted, token absent — with no server
   // round trip.
   const { status: syncStatus, syncNow } = useSyncStatus();
-  const authorityCauseLine =
-    syncStatus?.state === "error" && syncStatus.detail
-      ? AUTHORITY_CAUSES[syncStatus.detail]
+  // Which authority half is missing, from the VAULT DOCTOR rather than from the failure class
+  // (myne-md/myne#1003). The class is a lossy projection of `AuthorityMissing` and could name two
+  // of its causes; the doctor reports the cause itself, so the sentence and the log token agree.
+  //
+  // Read once per failing state, never on the status beat: one call is an ML-DSA roster
+  // verification. The key is the failure TAG rather than the status object, whose identity
+  // changes on every poll, so a standing failure is diagnosed once and a changed one re-reads.
+  const failingDetail = syncStatus?.state === "error" ? syncStatus.detail : null;
+  const [doctor, setDoctor] = useState<VaultDoctor | null>(null);
+  useEffect(() => {
+    // A stale verdict must not outlive the failure it described, in EITHER direction: a
+    // changed failure tag drops the previous report before the next read starts, and a
+    // failed read drops it too. Keeping it would make the report outrank the class-based
+    // fallback that exists for exactly that case.
+    setDoctor(null);
+    if (failingDetail === null) return;
+    let live = true;
+    void readVaultDoctor()
+      .then((report) => {
+        if (live) setDoctor(report);
+      })
+      .catch(() => {
+        if (live) setDoctor(null);
+      });
+    return () => {
+      live = false;
+    };
+  }, [failingDetail]);
+  // One line, one derivation, and silence when nothing is missing: a verdict of `device_key` or
+  // `person_key` under a failure means the authority is NOT the fault, and rendering an authority
+  // sentence there would send the reader after the wrong half.
+  const authorityCauseLine = doctor
+    ? doctor.authority.state === "missing"
+      ? AUTHORITY_CAUSE_COPY[doctor.authority.cause]
+      : // An unreadable frame is the same fact as a head context that never built: the vault
+        // cannot be read, and the credentials are not the problem. It has its own state so
+        // the report never calls it a cause, not so the panel stays silent about it.
+        doctor.authority.state === "unknown"
+        ? AUTHORITY_CAUSE_COPY.no_head_context
+        : undefined
+    : failingDetail
+      ? AUTHORITY_CAUSES[failingDetail]
       : undefined;
   // The shared person-identity store: the roster's Lock/Forget and this panel's
   // own unlock all write it, so it is the one "is the identity ready for this
@@ -732,12 +800,14 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
         />
         <BuildingIndexState building={buildingIndex} />
         <p style={HELPER_STYLE}>{t("sync.panel.status.helper")}</p>
-        {/* One line naming WHICH authority problem this is, from the same status the indicator
-            derives, so the two cannot disagree (myne-md/myne#983). Only the two causes whose
-            repair is the identity phrase are named here: every other detail already has its own
-            sentence in the status row above, and rendering the raw tag would put `identity_locked`
-            in front of a user. The generation and key-at-rest halves need a command that reads the
-            vault from the backend, which is its own change. */}
+        {/* One line naming WHICH authority problem this is, from the VAULT DOCTOR's cause rather
+            than from the failure class (myne-md/myne#1003, finishing the deferral this comment
+            carried since #983). The class names two causes out of nine; the doctor names the one
+            that is true, and it is derived beside the same status the indicator renders, so the two
+            cannot disagree. Nothing renders when the doctor says the authority is present: the
+            failure is then a different half, and an authority sentence would send the reader after
+            the wrong one. The five facts themselves live in the diagnostics block, which is what a
+            bug report needs, and the panel owes the answer rather than the table. */}
         {authorityCauseLine && (
           <p style={HELPER_STYLE} data-testid="sync.authority-verdict">
             {t(authorityCauseLine)}

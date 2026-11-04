@@ -286,6 +286,12 @@ pub const DISPATCHED: &[&str] = &[
     // the background loop, which the browser does not have yet — so the user
     // sees the honest base state rather than a fabricated "Syncing".
     "plugin:sync|sync_status",
+    // The vault doctor (myne-md/myne#1003). Dispatched rather than refused, and that is a
+    // truthful answer rather than a port: its five facts are all readable from this
+    // client's own container, and the one that reads `absent` here, the key at rest, IS
+    // absent in a browser, by construction. A refusal would leave a browser with nothing
+    // to say about a vault that will not sync, which is the state the verdict is for.
+    "plugin:sync|sync_vault_doctor",
     // Which notes the server has NOT acknowledged (task 23). A sibling of
     // `sync_status`, not a field on it: that one is a property of the DEVICE and
     // this is a property of each NOTE, and they diverge in exactly the case that

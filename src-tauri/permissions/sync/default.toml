@@ -27,6 +27,7 @@ permissions = [
     "allow-sync-get-endpoint",
     "allow-sync-set-endpoint",
     "allow-sync-status",
+    "allow-sync-vault-doctor",
     "allow-sync-unsynced-edits",
     "allow-sync-materialisation-progress",
     "allow-sync-now",
@@ -144,6 +145,11 @@ description = "Allow invoking sync:sync_status (read-only current sync status fo
 commands.allow = ["sync_status"]
 
 [[permission]]
+identifier = "allow-sync-vault-doctor"
+description = "Allow invoking sync:sync_vault_doctor (read-only ONE verdict over the five facts behind \"sync is not working\": vault.meta generation, authority, the device-binding row, the key at rest and the session). It reads vault.meta, the device-binding store and the device-key store, and reports bounded enum tokens only: no key material, no identifier, no path, no network. NOT granted to the detached note window: its subject is the vault, and that seat exists for one note's marker."
+commands.allow = ["sync_vault_doctor"]
+
+[[permission]]
 identifier = "allow-sync-unsynced-edits"
 description = "Allow invoking sync:sync_unsynced_edits (read-only list of note ids whose local bytes the server has not acknowledged, for the unsynced-edit marker). Derived from each note's MY01 header nonce and the sync-state.json baselines — no decrypt, no key material, no network."
 commands.allow = ["sync_unsynced_edits"]
@@ -165,12 +171,12 @@ commands.allow = ["sync_published_state"]
 
 [[permission]]
 identifier = "allow-sync-person-join-device"
-description = "Allow invoking sync:sync_person_join_device (myne-md/myne#911 task 9 - admit THIS device to a person's account from a scanned person QR and the 24-word phrase). The phrase crosses IPC once, exactly as the identity-unlock path does; the device lands pending until an existing device approves it, and it mints this device's OWN server credential at that moment (it is not installed until the approval lands, decisions/protocol/0783). Never grants vault content: admission is an account binding, and each vault still asks for its own password."
+description = "Allow invoking sync:sync_person_join_device (myne-md/myne#911 task 9 - admit THIS device to a person's account from a scanned person QR and the 24-word phrase). The phrase crosses IPC once, exactly as the identity-unlock path does; the device lands pending until an existing device approves it, and it mints this device's OWN server credential at that moment (it is not installed until the approval lands, decisions/protocol/0784). Never grants vault content: admission is an account binding, and each vault still asks for its own password."
 commands.allow = ["sync_person_join_device"]
 
 [[permission]]
 identifier = "allow-sync-person-claim-device"
-description = "Allow invoking sync:sync_person_claim_device (myne-md/myne#911 task 9 - finish a pending device's enrolment once an existing device approved it, using the session's cached derived SCRAM secret; no phrase re-entry). Since decisions/protocol/0783 this also installs the credential the join minted and takes the token that credential mints, so the device stops needing the phrase to authenticate at all; it reads and writes the device-local person-auth file and no vault."
+description = "Allow invoking sync:sync_person_claim_device (myne-md/myne#911 task 9 - finish a pending device's enrolment once an existing device approved it, using the session's cached derived SCRAM secret; no phrase re-entry). Since decisions/protocol/0784 this also installs the credential the join minted and takes the token that credential mints, so the device stops needing the phrase to authenticate at all; it reads and writes the device-local person-auth file and no vault."
 commands.allow = ["sync_person_claim_device"]
 
 [[permission]]

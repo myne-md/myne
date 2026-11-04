@@ -151,7 +151,7 @@ pub trait VaultIo: Send + Sync {
     /// file it is handed does persist, which is why this is a question about one class of file
     /// rather than about the implementation.
     ///
-    /// The one caller is the device-credential mint (`decisions/protocol/0783`), and the reason
+    /// The one caller is the device-credential mint (`decisions/protocol/0784`), and the reason
     /// it asks the seam instead of the target arch is the seam's own rule: `myne-core` has no
     /// business knowing which host it runs on. A verifier minted where the secret cannot be kept
     /// is a verifier on the account that nobody can authenticate with.

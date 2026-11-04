@@ -950,7 +950,7 @@ mod tests {
         assert!(out.token.is_empty());
     }
 
-    // The merged approval flow (`decisions/protocol/0783`): the joining device installs its
+    // The merged approval flow (`decisions/protocol/0784`): the joining device installs its
     // OWN credential once an existing device has approved its row, then authenticates under it.
     // Four things are load-bearing and each is asserted rather than implied: the install goes
     // out under the ACCOUNT session (a pending device has no token of its own), the verifier

@@ -699,6 +699,9 @@ fn main() {
                 "sync_get_endpoint",
                 "sync_set_endpoint",
                 "sync_status",
+                // myne-md/myne#1003: the vault doctor. Lock-stepped with
+                // `permissions/sync/default.toml`, like every name above.
+                "sync_vault_doctor",
                 "sync_unsynced_edits",
                 "sync_materialisation_progress",
                 "sync_now",

@@ -4808,7 +4808,14 @@
         "helper": "Myne syncs your encrypted notes across your devices. The server stores only ciphertext it cannot read.",
         "label": "Sync status",
         "authorityIdentityClosed": "Sync resumes once you open your identity on this device",
-        "authorityKeyMissing": "Sync resumes once you open your identity and this device is repaired"
+        "authorityKeyMissing": "Sync resumes once you open your identity and this device is repaired",
+        "authorityNoHeadContext": "This device cannot read enough of the vault to sign for it. Your credentials are not the problem.",
+        "authorityNoDeviceId": "This device has no identity of its own yet, so the vault cannot name it.",
+        "authorityNoKeyAtRest": "This device holds no signing key. Open your identity on this device to set one up.",
+        "authorityKeyUnreadable": "This device's signing key is present but the system key store would not read it. A restart usually clears it, and opening your identity works until then.",
+        "authorityNoBindingRow": "This device's signing key is not published in the vault yet. Open your identity on this device to publish it.",
+        "authorityRowNamesDifferentKey": "The vault's record for this device names a different key than the one stored here. Open your identity on this device to repair it.",
+        "authorityRowUnverified": "The vault's record for this device does not check out. Open your identity on this device to sign it again."
       },
       "usage": {
         "helper": "How much encrypted data this account stores on the server, and how many devices are signed in.",
@@ -5677,7 +5684,11 @@
       "finishingTitle": "Finishing this device",
       "finishingLead": "This phone is added to your account. Its vaults are being fetched now; each one still asks for its own password.",
       "listFailed": "This phone was added, but your account’s vaults did not arrive. Check your connection and try again.",
-      "listRetry": "Fetch the vaults again"
+      "listRetry": "Fetch the vaults again",
+      "noVaults": "This phone was added, but none of your vaults could be brought onto it. Open this account on a device that already has one, then try again.",
+      "vaultsNoneOnServer": "Your account has no vaults on the server yet. A vault appears here once the device that holds it has published it.",
+      "vaultsNotHere_one": "{{count}} vault of this account could not be brought onto this phone. Open this account once more to retry.",
+      "vaultsNotHere_other": "{{count}} vaults of this account could not be brought onto this phone. Open this account once more to retry."
     },
     "unlock": {
       "title": "Unlock your identity",

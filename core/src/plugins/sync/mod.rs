@@ -92,6 +92,11 @@ pub mod dictionary_payload;
 // a NEW seam function (`task::run_blocking_future`) rather than either of the
 // two that already existed.
 pub mod cycle;
+// One verdict over the five facts that decide whether this device can sync
+// (myne-md/myne#1003). A READER that consumes `cycle`'s authority builder rather than
+// resolving a second time. See its module doc for why every fact is projected from
+// one decision.
+pub mod doctor;
 pub mod engine;
 pub mod enroll;
 pub mod fork_audit;
