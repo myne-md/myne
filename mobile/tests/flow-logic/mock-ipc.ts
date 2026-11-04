@@ -731,6 +731,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // scenarios read prefs before ever unlocking and gating them would rewrite
     // half this file's fixtures to prove nothing.
     let unlockedThisSession = false;
+    // Person-joined vaults arrive LOCKED, so the fixture has to remember that one
+    // of them was opened: without it the slot answers "Empty" for the rest of the
+    // scenario, and a scenario that re-probes after the unlock passes on a state
+    // the real app left one render earlier.
+    let personJoinedUnlocked = false;
 
     /** The vault an accepted invite produced on THIS device, or `null` while none
      *  has (myne-md/myne#851 task 14). The accept is the only thing that sets it,
@@ -915,7 +920,9 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       },
       "plugin:vault-unlock|vault_slot_kind": () =>
         personJoinedFrames.length > 0
-          ? "Empty"
+          ? personJoinedUnlocked
+            ? "Unlocked"
+            : "Empty"
           : acceptedVaultId !== null
             ? "Unlocked"
             : config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault
@@ -926,6 +933,7 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       "plugin:vault-unlock|unlock": () => {
         if (config.unlockError) throw config.unlockError;
         unlockedThisSession = true;
+        if (personJoinedFrames.length > 0) personJoinedUnlocked = true;
         return null;
       },
       // ── Vault creation (5-step onboarding) ──

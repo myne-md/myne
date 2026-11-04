@@ -40,10 +40,12 @@
 //
 // A twin of `src/lib/pending-approval.ts`, and the ORDER is where the two differ:
 // this file answers the join's marker before it reads the baseline, and the desktop
-// one does not. The divergence is deliberate and one-sided: since
-// `decisions/sync/0767` deleted the desktop join, nothing on desktop writes a marker
-// at all, so there the question cannot arise; here the join is the only door in.
-// Everything else is shared and kept identical on purpose: `try_claim_token`
+// one never asks, because it has no marker to answer. The divergence is one-sided and
+// deliberate: mobile's join leaves the vault LOCKED, so the question has to outlive
+// the unlock and is written down (`@myne/client-core/approval-wait`), while desktop's
+// accept lands the vault on the `pending-approval` stage at accept time
+// (`decisions/sync/0767`) and needs to remember nothing. Everything else is shared and
+// kept identical on purpose: `try_claim_token`
 // collapses a refused approval, an unreachable server and a transport that will not
 // build into one `None`, so "the server refused" is not an answer this client can get.
 // Every fact below is device-local, and none can be made to lie by a network
@@ -107,9 +109,10 @@ export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean
     // land a head before this verdict runs, because the sync loop arms its own cycle
     // on the locked-to-unlocked edge, and reading the baseline first therefore
     // answered "an approval has been observed" for a device whose compare had never
-    // happened and silently retired the marker that owed it. The marker is cleared by
-    // the compare itself ("they match") and by a local un-enrol; never by a head
-    // appearing.
+    // happened and silently retired the marker that owed it. What retires the marker
+    // is a match, a mismatch that un-enrols this device, or a cancel out of the
+    // compare once a code was on screen; a head appearing is none of the three, and
+    // neither is the idle re-lock.
     if (vaultId !== undefined && isApprovalWait(vaultId)) return true;
 
     let baseline: string | null = null;

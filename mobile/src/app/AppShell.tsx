@@ -207,17 +207,16 @@ function StageSwitch() {
    * Several vaults are all marked and none is entered: the probe answers the picker,
    * and whichever one the user opens carries its own marker into the wait.
    *
-   * A second join on a device that already holds these vaults marks them again, and
-   * that is deliberate rather than overlooked: the wait retires its marker once a
-   * code has been shown and left, and a vault this device already synced has a
-   * baseline, so its wait shows the code on the first poll instead of a spinner. The
-   * cost of a repeat join is therefore one screen and one tap, which is the same
-   * cost the marker's own doc accepts for a stale marker. Probing each id here to
-   * skip them would buy nothing else.
+   * A second join on a device that already holds these vaults marks them again. That
+   * costs one screen rather than locking the user out: a vault this device already
+   * synced has a baseline, so its wait shows the code on the first poll instead of a
+   * spinner, and the compare screen now carries a Cancel next to the two answers, so
+   * the non-destructive exit is one tap. Probing every id here to skip them would buy
+   * a saved screen and nothing else.
    */
   const landOnJoinedVaults = useCallback(
     (landing?: JoinLanding) => {
-      if (landing === undefined || landing.vaultIds.length === 0) {
+      if (landing === undefined) {
         reprobe();
         return;
       }
@@ -225,7 +224,9 @@ function StageSwitch() {
       // showing an editor (the join's own answer is the only moment this fact is
       // known without inference).
       for (const vaultId of landing.vaultIds) markApprovalWait(vaultId);
-      if (landing.holding === "locked" || landing.vaultIds.length > 1) {
+      // `!== 1` rather than `> 1`: a landing with no id cannot be entered, and the
+      // probe is the only thing that can decide where to go instead.
+      if (landing.holding === "locked" || landing.vaultIds.length !== 1) {
         reprobe();
         return;
       }

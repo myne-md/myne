@@ -1009,10 +1009,17 @@ export function IdentityFlow({
         // the §6.3 compare it owed unreachable, and the approving device then
         // waited on a code this device was never going to show (myne#957 follow-up).
         const here = rows.flatMap((row) => (row.vault_id === null ? [] : [row.vault_id]));
+        if (rows.length === 0) {
+          // The account is bound to nothing on the server, so there is nothing to
+          // bring across and the remedy is on another device: publish from the one
+          // that holds the vault.
+          setPersonListError(t("identityFlow.personJoin.vaultsNoneOnServer"));
+          return;
+        }
         if (here.length === 0) {
-          // Admitted, and not one vault arrived. "No vaults" would be a claim about
-          // the account; the truth is that no frame landed on this device, and the
-          // retry is the one control this step has.
+          // Bound to something, and not one frame landed here. "No vaults" would be
+          // a claim about the account; the truth is that this device could not hold
+          // what the server sent, and the retry is the one control this step has.
           setPersonListError(t("identityFlow.personJoin.noVaults"));
           return;
         }
