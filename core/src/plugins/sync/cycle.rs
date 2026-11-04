@@ -137,11 +137,9 @@ pub(crate) async fn try_claim_token(
             device_id,
         )
         .ok()?;
-        if out.approved && !out.token.is_empty() {
-            Some(out.token)
-        } else {
-            None // still pending approval
-        }
+        // `approved_token` is the one spelling of "approved AND a token arrived"; None here is
+        // still pending approval, not a failure.
+        out.approved_token().map(<[u8]>::to_vec)
     })
     .await
     .ok()

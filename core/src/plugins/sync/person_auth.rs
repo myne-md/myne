@@ -54,8 +54,9 @@ pub struct PersonAuth {
     pub ed_pk_hex: String,
     #[serde(default)]
     pub mldsa_vk_hex: String,
-    /// This device's OWN server-auth secret, when it joined with a device credential
-    /// instead of the recovery phrase (`decisions/protocol/0735`).
+    /// This device's OWN server-auth secret, minted from CSPRNG bytes the first time this
+    /// device registers on a person account (`decisions/protocol/0735`; installed on the
+    /// approval tap by `0784`).
     ///
     /// It is stored beside `token_hex` on purpose, and the reason is a threat-model
     /// statement rather than a convenience: the token already authenticates every request
@@ -64,8 +65,11 @@ pub struct PersonAuth {
     /// would protect the weaker of the two secrets and leave the stronger one in the same
     /// file, which is the kind of asymmetry that reads as security and is not.
     ///
-    /// Absent on every device that joined with the phrase, and on every pre-feature file.
-    /// Redacted from `Debug` like the token.
+    /// Present from the moment a device registers, including while its row is still
+    /// PENDING: the phrase is in hand exactly once, and a secret written only after the
+    /// approval would have to ask for it again. Absent on every pre-feature file, on a
+    /// device that never registered, and on the browser, which keeps no person credential
+    /// at rest at all. Redacted from `Debug` like the token.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub device_secret_hex: Option<String>,
     /// The salt this device's credential was derived under (lowercase hex). Public

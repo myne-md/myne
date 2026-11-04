@@ -222,6 +222,10 @@ pub mod test_io {
     #[derive(Default)]
     pub struct MemoryVaultIo {
         files: Mutex<BTreeMap<PathBuf, Vec<u8>>>,
+        /// Models a host whose person credential does not survive the session, i.e. the browser
+        /// (`web/wasm/src/person_io.rs`). Default `false` so every existing fake keeps the
+        /// filesystem answer.
+        volatile_person_credential: bool,
     }
 
     impl MemoryVaultIo {
@@ -240,6 +244,14 @@ pub mod test_io {
             io
         }
 
+        /// The same fake, answering "a person credential written here dies with the session".
+        pub fn volatile_person_credential() -> Self {
+            Self {
+                volatile_person_credential: true,
+                ..Default::default()
+            }
+        }
+
         pub fn bytes_at(&self, path: &Path) -> Option<Vec<u8>> {
             self.files
                 .lock()
@@ -255,6 +267,10 @@ pub mod test_io {
 
     #[async_trait::async_trait]
     impl VaultIo for MemoryVaultIo {
+        fn keeps_person_credential_at_rest(&self) -> bool {
+            !self.volatile_person_credential
+        }
+
         async fn read(&self, path: &Path) -> IoResult<Vec<u8>> {
             self.bytes_at(path).ok_or_else(not_found)
         }
