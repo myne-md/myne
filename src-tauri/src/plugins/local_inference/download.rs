@@ -202,6 +202,22 @@ pub enum ModelDownloadCommandError {
     Store(#[from] ModelStoreError),
 }
 
+impl ModelDownloadCommandError {
+    /// Bounded, content-free tag for the diagnostic log, the same shape
+    /// `ModelStoreError::kind` uses.
+    ///
+    /// One tag per layer rather than `?error`: a `Debug` of this enum would print
+    /// whatever a future variant carries, and the file it lands in is one users are
+    /// invited to publish.
+    pub fn kind(&self) -> &'static str {
+        match self {
+            ModelDownloadCommandError::UnknownArtifact => "unknown_artifact",
+            ModelDownloadCommandError::Download(_) => "download",
+            ModelDownloadCommandError::Store(error) => error.kind(),
+        }
+    }
+}
+
 /// Per-download cancellation registry, keyed by the frontend-supplied
 /// `download_id`. A separate map from [`super::cancel::CancelRegistry`] because
 /// a download has no shared Stop button and is not a model generation: it is
@@ -297,7 +313,7 @@ fn fetch_one<W: std::io::Write>(
 /// hundreds of megabytes in one attempt with no retry behind it, and until this
 /// wrapper existed it left no trace at all: the only evidence of a failed download
 /// was a typed error the page turned into a sentence. Recording it here rather than
-/// at each `return Err` in the body is what makes the coverage total — the body has
+/// at each `return Err` in the body is what makes the coverage total: the body has
 /// four failure arms today and a fifth would be silent otherwise.
 ///
 /// `expected_bytes` is the artefact's declared size, not a count of what moved: the
@@ -325,12 +341,11 @@ pub fn download_and_install(
             expected_bytes = artifact.approx_total_bytes,
             elapsed_ms
         ),
-        // `?error` on this pair of closed enums: neither variant set carries an
-        // `io::Error`, so no path and no OS message can reach the file.
         Err(error) => tracing::warn!(
             event = "model_download_failed",
+            stage = "download",
             artifact = artifact.id,
-            kind = ?error,
+            kind = error.kind(),
             elapsed_ms
         ),
     }

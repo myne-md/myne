@@ -229,6 +229,7 @@ pub(crate) fn teardown(w: Option<WorkerHandle>) {
             if join.join().is_err() {
                 tracing::warn!(
                     event = "sync_stream_worker_panicked",
+                    stage = "teardown",
                     fallback = "poll",
                     "the live-collab stream worker ended by panic; sync falls back to the poll"
                 );

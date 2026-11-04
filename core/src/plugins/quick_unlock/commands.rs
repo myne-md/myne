@@ -165,13 +165,21 @@ pub fn wipe_files(dir: &Path) -> Result<(), IoFailureKind> {
 /// [`wipe_files`] on a path whose caller cannot act on a failure: log the
 /// bounded kind rather than discard it, so a credential that outlived its own
 /// deletion is at least visible in the diagnostic log.
+///
+/// **The one place a removal is recorded, and the reason it takes `stage`.** Four
+/// paths destroy the credential (an over-cap counter, the attempt cap, a password
+/// change, a corrupt blob) and they mean four different things to a reader, so the
+/// reason is the field rather than a fourth call site each spelling its own event.
+/// Writing it here instead of at each caller is also what makes the two paths nobody
+/// instrumented (invalidation and a corrupt blob) stop being silent.
 fn wipe_files_best_effort(dir: &Path, stage: &'static str) {
-    if let Err(io_error_kind) = wipe_files(dir) {
-        tracing::warn!(
+    match wipe_files(dir) {
+        Ok(()) => tracing::info!(event = "quick_unlock_credential_removed", reason = stage),
+        Err(io_error_kind) => tracing::warn!(
             stage,
             io_failure_kind = ?io_error_kind,
             "quick-unlock credential file could not be removed"
-        );
+        ),
     }
 }
 
@@ -233,6 +241,24 @@ pub fn invalidate_credential(dir: &Path) {
 /// Configure quick-unlock for the (currently Unlocked) vault: wrap `root_key`
 /// under a fresh provider wrap key into `vault.quickunlock`.
 pub async fn setup_with_dir<P: QuickUnlockProvider + Send + 'static>(
+    dir: &Path,
+    state: &VaultRuntimeState,
+    provider: P,
+    account_number_hash: &[u8; 16],
+) -> Result<(), QuickUnlockError> {
+    // Enrolment is the second half of "quick-unlock does not work" and it had no
+    // record at all: a PIN the user set and a biometric they enrolled either took or
+    // silently did not, and the only evidence was a sentence on the Settings row.
+    // `?error` is safe here because `QuickUnlockError` is a closed enum that carries
+    // `IoFailureKind` and counters, never a path and never the PIN.
+    let outcome = setup_inner(dir, state, provider, account_number_hash).await;
+    if let Err(ref error) = outcome {
+        tracing::warn!(event = "quick_unlock_setup_failed", stage = "setup", kind = ?error);
+    }
+    outcome
+}
+
+async fn setup_inner<P: QuickUnlockProvider + Send + 'static>(
     dir: &Path,
     state: &VaultRuntimeState,
     provider: P,
@@ -363,6 +389,19 @@ fn requires_full_unlock_first(provider_kind: u8) -> bool {
 /// Disable quick-unlock: remove the device-local files. OS-free — the
 /// [`quick_unlock_disable`] command layers the Apple-Keychain cleanup on.
 pub fn disable_with_dir(dir: &Path, state: &VaultRuntimeState) -> Result<(), QuickUnlockError> {
+    // A failed disable is the one quick-unlock outcome that leaves the feature ON
+    // with a credential still unwrapping the live `root_key`, so it is the one the
+    // user reports as "I turned it off and it came back". The fail-closed refusal is
+    // already visible on screen; this says whether the permit, the missing blob or
+    // the wipe refused it.
+    let outcome = disable_inner(dir, state);
+    if let Err(ref error) = outcome {
+        tracing::warn!(event = "quick_unlock_disable_failed", stage = "disable", kind = ?error);
+    }
+    outcome
+}
+
+fn disable_inner(dir: &Path, state: &VaultRuntimeState) -> Result<(), QuickUnlockError> {
     // `auth_permits` gate (myne#378), BEFORE the precondition — the same
     // ordering `vault_delete_with_dir` uses, and for the same reason: never
     // report "nothing to delete" while an operation you cannot see is running.
@@ -504,14 +543,6 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // wipes immediately (fail safe).
     let mut attempts = read_attempt_state(dir);
     if attempts.must_wipe() {
-        // Recorded before the wipe, because after it the counter this line names is
-        // gone and the only remaining evidence is the user's memory of the screen.
-        tracing::warn!(
-            event = "quick_unlock_credential_wiped",
-            reason = "attempts_over_cap",
-            "quick-unlock attempt counter was already over the cap on read; the \
-             credential is wiped and the master password is required"
-        );
         let _ = provider.delete();
         wipe_files_best_effort(dir, "attempts_over_cap");
         return Err(QuickUnlockError::AttemptsExhausted);
@@ -661,16 +692,6 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
         }
         Err(_) => match attempts.record_failure() {
             AttemptOutcome::Wipe => {
-                // The one quick-unlock outcome the user cannot undo without the
-                // master password, and the report for it arrives afterwards, when
-                // the counter is already gone. The screen says it happened; this
-                // line says when, and on which attempt.
-                tracing::warn!(
-                    event = "quick_unlock_credential_wiped",
-                    reason = "attempts_exhausted",
-                    "the quick-unlock credential was rejected at the cap and wiped; \
-                     the master password is required from here"
-                );
                 let _ = provider.delete();
                 wipe_files_best_effort(dir, "attempts_exhausted");
                 Err(QuickUnlockError::AttemptsExhausted)
@@ -679,7 +700,7 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
                 // An ordinary wrong credential, at `info`: "my PIN is right and it
                 // says wrong" is a recurring report, and this is the only record
                 // that says how many answers the user had already spent.
-                tracing::info!(event = "quick_unlock_rejected", remaining);
+                tracing::info!(event = "quick_unlock_rejected", stage = "redeem", remaining);
                 persist_attempt_state(dir, &attempts)?;
                 Err(QuickUnlockError::WrongCredential { remaining })
             }
@@ -1947,8 +1968,20 @@ mod tests {
     }
 
     #[test]
+    #[tracing_test::traced_test]
     fn wrong_credential_counts_then_wipes_at_the_cap() {
-        rt().block_on(wrong_credential_counts_then_wipes_at_the_cap_inner())
+        rt().block_on(wrong_credential_counts_then_wipes_at_the_cap_inner());
+
+        // The two records a report for this path has, asserted HERE because the
+        // fixture already reaches the state: a deleted record fails this test rather
+        // than passing silently, which is the half `check-tracing-discipline.mjs`
+        // cannot see (it reads content, never emission). They live in the `#[test]`
+        // wrapper rather than in `_inner`, because `traced_test` puts `logs_contain`
+        // in scope only in the annotated function.
+        assert!(logs_contain("event=\"quick_unlock_rejected\""));
+        assert!(logs_contain("remaining=4"));
+        assert!(logs_contain("event=\"quick_unlock_credential_removed\""));
+        assert!(logs_contain("reason=\"attempts_exhausted\""));
     }
     async fn wrong_credential_counts_then_wipes_at_the_cap_inner() {
         let tmp = ScopedTempDir::new("qu-wrong").unwrap();

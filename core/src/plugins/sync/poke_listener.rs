@@ -554,6 +554,36 @@ mod tests {
         );
     }
 
+    /// A worker that ended by panic is joined without taking `teardown` down with it,
+    /// which is the behaviour the record hangs off.
+    ///
+    /// **The record itself is NOT asserted here, and the reason is mechanical rather
+    /// than an omission.** `teardown` joins on a blocking thread, and
+    /// `tracing_test::traced_test` captures only records carrying its test span, so a
+    /// record emitted from that thread never reaches `logs_contain` even though it is
+    /// printed (verified: the assertion fails while the line appears on stdout). The
+    /// branch is `join.join().is_err()`, and this fixture is what proves the ERROR arm
+    /// is reachable and harmless; its emission is held by review and by the shape's
+    /// one call site, not by a test.
+    #[test]
+    fn a_panicking_worker_is_joined_without_failing_the_teardown() {
+        let join = std::thread::spawn(|| panic!("the worker exploded"));
+        teardown(Some(WorkerHandle {
+            stop: Arc::new(AtomicBool::new(false)),
+            sock: Arc::new(Mutex::new(None)),
+            unauth: Arc::new(AtomicBool::new(false)),
+            join: Some(join),
+            identity: StreamIdentity {
+                fingerprint: 0,
+                route: Route::Direct,
+                rooms: 0,
+            },
+        }));
+        // The join runs on a blocking thread; a bounded wait keeps the assertion from
+        // depending on the runtime's scheduler without hiding a hang.
+        std::thread::sleep(Duration::from_millis(50));
+    }
+
     /// Endpoint/token rotation still tears the stream down — the pre-existing
     /// behaviour the route term is layered on top of, not a replacement for.
     #[test]
