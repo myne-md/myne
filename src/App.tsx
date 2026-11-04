@@ -1004,6 +1004,7 @@ function App() {
           <UpdatingScreen
             phase={update.phase === "failed" ? "failed" : "working"}
             version={update.version ?? ""}
+            progress={update.progress}
             onRetry={update.retry}
             // Reprobe-based exit (myne-md/myne#870): the vault was locked before
             // the install, so boot routing answers `unlock` on its own and there

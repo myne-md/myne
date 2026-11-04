@@ -3236,6 +3236,7 @@
       "updateHelper": "Myne verifies every update against an offline release key before installing it. The check asks downloads.myne.md for the latest version, sending only your version and platform (and your IP, which that origin does not log); never your notes or account.",
       "updateIdle": "Signed updates, fetched from downloads.myne.md when you check.",
       "updateInstallButton": "Restart to update",
+      "updateFlushFailed": "Could not save every open note, so Myne did not restart to update. Try again in a moment.",
       "updateLabel": "Updates",
       "updateUpToDate": "You're on the latest version.",
       "version": "Version",
@@ -4551,13 +4552,19 @@
     },
     "updating": {
       "eyebrow": "Updating",
-      "heading": "Updating Myne",
       "version": "Version {{version}}",
-      "caption": "Downloading and installing the new version.",
-      "hint": "Myne restarts on its own when this finishes. Leave the window open."
+      "progressLabel": "Update progress",
+      "bytes": "{{done}} downloaded",
+      "bytesOfTotal": "{{done}} of {{total}}",
+      "hint": "Myne restarts by itself when this finishes."
+    },
+    "phase": {
+      "starting": "Preparing",
+      "downloading": "Downloading",
+      "verifying": "Verifying",
+      "installing": "Installing"
     },
     "failed": {
-      "eyebrow": "Update did not finish",
       "heading": "The update did not finish",
       "caption": "Myne {{version}} is still running and your notes are untouched.",
       "hint": "Trying again starts the download over.",

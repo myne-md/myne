@@ -54,6 +54,31 @@ vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (key: string) => key, i18n: { language } }),
 }));
 
+// The update row's two seams (myne-md/myne#1020): what a check answers, and the
+// flush that has to land before the process is allowed to exit into an install.
+// Mutable so each case drives its own arm.
+const updateSeam = vi.hoisted(() => ({
+  /** What the next manual check reports. */
+  answer: { kind: "available", version: "0.13.0", notes: "Fixes a crash." } as
+    | { kind: "available"; version: string; notes: string }
+    | { kind: "up-to-date" },
+  /** True when an open pane refuses to save, which must stop the install. */
+  flushShouldReject: false,
+  updateCheck: vi.fn(),
+  updateInstall: vi.fn(),
+  flushOpenPanes: vi.fn(),
+}));
+vi.mock("../../src/platform/update", () => ({
+  updateCheck: updateSeam.updateCheck,
+  updateInstall: updateSeam.updateInstall,
+  getAutoCheck: () => Promise.resolve(true),
+  setAutoCheck: () => Promise.resolve(),
+  UPDATE_PROGRESS_EVENT: "update:progress",
+}));
+vi.mock("../../src/notes/renameFlushHook", () => ({
+  renameFlushHooks: () => ({ flushOpenPanes: updateSeam.flushOpenPanes }),
+}));
+
 import { AboutPanel } from "../../src/components/settings/AboutPanel";
 
 beforeEach(() => {
@@ -63,6 +88,18 @@ beforeEach(() => {
   servedBuild.value = null;
   setDeveloperMode.mockClear();
   openUrl.mockClear();
+  updateSeam.answer = { kind: "available", version: "0.13.0", notes: "Fixes a crash." };
+  updateSeam.flushShouldReject = false;
+  updateSeam.updateCheck.mockReset();
+  updateSeam.updateInstall.mockReset();
+  updateSeam.flushOpenPanes.mockReset();
+  updateSeam.updateCheck.mockImplementation(() => Promise.resolve(updateSeam.answer));
+  updateSeam.updateInstall.mockImplementation(() => Promise.resolve());
+  updateSeam.flushOpenPanes.mockImplementation(() =>
+    updateSeam.flushShouldReject
+      ? Promise.reject(new Error("no"))
+      : Promise.resolve(),
+  );
 });
 afterEach(() => cleanup());
 
@@ -208,5 +245,87 @@ describe("AboutPanel — build readout", () => {
     });
     expect(screen.getByTestId("about.build-commit").textContent).toBe("test");
     expect(screen.queryByTestId("about.bundle-hash")).toBeNull();
+  });
+});
+
+describe("AboutPanel — the update row is one button (myne-md/myne#1020)", () => {
+  // The row used to hold the check in its control slot and grow a SECOND primary
+  // button underneath once a version was offered. The owner asked for one control
+  // that becomes the install, and the reason it is worth a test is that the two
+  // shapes render the same row: only an assertion on which button survives a
+  // check distinguishes them, and the row's height not moving is the whole point
+  // of the change.
+
+  it("starts as the check, with no install affordance anywhere in the row", () => {
+    render(<AboutPanel />);
+    expect(screen.getByTestId("about.update-check")).toBeTruthy();
+    expect(screen.queryByTestId("about.update-install")).toBeNull();
+  });
+
+  it("turns into the install in place when a check finds a version", async () => {
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.update-check"));
+    const install = await screen.findByTestId("about.update-install");
+    // The check is GONE, not merely accompanied: a row holding both is the shape
+    // the owner rejected.
+    expect(screen.queryByTestId("about.update-check")).toBeNull();
+    expect(install.textContent).toBe("settings.about.updateInstallButton");
+  });
+
+  it("stays the check when there is nothing to install", async () => {
+    updateSeam.answer = { kind: "up-to-date" };
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.update-check"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("about.update-check")).toBeTruthy();
+    expect(screen.queryByTestId("about.update-install")).toBeNull();
+  });
+
+  it("flushes the open panes before installing", async () => {
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.update-check"));
+    fireEvent.click(await screen.findByTestId("about.update-install"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(updateSeam.flushOpenPanes).toHaveBeenCalledTimes(1);
+    expect(updateSeam.updateInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not exit into an install when a pane refuses to save, and says so on the row", async () => {
+    updateSeam.flushShouldReject = true;
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.update-check"));
+    fireEvent.click(await screen.findByTestId("about.update-install"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    // The install exits the process. Refused flush, refused exit: the edits are
+    // still only in memory and a restart would take them with it.
+    expect(updateSeam.updateInstall).not.toHaveBeenCalled();
+    expect(screen.getByTestId("about.update-blocked")).toBeTruthy();
+    // The button stays pressable, so the retry after saving is the same button.
+    expect(screen.getByTestId("about.update-install")).toBeTruthy();
+  });
+
+  it("clears the refusal once a press gets through", async () => {
+    updateSeam.flushShouldReject = true;
+    render(<AboutPanel />);
+    fireEvent.click(screen.getByTestId("about.update-check"));
+    fireEvent.click(await screen.findByTestId("about.update-install"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.getByTestId("about.update-blocked")).toBeTruthy();
+
+    updateSeam.flushShouldReject = false;
+    fireEvent.click(screen.getByTestId("about.update-install"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(screen.queryByTestId("about.update-blocked")).toBeNull();
+    expect(updateSeam.updateInstall).toHaveBeenCalledTimes(1);
   });
 });

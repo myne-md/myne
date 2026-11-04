@@ -20,8 +20,8 @@
 //! updater. This module only maps its result and its errors. A failure is the
 //! `Err` arm, so the UI never has to tell a failure apart from an update.
 
-use crate::update::{UpdateCheckError, UpdateStatus};
-use tauri::{AppHandle, Manager, Runtime, Url};
+use crate::update::{UpdateCheckError, UpdateProgress, UpdateStatus, PROGRESS_EVENT};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Url};
 use tauri_plugin_updater::{Updater, UpdaterExt};
 
 /// Build the updater pinned to this build's channel endpoint.
@@ -96,7 +96,39 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
     }
 }
 
+/// The smallest byte delta between two `Downloading` ticks.
+///
+/// One event per transport chunk would be thousands of IPC round trips for a
+/// 200 MiB artifact, and the UI cannot paint faster than about 60 Hz anyway. A
+/// step of one percent of the total keeps the bar within half a percent of the
+/// truth while capping the stream at about a hundred ticks; the 64 KiB floor
+/// stops a small artifact from reporting every chunk, and 256 KiB is the fallback
+/// for an origin that sent no `Content-Length` (where there is no total to take a
+/// percentage of). Everything is capped at 4 MiB so a very large artifact still
+/// reports movement.
+fn progress_step(total: Option<u64>) -> u64 {
+    total.map_or(256 * 1024, |total| {
+        (total / 100).clamp(64 * 1024, 4 * 1024 * 1024)
+    })
+}
+
 /// Download and install the offered update, then relaunch into it.
+///
+/// The install is streamed to the WebView as [`UpdateProgress`] events on
+/// [`PROGRESS_EVENT`], which is the difference from `download_and_install`: that
+/// call downloads and installs in one expression, so a UI can only say
+/// "installing" for however many minutes the download takes. Splitting it is not
+/// a reimplementation of anything. `download` verifies the artifact's minisign
+/// signature before it returns, and `install` does the same work it did inside
+/// the combined call, so the split only puts a seam where the phase boundary
+/// already was.
+///
+/// **Every emit is best effort.** A closed window, or a WebView that listened to
+/// nothing, must not fail an install that is otherwise fine: the progress stream
+/// is a readout for a window that may no longer exist, and the install's own
+/// result travels in this command's return value. A discarded `emit` error is
+/// therefore the intended behaviour rather than an oversight, and each of the
+/// three sites below says so where it happens.
 ///
 /// On Windows the installer exits the process itself; on macOS and Linux this
 /// returns and the relaunch below is what starts the new version.
@@ -109,10 +141,46 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
         // hanging on it.
         return Err(UpdateCheckError::Other);
     };
-    update
-        .download_and_install(|_, _| {}, || {})
+
+    let chunk_app = app.clone();
+    let mut downloaded: u64 = 0;
+    let mut last_reported: u64 = 0;
+    let bytes = update
+        .download(
+            move |chunk: usize, total: Option<u64>| {
+                downloaded += chunk as u64;
+                let complete = total.is_some_and(|total| downloaded >= total);
+                if complete || downloaded - last_reported >= progress_step(total) {
+                    last_reported = downloaded;
+                    // Discarded on purpose: an emit fails when the window is gone,
+                    // and a closed window must not abort an install that is
+                    // otherwise fine.
+                    let _ = chunk_app.emit(
+                        PROGRESS_EVENT,
+                        UpdateProgress::Downloading { downloaded, total },
+                    );
+                }
+            },
+            {
+                // Runs after the last chunk and BEFORE the signature check, which
+                // is what makes `Verifying` a phase the host can testify to rather
+                // than a sentence it made up.
+                let finish_app = app.clone();
+                move || {
+                    // Same best-effort rule as the chunk arm above.
+                    let _ = finish_app.emit(PROGRESS_EVENT, UpdateProgress::Verifying);
+                }
+            },
+        )
         .await
         .map_err(map_error)?;
+
+    // Same best-effort rule: the swap below is what the user is waiting for, and
+    // a window that closed mid-download cannot be allowed to veto it.
+    let _ = app.emit(PROGRESS_EVENT, UpdateProgress::Installing);
+    // Sync and blocking on purpose: it is the same work the combined call did on
+    // this task, and there is nothing else for this task to do while it runs.
+    update.install(&bytes).map_err(map_error)?;
     tauri::process::restart(&app.env());
 }
 

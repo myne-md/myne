@@ -49,6 +49,10 @@ describeE2E("su1 desktop self-update surfaces", () => {
         await s.byTestId("about.update-channel");
         await s.byTestId("about.update-check");
         await s.byTestId("about.update-status");
+        // The row is ONE control (myne-md/myne#1020): with nothing offered it is
+        // the check, and the install path does not exist yet. Pinned because the
+        // two shapes render an identical row, so only presence tells them apart.
+        expect(await s.byTestIdAll("about.update-install")).toHaveLength(0);
       },
     );
   });

@@ -50,11 +50,23 @@ const update = vi.hoisted(() => ({
   ),
   install: vi.fn(() => Promise.resolve()),
   autoCheck: vi.fn(() => Promise.resolve(true)),
+  /** The progress event's name, and the handler the hook subscribed with. */
+  progressEvent: "update:progress",
+  progressHandler: null as null | ((event: { payload: unknown }) => void),
+  unlisten: vi.fn(),
 }));
 vi.mock("../../src/platform/update", () => ({
   getAutoCheck: update.autoCheck,
   updateCheck: update.check,
   updateInstall: update.install,
+  UPDATE_PROGRESS_EVENT: update.progressEvent,
+}));
+vi.mock("../../src/platform/event", () => ({
+  listen: (name: string, handler: (event: { payload: unknown }) => void) => {
+    if (name !== update.progressEvent) return Promise.reject(new Error(name));
+    update.progressHandler = handler;
+    return Promise.resolve(update.unlisten);
+  },
 }));
 
 const lockVault = vi.hoisted(() => vi.fn(() => Promise.resolve()));
@@ -128,6 +140,7 @@ async function offerArrives(): Promise<void> {
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
   caps.absent = [];
+  update.progressHandler = null;
   wire();
 });
 
@@ -135,6 +148,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.clearAllMocks();
+  update.progressHandler = null;
 });
 
 describe("the notice, wired through App", () => {
@@ -197,6 +211,23 @@ describe("the updating stage, wired through App", () => {
     expect(flushOpenPanes).toHaveBeenCalledTimes(1);
     expect(lockVault).toHaveBeenCalledTimes(1);
     expect(update.install).toHaveBeenCalledTimes(1);
+
+    // The host's byte events reach the screen (myne-md/myne#1020). Asserted
+    // through `App` because the two halves are joined here and nowhere else: the
+    // hook owns the subscription and the screen owns the rendering, so a `progress`
+    // prop dropped from `App`'s `<UpdatingScreen>` leaves both of their own tests
+    // green and the bar permanently empty. The percentage is asserted rather than
+    // the phase word so this does not depend on the translation catalogue.
+    expect(update.progressHandler).not.toBeNull();
+    act(() => {
+      update.progressHandler?.({
+        payload: { phase: "downloading", downloaded: 4096, total: 8192 },
+      });
+    });
+    expect(screen.getByTestId("update.percent").textContent).toBe("50%");
+    expect(
+      screen.getByTestId("update.progress").getAttribute("aria-valuenow"),
+    ).toBe("50");
   });
 
   it("keeps the editor and reports the refusal when the vault will not lock", async () => {
