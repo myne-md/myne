@@ -504,6 +504,14 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
     // wipes immediately (fail safe).
     let mut attempts = read_attempt_state(dir);
     if attempts.must_wipe() {
+        // Recorded before the wipe, because after it the counter this line names is
+        // gone and the only remaining evidence is the user's memory of the screen.
+        tracing::warn!(
+            event = "quick_unlock_credential_wiped",
+            reason = "attempts_over_cap",
+            "quick-unlock attempt counter was already over the cap on read; the \
+             credential is wiped and the master password is required"
+        );
         let _ = provider.delete();
         wipe_files_best_effort(dir, "attempts_over_cap");
         return Err(QuickUnlockError::AttemptsExhausted);
@@ -653,11 +661,25 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
         }
         Err(_) => match attempts.record_failure() {
             AttemptOutcome::Wipe => {
+                // The one quick-unlock outcome the user cannot undo without the
+                // master password, and the report for it arrives afterwards, when
+                // the counter is already gone. The screen says it happened; this
+                // line says when, and on which attempt.
+                tracing::warn!(
+                    event = "quick_unlock_credential_wiped",
+                    reason = "attempts_exhausted",
+                    "the quick-unlock credential was rejected at the cap and wiped; \
+                     the master password is required from here"
+                );
                 let _ = provider.delete();
                 wipe_files_best_effort(dir, "attempts_exhausted");
                 Err(QuickUnlockError::AttemptsExhausted)
             }
             AttemptOutcome::Allowed { remaining } => {
+                // An ordinary wrong credential, at `info`: "my PIN is right and it
+                // says wrong" is a recurring report, and this is the only record
+                // that says how many answers the user had already spent.
+                tracing::info!(event = "quick_unlock_rejected", remaining);
                 persist_attempt_state(dir, &attempts)?;
                 Err(QuickUnlockError::WrongCredential { remaining })
             }
