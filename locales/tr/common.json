@@ -53,9 +53,7 @@
       "scopeQuestion": "Ajan ne okuyabilir",
       "scopeFolders": "Klasörler",
       "scopeApplies": "Sonraki mesajınız için geçerli. Çöpe atılan, arşivlenen ve şablon notlar her zaman dışarıda bırakılır.",
-      "blockedScope": "Ajanın henüz üzerinde çalışacağı bir şey yok: her not yapay zekadan hariç tutulmuş ya da kasa boş.",
       "preparing": "Hazırlanıyor…",
-      "blockedScopeSidebar": "Burada henüz sorulacak bir şey yok: bu notun klasörü yapay zekadan hariç tutulmuş.",
       "needsScope": "Aşağıdan bir klasör seçin ya da ajanın üzerinde çalışacak bir şeyi olsun diye bir not açın.",
       "scopeExcluded_one": "{{count}} yapay zekadan hariç tutuldu",
       "scopeExcluded_other": "{{count}} yapay zekadan hariç tutuldu"

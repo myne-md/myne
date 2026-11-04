@@ -53,9 +53,7 @@
       "scopeQuestion": "Mitä agentti voi lukea",
       "scopeFolders": "Kansiot",
       "scopeApplies": "Koskee seuraavaa viestiäsi. Roskakorissa, arkistossa ja mallimuistiinpanoissa olevat jätetään aina pois.",
-      "blockedScope": "Agentilla ei ole vielä työstettävää: jokainen muistiinpano on rajattu pois tekoälyltä tai holvi on tyhjä.",
       "preparing": "Valmistellaan…",
-      "blockedScopeSidebar": "Täällä ei ole vielä mitään kysyttävää: tämän muistiinpanon kansio on rajattu pois tekoälyltä.",
       "needsScope": "Valitse alta kansio tai avaa muistiinpano, jotta agentilla on työstettävää.",
       "scopeExcluded_one": "{{count}} rajattu pois tekoälyltä",
       "scopeExcluded_other": "{{count}} rajattu pois tekoälyltä"

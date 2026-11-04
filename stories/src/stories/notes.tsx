@@ -1496,8 +1496,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-            surface="sidebar"
-            openNoteId="n1"
+                        openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />
@@ -1518,8 +1517,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-            surface="sidebar"
-            openNoteId="n1"
+                        openNoteId="n1"
             anchoredNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
@@ -1534,15 +1532,14 @@ export const NOTES_STORIES: StoryDescriptor[] = [
     surface: "ChatComposer",
     state: "scope-empty",
     description:
-      "The scope resolved to no notes: the field refuses the keystroke, the picker is outlined, and the placeholder says why. The count and the excluded figure stay on the line, they are the disclosure, not the picker (myne-md/myne#848).",
+      "The scope resolved to no notes: the field refuses the keystroke, the picker is outlined, and the field keeps its ordinary placeholder. Why it is closed is on the line under it, in figures, which is the control that owns that fact: the same sentence rendered inside the field ran to two lines at panel width, in a box the user could not type into (myne-md/myne#1020).",
     tags: ["notes", "ai", "agent", "composer", "blocked", "excluded"],
     fixture: EMPTY_SCOPE_FIXTURE,
     render: () => (
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-            surface="sidebar"
-            openNoteId="n1"
+                        openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />
@@ -1563,8 +1560,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-            surface="sidebar"
-            openNoteId="n1"
+                        openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />

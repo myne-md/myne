@@ -53,9 +53,7 @@
       "scopeQuestion": "Tác nhân AI có thể đọc gì",
       "scopeFolders": "Thư mục",
       "scopeApplies": "Áp dụng cho tin nhắn tiếp theo của bạn. Ghi chú trong thùng rác, đã lưu trữ và mẫu luôn bị bỏ qua.",
-      "blockedScope": "Chưa có gì để tác nhân AI làm việc: mọi ghi chú đều bị loại trừ khỏi AI, hoặc kho đang trống.",
       "preparing": "Đang chuẩn bị…",
-      "blockedScopeSidebar": "Chưa có gì để hỏi ở đây: thư mục của ghi chú này bị loại trừ khỏi AI.",
       "needsScope": "Hãy chọn một thư mục bên dưới, hoặc mở một ghi chú, để tác nhân AI có việc để làm.",
       "scopeExcluded_other": "{{count}} bị loại trừ khỏi AI",
       "scopeExcluded_one": "{{count}} bị loại trừ khỏi AI"

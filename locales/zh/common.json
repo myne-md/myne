@@ -53,9 +53,7 @@
       "scopeQuestion": "智能体可读取的内容",
       "scopeFolders": "文件夹",
       "scopeApplies": "适用于你的下一条消息。回收站、归档和模板笔记始终被排除。",
-      "blockedScope": "暂时没有可供智能体处理的内容：所有笔记都被排除在 AI 之外，或保险库为空。",
       "preparing": "正在准备…",
-      "blockedScopeSidebar": "这里暂时没有可询问的内容：此笔记所在的文件夹被排除在 AI 之外。",
       "needsScope": "请在下方选择一个文件夹，或打开一篇笔记，好让智能体有可处理的内容。",
       "scopeExcluded_other": "{{count}} 项被排除在 AI 之外",
       "scopeExcluded_one": "{{count}} 项被排除在 AI 之外"

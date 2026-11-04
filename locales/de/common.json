@@ -53,9 +53,7 @@
       "scopeQuestion": "Was der Agent lesen kann",
       "scopeFolders": "Ordner",
       "scopeApplies": "Gilt für Ihre nächste Nachricht. Papierkorb-, Archiv- und Vorlagennotizen werden immer ausgelassen.",
-      "blockedScope": "Noch nichts, woran der Agent arbeiten könnte: Jede Notiz ist von der KI ausgeschlossen, oder der Tresor ist leer.",
       "preparing": "Wird vorbereitet…",
-      "blockedScopeSidebar": "Noch nichts, wonach hier gefragt werden könnte: Der Ordner dieser Notiz ist von der KI ausgeschlossen.",
       "needsScope": "Wählen Sie unten einen Ordner oder öffnen Sie eine Notiz, damit der Agent etwas zu bearbeiten hat.",
       "scopeExcluded_one": "{{count}} von der KI ausgeschlossen",
       "scopeExcluded_other": "{{count}} von der KI ausgeschlossen"
