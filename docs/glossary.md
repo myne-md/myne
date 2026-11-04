@@ -4119,9 +4119,9 @@ A monotonic in-memory counter, one per client, advanced after a [`vault.themes`]
 
 **The bump belongs to the writer, not to a surface.** `src/lib/themes.ts` (`importCustomTheme`, `deleteCustomTheme`) is the one module every surface goes through, so the advance lives there and the `myne://theme/install` dialog's Apply inherits it without a line of its own.
 
-**What it does NOT cover, and why that is stated rather than fixed here.** A sync round landing a peer's `vault.themes` advances nothing, because no event announces that merge: `core` reports it as `SyncCycleSummary::themes_applied_remote` and its own doc comment records that no listener is wired yet, where `vault.prefs` gets `myne://prefs-changed` off the same flag (`PREFS_CHANGED_EVENT`, MYND-478). A peer's theme therefore reaches an open picker on the next mount, which is the refresh boundary the paint path has too (`src/App.tsx` re-applies a custom palette on a stage transition, not on a sync).
+**Two sources advance it, and the second is the one a reader will not guess.** The writers in `src/lib/themes.ts` (`importCustomTheme`, `deleteCustomTheme`) advance it after a local write resolves. The `THEMES_SYNC_APPLIED_EVENT` bridge advances it when the sync loop merges a REMOTE `vault.themes` change onto disk: `core` reports that merge as `SyncSummary::themes_applied_remote` and emits `THEMES_CHANGED_EVENT`, the sibling of the prefs event off the same cycle (`PREFS_CHANGED_EVENT`, MYND-478), and `src/screens/Editor.tsx` bridges both into their nonces. That second advance is the only one with no local write behind it, and it is what keeps an open Appearance panel honest: the override line above the list reads `vault.prefs.custom_theme`, a DeviceLocal field that never arrives from a peer, while the list itself reads this store, which does (myne#943). The same event also drives the PAINT path in `src/App.tsx`, which otherwise re-applied a custom palette only on a stage transition, so a theme a peer deleted or edited kept painting until the user locked and returned.
 
-Used in: `src/lib/themesSignal.ts`; `src/lib/themes.ts`; `src/components/settings/CustomThemesSection.tsx`
+Used in: `src/lib/themesSignal.ts`; `src/lib/themes.ts`; `src/components/settings/CustomThemesSection.tsx`; `src/screens/Editor.tsx`; `src/App.tsx`
 
 ### **throughput routing preference** &nbsp; 📋 *Protocol*
 
