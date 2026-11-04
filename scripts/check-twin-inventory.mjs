@@ -768,9 +768,9 @@ const ROSTER = [
     a: "src/lib/themes.ts",
     b: "mobile/src/lib/themes.ts",
     verdict: "decision",
-    destination: "undecided",
+    destination: "stays per-client",
     reason:
-      "Custom-theme listing and application over the MYT1 blob. The palette is synced vault content, so what a theme means cannot differ per client.",
+      "Custom-theme listing and application over the MYT1 blob. The palette is synced vault content, so what a theme means cannot differ per client. The WRAPPERS stay per-client because the refresh boundary each one owes is a property of its own shell: desktop's half carries the store nonce and the sync bridge (`myne://themes-changed` into `src/screens/Editor.tsx` and the paint effect in `src/App.tsx`, myne-md/myne#943), while mobile's Settings sheet reads the store once per visit on purpose (rows must not shift under a finger) and its paint boundary is the stage entry in `mobile/src/app/AppShell.tsx`. Mobile has no counterpart to the desktop list refresh, and myne#943 scoped that out deliberately rather than leaving it undiscovered;",
   },
   {
     a: "src/lib/transcribe.ts",

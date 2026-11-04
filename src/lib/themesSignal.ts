@@ -12,18 +12,17 @@
 // exactly what shipped, so the read needs a signal to hang off rather than a
 // longer mount.
 //
-// # What this signal does NOT cover
+// # Two sources advance it, and the second is the one a reader will not guess
 //
-// A sync round landing a peer's `vault.themes` does not advance it, because
-// nothing tells the WebView that happened: `core` reports the merge as
-// `SyncCycleSummary::themes_applied_remote` and its own doc comment says no
-// listener is wired yet, where `vault.prefs` gets `myne://prefs-changed` off the
-// same flag (`PREFS_CHANGED_EVENT`, MYND-478). So a peer's theme reaches an open
-// picker on the next mount, which is the same refresh boundary the PAINT path
-// has (`App.tsx` re-applies a custom palette on a stage transition, not on a
-// sync). Covering it means a `myne://themes-changed` emit beside the prefs one
-// plus a bridge in `Editor.tsx`, and it belongs with that pair rather than
-// invented here for one of the two blobs.
+// The writers in `src/lib/themes.ts` advance it after a local write RESOLVES.
+// A sync cycle that merged a peer's `vault.themes` onto disk advances it too
+// (myne#943): `core` reports that merge as `SyncSummary::themes_applied_remote`
+// and emits `THEMES_CHANGED_EVENT`, the sibling of the prefs event off the same
+// cycle (MYND-478), and `src/screens/Editor.tsx` bridges it into this nonce.
+// That is the only advance with no local write behind it. It is also what keeps
+// an open Appearance panel honest: the panel's override line reads
+// `vault.prefs.custom_theme`, which is a DeviceLocal field and so never arrives
+// from a peer, while the list below it reads this store, which does.
 //
 // # Why a nonce and not a window event
 //
@@ -43,18 +42,34 @@
 // to collapse. If a future path writes the store twice in one action, this
 // module is where the batching goes, not the caller.
 //
-// Bumping belongs to the writer, never to a surface: `src/lib/themes.ts` does
-// it after the write RESOLVES, so a rejected import (nothing written) advances
-// nothing and a picker does not re-read to find the store unchanged.
+// Bumping belongs to whoever learned that the store changed, and never to a
+// re-rendering surface: `src/lib/themes.ts` does it after the write RESOLVES, so
+// a rejected import (nothing written) advances nothing and a picker does not
+// re-read to find the store unchanged. The sync bridge is the one other
+// legitimate caller, and it has a merge on disk behind it rather than a render.
 
 import { useSyncExternalStore } from "react";
+
+/**
+ * Tauri event the sync loop emits after merging a REMOTE `vault.themes` change
+ * onto disk (myne#943; `THEMES_CHANGED_EVENT` in `core`). Never fired for the
+ * user's own IPC writes: their own resolve bumps the nonce. Contentless, so the
+ * listener re-reads the store.
+ *
+ * Keep the string identical to the Rust constant. `tests/lib/eventNameMirrors.test.ts`
+ * is what holds the pair, because a mismatch here is SILENT: the bridge would
+ * subscribe to a name the backend never emits, and the panel would go stale with
+ * no error anywhere.
+ */
+export const THEMES_SYNC_APPLIED_EVENT = "myne://themes-changed";
 
 const listeners = new Set<() => void>();
 let nonce = 0;
 
 /**
- * Advance the signal. Called only at the post-mutation chokepoint in
- * `src/lib/themes.ts`, after the write has resolved.
+ * Advance the signal. Called at the post-mutation chokepoint in
+ * `src/lib/themes.ts` after a write resolves, and by the sync bridge in
+ * `src/screens/Editor.tsx` when a peer's merge lands on disk.
  */
 export function bumpThemesNonce(): void {
   nonce += 1;
