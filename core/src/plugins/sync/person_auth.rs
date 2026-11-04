@@ -56,7 +56,7 @@ pub struct PersonAuth {
     pub mldsa_vk_hex: String,
     /// This device's OWN server-auth secret, minted from CSPRNG bytes the first time this
     /// device registers on a person account (`decisions/protocol/0735`; installed on the
-    /// approval tap by `0783`).
+    /// approval tap by `0784`).
     ///
     /// It is stored beside `token_hex` on purpose, and the reason is a threat-model
     /// statement rather than a convenience: the token already authenticates every request

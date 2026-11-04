@@ -87,7 +87,7 @@ impl VaultIo for SessionPersonIo<'_> {
     /// `PERSON_FILES` for the session and nowhere else, so a credential minted here would be a
     /// verifier on the account whose secret dies with the tab. Core asks this question instead of
     /// testing `target_arch`, which is what keeps "which host is this" out of the crate
-    /// (`decisions/protocol/0783`).
+    /// (`decisions/protocol/0784`).
     fn keeps_person_credential_at_rest(&self) -> bool {
         false
     }

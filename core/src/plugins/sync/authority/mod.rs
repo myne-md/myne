@@ -45,7 +45,13 @@ use crate::vault_io::VaultIo;
 /// Exhaustive on purpose: the cycle's failure class, the log line and the sentence the
 /// user reads are all derived from this, so a new cause is a compile error at every
 /// consumer rather than a sixth silent `None`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Serialize` gives the vault doctor's report its wire token (myne-md/myne#1003), and
+/// `serde(rename_all = "snake_case")` makes that token the SAME string [`Self::as_str`]
+/// returns. `a_serialized_cause_is_the_logged_token` pins the two together, because two
+/// spellings of one vocabulary is how a log line and a bug report come to disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AuthorityMissing {
     /// The head context itself could not be built: unreadable `vault.meta`, no group key
     /// in the unlocked slot, or a roster that does not verify. Nothing about the user's
@@ -690,5 +696,29 @@ mod tests {
             !row_publishes_halves(&entry),
             "a tombstone claims nothing, whatever halves it left behind"
         );
+    }
+
+    /// The report's wire token and the diagnostic log's token are ONE vocabulary. A
+    /// renamed variant would otherwise land a `serde` name in a bug report and a
+    /// different `as_str` name in the log that is supposed to explain it.
+    #[test]
+    fn a_serialized_cause_is_the_logged_token() {
+        for cause in [
+            AuthorityMissing::NoHeadContext,
+            AuthorityMissing::NoPersonSession,
+            AuthorityMissing::NoDeviceId,
+            AuthorityMissing::NoKeyAtRest,
+            AuthorityMissing::KeyUnreadable,
+            AuthorityMissing::NoBindingRow,
+            AuthorityMissing::RowNamesDifferentKey,
+            AuthorityMissing::RowUnverified,
+            AuthorityMissing::KeyMissingWhileBound,
+        ] {
+            assert_eq!(
+                serde_json::to_string(&cause).unwrap(),
+                format!("\"{}\"", cause.as_str()),
+                "{cause:?}"
+            );
+        }
     }
 }

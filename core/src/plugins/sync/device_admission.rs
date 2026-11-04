@@ -386,7 +386,7 @@ async fn endpoint_url(host: &dyn HostCtx, io: &dyn VaultIo) -> Result<String, Sy
 /// session it returns.
 ///
 /// The handshake itself is [`crate::plugins::sync::enroll::device_login`], shared with the
-/// merged approval flow (`decisions/protocol/0783`); this function's own job is the one the
+/// merged approval flow (`decisions/protocol/0784`); this function's own job is the one the
 /// ceremony needs and the merged flow does not: the OTHER device installed the verifier, so
 /// there is nothing to install here, only a login and a stored token.
 async fn login_as_device(

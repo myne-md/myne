@@ -155,7 +155,7 @@ The B2B access model (`decisions/protocol/0603`) makes server accounts **person-
 
 **A device may hold its OWN SCRAM credential on the person account** (`decisions/protocol/0735`). Beside the
 account's phrase-derived verifier, an account may carry one verifier per device, installed BY a device that is
-already authenticated against that account, and since `decisions/protocol/0783` also by the joining device itself
+already authenticated against that account, and since `decisions/protocol/0784` also by the joining device itself
 once its row is approved: `POST /auth/devices/credential` with
 `{device_id_hex, username, salt_hex, iterations, stored_key_hex, server_key_hex}`. The account is taken from the
 session and never from the body, so a device installs only into its own account; and the username is NOT
@@ -175,7 +175,7 @@ operator gates (`frozen`, the device cap) apply exactly as they do at `/auth/scr
 reached by pre-approving around them.
 
 **The joining device may be the caller, and that installs nothing before the gate.** In the shipped flow
-(`decisions/protocol/0783`) the device that will hold the credential is the one that calls this route, under the
+(`decisions/protocol/0784`) the device that will hold the credential is the one that calls this route, under the
 account session its phrase derived, AFTER an already-approved device of the account approved its row. That is not
 a self-approval and it is not a new authority: a device whose row is pending is issued no token by `/auth/scram/final`,
 so it cannot reach an authed route at all, and what admits it is the other device's approval of a registry record.
@@ -194,7 +194,7 @@ derived over the whole code (class `"myne.device-admission-sas v1|"`, eight hex 
 for a human to compare between the two screens, and the write is bound to the string the user confirmed, so the
 code cannot change between display and signature. The verifier is one-way over the joining device's secret, so
 the admitting device forwards a value it cannot authenticate with. **No client ships this exchange since
-`decisions/protocol/0764`, and `0783` does not reinstate it**: the shipped join installs the verifier from the
+`decisions/protocol/0764`, and `0784` does not reinstate it**: the shipped join installs the verifier from the
 device that owns it, so no code and no SAS travels, and the one human comparison is the vault-head fingerprint
 eye-compare `threat-model.md` §7 records. This paragraph describes the codec, which stays; it is not a
 description of a surface.

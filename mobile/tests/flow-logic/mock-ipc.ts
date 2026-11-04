@@ -731,6 +731,11 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
     // scenarios read prefs before ever unlocking and gating them would rewrite
     // half this file's fixtures to prove nothing.
     let unlockedThisSession = false;
+    // Person-joined vaults arrive LOCKED, so the fixture has to remember that one
+    // of them was opened: without it the slot answers "Empty" for the rest of the
+    // scenario, and a scenario that re-probes after the unlock passes on a state
+    // the real app left one render earlier.
+    let personJoinedUnlocked = false;
 
     /** The vault an accepted invite produced on THIS device, or `null` while none
      *  has (myne-md/myne#851 task 14). The accept is the only thing that sets it,
@@ -738,6 +743,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
      *  real sequence: `sync_person_accept_invite` materializes and unlocks the
      *  slot host-side, and the shell then re-probes and finds it. */
     let acceptedVaultId: string | null = null;
+    /** Frames a PERSON JOIN wrote on this device (myne#957 follow-up). Written by
+     *  `sync_person_list_vaults`, which is the only thing that materialises them,
+     *  and read by `vault_list` / `vault_slot_kind`.
+     *
+     *  They are reported LOCKED and that is the whole point of the fixture: a
+     *  person join writes `vault.meta` and installs no key
+     *  (`core/src/plugins/sync/person_discovery.rs`), so boot lands on the unlock
+     *  form and the approval wait has to be reached after that unlock. A mock that
+     *  reported them unlocked would let the wait run against a vault whose
+     *  `root_key` no client has, which is the state the real backend refuses. */
+    const personJoinedFrames: string[] = [];
     /** The lifecycle state this session's identity has reached, or `null` while
      *  there is none (myne-md/myne#911 task 12). Set by `sync_person_setup`
      *  (create → `reserved`) and by `sync_person_register` (→ `enrolled`), and
@@ -858,6 +874,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
       // boot to Unlock (one Exists vault, Empty slot); otherwise the Unlocked
       // slot shortcuts `initialStageFromProbe` straight to the editor.
       "plugin:vault-unlock|vault_list": () => {
+        // A person join's frames OUTRANK every other arm: they are what is on disk
+        // once the listing has run, and they are locked, so the probe must land on
+        // Unlock rather than on the editor.
+        if (personJoinedFrames.length > 0) {
+          return personJoinedFrames.map((id) => ({
+            id,
+            status: { kind: "Exists" },
+            label: null,
+            icon: null,
+          }));
+        }
         // An accepted invite OUTRANKS `freshDevice` from that point on, which is
         // the whole observable difference the accept makes: the identity flow
         // hands back to the shell's re-probe, and only a vault that now exists
@@ -892,16 +919,21 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
         return [{ id: "flow-vault", status: { kind: "Exists" }, icon: vaultIcon }];
       },
       "plugin:vault-unlock|vault_slot_kind": () =>
-        acceptedVaultId !== null
-          ? "Unlocked"
-          : config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault
-            ? "Empty"
-            : "Unlocked",
+        personJoinedFrames.length > 0
+          ? personJoinedUnlocked
+            ? "Unlocked"
+            : "Empty"
+          : acceptedVaultId !== null
+            ? "Unlocked"
+            : config.freshDevice || config.lockedVault || config.corruptedVault || config.multiVault
+              ? "Empty"
+              : "Unlocked",
       "plugin:vault-unlock|vault_is_unlocked": () => true,
       "plugin:vault-unlock|report_user_activity": () => null,
       "plugin:vault-unlock|unlock": () => {
         if (config.unlockError) throw config.unlockError;
         unlockedThisSession = true;
+        if (personJoinedFrames.length > 0) personJoinedUnlocked = true;
         return null;
       },
       // ── Vault creation (5-step onboarding) ──
@@ -2247,7 +2279,17 @@ export async function installMockIpc(page: Page, cfg: MockConfig = {}): Promise<
           approved,
         };
       },
-      "plugin:sync|sync_person_list_vaults": () => config.personVaults ?? [],
+      "plugin:sync|sync_person_list_vaults": () => {
+        // The frames land HERE, which is the real sequence: this command is the
+        // only thing that writes them, and every row without an id is a binding
+        // this device could not hold.
+        for (const row of config.personVaults ?? []) {
+          if (row.vault_id !== null && !personJoinedFrames.includes(row.vault_id)) {
+            personJoinedFrames.push(row.vault_id);
+          }
+        }
+        return config.personVaults ?? [];
+      },
       "plugin:sync|sync_person_accept_invite": (args) => {
         // The four arguments, in order, are the accept's contract (task 14): the
         // invite id, the owner's out-of-band identity code, the recovery phrase,

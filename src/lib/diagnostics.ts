@@ -49,6 +49,16 @@ export const DIAGNOSTIC_FIELDS = [
   "commit",
   "bundleHash",
   "failureCode",
+  // The vault's own state, in five bounded tokens (myne-md/myne#1003). They sit right
+  // after the failure code because that is the causal order a reader follows: which
+  // build, which failure, and what the vault looked like while it happened. Every value
+  // is a closed enum token (no identifier, no path, no key material), which is what the
+  // allowlist above is for.
+  "vaultGeneration",
+  "vaultAuthority",
+  "vaultBinding",
+  "vaultKeyAtRest",
+  "vaultSession",
   "engine",
   "crossOriginIsolated",
   "storageUsedMb",
@@ -69,6 +79,17 @@ export interface DiagnosticInputs {
   readonly bundleHash: string | null;
   /** The bounded, closed-enum failure label — never a message string. */
   readonly failureCode: string;
+  /**
+   * The vault doctor's five facts (myne-md/myne#1003), each already a closed token.
+   * `null` when there is no vault to diagnose or the read failed, which omits the line,
+   * the same rule the storage figures follow, and for the same reason: a placeholder in
+   * a block a user pastes reads as a broken app.
+   */
+  readonly vaultGeneration: string | null;
+  readonly vaultAuthority: string | null;
+  readonly vaultBinding: string | null;
+  readonly vaultKeyAtRest: string | null;
+  readonly vaultSession: string | null;
   /** Engine + major version, e.g. `Chrome 140`. Never the full UA string.
    *  `null` when the UA is unrecognisable, which omits the line. */
   readonly engine: string | null;
@@ -113,6 +134,11 @@ export function diagnosticRecord(inputs: DiagnosticInputs): Partial<Record<Diagn
     commit: inputs.commit,
     bundleHash: inputs.bundleHash,
     failureCode: inputs.failureCode,
+    vaultGeneration: inputs.vaultGeneration,
+    vaultAuthority: inputs.vaultAuthority,
+    vaultBinding: inputs.vaultBinding,
+    vaultKeyAtRest: inputs.vaultKeyAtRest,
+    vaultSession: inputs.vaultSession,
     engine: inputs.engine,
     crossOriginIsolated: String(inputs.crossOriginIsolated),
     storageUsedMb: inputs.storageUsedMb === null ? null : String(inputs.storageUsedMb),

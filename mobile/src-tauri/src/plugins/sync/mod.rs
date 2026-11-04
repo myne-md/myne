@@ -70,6 +70,9 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::sync_get_endpoint,
             commands::sync_set_endpoint,
             commands::sync_status,
+            // myne-md/myne#1003. Registered on this client too: the command surface is
+            // shared, and a client that omits it refuses an invoke the core answers.
+            commands::sync_vault_doctor,
             commands::sync_now,
             commands::sync_published_state,
             commands::sync_person_list_vaults,

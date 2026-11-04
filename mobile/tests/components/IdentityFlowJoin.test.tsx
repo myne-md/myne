@@ -331,12 +331,18 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // collects an owner code this step does not have.
     expect(personAcceptInvite).not.toHaveBeenCalled();
     // Reaches the shell directly: a join installs a vault the identity is already a
-    // member of, so there is nothing to name (see the next test). The vault ID
+    // member of, so there is nothing to name (see the next test). The LANDING
     // travels with it because the shell addresses the approval wait with it: a
     // freshly installed member vault carries a device the owner has not admitted
     // yet, so re-probing would land on an ordinary editor and the §6.3 compare
-    // would never be made.
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    // would never be made. `unlocked` because the invite installed the keys with
+    // the vault, which is what lets the wait run immediately.
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
   });
 
   it("keeps the device password behind the project's floor", async () => {
@@ -373,7 +379,12 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     setJoinPassword(PASSWORD);
     fireEvent.click(submit());
 
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
     expect(screen.queryByTestId("identity-flow.name-input")).toBeNull();
     expect(setMyMemberName).not.toHaveBeenCalled();
   });
