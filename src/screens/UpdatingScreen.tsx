@@ -12,10 +12,17 @@
 // marker, a spinner, an eyebrow, a heading, a cipher version reveal, a caption and
 // a hint, three of which said the same thing, and none of which said what was
 // actually happening while minutes went by. What is here now is one readout with
-// four rows and no repetition: the version (the cipher moment, kept, now part of
-// the readout instead of a block above it), a determinate bar, the phase word with
-// its percentage, and one detail line that reports what the host is really doing
-// (bytes arriving, then the signature check, then the install). The state comes
+// three rows and no repetition: the version (the cipher moment, kept, now part of
+// the readout instead of a block above it), a determinate bar, and the phase word
+// with its percentage, plus one detail line on the download phase that reports the
+// bytes the host has actually counted.
+//
+// **The hint line is gone** (the owner's second pass on #1020, "the extra line is
+// not needed on any update screen"). It said "Myne restarts by itself when this
+// finishes", which is true, unactionable, and already implied by the bar: a
+// progress readout that completes and restarts is the ordinary behaviour of every
+// installer. On a screen whose whole point is that minutes are passing, a sentence
+// nobody can act on is the one thing that should not occupy a row. The state comes
 // from host events rather than from copy (`update_install` streams them; see
 // `src-tauri/src/plugins/update`), so the bar is a measurement and not an
 // animation standing in for one.
@@ -138,14 +145,6 @@ const CAPTION_STYLE: CSSProperties = {
   lineHeight: 1.6,
   color: "var(--fg-2)",
   textAlign: "center",
-};
-
-const HINT_STYLE: CSSProperties = {
-  fontSize: "var(--text-xs)",
-  lineHeight: 1.5,
-  color: "var(--fg-3)",
-  textAlign: "center",
-  maxWidth: 300,
 };
 
 const ACTIONS_STYLE: CSSProperties = {
@@ -307,7 +306,6 @@ export function UpdatingScreen({
                 t("update.failed.caption", { version: __APP_VERSION__ })
               }
             </span>
-            <span style={HINT_STYLE}>{t("update.failed.hint")}</span>
             <div style={ACTIONS_STYLE}>
               <Button
                 variant="ghost"
@@ -363,7 +361,6 @@ export function UpdatingScreen({
               </span>
             )}
 
-            <span style={HINT_STYLE}>{t("update.updating.hint")}</span>
           </>
         )}
       </div>

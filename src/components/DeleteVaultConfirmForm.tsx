@@ -109,6 +109,27 @@ interface DeleteVaultConfirmFormProps {
    * rewritten heading: the two claims are different claims, not two wordings.
    */
   variant?: "owner" | "member";
+  /**
+   * How the form sits on the page, and this is a claim about the flow rather
+   * than about spacing (myne-md/myne#1020).
+   *
+   * `"panel"` (default) is the two-step shape: the caller shows a button, the
+   * press replaces the panel with this form, and the form therefore has to
+   * introduce itself — its own heading, its eyebrow, and a Cancel that goes
+   * back to whatever the press came from. That is right for `Unlock` and
+   * `VaultRecover`, where the form arrives as its own screen.
+   *
+   * `"inline"` is the one-step shape the owner asked for in Settings: the field
+   * and the button are simply THERE, under the section's own heading, so the
+   * heading, the eyebrow and Cancel all go. A section that always shows the
+   * question does not need to ask it twice, and Cancel has nothing to go back
+   * to when nothing was opened.
+   *
+   * What does NOT change between the two: the typed-`DELETE` gate, the
+   * load-bearing disclosure, and the post-failure branch. The gate is the whole
+   * reason this component exists; where it is drawn is a layout question.
+   */
+  layout?: "panel" | "inline";
 }
 
 const HEADING_ROW_STYLE: CSSProperties = {
@@ -181,7 +202,9 @@ export function DeleteVaultConfirmForm({
   inFlight,
   partialFailContext,
   variant = "owner",
+  layout = "panel",
 }: DeleteVaultConfirmFormProps) {
+  const inline = layout === "inline";
   const { t } = useTranslation();
   const detailsId = useId();
   const [typed, setTyped] = useState("");
@@ -240,60 +263,83 @@ export function DeleteVaultConfirmForm({
     onSubmit();
   };
 
+  /* The mechanics, one press away (myne-md/myne#960): the erase destroys the
+     per-vault keychain item on the platforms that have one (myne-md/myne#761,
+     `design-notes/security/0709`), and the note is gated on the provider
+     capability rather than on `onlyCopy` — the browser has no per-vault keychain
+     item and its copy is a different claim about a different store, so the
+     sentence is omitted there.
+
+     Absent in the partial-failure branch, where the copy around it is about
+     recovering from a half-finished erase rather than about what the erase
+     destroys. One value, rendered by whichever layout asks for it: the panel
+     shape puts it on the heading's line (the icon means "more about THIS", so it
+     belongs beside the title it explains) and the inline shape puts it under the
+     disclosure it explains, because there is no heading of its own to attach to
+     there. */
+  const details =
+    partialFailContext === null ? (
+      <HelperDisclosure
+        paragraphs={[
+          t("settings.deleteVault.copySecondary"),
+          ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
+        ]}
+        descriptionId={detailsId}
+        testId="delete-vault.details"
+        triggerLabel={t("settings.deleteVault.detailsLabel")}
+        visibleLabel
+      />
+    ) : null;
+
   return (
     <div
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: "var(--space-4)",
+        gap: inline ? "var(--space-3)" : "var(--space-4)",
         alignSelf: "stretch",
         width: "100%",
       }}
+      data-layout={layout}
     >
-      <div style={HEADING_ROW_STYLE}>
-        <h3 style={HEADING_STYLE} data-testid="delete-vault.heading">
-          {copy.heading}
-        </h3>
-        {/* The mechanics, one press away (myne-md/myne#960), on the heading's own
-            line and pushed to its trailing edge: the icon means "more about
-            THIS", so it has to sit beside the title it explains rather than
-            floating below the warning with nothing to attach to.
-
-            Both claims are unchanged and both are still made. The erase
-            destroys the per-vault keychain item on the platforms that have one
-            (myne-md/myne#761, `design-notes/security/0709`), and the note is
-            gated on the provider capability rather than on `onlyCopy`: the
-            browser has no per-vault keychain item and its copy is a different
-            claim about a different store, so the sentence is omitted there.
-
-            Absent in the partial-failure branch, where the copy above it is
-            about recovering from a half-finished erase rather than about what
-            the erase destroys. */}
-        {partialFailContext === null && (
-          <HelperDisclosure
-            paragraphs={[
-              t("settings.deleteVault.copySecondary"),
-              ...(hasKeychainItem ? [t("settings.deleteVault.keychainNote")] : []),
-            ]}
-            descriptionId={detailsId}
-            testId="delete-vault.details"
-            triggerLabel={t("settings.deleteVault.detailsLabel")}
-            visibleLabel
-          />
-        )}
-      </div>
+      {!inline && (
+        <div style={HEADING_ROW_STYLE}>
+          <h3 style={HEADING_STYLE} data-testid="delete-vault.heading">
+            {copy.heading}
+          </h3>
+          {details}
+        </div>
+      )}
 
       {partialFailContext === null ? (
         <>
-          <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
-            {copy.eyebrow}
-          </div>
-          <p
-            style={COPY_PRIMARY_STYLE}
-            {...(copy.primaryTestId === null ? {} : { "data-testid": copy.primaryTestId })}
-          >
-            {copy.primary}
-          </p>
+          {inline ? (
+            <>
+              <p
+                style={COPY_PRIMARY_STYLE}
+                {...(copy.primaryTestId === null
+                  ? {}
+                  : { "data-testid": copy.primaryTestId })}
+              >
+                {copy.primary}
+              </p>
+              {details}
+            </>
+          ) : (
+            <>
+              <div style={EYEBROW_STYLE} data-testid="delete-vault.eyebrow">
+                {copy.eyebrow}
+              </div>
+              <p
+                style={COPY_PRIMARY_STYLE}
+                {...(copy.primaryTestId === null
+                  ? {}
+                  : { "data-testid": copy.primaryTestId })}
+              >
+                {copy.primary}
+              </p>
+            </>
+          )}
           <div
             style={{
               display: "flex",
@@ -317,7 +363,12 @@ export function DeleteVaultConfirmForm({
               value={typed}
               onChange={(e) => setTyped(e.target.value)}
               disabled={inFlight}
-              autoFocus
+              /* Only where the form ARRIVED (myne-md/myne#1020). The panel shape
+                 is the result of a press, so focusing the gate is a service; the
+                 inline shape is always on screen, and a settings panel that
+                 throws the caret into an irreversible field the moment its tab
+                 opens is a trap, not a shortcut. */
+              autoFocus={!inline}
               aria-describedby={detailsId}
               data-testid="delete-vault.confirm-input"
             />
@@ -326,15 +377,23 @@ export function DeleteVaultConfirmForm({
             </div>
           </div>
 
-          <div style={BUTTON_ROW_STYLE}>
-            <Button
-              variant="secondary"
-              onClick={onCancel}
-              disabled={inFlight}
-              data-testid="delete-vault.cancel"
-            >
-              {t("settings.deleteVault.cancel")}
-            </Button>
+          <div
+            style={
+              inline
+                ? { ...BUTTON_ROW_STYLE, justifyContent: "flex-start" }
+                : BUTTON_ROW_STYLE
+            }
+          >
+            {!inline && (
+              <Button
+                variant="secondary"
+                onClick={onCancel}
+                disabled={inFlight}
+                data-testid="delete-vault.cancel"
+              >
+                {t("settings.deleteVault.cancel")}
+              </Button>
+            )}
             <Button
               variant="danger"
               onClick={handleSubmit}

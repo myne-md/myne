@@ -10,7 +10,7 @@
 // transcript, the composer, the live run strip and the conversation's own modals
 // live in `ConversationSurface`, shared with the agent tab's Hub and Focus views
 // so the two surfaces cannot drift. What stays here is the panel's furniture: the
-// heading, the history / memory / new-chat buttons, the status chip, the honesty
+// heading, the history / new-chat buttons, the status chip, the honesty
 // note and the persist warning.
 //
 // Because AI ships in the default build as a runtime beta opt-in (decisions.md
@@ -70,7 +70,6 @@ import { startNewConversation } from "../ai/startNewConversation";
 import { providerLabelOf } from "../../lib/ai-capability";
 import { SECTION_HEADING_STYLE } from "./sharedStyles";
 import { ChatHistoryModal } from "./ChatHistoryModal";
-import { MemoryPopover } from "./MemoryPopover";
 import {
   ConversationSurface,
   type ConversationSurfaceStatus,
@@ -121,10 +120,6 @@ export interface AiChatTabProps {
    * just closes it, and the chip is not a button at all.
    */
   onOpenSettings?: (panel?: string, anchor?: string) => void;
-  /** Toast sink for the memory popover's one-shot outcomes (delete saved /
-   *  failed). Absent in isolation: the popover still deletes, it just
-   *  reports nothing. */
-  onShowToast?: (message: string) => void;
   /** Move from the light panel to the agent tab, on the open note's Focus view
    *  (myne-md/myne#771). The panel-to-deep-surface exit. Absent in isolation:
    *  the button is not rendered. */
@@ -138,7 +133,6 @@ export function AiChatTab({
   folders,
   onNotesWritten,
   onRunUndone,
-  onShowToast,
   onFocusAgent,
 }: AiChatTabProps = {}) {
   const { t } = useTranslation();
@@ -307,10 +301,6 @@ export function AiChatTab({
   // Conversation history modal (myne-md/myne#675): tab-local boolean, mounted
   // only while open so every opening re-fetches the roster.
   const [historyOpen, setHistoryOpen] = useState(false);
-  // Memory popover (myne-md/myne#697): tab-local boolean like the history modal.
-  const [memoryOpen, setMemoryOpen] = useState(false);
-  // The memory button's wrapper, as an anchor for the popover's own placement.
-  const memoryAnchorRef = useRef<HTMLSpanElement | null>(null);
   /**
    * Whether the user has expanded the honesty note back open.
    *
@@ -381,49 +371,13 @@ export function AiChatTab({
             testId="ai.history-button"
             onClick={() => setHistoryOpen(true)}
           />
-          {/* The anchor `MemoryPopover` measures. It used to be a
-              `position: relative` wrapper for an absolutely positioned card,
-              which is why the card was clipped by the panel's own overflow;
-              the primitive portals it to the body instead (myne-md/myne#867).
-              The testid is kept from that shape so nothing reaching for it
-              has to care which of the two it is. */}
-          <span
-            ref={memoryAnchorRef}
-            data-testid="ai.memory-popover-anchor"
-            style={{ display: "inline-flex" }}
-          >
-            <IconButton
-              icon="bookmark"
-              label={t("editor.chrome.rightPanel.aiChat.memory")}
-              tooltip
-              // A disclosure, so it says whether it is open. It is a toggle in
-              // behaviour and was silent about it: a screen-reader user pressed
-              // it twice and heard the same thing both times.
-              expanded={memoryOpen}
-              testId="ai.memory-button"
-              onClick={() => setMemoryOpen((open) => !open)}
-            />
-            {/* The popover and its button share ONE `position: relative`
-                container, so the popover's `bottom: 100%; right: 0` anchors to
-                the BUTTON rather than to wherever it sits in the flow. Before
-                this it rendered down by the composer (its old `{memoryOpen ? …}`
-                slot), so opening it from the header icon painted the card below
-                the header, half outside the panel and over the composer
-                (myne-md/myne#574). */}
-            {memoryOpen ? (
-              <MemoryPopover
-                anchorRef={memoryAnchorRef}
-                onClose={() => setMemoryOpen(false)}
-                onOpenSettings={() => {
-                  setMemoryOpen(false);
-                  // The settings shell opens from the Editor, which passes the
-                  // opener down. Absent in isolation: the link then just closes.
-                  onOpenSettings?.();
-                }}
-                onShowToast={onShowToast ?? (() => {})}
-              />
-            ) : null}
-          </span>
+          {/* **The memory button used to sit here, and it is gone**
+              (myne-md/myne#1020, the owner's call): one icon in the chat header
+              opening "what the assistant remembers", a surface Settings > AI >
+              Memory already owns in full (list, edit, delete, clear,
+              personality). A second, narrower door onto the same rows was one
+              affordance too many in the one strip that has to stay quiet while
+              a conversation is being read. */}
           {onFocusAgent !== undefined ? (
             <IconButton
               icon="maximize-2"

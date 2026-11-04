@@ -41,7 +41,10 @@ describe("the working phase", () => {
   it("names the version and offers no action a user could take mid install", () => {
     renderWorking();
     expect(screen.getByTestId("update.updating")).toBeTruthy();
-    expect(screen.getByText("update.updating.hint")).toBeTruthy();
+    // No sentence promising a restart, and no hint row at all: the owner's second
+    // pass on this screen removed the last one, because a progress readout that
+    // completes and restarts is the ordinary behaviour of every installer.
+    expect(screen.queryByText("update.updating.hint")).toBeNull();
     // No retry and no exit: the install is running and the only honest action is
     // to wait. A cancel here would be a lie, since the download is not abortable.
     expect(screen.queryByTestId("update.failed-retry")).toBeNull();
@@ -156,7 +159,10 @@ describe("the failed phase", () => {
     );
     expect(screen.getByTestId("update.failed")).toBeTruthy();
     expect(screen.getByText("update.failed.heading")).toBeTruthy();
-    expect(screen.getByText("update.failed.hint")).toBeTruthy();
+    // One caption, no hint: the failed screen used to add "Trying again starts the
+    // download over", which the owner read as one sentence too many and which the
+    // retry button's own label already implies.
+    expect(screen.queryByText("update.failed.hint")).toBeNull();
     // The redesigned surface states the RUNNING version in that sentence, and it
     // is the one the app is on rather than the one that failed to install.
     expect(screen.getByText(/update\.failed\.caption/)).toBeTruthy();

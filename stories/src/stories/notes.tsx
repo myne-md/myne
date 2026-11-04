@@ -5,7 +5,6 @@
 // signature requires, and a fixture supplying the prefs the panels read; a bare
 // mount would render an empty box and would be worse than the recorded debt.
 
-import { useRef } from "react";
 import type { Fixture, StoryDescriptor } from "../types";
 import { DEFAULT_PREFS } from "../../fixtures";
 import { action } from "../actions";
@@ -21,8 +20,6 @@ import { DeleteConfirmModal } from "@app/notes/components/DeleteConfirmModal";
 import { DiffView } from "@app/notes/components/DiffView";
 import { FolderGlyph } from "@app/notes/components/FolderGlyph";
 import { LeftRibbon } from "@app/notes/components/LeftRibbon";
-import { MemoryPopover } from "@app/notes/components/MemoryPopover";
-import { IconButton } from "@app/components/primitives/IconButton";
 import { NewTabChooser } from "@app/notes/components/NewTabChooser";
 import { NoteActionsMenu } from "@app/notes/components/NoteActionsMenu";
 import { NoteRow } from "@app/notes/components/NoteRow";
@@ -384,29 +381,6 @@ const NOTES_POPULATED_FIXTURE: Fixture = {
   },
 };
 
-/**
- * `MemoryPopover` takes its trigger as a REF rather than rendering one
- * (myne-md/myne#867): `AnchoredPanel` measures the anchor and portals the card
- * to the body, so a story with no real anchor element renders nothing at all.
- * The trigger below is the same icon button the chat header mounts it beside.
- */
-function MemoryPopoverStory() {
-  const anchorRef = useRef<HTMLSpanElement | null>(null);
-  return (
-    <Frame>
-      <span ref={anchorRef} style={{ display: "inline-flex" }}>
-        <IconButton icon="bookmark" label="Memory" onClick={action("onToggle")} />
-      </span>
-      <MemoryPopover
-        anchorRef={anchorRef}
-        onClose={action("onClose")}
-        onOpenSettings={action("onOpenSettings")}
-        onShowToast={action("onShowToast")}
-      />
-    </Frame>
-  );
-}
-
 export const NOTES_STORIES: StoryDescriptor[] = [
   {
     id: "notes/treerails/depth-3",
@@ -515,16 +489,6 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       </Frame>
     ),
   },
-  {
-    id: "notes/memorypopover/default",
-    group: "components",
-    surface: "MemoryPopover",
-    state: "default",
-    fixture: NOTES_FIXTURE,
-    description: "The agent-memory popover: what the assistant has been told to remember.",
-    tags: ["notes", "ai", "memory", "popover"],
-    render: () => <MemoryPopoverStory />,
-  },
 
   // ── Batch: the prop-driven surfaces (myne-md/myne#845 task 16) ─────────────
   // Each takes its shape as PROPS rather than from a provider, so these were
@@ -571,6 +535,50 @@ export const NOTES_STORIES: StoryDescriptor[] = [
           { id: "side", label: "Open to the side", group: "open", onSelect: action("side") },
           { id: "rename", label: "Rename", group: "edit", onSelect: action("rename") },
           { id: "trash", label: "Move to trash", group: "destructive", onSelect: action("trash") },
+        ]}
+      />
+    ),
+  },
+  {
+    id: "notes/contextmenu/background",
+    group: "components",
+    surface: "ContextMenu",
+    state: "background",
+    description:
+      "The file tree's own menu, opened on empty space below the rows: three creation items, each carrying the glyph the folder menu already draws for the same verb (a folder, a note, a drawing). Look for the glyphs being the point of the item rather than decoration: the same verb has the same picture wherever it is offered, and the menu is where a right-click lands before anything is selected.",
+    tags: ["notes", "menu", "context", "create", "file-tree", "glyph"],
+    render: () => (
+      // The three items `NoteList` builds for a right-click on blank space
+      // (`bgMenuItems`). A copy, deliberately: the builder is hook-local, and the
+      // list the app actually renders is pinned by
+      // `tests/notes/sidebarMenuIcons.test.ts` against the eager menu it must
+      // match. What this story is for is the PICTURE, which no assertion sees.
+      <ContextMenu
+        x={60}
+        y={60}
+        onClose={action("onClose")}
+        items={[
+          {
+            id: "new-folder",
+            group: "create",
+            icon: "folder-plus",
+            label: "New folder",
+            onSelect: action("newFolder"),
+          },
+          {
+            id: "new-note",
+            group: "create",
+            icon: "file-plus",
+            label: "New note",
+            onSelect: action("newNote"),
+          },
+          {
+            id: "new-drawing",
+            group: "create",
+            icon: "image-plus",
+            label: "New drawing",
+            onSelect: action("newDrawing"),
+          },
         ]}
       />
     ),
