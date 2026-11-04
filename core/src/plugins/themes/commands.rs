@@ -42,6 +42,20 @@ use tokio::sync::Mutex;
 /// themes blob's AAD account-hash are the same 16-byte field.
 const _: () = assert!(VAULT_META_ACCOUNT_HASH_LEN == protocol::THEMES_BLOB_ACCOUNT_HASH_LEN);
 
+/// Tauri event announcing a `vault.themes` change applied OUTSIDE the user's own
+/// IPC round-trip (today the sync merge phase, myne#943). It is the exact sibling
+/// of `plugins::prefs::commands::PREFS_CHANGED_EVENT`. A local import or delete
+/// needs no event: its own IPC success is the signal, and the TypeScript writer
+/// advances the store nonce itself. A sync-applied merge was invisible to the
+/// WebView without this, which left an open Appearance panel listing the pre-sync
+/// set until it was remounted.
+///
+/// Frontends bridge it into their themes re-read path (desktop and web: the
+/// `themes-changed` nonce in `src/lib/themesSignal.ts`, via `src/screens/Editor.tsx`).
+/// Payload: none. The listener re-reads, and the event never carries a palette or
+/// a theme name.
+pub const THEMES_CHANGED_EVENT: &str = "myne://themes-changed";
+
 /// One custom theme's palette: a flat map of CSS-variable token → value. The
 /// `BTreeMap` ordering makes the inner JSON deterministic on re-encode.
 pub type ThemePalette = BTreeMap<String, String>;
