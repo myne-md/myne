@@ -627,26 +627,6 @@ export function ChatComposer({
     setMessage("");
   }, [conversationEpoch]);
 
-  // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
-  // rather than counted from newlines, so a long wrapped line grows too.
-  //
-  // **An EMPTY input is one row, whatever the placeholder does.** `scrollHeight`
-  // measures the rendered text, and a textarea with no value renders its
-  // placeholder, so a placeholder that wrapped at panel width reported two lines
-  // and the box opened two rows tall before the user had typed anything. The
-  // height would then be a property of the COPY: translate the placeholder into
-  // a longer language and the empty composer grows, in every locale, with
-  // nothing in the code to point at.
-  //
-  // **Two more holes, both visible in the sidebar and both fixed here**
-  // (myne-md/myne#1020, on the owner's read of it). The growth was measured ONCE
-  // at mount, so a box measured at one width and then laid out at a narrower one
-  // kept the old height and grew a scrollbar for text that had not changed. And
-  // the scrollbar was never asked for: a box that fits its content has nothing
-  // to scroll, so `overflow` now follows the fit instead of being permanently
-  // `auto`. The three together are why the empty composer could show two lines
-  // of a sentence the user could not type into, with a thumb beside it.
-
   /**
    * The scope choices.
    *
@@ -699,11 +679,26 @@ export function ChatComposer({
   const blocked =
     empty || busy || probing || refused || scopeEmpty || readingDocs || pasting.length > 0;
 
-  // **Except while the field is BLOCKED, where the copy IS the message.**
-  // (myne-md/myne#848.) The rule above exists so an empty composer does not grow
-  // because a translation is long. A blocked field is the other case: it has
-  // nothing else to say, and clipping its sentence at the first line hides the
-  // only explanation on screen. So it measures like a typed message does.
+  // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
+  // rather than counted from newlines, so a long wrapped line grows too.
+  //
+  // **An EMPTY input is one row, whatever the placeholder does.** `scrollHeight`
+  // measures the rendered text, and a textarea with no value renders its
+  // placeholder, so a placeholder that wrapped at panel width reported two lines
+  // and the box opened two rows tall before the user had typed anything. The
+  // height would then be a property of the COPY: translate the placeholder into
+  // a longer language and the empty composer grows, in every locale, with
+  // nothing in the code to point at.
+  //
+  // **Two more holes, both visible in the sidebar and both fixed here**
+  // (myne-md/myne#1020, on the owner's read of it). The growth was measured ONCE
+  // at mount, so a box measured at one width and then laid out at a narrower one
+  // kept the old height and grew a scrollbar for text that had not changed. And
+  // the scrollbar was never asked for: a box that fits its content has nothing
+  // to scroll, so `overflow` now follows the fit instead of being permanently
+  // `auto`. The three together are why the empty composer could show two lines
+  // of a sentence the user could not type into, with a thumb beside it.
+
   useEffect(() => {
     const el = inputRef.current;
     if (el === null) return;
@@ -725,7 +720,7 @@ export function ChatComposer({
       // **The border is part of the height and not part of `scrollHeight`.**
       // The box is `box-sizing: border-box`, so a height written as the measured
       // content left the content box 2px short of it and the field drew a
-      // scrollbar for text that fit — measured in Chromium on the real composer,
+      // scrollbar for text that fit. Measured in Chromium on the real composer,
       // three typed lines reported `scrollHeight 63` against `clientHeight 61`.
       // The difference is the frame, so the frame is added here rather than
       // absorbed by a tolerance constant nobody could justify.

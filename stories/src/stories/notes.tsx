@@ -1496,7 +1496,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-                        openNoteId="n1"
+            openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />
@@ -1517,7 +1517,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-                        openNoteId="n1"
+            openNoteId="n1"
             anchoredNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
@@ -1539,7 +1539,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-                        openNoteId="n1"
+            openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />
@@ -1560,7 +1560,7 @@ export const NOTES_STORIES: StoryDescriptor[] = [
       <Box width={320} height={220}>
         <div style={{ padding: "var(--space-3)" }}>
           <ChatComposer
-                        openNoteId="n1"
+            openNoteId="n1"
             folders={["Projects/"]}
             onNotesWritten={action("onNotesWritten")}
           />
