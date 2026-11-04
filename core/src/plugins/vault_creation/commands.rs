@@ -583,7 +583,7 @@ pub async fn commit_from_host(
     };
     #[cfg(target_arch = "wasm32")]
     let membership = None;
-    commit_with_permit(
+    let claim_inputs = commit_with_permit(
         token,
         vault_path,
         state,
@@ -591,6 +591,31 @@ pub async fn commit_from_host(
         membership,
     )
     .await?;
+    // ---- myne-md/myne#1001: this device claims its binding AT CREATION ----
+    //
+    // The ceremony is the last moment the person key is in hand, and the only claim site
+    // that does not depend on the user typing the phrase. `0774`'s rejected alternative
+    // says it: "a `NTV5` single-user vault has no binding at all and never will, so the
+    // creation path records the claim's outcome". That outcome is the structured line the
+    // claim writes (`claim_completed` / `claim_stood_down`), and the surface that reports it
+    // to a user is the sync indicator, which asks the authority resolver rather than
+    // reading this return value, so `commit`'s IPC shape does not change for it.
+    //
+    // Best-effort and AFTER the permit, deliberately: a device that cannot record its
+    // binding must still get its vault, and this is not a `vault.meta` lifecycle mutation,
+    // so it neither blocks the creation nor extends the permit's scope. Web has no
+    // member surface at all, hence the gate (its path is `commit_from_host_io`).
+    #[cfg(not(target_arch = "wasm32"))]
+    if let Some(inputs) = claim_inputs {
+        crate::plugins::device_binding::commands::claim_own_binding_from_creation_best_effort(
+            host,
+            &crate::vault_io::StdVaultIo,
+            &vault_dir,
+            &inputs.group_key,
+            &inputs.person.pair,
+        )
+        .await;
+    }
     // Surface the written-to vault id so the frontend's chained auto-unlock can
     // target it explicitly (`target` is `Copy`, untouched by the path resolve).
     Ok(target.map(|id| id.to_string()))
@@ -644,7 +669,7 @@ pub(crate) async fn commit_with_permit(
     state: &VaultCreationState,
     auth_permits: &tokio::sync::Semaphore,
     membership: Option<protocol::Membership>,
-) -> Result<(), AppError> {
+) -> Result<Option<CreationClaimInputs>, AppError> {
     let _permit = match auth_permits.try_acquire() {
         Ok(p) => p,
         Err(_) => {
@@ -658,7 +683,9 @@ pub(crate) async fn commit_with_permit(
     };
     commit_with_vault_path(token, vault_path, state, membership).await
     // `_permit` drops here on every return path → released before the
-    // frontend's subsequent auto-unlock `vault_unlock` acquires.
+    // frontend's subsequent auto-unlock `vault_unlock` acquires, and before the
+    // creation-time device-binding claim, which is not a `vault.meta` mutation and
+    // therefore owes this permit nothing (myne-md/myne#1001).
 }
 
 /// Recognized-artefact predicate consumed by the
@@ -799,6 +826,28 @@ pub fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
     Ok(false)
 }
 
+/// What a person-born birth hands to the device-binding claim (myne-md/myne#1001).
+///
+/// `None` on a legacy `NTV5` birth, and that is an answer rather than an omission: a
+/// single-user vault carries no binding store and never will, so there is nothing to claim
+/// and no group tier to seal a row under (`0774`, "Blocking vault creation when the claim
+/// cannot run").
+///
+/// Both fields are already in the creation session. They leave this module only to reach the
+/// claim, and the group key stays a `Zeroizing` for its whole life: it never crosses the IPC
+/// boundary and it is not written anywhere the session did not already write it. There is
+/// deliberately no `Debug`, like every type that carries the owner's person keypair.
+///
+/// The `allow` is the same pattern the two `commit_from_host` signatures carry and for the
+/// same reason: the claim itself is native-only, so on `wasm32` these fields have no reader
+/// and the browser lane's clippy (`-D warnings`) would fail the build on dead code that only
+/// looks dead on one target.
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub(crate) struct CreationClaimInputs {
+    pub group_key: Zeroizing<[u8; protocol::AEAD_KEY_LEN]>,
+    pub person: crate::plugins::vault_creation::state::CreationPerson,
+}
+
 /// Testable core of [`commit`]. The Tauri-command wrapper resolves the
 /// platform-specific `vault.meta` path and delegates here so tests do
 /// not need an [`tauri::AppHandle`].
@@ -822,12 +871,17 @@ pub fn vault_artifacts_present(vault_dir: &Path) -> std::io::Result<bool> {
 ///    `atomic_write::atomic_write`). On failure the worker returns
 ///    the session by-value so this caller can re-insert it under the
 ///    same token (retry-on-failure semantics preserved).
+///
+/// The return value is what the creation-time device-binding claim needs, and `None` means
+/// "no claim applies" rather than "the claim failed". A failure is logged by the claim
+/// itself and never reaches this signature, because a device that cannot record its binding
+/// must still get its vault (myne-md/myne#1001).
 pub(crate) async fn commit_with_vault_path(
     token: Uuid,
     vault_path: PathBuf,
     state: &VaultCreationState,
     membership: Option<protocol::Membership>,
-) -> Result<(), AppError> {
+) -> Result<Option<CreationClaimInputs>, AppError> {
     let session: VaultCreationSession = match state.take(token) {
         SessionLookup::Found(boxed) => *boxed,
         SessionLookup::Expired => return Err(AppError::SessionExpired),
@@ -881,7 +935,7 @@ pub(crate) async fn commit_with_vault_path(
     // retry (see below). Box the tuple to keep the Err variant small —
     // clippy::result_large_err (new in Rust 1.96) otherwise flags the ~824-byte
     // payload moving on the stack; the box is on the rare error path only.
-    let outcome: Result<(), Box<(AppError, VaultCreationSession)>> =
+    let outcome: Result<Option<CreationClaimInputs>, Box<(AppError, VaultCreationSession)>> =
         crate::task::run_blocking(move || match serialize_meta(&session, &membership) {
             Err(e) => Err(Box::new((e, session))),
             Ok((bytes, group_key)) => match crate::atomic_write::atomic_write(&vault_path, &bytes, false) {
@@ -893,7 +947,11 @@ pub(crate) async fn commit_with_vault_path(
                     // from `root_key`. Sealing an `NTV7` vault's prefs under the
                     // root tier would ship a blob the unlock path cannot open,
                     // which reads as "all preferences silently reset".
-                    let group_key = group_key
+                    //
+                    // `group_key` itself is kept unmoved beside this: it is what the
+                    // creation-time binding claim needs when the birth carried a person
+                    // (myne-md/myne#1001).
+                    let group_tier = group_key
                         .as_ref()
                         .map(|g| protocol::GroupKey::new(**g));
                     // MYND-160 Task 12: eager-write the default vault.prefs
@@ -912,7 +970,7 @@ pub(crate) async fn commit_with_vault_path(
                     // is bounded; full atomic rollback would force the
                     // user to redo the entire Argon2id pipeline on every
                     // disk hiccup, which is the worse UX.
-                    let prefs_key = match group_key {
+                    let prefs_key = match group_tier {
                         Some(ref group) => {
                             protocol::derive_group_subkey_v0_2(group, protocol::GroupRole::PrefsKey)
                         }
@@ -966,7 +1024,7 @@ pub(crate) async fn commit_with_vault_path(
                     // vault.prefs: if this write fails the next catalog read
                     // falls back to empty per spec § 9.10.4 (read_or_empty),
                     // so the vault stays usable — no rollback of vault.meta.
-                    let catalog_key = match group_key {
+                    let catalog_key = match group_tier {
                         Some(ref group) => protocol::derive_group_subkey_v0_2(
                             group,
                             protocol::GroupRole::AttachmentsCatalogKey,
@@ -1008,7 +1066,23 @@ pub(crate) async fn commit_with_vault_path(
                             "vault.attachments encode failed during eager-write; vault remains usable via spec § 9.10.4 absence-fallback",
                         ),
                     }
-                    Ok(())
+                    // The claim's inputs, taken out of the session BEFORE it is dropped
+                    // (myne-md/myne#1001). This is the last moment the person key is in hand:
+                    // an `NTV7`/`NTV8` vault's unlock can never install a person session
+                    // (`person_vault_carrier::carrier_applies` excludes those generations,
+                    // `0774` records it as DO NOT ROUTE), so without this a new vault reached
+                    // its first lock unbound and sync asked for the phrase.
+                    //
+                    // A legacy birth carries no group key, so it answers `None` and no claim
+                    // is attempted, because a `NTV5` vault has no binding store to write one into.
+                    let claim_inputs = match (group_key, session.person) {
+                        (Some(group_key), Some(person)) => Some(CreationClaimInputs {
+                            group_key,
+                            person,
+                        }),
+                        _ => None,
+                    };
+                    Ok(claim_inputs)
                 }
             },
         })
@@ -1016,7 +1090,7 @@ pub(crate) async fn commit_with_vault_path(
         .map_err(|_| AppError::JoinFailure)?;
 
     match outcome {
-        Ok(()) => Ok(()),
+        Ok(claim_inputs) => Ok(claim_inputs),
         Err(boxed) => {
             let (err, session) = *boxed;
             // Re-insert under the same token so the frontend's retry
@@ -1616,6 +1690,8 @@ pub async fn commit_from_host_io(
     };
     #[cfg(target_arch = "wasm32")]
     let membership = None;
+    // The browser has no member surface and therefore no binding store
+    // (myne-md/myne#911 task 13 decided that absence), so there is no claim here.
     commit_with_vault_path_io(token, vault_path, state, io, membership).await?;
     Ok(target.map(|id| id.to_string()))
 }
@@ -1775,9 +1851,18 @@ mod tests {
                 .try_insert(token, session)
                 .expect("scratch state has room");
 
-            commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
-                .await
-                .expect("commit person-born vault");
+            let claim_inputs = commit_with_vault_path(
+                token,
+                scratch.path().to_path_buf(),
+                &state,
+                None,
+            )
+            .await
+            .expect("commit person-born vault")
+            .expect(
+                "a person-born birth must hand the device-binding claim its group key and the \
+                 person who signs the row (myne-md/myne#1001)",
+            );
 
             let vault_dir = scratch.path().parent().expect("vault dir");
             let meta = std::fs::read(scratch.path()).expect("vault.meta");
@@ -1819,6 +1904,19 @@ mod tests {
             let group_bytes = protocol::unlock_group_key_ntv6(&parsed.as_ntv6_tail(), &owner_key)
                 .expect("the owner subkey unwraps the group key");
             let group_key = protocol::GroupKey::new(*group_bytes);
+
+            // The claim is handed the key the vault was BORN with, not a re-derivation
+            // of it: a mismatch here would write the binding row under a keyspace no
+            // later reader can open, and every reader collapses that to the empty map.
+            assert_eq!(
+                *claim_inputs.group_key, *group_bytes,
+                "the claim's group key is the vault's own group key"
+            );
+            assert_eq!(
+                claim_inputs.person.pair.public_half().fingerprint(),
+                owner_pair.public_half().fingerprint(),
+                "the row is signed by the person who signed this vault's roster"
+            );
 
             let prefs = std::fs::read(vault_dir.join("vault.prefs")).expect("vault.prefs");
             let prefs_key =
@@ -1864,6 +1962,235 @@ mod tests {
                 &catalog,
             )
             .expect("vault.attachments opens under the GROUP tier");
+        });
+    }
+
+    /// The creation-time claim, END TO END (myne-md/myne#1001): after `commit_from_host`
+    /// returns, a person-born vault already carries this device's binding row.
+    ///
+    /// This is the assertion the issue is about, and the one that cannot be made later: the
+    /// ceremony is the last moment the owner's person key is in hand, because an
+    /// `NTV7`/`NTV8` vault's unlock can never install a person session
+    /// (`person_vault_carrier::carrier_applies` excludes those generations; `0774`, DO NOT
+    /// ROUTE). Without this row the vault's first lock answered "unlock your identity to
+    /// sync" and the phrase bought exactly one session.
+    ///
+    /// The row is opened through the vault's OWN group key, recovered from the password, so
+    /// the claim cannot pass by writing the map under a keyspace no reader shares.
+    #[test]
+    fn commit_writes_the_device_binding_row_for_a_person_born_vault() {
+        // The device-key slot is process-global, so this test serializes against the
+        // device-key suite that installs and clears it.
+        let _serialized = crate::test_support::device_key_slot_guard();
+        rt().block_on(async {
+            let base = crate::test_support::ScopedTempDir::new("commit-claim").expect("tempdir");
+            let host = crate::host::test_host::TestHost::new(base.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultCreationState::default();
+
+            // The person credential is the ONLY record that names this device on a
+            // person-born vault: it has no vault SCRAM account, so nothing ever wrote a
+            // `device_id_hex` into the vault's own sync state.
+            let person = person_fixture(PERSON_PHRASE);
+            let device_id = [0x5Au8; 16];
+            let owner_fingerprint = {
+                let half = person.pair.public_half();
+                *half.fingerprint()
+            };
+            // A fixture that lost its pair would satisfy the row assertions below for the
+            // wrong reason.
+            assert_ne!(owner_fingerprint, [0u8; 32]);
+            let auth_path = crate::plugins::sync::person_auth::person_auth_path(&host, &io)
+                .await
+                .expect("person-auth path");
+            crate::plugins::sync::person_auth::write_person_auth(
+                &io,
+                &auth_path,
+                &crate::plugins::sync::person_auth::PersonAuth {
+                    person_id_hex: crate::account::person_identity::hex_lower(&person.person_id),
+                    device_id_hex: crate::account::person_identity::hex_lower(&device_id),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("seed person-auth");
+
+            let vault_id = VaultId::mint();
+            let session =
+                build_person_session(vault_id, "creation-claim-pw", FAST_TEST_KDF, person)
+                    .expect("person session");
+            let token = Uuid::new_v4();
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            // A key at rest, so the claim's read-back can confirm the one it wrote. No
+            // session key means `Deferred` and no row, the rule `0774` states, covered
+            // deterministically in `device_binding::commands`' own tests.
+            crate::plugins::sync::device_identity::install_session_key(
+                protocol::device_key::DeviceKeyPair::generate().expect("device key"),
+            );
+
+            commit_from_host(
+                None,
+                token.to_string(),
+                &state,
+                &VaultRuntimeState::default(),
+                &host,
+                &crate::vault_label::fake_keychain::FakeKeychain::empty(),
+            )
+            .await
+            .expect("commit person-born vault");
+
+            let vault_dir =
+                crate::paths::vault_dir_for_id_from_host(&host, Some(vault_id)).expect("vault dir");
+            let meta = std::fs::read(vault_dir.join("vault.meta")).expect("vault.meta");
+            assert_eq!(&meta[..4], &protocol::VAULT_META_NTV8_MAGIC);
+            let parsed = protocol::parse_vault_meta_ntv8(&meta).expect("parse NTV8");
+            let root_key = protocol::unlock_root_key_v0_2_password(
+                &parsed.base,
+                "creation-claim-pw",
+                &parsed.base.account_number_hash,
+            )
+            .expect("the password opens the root key");
+            let group_bytes = protocol::unlock_group_key_ntv6(
+                &parsed.as_ntv6_tail(),
+                &protocol::OwnerKey::new(*root_key),
+            )
+            .expect("the owner subkey unwraps the group key");
+            let resolved = crate::plugins::device_binding::sync::resolve_bindings_from_group_key(
+                &io,
+                &group_bytes,
+                &vault_dir,
+            )
+            .await
+            .expect("the group key opens the binding keyspace");
+            let map = crate::plugins::device_binding::store::read_device_bindings_in_dir(
+                &io,
+                &vault_dir,
+                &resolved.borrow(),
+            )
+            .await
+            .expect("read the binding store");
+
+            let row = map
+                .get(&crate::account::person_identity::hex_lower(&device_id))
+                .expect(
+                    "a vault created under an identity must already carry this device's \
+                     binding row when commit returns (myne-md/myne#1001)",
+                );
+            assert!(!row.tombstone, "a fresh claim is a live row");
+            assert!(
+                row.device_ed_pk.is_some() && row.device_mldsa_vk.is_some(),
+                "the row publishes the halves the store confirmed"
+            );
+            assert_eq!(
+                row.person_fingerprint,
+                crate::account::person_identity::hex_lower(&owner_fingerprint),
+                "the row names the person who signed this vault's roster"
+            );
+
+            // Leave the process-global slot as this test found it: a key left installed
+            // would outlive the assertions and make any later test that reads the slot
+            // depend on this one having run.
+            crate::plugins::sync::device_identity::clear_session_key();
+        });
+    }
+
+    /// The gate the creation claim cannot cross, asserted rather than assumed
+    /// (myne-md/myne#1001): a RESERVED identity carries no device id, and a binding row is
+    /// keyed by one.
+    ///
+    /// `person_create_identity_from_host` writes `device_id_hex` empty because the server
+    /// issues it at enrolment, so a vault created before this device has ever registered is
+    /// committed unbound. The claim stands down on `NoDeviceId` rather than inventing an id:
+    /// an id drawn at claim time would bind a device the sync plane has never heard of
+    /// (`device_actor::durable_device_id` states that rule).
+    ///
+    /// The id arrives at person registration, and `person_register_from_host` claims there,
+    /// so this state is a delay rather than a hole.
+    #[test]
+    fn a_vault_created_before_this_device_has_an_id_is_committed_unbound() {
+        rt().block_on(async {
+            let base =
+                crate::test_support::ScopedTempDir::new("commit-no-device-id").expect("tempdir");
+            let host = crate::host::test_host::TestHost::new(base.path());
+            let io = crate::vault_io::StdVaultIo;
+            let state = VaultCreationState::default();
+
+            let person = person_fixture(PERSON_PHRASE);
+            let auth_path = crate::plugins::sync::person_auth::person_auth_path(&host, &io)
+                .await
+                .expect("person-auth path");
+            crate::plugins::sync::person_auth::write_person_auth(
+                &io,
+                &auth_path,
+                &crate::plugins::sync::person_auth::PersonAuth {
+                    person_id_hex: crate::account::person_identity::hex_lower(&person.person_id),
+                    // A reserved identity: the device id is issued at enrolment.
+                    device_id_hex: String::new(),
+                    ..Default::default()
+                },
+            )
+            .await
+            .expect("seed person-auth");
+
+            let vault_id = VaultId::mint();
+            let session = build_person_session(vault_id, "no-device-id-pw", FAST_TEST_KDF, person)
+                .expect("person session");
+            let token = Uuid::new_v4();
+            state
+                .try_insert(token, session)
+                .expect("scratch state has room");
+
+            commit_from_host(
+                None,
+                token.to_string(),
+                &state,
+                &VaultRuntimeState::default(),
+                &host,
+                &crate::vault_label::fake_keychain::FakeKeychain::empty(),
+            )
+            .await
+            .expect("commit person-born vault");
+
+            let vault_dir =
+                crate::paths::vault_dir_for_id_from_host(&host, Some(vault_id)).expect("vault dir");
+            assert!(
+                !vault_dir.join("vault.device-bindings").exists(),
+                "a device with no durable id must leave no binding row, rather than key one \
+                 by an id it invented"
+            );
+        });
+    }
+
+    /// The other half of the creation claim: a legacy `NTV5` birth hands NOTHING
+    /// (myne-md/myne#1001).
+    ///
+    /// A single-user vault carries no binding store and no group tier, so a claim attempt
+    /// there would target a family the vault does not have. `0774`'s rejected alternative
+    /// states the same rule from the product side: a `NTV5` vault "has no binding at all and
+    /// never will", which is why creation records an outcome rather than blocking on one.
+    #[test]
+    fn a_legacy_birth_hands_the_claim_nothing() {
+        rt().block_on(async {
+            let scratch = ScratchVault::new();
+            let state = VaultCreationState::default();
+            let token = seed_session_into_state(&state);
+
+            let claim_inputs =
+                commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None)
+                    .await
+                    .expect("commit legacy vault");
+
+            assert!(
+                claim_inputs.is_none(),
+                "an NTV5 birth must not attempt a device-binding claim"
+            );
+            assert_eq!(
+                &std::fs::read(scratch.path()).expect("vault.meta")[..4],
+                &protocol::VAULT_META_V0_2_MAGIC
+            );
         });
     }
 
@@ -2055,6 +2382,20 @@ mod tests {
         token
     }
 
+    /// A `commit` result rendered for an assertion message.
+    ///
+    /// [`CreationClaimInputs`] deliberately has no `Debug`, because it carries the owner's
+    /// person keypair and a secret must never reach a `{:?}`: that also means a `Result`
+    /// carrying one cannot be printed whole, which is why the Ok side is described in words
+    /// here and the error side is printed.
+    fn commit_outcome(result: &Result<Option<CreationClaimInputs>, AppError>) -> String {
+        match result {
+            Ok(Some(_)) => "Ok(person-born claim inputs)".to_string(),
+            Ok(None) => "Ok(legacy birth, no claim)".to_string(),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
     #[test]
     fn commit_returns_artifacts_present_when_vault_meta_present() {
         // Pre-seed `vault.meta` at the target path with arbitrary
@@ -2078,9 +2419,10 @@ mod tests {
             let result =
                 commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
 
+            let shown = commit_outcome(&result);
             assert!(
                 matches!(result, Err(AppError::VaultArtifactsPresent)),
-                "commit must reject when vault.meta exists, got {result:?}"
+                "commit must reject when vault.meta exists, got {shown}"
             );
 
             // Pre-existing bytes are untouched — atomic_write was
@@ -2150,9 +2492,10 @@ mod tests {
             // Either Ok (full happy path completed) or some non-
             // VaultArtifactsPresent error. The point is: guard did not
             // mis-fire on a clean directory.
+            let shown = commit_outcome(&result);
             assert!(
                 !matches!(result, Err(AppError::VaultArtifactsPresent)),
-                "guard mis-fired on clean directory; got {result:?}"
+                "guard mis-fired on clean directory; got {shown}"
             );
         });
     }
@@ -2174,9 +2517,10 @@ mod tests {
             let result =
                 commit_with_vault_path(unknown_token, scratch.path().to_path_buf(), &state, None)
                     .await;
+            let shown = commit_outcome(&result);
             assert!(
                 matches!(result, Err(AppError::SessionNotFound)),
-                "expected SessionNotFound, got {result:?}"
+                "expected SessionNotFound, got {shown}"
             );
         });
     }
@@ -2329,9 +2673,10 @@ mod tests {
             )
             .await;
 
+            let shown = commit_outcome(&result);
             assert!(
                 matches!(result, Err(AppError::VaultBusyAuth)),
-                "expected VaultBusyAuth when permit held, got {result:?}"
+                "expected VaultBusyAuth when permit held, got {shown}"
             );
         });
     }
@@ -2358,9 +2703,10 @@ mod tests {
                 None,
             )
             .await;
+            let shown = commit_outcome(&result);
             assert!(
                 matches!(result, Err(AppError::SessionNotFound)),
-                "expected SessionNotFound terminal return, got {result:?}"
+                "expected SessionNotFound terminal return, got {shown}"
             );
 
             // The permit MUST be free now — the auto-unlock `vault_unlock`
@@ -2557,9 +2903,10 @@ mod tests {
 
             let result =
                 commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
+            let shown = commit_outcome(&result);
             assert!(
                 result.is_ok(),
-                "commit happy-path must succeed; got {result:?}"
+                "commit happy-path must succeed; got {shown}"
             );
 
             // vault.meta is on disk per the existing pipeline.
@@ -2953,9 +3300,10 @@ mod tests {
             let result =
                 commit_with_vault_path(token, scratch.path().to_path_buf(), &state, None).await;
 
+            let shown = commit_outcome(&result);
             assert!(
                 matches!(result, Err(AppError::VaultArtifactsPresent)),
-                "commit must reject orphan-myn-without-vault-meta state, got {result:?}"
+                "commit must reject orphan-myn-without-vault-meta state, got {shown}"
             );
 
             // Non-destructive: session restored for retry after user

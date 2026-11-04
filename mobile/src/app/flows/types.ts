@@ -86,24 +86,18 @@ export interface IdentityFlowProps {
    */
   onScanCode?: () => void;
   /**
-   * An invite was accepted, this device has named itself, and the member vault
-   * exists on disk and unlocked (myne-md/myne#851 tasks 14 and 15). The shell
-   * closes the overlay and hands the vault to `landOnInstalledVault`, which is how
-   * every other flow hands a new vault back: the vault is on disk and unlocked, so
-   * what decides where the user lands is the state, not this flow guessing.
+   * The wizard finished and put vaults on this device. The shell closes the
+   * overlay and hands the landing to `landOnJoinedVaults`, which is how every
+   * flow hands a new vault back.
    *
    * NOT called by the accept itself. The name step sits between the two and reads
    * this through a ref, so the accepted vault cannot reach an editor unnamed: the
    * callback is the name gate's completion, not the accept's.
    *
-   * `vaultId` is the vault the flow just installed, and its presence is what tells
-   * the shell that a device still owes its approval wait: a freshly installed
-   * member vault carries a device the owner has to admit, so re-probing would land
-   * on an ordinary editor (or, worse, the unlock form) with the §6.3 compare never
-   * made. `undefined` keeps the old re-probe behaviour for the callers that never
-   * install anything.
+   * `undefined` keeps the old re-probe behaviour for a caller that installed
+   * nothing.
    */
-  onAccepted: (vaultId?: string) => void;
+  onAccepted: (landing?: JoinLanding) => void;
   /**
    * Create a vault from the identity home (myne-md/myne#911 task 12).
    *
@@ -115,6 +109,26 @@ export interface IdentityFlowProps {
    * needs no vault-list probe of its own.
    */
   onCreateVault?: () => void;
+}
+
+/**
+ * What a wizard put on this device, and whether it left it OPEN.
+ *
+ * The presence of a vault id is what tells the shell that this device still owes
+ * its approval wait: a freshly installed vault carries a device the owner has to
+ * admit, so re-probing would land on an ordinary editor (or the unlock form) with
+ * the §6.3 compare never made.
+ *
+ * `holding` is the second half and it is the flow's fact, not something the shell
+ * can infer: an ACCEPT and a member-vault join install the keys with the invite
+ * and hand the vault back unlocked, while a PERSON join writes frames and no key
+ * at all (`core/src/plugins/sync/person_discovery.rs`), so its vaults arrive
+ * locked and the approval wait cannot run against them yet, because the wait's poll
+ * claims a token, and the claim needs `root_key`.
+ */
+export interface JoinLanding {
+  vaultIds: string[];
+  holding: "unlocked" | "locked";
 }
 
 

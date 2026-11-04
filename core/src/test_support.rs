@@ -170,6 +170,30 @@ pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
     .expect("seed vault.meta");
 }
 
+/// The guard every test that touches the process-global device-key slot takes.
+///
+/// `device_identity` holds two process-wide slots (the RAM slot a rung-3 unlock
+/// installs into, and the host-provider `OnceLock`) and `cargo test` runs a suite in
+/// threads inside one process, so two tests mutating either slot interleave and the
+/// failure reads as a logic bug in the code under test.
+///
+/// It lives HERE rather than in `device_identity`'s own test module because the set of
+/// tests that need it is no longer local to that module: the creation-time binding claim
+/// installs a session key and reads it back (myne-md/myne#1001), so a `clear_session_key`
+/// landing between those two calls would send the read-back to the developer's real key
+/// store: a green test that writes a keychain item.
+///
+/// The callers are the two `device_identity` tests, which install or clear the slot
+/// directly, and `vault_unlock`'s single `lock_from_host` test, which clears it through the
+/// lock path. Those are the whole set: the vault-switch clear is reachable only from the IPC
+/// wrapper, which no test drives.
+pub fn device_key_slot_guard() -> std::sync::MutexGuard<'static, ()> {
+    static SLOT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    SLOT_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
 /// Drive an async body to completion on a throwaway current-thread runtime.
 ///
 /// # Why a test helper needs to exist at all
