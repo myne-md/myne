@@ -626,6 +626,33 @@ async fn person_device_id(
     super::device_actor::from_person_auth(host, io).await
 }
 
+/// The contentless "re-read it" events a finished cycle owes the WebView, one per
+/// store whose only reader re-reads the blob over IPC (myne#943).
+///
+/// A pure function of the summary, called from the cycle tail, because that tail
+/// is not reachable from a test: it sits in the `Ok(summary)` arm of a real
+/// cycle, which needs a live server, an enrolment and an unlocked vault before it
+/// can be reached at all. Deciding WHICH stores owe a signal is the whole content
+/// of that step, so it is the part that can be asserted, and a sibling store
+/// added later joins this table rather than a fifth shape in the tail.
+///
+/// **Only stores with no other refresh route belong here.** `vault.prefs` keeps
+/// its emit inline: that arm awaits a blob re-read and persists the durable
+/// `vault.label` before it emits, so it is IO rather than a gate on the summary.
+fn remote_apply_events(summary: &super::orchestrator::SyncSummary) -> Vec<&'static str> {
+    let mut events = Vec::new();
+    if summary.themes_applied_remote {
+        // A peer's `vault.themes` change was merged onto disk. The Appearance
+        // panel's list reads the store once and then subscribes to the store
+        // nonce, so without this an open panel keeps advertising the pre-sync set
+        // until it is remounted. (`vault.prefs.custom_theme` is a DeviceLocal
+        // field, so it cannot arrive from a peer: what the refresh exposes is a
+        // store the panel no longer agrees with, not a pref that just landed.)
+        events.push(crate::plugins::themes::commands::THEMES_CHANGED_EVENT);
+    }
+    events
+}
+
 pub async fn run_active_cycle_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
@@ -1310,6 +1337,9 @@ pub async fn run_active_cycle_from_host(
                     EventPayload::Unit,
                 );
             }
+            for event in remote_apply_events(&summary) {
+                host.emit(event, EventPayload::Unit);
+            }
             if summary.dictionary_applied_remote {
                 // A remote dictionary change was merged onto disk this cycle
                 // (myne-md/myne#640). The desktop holds the personal/ignore sets
@@ -1754,6 +1784,42 @@ mod tests {
     }
 
     use super::*;
+
+    /// A peer's `vault.themes` merge must reach the WebView (myne#943).
+    ///
+    /// The shipped bug is a silent one, which is why the assertion is on the event
+    /// rather than on any return value: the blob merged on disk, the palette came
+    /// out right, and the open Appearance panel went on listing the pre-sync set.
+    /// Nothing failed anywhere and a surface simply did not change, so the emit is
+    /// the only thing whose absence is observable.
+    ///
+    /// This asserts the decision, not the loop that publishes it: the call site is
+    /// in the `Ok(summary)` arm of a real cycle and no test reaches it, which is
+    /// recorded on myne-md/myne#943 rather than left to read as covered.
+    #[test]
+    fn a_remote_theme_apply_owes_the_themes_changed_event() {
+        use crate::plugins::themes::commands::THEMES_CHANGED_EVENT;
+
+        assert_eq!(
+            remote_apply_events(&super::super::orchestrator::SyncSummary {
+                themes_applied_remote: true,
+                ..Default::default()
+            }),
+            vec![THEMES_CHANGED_EVENT],
+            "a peer's theme store change is announced to the WebView"
+        );
+    }
+
+    /// The other direction, and it is the one a wrong gate breaks: a cycle that
+    /// applied nothing from a peer must owe no event, or every ordinary sync would
+    /// re-read the theme store (and, on the paint path, re-apply the palette) for
+    /// no change at all.
+    #[test]
+    fn a_cycle_with_no_remote_apply_owes_no_event() {
+        assert!(
+            remote_apply_events(&super::super::orchestrator::SyncSummary::default()).is_empty()
+        );
+    }
 
     /// The party-ness gate on the binding repair, tested for the ONE mistake that would
     /// make it dangerous rather than merely useless: matching a device that is not the
