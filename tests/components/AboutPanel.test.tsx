@@ -248,7 +248,7 @@ describe("AboutPanel — build readout", () => {
   });
 });
 
-describe("AboutPanel — the update row is one button (myne-md/myne#1020)", () => {
+describe("AboutPanel: the update row is one button (myne-md/myne#1020)", () => {
   // The row used to hold the check in its control slot and grow a SECOND primary
   // button underneath once a version was offered. The owner asked for one control
   // that becomes the install, and the reason it is worth a test is that the two

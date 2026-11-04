@@ -1258,8 +1258,8 @@
 .myne-empty[data-variant="error"] {
   --myne-empty-wash: var(--danger);
   /* **A fault is tinted, not flooded** (myne-md/myne#1020). Red at the accent
-     wash's strength covered a whole pane — the AI panel's "No model" state was
-     a rose-coloured field with two lines of text in it — so a state that says
+     wash's strength covered a whole pane. The AI panel's "No model" state was
+     a rose-coloured field with two lines of text in it, so a state that says
      "this needs one setting changed" read as an alarm filling the window.
 
      Strength roughly a third, footprint a little over half, and a tighter blur

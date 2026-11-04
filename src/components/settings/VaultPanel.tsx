@@ -562,13 +562,13 @@ export function VaultPanel({
         if (!mountedRef.current) return;
         setInFlight(false);
         const e = raw as VaultDeleteError;
-        // Resolve the vault path lazily on reject — the success
+        // Resolve the vault path lazily on reject: the success
         // path doesn't need it. UI-side resolution mirrors the
         // backend's `paths::vault_dir` derivation.
         //
         // `null` where the platform has no such path (phase3-web-client task
         // 72). `path.appDataDir` is a typed refusal in the browser seam, and
-        // an unguarded call here would throw INSIDE this catch block —
+        // an unguarded call here would throw INSIDE this catch block,
         // swallowing the mapping and leaving the user with a failed delete and
         // no banner at all. The capability is the same one that selects the
         // copy: a client whose vault is not the only copy has no directory to
@@ -807,7 +807,7 @@ export function VaultPanel({
       {/* The danger zone, and what "danger" means here (MYND-574 task 72).
           Where the local vault may be the only copy it is a destruction; where
           it is a cache of a sync-held vault it is a sign-out that takes this
-          browser's copy with it. Same field, same button, same command —
+          browser's copy with it. Same field, same button, same command,
           different promise, because the desktop promise would be false on the
           other client in the direction that loses a user's trust rather than
           their data.
