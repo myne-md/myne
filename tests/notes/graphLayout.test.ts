@@ -156,7 +156,11 @@ describe("settled extent stays bounded", () => {
     // regression that removes the gravity fails loudly while ordinary tuning of
     // the force constants has room to move.
     expect(extentOf(positions)).toBeLessThan(LAYOUT_BOX * 1.5);
-  });
+    // 500 nodes of force simulation is about half a second here and past the
+    // suite's 5 s default on a loaded CI runner, where it timed out three
+    // pipelines in a row while asserting nothing wrong (v0.13.0). The claim is
+    // the bound above, not how fast the machine is.
+  }, 30_000);
 
   it("never lets two nodes touch, even at the largest node size the panel offers", () => {
     // The user-visible property, and the one that has to hold unconditionally:
