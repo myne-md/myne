@@ -30,6 +30,7 @@ import { describe, expect, it } from "vitest";
 import { describeE2E, scenario } from "./support/scenario";
 import { seedVault } from "./support/fixtures";
 import {
+  contextMenuPick,
   createNote,
   dismissImporterOffer,
   enableAi,
@@ -112,12 +113,11 @@ async function pinAgentTab(s: Session): Promise<void> {
     testIdSelector("editor.tab", { "data-tab-id": AGENT_TAB_KEY }),
     { timeoutMs: 15_000 },
   );
-  await tab.rightClick();
-  const item = await s.waitForElement(
-    testIdSelector("notes.context-menu-item", { "data-item-id": "tab.pin" }),
-    { timeoutMs: 10_000 },
-  );
-  await item.click();
+  // Through the shared helper rather than a private two-step: it re-fires the
+  // right-click while polling for its item, which is what a menu whose first
+  // synthetic right-click dispatched nothing needs (measured 2026-11-03 on this
+  // very tab: the same handler served a note tab's menu fine).
+  await contextMenuPick(s, tab, "tab.pin");
   await s.waitUntil(
     async () => ((await tab.attribute("data-pinned")) === "true" ? true : null),
     { label: "the agent tab reports pinned", timeoutMs: 10_000 },

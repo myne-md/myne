@@ -14,7 +14,16 @@
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import {
@@ -367,6 +376,78 @@ const PORT_FALLBACK_STRIDE = 1000;
 const PORT_FALLBACK_ATTEMPTS = 24;
 
 /**
+ * Every process whose environment names `dataHome` — i.e. one of OUR OWN app
+ * trees, and nothing else on the machine.
+ *
+ * **The port fallback above stepped over the leak instead of stopping it, and
+ * the price is now measurable.** `detached: true` plus a group SIGKILL reaps the
+ * driver tree the harness knows about, but a tree whose driver died first (a
+ * timed-out `deleteSession`, a worker that was interrupted) is not in that group
+ * any more: it keeps a WebKit web process, a GPU process and the app binary
+ * alive, holding a display connection and a file watcher. Measured 2026-11-03 on
+ * a full single-shard run: 12–14 `WebKitWebProcess` and 7–8 `myne-desktop`
+ * processes alive at once, against one app per scenario; the same scenarios took
+ * 30 s alone and 88–348 s inside the suite, and six of them failed on
+ * `editor.content .cm-content` not appearing within 45 s — a slow machine that
+ * was made slow by its own leftovers.
+ *
+ * The MATCH is the scenario's `XDG_DATA_HOME`, which is a fresh `mkdtemp` per
+ * launch: an app started by this run carries it, the developer's real Myne does
+ * not, and a second device launched by the same scenario carries a different one
+ * — so reaping one device cannot touch its sibling.
+ */
+function ownedProcessIds(): number[] {
+  // Every data dir this harness creates is `mkdtemp`'d under the tmpdir with
+  // this prefix, so the prefix — not one scenario's path — is what identifies a
+  // leftover of THIS RUN. A narrower match would find only the tree it was
+  // handed, which is the one tree that teardown already knows about.
+  const needle = `XDG_DATA_HOME=${join(tmpdir(), "myne-e2e-")}`;
+  const self = process.pid;
+  const ids: number[] = [];
+  let entries: string[];
+  try {
+    entries = readdirSync("/proc");
+  } catch {
+    return ids; // not Linux: nothing to reap, and nothing to report either
+  }
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue;
+    const pid = Number(entry);
+    if (pid === self) continue;
+    try {
+      const environ = readFileSync(`/proc/${entry}/environ`, "latin1");
+      if (environ.split("\0").some((entry) => entry.startsWith(needle))) ids.push(pid);
+    } catch {
+      // Gone between readdir and read, or another user's process: not ours.
+    }
+  }
+  return ids;
+}
+
+/** Kill every leftover app tree of THIS run, and say so. Returns how many were
+ *  found: launch calls it before starting, teardown after finishing, so a leak
+ *  shows up in the log of the scenario that produced it. */
+export async function reapOwnedProcesses(): Promise<number> {
+  const ids = ownedProcessIds();
+  if (ids.length === 0) return 0;
+  for (const pid of ids) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      /* already gone */
+    }
+  }
+  await sleep(100);
+  // eslint-disable-next-line no-console
+  console.warn(
+    `[e2e] reaped ${ids.length} leftover process(es) from a previous app tree ` +
+      `(${ids.join(",")}) — the teardown did not own them, and they were holding ` +
+      "CPU and a display connection that the next scenario needs",
+  );
+  return ids.length;
+}
+
+/**
  * A driver/native port pair nothing is answering on: the configured one when it
  * is free, else a deterministic alternate.
  *
@@ -478,7 +559,14 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
   // symptom is a screen that says the vault does not exist. Resolving here
   // rather than only in `teardown` covers the paths a teardown cannot: a worker
   // that died mid-scenario, a driver whose child outlived it, a stray manual run.
+  // **Reap before probing ports.** The port fallback exists so a leaked driver
+  // cannot be attached to; reaping first means the fallback is the exception
+  // again rather than the normal path, and it is the point that stops the leak
+  // from ACCUMULATING — one leftover per scenario is a suite that slows down
+  // linearly, which is exactly what the measurements showed.
   phase = Date.now();
+  const reaped = await reapOwnedProcesses();
+  if (reaped > 0) recordWait("[launch:reap]", Date.now() - phase, false);
   const ports = await freeDriverPorts(wantedDriverPort, wantedNativePort);
   recordWait("[launch:ports]", Date.now() - phase, false);
   const driverPort = ports.driverPort;
@@ -611,6 +699,11 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
       // mask the scenario's own error; the launch-side check is the one that
       // refuses to proceed.
       await waitForDriverGone(baseUrl, DRIVER_FREE_TIMEOUT_MS);
+      // The group kill above only reaches the tree it OWNS. A tree whose driver
+      // died first is orphaned rather than killed, and reaping by data-directory
+      // ownership is the only handle on it — so the scenario that leaked it pays
+      // for it here, in its own log, instead of the ninth scenario downstream.
+      await reapOwnedProcesses();
       try {
         if (!opts.keepDataDir) rmSync(dataHome, { recursive: true, force: true });
       } catch {
