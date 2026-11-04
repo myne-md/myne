@@ -26,1024 +26,1024 @@
   ],
   "verified": {
     "a11y.wcag22-manual": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.agent-hub": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.agent-mode": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.chat": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.model-download-onboarding": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.on-device-transcription": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.summarize-and-ask": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ai.tag-suggestions": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.cold-start": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.crash-recovery": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.diagnostic-log": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.language-and-i18n": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.reminders": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.self-update": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.toasts": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "app.window-chrome": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "appearance.custom-themes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "appearance.themes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "attachments.camera-capture": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "attachments.library": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "attachments.uri-scheme-playback": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "backup.automatic-schedule": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "backup.manual-export": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "backup.restore": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "cli.door": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "cli.read-commands": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.capture-article": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.capture-bookmark": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.connected-extensions": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.host-install": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.locked-or-closed": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.pairing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "clipper.relay-ingest": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "collab.presence": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.ai-writing-assistant": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.attachments-inline": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.code-blocks": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.detached-window-pop-out": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.detached-window-screen-capture": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.drawing-notes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.find-and-replace": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.folding-and-outline": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.formatting-toolbar": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.frontmatter-properties": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.markdown-rendering": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.math-and-diagrams": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.photo-to-note": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.slash-menu": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.tables": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.tags": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.task-queries": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.tasks-inline": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.text-editing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.transcription": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.view-modes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.vim-mode": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.voice-recording": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "editor.wikilinks": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "enrolment.qr-scan": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.backup-exclusion": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.note-file": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.note-image": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.pdf": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.pdf-native": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.share-destination": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "export.vault-markdown": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "graph.view": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "identity.first-run": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "import.drag-drop-markdown": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "import.external-sources": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "import.myne-vault": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "input.keybindings": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "install.desktop-artefacts": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "install.store-distribution-and-update": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "keyboard.ime-and-accessory-bar": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "layout.safe-areas": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "layout.size-classes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "lifecycle.background-grace-lock": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "lifecycle.sync-suspend-resume": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "links.backlinks-and-mentions": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "meeting.notes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "navigation.back-gesture": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "network.ai-egress-gate": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "network.tor-routing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "notes.cover-images": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "notes.snapshots": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "onboarding.welcome": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "plain-file-editor": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "print.physical": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "procedures.accessibility": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "procedures.clipboard-sensitivity": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "procedures.clipper-testing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "reminders.android-delivery": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "reminders.ios-delivery": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "reminders.tap-landing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "rtl.bidi-rendering": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "search.command-palette": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "search.quick-picker": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "security.keychain-device-binding": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.accent-color": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.ai-models": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.ai-provider": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.attachment-ocr": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.daily-notes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.datetime-display": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.default-view-mode": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.external-mcp": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.focus-mode": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.hide-vault-names": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.language": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.line-numbers": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.new-note-location": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-override": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-protection.android": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-protection.ios": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-protection.linux": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-protection.macos": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.screen-capture-protection.windows": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.spell": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.block.typography": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.ai": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.appearance": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.editor": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.files": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.privacy": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.storage": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.sync": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.panel.vault": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "settings.shell": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "share-import.android-intent": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "share-import.ios-extension": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sidebar.notes-and-folders": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sync.conflicts": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sync.cross-version": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sync.device-join": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sync.recovered-notes": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "sync.status-and-banners": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "ui.press-feedback": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "unlock.argon2id-budget": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.auto-lock": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.change-password": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.creation": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.delete": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.migration-and-repair": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.picker-and-switcher": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.quick-unlock": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.recover-from-phrase": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "vault.unlock": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "views.saved-views": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "voice.mic-capture": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "watch.capture-drain": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "watch.meeting-capture": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.clipboard.write-per-engine": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.deploy.headers-and-isolation": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.download.browser-delivery": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.files.picker-and-drop": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.keyboard.reserved-chords": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.opfs.double-buffer-crash": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.phrase.creation-and-recovery-in-a-page": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.render.zoom-and-text-input": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.storage.eviction-rebootstrap": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.storage.private-browsing": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.storage.quota-exhaustion": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "web.tab.single-tab-lock-lifecycle": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "webview.navigation-policy": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "webview.rendering-parity": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "widgets.deep-link-launchers": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "workspace.bottom-bar": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "workspace.navigation-history": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     },
     "workspace.panes-and-tabs": {
-      "version": "v0.13.0",
+      "version": "v0.14.0",
       "date": "2026-11-04",
       "verdict": "override",
-      "reason": "not walked for v0.13.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
+      "reason": "not walked for v0.14.0 by the owner's decision on 2026-11-04. The gating half alone is 75.1 hours against an 8 hour budget, and that automation debt is tracked as myne#554. This records the absence of a walk, not a result."
     }
   }
 }
