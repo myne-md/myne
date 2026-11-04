@@ -36,7 +36,7 @@ vi.mock("@tauri-apps/plugin-clipboard-manager", () => ({
   writeText: writeTextMock,
 }));
 
-import { getToasts, resetToasts } from "../../src/components/toast/toastStore";
+import { resetToasts } from "../../src/components/toast/toastStore";
 import { resetPersonIdentityState } from "../../src/components/sync/personIdentityState";
 import { renderSyncPanel, syncPanelCommandRouter } from "./_syncPanelHarness";
 
