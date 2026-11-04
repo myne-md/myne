@@ -136,6 +136,17 @@ describe("computeTagAcceptEdit — idempotence under the tag-identity fold", () 
     expect(computeTagAcceptEdit("body", "#")).toBeNull();
   });
 
+  it("refuses to write a string that is not a legal tag body (myne#1025)", () => {
+    // The reader drops such a candidate before it is ever offered; this is the
+    // writer's own refusal, so no path can land a tag the author cannot type.
+    expect(computeTagAcceptEdit("body", "(#Writing with Markdown")).toBeNull();
+    expect(computeTagAcceptEdit("body", "Links and tags")).toBeNull();
+    expect(computeTagAcceptEdit("body", "c++")).toBeNull();
+    expect(computeTagAcceptEdit("body", "Trash)")).toBeNull();
+    // Still writable: a digits-only body is legal frontmatter data (§3.7.3).
+    expect(computeTagAcceptEdit("body", "1984")).not.toBeNull();
+  });
+
   it("re-applying its own output changes nothing", () => {
     const once = applyTagAccept("---\ntitle: N\n---\n\nbody\n", "rust");
     expect(applyTagAccept(once, "rust")).toBe(once);

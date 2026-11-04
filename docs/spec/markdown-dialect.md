@@ -273,6 +273,8 @@ The inline-tag tokenizer does **not** match within the YAML frontmatter block. T
 
 The numeric-only-reject rule (§3.7.3) applies only to inline tags. Frontmatter `tags:` entries may be entirely numeric. (Research Q3, Q9.)
 
+**Read permissive, propose legal.** §3.7.2's deny-list constrains what a surface may **propose or write** as a tag, not what a user's file may **contain**. A frontmatter `tags:` entry is read and displayed as the YAML scalar it is, whatever characters it carries: an imported vault keeps `c++`, `node.js` and values with a parenthesis, and no reader rejects or normalizes them (§6 C1). The converse is equally load-bearing. Anything that offers a tag to the user (the AI tag-suggestion band is the first) MUST present only bodies §3.7.2 permits, and any write of a tag MUST land one: a proposal carrying `(`, `)` or a space becomes a tag that no inline `#tag` can ever match and that the user cannot type. (`decisions.md` 2026-11-04, myne-md/myne#1025.)
+
 #### 3.7.7 Recognize-only
 
 The inline-tag tokenizer **only recognizes** tag occurrences. It MUST NOT rewrite, normalize, or canonicalize the bytes of any matched tag. The byte-stability guarantee in §6 (C1) extends to inline-tag bytes alongside the existing list (non-canonical emphasis, alternate list markers, etc.).
