@@ -491,6 +491,7 @@ export class Element {
     // pointerMove resolves the element's in-view centre first; if that throws
     // "not interactable" NOTHING was dispatched (no contextmenu fired), so the
     // retry cannot double-open a menu. Mirrors `click()`'s retry contract.
+    let refreshed = false;
     await this.session.waitUntil(
       async () => {
         try {
@@ -521,6 +522,15 @@ export class Element {
             (e.code === "element not interactable" ||
               e.code === "element click intercepted")
           ) {
+            // A stale hit-test map refuses the pointer MOVE before any button
+            // event exists, so this is the same one-shot repair `click()` makes.
+            // Measured 2026-11-03: the tab strip's `tab.pin` menu never opened
+            // for its whole 10 s budget while the tab was visible, because the
+            // strip had overflowed and the driver could not resolve the element.
+            if (!refreshed) {
+              refreshed = true;
+              await this.refreshHitTestMap();
+            }
             return null; // not hit-testable yet — keep polling
           }
           throw e;

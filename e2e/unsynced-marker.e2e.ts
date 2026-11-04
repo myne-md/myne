@@ -118,6 +118,21 @@ describe.skipIf(!supported)("um · unsynced-edit marker (MYND-574 task 23)", () 
       await unlockAndEnroll(a.session, account, password);
       await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 30_000);
 
+      // **The ack is made IMPOSSIBLE for the first half, not merely unlikely.**
+      // The claim is "a local save does not clear the marker", and with the
+      // server reachable the poke timer can acknowledge between the save and the
+      // read - at which point the marker clears for the RIGHT reason and the
+      // assertion fails for the wrong one (measured 2026-11-03: `expected 0 to be
+      // greater than 0`, alone-green). Pointing the endpoint at a port nothing
+      // listens on is the product's own control, and it is restored below, so the
+      // second half still proves the clear-on-acknowledgement it always did.
+      await pageSeatInvoke(
+        a.session,
+        "plugin:sync|sync_set_endpoint",
+        { endpointUrl: "http://127.0.0.1:9", inviteCode: null },
+        30_000,
+      );
+
       await createNote(a.session, "AckNote");
       await typeIntoEditor(a.session, "first body");
       await waitForSaved(a.session);
@@ -130,6 +145,14 @@ describe.skipIf(!supported)("um · unsynced-edit marker (MYND-574 task 23)", () 
       await typeIntoEditor(a.session, " and more");
       await waitForSaved(a.session);
       expect(await markedRows(a.session)).toBeGreaterThan(0);
+
+      // Put the relay back before asking for the acknowledgement.
+      await pageSeatInvoke(
+        a.session,
+        "plugin:sync|sync_set_endpoint",
+        { endpointUrl: srv.url, inviteCode: null },
+        30_000,
+      );
 
       // The real thing.
       await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 30_000);

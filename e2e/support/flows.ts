@@ -1821,12 +1821,28 @@ export async function contextMenuPick(
   target: { rightClick(): Promise<void> },
   itemId: string,
 ): Promise<void> {
-  await target.rightClick();
-  await (
-    await session.waitForElement(
-      testIdSelector("notes.context-menu-item", { "data-item-id": itemId }),
-    )
-  ).click();
+  // **Re-fire the right-click, do not wait on one.** A synthetic right-click that
+  // is accepted but dispatches nothing looks exactly like a slow menu, and one
+  // `waitForElement` budget was spent on it: measured 2026-11-03, the AI panel's
+  // agent tab never produced `tab.pin` in 10 s while a note tab's did, with the
+  // tab visible and the same handler behind both. Each attempt dismisses a stray
+  // menu first, so a second attempt cannot land on the first one's overlay.
+  const item = testIdSelector("notes.context-menu-item", { "data-item-id": itemId });
+  let last: unknown = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await pressKey(session, KEY.ESCAPE);
+    await target.rightClick();
+    try {
+      const row = await session.waitForElement(item, { timeoutMs: 3_000 });
+      await row.click();
+      return;
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw new Error(
+    `the context menu never offered "${itemId}" after 3 right-clicks: ${(last as Error)?.message ?? ""}`,
+  );
 }
 
 /** Create a note via the sidebar CTA and commit `title` through the note's own
