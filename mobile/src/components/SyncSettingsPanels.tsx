@@ -14,7 +14,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
-import { statusView } from "../lib/sync-status-view";
+import { syncStatusView } from "@myne/sync-status-view";
 import type { SyncStatus } from "../lib/use-sync-status";
 import type { VaultId } from "../lib/stage";
 import {
@@ -228,7 +228,8 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
   // KNOWN rather than defaulting either way: `unknown` would otherwise print the
   // owner's label over the member's numbers, or the reverse.
   const plane = useMemberVault(vaultId);
-  const view = statusView(status, t);
+  // The shared mapping, the same one the desktop indicator calls (myne-md/myne#1027).
+  const view = syncStatusView(status, t);
   // "Sync now" is only meaningful with an authed session to sync — a cycle while
   // disabled / not-enrolled / pending returns NotReady, so hide it there rather
   // than promise a sync that can't run (mirrors the old SY-08 detail sheet).
@@ -280,7 +281,7 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
         <Row testId="sync.settings.status">
           <span style={rowLabel}>{t("sync.settings.statusLabel")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--fg-2)" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: view.color, flex: "none" }} />
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: view.dotColor, flex: "none" }} />
             <span style={{ fontSize: 15 }}>{view.label}</span>
           </div>
         </Row>

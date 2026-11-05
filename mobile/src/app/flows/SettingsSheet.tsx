@@ -3,6 +3,7 @@ import { motionDurationMs, motionEasing } from "@myne/client-core/motion";
 import { useTranslation } from "react-i18next";
 import { strengthLevel } from "../../lib/password-strength";
 import type { TFunction } from "i18next";
+import { syncStatusView } from "@myne/sync-status-view";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, InfoNote, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
@@ -1577,25 +1578,15 @@ const PANEL_TITLE: Record<Panel, string> = {
 };
 
 /** Short, glanceable sync summary for the Settings row value (no wall-clock — SYNC-48).
+ *
+ *  It delegates to the shared mapping rather than keeping a third switch (myne-md/myne#1027).
+ *  This WAS the third copy of "what does this status mean", and it was the one that read "On" for
+ *  a device that had uploaded nothing for a day: `idle` means enrolled, not synced. The row now
+ *  says exactly what the sync panel says, which is the consistency the row exists to provide.
+ *
  *  `t` is passed in from the render site so this stays free of module-scope `t()`. */
 function syncSummary(status: SyncStatus | null, t: TFunction): string {
-  switch (status?.state) {
-    case "disabled":
-    case undefined:
-      return t("settings.archive.off");
-    case "not_enrolled":
-      return t("settings.sync.summary.notSetUp");
-    case "pending":
-      return t("sync.status.awaitingApproval");
-    case "idle":
-      return t("settings.archive.on");
-    case "syncing":
-      return t("sync.status.syncing");
-    case "error":
-      return t("settings.sync.summary.offline");
-    case "conflicts":
-      return t("settings.sync.summary.conflicts", { count: status.count });
-  }
+  return syncStatusView(status, t).label;
 }
 
 export interface SettingsSheetProps {

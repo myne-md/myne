@@ -34,6 +34,12 @@ export default defineConfig(async () => ({
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
+      // The shared sync-status VOCABULARY (myne-md/myne#1027): the status union and the one
+      // mapping from a status to a sentence. Aliased for the same reason as the staleness rule
+      // above, and for one more: the phone used to hold its own copy of the mapping, and the two
+      // had already drifted (the same `idle` read "Synced" on a computer and "On" on a phone),
+      // which is precisely what a user cannot trust. One function, two renderers.
+      { find: "@myne/sync-status-view", replacement: sib("../src/lib/sync-status-view.ts") },
       // The shared RECOVERY-KIT FILE FORMAT (myne-md/myne#468). Aliased for
       // exactly the reason above: the kit is a plain-text document a user saves
       // on one client and reads back into the recovery flow on ANOTHER, so its

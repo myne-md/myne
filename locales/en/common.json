@@ -4864,6 +4864,7 @@
       "syncing": "Syncing…",
       "syncNow": "Sync now",
       "errorIdentityLocked": "Unlock your identity to sync",
+      "uploadsBlocked": "Uploads paused: this device cannot sign the vault head",
       "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "unlockIdentityCta": "Unlock identity",
       "errorDeviceKeyMissing": "The signing key this device published is not here, so sync cannot run",

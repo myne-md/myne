@@ -57,19 +57,58 @@ pub enum SyncRuntimeStatus {
         /// Number of `conflict:`-marked notes awaiting resolution.
         count: u32,
     },
+    /// The cycle RUNS and cannot UPLOAD: this device is enrolled, it is reaching the server,
+    /// and it cannot author a vault head (myne-md/myne#1027).
+    ///
+    /// A state of its own, and the reason is the defect it came from. It is not `Error` because
+    /// nothing failed — the pull succeeds every thirty seconds — and it was not `Idle` before,
+    /// although that is what it reported: `Idle` means "enrolled, nothing in flight", the
+    /// indicator renders `Idle` as "Synced", and a published vault uploaded nothing for a day
+    /// while saying exactly that.
+    UploadsBlocked {
+        /// A bounded cause token, from the same vocabulary as [`SyncRuntimeStatus::Error`]'s
+        /// `detail`: `device_key_missing` and `identity_locked` are the two a user action
+        /// repairs, and `uploads_blocked` covers the causes none does.
+        detail: String,
+        /// Epoch-ms of the last cycle that uploaded anything, or `None` if this device never
+        /// has.
+        ///
+        /// A raw timestamp, coarsened by the surface, and it appears ONLY on this variant.
+        /// AS15 keeps a per-device sync wall-clock off screen, and the one moment that clock
+        /// earns its place is telling someone their work has not left the machine: "last
+        /// upload: three hours ago" is the sentence this whole state exists to make possible.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        last_upload_at: Option<u64>,
+    },
 }
 
 /// A live sync-status overlay (SYNC-36): the background loop / `sync_now`
-/// publishes `Syncing` while a cycle runs and `Error` after a failed cycle;
-/// [`overlay_status`] overlays it on the derived base state. Cleared after a
-/// clean cycle. (`Conflicts` is derived from the on-disk staging dir, not held
-/// here.)
+/// publishes `Syncing` while a cycle runs, `Error` after a failed cycle, and `Blocked` after a
+/// cycle that succeeded and could not upload; [`overlay_status`] overlays it on the derived base
+/// state. Cleared after a clean cycle. (`Conflicts` is derived from the on-disk staging dir, not
+/// held here.)
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LiveStatus {
     /// A pull/push is in flight.
     Syncing,
     /// The last cycle failed (bounded, non-secret detail tag).
     Error(String),
+    /// The last cycle ran and could not upload (bounded cause token).
+    ///
+    /// The third arm is the whole point of myne-md/myne#1027: a cycle can SUCCEED and still have
+    /// moved nothing up, and before this the cell had no way to say so — so it said `None`, the
+    /// base state said `Idle`, and the UI said "Synced".
+    Blocked(String),
+}
+
+/// The two on-disk clocks a status read carries, kept together so a caller cannot pass one
+/// where the other belongs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SyncClocks {
+    /// Last cycle that completed against the server — reachability, not uploads.
+    pub last_success_at: Option<u64>,
+    /// Last cycle that uploads anything — see [`SyncRuntimeStatus::UploadsBlocked`].
+    pub last_upload_at: Option<u64>,
 }
 
 /// Pure endpoint+token+identity → status mapping. No endpoint → `Disabled` (the
@@ -103,13 +142,17 @@ pub fn status_from(
 /// Precedence: a config state (`Disabled`/`NotEnrolled`/`Pending`) dominates — a
 /// device that cannot sync shows WHY, never a stale live overlay. Only for an
 /// enrolled, idle-eligible device does the overlay apply: an in-flight
-/// `Syncing` or a last-cycle `Error` wins over conflicts, and unresolved
-/// conflicts win over a bare `Idle`.
+/// `Syncing`, a last-cycle `Error`, or a last-cycle `Blocked` wins over conflicts, and
+/// unresolved conflicts win over a bare `Idle`.
+///
+/// `Blocked` sits between `Error` and `Conflicts` deliberately. It describes a cycle that
+/// RAN, so it outranks an unresolved conflict: a conflict is something to fix once the
+/// uploads work, and a device that cannot upload cannot resolve one.
 pub fn overlay_status(
     base: SyncRuntimeStatus,
     live: Option<LiveStatus>,
     conflict_count: u32,
-    last_success_at: Option<u64>,
+    clocks: SyncClocks,
 ) -> SyncRuntimeStatus {
     if !matches!(base, SyncRuntimeStatus::Idle) {
         return base;
@@ -118,7 +161,11 @@ pub fn overlay_status(
         Some(LiveStatus::Syncing) => SyncRuntimeStatus::Syncing,
         Some(LiveStatus::Error(detail)) => SyncRuntimeStatus::Error {
             detail,
-            last_success_at,
+            last_success_at: clocks.last_success_at,
+        },
+        Some(LiveStatus::Blocked(detail)) => SyncRuntimeStatus::UploadsBlocked {
+            detail,
+            last_upload_at: clocks.last_upload_at,
         },
         None if conflict_count > 0 => SyncRuntimeStatus::Conflicts {
             count: conflict_count,
@@ -150,7 +197,7 @@ pub async fn read_status(
     let cfg = super::config::read_config(io, &path).await?;
     let vault_root =
         crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await).ok();
-    let mut last_success_at: Option<u64> = None;
+    let mut clocks = SyncClocks::default();
     let (token_present, identity_present, conflict_count) = match vault_root.as_deref() {
         Some(dir) => {
             use super::token_store::TokenStore as _;
@@ -184,7 +231,8 @@ pub async fn read_status(
             } else {
                 false
             };
-            last_success_at = persisted.and_then(|s| s.last_success_at_ms);
+            clocks.last_success_at = persisted.as_ref().and_then(|s| s.last_success_at_ms);
+            clocks.last_upload_at = persisted.as_ref().and_then(|s| s.last_upload_at_ms);
             let token = token || person_published;
             let identity = identity || person_published;
             // Unresolved conflict copies (decryption-free — reads the staging dir).
@@ -196,7 +244,7 @@ pub async fn read_status(
         None => (false, false, 0),
     };
     let base = status_from(cfg.endpoint_url.is_some(), token_present, identity_present);
-    Ok(overlay_status(base, live, conflict_count, last_success_at))
+    Ok(overlay_status(base, live, conflict_count, clocks))
 }
 
 /// Which of the two "cannot sync yet" states this device is in: awaiting
@@ -433,7 +481,12 @@ mod tests {
             SyncRuntimeStatus::Pending,
         ] {
             assert_eq!(
-                overlay_status(base.clone(), Some(LiveStatus::Syncing), 3, None),
+                overlay_status(
+                    base.clone(),
+                    Some(LiveStatus::Syncing),
+                    3,
+                    SyncClocks::default()
+                ),
                 base
             );
         }
@@ -442,7 +495,12 @@ mod tests {
     #[test]
     fn live_wins_over_conflicts_and_conflicts_over_idle() {
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, Some(LiveStatus::Syncing), 2, None),
+            overlay_status(
+                SyncRuntimeStatus::Idle,
+                Some(LiveStatus::Syncing),
+                2,
+                SyncClocks::default()
+            ),
             SyncRuntimeStatus::Syncing
         );
         assert_eq!(
@@ -450,7 +508,7 @@ mod tests {
                 SyncRuntimeStatus::Idle,
                 Some(LiveStatus::Error("rate_limited".into())),
                 2,
-                None
+                SyncClocks::default()
             ),
             SyncRuntimeStatus::Error {
                 detail: "rate_limited".into(),
@@ -458,12 +516,62 @@ mod tests {
             }
         );
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, None, 2, None),
+            overlay_status(SyncRuntimeStatus::Idle, None, 2, SyncClocks::default()),
             SyncRuntimeStatus::Conflicts { count: 2 }
         );
         assert_eq!(
-            overlay_status(SyncRuntimeStatus::Idle, None, 0, None),
+            overlay_status(SyncRuntimeStatus::Idle, None, 0, SyncClocks::default()),
             SyncRuntimeStatus::Idle
+        );
+    }
+
+    /// A cycle that ran and could not upload must NOT read as idle (myne-md/myne#1027).
+    ///
+    /// `Idle` is what the indicator renders as "Synced", and "Synced" is what a published vault
+    /// reported for a day while it uploaded nothing at all. Three clauses: the state is its own,
+    /// the cause survives, and the upload clock reaches the one surface that exists for it.
+    #[test]
+    fn a_blocked_cycle_is_never_reported_as_idle() {
+        let clocks = SyncClocks {
+            last_success_at: Some(1_700_000_000_000),
+            last_upload_at: Some(1_699_000_000_000),
+        };
+        let blocked = overlay_status(
+            SyncRuntimeStatus::Idle,
+            Some(LiveStatus::Blocked("device_key_missing".into())),
+            0,
+            clocks,
+        );
+        assert_eq!(
+            blocked,
+            SyncRuntimeStatus::UploadsBlocked {
+                detail: "device_key_missing".into(),
+                last_upload_at: Some(1_699_000_000_000),
+            },
+            "the cause and the upload clock both survive the overlay"
+        );
+        assert_ne!(blocked, SyncRuntimeStatus::Idle, "and it is not `Synced`");
+
+        // It outranks an unresolved conflict: a device that cannot upload cannot resolve one.
+        assert!(matches!(
+            overlay_status(
+                SyncRuntimeStatus::Idle,
+                Some(LiveStatus::Blocked("uploads_blocked".into())),
+                4,
+                clocks
+            ),
+            SyncRuntimeStatus::UploadsBlocked { .. }
+        ));
+
+        // And a config state still dominates it, like every other overlay.
+        assert_eq!(
+            overlay_status(
+                SyncRuntimeStatus::NotEnrolled,
+                Some(LiveStatus::Blocked("device_key_missing".into())),
+                0,
+                clocks
+            ),
+            SyncRuntimeStatus::NotEnrolled
         );
     }
 }
