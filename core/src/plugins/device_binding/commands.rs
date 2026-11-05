@@ -266,6 +266,7 @@ async fn write_own_binding_row(
         ConfirmedHalves::Publish(public) => Some(*public),
         // No verified key, so nothing about the row may change: not its halves, not its
         // version. See `confirm_read_back` for why withdrawing was tried and reverted.
+        ConfirmedHalves::Absent => None,
         ConfirmedHalves::Unknown => {
             let map = read_device_bindings_in_dir(io, vault_dir, &resolved.borrow()).await?;
             return Ok((map, ClaimOutcome::Deferred));
@@ -317,6 +318,25 @@ async fn write_own_binding_row(
 /// be `load_key`, and that reader answers from the session slot first: a key that existed only
 /// in memory satisfied it, the row was written, and the halves it published belonged to no
 /// store. `KeyAtRestProof` is what makes that mistake unrepresentable now.
+/// What a store fault means for the row: two answers, and they differ in whether a row is
+/// written.
+///
+/// Split out because it is the one decision in this file that a test cannot reach through the
+/// real store: the store is process-global and a refusing one is not something a fixture can
+/// install. Reverting `Absent` to `Unknown` here restores the state the comment below used to
+/// describe falsely, and `a_store_fault_still_leaves_a_repairable_row` names it.
+fn on_store_fault(
+    err: &crate::plugins::sync::device_identity::DeviceKeyStoreError,
+) -> ConfirmedHalves {
+    use crate::plugins::sync::device_identity::DeviceKeyStoreError as E;
+    match err {
+        // Rung 4 is a platform fact, not a fault: the row is written exactly as it was
+        // before the device-key change, and that is not this branch's business.
+        E::Unsupported => ConfirmedHalves::Unknown,
+        _ => ConfirmedHalves::Absent,
+    }
+}
+
 fn mint_and_confirm_at_rest(
 ) -> Result<ConfirmedHalves, crate::plugins::sync::device_identity::DeviceKeyStoreError> {
     let pair = match crate::plugins::sync::device_identity::load_or_create() {
@@ -326,20 +346,18 @@ fn mint_and_confirm_at_rest(
         Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => {
             return Ok(ConfirmedHalves::Unknown)
         }
-        // A store that REFUSED the write is the same answer as a platform with no store: this
-        // claim cannot state where a key lives, so it states nothing about one. It used to
-        // propagate, and the cost was that NO row was written at all, which left the device in
-        // `NoBindingRow` with a store error as the only explanation, and a row that is absent
-        // is the one state no later claim can see to repair. Logged rather than swallowed, and
-        // nothing false is published: a `v1` row carries no halves (myne-md/myne#1027).
+        // A store that REFUSED the write cannot say where a key lives, so nothing is
+        // published: the row is written with no halves rather than not written at all, because
+        // an absent row is the one state no later claim can see to repair. Logged rather than
+        // swallowed (myne-md/myne#1027).
         Err(err) => {
             tracing::warn!(
                 stage = "device_binding_claim",
                 event = "device_key_write_failed",
                 reason = ?err,
-                "the device key could not be written; the row is written without halves"
+                "the device key could not be written; the row will publish no halves"
             );
-            return Ok(ConfirmedHalves::Unknown);
+            return Ok(on_store_fault(&err));
         }
     };
     Ok(confirm_read_back(
@@ -420,6 +438,15 @@ enum ConfirmedHalves {
     Publish(Box<protocol::device_key::DevicePublicHalf>),
     /// No verified key: leave the row exactly as it is and retry on the next unlock.
     Unknown,
+    /// A store that REFUSED to write the key: write the row publishing NO halves.
+    ///
+    /// Not the same as `Unknown`. "Leave the row alone" is right when a row already exists
+    /// and its halves might still be the ones at rest; on a device with no row at all it is
+    /// the one outcome no later claim can see to repair, so the device stays in
+    /// `NoBindingRow` for ever. A halves-less row is what every pre-device-key path wrote and
+    /// it claims nothing about where a key lives, so this keeps the device repairable without
+    /// publishing anything false (myne-md/myne#1027).
+    Absent,
 }
 
 /// Claim this device's binding, best effort, from the unlock pipeline and from the
@@ -790,6 +817,31 @@ mod tests {
                 "a never-enrolled vault has no device id, and the list must say so"
             );
         });
+    }
+
+    /// A store that refuses the write still leaves a REPAIRABLE row.
+    ///
+    /// The regression this holds: the fault arm answered `Unknown`, which the row writer turns
+    /// into "leave the row exactly as it is". On a device that has no row yet that is a dead
+    /// end, because nothing later ever sees the device to claim it again, and the comment
+    /// beside the arm claimed the opposite in words. `Absent` writes the row with no halves,
+    /// which publishes nothing false and keeps the device visible to the next claim.
+    #[test]
+    fn a_store_fault_still_leaves_a_repairable_row() {
+        use crate::plugins::sync::device_identity::DeviceKeyStoreError as E;
+
+        assert_eq!(
+            super::on_store_fault(&E::Unsupported),
+            super::ConfirmedHalves::Unknown,
+            "a platform with no rung-3 store is a fact, not a fault: the row takes the same \
+             shape it took before the device-key change"
+        );
+        assert_eq!(
+            super::on_store_fault(&E::Backend),
+            super::ConfirmedHalves::Absent,
+            "a store that refused the write must still leave a row, or the device can never be \
+             claimed again"
+        );
     }
 
     /// The read-back, in all four states. The ones that matter are the states that were

@@ -131,10 +131,11 @@ function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
     case "conflicts":
       return b.state === "conflicts" && sameFields(a, b, { count: true });
     case "uploads_blocked":
-      // Both payload fields, for the same reason `error` names `last_success_at`: the panel
-      // renders the cause sentence and the upload clock, so a poll whose only change is a newer
-      // `last_upload_at` (the first upload after a repair) must reach React or the "last upload"
-      // line freezes on the value it had while the device was still broken (myne-md/myne#1027).
+      // Both payload fields. `detail` drives the sentence today; `last_upload_at` is carried
+      // because NO surface formats it yet (`src/lib/sync-status-view.ts` says so, and 0787
+      // records it as a residual), so comparing it is the price of the day one does: a poll whose
+      // only change is a newer `last_upload_at` (the first upload after a repair) must reach
+      // React then, or that line freezes on the value it had while the device was broken.
       return (
         b.state === "uploads_blocked" &&
         sameFields(a, b, { detail: true, last_upload_at: true })

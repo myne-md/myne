@@ -16,7 +16,7 @@ use crate::vault_io::VaultIo as _;
 use std::path::PathBuf;
 // The rest of this module is still Tauri-shaped (task 79 step 9); only the two
 // entry points the auth cluster calls have host arms so far.
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Re-exported so `generate_handler!`, the mobile crate and the TS mirror keep
 /// resolving `commands::SyncRuntimeStatus`; the type moved to `status` with the
@@ -379,8 +379,9 @@ pub async fn push_vault_meta_now_from_host(host: &dyn HostCtx, state: &VaultRunt
 /// Request an immediate sync ("sync now" affordance, task 10). Runs one real
 /// full cycle (pull head-verify + rollback-reject → download → write to disk →
 /// push local changes under a fresh head → persist). Returns the resulting
-/// status — `Disabled`/`Idle` for the honest not-ready states, `Error` only on a
-/// genuine transport/protocol failure.
+/// status: `Disabled` for the honest not-ready states, `Idle` only for a cycle
+/// that could upload, `UploadsBlocked` when it ran and could not, and `Error` on
+/// a genuine transport/protocol failure.
 #[tauri::command]
 pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus, SyncConfigError> {
     let Some(state) = app.try_state::<VaultRuntimeState>() else {
@@ -414,6 +415,10 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
             _ => {}
         }
     }
+    // Every other writer of this cell emits, and a subscriber that is not the pressing surface
+    // (the unsynced-edits banner, the phone's hook) renders the superseded value for a poll
+    // interval without it (myne-md/myne#1027 review).
+    let _ = app.emit("sync://status-changed", ());
     Ok(status)
 }
 

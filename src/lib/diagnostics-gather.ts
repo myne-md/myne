@@ -35,6 +35,26 @@ export interface DiagnosticsEnv {
 }
 
 /**
+ * Which WebView this build is hosted in, from the user agent.
+ *
+ * One ladder for every client (myne-md/myne#1027 review): these labels are the field vocabulary
+ * `engineLabel` prints, so a second copy would name the same engine two ways in two pastes, which
+ * is the failure this module exists to prevent. `fallback` is what the caller answers when none of
+ * the arms match, and it is the one thing the clients genuinely differ on: a desktop build is
+ * running inside some GTK WebView, and a browser is running inside none of them.
+ *
+ * The order is load-bearing. Android carries both `Linux` and `Android` plus a Chrome token, so it
+ * has to be recognised before either; Windows WebView2 carries Chrome's and Edge's tokens plus
+ * `Windows`.
+ */
+export function webViewLabel(ua: string, fallback: HostWebView | null): HostWebView | null {
+  if (/Android/i.test(ua)) return "Android WebView";
+  if (/Windows/i.test(ua)) return "WebView2";
+  if (/Macintosh|Mac OS X|iPhone|iPad|iPod/i.test(ua)) return "WKWebView";
+  return fallback;
+}
+
+/**
  * How long the vault read may take before the block is built without it.
  *
  * The doctor verifies the vault's roster and reads the OS key store, and this block is what a

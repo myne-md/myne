@@ -77,6 +77,11 @@ pub enum SyncRuntimeStatus {
         /// variant. AS15 bounds it: an hourly stamp, never synced, riding the OS backup like
         /// the rest of `sync-state.json` (TB3).
         ///
+        /// **This status is published by the desktop and the phone; the browser does NOT publish
+        /// it yet** (the Worker passes no `live` overlay and its cycle loop discards the verdict),
+        /// so a blocked web client still reports the base state. Recorded in `0787` as a
+        /// residual rather than left as an implicit "all clients".
+        ///
         /// NOTHING renders it today. The sentence it is for is "your work has not left this
         /// machine, and the last time it did was three hours ago", which needs a coarsening
         /// formatter and a translation, so it is a named residual rather than a half-wired

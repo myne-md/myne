@@ -235,7 +235,7 @@ impl KeyAtRestProof {
 /// The log line is half the point (myne-md/myne#1027): a `Present` that no later read can
 /// reproduce is the state that cost a day of forensics, and "absent" used to be silent by
 /// design, which made a device with a store and no key indistinguishable from a dead one.
-/// Only the claim and the vault doctor call this, never the per-cycle resolution, so the
+/// Only the binding claim calls this today, never the per-cycle resolution, so the
 /// line stays rare enough to be worth reading.
 #[must_use = "the proof is the answer"]
 pub fn load_proven_at_rest(site: &'static str) -> KeyAtRestProof {

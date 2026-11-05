@@ -145,6 +145,44 @@ describe("SyncStatusIndicator — status variants", () => {
   });
 });
 
+describe("SyncStatusIndicator — which states offer 'Sync now'", () => {
+  // The mapping moved into `src/lib/sync-status-view.ts` (myne-md/myne#1027) and its first
+  // version answered `false` for five error classes the desktop had always offered the button
+  // for. Nothing noticed, because the only visibility assertions were for `idle` and the two
+  // identity states. The rule this table holds: the row is hidden where a cycle cannot reach the
+  // network or where another act is the repair, and shown wherever a retry is what a user wants
+  // after fixing the cause.
+  const offers = async (status: SyncStatus): Promise<boolean> => {
+    statusFixture(status);
+    render(<SyncStatusIndicator />);
+    await waitFor(() =>
+      expect(screen.getByTestId("sync.status-indicator").getAttribute("data-sync-state")).not.toBe(
+        "loading",
+      ),
+    );
+    return screen.queryByTestId("sync.sync-now") !== null;
+  };
+
+  it.each([
+    ["quota_exceeded", true, "freed server quota, then retry"],
+    ["storage_full", true, "freed local disk, then retry"],
+    ["tls_failure", true, "repaired the certificate or the network, then retry"],
+    ["frozen", true, "the account was unfrozen, then retry"],
+    ["device_revoked", true, "the owner re-added the device, then retry"],
+    ["sync_failed", true, "a transport blip, retry is the whole fix"],
+    ["identity_locked", false, "the phrase entry is the honest control"],
+    ["device_key_missing", false, "the repair action is the honest control"],
+  ] as const)("error %s → Sync now visible: %s", async (detail, expected) => {
+    expect(await offers({ state: "error", detail })).toBe(expected);
+    cleanup();
+  });
+
+  it("hides the row while uploads are blocked, which is the state the branch exists for", async () => {
+    expect(await offers({ state: "uploads_blocked", detail: "device_key_missing" })).toBe(false);
+    cleanup();
+  });
+});
+
 describe("SyncStatusIndicator — sync now affordance", () => {
   it("clicking 'Sync now' invokes plugin:sync|sync_now", async () => {
     statusFixture({ state: "idle" }, { state: "syncing" });

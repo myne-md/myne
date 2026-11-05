@@ -3454,7 +3454,6 @@
       "helper": "Permite mutarea notelor într-o Arhivă, ținută în afara listei principale. Dezactivarea acestei opțiuni readuce fiecare notă arhivată în folderul ei, dezarhivează fiecare folder arhivat și ascunde controalele arhivei. Se aplică întregului seif, pe fiecare dispozitiv.",
       "label": "Arhivare",
       "off": "Dezactivat",
-      "on": "Activat",
       "saveError": "Setarea de arhivare nu a putut fi actualizată."
     },
     "attachmentCompression": {
@@ -4225,11 +4224,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Neconfigurat",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_few": "{{count}} conflicte",
-        "conflicts_other": "{{count}} conflicte"
+        "conflicts_few": "{{count}} conflicte"
       }
     },
     "data": {

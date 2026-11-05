@@ -320,7 +320,18 @@ pub fn destroy() {
 /// binding row (a row publishing halves no store holds) could not be told apart from a store
 /// that had never been written to. The refused case already had its own `warn` with an
 /// OSStatus; this is the other two thirds.
-fn log_key_op(op: &'static str, result: &'static str) {
+/// One line per keychain mutation, from every platform arm.
+///
+/// `pub` because the store on two shipped platforms is not in this crate: Windows seals through
+/// DPAPI in `src-tauri/src/device_key_dpapi.rs` and Android/iOS through a Keystore plugin in
+/// `mobile/src-tauri/src/device_key_keystore.rs`. A hook only the desktop's built-in arms
+/// implement answers the forensic question ("was this device's signing key ever written, and was
+/// it later erased?") on the platforms where the defect is least likely, and stays silent on the
+/// two where it is most likely (myne-md/myne#1027 review).
+///
+/// Allowed fields are `stage`, `op`, `result`, and a bounded static token for each: no path, no
+/// account, no key material, per `check-tracing-discipline.mjs`.
+pub fn log_key_op(op: &'static str, result: &'static str) {
     tracing::info!(
         stage = "device_key_keychain",
         op,
@@ -958,6 +969,41 @@ mod tests {
             "load() must prefer the host store over this crate's own arm"
         );
 
+        // The at-rest read must NOT see a key that lives only in this process, and this is the
+        // one test that may own `HOST_PROVIDER` (myne-md/myne#1027). Asserted HERE rather than in
+        // a test of its own because `install_host_provider` is first-call-wins: a second
+        // installer takes the slot from this fixture whenever the two run in that order, which
+        // emptied the store above and made this test fail once in twelve runs. A property that
+        // needs the provider is proved by the test that already holds it.
+        //
+        // The injection this catches: give `load_at_rest` the `session_key()` arm `load` has, and
+        // the `assert_ne!` below fails naming "a key that exists only in this process is not at
+        // rest".
+        assert_eq!(
+            load_at_rest()
+                .expect("the provider answers")
+                .map(|p| p.public_half()),
+            Some(minted.public_half()),
+            "the provider holds this key, so it IS at rest"
+        );
+        let only_in_ram = DeviceKeyPair::generate_raw(&[0x71; 32], &[0x72; 32]);
+        install_session_key(only_in_ram.clone());
+        assert_eq!(
+            load()
+                .expect("read the signing path")
+                .map(|p| p.public_half()),
+            Some(only_in_ram.public_half()),
+            "the signing read answers from RAM, which is why a rung-3 PIN key works"
+        );
+        assert_ne!(
+            load_at_rest()
+                .expect("the provider answers")
+                .map(|p| p.public_half()),
+            Some(only_in_ram.public_half()),
+            "a key that exists only in this process is not at rest"
+        );
+        clear_session_key();
+
         // A second key must not be minted while one is stored: a replacement key
         // silently un-binds the device.
         let again = load_or_create().expect("reuse");
@@ -1012,66 +1058,6 @@ mod tests {
         // replacement key would silently un-bind this device.
         let same = load_or_create().expect("the installed key is reused");
         assert_eq!(same.public_half(), pair.public_half());
-
-        clear_session_key();
-    }
-
-    /// A key in RAM is not a key at rest (myne-md/myne#1027).
-    ///
-    /// The property the whole slice rests on, asserted without a keychain: `load_at_rest` must
-    /// never answer with the key this process installed. It used to share `load`'s arm order,
-    /// so a session-only key satisfied the binding claim's read-back and a `v2` row published
-    /// halves no store held.
-    ///
-    /// The assertion is deliberately "not this key" rather than "nothing": a developer machine
-    /// with the app installed HAS a real device key, and a test that demanded `None` there would
-    /// go red on exactly the machines that can check the real thing.
-    #[test]
-    fn the_at_rest_read_ignores_a_session_key() {
-        let _serialized = device_key_slot_guard();
-        let session = DeviceKeyPair::generate_raw(&[0x51; 32], &[0x52; 32]);
-        install_session_key(session.clone());
-
-        assert_eq!(
-            load()
-                .expect("the signing read consults the slot")
-                .map(|p| p.public_half()),
-            Some(session.public_half()),
-            "the signing read is supposed to answer from RAM: a rung-3 unlock has nowhere else"
-        );
-        // A store is INSTALLED for the length of this test, so the assertion below runs on every
-        // platform. The earlier version read the real store and skipped the check when it
-        // answered `Unsupported`, true on every CI runner without a keychain, which made a test
-        // that names this property pass without asserting it (review finding, myne-md/myne#1027;
-        // AGENTS.md "A fixture that cannot reach the defective state is not a test").
-        //
-        // `install_host_provider` is first-call-wins, so another test may already own the slot;
-        // either way a provider answers, and neither fake ever holds the random key generated
-        // below.
-        struct EmptyStore;
-        impl super::DeviceKeyProvider for EmptyStore {
-            fn load(&self) -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
-                Ok(None)
-            }
-            fn store(&self, _pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
-                Ok(())
-            }
-            fn destroy(&self) {}
-        }
-        install_host_provider(Box::new(EmptyStore));
-        match load_at_rest() {
-            Ok(found) => assert_ne!(
-                found.map(|p| p.public_half()),
-                Some(session.public_half()),
-                "a key that exists only in this process is not at rest"
-            ),
-            // A provider is installed, so the ladder cannot answer `Unsupported`; anything else
-            // is still not the session key, but failing here is better than passing without an
-            // assertion.
-            Err(err) => {
-                panic!("an installed store must answer the at-rest read, not fail: {err:?}")
-            }
-        }
 
         clear_session_key();
     }
