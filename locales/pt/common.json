@@ -3454,7 +3454,6 @@
       "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta, todas as pastas arquivadas são desarquivadas e os controlos do arquivo ficam ocultos. Aplica-se a todo o cofre, em todos os dispositivos.",
       "label": "Arquivamento",
       "off": "Desativado",
-      "on": "Ativado",
       "saveError": "Não foi possível atualizar a definição de arquivamento."
     },
     "attachmentCompression": {
@@ -4225,11 +4224,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Não configurado",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflito",
-        "conflicts_many": "{{count}} conflitos",
-        "conflicts_other": "{{count}} conflitos"
+        "conflicts_many": "{{count}} conflitos"
       }
     },
     "data": {

@@ -16,12 +16,12 @@ use crate::vault_io::VaultIo as _;
 use std::path::PathBuf;
 // The rest of this module is still Tauri-shaped (task 79 step 9); only the two
 // entry points the auth cluster calls have host arms so far.
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 /// Re-exported so `generate_handler!`, the mobile crate and the TS mirror keep
 /// resolving `commands::SyncRuntimeStatus`; the type moved to `status` with the
 /// derivation (task 84).
-pub use super::status::{overlay_status, status_from, LiveStatus, SyncRuntimeStatus};
+pub use super::status::{overlay_status, status_from, LiveStatus, SyncClocks, SyncRuntimeStatus};
 
 /// Resolve `<app_config_dir>/sync-config.json` (the `themes` plugin precedent).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -196,6 +196,16 @@ impl SyncRuntimeStatusCell {
     pub fn set_error(&self, detail: impl Into<String>) {
         *self.0.lock().unwrap() = Some(LiveStatus::Error(detail.into()));
     }
+    /// Publish "the last cycle ran and could not upload", with a bounded cause token
+    /// (myne-md/myne#1027).
+    ///
+    /// The third state this cell was missing. Before it, a cycle that succeeded without
+    /// uploading had to choose between `set_error` (a lie about a pull that worked) and
+    /// `clear` (the status falls back to `Idle`, which the indicator renders as "Synced", the
+    /// other lie, and the one that hid this state for a day).
+    pub fn set_blocked(&self, detail: impl Into<String>) {
+        *self.0.lock().unwrap() = Some(LiveStatus::Blocked(detail.into()));
+    }
     /// Clear the overlay (a clean/idle cycle → fall back to base + conflicts).
     pub fn clear(&self) {
         *self.0.lock().unwrap() = None;
@@ -369,8 +379,9 @@ pub async fn push_vault_meta_now_from_host(host: &dyn HostCtx, state: &VaultRunt
 /// Request an immediate sync ("sync now" affordance, task 10). Runs one real
 /// full cycle (pull head-verify + rollback-reject → download → write to disk →
 /// push local changes under a fresh head → persist). Returns the resulting
-/// status — `Disabled`/`Idle` for the honest not-ready states, `Error` only on a
-/// genuine transport/protocol failure.
+/// status: `Disabled` for the honest not-ready states, `Idle` only for a cycle
+/// that could upload, `UploadsBlocked` when it ran and could not, and `Error` on
+/// a genuine transport/protocol failure.
 #[tauri::command]
 pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus, SyncConfigError> {
     let Some(state) = app.try_state::<VaultRuntimeState>() else {
@@ -382,14 +393,33 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
     let Some(live_registry) = app.try_state::<crate::plugins::live::LiveSessionRegistry>() else {
         return Ok(SyncRuntimeStatus::NotEnrolled);
     };
-    Ok(super::cycle::sync_now_from_host(
+    let status = super::cycle::sync_now_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
         hooks.inner(),
         live_registry.inner(),
     )
-    .await)
+    .await;
+    // The manual answer must also move the overlay the POLLED status reads. The background
+    // loop is the only other writer, so without this a "Sync now" that could not upload shows
+    // "Uploads paused" for one render and then flips back to "Synced" on the next poll, which
+    // is the same lie reached through the other path (myne-md/myne#1027).
+    if let Some(cell) = app.try_state::<SyncRuntimeStatusCell>() {
+        match &status {
+            SyncRuntimeStatus::UploadsBlocked { detail, .. } => cell.set_blocked(detail.clone()),
+            SyncRuntimeStatus::Error { detail, .. } => cell.set_error(detail.clone()),
+            SyncRuntimeStatus::Idle => cell.clear(),
+            // Disabled / NotEnrolled / Pending are base states, not overlays: they come
+            // from the config+token derivation and are wrong to pin in the cell.
+            _ => {}
+        }
+    }
+    // Every other writer of this cell emits, and a subscriber that is not the pressing surface
+    // (the unsynced-edits banner, the phone's hook) renders the superseded value for a poll
+    // interval without it (myne-md/myne#1027 review).
+    let _ = app.emit("sync://status-changed", ());
+    Ok(status)
 }
 
 /// Report where this vault stands with respect to the server (myne-md/myne#911
@@ -2807,7 +2837,12 @@ mod tests {
             SyncRuntimeStatus::Pending,
         ] {
             assert_eq!(
-                overlay_status(base.clone(), Some(LiveStatus::Syncing), 5, None),
+                overlay_status(
+                    base.clone(),
+                    Some(LiveStatus::Syncing),
+                    5,
+                    SyncClocks::default()
+                ),
                 base
             );
         }
@@ -2818,7 +2853,7 @@ mod tests {
         use SyncRuntimeStatus as S;
         // In-flight Syncing wins even with conflicts present.
         assert_eq!(
-            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3, None),
+            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3, SyncClocks::default()),
             S::Syncing
         );
         // A failed cycle surfaces Error (with its detail) over conflicts.
@@ -2827,7 +2862,7 @@ mod tests {
                 S::Idle,
                 Some(LiveStatus::Error("sync_failed".into())),
                 3,
-                None
+                SyncClocks::default()
             ),
             S::Error {
                 detail: "sync_failed".into(),
@@ -2836,11 +2871,14 @@ mod tests {
         );
         // No live overlay + unresolved conflicts → Conflicts{count}.
         assert_eq!(
-            overlay_status(S::Idle, None, 2, None),
+            overlay_status(S::Idle, None, 2, SyncClocks::default()),
             S::Conflicts { count: 2 }
         );
         // Enrolled, nothing in flight, no conflicts → a bare Idle.
-        assert_eq!(overlay_status(S::Idle, None, 0, None), S::Idle);
+        assert_eq!(
+            overlay_status(S::Idle, None, 0, SyncClocks::default()),
+            S::Idle
+        );
     }
 
     #[test]

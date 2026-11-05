@@ -67,6 +67,10 @@ const ROOTS = ["core/src"];
 /** The primitives that answer a piece of the authority question, with what each answers. */
 const PATTERNS = [
   { re: /\bdevice_identity::load\s*\(/g, what: "key at rest" },
+  // The STORE-ONLY read (myne-md/myne#1027). It is recorded for the same reason as `load`, and
+  // for one more: it is the reader the binding claim's proof comes from, so a second site that
+  // mints a proof outside the resolver would be an authority decision taken without asking.
+  { re: /\bdevice_identity::load_at_rest\s*\(/g, what: "key proven at rest" },
   { re: /\bdevice_identity::load_for_fallback\s*\(/g, what: "key at rest, errors swallowed" },
   // The MINT is the fourth answer to the authority question: the first `Some` out of it is a
   // key this device will sign with, so a site that mints outside the resolver has decided the

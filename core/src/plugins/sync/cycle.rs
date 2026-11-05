@@ -1095,6 +1095,11 @@ pub async fn run_active_cycle_from_host(
     // thread. A vault with no tail keeps the `NTV5` HMAC head and resolves to `no_context`
     // here, which the guard never consults because it only fires on a tail-carrying vault.
     let authority = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
+    // Why this cycle could not upload, when it could not (myne-md/myne#1027). Declared here so
+    // the ReadOnly arm can record it and the success arm can carry it back on the summary: the
+    // arm already LOGGED this and then dropped it, which is how a device that uploaded nothing
+    // for a day reported `Ran` with no caveat and the UI printed "Synced".
+    let mut upload_blocked: Option<&'static str> = None;
     // An `NTV6` vault's head is signature-authenticated. If no person identity is
     // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
@@ -1148,6 +1153,7 @@ pub async fn run_active_cycle_from_host(
                          fetch the state that would let it"
                     );
                     gate = super::orchestrator::PushGate::PollOnly;
+                    upload_blocked = blocked_token(cause);
                 }
                 HeadAuthorityVerdict::Refuse => {
                     let class = class_for_missing_authority(cause, authority.person_held);
@@ -1473,6 +1479,19 @@ pub async fn run_active_cycle_from_host(
             // existed nothing on disk did.
             super::state::record_sync_success(io, &vault_root_for_stamp, host.now_unix_millis())
                 .await;
+            // The OTHER clock (myne-md/myne#1027): "last success" is reachability, and a
+            // pull-only cycle stamps it, so a device that had uploaded nothing for a day still
+            // reported a success two minutes old. This one moves only when something went UP.
+            if pushed_anything(&summary) {
+                super::state::record_upload_success(
+                    io,
+                    &vault_root_for_stamp,
+                    host.now_unix_millis(),
+                )
+                .await;
+            }
+            let mut summary = summary;
+            summary.upload_blocked = upload_blocked;
             CycleOutcome::Ran(summary)
         }
         Ok(Err(e)) => {
@@ -1577,6 +1596,90 @@ pub async fn run_active_cycle_from_host(
     outcome
 }
 
+/// The cause token a pull-only cycle publishes.
+///
+/// The class is asked as if no identity were held: `class_for_missing_authority` answers `Other`
+/// whenever one IS held, on the reasoning that the user has nothing to do, which is true for the
+/// retry ladder and useless as a sentence. What the UI needs is what is missing, and
+/// `status_detail` is the one vocabulary every client already maps.
+///
+/// `Other` means no user action repairs it, and "Sync failed" would be a lie about a cycle that
+/// just succeeded, so it becomes the neutral token instead.
+///
+/// Split out because this is the branch's headline production decision and a test cannot drive
+/// `run_active_cycle_from_host` (it needs a host, a server and a live session). What a test at
+/// this seam buys is the vocabulary: the mapping from a cause to the token a user reads. It does
+/// not cover the assignment that publishes the token, and `0787` records that gap rather than
+/// pretending the seam closes it.
+fn blocked_token(cause: crate::plugins::sync::authority::AuthorityMissing) -> Option<&'static str> {
+    Some(
+        match class_for_missing_authority(cause, false).status_detail() {
+            "sync_failed" => "uploads_blocked",
+            detail => detail,
+        },
+    )
+}
+
+/// Whether a summary advanced anything on the server, which is what the upload clock records.
+///
+/// Split out with `blocked_token` for the same reason and with the same limit: the predicate is
+/// proved, the `if` around it is not.
+fn pushed_anything(summary: &super::orchestrator::SyncSummary) -> bool {
+    summary.pushed > 0
+        || summary.head_advanced
+        || summary.attachments_pushed > 0
+        || summary.tombstones_pushed > 0
+}
+
+/// The manual button's answer for a cycle that RAN.
+///
+/// Split out from the async shell so the rule is testable without a host, because the
+/// shell had this wrong: it answered `Idle` for every `Ran` and dropped the verdict the
+/// cycle had just computed, so one click of "Sync now" on a device that cannot sign
+/// painted "Synced". That is the same collapse the function's own doc comment forbids,
+/// reached through the one path the background loop does not cover (myne-md/myne#1027).
+fn ran_status(
+    upload_blocked: Option<&'static str>,
+    last_upload_at: Option<u64>,
+) -> super::status::SyncRuntimeStatus {
+    match upload_blocked {
+        Some(detail) => super::status::SyncRuntimeStatus::UploadsBlocked {
+            detail: detail.into(),
+            last_upload_at,
+        },
+        None => super::status::SyncRuntimeStatus::Idle,
+    }
+}
+
+/// Read the two persisted clocks. One place, because both arms of the manual
+/// button's answer need them and a second copy of the path resolution is a second
+/// place to get the vault root wrong.
+async fn read_clocks(
+    host: &dyn HostCtx,
+    io: &'static dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> super::status::SyncClocks {
+    let none = super::status::SyncClocks {
+        last_success_at: None,
+        last_upload_at: None,
+    };
+    let Ok(dir) = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        return none;
+    };
+    match super::state::read_sync_state(io, &dir).await {
+        // The STRUCT, not a positional pair: `SyncClocks`' own doc says the two Option<u64> are
+        // kept together so a caller cannot pass one where the other belongs, and a tuple
+        // undoes exactly that in the two call sites below (the upload clock would land in
+        // `Error.last_success_at`, the staleness number a user reads).
+        Ok(s) => super::status::SyncClocks {
+            last_success_at: s.last_success_at_ms,
+            last_upload_at: s.last_upload_at_ms,
+        },
+        Err(_) => none,
+    }
+}
+
 /// Run one cycle NOW (the manual "Sync now" button) and report the resulting
 /// status.
 ///
@@ -1585,7 +1688,13 @@ pub async fn run_active_cycle_from_host(
 /// `NotReady` outcome must NOT collapse into `Idle`. Reporting "Synced" for a
 /// device that cannot sync is the exact dishonesty the status derivation exists
 /// to prevent, and clicking "Sync now" on an unenrolled device would otherwise
-/// flip the dot to green. Only a genuine `Ran` is `Idle`.
+/// flip the dot to green.
+///
+/// A `Ran` is `Idle` only when the cycle could upload. It used to mean "the cycle
+/// ran, therefore all is well", which is how one click on a device that cannot
+/// sign a head painted "Synced" over a day of dropped uploads (myne-md/myne#1027);
+/// `ran_status` is the one place that decides, and `UploadsBlocked` carries the
+/// cause.
 pub async fn sync_now_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
@@ -1612,25 +1721,19 @@ pub async fn sync_now_from_host(
                 // this covers the manual path on top of it.
                 host.emit("sync://changed", EventPayload::Count(summary.pulled as u32));
             }
-            SyncRuntimeStatus::Idle
+            // A `Ran` that could not upload is NOT `Idle`: the cycle's own verdict travels
+            // on the summary, and answering "Synced" here would hide the very state this
+            // button has to be able to show (myne-md/myne#1027).
+            let clocks = read_clocks(host, io, state).await;
+            ran_status(summary.upload_blocked, clocks.last_upload_at)
         }
         CycleOutcome::Failed(class) => {
             // The manual button's answer carries the same clock the polled
             // status does, so a "Sync now" that fails does not blank out a
             // staleness warning the poll had already raised.
-            let last_success_at = match crate::paths::active_vault_root_io_from_host(
-                host,
-                state.active_vault_id().await,
-            ) {
-                Ok(dir) => super::state::read_sync_state(io, &dir)
-                    .await
-                    .ok()
-                    .and_then(|s| s.last_success_at_ms),
-                Err(_) => None,
-            };
             SyncRuntimeStatus::Error {
                 detail: class.status_detail().into(),
-                last_success_at,
+                last_success_at: read_clocks(host, io, state).await.last_success_at,
             }
         }
     }
@@ -1863,6 +1966,119 @@ mod tests {
     //! rule is about — which file the hash comes from, and what happens when the
     //! two disagree — is decided here, and the rest of the gather is a host, a
     //! runtime slot and a live server.
+
+    /// A pull-only cycle publishes a token, and the token is the sentence a user reads.
+    ///
+    /// **What this proves and what it does not.** It proves the VOCABULARY: which cause becomes
+    /// which token, including the `sync_failed` rewrite that exists because "Sync failed" would
+    /// slander a cycle that just succeeded. It does NOT prove the assignment that publishes it,
+    /// because that sits inside a cycle that needs a host, a server and a live session, and
+    /// deleting the assignment together with the `mut` it needs compiles and leaves this test
+    /// green. Measured rather than assumed: that injection was run. The missing call-site test is
+    /// a named residual in `decisions/sync/0787`, not a claim this comment makes.
+    #[test]
+    fn a_pull_only_cycle_names_what_is_missing() {
+        use super::blocked_token;
+        use crate::plugins::sync::authority::AuthorityMissing;
+
+        assert_eq!(
+            blocked_token(AuthorityMissing::KeyMissingWhileBound),
+            Some("device_key_missing"),
+            "a key this device published and no longer holds is the repairable cause"
+        );
+        assert_eq!(
+            blocked_token(AuthorityMissing::NoPersonSession),
+            Some("identity_locked"),
+            "no session and no key is the cause the identity phrase fixes"
+        );
+        assert_eq!(
+            blocked_token(AuthorityMissing::KeyUnreadable),
+            Some("uploads_blocked"),
+            "a store fault is the neutral token, because 'Sync failed' would slander a cycle \
+             that just succeeded"
+        );
+    }
+
+    /// Only a summary that actually advanced something stamps the upload clock.
+    ///
+    /// The predicate is proved here; its CALL SITE is not, for the same reason as above (the same
+    /// undrivable cycle). Deleting the `if` leaves `last_upload_at` absent for ever with every
+    /// test green, which was measured. `0787` carries it as a residual rather than this comment
+    /// claiming a deletion test it does not have.
+    #[test]
+    fn only_a_pushing_cycle_counts_as_an_upload() {
+        use super::pushed_anything;
+        use crate::plugins::sync::orchestrator::SyncSummary;
+
+        assert!(
+            !pushed_anything(&SyncSummary::default()),
+            "a cycle that moved nothing is not an upload, which is the whole defect: idle and \
+             unreachable-for-uploads looked identical"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                pushed: 1,
+                ..Default::default()
+            }),
+            "a pushed note is an upload"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                head_advanced: true,
+                ..Default::default()
+            }),
+            "a head that moved is an upload even with no blob of its own"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                attachments_pushed: 1,
+                ..Default::default()
+            }),
+            "an attachment is an upload"
+        );
+        assert!(
+            !pushed_anything(&SyncSummary {
+                pulled: 7,
+                ..Default::default()
+            }),
+            "a pure pull is NOT an upload, which is why this clock is separate from last_success_at"
+        );
+    }
+
+    /// The manual "Sync now" button must not answer `Idle` for a cycle that could not upload.
+    ///
+    /// The exact regression: `sync_now_from_host` matched `Ran(_)` and returned `Idle`
+    /// unconditionally, so the verdict the cycle had just computed was dropped on the one path
+    /// the background loop does not cover, and a click on a blocked device painted "Synced".
+    /// Removing the `upload_blocked` arm below compiles and leaves every other test green.
+    #[test]
+    fn a_manual_sync_that_cannot_upload_is_not_idle() {
+        use super::ran_status;
+        use crate::plugins::sync::status::SyncRuntimeStatus;
+
+        assert_eq!(
+            ran_status(None, Some(1)),
+            SyncRuntimeStatus::Idle,
+            "a clean cycle is still Idle, and carries no blocked cause"
+        );
+        match ran_status(Some("device_key_missing"), Some(1_700_000_000_000)) {
+            SyncRuntimeStatus::UploadsBlocked {
+                detail,
+                last_upload_at,
+            } => {
+                assert_eq!(detail, "device_key_missing");
+                assert_eq!(
+                    last_upload_at,
+                    Some(1_700_000_000_000),
+                    "the blocked answer carries the upload clock, which is the whole reason \
+                     the state exists"
+                );
+            }
+            other => {
+                panic!("a Ran cycle that could not upload answered {other:?}, not UploadsBlocked")
+            }
+        }
+    }
 
     /// The failure class a missing authority becomes, asserted for the four shapes that matter.
     ///

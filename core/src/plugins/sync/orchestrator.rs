@@ -58,6 +58,15 @@ pub struct SyncSummary {
     pub pushed: usize,
     /// True if a new vault head was authored + accepted.
     pub head_advanced: bool,
+    /// Why this cycle could not UPLOAD, when it could not (myne-md/myne#1027).
+    ///
+    /// `Some(token)` means the cycle ran under `PushGate::PollOnly` because this device cannot
+    /// author a vault head; the token is the `AuthorityMissing` cause, or the failure class it
+    /// maps to. `None` is an ordinary cycle. The cycle sets it AFTER the orchestrator returns,
+    /// which is why the orchestrator's own constructor leaves it `None`, the decision is made
+    /// one layer up, before the call, and carried back on the summary rather than in a second
+    /// out-parameter.
+    pub upload_blocked: Option<&'static str>,
     /// The advanced pull cursor.
     pub cursor: u64,
     /// Notes the server advanced concurrently with an unpushed local edit (a true
@@ -7652,6 +7661,9 @@ async fn sync_cycle_attempt(
         pulled,
         pushed,
         head_advanced,
+        // The upload decision belongs to `cycle`, which knows the authority verdict before it
+        // ever calls here; it stamps this on the way back (myne-md/myne#1027).
+        upload_blocked: None,
         cursor: state.cursor,
         conflicts,
         tombstones_pushed,

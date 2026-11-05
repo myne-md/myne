@@ -12,7 +12,8 @@
 //! task asks for.
 
 use myne_core::plugins::sync::device_identity::{
-    from_item_bytes, install_host_provider, to_item_bytes, DeviceKeyProvider, DeviceKeyStoreError,
+    from_item_bytes, install_host_provider, log_key_op, to_item_bytes, DeviceKeyProvider,
+    DeviceKeyStoreError,
 };
 
 /// File name of the DPAPI-sealed device key inside the app config directory.
@@ -112,7 +113,7 @@ impl<R: tauri::Runtime> DeviceKeyProvider for DpapiProvider<R> {
             );
             DeviceKeyStoreError::Backend
         })?;
-        std::fs::rename(&tmp, &path).map_err(|e| {
+        let placed = std::fs::rename(&tmp, &path).map_err(|e| {
             tracing::warn!(
                 stage = "device_key_dpapi",
                 op = "rename",
@@ -122,13 +123,18 @@ impl<R: tauri::Runtime> DeviceKeyProvider for DpapiProvider<R> {
             );
             let _ = std::fs::remove_file(&tmp);
             DeviceKeyStoreError::Backend
-        })
+        });
+        // The shared line the other platform arms write, so the diagnostics answer "was the key
+        // ever written?" on a Windows device too (myne-md/myne#1027).
+        log_key_op("store", if placed.is_ok() { "ok" } else { "refused" });
+        placed
     }
 
     fn destroy(&self) {
         if let Some(path) = self.path() {
             // Best-effort: the erase's own guarantee is about vault content.
-            let _ = std::fs::remove_file(&path);
+            let ok = std::fs::remove_file(&path).is_ok();
+            log_key_op("delete", if ok { "ok" } else { "refused" });
         }
     }
 }

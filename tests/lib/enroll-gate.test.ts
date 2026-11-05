@@ -24,8 +24,21 @@ const CASES: Array<[SyncStatusState | undefined, boolean, string]> = [
   ["syncing", false, "a member, mid-cycle"],
   ["error", false, "a failed cycle is transport news, not a second registration"],
   ["conflicts", false, "a member with unresolved copies"],
-  [undefined, false, "status unread — withhold rather than flash the form"],
+  [
+    "uploads_blocked",
+    false,
+    "a member that cannot sign a head (myne-md/myne#1027): enrolling again mints a second device_id over a device that is already registered",
+  ],
+  [undefined, false, "status unread, so withhold rather than flash the form"],
 ];
+
+// A roster loop with no floor is not a coverage claim: adding a state to the union and no row
+// here leaves the comment above ("Every `SyncRuntimeStatus` variant") false while the suite stays
+// green. The count is pinned so a new variant has to be considered.
+const VARIANT_COUNT = 9; // eight union variants, plus the unread status
+it("the table covers every variant plus the unread status", () => {
+  expect(CASES.length).toBe(VARIANT_COUNT);
+});
 
 describe("canAddThisDevice", () => {
   it.each(CASES)("%s → %s (%s)", (state, expected) => {
