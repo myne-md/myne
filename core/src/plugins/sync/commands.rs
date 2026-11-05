@@ -201,7 +201,7 @@ impl SyncRuntimeStatusCell {
     ///
     /// The third state this cell was missing. Before it, a cycle that succeeded without
     /// uploading had to choose between `set_error` (a lie about a pull that worked) and
-    /// `clear` (the status falls back to `Idle`, which the indicator renders as "Synced" — the
+    /// `clear` (the status falls back to `Idle`, which the indicator renders as "Synced", the
     /// other lie, and the one that hid this state for a day).
     pub fn set_blocked(&self, detail: impl Into<String>) {
         *self.0.lock().unwrap() = Some(LiveStatus::Blocked(detail.into()));
@@ -392,14 +392,29 @@ pub async fn sync_now<R: Runtime>(app: AppHandle<R>) -> Result<SyncRuntimeStatus
     let Some(live_registry) = app.try_state::<crate::plugins::live::LiveSessionRegistry>() else {
         return Ok(SyncRuntimeStatus::NotEnrolled);
     };
-    Ok(super::cycle::sync_now_from_host(
+    let status = super::cycle::sync_now_from_host(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
         hooks.inner(),
         live_registry.inner(),
     )
-    .await)
+    .await;
+    // The manual answer must also move the overlay the POLLED status reads. The background
+    // loop is the only other writer, so without this a "Sync now" that could not upload shows
+    // "Uploads paused" for one render and then flips back to "Synced" on the next poll, which
+    // is the same lie reached through the other path (myne-md/myne#1027).
+    if let Some(cell) = app.try_state::<SyncRuntimeStatusCell>() {
+        match &status {
+            SyncRuntimeStatus::UploadsBlocked { detail, .. } => cell.set_blocked(detail.clone()),
+            SyncRuntimeStatus::Error { detail, .. } => cell.set_error(detail.clone()),
+            SyncRuntimeStatus::Idle => cell.clear(),
+            // Disabled / NotEnrolled / Pending are base states, not overlays: they come
+            // from the config+token derivation and are wrong to pin in the cell.
+            _ => {}
+        }
+    }
+    Ok(status)
 }
 
 /// Report where this vault stands with respect to the server (myne-md/myne#911

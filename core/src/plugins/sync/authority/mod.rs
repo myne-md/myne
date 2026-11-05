@@ -198,7 +198,7 @@ fn classify_key_load(
 ///
 /// Two things follow from the private field:
 ///   * the only way to obtain one is [`load_proven_at_rest`], which reads the store and nothing
-///     else — a caller cannot pass a `load_key` result off as at-rest;
+///     else, so a caller cannot pass a `load_key` result off as at-rest;
 ///   * a test cannot mint one by hand, so a fixture cannot take the shortcut that hid this for
 ///     two releases (the creation-claim test literally installed a session key and called it
 ///     "a key at rest").
@@ -220,7 +220,7 @@ impl KeyAtRestProof {
     ///
     /// The production property is unchanged: `cfg(test)` code cannot ship, so no non-test
     /// caller can name an at-rest answer it did not read. What it deliberately does NOT do is
-    /// let a test pretend a SESSION key is at rest — that mistake is `for_test(KeyAtRest::
+    /// let a test pretend a SESSION key is at rest. That mistake is `for_test(KeyAtRest::
     /// Present(..))` and it is visible at the call site, which is the opposite of the fixture
     /// myne-md/myne#1027 removed (a `load_or_create` call that quietly answered from RAM).
     #[cfg(test)]
@@ -235,7 +235,7 @@ impl KeyAtRestProof {
 /// The log line is half the point (myne-md/myne#1027): a `Present` that no later read can
 /// reproduce is the state that cost a day of forensics, and "absent" used to be silent by
 /// design, which made a device with a store and no key indistinguishable from a dead one.
-/// Only the claim and the vault doctor call this — never the per-cycle resolution — so the
+/// Only the claim and the vault doctor call this, never the per-cycle resolution, so the
 /// line stays rare enough to be worth reading.
 #[must_use = "the proof is the answer"]
 pub fn load_proven_at_rest(site: &'static str) -> KeyAtRestProof {

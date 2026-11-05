@@ -203,13 +203,10 @@ pub fn load() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
     if let Some(pair) = session_key() {
         return Ok(Some(pair));
     }
-    // A host-registered store wins over this crate's own cfg arm: the host knows
-    // whether its platform has one (Android's Keystore lives behind a Kotlin plugin),
-    // and no host installs a provider where `imp` already works.
-    if let Some(provider) = host_provider() {
-        return provider.load();
-    }
-    imp::load()
+    // Everything below is [`load_at_rest`], and it is spelled that way rather than copied:
+    // the two questions differ by exactly the session arm above, so a change to the store
+    // ladder cannot be made on one of them and forgotten on the other.
+    load_at_rest()
 }
 
 /// Read the device key from the OS STORE, and from nowhere else.
@@ -231,12 +228,16 @@ pub fn load() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
 ///   * *does the key survive this process* → this.
 ///
 /// Rung 3 (the PIN-sealed file) lives outside any keychain and only its OWN unlock can say
-/// whether it is present, so it answers here when that rung is wired to a production path —
+/// whether it is present, so it answers here when that rung is wired to a production path ,
 /// today nothing calls it, and this is the one function that changes when it is.
 #[must_use = "the ladder's three outcomes are the answer, and Absent is one of them"]
 pub fn load_at_rest() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
     // Deliberately no `session_key()` arm. See the doc comment: a key in RAM is the exact
     // answer this function exists to NOT give.
+    //
+    // A host-registered store wins over this crate's own cfg arm: the host knows whether its
+    // platform has one (Android's Keystore lives behind a Kotlin plugin), and no host installs
+    // a provider where `imp` already works.
     if let Some(provider) = host_provider() {
         return provider.load();
     }
@@ -311,7 +312,7 @@ pub fn destroy() {
 /// One line per keychain mutation, from every platform arm (myne-md/myne#1027).
 ///
 /// The shape lives here rather than in each `imp` because the FORENSIC question is the same
-/// on all of them — "was this device's signing key ever written, and was it later erased?" —
+/// on all of them, "was this device's signing key ever written, and was it later erased?" ,
 /// and three copies of one message drift the first time one is touched. Each arm supplies
 /// the two bounded tokens it can actually answer; nothing platform-specific crosses.
 ///
@@ -1040,7 +1041,7 @@ mod tests {
         );
         // A store is INSTALLED for the length of this test, so the assertion below runs on every
         // platform. The earlier version read the real store and skipped the check when it
-        // answered `Unsupported` — true on every CI runner without a keychain, which made a test
+        // answered `Unsupported`, true on every CI runner without a keychain, which made a test
         // that names this property pass without asserting it (review finding, myne-md/myne#1027;
         // AGENTS.md "A fixture that cannot reach the defective state is not a test").
         //

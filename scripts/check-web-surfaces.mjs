@@ -503,6 +503,10 @@ const V = {
     "ported",
     "Pure arithmetic over the last-successful-sync timestamp, plus the copy that says so after three days. It belongs on web MORE than on desktop, not less: a desktop vault works offline indefinitely, while the web client is sync-required (`decisions.md` 2026-07-26), so a sync that stopped working is the difference between a vault that is merely idle and one the user cannot reach from anywhere else.",
   ],
+  "src/lib/diagnostics-gather.ts": [
+    "ported",
+    "The reads that fill the allowlisted diagnostics block, shared by desktop, web and phone (myne-md/myne#1027). Seam-free by construction: the caller injects the IPC binding and its WebView name, which is exactly what lets the browser run the same gather the desktop panel runs. It belongs on web for the reason the block exists there at all: a web vault is sync-required, so 'uploads paused' is the difference between a delay and a vault the user cannot reach from anywhere else, and a maintainer needs the paste to name the same fields on every client.",
+  ],
   "src/lib/sync-status-view.ts": [
     "ported",
     "One mapping from a sync status to its sentence, shared by all three clients (myne-md/myne#1027). It has to be the same answer on web as on desktop for the reason it exists at all: the copies had already drifted on two states before the browser was ever asked, and a web client is sync-required, so a status that misdescribes an upload block is the difference between a vault the user can reach and one they cannot.",

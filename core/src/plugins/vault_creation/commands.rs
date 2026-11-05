@@ -2029,7 +2029,7 @@ mod tests {
             // is the bug written down as the setup: the claim's read-back consults the store
             // only now, so a session key proves nothing. The store itself is process-global and
             // a test binary cannot control it, so this test asserts the one thing that holds
-            // either way — a row exists — and leaves the halves rule to the tests that own it.
+            // either way, a row exists, and leaves the halves rule to the tests that own it.
             commit_from_host(
                 None,
                 token.to_string(),
@@ -2081,7 +2081,7 @@ mod tests {
             assert!(!row.tombstone, "a fresh claim is a live row");
             // NO assertion about halves here, and that is the fix (myne-md/myne#1027). Whether
             // they are present depends on a store this test binary cannot control, which is why
-            // the old fixture installed a SESSION key and called it "a key at rest" — the bug
+            // the old fixture installed a SESSION key and called it "a key at rest", the bug
             // written down as the setup. `a_row_publishes_only_halves_the_store_returns` owns
             // that rule, and `the_at_rest_read_ignores_a_session_key` owns the reader.
             // What this test owns is #1001: the ceremony leaves a row behind at all.

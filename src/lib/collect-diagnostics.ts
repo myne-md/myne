@@ -11,8 +11,8 @@
 // user presses; there is no endpoint, no beacon and no automatic send, which is
 // why task 60's zero-third-party request-log assertion is unaffected.
 
-import { buildDiagnostics, engineLabel, mb, type HostWebView } from "./diagnostics";
-import { authorityToken, readVaultDoctor, sessionToken } from "./vault-doctor";
+import type { HostWebView } from "./diagnostics";
+import { gatherDiagnostics } from "./diagnostics-gather";
 import { servedBuildInfo } from "../platform/build-info";
 import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
@@ -33,50 +33,11 @@ function desktopWebView(): HostWebView | null {
   return "WebKitGTK";
 }
 
-/**
- * How long the vault read may take before the block is built without it.
- *
- * The doctor verifies the vault's roster and reads the OS key store, and this block is what
- * a user hands over when the app has already failed closed. A wedged key store must cost the
- * five vault lines, never the whole report: this block was assembled from local facts before
- * that command existed, and it stays that way.
- */
-const DOCTOR_DEADLINE_MS = 2000;
-
-/** Settle with the work's value, or with `null` at the deadline (or on a rejection). */
-function withinDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
-    void work.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      () => {
-        clearTimeout(timer);
-        resolve(null);
-      },
-    );
-  });
-}
-
 export async function collectDiagnostics(failureCode: string): Promise<string> {
   const served = await servedBuildInfo().catch(() => null);
-  // The vault's five facts (myne-md/myne#1003), from the same command the sync panel asks.
-  // One read, one verdict: a second derivation here would be a second answer to a question
-  // whose whole point is that it has one. A refusal, a missing vault and a read that never
-  // settles all leave `null`, and the five lines are then ABSENT rather than placeholdered.
-  const doctor = await withinDeadline(readVaultDoctor(invoke), DOCTOR_DEADLINE_MS);
-  let usage: StorageEstimate | null = null;
-  try {
-    usage = (await navigator.storage?.estimate?.()) ?? null;
-  } catch {
-    // Storage estimation is permission- and engine-dependent; an unavailable
-    // reading drops the two storage lines, never the copy.
-  }
-  return buildDiagnostics({
-    version: __APP_VERSION__,
-    channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
+  return gatherDiagnostics({
+    call: invoke,
+    webView: desktopWebView(),
     // Unsliced, unlike the About row: a maintainer reading a pasted block wants
     // the whole SHA. Served build first for the reason given there — the web
     // define is pinned, so `version.json` is where the commit lives
@@ -87,16 +48,5 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     commit: served?.commit ?? (__BUILD_COMMIT__ === "unknown" ? null : __BUILD_COMMIT__),
     bundleHash: served?.bundleHash ?? null,
     failureCode,
-    vaultGeneration: doctor?.generation ?? null,
-    vaultAuthority: doctor ? authorityToken(doctor.authority) : null,
-    vaultBinding: doctor?.binding ?? null,
-    vaultKeyAtRest: doctor?.key_at_rest ?? null,
-    vaultSession: doctor ? sessionToken(doctor.session) : null,
-    // The engine and major version only — never the full UA string, whose tail
-    // carries device models, OEM tokens and extension markers.
-    engine: engineLabel(navigator.userAgent, desktopWebView()),
-    crossOriginIsolated: typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false,
-    storageUsedMb: mb(usage?.usage),
-    storageQuotaMb: mb(usage?.quota),
   });
 }

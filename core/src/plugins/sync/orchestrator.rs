@@ -63,7 +63,7 @@ pub struct SyncSummary {
     /// `Some(token)` means the cycle ran under `PushGate::PollOnly` because this device cannot
     /// author a vault head; the token is the `AuthorityMissing` cause, or the failure class it
     /// maps to. `None` is an ordinary cycle. The cycle sets it AFTER the orchestrator returns,
-    /// which is why the orchestrator's own constructor leaves it `None` — the decision is made
+    /// which is why the orchestrator's own constructor leaves it `None`, the decision is made
     /// one layer up, before the call, and carried back on the summary rather than in a second
     /// out-parameter.
     pub upload_blocked: Option<&'static str>,

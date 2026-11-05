@@ -61,7 +61,7 @@ pub enum SyncRuntimeStatus {
     /// and it cannot author a vault head (myne-md/myne#1027).
     ///
     /// A state of its own, and the reason is the defect it came from. It is not `Error` because
-    /// nothing failed — the pull succeeds every thirty seconds — and it was not `Idle` before,
+    /// nothing failed, the pull succeeds every thirty seconds, and it was not `Idle` before,
     /// although that is what it reported: `Idle` means "enrolled, nothing in flight", the
     /// indicator renders `Idle` as "Synced", and a published vault uploaded nothing for a day
     /// while saying exactly that.
@@ -73,10 +73,14 @@ pub enum SyncRuntimeStatus {
         /// Epoch-ms of the last cycle that uploaded anything, or `None` if this device never
         /// has.
         ///
-        /// A raw timestamp, coarsened by the surface, and it appears ONLY on this variant.
-        /// AS15 keeps a per-device sync wall-clock off screen, and the one moment that clock
-        /// earns its place is telling someone their work has not left the machine: "last
-        /// upload: three hours ago" is the sentence this whole state exists to make possible.
+        /// A raw timestamp, coarsened by whatever renders it, and it appears ONLY on this
+        /// variant. AS15 bounds it: an hourly stamp, never synced, riding the OS backup like
+        /// the rest of `sync-state.json` (TB3).
+        ///
+        /// NOTHING renders it today. The sentence it is for is "your work has not left this
+        /// machine, and the last time it did was three hours ago", which needs a coarsening
+        /// formatter and a translation, so it is a named residual rather than a half-wired
+        /// surface (`decisions/sync/0787`). Carry it; do not claim it is shown.
         #[serde(skip_serializing_if = "Option::is_none")]
         last_upload_at: Option<u64>,
     },
@@ -96,7 +100,7 @@ pub enum LiveStatus {
     /// The last cycle ran and could not upload (bounded cause token).
     ///
     /// The third arm is the whole point of myne-md/myne#1027: a cycle can SUCCEED and still have
-    /// moved nothing up, and before this the cell had no way to say so — so it said `None`, the
+    /// moved nothing up, and before this the cell had no way to say so, so it said `None`, the
     /// base state said `Idle`, and the UI said "Synced".
     Blocked(String),
 }
@@ -105,9 +109,9 @@ pub enum LiveStatus {
 /// where the other belongs.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SyncClocks {
-    /// Last cycle that completed against the server — reachability, not uploads.
+    /// Last cycle that completed against the server, reachability, not uploads.
     pub last_success_at: Option<u64>,
-    /// Last cycle that uploads anything — see [`SyncRuntimeStatus::UploadsBlocked`].
+    /// Last cycle that uploads anything, see [`SyncRuntimeStatus::UploadsBlocked`].
     pub last_upload_at: Option<u64>,
 }
 

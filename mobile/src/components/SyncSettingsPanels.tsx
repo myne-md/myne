@@ -230,11 +230,11 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
   const plane = useMemberVault(vaultId);
   // The shared mapping, the same one the desktop indicator calls (myne-md/myne#1027).
   const view = syncStatusView(status, t);
-  // "Sync now" is only meaningful with an authed session to sync — a cycle while
-  // disabled / not-enrolled / pending returns NotReady, so hide it there rather
-  // than promise a sync that can't run (mirrors the old SY-08 detail sheet).
-  const canSyncNow =
-    status?.state !== "disabled" && status?.state !== "not_enrolled" && status?.state !== "pending";
+  // Whether "Sync now" is a promise this state can keep is the SHARED view's answer, not a
+  // local one: the phone used to hold a fourth copy of the rule, and it offered the button
+  // while uploads were blocked, where a cycle uploads nothing and then flashes a success
+  // (myne-md/myne#1027). One mapping, one answer, both clients.
+  const canSyncNow = view.syncNowUseful;
   // "Add this device" is the enrol entry point for a device that is not a
   // member — and dead UI for one that is. It used to render unconditionally, so
   // an already-syncing phone was invited to enrol again; `sync_enroll` mints a

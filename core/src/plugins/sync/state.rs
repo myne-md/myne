@@ -152,8 +152,8 @@ pub struct SyncState {
     /// which is why the granularity is the control rather than encryption.
     #[serde(default)]
     pub last_success_at_ms: Option<u64>,
-    /// Epoch-ms of the last cycle that **uploaded something** — a push that moved a blob or
-    /// advanced the head — or `None` if this device has never uploaded (myne-md/myne#1027).
+    /// Epoch-ms of the last cycle that **uploaded something**, a push that moved a blob or
+    /// advanced the head, or `None` if this device has never uploaded (myne-md/myne#1027).
     ///
     /// Separate from [`Self::last_success_at_ms`], and the separation is the fix: that stamp is
     /// written by a cycle that merely REACHED the server, which includes every pull-only cycle.
@@ -701,25 +701,22 @@ pub const SUCCESS_STAMP_COALESCE_MS: u64 = 60 * 60 * 1000;
 /// just finished talking to a server.
 ///
 /// **This is a REACHABILITY clock, not an upload clock.** Every pull-only cycle stamps it
-/// (myne-md/myne#1027), which is right for its own consumer — the staleness banner measures
-/// "how long has this device been failing to reach the server" — and wrong for the one question
+/// (myne-md/myne#1027), which is right for its own consumer, the staleness banner measures
+/// "how long has this device been failing to reach the server", and wrong for the one question
 /// a user asks of it. [`record_upload_success`] is the other clock.
 pub async fn record_sync_success(
     io: &dyn crate::vault_io::VaultIo,
     vault_root: &std::path::Path,
     now_ms: u64,
 ) -> bool {
-    let Ok(mut state) = read_sync_state(io, vault_root).await else {
-        return false;
-    };
-    let fresh_enough = state
-        .last_success_at_ms
-        .is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
-    if fresh_enough {
-        return false;
-    }
-    state.last_success_at_ms = Some(now_ms);
-    write_sync_state(io, vault_root, &state).await.is_ok()
+    stamp_clock(
+        io,
+        vault_root,
+        now_ms,
+        |s| s.last_success_at_ms,
+        |s, v| s.last_success_at_ms = v,
+    )
+    .await
 }
 
 /// Record that a cycle **uploaded** something (myne-md/myne#1027).
@@ -736,16 +733,36 @@ pub async fn record_upload_success(
     vault_root: &std::path::Path,
     now_ms: u64,
 ) -> bool {
+    stamp_clock(
+        io,
+        vault_root,
+        now_ms,
+        |s| s.last_upload_at_ms,
+        |s, v| s.last_upload_at_ms = v,
+    )
+    .await
+}
+
+/// Write one of the two clocks, coalesced. The rule lives here once because the two stamps
+/// differ only by which field they own: a second copy of "is it fresh enough to skip the write"
+/// drifts the first time one window changes, and the at-rest reasoning behind it is stated
+/// per-field, not per-clone.
+async fn stamp_clock(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &std::path::Path,
+    now_ms: u64,
+    read: fn(&SyncState) -> Option<u64>,
+    set: fn(&mut SyncState, Option<u64>),
+) -> bool {
     let Ok(mut state) = read_sync_state(io, vault_root).await else {
         return false;
     };
-    let fresh_enough = state
-        .last_upload_at_ms
-        .is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
+    let fresh_enough =
+        read(&state).is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
     if fresh_enough {
         return false;
     }
-    state.last_upload_at_ms = Some(now_ms);
+    set(&mut state, Some(now_ms));
     write_sync_state(io, vault_root, &state).await.is_ok()
 }
 

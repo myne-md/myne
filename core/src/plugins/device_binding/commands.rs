@@ -328,7 +328,7 @@ fn mint_and_confirm_at_rest(
         }
         // A store that REFUSED the write is the same answer as a platform with no store: this
         // claim cannot state where a key lives, so it states nothing about one. It used to
-        // propagate, and the cost was that NO row was written at all — leaving the device in
+        // propagate, and the cost was that NO row was written at all, which left the device in
         // `NoBindingRow` with a store error as the only explanation, and a row that is absent
         // is the one state no later claim can see to repair. Logged rather than swallowed, and
         // nothing false is published: a `v1` row carries no halves (myne-md/myne#1027).
