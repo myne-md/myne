@@ -40,6 +40,12 @@ export default defineConfig(async () => ({
       // had already drifted (the same `idle` read "Synced" on a computer and "On" on a phone),
       // which is precisely what a user cannot trust. One function, two renderers.
       { find: "@myne/sync-status-view", replacement: sib("../src/lib/sync-status-view.ts") },
+      // The diagnostics BLOCK and the vault-doctor mirror (myne-md/myne#1027). Both are pure:
+      // `diagnostics.ts` takes a plain input record, and `vault-doctor.ts` takes the caller's own
+      // `invoke` rather than importing a host. That is what lets the phone build the SAME block
+      // the desktop panel builds, so a maintainer can diff two pastes field by field.
+      { find: "@myne/diagnostics", replacement: sib("../src/lib/diagnostics.ts") },
+      { find: "@myne/vault-doctor", replacement: sib("../src/lib/vault-doctor.ts") },
       // The shared RECOVERY-KIT FILE FORMAT (myne-md/myne#468). Aliased for
       // exactly the reason above: the kit is a plain-text document a user saves
       // on one client and reads back into the recovery flow on ANOTHER, so its

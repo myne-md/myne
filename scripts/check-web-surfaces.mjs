@@ -503,6 +503,10 @@ const V = {
     "ported",
     "Pure arithmetic over the last-successful-sync timestamp, plus the copy that says so after three days. It belongs on web MORE than on desktop, not less: a desktop vault works offline indefinitely, while the web client is sync-required (`decisions.md` 2026-07-26), so a sync that stopped working is the difference between a vault that is merely idle and one the user cannot reach from anywhere else.",
   ],
+  "src/lib/sync-status-view.ts": [
+    "ported",
+    "One mapping from a sync status to its sentence, shared by all three clients (myne-md/myne#1027). It has to be the same answer on web as on desktop for the reason it exists at all: the copies had already drifted on two states before the browser was ever asked, and a web client is sync-required, so a status that misdescribes an upload block is the difference between a vault the user can reach and one they cannot.",
+  ],
   "src/lib/syntaxTheme.ts": ["ported", "Colour math for the theme apply path (parse, luminance, appearance)."],
   "src/lib/theme-errors.ts": ["ported", "Error copy."],
   "src/lib/theme.ts": ["ported", "CSSOM only."],

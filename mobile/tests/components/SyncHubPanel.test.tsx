@@ -67,18 +67,34 @@ afterEach(() => {
   invokeMock.mockClear();
 });
 
-describe("the mobile status row reserves 'Offline' for a transport failure", () => {
+describe("the mobile status row names the class rather than guessing 'Offline'", () => {
   it("says the identity is locked rather than that the device is offline", () => {
     const text = labelFor({ state: "error", detail: "identity_locked" });
     expect(text).toContain("sync.status.errorIdentityLocked");
     expect(text).not.toContain("settings.sync.summary.offline");
   });
 
-  it("keeps 'Offline' for the class that names it, `sync_failed`", () => {
-    // `FailureClass::Transport` and `Other` both report this detail, so it is the
-    // one class where "Offline" is a true statement about the network.
-    expect(labelFor({ state: "error", detail: "sync_failed" })).toContain(
-      "settings.sync.summary.offline",
+  it("does not claim 'Offline' for `sync_failed`, which does not establish it", () => {
+    // This row used to answer `settings.sync.summary.offline` for `sync_failed`, on the
+    // reasoning that `FailureClass::Transport` names the network. `Other` reports the same
+    // detail, so the sentence asserted a cause the class does not establish — and it was the
+    // phone's own vocabulary, which is why the computer said "Sync error" about the same state
+    // (myne-md/myne#1027). The shared map gives the honest generic line, and "Offline" is gone
+    // from this surface entirely.
+    expect(labelFor({ state: "error", detail: "sync_failed" })).toContain("sync.status.error");
+  });
+
+  it("carries the blocked cause and its repair", () => {
+    // The state a published vault sat in for a day while this row said "On": a cycle that runs
+    // and cannot upload. It has its own sentence now, and the repair the desktop offers.
+    expect(labelFor({ state: "uploads_blocked", detail: "device_key_missing" })).toContain(
+      "sync.status.errorDeviceKeyMissing",
+    );
+    expect(labelFor({ state: "uploads_blocked", detail: "identity_locked" })).toContain(
+      "sync.status.errorIdentityLocked",
+    );
+    expect(labelFor({ state: "uploads_blocked", detail: "uploads_blocked" })).toContain(
+      "sync.status.uploadsBlocked",
     );
   });
 
