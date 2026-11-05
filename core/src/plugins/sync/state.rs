@@ -152,6 +152,21 @@ pub struct SyncState {
     /// which is why the granularity is the control rather than encryption.
     #[serde(default)]
     pub last_success_at_ms: Option<u64>,
+    /// Epoch-ms of the last cycle that **uploaded something**, a push that moved a blob or
+    /// advanced the head, or `None` if this device has never uploaded (myne-md/myne#1027).
+    ///
+    /// Separate from [`Self::last_success_at_ms`], and the separation is the fix: that stamp is
+    /// written by a cycle that merely REACHED the server, which includes every pull-only cycle.
+    /// A device that had uploaded nothing for a day reported a success two minutes old, so the
+    /// one number a user would read to answer "is everything on the server?" said yes.
+    ///
+    /// **Coalesced to [`SUCCESS_STAMP_COALESCE_MS`] for the same, stronger reason.** `sync-state.json`
+    /// is device-local plaintext, and its mtime is at-rest activity metadata; an upload stamp
+    /// per upload would resolve the user's editing rhythm rather than their online-ness. One
+    /// hour keeps the value honest to the coarseness the surface uses ("three hours ago") while
+    /// leaving the file's resolution where `threat-model.md` bounds it.
+    #[serde(default)]
+    pub last_upload_at_ms: Option<u64>,
     /// This device's 16-byte VV-actor `device_id` (lowercase hex), captured at
     /// enrollment so a later `sync_now` can author heads under the right actor.
     #[serde(default)]
@@ -678,28 +693,76 @@ const _: () = assert!(HEAD_ID_LEN == 32);
 /// than a once-a-cycle one.
 pub const SUCCESS_STAMP_COALESCE_MS: u64 = 60 * 60 * 1000;
 
-/// Record that a cycle completed, if the recorded stamp is old enough to be
-/// worth replacing.
+/// Record that a cycle COMPLETED, if the recorded stamp is old enough to be worth replacing.
 ///
 /// Returns whether it wrote. A no-op on the common path: with a 30-second poll
 /// interval this writes on roughly one cycle in 120, and reads the file it is
 /// about to skip writing, which is the cheap half of an operation that has
 /// just finished talking to a server.
+///
+/// **This is a REACHABILITY clock, not an upload clock.** Every pull-only cycle stamps it
+/// (myne-md/myne#1027), which is right for its own consumer, the staleness banner measures
+/// "how long has this device been failing to reach the server", and wrong for the one question
+/// a user asks of it. [`record_upload_success`] is the other clock.
 pub async fn record_sync_success(
     io: &dyn crate::vault_io::VaultIo,
     vault_root: &std::path::Path,
     now_ms: u64,
 ) -> bool {
+    stamp_clock(
+        io,
+        vault_root,
+        now_ms,
+        |s| s.last_success_at_ms,
+        |s, v| s.last_success_at_ms = v,
+    )
+    .await
+}
+
+/// Record that a cycle **uploaded** something (myne-md/myne#1027).
+///
+/// Called only from a cycle that pushed a blob or advanced the head, so the stamp answers the
+/// question `last_success_at_ms` cannot: *when did this device last put anything on the
+/// server?* A device that can only pull keeps the old value for ever, which is exactly the
+/// signal that was missing when a published vault silently stopped uploading.
+///
+/// Coalesced like its sibling, one hour, for the reason its field carries: the write this
+/// avoids is pure at-rest activity metadata.
+pub async fn record_upload_success(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &std::path::Path,
+    now_ms: u64,
+) -> bool {
+    stamp_clock(
+        io,
+        vault_root,
+        now_ms,
+        |s| s.last_upload_at_ms,
+        |s, v| s.last_upload_at_ms = v,
+    )
+    .await
+}
+
+/// Write one of the two clocks, coalesced. The rule lives here once because the two stamps
+/// differ only by which field they own: a second copy of "is it fresh enough to skip the write"
+/// drifts the first time one window changes, and the at-rest reasoning behind it is stated
+/// per-field, not per-clone.
+async fn stamp_clock(
+    io: &dyn crate::vault_io::VaultIo,
+    vault_root: &std::path::Path,
+    now_ms: u64,
+    read: fn(&SyncState) -> Option<u64>,
+    set: fn(&mut SyncState, Option<u64>),
+) -> bool {
     let Ok(mut state) = read_sync_state(io, vault_root).await else {
         return false;
     };
-    let fresh_enough = state
-        .last_success_at_ms
-        .is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
+    let fresh_enough =
+        read(&state).is_some_and(|prev| now_ms.saturating_sub(prev) < SUCCESS_STAMP_COALESCE_MS);
     if fresh_enough {
         return false;
     }
-    state.last_success_at_ms = Some(now_ms);
+    set(&mut state, Some(now_ms));
     write_sync_state(io, vault_root, &state).await.is_ok()
 }
 
@@ -947,6 +1010,11 @@ mod tests {
     /// a high-resolution log of when the device was awake and online — the
     /// at-rest activity signal `threat-model.md` bounds elsewhere and there is
     /// no reason to add a sharper one for a threshold measured in days.
+    ///
+    /// **The upload stamp is a DIFFERENT field and this is the test that keeps them apart**
+    /// (myne-md/myne#1027): a pull-only cycle stamps the success clock and must not touch the
+    /// upload clock, or the one number a user reads to answer "is my work on the server?"
+    /// reports the pull it just did.
     #[test]
     fn the_success_stamp_advances_hourly_and_not_per_cycle() {
         let tmp = ScopedTempDir::new("sync-success-stamp").unwrap();
@@ -958,6 +1026,28 @@ mod tests {
         assert_eq!(
             read_sync_state(dir).unwrap().last_success_at_ms,
             Some(1_000_000)
+        );
+        assert_eq!(
+            read_sync_state(dir).unwrap().last_upload_at_ms,
+            None,
+            "reaching the server is not uploading to it"
+        );
+
+        // A real upload stamps its own clock and leaves the success clock alone.
+        assert!(rt(super::record_upload_success(&IO, dir, 1_200_000)));
+        let after_upload = read_sync_state(dir).unwrap();
+        assert_eq!(after_upload.last_upload_at_ms, Some(1_200_000));
+        assert_eq!(
+            after_upload.last_success_at_ms,
+            Some(1_000_000),
+            "the two clocks are independent"
+        );
+
+        // And the upload clock coalesces on the same hour, for the same at-rest reason.
+        assert!(!rt(super::record_upload_success(&IO, dir, 1_201_000)));
+        assert_eq!(
+            read_sync_state(dir).unwrap().last_upload_at_ms,
+            Some(1_200_000)
         );
 
         // A cycle a minute later does not: the recorded value is still fresh.
@@ -1004,6 +1094,7 @@ mod tests {
             corpus_complete: true,
             rekey_rebase_pending: false,
             last_success_at_ms: Some(1_700_000_000_000),
+            last_upload_at_ms: None,
             pending_orphan_tombstones: vec![OrphanTombstone {
                 blob_id_hex: "dd".repeat(16),
                 base_version: 7,

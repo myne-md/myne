@@ -266,6 +266,7 @@ async fn write_own_binding_row(
         ConfirmedHalves::Publish(public) => Some(*public),
         // No verified key, so nothing about the row may change: not its halves, not its
         // version. See `confirm_read_back` for why withdrawing was tried and reverted.
+        ConfirmedHalves::Absent => None,
         ConfirmedHalves::Unknown => {
             let map = read_device_bindings_in_dir(io, vault_dir, &resolved.borrow()).await?;
             return Ok((map, ClaimOutcome::Deferred));
@@ -306,11 +307,36 @@ async fn write_own_binding_row(
 /// refuse every cycle under "unlock your identity to sync", and it survived every lock,
 /// relaunch and rebuild because nothing ever compared the two.
 ///
-/// Three outcomes, and none of them is an error that blocks a claim. `Publish` is the store
+/// Three outcomes, and none of them is an error that blocks a claim. `Publish` is the STORE
 /// returning the key just written. `Unknown` is everything else (rung 4 of the ladder, a store
-/// that refused, a store that cannot return what it accepted), and its meaning is the same in
-/// all three: leave the row exactly as it is and ask again on the next unlock. `Err` is a real
-/// fault, returned rather than swallowed so the caller can log it.
+/// that refused the write, a store that cannot return what it accepted), and its meaning is the
+/// same in all three: state nothing about where a key lives, and ask again on the next unlock.
+/// The `Result` stays for the caller's shape; no arm of this function produces `Err`, because a
+/// claim that cannot confirm a key still owes the vault its row.
+///
+/// The read-back is `load_proven_at_rest`, which is the point (myne-md/myne#1027). It used to
+/// be `load_key`, and that reader answers from the session slot first: a key that existed only
+/// in memory satisfied it, the row was written, and the halves it published belonged to no
+/// store. `KeyAtRestProof` is what makes that mistake unrepresentable now.
+/// What a store fault means for the row: two answers, and they differ in whether a row is
+/// written.
+///
+/// Split out because it is the one decision in this file that a test cannot reach through the
+/// real store: the store is process-global and a refusing one is not something a fixture can
+/// install. Reverting `Absent` to `Unknown` here restores the state the comment below used to
+/// describe falsely, and `a_store_fault_still_leaves_a_repairable_row` names it.
+fn on_store_fault(
+    err: &crate::plugins::sync::device_identity::DeviceKeyStoreError,
+) -> ConfirmedHalves {
+    use crate::plugins::sync::device_identity::DeviceKeyStoreError as E;
+    match err {
+        // Rung 4 is a platform fact, not a fault: the row is written exactly as it was
+        // before the device-key change, and that is not this branch's business.
+        E::Unsupported => ConfirmedHalves::Unknown,
+        _ => ConfirmedHalves::Absent,
+    }
+}
+
 fn mint_and_confirm_at_rest(
 ) -> Result<ConfirmedHalves, crate::plugins::sync::device_identity::DeviceKeyStoreError> {
     let pair = match crate::plugins::sync::device_identity::load_or_create() {
@@ -320,25 +346,42 @@ fn mint_and_confirm_at_rest(
         Err(crate::plugins::sync::device_identity::DeviceKeyStoreError::Unsupported) => {
             return Ok(ConfirmedHalves::Unknown)
         }
-        Err(err) => return Err(err),
+        // A store that REFUSED the write cannot say where a key lives, so nothing is
+        // published: the row is written with no halves rather than not written at all, because
+        // an absent row is the one state no later claim can see to repair. Logged rather than
+        // swallowed (myne-md/myne#1027).
+        Err(err) => {
+            tracing::warn!(
+                stage = "device_binding_claim",
+                event = "device_key_write_failed",
+                reason = ?err,
+                "the device key could not be written; the row will publish no halves"
+            );
+            return Ok(on_store_fault(&err));
+        }
     };
     Ok(confirm_read_back(
         pair.public_half(),
-        crate::plugins::sync::authority::load_key("device_binding_claim"),
+        &crate::plugins::sync::authority::load_proven_at_rest("device_binding_claim"),
     ))
 }
 
 /// The read-back's decision, split from the store so all four outcomes are testable.
+///
+/// It takes a [`KeyAtRestProof`](crate::plugins::sync::authority::KeyAtRestProof) rather than a
+/// bare `KeyAtRest` so that "the store answered" is a property of the type: the only way to
+/// obtain one is a store-only read. A caller cannot hand it a value that came from the session
+/// slot, and a test cannot mint one (myne-md/myne#1027).
 ///
 /// A store that reports a successful write and cannot return the item is the failure this
 /// whole slice exists for, and it is logged at `ERROR` because nothing else in the tree will
 /// notice: the row it would have published is a promise no peer can resolve.
 fn confirm_read_back(
     written: protocol::device_key::DevicePublicHalf,
-    stored: crate::plugins::sync::authority::KeyAtRest,
+    proof: &crate::plugins::sync::authority::KeyAtRestProof,
 ) -> ConfirmedHalves {
     use crate::plugins::sync::authority::KeyAtRest;
-    match stored {
+    match proof.at_rest() {
         KeyAtRest::Present(key) if key.public_half() == written => {
             ConfirmedHalves::Publish(Box::new(written))
         }
@@ -395,6 +438,15 @@ enum ConfirmedHalves {
     Publish(Box<protocol::device_key::DevicePublicHalf>),
     /// No verified key: leave the row exactly as it is and retry on the next unlock.
     Unknown,
+    /// A store that REFUSED to write the key: write the row publishing NO halves.
+    ///
+    /// Not the same as `Unknown`. "Leave the row alone" is right when a row already exists
+    /// and its halves might still be the ones at rest; on a device with no row at all it is
+    /// the one outcome no later claim can see to repair, so the device stays in
+    /// `NoBindingRow` for ever. A halves-less row is what every pre-device-key path wrote and
+    /// it claims nothing about where a key lives, so this keeps the device repairable without
+    /// publishing anything false (myne-md/myne#1027).
+    Absent,
 }
 
 /// Claim this device's binding, best effort, from the unlock pipeline and from the
@@ -767,43 +819,72 @@ mod tests {
         });
     }
 
+    /// A store that refuses the write still leaves a REPAIRABLE row.
+    ///
+    /// The regression this holds: the fault arm answered `Unknown`, which the row writer turns
+    /// into "leave the row exactly as it is". On a device that has no row yet that is a dead
+    /// end, because nothing later ever sees the device to claim it again, and the comment
+    /// beside the arm claimed the opposite in words. `Absent` writes the row with no halves,
+    /// which publishes nothing false and keeps the device visible to the next claim.
+    #[test]
+    fn a_store_fault_still_leaves_a_repairable_row() {
+        use crate::plugins::sync::device_identity::DeviceKeyStoreError as E;
+
+        assert_eq!(
+            super::on_store_fault(&E::Unsupported),
+            super::ConfirmedHalves::Unknown,
+            "a platform with no rung-3 store is a fact, not a fault: the row takes the same \
+             shape it took before the device-key change"
+        );
+        assert_eq!(
+            super::on_store_fault(&E::Backend),
+            super::ConfirmedHalves::Absent,
+            "a store that refused the write must still leave a row, or the device can never be \
+             claimed again"
+        );
+    }
+
     /// The read-back, in all four states. The ones that matter are the states that were
     /// impossible before this slice: a store that reports success and returns nothing, one
     /// that returns a DIFFERENT key, and one that refuses to answer at all.
+    ///
+    /// `for_test` is how the three negative arms are reached without a keychain. It is
+    /// `cfg(test)`, so the production rule still holds: only `load_proven_at_rest` can make a
+    /// proof, and only a proof can publish halves (myne-md/myne#1027).
     #[test]
     fn a_row_publishes_only_halves_the_store_returns() {
         use crate::plugins::sync::authority::KeyAtRest as K;
+        use crate::plugins::sync::authority::KeyAtRestProof as P;
 
         let key = protocol::device_key::DeviceKeyPair::generate_raw(&[0x31; 32], &[0x32; 32]);
         let other = protocol::device_key::DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
 
         assert_eq!(
-            super::confirm_read_back(key.public_half(), K::Present(Box::new(key.clone()))),
+            super::confirm_read_back(
+                key.public_half(),
+                &P::for_test(K::Present(Box::new(key.clone())))
+            ),
             super::ConfirmedHalves::Publish(Box::new(key.public_half())),
             "the one case that may publish halves"
         );
         assert_eq!(
-            super::confirm_read_back(key.public_half(), K::Present(Box::new(other))),
+            super::confirm_read_back(key.public_half(), &P::for_test(K::Present(Box::new(other)))),
             super::ConfirmedHalves::Unknown,
             "a different key at rest leaves the row alone: neither half can be shown to be \
              the one at rest, and a rewrite would strip the material that verifies this \
              device's signed heads"
         );
         assert_eq!(
-            super::confirm_read_back(key.public_half(), K::Absent),
+            super::confirm_read_back(key.public_half(), &P::for_test(K::Absent)),
             super::ConfirmedHalves::Unknown,
             "a store that cannot return the item it just accepted leaves the row alone"
         );
+        // Absence and refusal reach the same non-write, and the CODE differs rather than the
+        // outcome: an absent store logs `device_key_read_back_missing` at `ERROR` (a promise no
+        // peer can resolve) while a refusal logs `claim_deferred` at `WARN` (a store that would
+        // not answer this time). Both leave the row untouched.
         assert_eq!(
-            super::confirm_read_back(key.public_half(), K::Absent),
-            super::confirm_read_back(key.public_half(), K::Unreadable),
-            "absence and refusal reach the same non-write, because a write here would demote"
-        );
-        // The distinction that reaches a WRITE: a refusal is not an absence, so the row is
-        // not rewritten. Folding these two together let one transient keychain refusal strip
-        // a public key the device still held, from a synced and person-signed row.
-        assert_eq!(
-            super::confirm_read_back(key.public_half(), K::Unreadable),
+            super::confirm_read_back(key.public_half(), &P::for_test(K::Unreadable)),
             super::ConfirmedHalves::Unknown,
             "a fault leaves the row alone rather than demoting it"
         );

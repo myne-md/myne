@@ -19,7 +19,9 @@ test.describe("sync status surface (Settings → Sync, MYND-481)", () => {
     await installMockIpc(page, { syncStatus: { state: "idle" } });
     await page.goto("/");
     await openSyncSettings(page);
-    await expect(page.getByTestId("sync.settings.status")).toContainText("On");
+    // "Synced", not the phone's old "On": both clients render the shared map now, and the two
+    // had already drifted before this change (myne-md/myne#1027).
+    await expect(page.getByTestId("sync.settings.status")).toContainText("Synced");
     await expect(page.getByTestId("sync.settings.sync-now")).toBeVisible();
   });
 
@@ -40,13 +42,15 @@ test.describe("sync status surface (Settings → Sync, MYND-481)", () => {
     await expect(page.getByTestId("sync.settings.status")).toContainText("2 conflicts");
   });
 
-  // "Offline" now names ONE failure class, `sync_failed` (`FailureClass::Transport`
-  // | `Other`). Every other class gets its own copy, which the next test pins.
-  test("error → Settings shows the offline state", async ({ page }) => {
+  // "Offline" is gone from this surface entirely. It named a cause the class does not
+  // establish (`sync_failed` is `Transport` OR `Other`), and the phone said it while the
+  // computer said "Sync error" about the same state (myne-md/myne#1027). The honest generic
+  // sentence is the shared map's, and the classes with a name of their own are pinned below.
+  test("a generic failure says 'Sync error', not 'Offline'", async ({ page }) => {
     await installMockIpc(page, { syncStatus: { state: "error", detail: "sync_failed" } });
     await page.goto("/");
     await openSyncSettings(page);
-    await expect(page.getByTestId("sync.settings.status")).toContainText("Offline");
+    await expect(page.getByTestId("sync.settings.status")).toContainText("Sync error");
   });
 
   test("a locked identity is not reported as offline", async ({ page }) => {

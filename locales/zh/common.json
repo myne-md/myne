@@ -3336,7 +3336,6 @@
       "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，取消每个已存档文件夹的存档状态，并隐藏存档控件。它作用于整个保险库，在所有设备上生效。",
       "label": "存档",
       "off": "关闭",
-      "on": "开启",
       "saveError": "无法更新存档设置。"
     },
     "attachmentCompression": {
@@ -4091,12 +4090,6 @@
       "tooWeak": "太弱"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "未设置",
-        "offline": "离线",
-        "conflicts_one": "{{count}} 个冲突",
-        "conflicts_other": "{{count}} 个冲突"
-      }
     },
     "data": {
       "exported_one": "已导出 {{count}} 篇笔记 → {{label}}",

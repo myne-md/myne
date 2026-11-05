@@ -3336,7 +3336,6 @@
       "helper": "Erlaubt es, Notizen in ein Archiv zu verschieben, das aus der Hauptliste herausgehalten wird. Beim Deaktivieren wird jede archivierte Notiz in ihren Ordner zurückgestellt, jeder archivierte Ordner wird aus dem Archiv geholt und die Archiv-Bedienelemente werden ausgeblendet. Das gilt für den gesamten Tresor, auf allen Geräten.",
       "label": "Archivierung",
       "off": "Aus",
-      "on": "Ein",
       "saveError": "Die Archivierungseinstellung konnte nicht aktualisiert werden."
     },
     "attachmentCompression": {
@@ -4091,12 +4090,6 @@
       "tooWeak": "Zu schwach"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Nicht eingerichtet",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} Konflikt",
-        "conflicts_other": "{{count}} Konflikte"
-      }
     },
     "data": {
       "exported_one": "{{count}} Notiz exportiert → {{label}}",
