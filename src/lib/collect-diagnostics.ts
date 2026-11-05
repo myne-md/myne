@@ -12,25 +12,17 @@
 // why task 60's zero-third-party request-log assertion is unaffected.
 
 import type { HostWebView } from "./diagnostics";
-import { gatherDiagnostics } from "./diagnostics-gather";
+import { gatherDiagnostics, webViewLabel } from "./diagnostics-gather";
 import { servedBuildInfo } from "../platform/build-info";
 import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
 
-/**
- * Which WebView this desktop build is hosted in, or `null` in a browser.
- *
- * The UA order is load-bearing. Android carries both `Linux` and `Android` and a
- * Chrome token, so it has to be recognised before either; Windows WebView2
- * carries Chrome's and Edge's tokens plus `Windows`.
- */
+/** Which WebView this desktop build is hosted in, or `null` in a browser. */
 function desktopWebView(): HostWebView | null {
   if (!HAS_TAURI) return null;
-  const ua = navigator.userAgent;
-  if (/Android/i.test(ua)) return "Android WebView";
-  if (/Windows/i.test(ua)) return "WebView2";
-  if (/Macintosh|Mac OS X|iPhone|iPad/i.test(ua)) return "WKWebView";
-  return "WebKitGTK";
+  // The ladder is shared with the phone; only the fallback is this client's own answer, because a
+  // Tauri desktop that matched no arm is still running inside a GTK WebView.
+  return webViewLabel(navigator.userAgent, "WebKitGTK");
 }
 
 export async function collectDiagnostics(failureCode: string): Promise<string> {

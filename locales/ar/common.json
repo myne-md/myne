@@ -3808,7 +3808,6 @@
       "helper": "اسمح بنقل الملاحظات إلى الأرشيف، بعيدًا عن القائمة الرئيسية. إيقاف هذا يعيد كل ملاحظة مؤرشفة إلى مجلدها، ويلغي أرشفة كل مجلد مؤرشف، ويخفي عناصر التحكّم بالأرشيف. وينطبق على الخزنة بأكملها، على كل جهاز.",
       "label": "الأرشفة",
       "off": "مُعطّل",
-      "on": "مُفعّل",
       "saveError": "تعذّر تحديث إعداد الأرشفة."
     },
     "attachmentCompression": {
@@ -4625,13 +4624,9 @@
     "sync": {
       "summary": {
         "conflicts_zero": "{{count}} تعارض",
-        "conflicts_one": "{{count}} تعارض",
         "conflicts_two": "{{count}} تعارضين",
         "conflicts_few": "{{count}} تعارضات",
-        "conflicts_many": "{{count}} تعارضًا",
-        "conflicts_other": "{{count}} تعارض",
-        "notSetUp": "غير مُعدّة",
-        "offline": "غير متصل"
+        "conflicts_many": "{{count}} تعارضًا"
       }
     },
     "data": {

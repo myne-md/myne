@@ -3572,7 +3572,6 @@
       "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky, každá archivovaná složka se z archivu vyjme a ovládací prvky archivu se skryjí. Platí pro celý trezor, na všech zařízeních.",
       "label": "Archivace",
       "off": "Vypnuto",
-      "on": "Zapnuto",
       "saveError": "Nastavení archivace se nepodařilo aktualizovat."
     },
     "attachmentCompression": {
@@ -4358,12 +4357,8 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Není nastaveno",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
         "conflicts_few": "{{count}} konflikty",
-        "conflicts_many": "{{count}} konfliktu",
-        "conflicts_other": "{{count}} konfliktů"
+        "conflicts_many": "{{count}} konfliktu"
       }
     },
     "data": {

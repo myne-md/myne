@@ -3336,7 +3336,6 @@
       "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map, dearchiveert elke gearchiveerde map en verbergt de archiefknoppen. Het geldt voor de hele kluis, op elk apparaat.",
       "label": "Archiveren",
       "off": "Uit",
-      "on": "Aan",
       "saveError": "De archiveringsinstelling kon niet worden bijgewerkt."
     },
     "attachmentCompression": {
@@ -4091,12 +4090,6 @@
       "tooWeak": "Te zwak"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Niet ingesteld",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_other": "{{count}} conflicten"
-      }
     },
     "data": {
       "exported_one": "{{count}} notitie geëxporteerd → {{label}}",

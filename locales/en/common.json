@@ -3202,7 +3202,7 @@
       "diagnosticsIntro": "What Myne knows about this device right now. Nothing is sent anywhere; you decide what to share.",
       "diagnosticsReading": "Reading…",
       "diagnosticCopied": "Copied",
-      "diagnosticsLogNote": "The diagnostic log itself is desktop-only, so there is no log to share from this device.",
+      "diagnosticsLogNote": "There is no log file on this device for this block to hand over: the saved diagnostic log is a desktop feature.",
       "diagnosticCopy": "Copy diagnostics",
       "diagnosticCopyDone": "Diagnostics copied",
       "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
@@ -4346,8 +4346,6 @@
       "strong": "Strong"
     },
     "sync": {
-      "summary": {
-      }
     },
     "data": {
       "exported_one": "Exported {{count}} note → {{label}}",

@@ -1,5 +1,11 @@
 // The sync status as one honest sentence, in ONE place, for every client.
 //
+// "Every client" is about the MAPPING, and it holds: desktop, web and phone all import this
+// module. What the browser does not yet do is publish `uploads_blocked`, because its Worker
+// carries no live overlay, so on web the blocked arm is reachable only from a manual `sync_now`
+// answer. `decisions/sync/0787` records that residual; the mapping being shared is what makes
+// fixing it a one-line writer rather than a fourth copy.
+//
 // # Why this module exists
 //
 // The mapping from `SyncRuntimeStatus` to a dot colour and a label was written three times:
@@ -92,8 +98,16 @@ export interface SyncStatusView {
    * Whether "Sync now" can keep its promise in this state.
    *
    * False where a cycle would return before any network call (`disabled`, `not_enrolled`,
-   * `pending`) and false while uploads are blocked: the button would upload nothing and then
-   * flash a success. The identity/device-key actions are the honest control there.
+   * `pending`), false while uploads are blocked (the button would upload nothing and then flash
+   * a success), and false where only another act helps (`identity_locked`,
+   * `device_key_missing`): the identity action is the honest control there.
+   *
+   * True for every other failure, including the ones a user CAN clear beside the button: a freed
+   * disk (`storage_full`), a repaired certificate (`tls_failure`), an unfrozen account
+   * (`frozen`), a freed quota (`quota_exceeded`) and a device the owner re-added
+   * (`device_revoked`). Those five were `false` in this module's first version, which silently
+   * removed the retry control from the states where retrying is exactly what a user wants to do
+   * after fixing the cause (myne-md/myne#1027 review).
    */
   syncNowUseful: boolean;
 }
@@ -213,7 +227,7 @@ export function syncStatusView(
             dotColor: "var(--danger)",
             label: t("sync.status.errorQuota"),
             action: null,
-            syncNowUseful: false,
+            syncNowUseful: true,
           };
         case "payload_too_large":
           return {
@@ -227,7 +241,7 @@ export function syncStatusView(
             dotColor: "var(--danger)",
             label: t("sync.status.errorFrozen"),
             action: null,
-            syncNowUseful: false,
+            syncNowUseful: true,
           };
         case "identity_locked":
           return {
@@ -255,7 +269,7 @@ export function syncStatusView(
             dotColor: "var(--warning)",
             label: t("sync.status.errorStorageFull"),
             action: null,
-            syncNowUseful: false,
+            syncNowUseful: true,
           };
         case "device_revoked":
           // NOT folded into `auth_failed`: that copy says the sign-in expired and points at
@@ -265,14 +279,14 @@ export function syncStatusView(
             dotColor: "var(--danger)",
             label: t("sync.status.errorDeviceRevoked"),
             action: null,
-            syncNowUseful: false,
+            syncNowUseful: true,
           };
         case "tls_failure":
           return {
             dotColor: "var(--danger)",
             label: t("sync.status.errorTls"),
             action: null,
-            syncNowUseful: false,
+            syncNowUseful: true,
           };
         default:
           return {

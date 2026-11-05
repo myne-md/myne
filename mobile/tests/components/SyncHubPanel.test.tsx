@@ -90,7 +90,7 @@ describe("the mobile status row names the class rather than guessing 'Offline'",
     // phone still offered a button whose cycle uploads nothing and then flashes a success. The
     // shared view answers the question for both clients now; wiring the row back to a local
     // predicate makes this fail.
-    const show = (status: SyncStatus): boolean => {
+    const show = (status: SyncStatus | null): boolean => {
       render(
         <SyncHubPanel
           status={status}

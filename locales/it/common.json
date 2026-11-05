@@ -3454,7 +3454,6 @@
       "helper": "Consenti di spostare le note in un Archivio, tenendole fuori dall'elenco principale. Disattivando questa opzione ogni nota archiviata torna nella sua cartella, ogni cartella archiviata viene rimossa dall'archivio e i controlli dell'archivio vengono nascosti. Vale per l'intera cassaforte, su ogni dispositivo.",
       "label": "Archiviazione",
       "off": "Disattivata",
-      "on": "Attivata",
       "saveError": "Impossibile aggiornare l'impostazione di archiviazione."
     },
     "attachmentCompression": {
@@ -4225,11 +4224,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Non configurato",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflitto",
-        "conflicts_many": "{{count}} conflitti",
-        "conflicts_other": "{{count}} conflitti"
+        "conflicts_many": "{{count}} conflitti"
       }
     },
     "data": {

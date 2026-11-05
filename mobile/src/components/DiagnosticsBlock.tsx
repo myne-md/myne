@@ -22,29 +22,23 @@
 // # What is deliberately absent
 //
 // The diagnostic LOG and its toggle. Mobile answers `diagnosticLog: false`
-// (`mobile/src/platform/capabilities.ts`, myne-md/myne#860): the file layer and its subscriber
-// are desktop-only, and a toggle that writes nothing is worse than one line saying so.
+// (`mobile/src/platform/capabilities.ts`, myne-md/myne#860): the saved file layer and its
+// subscriber are desktop-only, and a toggle that writes nothing is worse than one line saying so.
+// What the phone DOES have is the platform log: `tracing_subscriber::fmt()` is installed
+// unconditionally in `mobile/src-tauri/src/lib.rs`, so the app's traced events reach logcat or the
+// Xcode console. This block cannot hand that over, which is what the note under the button says.
 //
 // Nothing is transmitted. The only consumer is the Copy button the user presses.
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { gatherDiagnostics } from "@myne/diagnostics-gather";
-import type { HostWebView } from "@myne/diagnostics";
+import { gatherDiagnostics, webViewLabel } from "@myne/diagnostics-gather";
 import { invoke } from "../platform/core";
 import { writeText as clipboardWriteText } from "../lib/clipboardTransport";
 import { copyText } from "@myne/clipboard";
 import { Button } from "./Button";
 import { showToast } from "./ToastHost";
 import { ListGroup } from "./list";
-
-/** Which WebView this build runs in. Two clients, two answers, one label vocabulary. */
-function hostWebView(): HostWebView | null {
-  const ua = navigator.userAgent;
-  if (/Android/i.test(ua)) return "Android WebView";
-  if (/iPhone|iPad|iPod|Macintosh/i.test(ua)) return "WKWebView";
-  return null;
-}
 
 /** The block, read once per mount, through the ONE gather both clients use.
  *
@@ -57,7 +51,8 @@ function hostWebView(): HostWebView | null {
 function collect(): Promise<string> {
   return gatherDiagnostics({
     call: invoke,
-    webView: hostWebView(),
+    // A browser-shaped UA on the phone answers `null`: this client has no GTK fallback.
+    webView: webViewLabel(navigator.userAgent, null),
     commit: null,
     bundleHash: null,
     failureCode: "none",
