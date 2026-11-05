@@ -721,6 +721,7 @@ mod imp {
     }
 
     fn store_inner(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
+        let ss = connect()?;
         let collection = ss.get_default_collection().map_err(|e| {
             log_backend_err("default_collection", &e);
             DeviceKeyStoreError::Backend
