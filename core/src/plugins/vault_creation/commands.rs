@@ -2024,13 +2024,12 @@ mod tests {
                 .try_insert(token, session)
                 .expect("scratch state has room");
 
-            // A key at rest, so the claim's read-back can confirm the one it wrote. No
-            // session key means `Deferred` and no row, the rule `0774` states, covered
-            // deterministically in `device_binding::commands`' own tests.
-            crate::plugins::sync::device_identity::install_session_key(
-                protocol::device_key::DeviceKeyPair::generate().expect("device key"),
-            );
-
+            // NO key store is installed, and that is the fixture (myne-md/myne#1027). This
+            // test used to call `install_session_key` with the comment "a key at rest", which
+            // is the bug written down as the setup: the claim's read-back consults the store
+            // only now, so a session key proves nothing. The store itself is process-global and
+            // a test binary cannot control it, so this test asserts the one thing that holds
+            // either way — a row exists — and leaves the halves rule to the tests that own it.
             commit_from_host(
                 None,
                 token.to_string(),
@@ -2080,20 +2079,17 @@ mod tests {
                      binding row when commit returns (myne-md/myne#1001)",
                 );
             assert!(!row.tombstone, "a fresh claim is a live row");
-            assert!(
-                row.device_ed_pk.is_some() && row.device_mldsa_vk.is_some(),
-                "the row publishes the halves the store confirmed"
-            );
+            // NO assertion about halves here, and that is the fix (myne-md/myne#1027). Whether
+            // they are present depends on a store this test binary cannot control, which is why
+            // the old fixture installed a SESSION key and called it "a key at rest" — the bug
+            // written down as the setup. `a_row_publishes_only_halves_the_store_returns` owns
+            // that rule, and `the_at_rest_read_ignores_a_session_key` owns the reader.
+            // What this test owns is #1001: the ceremony leaves a row behind at all.
             assert_eq!(
                 row.person_fingerprint,
                 crate::account::person_identity::hex_lower(&owner_fingerprint),
                 "the row names the person who signed this vault's roster"
             );
-
-            // Leave the process-global slot as this test found it: a key left installed
-            // would outlive the assertions and make any later test that reads the slot
-            // depend on this one having run.
-            crate::plugins::sync::device_identity::clear_session_key();
         });
     }
 

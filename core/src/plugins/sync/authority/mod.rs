@@ -188,6 +188,74 @@ fn classify_key_load(
     }
 }
 
+/// A key read that is PROVEN to be at rest, rather than merely loadable.
+///
+/// The unit of proof is the type, not a comment, because the difference is the whole defect
+/// (myne-md/myne#1027): `load_key` answers from the session slot first, so a key that exists
+/// only in this process reads as `Present`, and a claim that trusted that answer published a
+/// `v2` binding row for a key no store held. The device then could not author a head, every
+/// cycle ran pull-only, and the UI said "Synced".
+///
+/// Two things follow from the private field:
+///   * the only way to obtain one is [`load_proven_at_rest`], which reads the store and nothing
+///     else — a caller cannot pass a `load_key` result off as at-rest;
+///   * a test cannot mint one by hand, so a fixture cannot take the shortcut that hid this for
+///     two releases (the creation-claim test literally installed a session key and called it
+///     "a key at rest").
+///
+/// It is deliberately NOT what the resolution uses: "may this device sign right now" is a
+/// different question, and a rung-3 PIN unlock answers it from RAM for the length of one
+/// process.
+pub struct KeyAtRestProof(KeyAtRest);
+
+impl KeyAtRestProof {
+    /// The ladder's answer about the store.
+    #[must_use]
+    pub fn at_rest(&self) -> &KeyAtRest {
+        &self.0
+    }
+
+    /// A proof for TESTS ONLY, so the read-back's three negative arms can be asserted without
+    /// a keychain.
+    ///
+    /// The production property is unchanged: `cfg(test)` code cannot ship, so no non-test
+    /// caller can name an at-rest answer it did not read. What it deliberately does NOT do is
+    /// let a test pretend a SESSION key is at rest — that mistake is `for_test(KeyAtRest::
+    /// Present(..))` and it is visible at the call site, which is the opposite of the fixture
+    /// myne-md/myne#1027 removed (a `load_or_create` call that quietly answered from RAM).
+    #[cfg(test)]
+    #[must_use]
+    pub fn for_test(key: KeyAtRest) -> Self {
+        Self(key)
+    }
+}
+
+/// Read the key at rest and prove it, logging the result either way.
+///
+/// The log line is half the point (myne-md/myne#1027): a `Present` that no later read can
+/// reproduce is the state that cost a day of forensics, and "absent" used to be silent by
+/// design, which made a device with a store and no key indistinguishable from a dead one.
+/// Only the claim and the vault doctor call this — never the per-cycle resolution — so the
+/// line stays rare enough to be worth reading.
+#[must_use = "the proof is the answer"]
+pub fn load_proven_at_rest(site: &'static str) -> KeyAtRestProof {
+    let key = classify_key_load(crate::plugins::sync::device_identity::load_at_rest(), site);
+    // Bounded tokens only: `check-tracing-discipline.mjs` R1/R2 read this line.
+    let result = match key {
+        KeyAtRest::Present(_) => "present",
+        KeyAtRest::Absent => "absent",
+        KeyAtRest::Unreadable => "unreadable",
+    };
+    tracing::info!(
+        stage = "sync_authority",
+        event = "device_key_at_rest",
+        site,
+        result,
+        "the device key store was read"
+    );
+    KeyAtRestProof(key)
+}
+
 /// Whether a row CLAIMS that its device holds a key: live, and carrying public halves.
 ///
 /// The `0x01` generation publishes no halves and so claims nothing about a key at rest; a `0x02`
