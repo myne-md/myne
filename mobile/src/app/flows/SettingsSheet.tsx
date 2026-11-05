@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { strengthLevel } from "../../lib/password-strength";
 import type { TFunction } from "i18next";
 import { syncStatusView } from "@myne/sync-status-view";
+import { DiagnosticsBlock } from "../../components/DiagnosticsBlock";
 import { setLanguage } from "@myne/i18n";
 import { SUPPORTED_LANGUAGES, SUPPORTED_CODES, type LanguageCode } from "@myne/i18n/config";
 import { Sheet, Banner, Button, Icon, InfoNote, Toast, StrengthMeter, Switch, Segmented, Spinner, ThemeChiplet, FolderGlyph, MyneMark } from "../../components";
@@ -2942,6 +2943,13 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
                 The Impressum is deliberately not listed — see the same
                 omission and its reason in the desktop About panel. */}
+            {/* The diagnostics block (myne-md/myne#1027). Same allowlist and same field order as
+                the desktop panel, so a maintainer can diff a phone's paste against a computer's;
+                the reader and the copy live in `components/DiagnosticsBlock.tsx`. It sits above
+                the legal links because it is the thing a user in a bug thread is asked for. */}
+            <SectionLabel>{t("settings.about.diagnostics")}</SectionLabel>
+            <DiagnosticsBlock />
+
             <SectionLabel>{t("settings.about.legalLabel")}</SectionLabel>
             <Group>
               {LEGAL_LINKS.map(({ doc, labelKey, testId }, i) => (

@@ -108,7 +108,8 @@ describe("the approval wait names why the code has not arrived", () => {
       await vi.advanceTimersByTimeAsync(21_000);
     });
     const line = screen.getByTestId("sync.join.stalled");
-    expect(line.textContent).toContain("settings.sync.summary.notSetUp");
+    // The shared vocabulary, not this client's own key for the same state (myne-md/myne#1027).
+    expect(line.textContent).toContain("sync.status.notEnrolled");
   });
 
   it("drives the device-credential claim the join wizard used to own", async () => {

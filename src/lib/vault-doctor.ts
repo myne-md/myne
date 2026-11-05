@@ -23,7 +23,16 @@
 // That is what lets the same facts reach the diagnostics block a user pastes into a
 // public issue.
 
-import { invoke } from "../platform/core";
+/**
+ * The one host call this module makes, INJECTED rather than imported.
+ *
+ * The module used to import `invoke` from `../platform/core`, which made it a desktop
+ * module wearing a shared name: the mobile client has its own seam, so it could not reach
+ * the vault doctor at all, and the phone had no diagnostics surface (myne-md/myne#1027).
+ * Taking the caller's own `invoke` keeps the five-fact mirror and its tokens in ONE place
+ * while leaving the host call where each client already owns it.
+ */
+export type VaultDoctorInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
 /** The `vault.meta` magic on disk, or the reason there is none to name. */
 export type VaultGeneration =
@@ -106,8 +115,8 @@ export interface VaultDoctor {
  * rest genuinely is `absent`, and saying so is the truthful verdict rather than a
  * refusal.
  */
-export function readVaultDoctor(): Promise<VaultDoctor | null> {
-  return invoke<VaultDoctor | null>("plugin:sync|sync_vault_doctor");
+export function readVaultDoctor(call: VaultDoctorInvoke): Promise<VaultDoctor | null> {
+  return call<VaultDoctor | null>("plugin:sync|sync_vault_doctor");
 }
 
 /**

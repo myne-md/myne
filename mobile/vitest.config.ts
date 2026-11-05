@@ -31,6 +31,13 @@ export default defineConfig({
       // no count. The mirror is kept complete rather than only where today's
       // specs happen to reach it.
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
+      // The same three the bench mirrors (myne-md/myne#1027): the status vocabulary the phone
+      // shares with the desktop, and the two pure modules the diagnostics block is built from.
+      // Vitest resolves through THIS file, not `vite.config.ts`, so an alias added only there
+      // passes the build and fails every mobile suite.
+      { find: "@myne/sync-status-view", replacement: sib("../src/lib/sync-status-view.ts") },
+      { find: "@myne/diagnostics", replacement: sib("../src/lib/diagnostics.ts") },
+      { find: "@myne/vault-doctor", replacement: sib("../src/lib/vault-doctor.ts") },
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
       // The legal-document URL table (operations#15) - mirror of vite.config.ts,
       // which carries the rationale. `SettingsSheet.tsx` imports it, so without
