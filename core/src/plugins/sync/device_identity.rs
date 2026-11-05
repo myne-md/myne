@@ -1038,14 +1038,38 @@ mod tests {
             Some(session.public_half()),
             "the signing read is supposed to answer from RAM: a rung-3 unlock has nowhere else"
         );
-        // No store on this platform, or one that refused, is the other acceptable answer: either
-        // way the session key is not it, which is the property under test.
-        if let Ok(found) = load_at_rest() {
-            assert_ne!(
+        // A store is INSTALLED for the length of this test, so the assertion below runs on every
+        // platform. The earlier version read the real store and skipped the check when it
+        // answered `Unsupported` — true on every CI runner without a keychain, which made a test
+        // that names this property pass without asserting it (review finding, myne-md/myne#1027;
+        // AGENTS.md "A fixture that cannot reach the defective state is not a test").
+        //
+        // `install_host_provider` is first-call-wins, so another test may already own the slot;
+        // either way a provider answers, and neither fake ever holds the random key generated
+        // below.
+        struct EmptyStore;
+        impl super::DeviceKeyProvider for EmptyStore {
+            fn load(&self) -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
+                Ok(None)
+            }
+            fn store(&self, _pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
+                Ok(())
+            }
+            fn destroy(&self) {}
+        }
+        install_host_provider(Box::new(EmptyStore));
+        match load_at_rest() {
+            Ok(found) => assert_ne!(
                 found.map(|p| p.public_half()),
                 Some(session.public_half()),
                 "a key that exists only in this process is not at rest"
-            );
+            ),
+            // A provider is installed, so the ladder cannot answer `Unsupported`; anything else
+            // is still not the session key, but failing here is better than passing without an
+            // assertion.
+            Err(err) => {
+                panic!("an installed store must answer the at-rest read, not fail: {err:?}")
+            }
         }
 
         clear_session_key();
