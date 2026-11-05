@@ -1,1 +1,0 @@
-The diagnostic log records the steps that fail with no other evidence, so a failure that left nothing on screen leaves a line. Tag suggestions are gated on the inline-tag charset, so a suggested tag can always be written and matched as an inline #tag.
