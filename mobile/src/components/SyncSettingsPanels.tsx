@@ -213,10 +213,20 @@ export interface SyncHubPanelProps {
    *  verdict answers. Optional so a caller with no vault in scope renders none.
    */
   onShowApprovalCode?: () => void;
+  /** Open the identity-unlock door for this device (myne-md/myne#1029).
+   *
+   *  The shared view decides WHETHER this state offers a repair (`view.action`),
+   *  and this is what the phone has to route it to. Until it existed the row
+   *  printed "Unlock your identity to sync" and rendered no control at all,
+   *  because the phone's only identity surface mounted on the zero-vault stage:
+   *  a sentence naming an act the client could not perform. Optional so an
+   *  isolated render still shows just the row's label.
+   */
+  onUnlockIdentity?: () => void;
 }
 
 /** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
-export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers, onShowApprovalCode }: SyncHubPanelProps) {
+export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers, onShowApprovalCode, onUnlockIdentity }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
@@ -307,6 +317,22 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
             <span style={{ ...rowLabel, color: syncing ? "var(--fg-3)" : "var(--accent)" }}>
               {syncing ? t("sync.status.syncing") : t("sync.status.syncNow")}
             </span>
+          </Row>
+        )}
+        {view.action !== null && onUnlockIdentity !== undefined && (
+          // The repair the sentence promises (myne-md/myne#1029). Deliberately
+          // NOT inside the `canSyncNow` block: in exactly these states a cycle
+          // uploads nothing, so "Sync now" is the wrong control and this is the
+          // only one that does anything. The two labels are the desktop
+          // indicator's (`sync.status.unlockIdentityCta` / `repairDeviceCta`): one
+          // vocabulary for one state, whichever client renders it.
+          <Row onClick={onUnlockIdentity} testId="sync.settings.unlock-identity">
+            <span style={{ ...rowLabel, color: "var(--accent)" }}>
+              {view.action === "repair_device"
+                ? t("sync.status.repairDeviceCta")
+                : t("sync.status.unlockIdentityCta")}
+            </span>
+            <RowChevron />
           </Row>
         )}
       </Group>

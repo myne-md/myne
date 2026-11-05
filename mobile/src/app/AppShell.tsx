@@ -467,8 +467,11 @@ function StageSwitch() {
               // first run (myne-md/myne#911 task 12): the identity exists by the
               // time this is reachable, so the next step of the same chain is the
               // vault. Passed ONLY here, because this is the one entry that knows
-              // the device has zero vaults; the Settings entry below leaves it
-              // undefined so a device with vaults does not get a second door.
+              // the device has zero vaults; every other entry (the sync repair
+              // door, a scanned code) leaves it undefined so a device with vaults
+              // does not get a second door to a flow the picker and the editor
+              // already own. The identity UNLOCK door is not gated by this
+              // (myne-md/myne#1029).
               onCreateVault={() => {
                 setIdentityOpen(false);
                 dispatch({ type: "create-vault.start" });
