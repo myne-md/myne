@@ -40,7 +40,7 @@ import { Screen, Title, FooterBar, Button, Banner } from "../../components";
 import { syncResetLocal } from "../../lib/sync";
 import { personClaimDevice } from "../../lib/personAccount";
 import { invoke } from "../../platform/core";
-import { statusView } from "../../lib/sync-status-view";
+import { syncStatusView } from "@myne/sync-status-view";
 import type { SyncStatus } from "../../lib/use-sync-status";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { usePrefs } from "../../lib/use-prefs";
@@ -139,7 +139,7 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
     syncStatus !== null &&
     (syncStatus.state === "error" ||
       (waited && (syncStatus.state === "disabled" || syncStatus.state === "not_enrolled")))
-      ? statusView(syncStatus, t).label
+      ? syncStatusView(syncStatus, t).label
       : null;
 
   /**

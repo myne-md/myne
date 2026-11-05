@@ -12,25 +12,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "../platform/core";
 import { listen } from "../platform/event";
 
-/** The runtime sync status (mirrors the Rust `SyncRuntimeStatus`). */
-export type SyncStatus =
-  | { state: "disabled" }
-  | { state: "not_enrolled" }
-  | { state: "pending" }
-  | { state: "idle" }
-  | { state: "syncing" }
-  | {
-      state: "error";
-      detail: string;
-      /**
-       * Epoch ms of the last cycle that completed on this device (myne#583),
-       * absent when none ever has. The desktop twin carries the same field and
-       * the same rule: it feeds a threshold, never a rendered date — mobile is
-       * where the no-wall-clock rule (AS6/AS15) is stated most explicitly.
-       */
-      last_success_at?: number;
-    }
-  | { state: "conflicts"; count: number };
+// The union lives with the view that consumes it (`src/lib/sync-status-view.ts`, aliased as
+// `@myne/sync-status-view`), so the two clients cannot describe one state differently. It is
+// re-exported here because this is where every mobile importer expects it (myne-md/myne#1027).
+import type { SyncStatus } from "@myne/sync-status-view";
+
+export type { SyncStatus } from "@myne/sync-status-view";
 
 /** Status-poll cadence for the indicator (ms). Cheap read-only command. */
 const STATUS_POLL_MS = 5000;

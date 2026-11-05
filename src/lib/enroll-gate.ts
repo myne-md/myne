@@ -40,6 +40,7 @@ export type SyncStatusState =
   | "idle"
   | "syncing"
   | "error"
+  | "uploads_blocked"
   | "conflicts";
 
 /**
@@ -74,6 +75,10 @@ export function canAddThisDevice(state: SyncStatusState | undefined): boolean {
     case "syncing":
     case "error":
     case "conflicts":
+    // Enrolled and pulling: the device is a member and its credential is fine, so the enrol form
+    // is the same dead UI as `idle` (myne-md/myne#1027). Enrolling again would mint a second
+    // `device_id` rather than repair the upload path — the repair is the identity phrase entry.
+    case "uploads_blocked":
       return false;
 
     // Status not read yet. Withholding is what keeps the row from flashing on

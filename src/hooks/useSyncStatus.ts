@@ -12,27 +12,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "../platform/core";
 import { subscribeToEvents } from "../lib/subscribe";
+import type { SyncStatus } from "../lib/sync-status-view";
 
-/** The runtime sync status (mirrors the Rust `SyncRuntimeStatus`). */
-export type SyncStatus =
-  | { state: "disabled" }
-  | { state: "not_enrolled" }
-  | { state: "pending" }
-  | { state: "idle" }
-  | { state: "syncing" }
-  | {
-      state: "error";
-      detail: string;
-      /**
-       * Epoch ms of the last cycle that completed on this device (myne#583),
-       * absent when none ever has. Carried only on `error`, matching the Rust
-       * side: how long sync has been broken is a question that only exists
-       * while it is broken. Feed it to `isSyncStale`, never to a date format —
-       * see `src/lib/sync-staleness.ts` for why.
-       */
-      last_success_at?: number;
-    }
-  | { state: "conflicts"; count: number };
+// The union (and the sentence it maps to) lives in `src/lib/sync-status-view.ts`, so the phone,
+// the computer and the browser cannot describe one state differently. It is re-exported from here
+// because this is where every existing importer expects it.
+export type { SyncStatus } from "../lib/sync-status-view";
 
 /** Status-poll cadence for the indicator (ms). Cheap read-only command. */
 const STATUS_POLL_MS = 5000;
@@ -145,6 +130,15 @@ function sameStatus(a: SyncStatus | null, b: SyncStatus): boolean {
       return b.state === "error" && sameFields(a, b, { detail: true, last_success_at: true });
     case "conflicts":
       return b.state === "conflicts" && sameFields(a, b, { count: true });
+    case "uploads_blocked":
+      // Both payload fields, for the same reason `error` names `last_success_at`: the panel
+      // renders the cause sentence and the upload clock, so a poll whose only change is a newer
+      // `last_upload_at` (the first upload after a repair) must reach React or the "last upload"
+      // line freezes on the value it had while the device was still broken (myne-md/myne#1027).
+      return (
+        b.state === "uploads_blocked" &&
+        sameFields(a, b, { detail: true, last_upload_at: true })
+      );
     // Payload-free today, and listed one per line rather than collapsed into a
     // default, so adding a STATE to the union fails to compile below while
     // adding a FIELD to one of these fails to compile at its own arm.

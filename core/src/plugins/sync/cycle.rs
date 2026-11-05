@@ -1095,6 +1095,11 @@ pub async fn run_active_cycle_from_host(
     // thread. A vault with no tail keeps the `NTV5` HMAC head and resolves to `no_context`
     // here, which the guard never consults because it only fires on a tail-carrying vault.
     let authority = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
+    // Why this cycle could not upload, when it could not (myne-md/myne#1027). Declared here so
+    // the ReadOnly arm can record it and the success arm can carry it back on the summary: the
+    // arm already LOGGED this and then dropped it, which is how a device that uploaded nothing
+    // for a day reported `Ran` with no caveat and the UI printed "Synced".
+    let mut upload_blocked: Option<&'static str> = None;
     // An `NTV6` vault's head is signature-authenticated. If no person identity is
     // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
@@ -1148,6 +1153,19 @@ pub async fn run_active_cycle_from_host(
                          fetch the state that would let it"
                     );
                     gate = super::orchestrator::PushGate::PollOnly;
+                    // The class as if no identity were held: `class_for_missing_authority` answers
+                    // `Other` whenever one IS held, on the reasoning that the user has nothing to
+                    // do — true for the retry ladder, useless as a sentence. What the UI needs is
+                    // what is missing, and `status_detail` is the one vocabulary all three
+                    // clients already map (`device_key_missing`, `identity_locked`).
+                    upload_blocked = Some(
+                        match class_for_missing_authority(cause, false).status_detail() {
+                            // `Other` means no user action repairs it, and "Sync failed" would be a
+                            // lie about a cycle that just succeeded.
+                            "sync_failed" => "uploads_blocked",
+                            detail => detail,
+                        },
+                    );
                 }
                 HeadAuthorityVerdict::Refuse => {
                     let class = class_for_missing_authority(cause, authority.person_held);
@@ -1473,6 +1491,23 @@ pub async fn run_active_cycle_from_host(
             // existed nothing on disk did.
             super::state::record_sync_success(io, &vault_root_for_stamp, host.now_unix_millis())
                 .await;
+            // The OTHER clock (myne-md/myne#1027): "last success" is reachability, and a
+            // pull-only cycle stamps it, so a device that had uploaded nothing for a day still
+            // reported a success two minutes old. This one moves only when something went UP.
+            if summary.pushed > 0
+                || summary.head_advanced
+                || summary.attachments_pushed > 0
+                || summary.tombstones_pushed > 0
+            {
+                super::state::record_upload_success(
+                    io,
+                    &vault_root_for_stamp,
+                    host.now_unix_millis(),
+                )
+                .await;
+            }
+            let mut summary = summary;
+            summary.upload_blocked = upload_blocked;
             CycleOutcome::Ran(summary)
         }
         Ok(Err(e)) => {

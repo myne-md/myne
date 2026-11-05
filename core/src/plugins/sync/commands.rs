@@ -21,7 +21,7 @@ use tauri::{AppHandle, Manager, Runtime};
 /// Re-exported so `generate_handler!`, the mobile crate and the TS mirror keep
 /// resolving `commands::SyncRuntimeStatus`; the type moved to `status` with the
 /// derivation (task 84).
-pub use super::status::{overlay_status, status_from, LiveStatus, SyncRuntimeStatus};
+pub use super::status::{overlay_status, status_from, LiveStatus, SyncClocks, SyncRuntimeStatus};
 
 /// Resolve `<app_config_dir>/sync-config.json` (the `themes` plugin precedent).
 #[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
@@ -195,6 +195,16 @@ impl SyncRuntimeStatusCell {
     /// Publish "the last cycle failed" with a bounded, non-secret detail tag.
     pub fn set_error(&self, detail: impl Into<String>) {
         *self.0.lock().unwrap() = Some(LiveStatus::Error(detail.into()));
+    }
+    /// Publish "the last cycle ran and could not upload", with a bounded cause token
+    /// (myne-md/myne#1027).
+    ///
+    /// The third state this cell was missing. Before it, a cycle that succeeded without
+    /// uploading had to choose between `set_error` (a lie about a pull that worked) and
+    /// `clear` (the status falls back to `Idle`, which the indicator renders as "Synced" — the
+    /// other lie, and the one that hid this state for a day).
+    pub fn set_blocked(&self, detail: impl Into<String>) {
+        *self.0.lock().unwrap() = Some(LiveStatus::Blocked(detail.into()));
     }
     /// Clear the overlay (a clean/idle cycle → fall back to base + conflicts).
     pub fn clear(&self) {
@@ -2807,7 +2817,12 @@ mod tests {
             SyncRuntimeStatus::Pending,
         ] {
             assert_eq!(
-                overlay_status(base.clone(), Some(LiveStatus::Syncing), 5, None),
+                overlay_status(
+                    base.clone(),
+                    Some(LiveStatus::Syncing),
+                    5,
+                    SyncClocks::default()
+                ),
                 base
             );
         }
@@ -2818,7 +2833,7 @@ mod tests {
         use SyncRuntimeStatus as S;
         // In-flight Syncing wins even with conflicts present.
         assert_eq!(
-            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3, None),
+            overlay_status(S::Idle, Some(LiveStatus::Syncing), 3, SyncClocks::default()),
             S::Syncing
         );
         // A failed cycle surfaces Error (with its detail) over conflicts.
@@ -2827,7 +2842,7 @@ mod tests {
                 S::Idle,
                 Some(LiveStatus::Error("sync_failed".into())),
                 3,
-                None
+                SyncClocks::default()
             ),
             S::Error {
                 detail: "sync_failed".into(),
@@ -2836,11 +2851,14 @@ mod tests {
         );
         // No live overlay + unresolved conflicts → Conflicts{count}.
         assert_eq!(
-            overlay_status(S::Idle, None, 2, None),
+            overlay_status(S::Idle, None, 2, SyncClocks::default()),
             S::Conflicts { count: 2 }
         );
         // Enrolled, nothing in flight, no conflicts → a bare Idle.
-        assert_eq!(overlay_status(S::Idle, None, 0, None), S::Idle);
+        assert_eq!(
+            overlay_status(S::Idle, None, 0, SyncClocks::default()),
+            S::Idle
+        );
     }
 
     #[test]
