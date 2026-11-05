@@ -163,7 +163,7 @@ describe("SyncStatusIndicator — which states offer 'Sync now'", () => {
     return screen.queryByTestId("sync.sync-now") !== null;
   };
 
-  it.each([
+  const RETRY_CASES: Array<[string, boolean, string]> = [
     ["quota_exceeded", true, "freed server quota, then retry"],
     ["storage_full", true, "freed local disk, then retry"],
     ["tls_failure", true, "repaired the certificate or the network, then retry"],
@@ -172,7 +172,8 @@ describe("SyncStatusIndicator — which states offer 'Sync now'", () => {
     ["sync_failed", true, "a transport blip, retry is the whole fix"],
     ["identity_locked", false, "the phrase entry is the honest control"],
     ["device_key_missing", false, "the repair action is the honest control"],
-  ] as const)("error %s → Sync now visible: %s", async (detail, expected) => {
+  ];
+  it.each(RETRY_CASES)("error %s → Sync now visible: %s", async (detail, expected) => {
     expect(await offers({ state: "error", detail })).toBe(expected);
     cleanup();
   });
