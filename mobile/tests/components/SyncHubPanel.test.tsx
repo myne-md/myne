@@ -218,3 +218,71 @@ describe("the approval wait has a door that no status read can close", () => {
     expect(screen.queryByTestId("sync.settings.approval-code")).toBeNull();
   });
 });
+
+/**
+ * The repair row (myne-md/myne#1029).
+ *
+ * The measured failure, on an iPhone whose sync had never uploaded once: the
+ * status row read "Unlock your identity to sync" and the panel rendered no
+ * control, because the phone ignored the shared view's `action` and its identity
+ * surface mounted on the zero-vault stage only. A sentence that names an act the
+ * client cannot perform is worse than the generic line, and these three cases hold
+ * the row to the shared mapping rather than to a second opinion about which states
+ * are repairable.
+ */
+describe("the blocked states offer the repair the sentence names", () => {
+  const renderWithDoor = (status: SyncStatus, onUnlockIdentity: () => void) =>
+    render(
+      <SyncHubPanel
+        status={status}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+        onUnlockIdentity={onUnlockIdentity}
+      />,
+    );
+
+  it("routes the locked identity to the door, with the desktop's own label", async () => {
+    const onUnlockIdentity = vi.fn();
+    renderWithDoor({ state: "uploads_blocked", detail: "identity_locked" }, onUnlockIdentity);
+    const row = await screen.findByTestId("sync.settings.unlock-identity");
+    expect(row.textContent).toContain("sync.status.unlockIdentityCta");
+    // `unlock_identity` and `repair_device` are one phrase entry with two labels,
+    // so a row that swapped them would still send the user to the right place,
+    // but it would tell them the wrong thing about what is missing.
+    expect(row.textContent).not.toContain("sync.status.repairDeviceCta");
+    row.click();
+    expect(onUnlockIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("says 'repair' for the device-key state rather than 'unlock'", async () => {
+    renderWithDoor({ state: "uploads_blocked", detail: "device_key_missing" }, () => {});
+    const row = await screen.findByTestId("sync.settings.unlock-identity");
+    expect(row.textContent).toContain("sync.status.repairDeviceCta");
+  });
+
+  it("offers nothing while the state is healthy, and nothing without a door to open", async () => {
+    const healthy = renderWithDoor({ state: "idle" }, () => {});
+    expect(screen.queryByTestId("sync.settings.unlock-identity")).toBeNull();
+    healthy.unmount();
+
+    // An isolated render (a component test, a surface with no shell) keeps the
+    // label and owes the caller nothing it cannot do.
+    render(
+      <SyncHubPanel
+        status={{ state: "error", detail: "identity_locked" }}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+      />,
+    );
+    await screen.findByTestId("sync.settings.status");
+    expect(screen.queryByTestId("sync.settings.unlock-identity")).toBeNull();
+  });
+});

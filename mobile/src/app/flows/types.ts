@@ -102,13 +102,28 @@ export interface IdentityFlowProps {
    * Create a vault from the identity home (myne-md/myne#911 task 12).
    *
    * Passed ONLY by the entry that knows there are zero vaults on this device
-   * (the welcome door), because the identity home is also reachable from Settings
-   * on a device that already holds vaults, where a create action would be a second
-   * door to a flow the picker and the editor already own. The flow renders the
-   * action only when it is given, so the caller stays authoritative and the flow
-   * needs no vault-list probe of its own.
+   * (the welcome door): a device that already holds a vault reaches this flow from
+   * the sync surface's repair door or from a scanned code, where a create action
+   * would be a second door to a flow the picker and the editor already own. The
+   * flow renders the action only when it is given, so the caller stays
+   * authoritative and the flow needs no vault-list probe of its own.
+   *
+   * The identity UNLOCK door does not depend on this (myne-md/myne#1029): it used
+   * to, which is why a device holding a vault had no surface here that could open
+   * its identity.
    */
   onCreateVault?: () => void;
+  /**
+   * Present when this mount IS the sync surface's repair door (myne-md/myne#1029).
+   *
+   * The shell opens the flow for a device whose sync is blocked on a closed
+   * identity, so the mount lands on the phrase grid instead of the home whenever
+   * the probe answers "sealed", and calls this instead of landing on the home once
+   * the phrase is accepted: the caller closes the overlay and the surface that
+   * asked re-reads its own status. Absent on every other entry, which keeps the
+   * home as the landing step those doors have always used.
+   */
+  onUnlocked?: () => void;
 }
 
 /**

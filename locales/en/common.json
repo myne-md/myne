@@ -3203,6 +3203,7 @@
       "diagnosticsReading": "Reading…",
       "diagnosticCopied": "Copied",
       "diagnosticsLogNote": "There is no log file on this device for this block to hand over: the saved diagnostic log is a desktop feature.",
+      "diagnosticUnknownNote": "unknown is an answer, not a fault. That reading stopped before it asked its question, so it reports nothing either way.",
       "diagnosticCopy": "Copy diagnostics",
       "diagnosticCopyDone": "Diagnostics copied",
       "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
@@ -5624,7 +5625,10 @@
       "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
-      "continue": "Continue"
+      "continue": "Continue",
+      "registerCta": "Save and register",
+      "registerLater": "Later",
+      "registerHint": "Registering adds this identity to {{server}}, the sync server this device already uses, so people can invite you and your vaults can sync. Later keeps it on this device only, and the identity home can register it then."
     },
     "typeback": {
       "title": "Confirm your phrase"
