@@ -173,14 +173,14 @@ export type HostWebView = "WKWebView" | "WebKitGTK" | "WebView2" | "Android WebV
  *     the block as the literal `NaN`. A field saying NaN says the app is broken
  *     in a way it is not, and the honest answer for an unusable reading already
  *     exists one line down: no line at all.
- *   * a NON-EMPTY store rounding to `0`. Anything under 512 KB — a small but
- *     real vault — came out as a bare `0`, which is not a coarse version of
+ *   * a NON-EMPTY store rounding to `0`. Anything under 512 KB, a small but
+ *     real vault, came out as a bare `0`, which is not a coarse version of
  *     "some", it is the one value that says the opposite. The block exists to
  *     be acted on, and `storageUsedMb: 0` is what a maintainer uses to rule
  *     storage out of an investigation.
  *
  * So sub-megabyte usage reports as 1 rather than 0. That over-states by less
- * than a megabyte, at a granularity where a megabyte is already the unit — and
+ * than a megabyte, at a granularity where a megabyte is already the unit, and
  * it is the only direction that cannot mislead: "at least a bit" is true of
  * every non-empty store, "none" is true of none of them.
  */

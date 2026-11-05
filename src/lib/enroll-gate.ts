@@ -18,10 +18,10 @@
 //
 // # Why it takes a state string rather than a status object
 //
-// Each client declares its own `SyncStatus` union (`src/hooks/useSyncStatus.ts`
-// here, `src/lib/use-sync-status.ts` on mobile) because each carries different
-// extra signals beside it. The `state` tag is the part they agree on — it is
-// the serde tag of the Rust `SyncRuntimeStatus` — so the predicate takes that
+// The union is one type now (`src/lib/sync-status-view.ts`, re-exported by both
+// clients' hooks: myne-md/myne#1027), and its `state` tag is the serde tag of the
+// Rust `SyncRuntimeStatus`. The predicate still takes that tag rather than a
+// status object, because a caller holding only a tag must not have to build one
 // and stays unattached to either hook.
 //
 // # Why the arbiter is `sync_status` and not the device roster
@@ -77,7 +77,7 @@ export function canAddThisDevice(state: SyncStatusState | undefined): boolean {
     case "conflicts":
     // Enrolled and pulling: the device is a member and its credential is fine, so the enrol form
     // is the same dead UI as `idle` (myne-md/myne#1027). Enrolling again would mint a second
-    // `device_id` rather than repair the upload path — the repair is the identity phrase entry.
+    // `device_id` rather than repair the upload path, the repair is the identity phrase entry.
     case "uploads_blocked":
       return false;
 

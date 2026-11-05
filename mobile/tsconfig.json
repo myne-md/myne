@@ -28,6 +28,7 @@
       "@myne/sync-status-view": ["../src/lib/sync-status-view.ts"],
       "@myne/diagnostics": ["../src/lib/diagnostics.ts"],
       "@myne/vault-doctor": ["../src/lib/vault-doctor.ts"],
+      "@myne/diagnostics-gather": ["../src/lib/diagnostics-gather.ts"],
       "@myne/recovery-kit": ["../src/lib/recovery-kit.ts"],
       "@myne/locales-en": ["../locales/en/common.json"],
       "@myne/i18n": ["../src/i18n/index.ts"],

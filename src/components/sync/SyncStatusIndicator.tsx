@@ -12,7 +12,7 @@
 // What this component owns is LAYOUT. The sentence, the dot colour, which repair is
 // offered and whether "Sync now" can keep its promise all come from
 // `src/lib/sync-status-view.ts`, which is the one place any client maps a status to
-// words — the phone and the browser consume the same function, so a state cannot read
+// words, the phone and the browser consume the same function, so a state cannot read
 // as "Synced" here and "On" there.
 
 import type { CSSProperties } from "react";

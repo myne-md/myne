@@ -4,7 +4,7 @@
 //
 // The mapping from `SyncRuntimeStatus` to a dot colour and a label was written three times:
 // here on desktop (`SyncStatusIndicator`'s `present`), in `mobile/src/lib/sync-status-view.ts`,
-// and — for one state — nowhere, because a cycle that ran without uploading reported `Idle`
+// and, for one state, nowhere, because a cycle that ran without uploading reported `Idle`
 // and `Idle` renders as "Synced".
 //
 // The three copies had already drifted in the way that matters: `idle` said "Synced" on a
@@ -40,7 +40,7 @@ export type SyncStatus =
        * Epoch ms of the last cycle that completed on this device (myne#583), absent when none
        * ever has. Carried only on `error`, matching the Rust side: how long sync has been
        * broken is a question that only exists while it is broken. Feed it to `isSyncStale`,
-       * never to a date format — see `src/lib/sync-staleness.ts` for why.
+       * never to a date format, see `src/lib/sync-staleness.ts` for why.
        */
       last_success_at?: number;
     }
@@ -54,8 +54,11 @@ export type SyncStatus =
       /**
        * Epoch ms of the last cycle that uploaded anything, absent when this device never has.
        * Coarse by construction (an hourly stamp, see `SyncState::last_upload_at_ms`), and
-       * carried ONLY here: a healthy device shows no clock, and this one exists to say how long
-       * the user's work has been sitting on the machine.
+       * carried ONLY here: a healthy device shows no clock.
+       *
+       * No arm below formats it yet. Rendering "last upload: three hours ago" needs a coarsening
+       * formatter and a translated string, so it is a named residual (`decisions/sync/0787`)
+       * rather than a number smuggled into a sentence; feed it to a formatter or leave it.
        */
       last_upload_at?: number;
     }
@@ -65,8 +68,12 @@ export type SyncStatus =
  * The repair a state offers, when one is a user action.
  *
  * Named rather than implied because the caller owns the control: desktop renders a button in the
- * indicator, the phone routes to its own identity sheet. What this module decides is WHETHER the
- * action applies, which is the part that was duplicated and drifted.
+ * indicator. What this module decides is WHETHER the action applies, which is the part that was
+ * duplicated and drifted. **The phone reads no action at all today**, because its editor stage has
+ * no person-identity entry to route to: `personUnlock` is reachable only from `IdentityFlow`, and
+ * that flow renders on the zero-vault stage alone. So a blocked phone says what is wrong and
+ * offers no control, which is honest, and closing that is a navigation change in `mobile/`, not a
+ * sentence in this module (myne-md/myne#1027 review, recorded as a residual there).
  */
 export type SyncStatusAction = "unlock_identity" | "repair_device";
 
@@ -138,7 +145,7 @@ export function syncStatusView(
         syncNowUseful: false,
       };
     case "idle":
-      // "Synced" — and this arm is only reachable when the last cycle could in fact upload,
+      // "Synced", and this arm is only reachable when the last cycle could in fact upload,
       // because a cycle that could not reports `uploads_blocked` (myne-md/myne#1027). That is
       // the whole reason the new state exists: this line was reachable for a device that had
       // uploaded nothing for a day.

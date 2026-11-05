@@ -46,6 +46,8 @@ export default defineConfig(async () => ({
       // the desktop panel builds, so a maintainer can diff two pastes field by field.
       { find: "@myne/diagnostics", replacement: sib("../src/lib/diagnostics.ts") },
       { find: "@myne/vault-doctor", replacement: sib("../src/lib/vault-doctor.ts") },
+      // The gather both clients call, seam-free so the phone can run it (myne-md/myne#1027).
+      { find: "@myne/diagnostics-gather", replacement: sib("../src/lib/diagnostics-gather.ts") },
       // The shared RECOVERY-KIT FILE FORMAT (myne-md/myne#468). Aliased for
       // exactly the reason above: the kit is a plain-text document a user saves
       // on one client and reads back into the recovery flow on ANOTHER, so its

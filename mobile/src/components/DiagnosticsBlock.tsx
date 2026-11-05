@@ -12,7 +12,7 @@
 // The BLOCK is built by `@myne/diagnostics` (`buildDiagnostics`), the pure allowlist the desktop
 // panel also calls, over the vault-doctor mirror in `@myne/vault-doctor`. So a phone's paste and
 // a computer's paste carry the same field names in the same order, and a maintainer can diff
-// them — which is the whole reason the phone's surface is worth building.
+// them, which is the whole reason the phone's surface is worth building.
 //
 // What is per-client is the reading: this file takes the environment from the MOBILE seam. The
 // fields that genuinely do not apply here (no OPFS storage estimate on some platforms, no
@@ -29,12 +29,13 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { buildDiagnostics, engineLabel, mb, type HostWebView } from "@myne/diagnostics";
-import { authorityToken, readVaultDoctor, sessionToken } from "@myne/vault-doctor";
+import { gatherDiagnostics } from "@myne/diagnostics-gather";
+import type { HostWebView } from "@myne/diagnostics";
 import { invoke } from "../platform/core";
 import { writeText as clipboardWriteText } from "../lib/clipboardTransport";
 import { copyText } from "@myne/clipboard";
 import { Button } from "./Button";
+import { showToast } from "./ToastHost";
 import { ListGroup } from "./list";
 
 /** Which WebView this build runs in. Two clients, two answers, one label vocabulary. */
@@ -45,53 +46,21 @@ function hostWebView(): HostWebView | null {
   return null;
 }
 
-/** How long the vault read may take before the block is built without it. */
-const DOCTOR_DEADLINE_MS = 2000;
-
-function withinDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
-    void work.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      () => {
-        clearTimeout(timer);
-        resolve(null);
-      },
-    );
-  });
-}
-
-/** The block, read once per mount. Returns `null` until the first read settles. */
-async function collect(): Promise<string> {
-  const doctor = await withinDeadline(readVaultDoctor(invoke), DOCTOR_DEADLINE_MS);
-  let usage: StorageEstimate | null = null;
-  try {
-    usage = (await navigator.storage?.estimate?.()) ?? null;
-  } catch {
-    // Permission- and engine-dependent; an unavailable reading drops the two storage lines.
-  }
-  return buildDiagnostics({
-    version: __APP_VERSION__,
-    channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
-    // Mobile's build injects no commit define: `null` omits the line rather than printing a
-    // placeholder, which is the rule the block's own header states.
+/** The block, read once per mount, through the ONE gather both clients use.
+ *
+ * The phone answers four of `DiagnosticsEnv` with a "this build has no reading" value rather
+ * than a guess, and those omissions are the block's own rule (a field without a reading is
+ * absent, never a placeholder): mobile's build injects no commit or bundle hash define, and no
+ * global-failure recorder exists on this client, so `none` is the block's spelling for "no
+ * failure was recorded" rather than a claim that the build is healthy.
+ */
+function collect(): Promise<string> {
+  return gatherDiagnostics({
+    call: invoke,
+    webView: hostWebView(),
     commit: null,
     bundleHash: null,
-    // Mobile installs no global-failure recorder, so there is no code to report. `none` is the
-    // block's own spelling for "no failure was recorded", not a claim that the build is healthy.
     failureCode: "none",
-    vaultGeneration: doctor?.generation ?? null,
-    vaultAuthority: doctor ? authorityToken(doctor.authority) : null,
-    vaultBinding: doctor?.binding ?? null,
-    vaultKeyAtRest: doctor?.key_at_rest ?? null,
-    vaultSession: doctor ? sessionToken(doctor.session) : null,
-    engine: engineLabel(navigator.userAgent, hostWebView()),
-    crossOriginIsolated: typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false,
-    storageUsedMb: mb(usage?.usage),
-    storageQuotaMb: mb(usage?.quota),
   });
 }
 
@@ -107,7 +76,6 @@ export function DiagnosticsBlock() {
   const { t } = useTranslation();
   const [block, setBlock] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,13 +107,16 @@ export function DiagnosticsBlock() {
       onSuccess: {
         kind: "inline",
         run: () => {
-          setFailed(false);
           setCopied(true);
         },
       },
+      // A FAILURE is the one case that goes to a toast: `copyText`'s own contract keeps the
+      // confirmation on the pressed control and reserves the toast for the path where the button
+      // cannot say anything true about itself (a control that did nothing and silently went back
+      // to its resting label reads as a copy that worked).
       onFailure: {
-        kind: "inline",
-        run: () => setFailed(true),
+        kind: "toast",
+        run: () => showToast(t("settings.about.diagnosticCopyFailed")),
       },
     });
   };
@@ -199,11 +170,6 @@ export function DiagnosticsBlock() {
             {copied ? t("settings.about.diagnosticCopyDone") : ""}
           </span>
         </div>
-        {failed && (
-          <div style={{ fontSize: "var(--text-sm)", color: "var(--danger)", marginTop: "var(--space-2)" }}>
-            {t("settings.about.diagnosticCopyFailed")}
-          </div>
-        )}
         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", marginTop: "var(--space-2)" }}>
           {t("settings.about.diagnosticsLogNote")}
         </div>

@@ -1155,7 +1155,7 @@ pub async fn run_active_cycle_from_host(
                     gate = super::orchestrator::PushGate::PollOnly;
                     // The class as if no identity were held: `class_for_missing_authority` answers
                     // `Other` whenever one IS held, on the reasoning that the user has nothing to
-                    // do — true for the retry ladder, useless as a sentence. What the UI needs is
+                    // do: true for the retry ladder, useless as a sentence. What the UI needs is
                     // what is missing, and `status_detail` is the one vocabulary all three
                     // clients already map (`device_key_missing`, `identity_locked`).
                     upload_blocked = Some(
@@ -1612,6 +1612,44 @@ pub async fn run_active_cycle_from_host(
     outcome
 }
 
+/// The manual button's answer for a cycle that RAN.
+///
+/// Split out from the async shell so the rule is testable without a host, because the
+/// shell had this wrong: it answered `Idle` for every `Ran` and dropped the verdict the
+/// cycle had just computed, so one click of "Sync now" on a device that cannot sign
+/// painted "Synced". That is the same collapse the function's own doc comment forbids,
+/// reached through the one path the background loop does not cover (myne-md/myne#1027).
+fn ran_status(
+    upload_blocked: Option<&'static str>,
+    last_upload_at: Option<u64>,
+) -> super::status::SyncRuntimeStatus {
+    match upload_blocked {
+        Some(detail) => super::status::SyncRuntimeStatus::UploadsBlocked {
+            detail: detail.into(),
+            last_upload_at,
+        },
+        None => super::status::SyncRuntimeStatus::Idle,
+    }
+}
+
+/// Read the two persisted clocks. One place, because both arms of the manual
+/// button's answer need them and a second copy of the path resolution is a second
+/// place to get the vault root wrong.
+async fn read_clocks(
+    host: &dyn HostCtx,
+    io: &'static dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> (Option<u64>, Option<u64>) {
+    let Ok(dir) = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        return (None, None);
+    };
+    match super::state::read_sync_state(io, &dir).await {
+        Ok(s) => (s.last_success_at_ms, s.last_upload_at_ms),
+        Err(_) => (None, None),
+    }
+}
+
 /// Run one cycle NOW (the manual "Sync now" button) and report the resulting
 /// status.
 ///
@@ -1647,22 +1685,17 @@ pub async fn sync_now_from_host(
                 // this covers the manual path on top of it.
                 host.emit("sync://changed", EventPayload::Count(summary.pulled as u32));
             }
-            SyncRuntimeStatus::Idle
+            // A `Ran` that could not upload is NOT `Idle`: the cycle's own verdict travels
+            // on the summary, and answering "Synced" here would hide the very state this
+            // button has to be able to show (myne-md/myne#1027).
+            let (_, last_upload_at) = read_clocks(host, io, state).await;
+            ran_status(summary.upload_blocked, last_upload_at)
         }
         CycleOutcome::Failed(class) => {
             // The manual button's answer carries the same clock the polled
             // status does, so a "Sync now" that fails does not blank out a
             // staleness warning the poll had already raised.
-            let last_success_at = match crate::paths::active_vault_root_io_from_host(
-                host,
-                state.active_vault_id().await,
-            ) {
-                Ok(dir) => super::state::read_sync_state(io, &dir)
-                    .await
-                    .ok()
-                    .and_then(|s| s.last_success_at_ms),
-                Err(_) => None,
-            };
+            let (last_success_at, _) = read_clocks(host, io, state).await;
             SyncRuntimeStatus::Error {
                 detail: class.status_detail().into(),
                 last_success_at,
@@ -1898,6 +1931,41 @@ mod tests {
     //! rule is about — which file the hash comes from, and what happens when the
     //! two disagree — is decided here, and the rest of the gather is a host, a
     //! runtime slot and a live server.
+
+    /// The manual "Sync now" button must not answer `Idle` for a cycle that could not upload.
+    ///
+    /// The exact regression: `sync_now_from_host` matched `Ran(_)` and returned `Idle`
+    /// unconditionally, so the verdict the cycle had just computed was dropped on the one path
+    /// the background loop does not cover, and a click on a blocked device painted "Synced".
+    /// Removing the `upload_blocked` arm below compiles and leaves every other test green.
+    #[test]
+    fn a_manual_sync_that_cannot_upload_is_not_idle() {
+        use super::ran_status;
+        use crate::plugins::sync::status::SyncRuntimeStatus;
+
+        assert_eq!(
+            ran_status(None, Some(1)),
+            SyncRuntimeStatus::Idle,
+            "a clean cycle is still Idle, and carries no blocked cause"
+        );
+        match ran_status(Some("device_key_missing"), Some(1_700_000_000_000)) {
+            SyncRuntimeStatus::UploadsBlocked {
+                detail,
+                last_upload_at,
+            } => {
+                assert_eq!(detail, "device_key_missing");
+                assert_eq!(
+                    last_upload_at,
+                    Some(1_700_000_000_000),
+                    "the blocked answer carries the upload clock, which is the whole reason \
+                     the state exists"
+                );
+            }
+            other => {
+                panic!("a Ran cycle that could not upload answered {other:?}, not UploadsBlocked")
+            }
+        }
+    }
 
     /// The failure class a missing authority becomes, asserted for the four shapes that matter.
     ///

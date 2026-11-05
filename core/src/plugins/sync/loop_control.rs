@@ -658,7 +658,7 @@ pub fn spawn_sync_loop<R: Runtime>(app: AppHandle<R>) {
                     if let Some(cell) = app.try_state::<super::commands::SyncRuntimeStatusCell>() {
                         // A cycle that RAN and could not upload is not `clear` (myne-md/myne#1027).
                         // Clearing it fell back to `Idle`, and the indicator renders `Idle` as
-                        // "Synced" — so the one state a user most needs to see looked identical
+                        // "Synced", so the one state a user most needs to see looked identical
                         // to a healthy device. The cause travels on the summary from the cycle,
                         // which is the only place that knows the verdict.
                         match summary.upload_blocked {

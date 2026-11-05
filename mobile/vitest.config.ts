@@ -38,6 +38,7 @@ export default defineConfig({
       { find: "@myne/sync-status-view", replacement: sib("../src/lib/sync-status-view.ts") },
       { find: "@myne/diagnostics", replacement: sib("../src/lib/diagnostics.ts") },
       { find: "@myne/vault-doctor", replacement: sib("../src/lib/vault-doctor.ts") },
+      { find: "@myne/diagnostics-gather", replacement: sib("../src/lib/diagnostics-gather.ts") },
       { find: "@myne/locales-en", replacement: sib("../locales/en/common.json") },
       // The legal-document URL table (myne-ops#15) - mirror of vite.config.ts,
       // which carries the rationale. `SettingsSheet.tsx` imports it, so without

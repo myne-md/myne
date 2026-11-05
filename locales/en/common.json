@@ -3404,7 +3404,6 @@
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
       "label": "Archiving",
       "off": "Off",
-      "on": "On",
       "saveError": "Could not update the archiving setting."
     },
     "attachmentCompression": {
@@ -4348,10 +4347,6 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Not set up",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_other": "{{count}} conflicts"
       }
     },
     "data": {
