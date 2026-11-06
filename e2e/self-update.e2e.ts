@@ -50,8 +50,14 @@ describeE2E("su1 desktop self-update surfaces", () => {
         await s.byTestId("about.update-check");
         await s.byTestId("about.update-status");
         // The row is ONE control (myne-md/myne#1020): with nothing offered it is
-        // the check, and the install path does not exist yet. Pinned because the
-        // two shapes render an identical row, so only presence tells them apart.
+        // the check and no install control exists. This is an ABSENCE guard, not a
+        // shape pin: `about.update-install` was also conditional on an offered
+        // update before this change, so the line cannot tell the two shapes apart
+        // on its own (myne-md/myne#1022 review). The discriminating half is
+        // `tests/components/AboutPanel.test.tsx`, which drives the offered state
+        // and asserts the check button is gone while the install is present; this
+        // scenario has never been validated in the container either (its own
+        // header says so).
         expect(await s.byTestIdAll("about.update-install")).toHaveLength(0);
       },
     );

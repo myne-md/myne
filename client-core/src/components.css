@@ -1044,7 +1044,7 @@
 
    `.myne-review-card` deliberately keeps the ORIGINAL strength: it is a compact
    card on an editor surface, not a pane-wide zero state, which is the thing
-   `design-notes/ui/0786` retunes. */
+   `design-notes/ui/0790` retunes. */
 .myne-empty,
 .myne-review-card {
   --myne-empty-wash-paint:

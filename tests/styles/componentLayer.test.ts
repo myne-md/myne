@@ -179,7 +179,15 @@ describe("the zero state's wash (design-notes/ui/0633)", () => {
     expect(ruleBody(SHEET, ".myne-empty__wash {")).toContain(
       "background: var(--myne-empty-wash-paint)",
     );
-    expect(SHEET).toContain("color-mix(in srgb, var(--myne-empty-wash) 24%, transparent)");
+    // Scoped to the shared knob block and counted, not searched over the whole
+    // sheet: the paint moved into `.myne-empty, .myne-review-card`, and a
+    // whole-file `toContain` stayed green when both gradients were deleted from
+    // that block and the string was left behind in a comment (measured,
+    // myne-md/myne#1022 review). The other strength in this block is the error
+    // variant's 9%, in its own rule below.
+    const knob = ruleBody(SHEET, ".myne-empty,\n.myne-review-card {");
+    expect(knob).toContain("color-mix(in srgb, var(--myne-empty-wash) 24%, transparent)");
+    expect(SHEET.match(/var\(--myne-empty-wash\) 24%/g)).toHaveLength(1);
   });
 
   it("fades to nothing at every edge, so a filled state has no hard line", () => {
