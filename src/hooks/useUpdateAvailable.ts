@@ -31,7 +31,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { has } from "../platform/capabilities";
 import { lockVault } from "../lib/vault-unlock";
-import { getAutoCheck, updateCheck, updateInstall } from "../platform/update";
+import { listen, type UnlistenFn } from "../platform/event";
+import {
+  getAutoCheck,
+  updateCheck,
+  updateInstall,
+  UPDATE_PROGRESS_EVENT,
+  type UpdateProgress,
+} from "../platform/update";
 import { renameFlushHooks } from "../notes/renameFlushHook";
 
 /** Let the app settle before the first background check competes for the network. */
@@ -49,6 +56,33 @@ const COLLAPSE_MS = 8_000;
 export type UpdateNoticeView = "offer" | "confirm" | "pill";
 export type UpdatePhase = "idle" | "working" | "failed";
 export type UpdateBlock = "flush" | "lock" | "stage";
+
+/**
+ * Where the install has got to, as the screen renders it.
+ *
+ * `starting` is not a host phase: it is the window between pressing the button
+ * and the first tick, during which the host is resolving the manifest and
+ * opening the request. It exists so the screen has an honest indeterminate state
+ * instead of showing 0% and claiming the download began.
+ */
+export type UpdateProgressPhase =
+  | "starting"
+  | UpdateProgress["phase"];
+
+/** A live progress reading, in the shape the screen draws. */
+export interface UpdateProgressState {
+  phase: UpdateProgressPhase;
+  /** Bytes received in this attempt. Meaningful only while downloading. */
+  downloaded: number;
+  /** The artifact's size, or null when the origin declared none. */
+  total: number | null;
+}
+
+const NOT_STARTED: UpdateProgressState = {
+  phase: "starting",
+  downloaded: 0,
+  total: null,
+};
 
 export interface UseUpdateAvailableOptions {
   /** False outside the stages that can show an update, which gates the check. */
@@ -71,6 +105,8 @@ export interface UpdateAvailableHook {
   view: UpdateNoticeView | null;
   /** What the updating screen is doing. `idle` until an install starts. */
   phase: UpdatePhase;
+  /** Where the install has got to, for the updating screen's bar and readout. */
+  progress: UpdateProgressState;
   /** True from the confirm's press until the install resolves. */
   working: boolean;
   /** Which step refused to start the update. Null unless one did. */
@@ -101,6 +137,7 @@ export function useUpdateAvailable({
   const [blocked, setBlocked] = useState<UpdateBlock | null>(null);
   const [version, setVersion] = useState<string | null>(null);
   const [notes, setNotes] = useState<string | null>(null);
+  const [progress, setProgress] = useState<UpdateProgressState>(NOT_STARTED);
   // Session-scoped, and separate from `view` because a re-check must not
   // resurrect an offer the user dismissed.
   const dismissed = useRef(false);
@@ -160,8 +197,51 @@ export function useUpdateAvailable({
     return () => clearTimeout(timer);
   }, [view]);
 
+  // The install's own progress stream (myne-md/myne#1020). Subscribed for the session
+  // rather than around each install for one reason: `listen` resolves
+  // asynchronously, and a subscription taken at the press would race the first
+  // chunks, which is a bar that starts at 8% for no reason. Nothing emits this
+  // outside an install, and a ticket arriving while the screen is not showing is
+  // a value nothing renders.
+  useEffect(() => {
+    if (!has("selfUpdate")) return;
+    let cancelled = false;
+    let unlisten: UnlistenFn | null = null;
+    listen<UpdateProgress>(UPDATE_PROGRESS_EVENT, (event) => {
+      const tick = event.payload;
+      if (tick.phase === "downloading") {
+        setProgress({
+          phase: "downloading",
+          downloaded: tick.downloaded,
+          total: tick.total,
+        });
+      } else {
+        // The byte counts stay from the last tick: the screen shows a full bar
+        // for these phases, and keeping the numbers lets a later `downloading`
+        // (a retry) start from what the host actually reported.
+        setProgress((prev) => ({ ...prev, phase: tick.phase }));
+      }
+    })
+      .then((off) => {
+        if (cancelled) off();
+        else unlisten = off;
+      })
+      .catch((error: unknown) => {
+        // No event stream is not a failed install: the bar simply stays in its
+        // starting shape while the install runs to its own conclusion.
+        if (import.meta.env.DEV) {
+          console.warn("useUpdateAvailable: progress subscription failed", error);
+        }
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, []);
+
   const install = useCallback(() => {
     setPhase("working");
+    setProgress(NOT_STARTED);
     updateInstall()
       .catch(() => {
         // A failed install leaves the running version untouched, so this is the
@@ -221,6 +301,7 @@ export function useUpdateAvailable({
   return {
     view,
     phase,
+    progress,
     working: phase === "working",
     blocked,
     version,

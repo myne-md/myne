@@ -99,7 +99,12 @@ function runOpencode() {
     child.on('error', (e) => { clearTimeout(timer); reject(e); });
     child.on('close', (code) => {
       clearTimeout(timer);
-      if (code !== 0) return reject(new Error(`opencode exit ${code}: ${stderr.slice(0, 500)}`));
+      // The TAIL, not the head. `stderr.slice(0, 500)` kept opencode's startup
+      // banner and threw away the error, so every failure in this workflow read
+      // `loading path=/home/runner/.config/opencode/config.json` and then stopped
+      // mid-token: sixty consecutive runs died in three seconds each with no cause
+      // in the log (myne-md/myne#1022). The tail is where the reason is.
+      if (code !== 0) return reject(new Error(`opencode exit ${code}: ${stderr.length} bytes of stderr, tail:\n${stderr.slice(-2000)}`));
       resolve(stdout);
     });
   });

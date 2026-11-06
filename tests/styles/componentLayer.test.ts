@@ -174,14 +174,30 @@ describe("the zero state's wash (design-notes/ui/0633)", () => {
   it("takes its colour from the accent, so every palette tints it with its own", () => {
     // A literal here would be the one colour in the zero state no theme reaches.
     expect(ruleBody(SHEET, ".myne-empty {")).toContain("--myne-empty-wash: var(--accent)");
-    expect(ruleBody(SHEET, ".myne-empty__wash {")).toContain("var(--myne-empty-wash)");
+    // The wash paints from its own knob, so the error variant can retune the same
+    // two gradients instead of restating them.
+    expect(ruleBody(SHEET, ".myne-empty__wash {")).toContain(
+      "background: var(--myne-empty-wash-paint)",
+    );
+    // Scoped to the shared knob block and counted, not searched over the whole
+    // sheet: the paint moved into `.myne-empty, .myne-review-card`, and a
+    // whole-file `toContain` stayed green when both gradients were deleted from
+    // that block and the string was left behind in a comment (measured,
+    // myne-md/myne#1022 review). The other strength in this block is the error
+    // variant's 9%, in its own rule below.
+    const knob = ruleBody(SHEET, ".myne-empty,\n.myne-review-card {");
+    expect(knob).toContain("color-mix(in srgb, var(--myne-empty-wash) 24%, transparent)");
+    expect(SHEET.match(/var\(--myne-empty-wash\) 24%/g)).toHaveLength(1);
   });
 
   it("fades to nothing at every edge, so a filled state has no hard line", () => {
     // A filled zero state has no border to hide where the wash is cut off, so
-    // without a mask the glow met the pane edge as a visible seam.
+    // without a mask the glow met the pane edge as a visible seam. The stop is a
+    // knob because the error variant draws a smaller bloom (below).
     const wash = ruleBody(SHEET, ".myne-empty__wash {");
-    expect(wash).toMatch(/(^|\s)mask-image: radial-gradient\(closest-side,[^;]*transparent 100%\)/);
+    expect(wash).toMatch(
+      /mask-image: radial-gradient\(\s*closest-side,\s*black var\(--myne-empty-wash-mask\),\s*transparent 100%\s*\)/,
+    );
   });
 
   it("is static: no animation, so it needs no motion-canon exemption", () => {
@@ -194,6 +210,30 @@ describe("the zero state's wash (design-notes/ui/0633)", () => {
     expect(ruleBody(SHEET, '.myne-empty[data-variant="error"] {')).toContain(
       "--myne-empty-wash: var(--danger)",
     );
+  });
+
+  it("tints a fault instead of flooding the pane with it (myne-md/myne#1020)", () => {
+    // Measured on the owner's own screenshot of the AI panel: red at the accent
+    // wash's strength covered the whole pane, so "no model chosen" read as an
+    // alarm filling the window. The error variant keeps the same two glows at a
+    // third of the strength and a little over half the footprint, and the border
+    // and glyph still carry the full `--danger`.
+    const body = ruleBody(SHEET, '.myne-empty[data-variant="error"] {');
+    const strengths = [...body.matchAll(/var\(--myne-empty-wash\) (\d+)%/g)].map((m) =>
+      Number(m[1]),
+    );
+    expect(strengths, "the error wash left its two glows").toHaveLength(2);
+    for (const strength of strengths) {
+      expect(strength, "a fault flood came back: red at the accent's strength")
+        .toBeLessThan(12);
+    }
+    // The footprint and the edge fade moved with it, or the colour would still
+    // reach the pane's edges at a lower opacity.
+    expect(body).toContain("--myne-empty-wash-mask: 30%");
+    expect(body).toContain("--myne-empty-wash-blur: 24px");
+    // And the un-retuned recipe stays absent from this rule, which is the half an
+    // override could otherwise leave behind.
+    expect(body).not.toContain("24%, transparent");
   });
 
   it("the binary field's rules left with it", () => {

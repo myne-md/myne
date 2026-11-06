@@ -49,6 +49,16 @@ export const DIAGNOSTIC_FIELDS = [
   "commit",
   "bundleHash",
   "failureCode",
+  // The vault's own state, in five bounded tokens (myne-md/myne#1003). They sit right
+  // after the failure code because that is the causal order a reader follows: which
+  // build, which failure, and what the vault looked like while it happened. Every value
+  // is a closed enum token (no identifier, no path, no key material), which is what the
+  // allowlist above is for.
+  "vaultGeneration",
+  "vaultAuthority",
+  "vaultBinding",
+  "vaultKeyAtRest",
+  "vaultSession",
   "engine",
   "crossOriginIsolated",
   "storageUsedMb",
@@ -69,6 +79,17 @@ export interface DiagnosticInputs {
   readonly bundleHash: string | null;
   /** The bounded, closed-enum failure label — never a message string. */
   readonly failureCode: string;
+  /**
+   * The vault doctor's five facts (myne-md/myne#1003), each already a closed token.
+   * `null` when there is no vault to diagnose or the read failed, which omits the line,
+   * the same rule the storage figures follow, and for the same reason: a placeholder in
+   * a block a user pastes reads as a broken app.
+   */
+  readonly vaultGeneration: string | null;
+  readonly vaultAuthority: string | null;
+  readonly vaultBinding: string | null;
+  readonly vaultKeyAtRest: string | null;
+  readonly vaultSession: string | null;
   /** Engine + major version, e.g. `Chrome 140`. Never the full UA string.
    *  `null` when the UA is unrecognisable, which omits the line. */
   readonly engine: string | null;
@@ -113,6 +134,11 @@ export function diagnosticRecord(inputs: DiagnosticInputs): Partial<Record<Diagn
     commit: inputs.commit,
     bundleHash: inputs.bundleHash,
     failureCode: inputs.failureCode,
+    vaultGeneration: inputs.vaultGeneration,
+    vaultAuthority: inputs.vaultAuthority,
+    vaultBinding: inputs.vaultBinding,
+    vaultKeyAtRest: inputs.vaultKeyAtRest,
+    vaultSession: inputs.vaultSession,
     engine: inputs.engine,
     crossOriginIsolated: String(inputs.crossOriginIsolated),
     storageUsedMb: inputs.storageUsedMb === null ? null : String(inputs.storageUsedMb),
@@ -134,6 +160,35 @@ export function diagnosticRecord(inputs: DiagnosticInputs): Partial<Record<Diagn
  * WebKitGTK view dresses as Safari outright.
  */
 export type HostWebView = "WKWebView" | "WebKitGTK" | "WebView2" | "Android WebView";
+
+/**
+ * Bytes → whole MB, or `null` (which omits the line).
+ *
+ * Rounded deliberately: a byte-exact figure is a finer reading of the user's
+ * storage than a support block needs. Two cases are NOT rounding, though, and
+ * both used to reach the pasted text as facts (myne-md/myne#556):
+ *
+ *   * a NON-FINITE reading. `typeof NaN === "number"`, so a partial or
+ *     in-progress `estimate()` passed the old guard and `String(NaN)` landed in
+ *     the block as the literal `NaN`. A field saying NaN says the app is broken
+ *     in a way it is not, and the honest answer for an unusable reading already
+ *     exists one line down: no line at all.
+ *   * a NON-EMPTY store rounding to `0`. Anything under 512 KB, a small but
+ *     real vault, came out as a bare `0`, which is not a coarse version of
+ *     "some", it is the one value that says the opposite. The block exists to
+ *     be acted on, and `storageUsedMb: 0` is what a maintainer uses to rule
+ *     storage out of an investigation.
+ *
+ * So sub-megabyte usage reports as 1 rather than 0. That over-states by less
+ * than a megabyte, at a granularity where a megabyte is already the unit, and
+ * it is the only direction that cannot mislead: "at least a bit" is true of
+ * every non-empty store, "none" is true of none of them.
+ */
+export function mb(bytes: number | undefined): number | null {
+  if (typeof bytes !== "number" || !Number.isFinite(bytes) || bytes < 0) return null;
+  const whole = Math.round(bytes / (1024 * 1024));
+  return whole === 0 && bytes > 0 ? 1 : whole;
+}
 
 /**
  * Engine + major version from a user-agent string.

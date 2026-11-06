@@ -26,508 +26,1024 @@
   ],
   "verified": {
     "a11y.wcag22-manual": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "ai.agent-hub": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "ai.agent-mode": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "ai.chat": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "ai.model-download-onboarding": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "ai.on-device-transcription": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "ai.summarize-and-ask": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "ai.tag-suggestions": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "app.cold-start": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "app.crash-recovery": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "app.diagnostic-log": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "app.language-and-i18n": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "app.reminders": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "app.self-update": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "app.toasts": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "app.window-chrome": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "appearance.custom-themes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "appearance.themes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "attachments.camera-capture": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "attachments.library": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "attachments.uri-scheme-playback": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "backup.automatic-schedule": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "backup.manual-export": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "backup.restore": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "cli.door": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "cli.read-commands": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "clipper.capture-article": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "clipper.capture-bookmark": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "clipper.connected-extensions": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "clipper.host-install": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "clipper.locked-or-closed": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "clipper.pairing": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "clipper.relay-ingest": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "collab.presence": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.ai-writing-assistant": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.attachments-inline": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.code-blocks": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "editor.detached-window-pop-out": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.detached-window-screen-capture": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.drawing-notes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.find-and-replace": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.folding-and-outline": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.formatting-toolbar": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.frontmatter-properties": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.markdown-rendering": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.math-and-diagrams": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.photo-to-note": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.slash-menu": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.tables": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.tags": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.task-queries": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "editor.tasks-inline": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "editor.text-editing": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "editor.transcription": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.view-modes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.vim-mode": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "editor.voice-recording": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "editor.wikilinks": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "enrolment.qr-scan": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "export.backup-exclusion": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "export.note-file": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "export.note-image": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "export.pdf": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "export.pdf-native": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "export.share-destination": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "export.vault-markdown": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "graph.view": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "identity.first-run": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "import.drag-drop-markdown": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "import.external-sources": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "import.myne-vault": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "input.keybindings": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "install.desktop-artefacts": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "install.store-distribution-and-update": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "keyboard.ime-and-accessory-bar": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "layout.safe-areas": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "layout.size-classes": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "lifecycle.background-grace-lock": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "lifecycle.sync-suspend-resume": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "links.backlinks-and-mentions": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "meeting.notes": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "navigation.back-gesture": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "network.ai-egress-gate": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "network.tor-routing": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "notes.cover-images": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "notes.snapshots": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "onboarding.welcome": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "plain-file-editor": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "print.physical": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "procedures.accessibility": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "procedures.clipboard-sensitivity": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "procedures.clipper-testing": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "reminders.android-delivery": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "reminders.ios-delivery": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "reminders.tap-landing": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "rtl.bidi-rendering": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "search.command-palette": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "search.quick-picker": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "security.keychain-device-binding": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.accent-color": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.ai-models": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.ai-provider": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.attachment-ocr": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.daily-notes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.datetime-display": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.default-view-mode": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.external-mcp": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.focus-mode": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.hide-vault-names": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.language": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.line-numbers": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.new-note-location": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.screen-capture-override": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.screen-capture-protection.android": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.screen-capture-protection.ios": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.screen-capture-protection.linux": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.block.screen-capture-protection.macos": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.screen-capture-protection.windows": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.spell": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.block.typography": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.panel.ai": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.panel.appearance": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.panel.editor": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.panel.files": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.panel.privacy": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.panel.storage": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "settings.panel.sync": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.panel.vault": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "settings.shell": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "share-import.android-intent": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "share-import.ios-extension": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "sidebar.notes-and-folders": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "sync.conflicts": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "sync.cross-version": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "sync.device-join": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "sync.recovered-notes": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "sync.status-and-banners": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "ui.press-feedback": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "unlock.argon2id-budget": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.auto-lock": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.change-password": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.creation": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.delete": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.migration-and-repair": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.picker-and-switcher": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.quick-unlock": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "vault.recover-from-phrase": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "vault.unlock": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "views.saved-views": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "voice.mic-capture": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "watch.capture-drain": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "watch.meeting-capture": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.clipboard.write-per-engine": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.deploy.headers-and-isolation": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "web.download.browser-delivery": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "web.files.picker-and-drop": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "web.keyboard.reserved-chords": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.opfs.double-buffer-crash": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.phrase.creation-and-recovery-in-a-page": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "web.render.zoom-and-text-input": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.storage.eviction-rebootstrap": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.storage.private-browsing": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.storage.quota-exhaustion": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "web.tab.single-tab-lock-lifecycle": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "webview.navigation-policy": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "webview.rendering-parity": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "widgets.deep-link-launchers": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "workspace.bottom-bar": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     },
     "workspace.navigation-history": {
-      "version": "v0.11.4",
-      "date": "2026-11-02",
+      "version": "v0.16.0",
+      "date": "2026-11-06",
       "verdict": "override",
-      "reason": "OWNER OVERRIDE 2026-11-02 - the owner directed, against this plan's own output (1062 rows across 8 client surfaces, 199.8 h, 303 of them gating at 75.1 h against an 8 h budget), that v0.11.4 ship with the manual roster skipped; no row was walked on any client."
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
+    },
+    "workspace.panes-and-tabs": {
+      "version": "v0.16.0",
+      "date": "2026-11-06",
+      "verdict": "override",
+      "reason": "not walked for v0.16.0 by the owner's decision on 2026-11-06; the gating half alone is 75.3 hours against an 8 hour budget, this release is a beta of the phone identity door and the update flow, and the whole manual walk is tracked as automation debt at myne#554"
     }
   }
 }

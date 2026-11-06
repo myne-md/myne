@@ -8,7 +8,8 @@
 //   mem1: send "please remember this for later" → the run settles with NO
 //         review screen (a remember-only run proposes no edits, and an empty
 //         proposal opens none) → the turn-end marker reports one written
-//         entry → the chat popover lists the remembered text → Settings →
+//         entry → the chat header offers NO memory button (it was removed in
+//         myne-md/myne#1020, so Settings is the only door) → Settings →
 //         AI → the memory section lists it → delete it → the empty state
 //         returns.
 //   mem2: the personality block saves through the settings section and
@@ -66,9 +67,9 @@ async function sendTask(session: Session, task: string): Promise<void> {
   await (await session.byTestId("ai.composer-send")).click();
 }
 
-aiDescribe("mem1 agent run writes memory → marker → popover → settings delete", () => {
+aiDescribe("mem1 agent run writes memory → marker → settings delete", () => {
   // Vault-count precondition: 1 (weak KDF). Requires the local-inference-stub build.
-  it("remembers through a run and deletes through settings", async () => {
+  it("remembers through a run and deletes through settings, with no in-chat popover", async () => {
     let password = "";
     await scenario(
       "mem1-agent-memory",
@@ -108,24 +109,18 @@ aiDescribe("mem1 agent run writes memory → marker → popover → settings del
         expect(await marker.textContent()).toContain("1 memory saved");
         expect(await s.byTestIdAll("agentReview.screen")).toHaveLength(0);
 
-        // ── The chat popover lists the remembered text. ──
-        await (await s.byTestId("ai.memory-button")).click();
-        await s.waitForElement(testIdSelector("ai.memory-popover"), { timeoutMs: 10_000 });
-        const popoverRows = await s.byTestIdAll("ai.memory-popover-row");
-        expect(popoverRows.length).toBeGreaterThanOrEqual(1);
-        const popoverText = await Promise.all(popoverRows.map((r) => r.textContent()));
+        // ── The chat popover that used to list it is GONE (myne-md/myne#1020),
+        // and the absence is the assertion now. ──
+        // The header's memory button and its popover were removed at the owner's
+        // request, so the leg that opened it, read a row and closed it cannot run
+        // any more. What replaces it is the claim that survives: the button is
+        // not offered, and memory is reachable from Settings alone. A scenario
+        // that silently dropped the leg would leave the removed affordance
+        // unmentioned in the one place a regression would show up.
         expect(
-          popoverText.join("\n"),
-          "the popover must show the text the run just wrote",
-        ).toContain("terse");
-        // Close through the popover's own Close button: the overlay is
-        // viewport-capped, so it must be hit-testable (myne-md/myne#697
-        // review; the toggle-around this replaced hid the bug instead of
-        // proving the control).
-        await (await s.byTestId("ai.memory-popover-close")).click();
-        await s.waitForGone(testIdSelector("ai.memory-popover"), {
-          timeoutMs: 10_000,
-        });
+          await s.byTestIdAll("ai.memory-button"),
+          "the removed memory button is back in the chat header",
+        ).toHaveLength(0);
 
         // ── Settings → AI → the memory section lists it; delete it. ──
         await openSettings(s, "ai");

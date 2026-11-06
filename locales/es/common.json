@@ -54,9 +54,7 @@
       "scopeQuestion": "Lo que el agente puede leer",
       "scopeFolders": "Carpetas",
       "scopeApplies": "Se aplica a tu próximo mensaje. Las notas en la papelera, archivadas y de plantilla siempre se excluyen.",
-      "blockedScope": "Todavía no hay nada en lo que pueda trabajar el agente: todas las notas están excluidas de la IA, o la bóveda está vacía.",
       "preparing": "Preparando…",
-      "blockedScopeSidebar": "Todavía no hay nada aquí sobre lo que preguntar: la carpeta de esta nota está excluida de la IA.",
       "needsScope": "Elige una carpeta abajo, o abre una nota, para que el agente tenga algo en lo que trabajar.",
       "scopeExcluded_one": "{{count}} excluida de la IA",
       "scopeExcluded_many": "{{count}} excluidas de la IA",
@@ -3454,7 +3452,6 @@
       "helper": "Permite mover las notas a un archivo, fuera de la lista principal. Al desactivarlo, todas las notas archivadas vuelven a su carpeta, se desarchivan todas las carpetas archivadas y se ocultan los controles del archivo. Se aplica a toda la bóveda, en todos los dispositivos.",
       "label": "Archivado",
       "off": "Desactivado",
-      "on": "Activado",
       "saveError": "No se pudo actualizar el ajuste de archivado."
     },
     "attachmentCompression": {
@@ -4225,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Sin configurar",
-        "offline": "Sin conexión",
-        "conflicts_one": "{{count}} conflicto",
-        "conflicts_many": "{{count}} de conflictos",
-        "conflicts_other": "{{count}} conflictos"
+        "conflicts_many": "{{count}} de conflictos"
       }
     },
     "data": {

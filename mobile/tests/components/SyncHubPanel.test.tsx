@@ -67,18 +67,64 @@ afterEach(() => {
   invokeMock.mockClear();
 });
 
-describe("the mobile status row reserves 'Offline' for a transport failure", () => {
+describe("the mobile status row names the class rather than guessing 'Offline'", () => {
   it("says the identity is locked rather than that the device is offline", () => {
     const text = labelFor({ state: "error", detail: "identity_locked" });
     expect(text).toContain("sync.status.errorIdentityLocked");
     expect(text).not.toContain("settings.sync.summary.offline");
   });
 
-  it("keeps 'Offline' for the class that names it, `sync_failed`", () => {
-    // `FailureClass::Transport` and `Other` both report this detail, so it is the
-    // one class where "Offline" is a true statement about the network.
-    expect(labelFor({ state: "error", detail: "sync_failed" })).toContain(
-      "settings.sync.summary.offline",
+  it("does not claim 'Offline' for `sync_failed`, which does not establish it", () => {
+    // This row used to answer `settings.sync.summary.offline` for `sync_failed`, on the
+    // reasoning that `FailureClass::Transport` names the network. `Other` reports the same
+    // detail, so the sentence asserted a cause the class does not establish, and it was the
+    // phone's own vocabulary, which is why the computer said "Sync error" about the same state
+    // (myne-md/myne#1027). The shared map gives the honest generic line, and "Offline" is gone
+    // from this surface entirely.
+    expect(labelFor({ state: "error", detail: "sync_failed" })).toContain("sync.status.error");
+  });
+
+  it("hides 'Sync now' while uploads are blocked, because it would upload nothing", () => {
+    // The phone held its own copy of this rule (`canSyncNow`), and that copy knew only about
+    // disabled / not-enrolled / pending. So in the one state this whole change exists for, the
+    // phone still offered a button whose cycle uploads nothing and then flashes a success. The
+    // shared view answers the question for both clients now; wiring the row back to a local
+    // predicate makes this fail.
+    const show = (status: SyncStatus | null): boolean => {
+      render(
+        <SyncHubPanel
+          status={status}
+          onSyncNow={() => {}}
+          syncing={false}
+          onOpenEndpoint={() => {}}
+          onOpenEnroll={() => {}}
+          onOpenDevices={() => {}}
+          onOpenMembers={() => {}}
+        />,
+      );
+      const present = screen.queryByTestId("sync.settings.sync-now") !== null;
+      cleanup();
+      return present;
+    };
+
+    expect(show({ state: "uploads_blocked", detail: "device_key_missing" })).toBe(false);
+    expect(show({ state: "idle" })).toBe(true);
+    // A state that has not been read yet must not offer it either: `undefined !== "disabled"`
+    // was true, so the old predicate rendered the row before it knew anything.
+    expect(show(null)).toBe(false);
+  });
+
+  it("carries the blocked cause and its repair", () => {
+    // The state a published vault sat in for a day while this row said "On": a cycle that runs
+    // and cannot upload. It has its own sentence now, and the repair the desktop offers.
+    expect(labelFor({ state: "uploads_blocked", detail: "device_key_missing" })).toContain(
+      "sync.status.errorDeviceKeyMissing",
+    );
+    expect(labelFor({ state: "uploads_blocked", detail: "identity_locked" })).toContain(
+      "sync.status.errorIdentityLocked",
+    );
+    expect(labelFor({ state: "uploads_blocked", detail: "uploads_blocked" })).toContain(
+      "sync.status.uploadsBlocked",
     );
   });
 
@@ -170,5 +216,73 @@ describe("the approval wait has a door that no status read can close", () => {
     // approval to wait for: the row would promise a compare nothing can produce.
     await screen.findByTestId("sync.settings.status");
     expect(screen.queryByTestId("sync.settings.approval-code")).toBeNull();
+  });
+});
+
+/**
+ * The repair row (myne-md/myne#1029).
+ *
+ * The measured failure, on an iPhone whose sync had never uploaded once: the
+ * status row read "Unlock your identity to sync" and the panel rendered no
+ * control, because the phone ignored the shared view's `action` and its identity
+ * surface mounted on the zero-vault stage only. A sentence that names an act the
+ * client cannot perform is worse than the generic line, and these three cases hold
+ * the row to the shared mapping rather than to a second opinion about which states
+ * are repairable.
+ */
+describe("the blocked states offer the repair the sentence names", () => {
+  const renderWithDoor = (status: SyncStatus, onUnlockIdentity: () => void) =>
+    render(
+      <SyncHubPanel
+        status={status}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+        onUnlockIdentity={onUnlockIdentity}
+      />,
+    );
+
+  it("routes the locked identity to the door, with the desktop's own label", async () => {
+    const onUnlockIdentity = vi.fn();
+    renderWithDoor({ state: "uploads_blocked", detail: "identity_locked" }, onUnlockIdentity);
+    const row = await screen.findByTestId("sync.settings.unlock-identity");
+    expect(row.textContent).toContain("sync.status.unlockIdentityCta");
+    // `unlock_identity` and `repair_device` are one phrase entry with two labels,
+    // so a row that swapped them would still send the user to the right place,
+    // but it would tell them the wrong thing about what is missing.
+    expect(row.textContent).not.toContain("sync.status.repairDeviceCta");
+    row.click();
+    expect(onUnlockIdentity).toHaveBeenCalledTimes(1);
+  });
+
+  it("says 'repair' for the device-key state rather than 'unlock'", async () => {
+    renderWithDoor({ state: "uploads_blocked", detail: "device_key_missing" }, () => {});
+    const row = await screen.findByTestId("sync.settings.unlock-identity");
+    expect(row.textContent).toContain("sync.status.repairDeviceCta");
+  });
+
+  it("offers nothing while the state is healthy, and nothing without a door to open", async () => {
+    const healthy = renderWithDoor({ state: "idle" }, () => {});
+    expect(screen.queryByTestId("sync.settings.unlock-identity")).toBeNull();
+    healthy.unmount();
+
+    // An isolated render (a component test, a surface with no shell) keeps the
+    // label and owes the caller nothing it cannot do.
+    render(
+      <SyncHubPanel
+        status={{ state: "error", detail: "identity_locked" }}
+        onSyncNow={() => {}}
+        syncing={false}
+        onOpenEndpoint={() => {}}
+        onOpenEnroll={() => {}}
+        onOpenDevices={() => {}}
+        onOpenMembers={() => {}}
+      />,
+    );
+    await screen.findByTestId("sync.settings.status");
+    expect(screen.queryByTestId("sync.settings.unlock-identity")).toBeNull();
   });
 });

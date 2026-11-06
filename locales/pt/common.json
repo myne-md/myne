@@ -54,9 +54,7 @@
       "scopeQuestion": "O que o agente pode ler",
       "scopeFolders": "Pastas",
       "scopeApplies": "Aplica-se à sua próxima mensagem. Notas na lixeira, arquivadas e de modelo ficam sempre de fora.",
-      "blockedScope": "Ainda não há nada para o agente trabalhar: todas as notas estão excluídas da IA, ou o cofre está vazio.",
       "preparing": "A preparar…",
-      "blockedScopeSidebar": "Ainda não há aqui nada sobre que perguntar: a pasta desta nota está excluída da IA.",
       "needsScope": "Escolha uma pasta abaixo, ou abra uma nota, para o agente ter algo em que trabalhar.",
       "scopeExcluded_one": "{{count}} excluída da IA",
       "scopeExcluded_many": "{{count}} excluídas da IA",
@@ -3454,7 +3452,6 @@
       "helper": "Permite que as notas sejam movidas para um Arquivo, mantido fora da lista principal. Ao desativar isto, todas as notas arquivadas voltam à sua pasta, todas as pastas arquivadas são desarquivadas e os controlos do arquivo ficam ocultos. Aplica-se a todo o cofre, em todos os dispositivos.",
       "label": "Arquivamento",
       "off": "Desativado",
-      "on": "Ativado",
       "saveError": "Não foi possível atualizar a definição de arquivamento."
     },
     "attachmentCompression": {
@@ -4225,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Não configurado",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflito",
-        "conflicts_many": "{{count}} conflitos",
-        "conflicts_other": "{{count}} conflitos"
+        "conflicts_many": "{{count}} conflitos"
       }
     },
     "data": {

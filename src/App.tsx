@@ -64,6 +64,7 @@ import { installCloseInterceptor } from "./lib/close-request";
 import { useUpdateAvailable } from "./hooks/useUpdateAvailable";
 import { HAS_NATIVE_TITLE_BAR, dragRegionProps } from "./screens/titlebar";
 import { readCustomTheme } from "./lib/themes";
+import { useThemesNonce } from "./lib/themesSignal";
 import { detachedNoteId as readDetachedNoteId } from "./lib/detachedWindow";
 
 // Editor (the post-unlock workspace) is the app's heaviest screen — CodeMirror,
@@ -330,7 +331,7 @@ function App() {
   useEffect(() => {
     if (stage?.name !== "editor") return;
     let cancelled = false;
-    void awaitingApprovalVerdict(editorVaultId).then((awaiting) => {
+    void awaitingApprovalVerdict().then((awaiting) => {
       if (cancelled || !awaiting) return;
       setStage((prev) =>
         prev?.name === "editor" ? transition(prev, { type: "editor.awaiting-approval" }) : prev,
@@ -582,6 +583,13 @@ function App() {
     }
   }, [stage?.name]);
 
+  // myne#943: the PAINT path below has no refresh boundary other than a stage
+  // transition, so a theme deleted or edited on another device kept painting here
+  // until the user locked and came back. There is no second subscription for it:
+  // `Editor` is mounted for exactly the stage this effect acts on, and its bridge
+  // already advances the shared nonce, so reading that nonce is the whole wire.
+  const themesNonce = useThemesNonce();
+
   useEffect(() => {
     if (stageName !== "editor") {
       applyTheme(null);
@@ -625,7 +633,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [stageName, plainScreen]);
+  }, [stageName, plainScreen, themesNonce]);
 
   // Desktop self-update (myne-md/myne#870). Mounted HERE rather than in the
   // editor because the flow outlives the editor: the confirm locks the vault,
@@ -996,6 +1004,7 @@ function App() {
           <UpdatingScreen
             phase={update.phase === "failed" ? "failed" : "working"}
             version={update.version ?? ""}
+            progress={update.progress}
             onRetry={update.retry}
             // Reprobe-based exit (myne-md/myne#870): the vault was locked before
             // the install, so boot routing answers `unlock` on its own and there

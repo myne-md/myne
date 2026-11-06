@@ -1,3 +1,0 @@
-Myne 0.11.4. The account-number join door is gone from every client: a vault is joined through the invite and identity flow, and a phone that arrives that way waits on the approval compare instead of skipping it. Linux gains rpm, Flatpak and snap builds.
-
-This is the same app as the .apk on myne.md. F-Droid builds it from source and signs it with its own key, so it cannot install over a sideloaded .apk: uninstall that first, after exporting your notes, because an uninstall erases the vault.

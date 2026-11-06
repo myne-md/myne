@@ -2790,16 +2790,34 @@ function PopulatedList({
   ]);
 
   // Background (root-level) context-menu items — Story F2.
+  //
+  // **Glyphed like every other menu in the tree** (myne-md/myne#1020). These
+  // three rows were the last label-only menu in the sidebar: a right-click on the
+  // empty area under the tree produced a bare run of words while the same three
+  // actions, reached by right-clicking a folder row, each carried a glyph. Two
+  // menus for one vocabulary should not look like two different products. The
+  // names are the folder menu's own, so the same action is the same picture
+  // wherever it is offered.
   const bgMenuItems: ContextMenuItem[] = useMemo(
     () => [
       {
         id: "new-folder",
+        group: "create",
+        icon: "folder-plus",
         label: t("notes.list.newFolder"),
         onSelect: () => fm.startNewFolder(""),
       },
-      { id: "new-note", label: t("notes.list.newNoteMenu"), onSelect: onCreate },
+      {
+        id: "new-note",
+        group: "create",
+        icon: "file-plus",
+        label: t("notes.list.newNoteMenu"),
+        onSelect: onCreate,
+      },
       {
         id: "new-drawing",
+        group: "create",
+        icon: "image-plus",
         label: t("notes.list.newDrawingMenu"),
         onSelect: () => void ctx.createDrawingAndStartRename().catch(() => {}),
       },

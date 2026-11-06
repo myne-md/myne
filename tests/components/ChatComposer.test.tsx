@@ -87,7 +87,7 @@ const STEP = {
 };
 
 function mount(props: Partial<Parameters<typeof ChatComposer>[0]> = {}) {
-  render(<ChatComposer surface="agent" openNoteId="n1" folders={["Projects"]} {...props} />);
+  render(<ChatComposer openNoteId="n1" folders={["Projects"]} {...props} />);
 }
 
 function type(text: string) {
@@ -709,6 +709,62 @@ describe("ChatComposer: the empty input is one row", () => {
       expect(input().style.height).toBe("64px");
     });
   });
+
+  it("asks for no scrollbar until the content is taller than the box", () => {
+    // **A scrollbar is chrome around nothing when the box fits its content**
+    // (myne-md/myne#1020). The field used to be permanently `overflow: auto`, so
+    // any measurement that came out short of the padding drew a thumb beside the
+    // text. Both directions are asserted here because one alone cannot tell a
+    // fit-then-hide from an always-hide.
+    //
+    // The numbers are the ones measured in Chromium on the real composer: three
+    // typed lines reported `scrollHeight 63`, and the box's frame is the 2px
+    // between `offsetHeight` and `clientHeight`. The fit adds that frame to the
+    // height it writes, so the fixture carries what the box reports AFTER the
+    // write, which is the state the overflow decision is made in.
+    function box(measure: { scrollHeight: number; clientHeight: number; offsetHeight?: number }) {
+      for (const [key, value] of Object.entries(measure)) {
+        Object.defineProperty(HTMLTextAreaElement.prototype, key, {
+          configurable: true,
+          get: () => value,
+        });
+      }
+      try {
+        cleanup();
+        mount();
+        type("a message long enough to wrap in a side panel, several times over");
+        return { height: input().style.height, overflowY: input().style.overflowY };
+      } finally {
+        for (const key of Object.keys(measure)) {
+          delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>)[key];
+        }
+      }
+    }
+
+    // Fits: the content is what the height says, so nothing scrolls.
+    const fitted = box({ scrollHeight: 63, clientHeight: 63, offsetHeight: 65 });
+    expect(fitted.height).toBe("65px");
+    expect(fitted.overflowY, "a fitted box asked for a scrollbar").toBe("hidden");
+
+    // Clamped: the stylesheet's five-line ceiling is doing the cutting, and the
+    // scrollbar is the only way to reach the rest of the message.
+    const clamped = box({ scrollHeight: 200, clientHeight: 89, offsetHeight: 91 });
+    expect(clamped.overflowY, "a clamped box hid its overflow").toBe("auto");
+  });
+
+  it("goes back to one row when the message is cleared, and drops the scrollbar", () => {
+    // The reverse direction, which is the state the owner saw: empty, one row,
+    // nothing to scroll. Left as it was, the height and the scrollbar both
+    // stayed from the last thing typed.
+    withMeasuredHeight(64, () => {
+      mount();
+      type("a message long enough to wrap in a side panel, several times over");
+      expect(input().style.height).toBe("64px");
+      fireEvent.change(input(), { target: { value: "" } });
+      expect(input().style.height, "the empty box kept a measured height").toBe("auto");
+      expect(input().style.overflowY).toBe("hidden");
+    });
+  });
 });
 
 describe("ChatComposer: with no note open, it says so and offers the way out", () => {
@@ -724,7 +780,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
 
   function noteless(folders: readonly string[] = ["Projects", "Archive"]) {
     render(
-      <ChatComposer surface="agent" openNoteId={null} folders={folders} />,
+      <ChatComposer openNoteId={null} folders={folders} />,
     );
   }
 
@@ -744,7 +800,7 @@ describe("ChatComposer: with no note open, it says so and offers the way out", (
     // The gate is on the NOTE, not on the surface: the light panel has one
     // open almost always, and removing the entry there would take away the
     // common case's default.
-    render(<ChatComposer surface="agent" openNoteId="n-1" folders={["Projects"]} />);
+    render(<ChatComposer openNoteId="n-1" folders={["Projects"]} />);
     fireEvent.click(screen.getByTestId("ai.composer-scope"));
     expect(
       screen.getAllByTestId("ai.composer-scope-option").map((o) => o.getAttribute("data-value")),
@@ -979,8 +1035,18 @@ describe("ChatComposer, the blocked zero state", () => {
     expect(wrap.style.outline).toContain("2px solid");
   });
 
-  it("says what is needed in the placeholder, with no line under the field", async () => {
-    emptyScope();
+  it("keeps the ordinary placeholder, and says why in the line that already does", async () => {
+    // **The field states what to type, not why it is closed** (myne-md/myne#1020).
+    // The blocked placeholder was a sentence, and at panel width it wrapped to
+    // two lines inside a box the user could neither type into nor focus, with a
+    // scrollbar beside it. The facts it restated are already on the caption row
+    // in numbers, which is the control that owns them.
+    agentPreviewGrant.mockResolvedValue({
+      noteCount: 0,
+      excludedCount: 1,
+      unknownCount: 0,
+      newTotal: 1,
+    });
     mount();
     await waitFor(() =>
       expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
@@ -989,27 +1055,18 @@ describe("ChatComposer, the blocked zero state", () => {
     );
     expect(
       (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
-    ).toBe("agent.composer.blockedScope");
+    ).toBe("agent.composer.placeholder");
+    // The reason is on screen, one line, where it is a figure rather than prose.
+    expect(screen.getByTestId("ai.composer-scope-count").textContent).toBe(
+      "agent.composer.scopeCount:0",
+    );
+    expect(screen.getByTestId("ai.composer-scope-excluded").textContent).toBe(
+      "agent.composer.scopeExcluded:1",
+    );
     // The caption is gone, and this is the half that keeps it gone: the graph
     // had a warning line under the field, and reviving one would satisfy the
     // first assertion above while undoing the decision.
     expect(screen.queryByTestId("ai.composer-needs-scope")).toBeNull();
-  });
-
-  it("shows the sidebar its own sentence about what is missing", async () => {
-    emptyScope();
-    render(<ChatComposer surface="sidebar" openNoteId="n1" folders={["Projects"]} />);
-    await waitFor(() =>
-      expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
-        true,
-      ),
-    );
-    // Different copy, same state: the sidebar has a note open beside the box, so
-    // "every note is excluded, or the vault is empty" is the wrong sentence for
-    // what the user is looking at.
-    expect(
-      (screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).placeholder,
-    ).toBe("agent.composer.blockedScopeSidebar");
   });
 
   it("says it is GETTING READY while the scope's size is unknown", async () => {
@@ -1120,27 +1177,44 @@ describe("ChatComposer, the blocked zero state", () => {
     );
   });
 
-  it("DOES size itself from the copy when the field is blocked", async () => {
-    // The one exception to the rule above, and the reason is the copy itself: a
-    // blocked field has nothing else to say, and clipping its sentence at the
-    // first line hides the only explanation on screen (myne-md/myne#848).
+  it("does not size itself from the placeholder, even when the field is blocked", async () => {
+    // **The exception is gone, and it was the defect** (myne-md/myne#1020, on the
+    // owner's read of the sidebar). It existed because a blocked field "had
+    // nothing else to say", so clipping its sentence at the first line would hide
+    // the only explanation on screen. That sentence has left the field for the
+    // caption row that already carries the same figures, so there is nothing left
+    // to preserve and the reason for preserving it left with it.
+    //
+    // **The fixture is the part that matters.** A blocked composer mounted with
+    // an empty value never re-runs the effect, so asserting on it directly would
+    // pass against the guard this test exists to remove. The sequence below is
+    // the one that re-runs it: a keystroke, then an erase. Under the old guard
+    // the erase measured a 64px placeholder and wrote that height into a box the
+    // user had just emptied; under this one an empty value means one row.
     agentPreviewGrant.mockResolvedValue({
       noteCount: 0,
-      excludedCount: 0,
+      excludedCount: 1,
       unknownCount: 0,
-      newTotal: 0,
+      newTotal: 1,
     });
-    // The stub has to stay in place across the await: the preview resolves
-    // asynchronously, and the measure-and-write runs on the render after it.
     Object.defineProperty(HTMLTextAreaElement.prototype, "scrollHeight", {
       configurable: true,
       get: () => 64,
     });
-    const box = () => screen.getByTestId("ai.composer-input") as HTMLTextAreaElement;
     try {
       mount();
-      await waitFor(() => expect(box().disabled).toBe(true));
-      await waitFor(() => expect(box().style.height).toBe("64px"));
+      await waitFor(() =>
+        expect((screen.getByTestId("ai.composer-input") as HTMLTextAreaElement).disabled).toBe(
+          true,
+        ),
+      );
+      const box = () => screen.getByTestId("ai.composer-input") as HTMLTextAreaElement;
+      fireEvent.change(box(), { target: { value: "x" } });
+      fireEvent.change(box(), { target: { value: "" } });
+      expect(box().style.height, "the blocked box took a measured height").toBe("auto");
+      // Nothing to fit means nothing to scroll: the thumb the owner saw beside
+      // an empty field was chrome around the placeholder.
+      expect(box().style.overflowY).toBe("hidden");
     } finally {
       delete (HTMLTextAreaElement.prototype as unknown as Record<string, unknown>)
         .scrollHeight;
@@ -1155,7 +1229,8 @@ describe("ChatComposer, the blocked zero state", () => {
     // string would pass at any line height while the comment claimed five.
     const lines = parseFloat(input.style.maxHeight) / parseFloat(input.style.lineHeight);
     expect(lines).toBe(5);
-    expect(input.style.overflowY).toBe("auto");
+    // The scrollbar is not a declaration any more: the fit decides it, and the
+    // two directions are asserted in the `empty input is one row` block above.
   });
 });
 

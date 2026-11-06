@@ -46,6 +46,7 @@ const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personJoinVault = vi.hoisted(() => vi.fn());
 const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
+const syncGetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -72,7 +73,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   personJoinVault,
   personAccountNumber,
 }));
-vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
+vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, syncGetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
 // not cross, but `memberNameErrorKey` is kept REAL so the sibling accept spec's
 // assertions against the shared mapper are not invalidated by this file's mock.
@@ -173,6 +174,7 @@ beforeEach(() => {
   personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   personJoinVault.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
+  syncGetEndpoint.mockReset().mockResolvedValue({ endpoint_url: "", invite_code: "" });
   // The name step is never reached from a join, but the accept spec's own path
   // passes through it and this module is shared state across both files' mocks.
   listRoster.mockReset().mockResolvedValue({ members: [], authority: "member", group_key_epoch: 1 });
@@ -331,12 +333,18 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     // collects an owner code this step does not have.
     expect(personAcceptInvite).not.toHaveBeenCalled();
     // Reaches the shell directly: a join installs a vault the identity is already a
-    // member of, so there is nothing to name (see the next test). The vault ID
+    // member of, so there is nothing to name (see the next test). The LANDING
     // travels with it because the shell addresses the approval wait with it: a
     // freshly installed member vault carries a device the owner has not admitted
     // yet, so re-probing would land on an ordinary editor and the §6.3 compare
-    // would never be made.
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    // would never be made. `unlocked` because the invite installed the keys with
+    // the vault, which is what lets the wait run immediately.
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
   });
 
   it("keeps the device password behind the project's floor", async () => {
@@ -373,7 +381,12 @@ describe("IdentityFlow second-device join (myne-md/myne#852 task 7)", () => {
     setJoinPassword(PASSWORD);
     fireEvent.click(submit());
 
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
     expect(screen.queryByTestId("identity-flow.name-input")).toBeNull();
     expect(setMyMemberName).not.toHaveBeenCalled();
   });

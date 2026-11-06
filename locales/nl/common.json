@@ -53,9 +53,7 @@
       "scopeQuestion": "Wat de agent kan lezen",
       "scopeFolders": "Mappen",
       "scopeApplies": "Geldt voor je volgende bericht. Verwijderde, gearchiveerde en sjabloonnotities worden altijd weggelaten.",
-      "blockedScope": "Nog niets voor de agent om aan te werken: elke notitie is van AI uitgesloten, of de kluis is leeg.",
       "preparing": "Voorbereiden…",
-      "blockedScopeSidebar": "Nog niets om naar te vragen: de map van deze notitie is van AI uitgesloten.",
       "needsScope": "Kies hieronder een map, of open een notitie, zodat de agent iets heeft om aan te werken.",
       "scopeExcluded_one": "{{count}} uitgesloten van AI",
       "scopeExcluded_other": "{{count}} uitgesloten van AI"
@@ -3336,7 +3334,6 @@
       "helper": "Laat notities naar een archief verplaatsen, buiten de hoofdlijst gehouden. Dit uitschakelen herstelt elke gearchiveerde notitie naar zijn map, dearchiveert elke gearchiveerde map en verbergt de archiefknoppen. Het geldt voor de hele kluis, op elk apparaat.",
       "label": "Archiveren",
       "off": "Uit",
-      "on": "Aan",
       "saveError": "De archiveringsinstelling kon niet worden bijgewerkt."
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "Te zwak"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Niet ingesteld",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_other": "{{count}} conflicten"
-      }
     },
     "data": {
       "exported_one": "{{count}} notitie geëxporteerd → {{label}}",

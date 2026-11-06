@@ -1066,11 +1066,11 @@ Four constants and one invariant are load-bearing. The head format is **`0x03`**
 
 The invariant that makes the whole thing safe is a negative one: **a device key unwraps nothing.** The person key is deliberately NOT cached in a keychain, because on an `NTV7` vault every owned vault's `root_key` is sealed to it, so a keychain-held person key would let one biometric open every vault without a password, which is the cross-vault escalation `person_vault_carrier::carrier_applies` already refuses. What a stolen device key buys an adversary is the ability to sign as that device until its binding is revoked; what it does not buy is any vault.
 
-One rule governs what a row may say about a key (amended 2026-11-02, `decisions/protocol/0774`): **a row may publish only halves that the store returns, and a claim never withdraws a half it already published.** The claim reads its own write back, and only a read-back of the key just written publishes halves; a store that answers with a different key, with nothing, or with a refusal leaves the row exactly as it is, because the halves already there are the material that verifies the heads this device signed while it held the key. The state where the row publishes halves while the store holds no such key is called an **orphan**: it is named as `KeyMissingWhileBound` rather than repaired by a write, and the UI sentence says the signing key is missing instead of asking for the identity phrase as if the vault were simply locked.
+One rule governs what a row may say about a key (amended 2026-11-02, `decisions/protocol/0774`, and sharpened 2026-11-05, `decisions/sync/0787`): **a row may publish only halves that the store returns, and a claim never withdraws a half it already published.** The claim reads its own write back, and only a read-back of the key just written publishes halves. That read-back asks the narrower of two questions: **"is the key at rest"**, which consults the OS store alone, not "can this device sign right now", which may answer from RAM because a `0600`-file rung-3 unlock installs its key in memory and nowhere else. `0774` stated the rule; the distinction that makes it enforceable was `0787`'s. Both answers name the same failure when they disagree, and the disagreement is the **orphan** below; a store that answers with a different key, with nothing, or with a refusal leaves the row exactly as it is, because the halves already there are the material that verifies the heads this device signed while it held the key. The state where the row publishes halves while the store holds no such key is called an **orphan**: it is named as `KeyMissingWhileBound` rather than repaired by a write, and the UI sentence says the signing key is missing instead of asking for the identity phrase as if the vault were simply locked.
 
 Not to be confused with the reserved sense the term used to carry (a hardware-held device key participating in MLS group formation): that reading stays out of scope, and `0731` gives the term a different, narrower job.
 
-Used in: `design-notes/protocol/0731-daily-authority-moves-to-a-device-key.md`; `design-notes/protocol/0733-the-device-keys-open-questions-are-answered.md`; `design-notes/protocol/0670-the-device-binding-signature-class.md`; `design-notes/protocol/0774-the-device-key-is-the-daily-sync-authority.md`
+Used in: `design-notes/protocol/0731-daily-authority-moves-to-a-device-key.md`; `design-notes/protocol/0733-the-device-keys-open-questions-are-answered.md`; `design-notes/protocol/0670-the-device-binding-signature-class.md`; `design-notes/protocol/0774-the-device-key-is-the-daily-sync-authority.md`; `design-notes/sync/0787-a-key-at-rest-is-proven-not-assumed-and-a-cycle-that-c.md`
 
 ### **device_id (VV-actor)** &nbsp; 🗝️ *Key/identifier*
 
@@ -2737,20 +2737,25 @@ the OWNER's code as a pin inside that person's own sealed `MYY5` profile
 ciphertext inside a blob keyed from the person's own phrase: the server stores it
 and can neither read it nor serve it. Not an AEAD/magic value and not an AAD role.
 
-**device admission.** **Surface withdrawn** on 2026-10-31 (`decisions/protocol/0764`, myne-md/myne#956): the
-codec, the SAS class, the five `myne-core` commands and `POST /auth/devices/credential` all remain, and no client
-mounts a control for them, so the definition below is what the protocol does rather than what a user can reach
-today. The revival is myne-md/myne#957, which folds the per-device credential into the ordinary **Approve**
-action. The act itself: adding a device to a person account without typing the recovery phrase
-(`decisions/protocol/0735`). The joining device mints its own SCRAM secret, a device id and, where the platform
-has a storage rung, a device key; an ALREADY-APPROVED device of the same account reads the code that describes
-them, compares a short authentication string between the two screens, and installs the credential
-(`POST /auth/devices/credential`, which also approves the device) and binds the newcomer's row in
-`vault.device-bindings`. The phrase keeps two jobs and loses the routine one: it is still the account's own
-credential and still the only path when no working device is left. A device that joined this way holds no person
-keypair, so it signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display
-name; the admitting device is the one that signs. Not to be confused with **device join**, the older flow that
-scans a QR carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
+**device admission.** Adding a device to a person account with its own server credential rather than the recovery
+phrase (`decisions/protocol/0735`). Since `decisions/protocol/0783` it is part of the ordinary **Approve**, with no
+separate surface: the joining device mints a SCRAM secret, a device id and, where the platform has a storage rung,
+a device key when the phrase is submitted, and installs its own verifier
+(`POST /auth/devices/credential`) once an already-approved device of the same account has approved its pending row.
+The joining device is therefore the installer, and `0783` records why (it holds an account session from the phrase,
+and only a pending device's lack of a token keeps that off the self-approval path). The three facts it needs on
+disk are the **credential triple**: `device_secret_hex`, `device_salt_hex` and `device_iterations` in
+`<app_config_dir>/person-auth.json`, the fields a verifier is rebuilt from, stored beside the device token they
+replace. Nothing is minted where the credential would not survive the session, which is the browser
+(`web/wasm/src/person_io.rs`), and it asks that of the IO seam rather than of the target architecture.
+The withdrawn two-sided ceremony (`0764`, myne-md/myne#956) is what `0783` supersedes: the `MYNE-DEVICE-1:` codec
+and the SAS class remain in `protocol/` as a codec no client exercises, so no code and no short authentication
+string travels on any shipped path, and the one human comparison in the join is the vault-head fingerprint
+eye-compare. The phrase keeps two jobs and loses the routine one: it is still the account's own credential and
+still the only path when no working device is left. A device that joined this way holds no person keypair, so it
+signs with its DEVICE key (`0731` stage 1) and cannot bind another device or sign a member display name; the
+admitting device is the one that signs. Not to be confused with **device join**, the older flow that scans a QR
+carrying `{endpoint, person_id}` and still asks the joining device for the phrase.
 
 
 Used in: `design-notes/protocol/0605-b2b-invite-addressing-and-vault-invite-list.md`; `myne-md/myne#711`.
@@ -4119,9 +4124,9 @@ A monotonic in-memory counter, one per client, advanced after a [`vault.themes`]
 
 **The bump belongs to the writer, not to a surface.** `src/lib/themes.ts` (`importCustomTheme`, `deleteCustomTheme`) is the one module every surface goes through, so the advance lives there and the `myne://theme/install` dialog's Apply inherits it without a line of its own.
 
-**What it does NOT cover, and why that is stated rather than fixed here.** A sync round landing a peer's `vault.themes` advances nothing, because no event announces that merge: `core` reports it as `SyncCycleSummary::themes_applied_remote` and its own doc comment records that no listener is wired yet, where `vault.prefs` gets `myne://prefs-changed` off the same flag (`PREFS_CHANGED_EVENT`, MYND-478). A peer's theme therefore reaches an open picker on the next mount, which is the refresh boundary the paint path has too (`src/App.tsx` re-applies a custom palette on a stage transition, not on a sync).
+**Two sources advance it, and the second is the one a reader will not guess.** The writers in `src/lib/themes.ts` (`importCustomTheme`, `deleteCustomTheme`) advance it after a local write resolves. The `THEMES_SYNC_APPLIED_EVENT` bridge advances it when the sync loop merges a REMOTE `vault.themes` change onto disk: `core` reports that merge as `SyncSummary::themes_applied_remote` and emits `THEMES_CHANGED_EVENT`, the sibling of the prefs event off the same cycle (`PREFS_CHANGED_EVENT`, MYND-478), and `src/screens/Editor.tsx` bridges both into their nonces. That second advance is the only one with no local write behind it, and it is what keeps an open Appearance panel honest: the override line above the list reads `vault.prefs.custom_theme`, a DeviceLocal field that never arrives from a peer, while the list itself reads this store, which does (myne#943). The same event also drives the PAINT path in `src/App.tsx`, which otherwise re-applied a custom palette only on a stage transition, so a theme a peer deleted or edited kept painting until the user locked and returned.
 
-Used in: `src/lib/themesSignal.ts`; `src/lib/themes.ts`; `src/components/settings/CustomThemesSection.tsx`
+Used in: `src/lib/themesSignal.ts`; `src/lib/themes.ts`; `src/components/settings/CustomThemesSection.tsx`; `src/screens/Editor.tsx`; `src/App.tsx`
 
 ### **throughput routing preference** &nbsp; 📋 *Protocol*
 

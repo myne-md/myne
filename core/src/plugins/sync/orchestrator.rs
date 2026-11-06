@@ -58,6 +58,15 @@ pub struct SyncSummary {
     pub pushed: usize,
     /// True if a new vault head was authored + accepted.
     pub head_advanced: bool,
+    /// Why this cycle could not UPLOAD, when it could not (myne-md/myne#1027).
+    ///
+    /// `Some(token)` means the cycle ran under `PushGate::PollOnly` because this device cannot
+    /// author a vault head; the token is the `AuthorityMissing` cause, or the failure class it
+    /// maps to. `None` is an ordinary cycle. The cycle sets it AFTER the orchestrator returns,
+    /// which is why the orchestrator's own constructor leaves it `None`, the decision is made
+    /// one layer up, before the call, and carried back on the summary rather than in a second
+    /// out-parameter.
+    pub upload_blocked: Option<&'static str>,
     /// The advanced pull cursor.
     pub cursor: u64,
     /// Notes the server advanced concurrently with an unpushed local edit (a true
@@ -106,10 +115,13 @@ pub struct SyncSummary {
     /// cycle (MYND-486) — a theme added, edited or deleted on a peer. Reported
     /// for the same reason as `prefs_applied_remote` (the orchestrator stays
     /// AppHandle-free, so any refresh choreography lives at the command
-    /// boundary). NOTE: no listener is wired yet — a same-name concurrent edit
-    /// resolves silently by LWW (a theme is not a note: no keep-both, no
-    /// conflict surface), and the WebView re-reads themes over IPC on demand.
-    /// The live-refresh event is a follow-on that needs a frontend listener.
+    /// boundary).
+    ///
+    /// The cycle emits `THEMES_CHANGED_EVENT` off this flag (myne#943), which is
+    /// what re-reads an open Appearance panel's list and repaints the palette;
+    /// before that the list kept showing the pre-sync set until the panel was
+    /// remounted. A same-name concurrent edit still resolves silently by LWW (a
+    /// theme is not a note: no keep-both, no conflict surface).
     pub themes_applied_remote: bool,
     /// A remote `vault.chats` change was merged onto the on-disk catalog this
     /// cycle (myne-md/myne#675): a conversation added, renamed or deleted on
@@ -7649,6 +7661,9 @@ async fn sync_cycle_attempt(
         pulled,
         pushed,
         head_advanced,
+        // The upload decision belongs to `cycle`, which knows the authority verdict before it
+        // ever calls here; it stamps this on the way back (myne-md/myne#1027).
+        upload_blocked: None,
         cursor: state.cursor,
         conflicts,
         tombstones_pushed,

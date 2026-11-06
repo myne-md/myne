@@ -53,9 +53,7 @@
       "scopeQuestion": "Mitä agentti voi lukea",
       "scopeFolders": "Kansiot",
       "scopeApplies": "Koskee seuraavaa viestiäsi. Roskakorissa, arkistossa ja mallimuistiinpanoissa olevat jätetään aina pois.",
-      "blockedScope": "Agentilla ei ole vielä työstettävää: jokainen muistiinpano on rajattu pois tekoälyltä tai holvi on tyhjä.",
       "preparing": "Valmistellaan…",
-      "blockedScopeSidebar": "Täällä ei ole vielä mitään kysyttävää: tämän muistiinpanon kansio on rajattu pois tekoälyltä.",
       "needsScope": "Valitse alta kansio tai avaa muistiinpano, jotta agentilla on työstettävää.",
       "scopeExcluded_one": "{{count}} rajattu pois tekoälyltä",
       "scopeExcluded_other": "{{count}} rajattu pois tekoälyltä"
@@ -3336,7 +3334,6 @@
       "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa, poistaa jokaisen arkistoidun kansion arkistosta ja piilottaa arkistointitoiminnot. Se koskee koko holvia jokaisella laitteella.",
       "label": "Arkistointi",
       "off": "Pois",
-      "on": "Päällä",
       "saveError": "Arkistointiasetusta ei voitu päivittää."
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "Liian heikko"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Ei määritetty",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} ristiriita",
-        "conflicts_other": "{{count}} ristiriitaa"
-      }
     },
     "data": {
       "exported_one": "Vietiin {{count}} muistiinpano → {{label}}",

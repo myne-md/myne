@@ -29,6 +29,11 @@ const h = vi.hoisted(() => {
     flushShouldReject: false,
     /** True when the caller must refuse the stage transition. */
     stageShouldRefuse: false,
+    /** The event name the hook subscribes on; asserted, not just passed through. */
+    progressEvent: "update:progress",
+    /** The handler `listen` was handed, so a test can drive a tick into it. */
+    progressHandler: null as null | ((event: { payload: unknown }) => void),
+    unlisten: vi.fn(),
   };
   return {
     state,
@@ -67,6 +72,14 @@ vi.mock("../../src/platform/update", () => ({
   getAutoCheck: h.getAutoCheck,
   updateCheck: h.updateCheck,
   updateInstall: h.updateInstall,
+  UPDATE_PROGRESS_EVENT: h.state.progressEvent,
+}));
+vi.mock("../../src/platform/event", () => ({
+  listen: (name: string, handler: (event: { payload: unknown }) => void) => {
+    if (name !== h.state.progressEvent) return Promise.reject(new Error(name));
+    h.state.progressHandler = handler;
+    return Promise.resolve(h.state.unlisten);
+  },
 }));
 vi.mock("../../src/lib/vault-unlock", () => ({ lockVault: h.lockVault }));
 vi.mock("../../src/notes/renameFlushHook", () => ({
@@ -84,6 +97,7 @@ beforeEach(() => {
   // flush arm leaked into the two tests after it when this line was missing.
   h.state.flushShouldReject = false;
   h.state.stageShouldRefuse = false;
+  h.state.progressHandler = null;
   vi.clearAllMocks();
 });
 
@@ -176,6 +190,90 @@ describe("the automatic check", () => {
     });
     await settle();
     expect(hook.result.current.view).toBeNull();
+  });
+});
+
+describe("the install's progress stream", () => {
+  it("subscribes once, on the event name the host emits", async () => {
+    await mountChecked();
+    await settle();
+    // A name that drifted from `PROGRESS_EVENT` in Rust is a bar that never
+    // moves and says nothing about why, so the constant is asserted rather than
+    // trusted. The ORIGINAL module is imported, not the mock's own initialiser:
+    // `expect(mock.progressEvent).toBe("update:progress")` compared the mock to
+    // itself and stayed green when the real constant was changed to
+    // "update:progress-DRIFT" (measured, myne-md/myne#1022 review).
+    const real =
+      await vi.importActual<typeof import("../../src/platform/update")>(
+        "../../src/platform/update",
+      );
+    expect(real.UPDATE_PROGRESS_EVENT).toBe("update:progress");
+    expect(h.state.progressEvent).toBe(real.UPDATE_PROGRESS_EVENT);
+    expect(h.state.progressHandler).not.toBeNull();
+  });
+
+  it("reports the host's ticks, and keeps the byte counts through the later phases", async () => {
+    const { hook } = await mountChecked();
+    await settle();
+    expect(hook.result.current.progress.phase).toBe("starting");
+
+    act(() => {
+      h.state.progressHandler?.({
+        payload: { phase: "downloading", downloaded: 2048, total: 8192 },
+      });
+    });
+    expect(hook.result.current.progress).toEqual({
+      phase: "downloading",
+      downloaded: 2048,
+      total: 8192,
+    });
+
+    act(() => {
+      h.state.progressHandler?.({ payload: { phase: "verifying" } });
+    });
+    // The phase moves; the numbers stay, because the screen shows a full bar for
+    // these phases and a retry starts from what the host last reported.
+    expect(hook.result.current.progress).toEqual({
+      phase: "verifying",
+      downloaded: 2048,
+      total: 8192,
+    });
+  });
+
+  it("resets to the starting shape when a retry begins a new attempt", async () => {
+    h.state.installShouldReject = true;
+    const { hook } = await mountChecked();
+    await act(async () => {
+      hook.result.current.confirm();
+    });
+    await settle();
+    act(() => {
+      h.state.progressHandler?.({
+        payload: { phase: "downloading", downloaded: 4096, total: 8192 },
+      });
+    });
+    expect(hook.result.current.progress.phase).toBe("downloading");
+
+    h.state.installShouldReject = false;
+    await act(async () => {
+      hook.result.current.retry();
+    });
+    await settle();
+    // A retry downloads the whole artifact again, so a bar left at the previous
+    // attempt's byte count would claim progress that was thrown away.
+    expect(hook.result.current.progress).toEqual({
+      phase: "starting",
+      downloaded: 0,
+      total: null,
+    });
+  });
+
+  it("unsubscribes on unmount", async () => {
+    const { hook } = await mountChecked();
+    await settle();
+    hook.unmount();
+    await settle();
+    expect(h.state.unlisten).toHaveBeenCalledTimes(1);
   });
 });
 

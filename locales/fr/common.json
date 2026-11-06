@@ -54,9 +54,7 @@
       "scopeQuestion": "Ce que l'agent peut lire",
       "scopeFolders": "Dossiers",
       "scopeApplies": "S'applique à votre prochain message. Les notes à la corbeille, archivées et les modèles sont toujours exclus.",
-      "blockedScope": "Rien sur quoi l'agent puisse travailler pour l'instant : toutes les notes sont exclues de l'IA, ou le coffre est vide.",
       "preparing": "Préparation…",
-      "blockedScopeSidebar": "Rien à demander pour l'instant : le dossier de cette note est exclu de l'IA.",
       "needsScope": "Choisissez un dossier ci-dessous, ou ouvrez une note, pour que l'agent ait de quoi travailler.",
       "scopeExcluded_one": "{{count}} exclue de l'IA",
       "scopeExcluded_many": "{{count}} exclues de l'IA",
@@ -3454,7 +3452,6 @@
       "helper": "Permet de déplacer des notes vers une archive, à l'écart de la liste principale. Désactiver cette option restaure chaque note archivée dans son dossier, désarchive chaque dossier archivé et masque les commandes d'archivage. Elle s'applique à tout le coffre-fort, sur tous les appareils.",
       "label": "Archivage",
       "off": "Désactivé",
-      "on": "Activé",
       "saveError": "Impossible de mettre à jour le paramètre d'archivage."
     },
     "attachmentCompression": {
@@ -4225,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Non configuré",
-        "offline": "Hors ligne",
-        "conflicts_one": "{{count}} conflit",
-        "conflicts_many": "{{count}} de conflits",
-        "conflicts_other": "{{count}} conflits"
+        "conflicts_many": "{{count}} de conflits"
       }
     },
     "data": {

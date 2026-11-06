@@ -97,38 +97,6 @@
     "reason": "Same action label on the command palette and the bottom bar; the palette mirrors the UI, intentionally identical."
   },
   {
-    "value": "What the assistant remembers",
-    "keys": [
-      "editor.chrome.rightPanel.aiChat.memoryPopoverTitle",
-      "settings.memory.heading"
-    ],
-    "reason": "Same feature name as the memory popover title and the Settings heading; one feature, two labels."
-  },
-  {
-    "value": "Entry removed everywhere.",
-    "keys": [
-      "editor.chrome.rightPanel.aiChat.memoryPopoverDeleted",
-      "settings.memory.deletedToast"
-    ],
-    "reason": "Same delete toast in the agent memory widget and Settings memory panel; one event, one string."
-  },
-  {
-    "value": "Could not delete the entry.",
-    "keys": [
-      "editor.chrome.rightPanel.aiChat.memoryPopoverDeleteFailed",
-      "settings.memory.deleteFailed"
-    ],
-    "reason": "Same delete failure in the agent memory widget and Settings memory panel; one error, two call sites."
-  },
-  {
-    "value": "Couldn't read this entry. It is still stored; delete it here or fix it in Settings.",
-    "keys": [
-      "editor.chrome.rightPanel.aiChat.memoryPopoverEntryFailed",
-      "settings.memory.entryUnreadable"
-    ],
-    "reason": "Same unreadable-entry error in the agent memory widget and Settings memory panel; generic error, intentionally shared."
-  },
-  {
     "value": "This note could not be read.",
     "keys": [
       "export.note.errors.cannotDecrypt",

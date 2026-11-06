@@ -24,6 +24,24 @@ const PREFS_STUB = { device_names: {} };
 export interface SyncPanelRoute {
   /** What `sync_status` reports. */
   readonly syncState?: string;
+  /** The `Error` variant's bounded detail tag, which `syncState: "error"` needs to
+   *  carry: the panel's fallback authority sentence is derived from it. */
+  readonly syncDetail?: string;
+  /**
+   * What `sync_vault_doctor` reports (myne-md/myne#1003). `undefined` answers `null`,
+   * which is the "no vault to diagnose" case, and `"refuse"` makes the command reject
+   * so a case can assert the fallback.
+   */
+  readonly doctor?:
+    | "refuse"
+    | null
+    | {
+        readonly generation?: string;
+        readonly authority?: Record<string, unknown>;
+        readonly binding?: string;
+        readonly key_at_rest?: string;
+        readonly session?: Record<string, unknown>;
+      };
   readonly betaTermsAccepted?: boolean;
   /** What `sync_list_devices` reports. Omit it and the roster refuses
    *  `NotEnrolled`, which is the token-less case every other case relies on. */
@@ -92,6 +110,8 @@ export interface SyncPanelRoute {
 export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
   const {
     syncState = "not_enrolled",
+    syncDetail,
+    doctor,
     betaTermsAccepted = true,
     person,
     migration = { offerable: false, pending: false },
@@ -144,7 +164,24 @@ export function syncPanelCommandRouter(route: SyncPanelRoute = {}) {
     // accidentally-empty one.
     if (cmd === "plugin:device-binding|device_bindings_list")
       return { rows: [], unverified_device_ids: [] };
-    if (cmd === "plugin:sync|sync_status") return { state: syncState };
+    if (cmd === "plugin:sync|sync_status") {
+      return syncDetail === undefined ? { state: syncState } : { state: syncState, detail: syncDetail };
+    }
+    // The vault doctor (myne-md/myne#1003). It is asked ONLY while sync is failing, so a
+    // case that does not set `syncState: "error"` never reaches this arm, which is the
+    // property the spec about "read on a failure, not on the status beat" asserts.
+    if (cmd === "plugin:sync|sync_vault_doctor") {
+      if (doctor === "refuse") throw { kind: "Unavailable" };
+      if (doctor === undefined || doctor === null) return null;
+      return {
+        generation: "NTV8",
+        binding: "absent",
+        key_at_rest: "absent",
+        session: { person_held: false, device_id_adopted: true },
+        ...doctor,
+        authority: doctor.authority ?? { state: "device_key" },
+      };
+    }
     // The member-vault probe (myne-md/myne). It gates which account-plane
     // affordances the panel offers, so a spec that varies it is varying the one
     // fact both the QR icon and the usage block read.

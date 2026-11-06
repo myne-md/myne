@@ -57,6 +57,17 @@ pub struct SignedHeadCtx {
     /// The device public halves this vault's binding store carries, which resolve a
     /// `0x03` signer. Built from the same store the attribution path reads.
     pub device_signers: Vec<DeviceHeadSigner>,
+    /// Whether the vault's ROSTER was verified to build this context.
+    ///
+    /// `false` is the state of a device that has just joined: the owner roster is sealed
+    /// under the group key and its signer is resolved from the binding store, which this
+    /// device has not downloaded yet (`myne-md/myne#1000`). Such a context may VERIFY and
+    /// must never SIGN: its `roster_publics` carries one half rather than the live member
+    /// list, so a head it authored would be vouched for by a roster it never read.
+    ///
+    /// The distinction the field buys is one sentence: a context that cannot author can
+    /// still pull, and that is the only route by which the state it is missing arrives.
+    pub roster_verified: bool,
 }
 
 impl SignedHeadCtx {
@@ -79,6 +90,38 @@ impl SignedHeadCtx {
             roster_publics,
             device: None,
             device_signers: Vec::new(),
+            roster_verified: true,
+        }
+    }
+
+    /// A READ-ONLY context for a device whose vault roster cannot be verified yet.
+    ///
+    /// `signer` is the owner's person half: held as this device's own identity when this
+    /// device IS the owner, and taken from the pinned identity code otherwise. It is what
+    /// a `0x02` head is verified against, so a joined device can read the head its peer
+    /// authored before it has downloaded the binding store that resolves a `0x03` one.
+    ///
+    /// Not a relaxation of [`Self::can_author`]: a context built this way refuses to
+    /// sign, and `cycle` passes `PushGate::PollOnly`, so a device in this state pulls and
+    /// commits nothing. The head it adopts is still signature-verified, against a key it
+    /// derived or pinned out of band rather than one the server supplied.
+    #[must_use]
+    pub fn person_only_reader(
+        person: Option<PersonKeyPair>,
+        account_number_hash: [u8; VAULT_HEAD_ACCOUNT_HASH_LEN],
+        signer: PersonPublicHalf,
+    ) -> Self {
+        let author_id = person
+            .as_ref()
+            .map(|person| head_author_id(&person.public_half(), &account_number_hash));
+        Self {
+            person,
+            author_id,
+            account_number_hash,
+            roster_publics: vec![signer],
+            device: None,
+            device_signers: Vec::new(),
+            roster_verified: false,
         }
     }
 
@@ -141,7 +184,8 @@ impl SignedHeadCtx {
     /// them looking at the network.
     #[must_use]
     pub fn can_author(&self) -> bool {
-        self.device.is_some() || (self.person.is_some() && self.author_id.is_some())
+        self.roster_verified
+            && (self.device.is_some() || (self.person.is_some() && self.author_id.is_some()))
     }
 
     /// Author a signed head in this device's format.
@@ -150,6 +194,13 @@ impl SignedHeadCtx {
         head: &VaultHead,
         rng: &mut (impl rand_core::CryptoRng + ?Sized),
     ) -> Result<SealedHead, VaultHeadError> {
+        // A context built without the roster signs nothing: its signer set is one half
+        // rather than the live member list, so a head it authored would claim an
+        // authority this device never established. `can_author` refuses the same state at
+        // the cycle, and this arm is the backstop for a caller that skipped it.
+        if !self.roster_verified {
+            return Err(VaultHeadError::NoAuthority);
+        }
         match &self.device {
             Some(device) => sign_device_vault_head(
                 &VaultHead {
@@ -358,6 +409,51 @@ mod tests {
     /// And the other side of the same coin: with neither authority the context refuses
     /// rather than stamping a format, so the caller can say "unlock and retry" instead of
     /// surfacing a signature failure it cannot explain.
+    /// A device that has just joined can READ the owner's head before it has the binding
+    /// store that resolves the roster, and must never SIGN in that state.
+    ///
+    /// Both halves are the property `myne-md/myne#1000` needs. The deadlock it names is that
+    /// `vault.device-bindings` is both what the roster's signer is resolved from and what only
+    /// a sync cycle downloads, so a cycle that refuses to run cannot repair the state that made
+    /// it refuse. A read-only context breaks the loop without letting the device author
+    /// anything: the head it adopts is still signature-verified, against a half it derived from
+    /// the phrase rather than one the server supplied.
+    #[test]
+    fn a_person_signed_head_is_readable_without_the_roster_and_never_signable() {
+        let account = [0x53u8; 16];
+        let owner = PersonKeyPair::generate_raw(&[0x31; 64], &[0x32; 32], &[0x33; 32]);
+        let owner_public = owner.public_half();
+
+        // The device that holds the identity AND the roster authored the head.
+        let authoring =
+            SignedHeadCtx::new(Some(owner.clone()), account, vec![owner_public.clone()]);
+        assert_eq!(authoring.authors_format(), VAULT_HEAD_FORMAT_V2);
+        let sealed = authoring
+            .sign(&head(account), &mut Rng(9))
+            .expect("the owner's own session signs a 0x02 head");
+
+        // The joined device: the same person half, and the identity ITSELF in hand — the
+        // phrase was just typed, so `person` is `Some`. That is what makes the assertions
+        // below mean something: with a person held, `roster_verified` is the only thing
+        // standing between this context and a signature, so a test that passed `None` here
+        // would pass whether or not the flag was checked.
+        let reader = SignedHeadCtx::person_only_reader(Some(owner.clone()), account, owner_public);
+        assert!(
+            !reader.can_author(),
+            "a context without the roster signs nothing"
+        );
+        assert_eq!(
+            reader.sign(&head(account), &mut Rng(10)).unwrap_err(),
+            protocol::vault_head::VaultHeadError::NoAuthority,
+            "and the refusal is at the signer, not only at the guard"
+        );
+        let opened = reader
+            .open(&sealed.record)
+            .expect("the join can verify the head it cannot author");
+        assert_eq!(opened.seq, 1);
+        assert_eq!(opened.head_format_version, VAULT_HEAD_FORMAT_V2);
+    }
+
     #[test]
     fn neither_key_cannot_author() {
         let account = [0x52u8; 16];

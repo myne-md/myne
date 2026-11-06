@@ -218,7 +218,22 @@ pub(crate) fn teardown(w: Option<WorkerHandle>) {
     }
     if let Some(join) = w.join.take() {
         tauri::async_runtime::spawn_blocking(move || {
-            let _ = join.join();
+            // A worker that ends by panic used to leave only a `crash.log`
+            // location: the join result was dropped, so nothing said the
+            // live-collab stream had stopped and sync was back on the 30 s poll.
+            // That is the shape a user reports as "sync stopped" while every
+            // other moving part is healthy, so the death gets a line of its own.
+            // A clean return (a stop we asked for, or a stream the peer closed)
+            // stays silent: those are the ordinary ends of a worker's life, and
+            // logging them would bury this one.
+            if join.join().is_err() {
+                tracing::warn!(
+                    event = "sync_stream_worker_panicked",
+                    stage = "teardown",
+                    fallback = "poll",
+                    "the live-collab stream worker ended by panic; sync falls back to the poll"
+                );
+            }
         });
     }
 }

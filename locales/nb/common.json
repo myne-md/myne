@@ -53,9 +53,7 @@
       "scopeQuestion": "Hva agenten kan lese",
       "scopeFolders": "Mapper",
       "scopeApplies": "Gjelder neste melding. Papirkurv-, arkiv- og malnotater er alltid utelatt.",
-      "blockedScope": "Ingenting for agenten å jobbe med ennå: hvert notat er utelatt fra AI, eller hvelvet er tomt.",
       "preparing": "Forbereder…",
-      "blockedScopeSidebar": "Ingenting å spørre om her ennå: mappen til dette notatet er utelatt fra AI.",
       "needsScope": "Velg en mappe nedenfor, eller åpne et notat, så agenten har noe å jobbe med.",
       "scopeExcluded_one": "{{count}} utelatt fra AI",
       "scopeExcluded_other": "{{count}} utelatt fra AI"
@@ -3336,7 +3334,6 @@
       "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, alle arkiverte mapper fjernes fra arkivet, og arkivkontrollene skjules. Det gjelder hele hvelvet, på alle enheter.",
       "label": "Arkivering",
       "off": "Av",
-      "on": "På",
       "saveError": "Kunne ikke oppdatere arkiveringsinnstillingen."
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "For svakt"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Ikke konfigurert",
-        "offline": "Frakoblet",
-        "conflicts_one": "{{count}} konflikt",
-        "conflicts_other": "{{count}} konflikter"
-      }
     },
     "data": {
       "exported_one": "Eksporterte {{count}} notat → {{label}}",

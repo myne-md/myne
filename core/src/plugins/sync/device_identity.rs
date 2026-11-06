@@ -203,9 +203,41 @@ pub fn load() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
     if let Some(pair) = session_key() {
         return Ok(Some(pair));
     }
-    // A host-registered store wins over this crate's own cfg arm: the host knows
-    // whether its platform has one (Android's Keystore lives behind a Kotlin plugin),
-    // and no host installs a provider where `imp` already works.
+    // Everything below is [`load_at_rest`], and it is spelled that way rather than copied:
+    // the two questions differ by exactly the session arm above, so a change to the store
+    // ladder cannot be made on one of them and forgotten on the other.
+    load_at_rest()
+}
+
+/// Read the device key from the OS STORE, and from nowhere else.
+///
+/// The store-only sibling of [`load`], and the difference between them is a defect class
+/// rather than a preference. `load` answers from the session slot FIRST, which is right for
+/// signing (a rung-3 PIN unlock installs its key in RAM and nothing else) and wrong for every
+/// caller asking whether the key is AT REST: it answers "yes, a key is here" for a key that
+/// exists only inside this process.
+///
+/// That conflation is what produced myne-md/myne#1027: the binding claim read its own write
+/// back through [`load`], a session-only key satisfied the read, and a `v2` binding row
+/// published halves no store held. The device then could not author a head, every cycle ran
+/// pull-only, and nothing reported it (myne-md/myne#983's claim that "the claim reads its own
+/// write back" was never true for this one reason).
+///
+/// So the two questions get two names:
+///   * *can this device sign right now* → [`load`];
+///   * *does the key survive this process* → this.
+///
+/// Rung 3 (the PIN-sealed file) lives outside any keychain and only its OWN unlock can say
+/// whether it is present, so it answers here when that rung is wired to a production path ,
+/// today nothing calls it, and this is the one function that changes when it is.
+#[must_use = "the ladder's three outcomes are the answer, and Absent is one of them"]
+pub fn load_at_rest() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
+    // Deliberately no `session_key()` arm. See the doc comment: a key in RAM is the exact
+    // answer this function exists to NOT give.
+    //
+    // A host-registered store wins over this crate's own cfg arm: the host knows whether its
+    // platform has one (Android's Keystore lives behind a Kotlin plugin), and no host installs
+    // a provider where `imp` already works.
     if let Some(provider) = host_provider() {
         return provider.load();
     }
@@ -261,7 +293,7 @@ pub fn load_or_create() -> Result<DeviceKeyPair, DeviceKeyStoreError> {
     Ok(pair)
 }
 
-/// Destroy the device key. Called by the device-local erase paths (forget-identity,
+/// The device key was destroyed. Called by the device-local erase paths (forget-identity,
 /// vault delete) so a device that is being wiped does not leave a signing key behind.
 /// Best-effort: a failed delete is logged and does not fail the erase, because the
 /// erase's own guarantee is about vault content.
@@ -275,6 +307,37 @@ pub fn destroy() {
         Some(provider) => provider.destroy(),
         None => imp::destroy(),
     }
+}
+
+/// One line per keychain mutation, from every platform arm (myne-md/myne#1027).
+///
+/// The shape lives here rather than in each `imp` because the FORENSIC question is the same
+/// on all of them, "was this device's signing key ever written, and was it later erased?" ,
+/// and three copies of one message drift the first time one is touched. Each arm supplies
+/// the two bounded tokens it can actually answer; nothing platform-specific crosses.
+///
+/// A successful write and a successful erase were both SILENT before this, so an orphaned
+/// binding row (a row publishing halves no store holds) could not be told apart from a store
+/// that had never been written to. The refused case already had its own `warn` with an
+/// OSStatus; this is the other two thirds.
+/// One line per keychain mutation, from every platform arm.
+///
+/// `pub` because the store on two shipped platforms is not in this crate: Windows seals through
+/// DPAPI in `src-tauri/src/device_key_dpapi.rs` and Android/iOS through a Keystore plugin in
+/// `mobile/src-tauri/src/device_key_keystore.rs`. A hook only the desktop's built-in arms
+/// implement answers the forensic question ("was this device's signing key ever written, and was
+/// it later erased?") on the platforms where the defect is least likely, and stays silent on the
+/// two where it is most likely (myne-md/myne#1027 review).
+///
+/// Allowed fields are `stage`, `op`, `result`, and a bounded static token for each: no path, no
+/// account, no key material, per `check-tracing-discipline.mjs`.
+pub fn log_key_op(op: &'static str, result: &'static str) {
+    tracing::info!(
+        stage = "device_key_keychain",
+        op,
+        result,
+        "device-key keychain operation"
+    );
 }
 
 /// The plaintext this module stores, as bytes. Exposed so a test can prove the
@@ -491,6 +554,12 @@ mod imp {
     }
 
     pub fn store(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
+        let result = store_inner(pair);
+        super::log_key_op("store", if result.is_ok() { "ok" } else { "refused" });
+        result
+    }
+
+    fn store_inner(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
         // No access-control flags (0): no biometric / user-presence gate, because a
         // head is authored on a background cycle. `WhenUnlockedThisDeviceOnly`: the
         // item is never exported, never synced, never in a backup, and reachable only
@@ -521,11 +590,18 @@ mod imp {
         // other order leaves that resurrection reachable whenever the legacy delete is
         // refused.
         discard_file_keychain_copy("delete_file_keychain");
-        if let Err(e) = delete_generic_password_options(query_options()) {
-            if e.code() != ERR_SEC_ITEM_NOT_FOUND {
+        let result = match delete_generic_password_options(query_options()) {
+            Ok(()) => "ok",
+            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => "absent",
+            Err(e) => {
                 log_keychain_err("delete", &e);
+                "refused"
             }
-        }
+        };
+        // A successful DELETE used to be silent (myne-md/myne#1027), so a device key that
+        // was erased by some path left no trace at all and an orphaned binding row looked
+        // like a store that had never been written.
+        super::log_key_op("delete", result);
     }
 
     /// An OSStatus code is not key material, so it may be logged; it is the
@@ -639,6 +715,12 @@ mod imp {
     }
 
     pub fn store(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
+        let result = store_inner(pair);
+        super::log_key_op("store", if result.is_ok() { "ok" } else { "refused" });
+        result
+    }
+
+    fn store_inner(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
         let ss = connect()?;
         let collection = ss.get_default_collection().map_err(|e| {
             log_backend_err("default_collection", &e);
@@ -664,17 +746,24 @@ mod imp {
     }
 
     pub fn destroy() {
-        let Ok(ss) = connect() else { return };
+        let Ok(ss) = connect() else {
+            super::log_key_op("delete", "unavailable");
+            return;
+        };
         let Ok(found) = ss.search_items(attributes()) else {
+            super::log_key_op("delete", "refused");
             return;
         };
         // Locked items are deleted too: the point of the erase is that the key stops
         // existing, and a delete needs no unlock.
+        let mut refused = false;
         for item in found.unlocked.iter().chain(found.locked.iter()) {
             if let Err(e) = item.delete() {
                 log_backend_err("delete", &e);
+                refused = true;
             }
         }
+        super::log_key_op("delete", if refused { "refused" } else { "ok" });
     }
 
     /// A D-Bus error is not key material, so it may be logged; it is the diagnostic a
@@ -739,9 +828,9 @@ mod tests {
     /// slot rung 3 installs into, and the host-provider `OnceLock`. `cargo test`
     /// runs a suite in threads inside one process, so two tests mutating either
     /// slot interleave, and the failure reads as a logic bug in the code under
-    /// test rather than as shared state. Taken by `a_rung_three_unlock_...` and
-    /// `a_host_registered_store_...`, which are the only two.
-    static SLOT_LOCK: Mutex<()> = Mutex::new(());
+    /// test rather than as shared state. The lock lives in `test_support` now, because
+    /// the creation-time binding claim installs a session key too (myne-md/myne#1001).
+    use crate::test_support::device_key_slot_guard;
 
     #[test]
     #[cfg(any(target_os = "macos", target_os = "ios"))]
@@ -819,7 +908,7 @@ mod tests {
     /// the key it returns is the one this provider minted.
     #[test]
     fn a_host_registered_store_answers_for_the_crate() {
-        let _serialized = SLOT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _serialized = device_key_slot_guard();
         clear_session_key();
         struct FakeProvider {
             inner: Mutex<Option<DeviceKeyPair>>,
@@ -881,6 +970,41 @@ mod tests {
             "load() must prefer the host store over this crate's own arm"
         );
 
+        // The at-rest read must NOT see a key that lives only in this process, and this is the
+        // one test that may own `HOST_PROVIDER` (myne-md/myne#1027). Asserted HERE rather than in
+        // a test of its own because `install_host_provider` is first-call-wins: a second
+        // installer takes the slot from this fixture whenever the two run in that order, which
+        // emptied the store above and made this test fail once in twelve runs. A property that
+        // needs the provider is proved by the test that already holds it.
+        //
+        // The injection this catches: give `load_at_rest` the `session_key()` arm `load` has, and
+        // the `assert_ne!` below fails naming "a key that exists only in this process is not at
+        // rest".
+        assert_eq!(
+            load_at_rest()
+                .expect("the provider answers")
+                .map(|p| p.public_half()),
+            Some(minted.public_half()),
+            "the provider holds this key, so it IS at rest"
+        );
+        let only_in_ram = DeviceKeyPair::generate_raw(&[0x71; 32], &[0x72; 32]);
+        install_session_key(only_in_ram.clone());
+        assert_eq!(
+            load()
+                .expect("read the signing path")
+                .map(|p| p.public_half()),
+            Some(only_in_ram.public_half()),
+            "the signing read answers from RAM, which is why a rung-3 PIN key works"
+        );
+        assert_ne!(
+            load_at_rest()
+                .expect("the provider answers")
+                .map(|p| p.public_half()),
+            Some(only_in_ram.public_half()),
+            "a key that exists only in this process is not at rest"
+        );
+        clear_session_key();
+
         // A second key must not be minted while one is stored: a replacement key
         // silently un-binds the device.
         let again = load_or_create().expect("reuse");
@@ -920,7 +1044,7 @@ mod tests {
     /// cycle and lost.
     #[test]
     fn a_rung_three_unlock_answers_before_the_os_store() {
-        let _serialized = SLOT_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let _serialized = device_key_slot_guard();
         let pair = DeviceKeyPair::generate_raw(&[0x41; 32], &[0x42; 32]);
         install_session_key(pair.clone());
 

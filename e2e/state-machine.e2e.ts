@@ -300,10 +300,10 @@ describeE2E("post-delete routing (Settings → Account delete)", () => {
   async function deleteOpenVaultFromSettings(session: Session): Promise<void> {
     // Settings → Vault → Danger zone → typed-DELETE gate → Submit.
     await openSettings(session, "vault");
-    // The erase CTA is the Vault panel's `danger` topic (myne-md/myne#885);
-    // only the active topic's body is mounted.
+    // The erase field is the Vault panel's `danger` topic (myne-md/myne#885);
+    // only the active topic's body is mounted, and since myne-md/myne#1020 the
+    // field is simply there rather than behind a CTA that reveals it.
     await selectSettingsTopic(session, "vault", "danger");
-    await (await session.byTestId("settings.delete-vault-cta")).click();
     const confirmInput = await session.byTestId("delete-vault.confirm-input", {
       timeoutMs: 10_000,
     });

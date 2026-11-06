@@ -204,8 +204,28 @@ pub async fn save_report<R: Runtime>(
         io_error_kind: from_io_error_kind(e.kind()),
     };
     let destination = PathBuf::from(destination);
-    validate_report_destination(&destination, &guarded_stores(&app))?;
-    let captured = report::write_bundle(&block, &sink, &destination).map_err(io)?;
+    if let Err(refusal) = validate_report_destination(&destination, &guarded_stores(&app)) {
+        // The refusal is the load-bearing half of this path and the one failure a
+        // page that skipped the save dialog runs into, so it is the one worth a
+        // record. `kind` is the closed error enum: no path and no OS message.
+        tracing::warn!(event = "diagnostic_report_refused", kind = ?refusal);
+        return Err(refusal);
+    }
+    let captured = match report::write_bundle(&block, &sink, &destination) {
+        Ok(captured) => captured,
+        Err(e) => {
+            // The report file that could not be written is the case where the
+            // artefact the user wanted to send is itself the evidence, so this line
+            // is the only trace the failure leaves that is not on their screen.
+            let error = io(e);
+            tracing::warn!(event = "diagnostic_report_failed", stage = "write", kind = ?error);
+            return Err(error);
+        }
+    };
+    // Whether a crash record rode along is the difference between "no crash" and
+    // "the capture act lost it", which is the distinction the boolean this carries
+    // was introduced for.
+    let crash_record_included = captured.is_some();
     if let Some(captured) = captured {
         // Clear only when the record on disk is STILL the one whose bytes went
         // into the bundle. A panic landing between the read and this line would
@@ -217,9 +237,18 @@ pub async fn save_report<R: Runtime>(
                 .map(|now| now.as_bytes() == captured.as_slice())
                 .unwrap_or(false);
         if still_the_captured_one {
-            crash::clear(sink.dir()).map_err(io)?;
+            if let Err(e) = crash::clear(sink.dir()) {
+                let error = io(e);
+                tracing::warn!(
+                    event = "diagnostic_report_failed",
+                    stage = "clear_crash_record",
+                    kind = ?error
+                );
+                return Err(error);
+            }
         }
     }
+    tracing::info!(event = "diagnostic_report_written", crash_record_included);
     Ok(())
 }
 

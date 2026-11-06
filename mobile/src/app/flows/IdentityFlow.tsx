@@ -64,7 +64,7 @@ import { setMyMemberName, memberNameErrorKey } from "../../lib/memberNames";
 import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge";
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
-import type { IdentityFlowProps } from "./types";
+import type { IdentityFlowProps, JoinLanding } from "./types";
 
 type Step =
   | "gate"
@@ -393,6 +393,7 @@ export function IdentityFlow({
   fromPersonQr,
   initialStep,
   onScanCode,
+  onUnlocked,
 }: IdentityFlowProps) {
   const { t, i18n } = useTranslation();
   // The clipboard's auto-clear timer holds the phrase in its closure, so this
@@ -420,7 +421,25 @@ export function IdentityFlow({
   // …and the recover step's, a third grid of the same fields, for the same reason
   // a third time.
   const recoverPhraseLabelId = useId();
-  const [step, setStep] = useState<Step>(initialStep ?? "gate");
+  /**
+   * Whether this mount IS the sync surface's repair door, as a BOOLEAN.
+   *
+   * A flag rather than the callback it came from, because a callback prop is not a
+   * stable effect key: `EditorFlow` passes an inline arrow, so naming `onUnlocked`
+   * in the boot probe's dependency list would re-probe on every parent render and
+   * drag a user who had left the phrase grid back onto it (myne-md/myne#1029
+   * review). The callback itself is read through a ref, the same way the invite
+   * block below reads its own.
+   */
+  const repairDoor = onUnlocked !== undefined;
+  const onUnlockedRef = useRef(onUnlocked);
+  useEffect(() => {
+    onUnlockedRef.current = onUnlocked;
+  }, [onUnlocked]);
+  /** Where a mount lands when the probe cannot answer: the door's own step, never
+   *  the creation gate on a device that demonstrably holds an identity. */
+  const unaskedStep: Step = repairDoor ? "unlock-identity" : (initialStep ?? "gate");
+  const [step, setStep] = useState<Step>(unaskedStep);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -468,6 +487,51 @@ export function IdentityFlow({
       live = false;
     };
   }, []);
+  /**
+   * The sync server this device already names, read ONCE at mount.
+   *
+   * The ceremony's last step offers to register the identity it just made, and
+   * registration needs an address (myne-md/myne#1029). Two rules decide the offer.
+   * The address is a decision with a place, so it appears only when the device
+   * already has one; a device with none keeps the identity home's own register
+   * block, which is where the address is asked for. And the step NAMES the host,
+   * because the ceremony sends the 24 words to a stored address rather than one
+   * typed beside them: the desktop records that ordering as an owner decision
+   * (2026-10-24, `PersonRegisterForm`), and a phrase that crosses IPC to an
+   * endpoint the screen never shows would be the shape it warns about.
+   *
+   * One read, both fields: the register step seeds its own prefilled row from this
+   * same value, so the two surfaces cannot disagree about which server is meant.
+   * A failed read answers NO, because an unanswered question is not a yes.
+   */
+  const [server, setServer] = useState<{ url: string; code: string } | null>(null);
+  useEffect(() => {
+    if (!HAS_TAURI) return;
+    let live = true;
+    void syncGetEndpoint()
+      .then((cfg) => {
+        if (!live) return;
+        setServer({ url: cfg.endpoint_url ?? "", code: cfg.invite_code ?? "" });
+      })
+      .catch(() => {
+        /* unknown; the home's register block is the fallback either way */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  /** The server's host alone, for the copy. A full URL carries a path nobody needs. */
+  const serverHost = (() => {
+    const url = server?.url ?? "";
+    if (url === "") return "";
+    try {
+      return new URL(url).host;
+    } catch {
+      return url;
+    }
+  })();
+  const serverConfigured = serverHost !== "";
+
   // The type-back challenge (myne-md/myne#855): four positions drawn when the
   // phrase arrives, plus the answers. It REPLACES the acknowledgement checkbox,
   // for the reason `docs/spec/protocol.md` section 7.1.3 gives and the vault flow
@@ -545,11 +609,22 @@ export function IdentityFlow({
    *  refused credential, the other is an admitted device whose vault list did not
    *  arrive. */
   const [personListError, setPersonListError] = useState<string | null>(null);
-  // The account's vaults did not arrive (myne-md/myne#932). Its own state rather
-  // than the flow's `error`, which is about the identity: a listing failure leaves
-  // the identity fine and only the picker short, and saying so beside the vaults is
-  // where a reader looks for it.
-  const [vaultListFailed, setVaultListFailed] = useState(false);
+  // What the account's vault listing answered on the home step (myne-md/myne#932).
+  // `null` = nothing to report, `"failed"` = the call did not answer, `"empty"` =
+  // the account is bound to no vault server-side, and a number = that many
+  // bindings came back WITHOUT a local container (`PersonVaultRow.vault_id: null`:
+  // an unreachable frame, or a generation this device cannot hold).
+  //
+  // Its own state rather than the flow's `error`, which is about the identity: a
+  // listing that fell short leaves the identity fine and only the vaults short. A
+  // triage rather than a list, because the vault surface is the picker. What this
+  // step owes is the answer to "my account is right and my vaults are missing",
+  // which silence used to give.
+  const [vaultIssue, setVaultIssue] = useState<"failed" | "empty" | number | null>(null);
+  // Is this the first-run door (the only caller that passes `onCreateVault`)? Read
+  // through a ref by the listing effect below, for the reason given there.
+  const createAction = useRef(onCreateVault !== undefined);
+  createAction.current = onCreateVault !== undefined;
   // Forget-this-identity acknowledgement (myne-md/myne#782).
   const [forgetAck, setForgetAck] = useState(false);
 
@@ -664,7 +739,7 @@ export function IdentityFlow({
       return;
     }
     if (!HAS_TAURI) {
-      setStep(initialStep ?? "gate");
+      setStep(unaskedStep);
       return;
     }
     let cancelled = false;
@@ -682,7 +757,15 @@ export function IdentityFlow({
           setIdentityCode(s.identity_code);
           setAccountState(s.state);
           setIdentityUnlocked(s.identity_unlocked);
-          setStep("home");
+          // A mount the editor opened as the REPAIR door lands on the phrase grid
+          // (myne-md/myne#1029), and it does so whether or not a session is
+          // already live. The open-session case is not hypothetical: the row's
+          // other label is `repair_device`, whose cause is a binding row that
+          // publishes a key the store cannot produce, and a live session says
+          // nothing about that key. The claim runs inside `sync_person_unlock`,
+          // so the phrase entry IS the repair in both states, and landing on the
+          // home would offer a screen with no control that mints anything.
+          setStep(repairDoor ? "unlock-identity" : "home");
           // Read separately and tolerated: a device with no number to show still
           // has a working home, and the number is derived rather than stored.
           void personAccountNumber()
@@ -704,12 +787,12 @@ export function IdentityFlow({
         }
       })
       .catch(() => {
-        if (!cancelled) setStep(initialStep ?? "gate");
+        if (!cancelled) setStep(unaskedStep);
       });
     return () => {
       cancelled = true;
     };
-  }, [initialStep]);
+  }, [initialStep, repairDoor, unaskedStep]);
 
   // Load invites whenever the home step is shown, and refresh the lifecycle
   // state with them: registration happens on another step and must remove its own
@@ -739,15 +822,36 @@ export function IdentityFlow({
         // account to ask, and the command would refuse.
         if (s.state !== "enrolled") return;
         void personListVaults()
-          .then(() => {
-            if (!cancelled) setVaultListFailed(false);
+          .then((rows) => {
+            if (cancelled) return;
+            const missing = rows.filter((row) => row.vault_id === null).length;
+            // An account bound to nothing is a fact about the SERVER's index, not
+            // about this device, and it is the difference between "the vault is not
+            // published yet" (act on the device that holds it) and "the frame did
+            // not arrive" (retry here). Reporting neither is what a phone showed
+            // while its owner looked at a correct account number and no vaults.
+            //
+            // Except on the first-run door, which passes `onCreateVault`: an account
+            // with no vaults is exactly the state that door exists to leave, and its
+            // action is already on the screen, so a warning there is noise about
+            // nothing being wrong. Read through a ref, because the prop is an inline
+            // arrow in the shell and naming it in the dependency list would re-run
+            // this fetch on every parent render.
+            const firstRun = createAction.current;
+            setVaultIssue(
+              missing > 0
+                ? missing
+                : rows.length === 0 && !firstRun
+                  ? "empty"
+                  : null,
+            );
           })
           .catch(() => {
             // A listing failure is not a wrong phrase and not a lost vault: the
             // frames simply did not arrive, and the retry is reopening this step.
             // Said rather than swallowed, because the alternative is a picker that
             // looks merely empty (myne-md/myne#932 review).
-            if (!cancelled) setVaultListFailed(true);
+            if (!cancelled) setVaultIssue("failed");
           });
       })
       .catch(() => {
@@ -768,6 +872,15 @@ export function IdentityFlow({
     // config over what the user has just typed.
     if (step !== "register" || registerEndpointLoaded.current || !HAS_TAURI) return;
     registerEndpointLoaded.current = true;
+    // The mount's read is the same command, taken once. Seeding from it keeps one
+    // answer for one question instead of two reads that can disagree, and it is
+    // what lets the type-back step name the host it is about to send the words to.
+    if (server !== null) {
+      setRegisterServerUrl(server.url);
+      setRegisterInviteCode(server.code);
+      setRegisterConfigured({ url: server.url, code: server.code });
+      return;
+    }
     let cancelled = false;
     void syncGetEndpoint()
       .then((cfg) => {
@@ -784,7 +897,7 @@ export function IdentityFlow({
     return () => {
       cancelled = true;
     };
-  }, [step]);
+  }, [step, server]);
 
   // Forget a held identity this device cannot open with a fresh phrase, so a
   // create can proceed (myne-md/myne#780).
@@ -855,7 +968,16 @@ export function IdentityFlow({
       // unlocked, landed on the home, and was offered the same door again.
       setIdentityUnlocked(true);
       setUnlockWords(Array(PHRASE_WORDS).fill(""));
-      setStep("home");
+      // `sync_person_unlock` also mints this device's signing key and writes its
+      // binding row, which is what makes the sync cycle able to author a head
+      // (myne-md/myne#1029). A mount opened for that repair therefore hands control
+      // back rather than landing on the home: the caller closes the overlay and the
+      // row that asked re-reads its own status.
+      if (onUnlockedRef.current !== undefined) {
+        onUnlockedRef.current();
+      } else {
+        setStep("home");
+      }
     } catch {
       setUnlockWords(Array(PHRASE_WORDS).fill(""));
       setError(t("identityFlow.unlock.failed"));
@@ -864,15 +986,36 @@ export function IdentityFlow({
     }
   }, [unlockWords, t]);
 
-  const registerIdentity = useCallback(async () => {
-    const phrase = registerWords.join(" ");
-    if (!registerWords.every((word) => word.length > 0)) return;
+  /**
+   * Register this identity with the phrase it was given.
+   *
+   * Takes the phrase rather than reading `registerWords`, because there are two
+   * callers with two sources: the register step's grid (the user retyped the
+   * words), and the creation ceremony's own type-back step, which still HOLDS them
+   * and must not ask for them again (myne-md/myne#1029). Passing the value keeps
+   * the secret inside the ceremony: the alternative, seeding the register grid from
+   * the ceremony, kept the 24-word phrase in component state across a whole visit to
+   * the identity home, which is a custody change no screen needed.
+   */
+  const registerPhrase = useCallback(async (phrase: string) => {
+    if (phrase.trim() === "") return;
     setBusy(true);
     setError(null);
     try {
       const view = await personRegister(phrase);
       setIdentityCode(view.identity_code);
       setRegisterWords(Array(PHRASE_WORDS).fill(""));
+      // The ceremony's copy of the phrase dies here, whatever step it came from
+      // (myne-md/myne#1029 review). The registering exit runs from the type-back
+      // step, which is the one mount that still HOLDS the words, and leaving
+      // `result` set would keep the created identity's only credential in state
+      // for the rest of the visit to the home, the invite list and the accept
+      // step. `finishPhrase` does the same reset on the other exit; this covers
+      // the path that registers instead of finishing.
+      setResult(null);
+      setRevealed(false);
+      setChallenge([]);
+      setAnswers(["", "", "", ""]);
       // The account's vaults, written locally as frames (myne-md/myne#932).
       // Nothing else on this path lists them, so a device that registered here
       // showed a picker with only "create a vault" while its account owned one.
@@ -899,6 +1042,13 @@ export function IdentityFlow({
       // credential that was just rejected).
       if (kind === "NotConfigured") {
         setError(t("identityHome.registerServerError"));
+        // The words ARE still here, and the copy says so ("Your words are still
+        // here"), so the step this lands on must show them: a ceremony that
+        // reached this arm holds the phrase in `result`, and the grid is empty
+        // otherwise. That is the one place a seed is safe (myne-md/myne#1029
+        // review): we are inside the mount that displayed it, seconds ago.
+        const created = (result?.phrase ?? "").split(" ").filter((w) => w.length > 0);
+        if (created.length === PHRASE_WORDS) setRegisterWords(created);
         setStep("register");
         return;
       }
@@ -907,7 +1057,12 @@ export function IdentityFlow({
     } finally {
       setBusy(false);
     }
-  }, [registerWords, t]);
+  }, [t, result]);
+
+  const registerIdentity = useCallback(() => {
+    if (!registerWords.every((word) => word.length > 0)) return;
+    return registerPhrase(registerWords.join(" "));
+  }, [registerWords, registerPhrase]);
 
   /**
    * The register act's FIRST half: settle the server, then move on (2026-10-24).
@@ -952,6 +1107,33 @@ export function IdentityFlow({
     setStep("home");
   }, []);
 
+  /**
+   * Finish the ceremony by REGISTERING the identity it just created.
+   *
+   * The register act was a second screen asking for the same 24 words the ceremony
+   * had already displayed and asked four back of (myne-md/myne#1029). It is also the
+   * act that mints the device id a binding row needs, so the friction sat on the one
+   * path that makes phrase-free sync possible. Registering from the type-back step
+   * costs no secret lifetime at all: the phrase is the one this screen is holding,
+   * and it is dropped here rather than carried to the home.
+   *
+   * Deliberately available only when a server is already configured, because
+   * registration names a server: `registerServerUrl` is the address the user chose,
+   * and a device with none keeps the home's own register block, which is where the
+   * address is asked for.
+   */
+  const finishPhraseRegistering = useCallback(() => {
+    const phrase = result?.phrase ?? "";
+    if (phrase.trim() === "") {
+      // A primary control that reports success while doing the OPTIONAL action is
+      // the one shape this file refuses elsewhere: sync stays as blocked as before
+      // and the user believes the device registered.
+      setError(t("identityFlow.register.failed"));
+      return;
+    }
+    void registerPhrase(phrase);
+  }, [result, registerPhrase, t]);
+
   // ── The person join (myne-md/myne#911 tasks 9 and 12) ──────────────────────
 
   /**
@@ -970,7 +1152,29 @@ export function IdentityFlow({
     setStep("person-finishing");
     setPersonListError(null);
     void personListVaults()
-      .then(() => onAccepted())
+      .then((rows) => {
+        // The listing's own answer decides the landing, and until this read it had
+        // none: the rows were dropped and `onAccepted()` was called with nothing,
+        // so the shell re-probed and a joined vault landed on its unlock form with
+        // the §6.3 compare it owed unreachable, and the approving device then
+        // waited on a code this device was never going to show (myne#957 follow-up).
+        const here = rows.flatMap((row) => (row.vault_id === null ? [] : [row.vault_id]));
+        if (rows.length === 0) {
+          // The account is bound to nothing on the server, so there is nothing to
+          // bring across and the remedy is on another device: publish from the one
+          // that holds the vault.
+          setPersonListError(t("identityFlow.personJoin.vaultsNoneOnServer"));
+          return;
+        }
+        if (here.length === 0) {
+          // Bound to something, and not one frame landed here. "No vaults" would be
+          // a claim about the account; the truth is that this device could not hold
+          // what the server sent, and the retry is the one control this step has.
+          setPersonListError(t("identityFlow.personJoin.noVaults"));
+          return;
+        }
+        onAccepted({ vaultIds: here, holding: "locked" });
+      })
       .catch(() => setPersonListError(t("identityFlow.personJoin.listFailed")));
   }, [onAccepted, t]);
 
@@ -1251,7 +1455,7 @@ export function IdentityFlow({
         acceptWords.join(" "),
         password,
       );
-      acceptedVaultId.current = view.vault_id;
+      joined.current = { vaultIds: [view.vault_id], holding: "unlocked" };
       setAcceptInvite(null);
       clearAcceptSecrets();
       setError(null);
@@ -1292,10 +1496,10 @@ export function IdentityFlow({
         joinWords.join(" "),
         joinPassword,
       );
-      acceptedVaultId.current = view.vault_id;
+      joined.current = { vaultIds: [view.vault_id], holding: "unlocked" };
       setJoinInvite(null);
       clearJoinSecrets();
-      accepted.current(acceptedVaultId.current);
+      accepted.current(joined.current);
     } catch (e) {
       // Which failure it was, not only "could not be added": the kinds are a shared
       // closed enum and carry no secret (myne-md/myne#794). `Transport` is the arm a
@@ -1386,15 +1590,15 @@ export function IdentityFlow({
   const accepted = useRef(onAccepted);
   accepted.current = onAccepted;
   /**
-   * The vault this flow just installed, handed to `onAccepted` so the shell can
-   * address the approval wait.
+   * The vaults this flow put on this device, handed to `onAccepted` so the shell
+   * can address the approval wait.
    *
    * A ref rather than a state because the accept lands on the NAME step and the
-   * callback runs from there: the id has to survive that hop without a re-render
-   * depending on it. `undefined` until a vault actually lands, which is what keeps
-   * the shell's other `onAccepted` callers (a plain re-probe) unchanged.
+   * callback runs from there: the landing has to survive that hop without a
+   * re-render depending on it. `undefined` until a vault actually lands, which is
+   * what keeps the shell's other `onAccepted` callers (a plain re-probe) unchanged.
    */
-  const acceptedVaultId = useRef<string | undefined>(undefined);
+  const joined = useRef<JoinLanding | undefined>(undefined);
   const nameChecked = useRef(false);
 
   /**
@@ -1438,7 +1642,7 @@ export function IdentityFlow({
       // future mount change reopens it.
       nameChecked.current = true;
       setNameChecking(false);
-      if (named) accepted.current(acceptedVaultId.current);
+      if (named) accepted.current(joined.current);
     })();
     return () => {
       cancelled = true;
@@ -1452,7 +1656,7 @@ export function IdentityFlow({
     setNameError(null);
     try {
       await setMyMemberName(name);
-      accepted.current(acceptedVaultId.current);
+      accepted.current(joined.current);
     } catch (e) {
       // Which refusal it was: `NameTooLong`, `StoreUnreadable` and `SlotNotUnlocked`
       // are three different remedies, and the mapping is shared with the desktop
@@ -1476,9 +1680,17 @@ export function IdentityFlow({
         ) : null}
       </ScreenScroll>
       <FooterBar style={{ flexDirection: "column", gap: "var(--space-3)" }}>
-        <Button variant="danger" onClick={() => void forgetHeld()} disabled={busy} data-testid="identity-flow.held-forget">
-          {t("identityFlow.held.forget")}
-        </Button>
+        {/* `forget` deletes the sealed frame and every vault-bound carrier, and it
+            is one tap with no confirmation. That is a fair weight on the first-run
+            door, which is where this screen has always been. It is NOT fair on a
+            repair-door mount reached from a Settings row about sync, so the door
+            offers the exit alone and the destructive verb stays where it was
+            (myne-md/myne#1029 review). */}
+        {repairDoor ? null : (
+          <Button variant="danger" onClick={() => void forgetHeld()} disabled={busy} data-testid="identity-flow.held-forget">
+            {t("identityFlow.held.forget")}
+          </Button>
+        )}
         <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.held-cancel">
           {t("identityFlow.back")}
         </Button>
@@ -2064,16 +2276,63 @@ export function IdentityFlow({
               </div>
             ))}
           </div>
+          {serverConfigured ? (
+            <div style={HINT_STYLE} data-testid="identity-flow.typeback-register-hint">
+              {t("identityFlow.phrase.registerHint", { server: serverHost })}
+            </div>
+          ) : null}
         </ScreenScroll>
+        {/* The ceremony's last act, and the words never leave it (myne-md/
+            myne#1029). The register step used to ask for the same 24 words one
+            screen later, and it is the act that mints the device id a binding row
+            needs, so the friction sat on the one path that makes phrase-free sync
+            possible. With a server configured the primary registers here, and
+            "Later" keeps the old exit. Without one there is nothing to register
+            WITH, so the single button stays "Continue" and the home's register
+            block asks for the address first. */}
+        {/* A refused registration is the one outcome this step can produce, and
+            saying nothing is the worst shape on this branch: the button re-enables
+            and sync stays as blocked as before while the user believes the device
+            registered (myne-md/myne#1029 review). Same pair as the unlock and
+            recover steps: the step's own banner, and a blocking overlay while the
+            command runs. */}
+        {error ? (
+          <div style={{ padding: "0 22px" }}>
+            <Banner kind="warning" testID="identity-flow.typeback-error">
+              {error}
+            </Banner>
+          </div>
+        ) : null}
         <FooterBar>
-          <Button
-            onClick={finishPhrase}
-            disabled={!allCorrect}
-            data-testid="identity-flow.typeback-continue"
-          >
-            {t("identityFlow.phrase.continue")}
-          </Button>
+          {serverConfigured ? (
+            <>
+              <Button
+                variant="secondary"
+                onClick={finishPhrase}
+                disabled={!allCorrect || busy}
+                data-testid="identity-flow.typeback-later"
+              >
+                {t("identityFlow.phrase.registerLater")}
+              </Button>
+              <Button
+                onClick={finishPhraseRegistering}
+                disabled={!allCorrect || busy}
+                data-testid="identity-flow.typeback-continue"
+              >
+                {t("identityFlow.phrase.registerCta")}
+              </Button>
+            </>
+          ) : (
+            <Button
+              onClick={finishPhrase}
+              disabled={!allCorrect}
+              data-testid="identity-flow.typeback-continue"
+            >
+              {t("identityFlow.phrase.continue")}
+            </Button>
+          )}
         </FooterBar>
+        {busy && <BlockingOverlay title={t("identityFlow.register.working")} />}
       </Screen>
     );
   };
@@ -2221,6 +2480,33 @@ export function IdentityFlow({
     </Screen>
   );
 
+  /**
+   * The identity-unlock door on the home, in the one shape both states render.
+   *
+   * One control rather than two call sites (myne-md/myne#1029): the door used to
+   * exist only inside the create block, so the state that needed it most (a device
+   * with a vault whose sync is blocked on a sealed identity) rendered nothing. The
+   * hint above it is the caller's, because the sentence differs (a withheld create
+   * action, or the unlock step's own lead) while the control does not.
+   */
+  const unlockDoor = (hintKey: string, testId: string) => (
+    <div style={{ marginTop: "var(--space-3)" }} data-testid={testId}>
+      <div style={HINT_STYLE}>{t(hintKey)}</div>
+      <Button
+        variant="secondary"
+        full={false}
+        onClick={() => {
+          setError(null);
+          setStep("unlock-identity");
+        }}
+        style={{ marginTop: "var(--space-3)" }}
+        data-testid="identity-flow.home-unlock-open"
+      >
+        {t("identityFlow.unlock.open")}
+      </Button>
+    </div>
+  );
+
   const renderHome = () => {
     // The invite list is recipient-scoped and carries CLAIMED rows too, and a
     // claimed row is not an invitation to accept: the accept claims the invite and
@@ -2236,6 +2522,28 @@ export function IdentityFlow({
         <ScreenScroll style={{ padding: "18px 22px 0" }}>
           <Title>{t("identityFlow.home.title")}</Title>
           <Lead>{t("identityFlow.home.lead")}</Lead>
+          {/* What the account's vault listing answered (myne-md/myne#932 review).
+              OUTSIDE the create block below, which is the half this moved out of:
+              the create action belongs to the first-run door, while "my account is
+              right and my vaults are missing" is a question a device asks on every
+              entry, including the Settings one, which is offered no create action
+              and so used to be offered no answer either. Three answers, because they
+              have three remedies: retry here, publish from the device that holds the
+              vault, or fetch the frame this device could not hold. */}
+          {vaultIssue !== null ? (
+            <div
+              style={{ marginTop: "var(--space-4)" }}
+              data-testid="identity-flow.home-vault-issue"
+            >
+              <Banner kind="warning">
+                {vaultIssue === "failed"
+                  ? t("identityFlow.personJoin.listFailed")
+                  : vaultIssue === "empty"
+                    ? t("identityFlow.personJoin.vaultsNoneOnServer")
+                    : t("identityFlow.personJoin.vaultsNotHere", { count: vaultIssue })}
+              </Banner>
+            </div>
+          ) : null}
           {/* **The action comes first** (myne-md/myne#970 item 22). This block
               used to sit fourth, under the account number, the identity code and
               the invitation list: a person who arrived here from onboarding
@@ -2243,22 +2551,37 @@ export function IdentityFlow({
               reach the one thing the screen exists to offer. The material is
               still on the screen, and it is what makes this identity usable, but
               it is below, in the grouped cards the rest of the app uses. */}
+          {/* **The unlock door does not depend on the create action**
+              (myne-md/myne#1029). It used to live inside the `onCreateVault`
+              block, and the shell passes that only on the first-run door: so a
+              device that already held a vault, the one state a blocked sync
+              row is in, rendered neither a create action nor a way to open its
+              own identity, while `sync-status-view.ts` named exactly that act.
+              It renders first, because on a sealed identity it is the one thing
+              this screen exists to offer. */}
+          {!identityUnlocked ? (
+            <div style={{ marginTop: "var(--space-4)" }}>
+              {unlockDoor(
+                onCreateVault
+                  ? "identityHome.createVaultLocked"
+                  : "identityFlow.unlock.lead",
+                onCreateVault
+                  ? "identity-flow.home-create-vault-locked"
+                  : "identity-flow.home-unlock-block",
+              )}
+            </div>
+          ) : null}
           {onCreateVault ? (
             <div style={{ marginTop: "var(--space-4)" }}>
               <div data-testid="identity-flow.home-vault-hint" style={HINT_STYLE}>
                 {t("identityFlow.home.vaultHint")}
               </div>
-              {vaultListFailed ? (
-                <div data-testid="identity-flow.home-vault-list-failed" style={HINT_STYLE}>
-                  <Banner kind="warning">{t("identityFlow.personJoin.listFailed")}</Banner>
-                </div>
-              ) : null}
               {/* The action is WITHHELD while the identity is sealed, not shown
                   disabled: creating a vault signs its first member list with the
                   identity, so the sealed state makes the command answer
-                  `PersonLocked`. On a phone that answer used to dead-end, because
-                  the unlock door only existed on desktop. The door is the action
-                  here (`decisions/ui/0729`). */}
+                  `PersonLocked`, and a button whose only outcome is a refusal is
+                  a broken control (`decisions/ui/0729`). The door that clears it
+                  is the block above, which every caller gets. */}
               {identityUnlocked ? (
                 <Button
                   onClick={onCreateVault}
@@ -2267,26 +2590,7 @@ export function IdentityFlow({
                 >
                   {t("identityHome.createVaultCta")}
                 </Button>
-              ) : (
-                <div
-                  style={{ marginTop: "var(--space-3)" }}
-                  data-testid="identity-flow.home-create-vault-locked"
-                >
-                  <div style={HINT_STYLE}>{t("identityHome.createVaultLocked")}</div>
-                  <Button
-                    variant="secondary"
-                    full={false}
-                    onClick={() => {
-                      setError(null);
-                      setStep("unlock-identity");
-                    }}
-                    style={{ marginTop: "var(--space-3)" }}
-                    data-testid="identity-flow.home-unlock-open"
-                  >
-                    {t("identityFlow.unlock.open")}
-                  </Button>
-                </div>
-              )}
+              ) : null}
             </div>
           ) : null}
 

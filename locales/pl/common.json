@@ -55,9 +55,7 @@
       "scopeQuestion": "Co agent może przeczytać",
       "scopeFolders": "Foldery",
       "scopeApplies": "Dotyczy Twojej następnej wiadomości. Notatki usunięte, zarchiwizowane i szablony są zawsze pomijane.",
-      "blockedScope": "Agent nie ma jeszcze nad czym pracować: każda notatka jest wykluczona z AI albo skarbiec jest pusty.",
       "preparing": "Przygotowywanie…",
-      "blockedScopeSidebar": "Nie ma tu jeszcze o co pytać: folder tej notatki jest wykluczony z AI.",
       "needsScope": "Wybierz folder poniżej albo otwórz notatkę, aby agent miał nad czym pracować.",
       "scopeExcluded_one": "{{count}} notatka wykluczona z AI",
       "scopeExcluded_few": "{{count}} notatki wykluczone z AI",
@@ -3572,7 +3570,6 @@
       "helper": "Pozwól na przenoszenie notatek do Archiwum, poza główną listę. Wyłączenie tej opcji przywraca każdą zarchiwizowaną notatkę do jej folderu, cofa archiwizację każdego zarchiwizowanego folderu i ukrywa elementy sterujące archiwum. Dotyczy całego skarbca, na każdym urządzeniu.",
       "label": "Archiwizacja",
       "off": "Wył.",
-      "on": "Wł.",
       "saveError": "Nie udało się zaktualizować ustawienia archiwizacji."
     },
     "attachmentCompression": {
@@ -4358,12 +4355,8 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Nie skonfigurowano",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
         "conflicts_few": "{{count}} konflikty",
-        "conflicts_many": "{{count}} konfliktów",
-        "conflicts_other": "{{count}} konfliktów"
+        "conflicts_many": "{{count}} konfliktów"
       }
     },
     "data": {

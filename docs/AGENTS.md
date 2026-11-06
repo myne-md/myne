@@ -1,6 +1,6 @@
 # docs/ — Specifications, threat model, decisions log
 
-> Subdirectory AGENTS.md. Loaded when OpenCode reads files here. See repo-root `AGENTS.md` for cryptographically load-bearing identifiers (the table that lives there is normative).
+> Subdirectory AGENTS.md. Loaded when pi reads files here. See repo-root `AGENTS.md` for cryptographically load-bearing identifiers (the table that lives there is normative).
 
 ## What lives here
 

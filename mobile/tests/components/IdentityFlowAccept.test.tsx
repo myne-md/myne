@@ -44,6 +44,7 @@ const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
+const syncGetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -72,7 +73,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   // `.then`, which keeps the flow on the gate and reads as a routing bug.
   personAccountNumber,
 }));
-vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
+vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, syncGetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
 // not cross, but `memberNameErrorKey` is kept REAL: the error assertion below is
 // about the shared six-arm mapping in `@myne/client-core/member-name`, and a second
@@ -195,6 +196,7 @@ beforeEach(() => {
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
+  syncGetEndpoint.mockReset().mockResolvedValue({ endpoint_url: "", invite_code: "" });
   // Default: an accepted member whose row carries no name yet, which is the state
   // the step exists for. `namedRoster()` below is the other answer.
   listRoster.mockReset().mockResolvedValue({
@@ -397,10 +399,14 @@ describe("IdentityFlow accept (myne-md/myne#851 task 14)", () => {
     expect(onAccepted).not.toHaveBeenCalled();
     await typeName(MEMBER_NAME);
     await vi.waitFor(() => expect(setMyMemberName).toHaveBeenCalledWith(MEMBER_NAME));
-    // The installed vault's id travels with the callback: the shell addresses the
+    // The installed vault travels with the callback: the shell addresses the
     // approval wait with it, and a fresh member device owes that wait before it can
-    // pull (`AppShell`'s `landOnInstalledVault`).
-    expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id);
+    // pull (`AppShell`'s `landOnJoinedVaults`). `unlocked` because the accept
+    // installed the keys with the vault.
+    expect(onAccepted).toHaveBeenCalledWith({
+      vaultIds: [ACCEPTED_VIEW.vault_id],
+      holding: "unlocked",
+    });
   });
 
   it("keeps the credential behind the project's floor", async () => {
@@ -550,7 +556,12 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
     // The roster's answer IS the question here, and a member re-invited to a vault
     // they already named in reads as named: the step is passed through rather than
     // asked again, and the callback fires without a second write.
-    await vi.waitFor(() => expect(onAccepted).toHaveBeenCalledWith(ACCEPTED_VIEW.vault_id));
+    await vi.waitFor(() =>
+      expect(onAccepted).toHaveBeenCalledWith({
+        vaultIds: [ACCEPTED_VIEW.vault_id],
+        holding: "unlocked",
+      }),
+    );
     expect(setMyMemberName).not.toHaveBeenCalled();
     // Non-vacuity: the step did render (the test harness never unmounts the flow, so
     // it is still on screen) and the member was released THROUGH it rather than the
