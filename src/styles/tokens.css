@@ -938,3 +938,45 @@ a:focus-visible,
 .myne-version-reveal span[aria-hidden="true"] {
   animation: myne-version-reveal-in var(--duration-fast) var(--ease-out) both;
 }
+
+/* -- The updating screen's progress bar (myne-md/myne#1020) -------------------
+
+   The install streams real byte counts from the host, so the bar is a
+   measurement: a track and a fill whose inline `width` is the fraction the host
+   reported. No transition on that width: it would lag a tick that arrives every
+   ~1% and it is a layout property besides (`check-motion-canon.mjs` rule 4), so
+   the fill snaps, which at this tick rate is what reads as smooth.
+
+   The indeterminate shape is the one loop, and it is admitted by name in
+   `INFINITE_ALLOWLIST`: an origin that sends no `Content-Length` gives the host no
+   denominator, so the honest thing left is "work is in flight, size unknown". A
+   frozen 0% bar reads as hung, which is the same argument MYND-630 records for the
+   spinner. The element carries `data-motion="essential"`, so reduced motion slows
+   the sweep rather than freezing it. */
+@keyframes myne-update-progress-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+}
+
+.myne-update-progress-track {
+  position: relative;
+  overflow: hidden;
+  /* 6px: thick enough to read as a quantity at arm's length, thin enough to stay
+     in the hairline family on a surface that draws no cards. */
+  height: 6px;
+  background: var(--bg-3);
+  border-radius: var(--radius-pill);
+}
+
+.myne-update-progress-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+}
+
+.myne-update-progress-indeterminate {
+  width: 40%;
+  animation: myne-update-progress-sweep 1.2s var(--ease-standard) infinite;
+}

@@ -79,20 +79,7 @@ import { useConversationEpoch } from "../ai/chatStore";
 import { useIndexNonce } from "../indexNonce";
 import { CAPTION_STYLE } from "./sharedStyles";
 
-/**
- * Which host this composer is in (myne-md/myne#848).
- *
- * Defined HERE and re-exported by `ConversationSurface`, rather than the other
- * way round: the surface imports the composer, so a type declared up there would
- * be a cycle for the sake of one union.
- */
-export type ChatComposerSurface = "agent" | "sidebar";
-
 export interface ChatComposerProps {
-  /** Which host this composer is in. Required: the zero state says different
-   *  things in the two, and a default would let a third mount inherit the wrong
-   *  sentence silently. */
-  surface: ChatComposerSurface;
   /** The open note: the default scope when no folder is attached. */
   openNoteId: string | null;
   /**
@@ -142,7 +129,10 @@ const INPUT_STYLE: CSSProperties = {
   // font size and would drift out of agreement with its own comment at another.
   maxHeight: "7em",
   resize: "none",
-  overflowY: "auto",
+  // No `overflowY` here on purpose: the growth effect decides it per render,
+  // because a box that fits its content has nothing to scroll and a permanently
+  // `auto` field drew a thumb beside text that was not cut off
+  // (myne-md/myne#1020).
   fontFamily: "var(--font-sans)",
   fontSize: "var(--text-sm)",
   lineHeight: 1.4,
@@ -362,7 +352,6 @@ const ROW_STYLE: CSSProperties = {
 export const VAULT_SCOPE_SENTINEL = "\u0000vault";
 
 export function ChatComposer({
-  surface,
   openNoteId,
   openNoteTitle = null,
   anchoredNoteId = null,
@@ -638,17 +627,6 @@ export function ChatComposer({
     setMessage("");
   }, [conversationEpoch]);
 
-  // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
-  // rather than counted from newlines, so a long wrapped line grows too.
-  //
-  // **An EMPTY input is one row, whatever the placeholder does.** `scrollHeight`
-  // measures the rendered text, and a textarea with no value renders its
-  // placeholder — so a placeholder that wraps at panel width reported two lines
-  // and the box opened two rows tall before the user had typed anything. The
-  // height would then be a property of the COPY: translate the placeholder into
-  // a longer language and the empty composer grows, in every locale, with
-  // nothing in the code to point at.
-
   /**
    * The scope choices.
    *
@@ -701,18 +679,72 @@ export function ChatComposer({
   const blocked =
     empty || busy || probing || refused || scopeEmpty || readingDocs || pasting.length > 0;
 
-  // **Except while the field is BLOCKED, where the copy IS the message.**
-  // (myne-md/myne#848.) The rule above exists so an empty composer does not grow
-  // because a translation is long. A blocked field is the other case: it has
-  // nothing else to say, and clipping its sentence at the first line hides the
-  // only explanation on screen. So it measures like a typed message does.
+  // Grow the input with its content, up to the cap in `INPUT_STYLE`. Measured
+  // rather than counted from newlines, so a long wrapped line grows too.
+  //
+  // **An EMPTY input is one row, whatever the placeholder does.** `scrollHeight`
+  // measures the rendered text, and a textarea with no value renders its
+  // placeholder, so a placeholder that wrapped at panel width reported two lines
+  // and the box opened two rows tall before the user had typed anything. The
+  // height would then be a property of the COPY: translate the placeholder into
+  // a longer language and the empty composer grows, in every locale, with
+  // nothing in the code to point at.
+  //
+  // **Two more holes, both visible in the sidebar and both fixed here**
+  // (myne-md/myne#1020, on the owner's read of it). The growth was measured ONCE
+  // at mount, so a box measured at one width and then laid out at a narrower one
+  // kept the old height and grew a scrollbar for text that had not changed. And
+  // the scrollbar was never asked for: a box that fits its content has nothing
+  // to scroll, so `overflow` now follows the fit instead of being permanently
+  // `auto`. The three together are why the empty composer could show two lines
+  // of a sentence the user could not type into, with a thumb beside it.
+
   useEffect(() => {
     const el = inputRef.current;
     if (el === null) return;
-    el.style.height = "auto";
-    if (message === "" && !scopeEmpty) return;
-    if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
-  }, [message, scopeEmpty]);
+    /**
+     * Fit the box to what the user typed.
+     *
+     * Run on every value change AND on every resize, because the same value
+     * needs a different height at a different width, which is the half the
+     * one-shot measurement got wrong.
+     */
+    const fit = () => {
+      el.style.height = "auto";
+      if (message === "") {
+        // Nothing of the user's to fit. The placeholder is not content, so it
+        // gets one row and no scrolling, whatever length it is in this locale.
+        el.style.overflowY = "hidden";
+        return;
+      }
+      // **The border is part of the height and not part of `scrollHeight`.**
+      // The box is `box-sizing: border-box`, so a height written as the measured
+      // content left the content box 2px short of it and the field drew a
+      // scrollbar for text that fit. Measured in Chromium on the real composer,
+      // three typed lines reported `scrollHeight 63` against `clientHeight 61`.
+      // The difference is the frame, so the frame is added here rather than
+      // absorbed by a tolerance constant nobody could justify.
+      const frame = Math.max(0, el.offsetHeight - el.clientHeight);
+      const wanted = el.scrollHeight + frame;
+      const next = `${wanted}px`;
+      if (el.style.height !== next) el.style.height = next;
+      // `maxHeight` is the ceiling and it lives in the stylesheet. Reading the
+      // overflow back AFTER the write is what tells the two cases apart: when
+      // the cap clamped the box, the content is taller than the room it was
+      // given and a scrollbar is honest; when it did not, a scrollbar would be
+      // chrome around nothing.
+      el.style.overflowY = el.scrollHeight > el.clientHeight ? "auto" : "hidden";
+    };
+    fit();
+    // The width this box gets is decided by its host (the panel, a window
+    // resize, the settings rail opening). Observing the PARENT rather than the
+    // box keeps the write above from re-triggering the observer that caused it.
+    const host = el.parentElement;
+    if (host === null || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(fit);
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, [message]);
   // While a run works there is no second Stop control: this button turns
   // into it, in place, like the mobile composer already does. The id may
   // genuinely be null on the first leg (before `agentStart` reports the
@@ -981,25 +1013,25 @@ export function ChatComposer({
               void submit();
             }
           }}
-          // **The copy is the PLACEHOLDER, not a line under the field.** The
-          // graph had a caption warning that Send was off, and the highlight on
-          // the picker plus a field that refuses the keystroke already say it.
-          // The sentence only had to say WHAT is needed, so it moved into the
-          // field the user is trying to type into (myne-md/myne#848).
+          // **The placeholder states what to type, and nothing else**
+          // (myne-md/myne#1020, on the owner's read of the sidebar). It used to
+          // carry a sentence about WHY the field was refusing: "Nothing here to
+          // ask about yet: this note's folder is excluded from AI." At panel
+          // width that is two lines, in a box the user cannot type into and
+          // cannot focus, with a scrollbar beside it. The line under the field
+          // already says the same thing in numbers ("0 notes", "1 excluded from
+          // AI"), and a sentence inside the field is the worst place in the
+          // composer for an explanation: it reads as text the user may overwrite
+          // and as a field that is broken rather than closed on purpose.
+          //
+          // **Unanswered is not the same as empty** (myne-md/myne#848, on the
+          // user's report), and that one stays: while the scope's size read is
+          // in flight the composer knows nothing about the scope, and "Getting
+          // ready…" is one short line that makes no claim about the vault.
           placeholder={
-            // **Unanswered is not the same as empty** (myne-md/myne#848, on the
-            // user's report): the scope's size comes from the host, and while
-            // that read is in flight the composer knows nothing about the
-            // scope. It used to say so in the vault's words, "every note is
-            // excluded from AI, or the vault is empty", which is a claim about
-            // the vault made before the vault was asked.
             preview === null
               ? t("agent.composer.preparing")
-              : scopeEmpty
-                ? surface === "agent"
-                  ? t("agent.composer.blockedScope")
-                  : t("agent.composer.blockedScopeSidebar")
-                : t("agent.composer.placeholder")
+              : t("agent.composer.placeholder")
           }
           aria-label={t("agent.composer.placeholder")}
           disabled={busy || scopeEmpty}

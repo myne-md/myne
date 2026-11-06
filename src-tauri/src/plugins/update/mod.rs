@@ -21,8 +21,8 @@
 //! `Err` arm, so the UI never has to tell a failure apart from an update.
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
-use crate::update::{UpdateCheckError, UpdateStatus};
-use tauri::{AppHandle, Manager, Runtime, Url};
+use crate::update::{UpdateCheckError, UpdateProgress, UpdateStatus, PROGRESS_EVENT};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Url};
 use tauri_plugin_updater::{Updater, UpdaterExt};
 
 /// Build the updater pinned to this build's channel endpoint.
@@ -231,7 +231,40 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
     }
 }
 
+/// The smallest byte delta between two `Downloading` ticks.
+///
+/// One event per transport chunk would be thousands of IPC round trips for a
+/// 200 MiB artifact, and the UI cannot paint faster than about 60 Hz anyway. A
+/// step of one percent of the total keeps the bar within ONE percent of the
+/// truth, because a tick fires on a full step rather than on half of one, while
+/// capping the stream at about a hundred ticks; the 64 KiB floor
+/// stops a small artifact from reporting every chunk, and 256 KiB is the fallback
+/// for an origin that sent no `Content-Length` (where there is no total to take a
+/// percentage of). Everything is capped at 4 MiB so a very large artifact still
+/// reports movement.
+fn progress_step(total: Option<u64>) -> u64 {
+    total.map_or(256 * 1024, |total| {
+        (total / 100).clamp(64 * 1024, 4 * 1024 * 1024)
+    })
+}
+
 /// Download and install the offered update, then relaunch into it.
+///
+/// The install is streamed to the WebView as [`UpdateProgress`] events on
+/// [`PROGRESS_EVENT`], which is the difference from `download_and_install`: that
+/// call downloads and installs in one expression, so a UI can only say
+/// "installing" for however many minutes the download takes. Splitting it is not
+/// a reimplementation of anything. `download` verifies the artifact's minisign
+/// signature before it returns, and `install` does the same work it did inside
+/// the combined call, so the split only puts a seam where the phase boundary
+/// already was.
+///
+/// **Every emit is best effort.** A closed window, or a WebView that listened to
+/// nothing, must not fail an install that is otherwise fine: the progress stream
+/// is a readout for a window that may no longer exist, and the install's own
+/// result travels in this command's return value. A discarded `emit` error is
+/// therefore the intended behaviour rather than an oversight, and each of the
+/// three sites below says so where it happens.
 ///
 /// On Windows the installer exits the process itself; on macOS and Linux this
 /// returns and the relaunch below is what starts the new version.
@@ -271,26 +304,90 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
     );
 
     let started = std::time::Instant::now();
-    let mut received: u64 = 0;
-    let outcome = update
-        .download_and_install(|chunk, _total| received += chunk as u64, || {})
-        .await;
-    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let chunk_app = app.clone();
+    // SHARED, not a plain `u64` (myne-md/myne#1022 review). The chunk closure is
+    // `move`, and `u64` is `Copy`, so a plain counter means the closure increments
+    // its own copy and every read after `download` returns sees zero: the failure
+    // records and the `update_installed` line would all report `bytes = 0` on a
+    // transfer that moved 149 MiB, which is the one number those lines exist for.
+    // No lint catches it; a reviewer did.
+    let downloaded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+    let mut last_reported: u64 = 0;
+    // The counter as the closures see it, and the two ways out of them.
+    let counter = std::sync::Arc::clone(&downloaded);
+    let bytes = update
+        .download(
+            move |chunk: usize, total: Option<u64>| {
+                use std::sync::atomic::Ordering;
+                let now = counter.fetch_add(chunk as u64, Ordering::Relaxed) + chunk as u64;
+                let complete = total.is_some_and(|total| now >= total);
+                if complete || now - last_reported >= progress_step(total) {
+                    last_reported = now;
+                    // Discarded on purpose: an emit fails when the window is gone,
+                    // and a closed window must not abort an install that is
+                    // otherwise fine.
+                    let _ = chunk_app.emit(
+                        PROGRESS_EVENT,
+                        UpdateProgress::Downloading {
+                            downloaded: now,
+                            total,
+                        },
+                    );
+                }
+            },
+            {
+                // Runs after the last chunk and BEFORE the signature check, which
+                // is what makes `Verifying` a phase the host can testify to rather
+                // than a sentence it made up.
+                let finish_app = app.clone();
+                move || {
+                    // Same best-effort rule as the chunk arm above.
+                    let _ = finish_app.emit(PROGRESS_EVENT, UpdateProgress::Verifying);
+                }
+            },
+        )
+        .await
+        .map_err(|error| {
+            // The stage comes from the kind, not from the call: `download` runs the
+            // minisign check itself, so a bad signature arrives here with
+            // `FailureKind::Verification` and must be filed as `verify` rather than
+            // as a dead transfer (myne-md/myne#1022 review; without this the
+            // `install_stage` arm is unreachable from any production path).
+            failed(
+                install_stage(classify(&error)),
+                error,
+                Some((
+                    downloaded.load(std::sync::atomic::Ordering::Relaxed),
+                    started.elapsed().as_millis() as u64,
+                )),
+            )
+        })?;
 
-    if let Err(error) = outcome {
-        // The stage is derived from the classified kind, because the updater hides
-        // three steps behind one error type and a constant `stage` would file a dead
-        // download under the bundle swap. The `io_kind` is what makes a swap failure
-        // actionable: a refusal (`PermissionDenied`) and a full disk are one sentence
-        // on screen and two different repairs.
-        return Err(failed(
+    // Same best-effort rule: the swap below is what the user is waiting for, and
+    // a window that closed mid-download cannot be allowed to veto it.
+    let _ = app.emit(PROGRESS_EVENT, UpdateProgress::Installing);
+    // Sync and blocking on purpose: it is the same work the combined call did on
+    // this task, and there is nothing else for this task to do while it runs.
+    update.install(&bytes).map_err(|error| {
+        failed(
             install_stage(classify(&error)),
             error,
-            Some((received, elapsed_ms)),
-        ));
-    }
+            Some((
+                downloaded.load(std::sync::atomic::Ordering::Relaxed),
+                started.elapsed().as_millis() as u64,
+            )),
+        )
+    })?;
 
-    tracing::info!(event = "update_installed", bytes = received, elapsed_ms);
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    // The artifact's own length, which is the whole transfer by definition: the
+    // shared counter and this cannot disagree on the success path, and this half
+    // cannot be zero while the install succeeded.
+    tracing::info!(
+        event = "update_installed",
+        bytes = bytes.len() as u64,
+        elapsed_ms
+    );
     // The last line this process writes before it hands over. Nothing after it in the
     // log means the restart itself did not reach the new build; the complement is the
     // `app_started` record the logging install writes on every run.
@@ -341,6 +438,28 @@ mod tests {
     use crate::io_failure_kind::IoFailureKind;
     use std::io::ErrorKind;
     use tauri_plugin_updater::Error;
+
+    /// The throttling rule, branch by branch (myne-md/myne#1022 review). It is the
+    /// one knob between "the bar moves" and "the bar is frozen", and replacing its
+    /// body with a constant left every test in this tree green. `clamp` also panics
+    /// on inverted bounds, and a panic inside the download callback aborts an
+    /// install that would otherwise have finished.
+    #[test]
+    fn the_progress_step_is_a_percentage_inside_a_floor_and_a_cap() {
+        // No `Content-Length`: no total to take a percentage of.
+        assert_eq!(progress_step(None), 256 * 1024);
+        // One percent of a small artifact is under the floor, so the floor wins.
+        assert_eq!(progress_step(Some(2 * 1024 * 1024)), 64 * 1024);
+        // One percent of a large artifact is over the cap, so the cap wins.
+        assert_eq!(progress_step(Some(1024 * 1024 * 1024)), 4 * 1024 * 1024);
+        // A zero or absent total is the floor rather than a division by zero.
+        assert_eq!(progress_step(Some(0)), 64 * 1024);
+        // …and the middle is the percentage itself.
+        assert_eq!(
+            progress_step(Some(64 * 1024 * 1024)),
+            64 * 1024 * 1024 / 100
+        );
+    }
 
     /// The invariant that used to be a comment and nothing more: a failure to write
     /// the bundle must not be reported as a network problem.

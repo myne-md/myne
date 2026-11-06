@@ -1,16 +1,18 @@
 // @vitest-environment jsdom
 //
-// `AnchoredPanel` and the one surface that moved onto it (myne-md/myne#867).
+// `AnchoredPanel` and the surfaces that moved onto it (myne-md/myne#867).
 //
 // Two claims, and both are about a defect that shipped:
 //
 //   1. **The panel is drawn in the BODY, not inside its trigger's ancestors.**
-//      The memory popover was a hand-written `position: absolute` box inside the
-//      chat header's button, and the chat panel is narrower than the box: the
-//      card grew leftward past the panel edge and the panel's `overflow` cut its
-//      text off. Nothing could see it: the card and every word in it were in
-//      the DOM the whole time, and a test that finds one by testid passes on a
-//      panel the user cannot read.
+//      The original case was the memory popover, a hand-written
+//      `position: absolute` box inside the chat header's button: the chat panel
+//      is narrower than the box, so the card grew leftward past the panel edge
+//      and the panel's `overflow` cut its text off. Nothing could see it: the card
+//      and every word in it were in the DOM the whole time, and a test that finds
+//      one by testid passes on a panel the user cannot read. That popover is gone
+//      (myne-md/myne#1020 removed its button), and the claim is the primitive's,
+//      so it is held here by the two surfaces that still wear it.
 //   2. **A panel wider than its anchor is pulled back inside the window.** `left`
 //      is clamped against the ANCHOR's box in the first pass, and the panel's own
 //      box is decided by its content, so a wide panel overhung the edge the
@@ -28,15 +30,6 @@ import { useRef } from "react";
 import { AnchoredPanel } from "../../src/components/primitives/AnchoredPanel";
 import { UsedInNotesPopover } from "../../src/components/attachments/UsedInNotesPopover";
 
-vi.mock("../../src/lib/memory", () => ({
-  // The list command answers `{ rows, cap }` since myne-md/myne#867: the cap
-  // travels with the rows so no client keeps a second copy of the number.
-  memoryList: () => Promise.resolve({ rows: [], cap: 100 }),
-  memoryRead: () => Promise.resolve(""),
-  memoryDelete: () => Promise.resolve(),
-}));
-
-import { MemoryPopover } from "../../src/notes/components/MemoryPopover";
 
 afterEach(cleanup);
 
@@ -195,46 +188,6 @@ describe("AnchoredPanel: a cursor point (a context menu)", () => {
     const panel = await screen.findByTestId("panel");
     // Default `minWidth` is 160, so the clamp caps `left` at innerWidth - 168.
     expect(Number.parseFloat(panel.style.left)).toBe(innerWidth - 160 - 8);
-  });
-});
-
-describe("MemoryPopover: it uses the primitive", () => {
-  function Harness() {
-    const anchorRef = useRef<HTMLSpanElement | null>(null);
-    return (
-      <div data-testid="panel-column" style={{ overflow: "hidden", width: 300 }}>
-        <span ref={anchorRef} data-testid="ai.memory-popover-anchor">
-          trigger
-        </span>
-        <MemoryPopover
-          anchorRef={anchorRef}
-          onClose={() => {}}
-          onOpenSettings={() => {}}
-          onShowToast={() => {}}
-        />
-      </div>
-    );
-  }
-
-  it("renders in the body, so the panel column cannot cut its text off", async () => {
-    render(<Harness />);
-    const popover = await screen.findByTestId("ai.memory-popover");
-    // The reported symptom, as an assertion: the card is NOT inside the narrow
-    // column that used to clip it.
-    expect(screen.getByTestId("panel-column").contains(popover)).toBe(false);
-    expect(document.body.contains(popover)).toBe(true);
-    // …and it is still the dialog it was: named, focused-by-tabindex, and
-    // carrying the locale's own copy.
-    expect(popover.getAttribute("role")).toBe("dialog");
-    // The accessible name is the heading the user reads, not a second string
-    // that could drift from it. Asserted as the copy itself (this file does not
-    // mock i18n), which is also what the E2E lane does with this surface.
-    const label = popover.getAttribute("aria-label");
-    expect(label).toBe("What the assistant remembers");
-    expect(popover.textContent).toContain(label as string);
-    // Its roster really rendered inside it.
-    expect(await screen.findByTestId("ai.memory-popover-empty")).toBeTruthy();
-    expect(screen.getByTestId("ai.memory-popover-close")).toBeTruthy();
   });
 });
 

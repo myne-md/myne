@@ -262,7 +262,9 @@ describeE2E("st1 settings in-panel topic tabs (myne-md/myne#885)", () => {
         // not, which is the "exactly one home" half rather than the selection
         // half.
         await s.byTestId("settings.change-password-cta");
-        expect((await s.byTestIdAll("settings.delete-vault-cta")).length).toBe(0);
+        // The danger topic's own control is the typed-`DELETE` field, always
+        // visible there since myne-md/myne#1020 replaced the reveal CTA.
+        expect((await s.byTestIdAll("delete-vault.confirm-input")).length).toBe(0);
 
         assertStripSharesTheSearchRow(
           await stripAndSearchRow(s, "settings.vault-tabs"),
@@ -276,9 +278,9 @@ describeE2E("st1 settings in-panel topic tabs (myne-md/myne#885)", () => {
         expect(await mountedTopics(s, "settings.vault-topic-")).toEqual([
           "settings.vault-topic-danger",
         ]);
-        // The erase CTA is reachable from its own topic, and the vault topic is
+        // The erase field is reachable from its own topic, and the vault topic is
         // gone rather than merely scrolled away.
-        await s.byTestId("settings.delete-vault-cta");
+        await s.byTestId("delete-vault.confirm-input");
         expect((await s.byTestIdAll("settings.change-password-cta")).length).toBe(0);
 
         // ── A single-concern panel renders no strip ───────────────────────────

@@ -19,7 +19,7 @@
 // than by a substring: a paraphrase is a failing test, not a review comment.
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 
 const hasMock = vi.fn((_cap: string) => true);
 vi.mock("../../src/platform/capabilities", async (importOriginal) => {
@@ -83,6 +83,67 @@ function renderForm(only: boolean, variant?: "owner" | "member", keychain = true
     />,
   );
 }
+
+// **The inline layout is a different flow, not different spacing**
+// (myne-md/myne#1020). `VaultPanel` used to hold a CTA whose only job was to
+// replace the panel with this form, so the form introduced itself: its own
+// heading, its own eyebrow, and a Cancel that went back to what the press came
+// from. In Settings it is simply on the page under the section's own heading.
+// These assertions are what says that, and they are STRUCTURAL on purpose: the
+// typed-`DELETE` gate is asserted alongside them, because a layout that dropped
+// the gate would be a much worse bug than one that kept a heading.
+describe("the inline layout", () => {
+  function renderInline() {
+    hasMock.mockImplementation((cap: string) => {
+      if (cap === "localOnlyVault") return false;
+      if (cap === "biometricQuickUnlock") return true;
+      return true;
+    });
+    render(
+      <DeleteVaultConfirmForm
+        layout="inline"
+        onSubmit={() => {}}
+        onCancel={() => {}}
+        onContinueAfterPartial={() => {}}
+        partialFailContext={null}
+      />,
+    );
+  }
+
+  it("does not introduce itself: no heading, no eyebrow, no cancel", () => {
+    renderInline();
+    expect(screen.queryByTestId("delete-vault.heading")).toBeNull();
+    expect(screen.queryByTestId("delete-vault.eyebrow")).toBeNull();
+    expect(screen.queryByTestId("delete-vault.cancel")).toBeNull();
+  });
+
+  it("still states the disclosure and still gates the erase on the typed word", () => {
+    renderInline();
+    // The claim the section deliberately does NOT repeat (it renders here once).
+    expect(disclosureText().length).toBeGreaterThan(0);
+    const submit = screen.getByTestId("delete-vault.submit") as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+    fireEvent.change(screen.getByTestId("delete-vault.confirm-input"), {
+      target: { value: "DELETE" },
+    });
+    expect((screen.getByTestId("delete-vault.submit") as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+  });
+
+  it("does not steal the caret, and the panel layout still does", () => {
+    // A settings panel that focuses an irreversible field the moment its tab
+    // opens is a trap; the panel layout is the result of a press, so focusing
+    // the gate there is a service. Both halves are asserted, since either one
+    // alone is satisfied by simply removing `autoFocus`.
+    cleanup();
+    renderForm(false);
+    expect(document.activeElement).toBe(screen.getByTestId("delete-vault.confirm-input"));
+    cleanup();
+    renderInline();
+    expect(document.activeElement).not.toBe(screen.getByTestId("delete-vault.confirm-input"));
+  });
+});
 
 describe("the delete-vault promise", () => {
   it("renders the local-erase disclosure VERBATIM where the vault is not the only copy", () => {

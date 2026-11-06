@@ -53,9 +53,7 @@
       "scopeQuestion": "Mit olvashat az ágens",
       "scopeFolders": "Mappák",
       "scopeApplies": "A következő üzenetedre vonatkozik. A törölt, archivált és sablonjegyzetek mindig ki vannak hagyva.",
-      "blockedScope": "Az ügynöknek még nincs min dolgoznia: minden jegyzet ki van zárva az AI elől, vagy a széf üres.",
       "preparing": "Előkészítés…",
-      "blockedScopeSidebar": "Itt még nincs miről kérdezni: ennek a jegyzetnek a mappája ki van zárva az AI elől.",
       "needsScope": "Válassz lentebb egy mappát, vagy nyiss meg egy jegyzetet, hogy az ügynöknek legyen min dolgoznia.",
       "scopeExcluded_one": "{{count}} kizárva az AI elől",
       "scopeExcluded_other": "{{count}} kizárva az AI elől"

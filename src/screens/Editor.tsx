@@ -2644,7 +2644,6 @@ function EditorChrome({
                   anchor ?? null,
                 )
               }
-              onShowToast={(message) => showToastMessage(message)}
             />
           </SidebarPane>
         )}
@@ -4885,7 +4884,6 @@ const EMPTY_FOLDERS: readonly string[] = [];
 
 function RightSidebar({
   onOpenSettings,
-  onShowToast,
   stripClearance = 0,
   notes,
   notesWritten,
@@ -4894,7 +4892,6 @@ function RightSidebar({
   // a fault and lands ON the control that clears it rather than at the top of
   // a panel (myne-md/myne#771).
   onOpenSettings?: (panel?: string, anchor?: string) => void;
-  onShowToast?: (message: string) => void;
   /** Room kept clear at the strip's inline END, for the controls that float in
    *  the window's top-right corner (`RIGHT_CLEARANCE`, computed by the caller
    *  because only it knows whether they are shown). See the strip's own comment
@@ -5224,7 +5221,6 @@ function RightSidebar({
         ) : active === "ai-chat" ? (
           <AiChatTab
             onOpenSettings={onOpenSettings}
-            onShowToast={onShowToast}
             // The automatic-apply path writes out of band of any pane's own
             // autosave loop, exactly as the manual one does, so it owes the
             // same reload (myne-md/myne#551). The handler above states both

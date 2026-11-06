@@ -1504,18 +1504,57 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "components/updatingscreen/working",
+    id: "components/updatingscreen/downloading",
     group: "components",
     surface: "UpdatingScreen",
-    state: "working",
+    state: "downloading",
     description:
-      "The full-window updating surface mid install, with the version resolving once over the spinner.",
-    tags: ["components", "updatingscreen", "working", "update"],
+      "The full-window updating surface mid download: the version resolving once in the readout, a determinate bar fed by the host's byte events, the phase word with its percentage, and what has arrived so far. This is the state a slow connection sits in for minutes, so it says how far it has got instead of only that something is happening.",
+    tags: ["components", "updatingscreen", "downloading", "progress", "update"],
     fixture: "unlocked",
     render: () => (
       <UpdatingScreen
         phase="working"
-        version="0.10.1"
+        version="0.13.0"
+        progress={{ phase: "downloading", downloaded: 13_631_488, total: 26_843_545 }}
+        onRetry={action("onRetry")}
+        onBackToUnlock={action("onBackToUnlock")}
+      />
+    ),
+  },
+  {
+    id: "components/updatingscreen/unknown-size",
+    group: "components",
+    surface: "UpdatingScreen",
+    state: "unknown-size",
+    description:
+      "The same surface when the origin sent no Content-Length: the bar sweeps instead of filling and the readout says only how much has arrived, because there is no total to take a percentage of and a frozen 0% reads as hung.",
+    tags: ["components", "updatingscreen", "unknown-size", "indeterminate", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdatingScreen
+        phase="working"
+        version="0.13.0"
+        progress={{ phase: "downloading", downloaded: 4_194_304, total: null }}
+        onRetry={action("onRetry")}
+        onBackToUnlock={action("onBackToUnlock")}
+      />
+    ),
+  },
+  {
+    id: "components/updatingscreen/installing",
+    group: "components",
+    surface: "UpdatingScreen",
+    state: "installing",
+    description:
+      "The last phase: the bytes are in and verified, and the app is being written into place. The bar is full and the readout drops its byte line, because there is nothing left to count.",
+    tags: ["components", "updatingscreen", "installing", "update"],
+    fixture: "unlocked",
+    render: () => (
+      <UpdatingScreen
+        phase="working"
+        version="0.13.0"
+        progress={{ phase: "installing", downloaded: 26_843_545, total: 26_843_545 }}
         onRetry={action("onRetry")}
         onBackToUnlock={action("onBackToUnlock")}
       />
@@ -1527,13 +1566,13 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
     surface: "UpdatingScreen",
     state: "failed",
     description:
-      "The updating surface after a failed install, with the retry and the only honest way back, which is unlock.",
+      "The updating surface after a failed install: the heading, one sentence saying the running version is untouched, and the retry with the only honest way back, which is unlock. No cause is named, because the host cannot yet tell an install failure from a reachability one (myne-md/myne#864).",
     tags: ["components", "updatingscreen", "failed", "update"],
     fixture: "unlocked",
     render: () => (
       <UpdatingScreen
         phase="failed"
-        version="0.10.1"
+        version="0.13.0"
         onRetry={action("onRetry")}
         onBackToUnlock={action("onBackToUnlock")}
       />

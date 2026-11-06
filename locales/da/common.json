@@ -53,9 +53,7 @@
       "scopeQuestion": "Hvad agenten kan læse",
       "scopeFolders": "Mapper",
       "scopeApplies": "Gælder din næste besked. Slettede, arkiverede og skabelonnoter holdes altid udenfor.",
-      "blockedScope": "Der er endnu intet for agenten at arbejde på: hver note er udelukket fra AI, eller boksen er tom.",
       "preparing": "Gør klar…",
-      "blockedScopeSidebar": "Der er endnu intet at spørge om her: denne notes mappe er udelukket fra AI.",
       "needsScope": "Vælg en mappe nedenfor, eller åbn en note, så agenten har noget at arbejde på.",
       "scopeExcluded_one": "{{count}} udelukket fra AI",
       "scopeExcluded_other": "{{count}} udelukket fra AI"

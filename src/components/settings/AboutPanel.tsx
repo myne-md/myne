@@ -116,6 +116,15 @@ const LICENSE_BODY_STYLE: CSSProperties = {
   margin: 0,
 };
 
+/** A refused install start, under its own row. Danger tone: it stopped something
+ *  the row promised, and the fix is on the same row. */
+const FLUSH_REFUSED_STYLE: CSSProperties = {
+  fontSize: "var(--text-sm)",
+  lineHeight: "var(--leading-normal)",
+  color: "var(--danger)",
+  margin: 0,
+};
+
 function Block({
   children,
   ...rest
@@ -208,25 +217,35 @@ export function AboutPanel() {
       });
   };
 
-  // A manual check that finds an update must offer the install, not just the
-  // sentence: with the automatic check off, the notice's check never runs, so this
-  // is the only reachable affordance.
+  // A manual check that finds an update turns the SAME button into the install
+  // (owner request, myne-md/myne#1020). It used to be two controls: the check in
+  // the row's slot, and a second primary button appearing underneath it, which
+  // made the row grow a control nobody had asked for and left the row's own button
+  // looking inert next to it. One control, two states, and the row's height never
+  // moves.
   //
-  // This is the SECOND install door, and it is deliberately not the notice's flow
+  // This is still the SECOND install door and deliberately not the notice's flow
   // (myne-md/myne#870): it flushes and installs without locking the vault, so it
-  // has no confirm, no `updating` Stage and no failure surface. The notice's
-  // confirm is the path that locks first, and unifying the two is a product
-  // decision recorded in `design-notes/ui/0686` rather than taken here.
+  // has no confirm, no `updating` Stage and no failure surface of its own. The
+  // notice's confirm is the path that locks first, and unifying the two is a
+  // product decision recorded in `design-notes/ui/0686` rather than taken here.
+  // What this door no longer does is swallow a failed flush: the install would
+  // then exit the process with unsaved edits in memory, so a refusal stops it and
+  // says so on the row.
   const [installing, setInstalling] = useState(false);
+  const [flushRefused, setFlushRefused] = useState(false);
   const runUpdateInstall = () => {
     setInstalling(true);
+    setFlushRefused(false);
     void (async () => {
       // Flush unsaved note edits before the process exits to install, as every
       // other exit path does.
       try {
         await renameFlushHooks().flushOpenPanes();
       } catch {
-        // best effort
+        setInstalling(false);
+        setFlushRefused(true);
+        return;
       }
       updateInstall().catch(() => {
         setInstalling(false);
@@ -234,6 +253,9 @@ export function AboutPanel() {
       });
     })();
   };
+
+  const updateOffered =
+    check.kind === "status" && check.status.kind === "available";
 
   const updateChannelLabel =
     __UPDATE_CHANNEL__ === "beta"
@@ -344,7 +366,12 @@ export function AboutPanel() {
               the button in the control slot on the right, the short status line
               inline, and the long verification paragraph behind the question
               mark, where the settings panels keep the rest of what a row has to
-              say. The status line stays inline because it IS the readout. */}
+              say. The status line stays inline because it IS the readout.
+
+              ONE control (myne-md/myne#1020): while nothing is on offer it checks,
+              and once a version is offered the same button becomes the install.
+              A refusal to start says so under the row rather than under a second
+              button, because there is no second button. */}
           <SettingRow
             anchorId="about.update"
             testId="about.update-row"
@@ -352,29 +379,34 @@ export function AboutPanel() {
             helper={updateStatusText}
             helperTestId="about.update-status"
             explanation={[t("settings.about.updateHelper")]}
-            control={(_helperId, explanationId) => (
-              <Button
-                variant="secondary"
-                onClick={runUpdateCheck}
-                disabled={check.kind === "checking"}
-                data-testid="about.update-check"
-                aria-describedby={explanationId}
-              >
-                {t("settings.about.updateCheckButton")}
-              </Button>
-            )}
-          >
-            {check.kind === "status" && check.status.kind === "available" && (
-              <div>
+            control={(_helperId, explanationId) =>
+              updateOffered ? (
                 <Button
                   variant="primary"
                   onClick={runUpdateInstall}
                   disabled={installing}
                   data-testid="about.update-install"
+                  aria-describedby={explanationId}
                 >
                   {t("settings.about.updateInstallButton")}
                 </Button>
-              </div>
+              ) : (
+                <Button
+                  variant="secondary"
+                  onClick={runUpdateCheck}
+                  disabled={check.kind === "checking"}
+                  data-testid="about.update-check"
+                  aria-describedby={explanationId}
+                >
+                  {t("settings.about.updateCheckButton")}
+                </Button>
+              )
+            }
+          >
+            {flushRefused && (
+              <p style={FLUSH_REFUSED_STYLE} data-testid="about.update-blocked">
+                {t("settings.about.updateFlushFailed")}
+              </p>
             )}
           </SettingRow>
 
