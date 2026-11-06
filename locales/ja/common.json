@@ -53,9 +53,7 @@
       "scopeQuestion": "エージェントが読めるもの",
       "scopeFolders": "フォルダ",
       "scopeApplies": "次のメッセージに適用されます。ゴミ箱、アーカイブ、テンプレートのノートは常に除外されます。",
-      "blockedScope": "エージェントが作業できる対象がまだありません: すべてのノートがAIから除外されているか、保管庫が空です。",
       "preparing": "準備中…",
-      "blockedScopeSidebar": "ここで尋ねられる対象がまだありません: このノートのフォルダはAIから除外されています。",
       "needsScope": "下からフォルダを選ぶかノートを開いて、エージェントが作業できる対象を用意してください。",
       "scopeExcluded_other": "{{count}}件がAIから除外",
       "scopeExcluded_one": "{{count}}件がAIから除外"

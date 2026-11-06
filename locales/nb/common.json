@@ -53,9 +53,7 @@
       "scopeQuestion": "Hva agenten kan lese",
       "scopeFolders": "Mapper",
       "scopeApplies": "Gjelder neste melding. Papirkurv-, arkiv- og malnotater er alltid utelatt.",
-      "blockedScope": "Ingenting for agenten å jobbe med ennå: hvert notat er utelatt fra AI, eller hvelvet er tomt.",
       "preparing": "Forbereder…",
-      "blockedScopeSidebar": "Ingenting å spørre om her ennå: mappen til dette notatet er utelatt fra AI.",
       "needsScope": "Velg en mappe nedenfor, eller åpne et notat, så agenten har noe å jobbe med.",
       "scopeExcluded_one": "{{count}} utelatt fra AI",
       "scopeExcluded_other": "{{count}} utelatt fra AI"

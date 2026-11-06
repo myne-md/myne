@@ -1468,7 +1468,7 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
 
   it("swaps Send for Stop and stops host-side on click", () => {
     startRunning();
-    render(<ChatComposer surface="agent" openNoteId="n1" folders={[]} />);
+    render(<ChatComposer openNoteId="n1" folders={[]} />);
     expect(screen.queryByTestId("ai.composer-send")).toBeNull();
     const stop = screen.getByTestId("ai.composer-stop");
     fireEvent.click(stop);
@@ -1477,7 +1477,7 @@ describe("ChatComposer: Send turns into Stop while a run works", () => {
 
   it("ignores Enter while running instead of sending a second run", () => {
     startRunning();
-    render(<ChatComposer surface="agent" openNoteId="n1" folders={[]} />);
+    render(<ChatComposer openNoteId="n1" folders={[]} />);
     agentStart.mockClear();
     fireEvent.change(screen.getByTestId("ai.composer-input"), {
       target: { value: "a second question" },

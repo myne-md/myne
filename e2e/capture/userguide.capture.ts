@@ -2024,9 +2024,10 @@ runner(
       });
 
       // ---- Frame: delete a vault (the confirm form, Vault panel) ----
-      // VaultPanel: settings.delete-vault-cta reveals DeleteVaultConfirmForm
-      // (delete-vault.confirm-input). Submit is gated on the typed phrase, so
-      // capturing the empty form + cancelling never deletes anything.
+      // VaultPanel's danger topic carries `delete-vault.confirm-input` directly
+      // since myne-md/myne#1020 (the reveal CTA it used to sit behind is gone).
+      // Submit stays gated on the typed phrase, so capturing the empty form and
+      // leaving the panel never deletes anything.
       await frame(
         s,
         "delete-a-vault",
@@ -2036,15 +2037,12 @@ runner(
           await (await s.byTestId("settings.tab-vault")).click();
           // The erase is the Vault panel's `danger` topic (myne-md/myne#885).
           await (await s.byTestId("settings.vault-tab-danger")).click();
-          await (await s.byTestId("settings.delete-vault-cta")).click();
           await s.byTestId("delete-vault.confirm-input", { timeoutMs: 6000 });
           await settle(s, 400);
         },
       );
-      await safe("cancel delete-vault", async () => {
-        await (await s.byTestId("delete-vault.cancel")).click();
-      });
-
+      // There is nothing to cancel: the field is part of the section rather than
+      // a view that was opened, and the frame's own teardown is `closeSettings`.
       await safe("close settings", () => closeSettings(s));
 
       // =====================================================================

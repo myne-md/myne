@@ -133,7 +133,6 @@ export function AgentConversationView({
       </div>
       <ConversationSurface
         testId="agent.focus-surface"
-        surface="agent"
         openNoteId={noteId}
         openNoteTitle={openNoteTitle}
         // **This view IS the anchored session** (myne-md/myne#848): it was

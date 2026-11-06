@@ -53,9 +53,7 @@
       "scopeQuestion": "Apa yang dapat dibaca agen",
       "scopeFolders": "Folder",
       "scopeApplies": "Berlaku untuk pesan Anda berikutnya. Catatan yang dibuang, diarsipkan dan template selalu dikeluarkan.",
-      "blockedScope": "Belum ada yang bisa dikerjakan agen: semua catatan dikecualikan dari AI, atau brankas kosong.",
       "preparing": "Menyiapkan…",
-      "blockedScopeSidebar": "Belum ada yang bisa ditanyakan di sini: folder catatan ini dikecualikan dari AI.",
       "needsScope": "Pilih folder di bawah, atau buka sebuah catatan, agar agen punya sesuatu untuk dikerjakan.",
       "scopeExcluded_other": "{{count}} dikecualikan dari AI",
       "scopeExcluded_one": "{{count}} dikecualikan dari AI"

@@ -53,9 +53,7 @@
       "scopeQuestion": "에이전트가 읽을 수 있는 것",
       "scopeFolders": "폴더",
       "scopeApplies": "다음 메시지에 적용됩니다. 휴지통, 보관, 템플릿 노트는 항상 제외됩니다.",
-      "blockedScope": "아직 에이전트가 작업할 대상이 없습니다. 모든 노트가 AI에서 제외되었거나 보관함이 비어 있습니다.",
       "preparing": "준비하는 중…",
-      "blockedScopeSidebar": "아직 여기에서 물어볼 대상이 없습니다. 이 노트의 폴더가 AI에서 제외되어 있습니다.",
       "needsScope": "아래에서 폴더를 선택하거나 노트를 열어 에이전트가 작업할 대상을 정하세요.",
       "scopeExcluded_other": "AI에서 {{count}}개 제외됨",
       "scopeExcluded_one": "AI에서 {{count}}개 제외됨"

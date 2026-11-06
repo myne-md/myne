@@ -221,13 +221,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -237,7 +237,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -265,6 +265,15 @@ describe("check-twin-inventory", () => {
     // (`src/notes/components/MemoryPopover.tsx` against
     // `mobile/src/app/flows/MemorySheet.tsx`). Both `screen`: same surface,
     // per-client container by design, recorded with reasons at entry time.
+    //
+    // Then 120 back to 119: myne-md/myne#1020 DELETED the desktop half of the
+    // second pair at the owner's request, so the in-chat memory surface is now a
+    // phone-only one. The curated entry and its roster row both went, rather than
+    // being re-verdicted `absent`, because this guard resolves BOTH paths and
+    // rejects an entry whose file does not exist: a row naming a deleted module
+    // would have printed ok while describing nothing. The convergence is locked
+    // in by `check-twin-drift-ratchet.mjs --record` in the same change, which is
+    // what stops the pair quietly re-appearing on the desktop side.
     //
     // Then 120 to 121: myne-md/myne#768 adds the person-account bindings twin
     // (`src/lib/personAccount.ts` against `mobile/src/lib/personAccount.ts`),
@@ -318,7 +327,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("134 twin(s) discovered");
+    expect(full.out).toContain("133 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -521,7 +530,16 @@ describe("check-twin-inventory", () => {
     // `src/dialect/exampleVault.ts` / `mobile/src/dialect/exampleVault.ts` shim
     // pair the sweep sees, and the `src/notes/exampleVault.ts` partner the roster
     // carries. The branch wrote 133; the measurement is 134.
-    expect(ROSTER.length).toBe(134);
+    //
+    // 134 down to 133: **the first SHRINK in this history**, and it is a deletion
+    // rather than a re-verdict (myne-md/myne#1020). The desktop's in-chat memory
+    // popover was removed at the owner's request, so the pair it formed with
+    // `mobile/src/app/flows/MemorySheet.tsx` has one side left and cannot be
+    // rostered: this guard resolves both paths, so an `absent` row would fail the
+    // same read a missing file does. The drift ratchet locks the convergence in,
+    // which is what keeps the pair from re-appearing on the desktop side without
+    // somebody deciding to bring the surface back.
+    expect(ROSTER.length).toBe(133);
   });
 
   it("keeps `screen` narrow", () => {
@@ -566,7 +584,6 @@ describe("check-twin-inventory", () => {
       "src/App.tsx", // surface: the shell each client renders
       "src/components/settings/MemorySection.tsx", // surface: the memory management panel
       "src/main.tsx", // host: boot side-effect composition
-      "src/notes/components/MemoryPopover.tsx", // surface: the in-chat memory roster
       "src/notes/components/WhoIsHereTab.tsx", // surface: the presence roster (#849)
       "src/platform/core.ts", // host: the IPC entry point
       "src/platform/deepLink.ts", // host: deep-link registration

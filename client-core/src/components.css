@@ -1035,6 +1035,33 @@
   }
 }
 
+/* The wash's geometry and strength, as three knobs rather than one baked block.
+   They live on a shared selector because the wash is worn by TWO hosts: this
+   component and the review card (`src/styles/tokens.css`, MYND-894), which
+   supplies only a colour. Declaring them on `.myne-empty__wash` itself would
+   make the error variant unable to retune them, since a property declared on the
+   element beats the value it would otherwise inherit from its parent.
+
+   `.myne-review-card` deliberately keeps the ORIGINAL strength: it is a compact
+   card on an editor surface, not a pane-wide zero state, which is the thing
+   `docs/decisions/ui/0790` retunes. */
+.myne-empty,
+.myne-review-card {
+  --myne-empty-wash-paint:
+    radial-gradient(
+      38% 44% at 34% 36%,
+      color-mix(in srgb, var(--myne-empty-wash) 24%, transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      36% 40% at 68% 62%,
+      color-mix(in srgb, var(--myne-empty-wash) 16%, transparent),
+      transparent 72%
+    );
+  --myne-empty-wash-blur: 32px;
+  --myne-empty-wash-mask: 45%;
+}
+
 .myne-empty {
   /* The wash's colour — see `.myne-empty__wash`. The accent by default; the
      error variant overrides it. */
@@ -1073,31 +1100,35 @@
    error variant overrides it with `--danger` rather than needing a second
    rule set. The percentages are low enough that body text over the brightest
    point keeps its contrast on both ramps: the wash sits UNDER `--paper-2`'s
-   ink, never over it. */
+   ink, never over it.
+
+   The PAINT, the blur and the mask stop are the three knobs the variant retunes
+   (`myne-empty[data-variant="error"]`), which is why they are variables here
+   instead of literals: the error variant needs the same two glows at a different
+   strength and a smaller footprint, and copying the gradient block to say that
+   would put the geometry in two places. */
 .myne-empty__wash {
   position: absolute;
   inset: 0;
   z-index: var(--z-ground);
   pointer-events: none;
-  background:
-    radial-gradient(
-      38% 44% at 34% 36%,
-      color-mix(in srgb, var(--myne-empty-wash) 24%, transparent),
-      transparent 72%
-    ),
-    radial-gradient(
-      36% 40% at 68% 62%,
-      color-mix(in srgb, var(--myne-empty-wash) 16%, transparent),
-      transparent 72%
-    );
-  filter: blur(32px);
+  background: var(--myne-empty-wash-paint);
+  filter: blur(var(--myne-empty-wash-blur));
   /* The fade to the edges. A radial mask sized to the box (`closest-side`)
      takes the wash to fully transparent AT every edge, so a filled state — which
      has no border to hide a cut — dissolves into the surrounding surface
      instead of meeting the pane edge as a hard line. Masking happens after the
      blur in the rendering order, so the blur cannot bleed it back out. */
-  -webkit-mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
-  mask-image: radial-gradient(closest-side, black 45%, transparent 100%);
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    black var(--myne-empty-wash-mask),
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    black var(--myne-empty-wash-mask),
+    transparent 100%
+  );
 }
 
 /* Forced colours strip backgrounds anyway; hiding the element keeps a blurred
@@ -1226,6 +1257,29 @@
 
 .myne-empty[data-variant="error"] {
   --myne-empty-wash: var(--danger);
+  /* **A fault is tinted, not flooded** (myne-md/myne#1020). Red at the accent
+     wash's strength covered a whole pane. The AI panel's "No model" state was
+     a rose-coloured field with two lines of text in it, so a state that says
+     "this needs one setting changed" read as an alarm filling the window.
+
+     Strength roughly a third, footprint a little over half, and a tighter blur
+     with an earlier mask stop, so the colour sits behind the glyph and its two
+     lines instead of behind the pane. Contrast only improves (the wash is a
+     tint UNDER the ink, never over it), and the border and glyph keep the full
+     `--danger` so the state is still unmissable at a glance. */
+  --myne-empty-wash-paint:
+    radial-gradient(
+      26% 30% at 34% 38%,
+      color-mix(in srgb, var(--myne-empty-wash) 9%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      24% 26% at 68% 62%,
+      color-mix(in srgb, var(--myne-empty-wash) 6%, transparent),
+      transparent 70%
+    );
+  --myne-empty-wash-blur: 24px;
+  --myne-empty-wash-mask: 30%;
   border-color: color-mix(in srgb, var(--danger) 40%, var(--line-1));
 }
 .myne-empty[data-variant="error"] .myne-empty__glyph {
