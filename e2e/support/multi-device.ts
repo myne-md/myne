@@ -27,6 +27,7 @@ import {
   selectSettingsTopic,
   unlockToEditor,
 } from "./flows";
+import { waitForEnrolled } from "./enrolment";
 
 const DRIVER_BASE = Number(process.env.MYNE_E2E_DRIVER_PORT ?? 4444);
 const NATIVE_BASE = Number(process.env.MYNE_E2E_NATIVE_PORT ?? 4445);
@@ -372,7 +373,7 @@ export async function setupTwoSyncedDevices(
       }
       await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
       await (await a.session.byTestId("sync.enroll.submit")).click();
-      await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+      await waitForEnrolled(a.session);
       await closeSettings(a.session);
       let noteId: string | null = null;
       if (seedNote) {
