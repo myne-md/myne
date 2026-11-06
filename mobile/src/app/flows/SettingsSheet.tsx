@@ -1602,9 +1602,13 @@ export interface SettingsSheetProps {
    *  through to `SyncHubPanel`; see the prop's own note for why it exists beside
    *  the automatic route. */
   onShowApprovalCode?: () => void;
+  /** The Sync panel's identity repair (myne-md/myne#1029): the row names the act
+   *  while a sealed identity is what blocks the cycle, and this opens the phone's
+   *  one surface that can perform it. Passed straight through to `SyncHubPanel`. */
+  onUnlockIdentity?: () => void;
 }
 
-export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel, onShowApprovalCode }: SettingsSheetProps) {
+export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, initialPanel, onShowApprovalCode, onUnlockIdentity }: SettingsSheetProps) {
   const { t, i18n } = useTranslation();
   const { biometric, isAndroid } = usePlatform();
   const [panel, setPanel] = useState<Panel>(initialPanel ?? "root");
@@ -2890,6 +2894,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             onOpenEnroll={() => setPanel("sync-enroll")}
             onOpenDevices={() => setPanel("sync-devices")}
             onOpenMembers={() => setPanel("sync-members")}
+            onUnlockIdentity={onUnlockIdentity}
             onShowApprovalCode={
               onShowApprovalCode === undefined
                 ? undefined

@@ -44,6 +44,7 @@ const personLock = vi.hoisted(() => vi.fn());
 const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
+const syncGetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -72,7 +73,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   // `.then`, which keeps the flow on the gate and reads as a routing bug.
   personAccountNumber,
 }));
-vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
+vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, syncGetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
 // not cross, but `memberNameErrorKey` is kept REAL: the error assertion below is
 // about the shared six-arm mapping in `@myne/client-core/member-name`, and a second
@@ -195,6 +196,7 @@ beforeEach(() => {
   personLock.mockReset().mockResolvedValue(undefined);
   personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
+  syncGetEndpoint.mockReset().mockResolvedValue({ endpoint_url: "", invite_code: "" });
   // Default: an accepted member whose row carries no name yet, which is the state
   // the step exists for. `namedRoster()` below is the other answer.
   listRoster.mockReset().mockResolvedValue({
