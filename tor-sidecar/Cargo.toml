@@ -44,3 +44,12 @@ arti = { version = "=2.5.0", default-features = false, features = [
     "compression",
     "harden",
 ] }
+# `compression` is what makes arti reach liblzma, and `liblzma-sys`'s default is a
+# DYNAMIC link to whatever the BUILD HOST has. On a Homebrew Mac that is an absolute
+# `/opt/homebrew/opt/xz/lib/liblzma.5.dylib`, tauri copies the sidecar into the
+# bundle verbatim, and the binary then cannot load under the hardened runtime at all
+# (different Team IDs) let alone on a machine without Homebrew: Tor routing died on
+# launch in every macOS build up to and including v0.15.0 (myne-md/myne#1031).
+# Naming it here with `static` unifies the feature across the graph, so the vendored
+# xz source is compiled into the sidecar and the bundle carries no absolute path.
+liblzma-sys = { version = "0.4", features = ["static"] }
