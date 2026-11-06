@@ -10,5 +10,17 @@
 # silently masked. Doctests are unaffected (nextest never runs them; the crates
 # have no runnable doctests — protocol is #![no_std], the other fences are
 # ```text/```sh).
+#
+# The LOCAL pre-push gate (`lefthook.yml` → `cargo-test`) runs the DEFAULT
+# profile, with no `--profile` flag, and that is the point rather than an
+# omission: a flake must stay visible on the machine that can fix it, so
+# `retries` belongs to CI alone. `fail-fast = false` is declared here rather than
+# passed as a flag so that the command the docs show is the whole command: with
+# nextest's default, one red test cancels the rest and reports them as "not run",
+# which is the behaviour the local gate was moved off `cargo test` to escape.
+# myne-md/myne#1034 carries the measurements.
+[profile.default]
+fail-fast = false
+
 [profile.ci]
 retries = 2

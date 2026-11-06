@@ -33,7 +33,7 @@
 //! the *real* install on a developer's Mac: it never connected, the fixture's
 //! listener sat in `accept()` forever, and `Drop`'s join turned the loud
 //! failure this harness was designed for into a permanent hang that stalled
-//! `cargo test --workspace` — and with it every `pre-push`. So the fixture
+//! `cargo nextest run --workspace`, and with it every `pre-push`. So the fixture
 //! sets BOTH variables and computes the app dir the same way `dirs` does.
 
 use std::io::{Read, Write};

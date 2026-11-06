@@ -1402,18 +1402,63 @@ pre-push:
     # myne-web-wasm` (main.yml:232-254), and `tauri-compile` carries
     # `cargo clippy -p myne-desktop --all-targets --no-default-features`
     # (main.yml:841), which is strictly stronger than the `cargo check
-    # --no-default-features` this file used to run. `cargo test --workspace`
-    # below covers the web-wasm test crate locally too, so nothing here lost a
-    # local gate; the three were the redundant, and slowest-throughput, half of
-    # the battery.
+    # --no-default-features` this file used to run. The nextest run below covers
+    # the web-wasm test crate locally too, so nothing here lost a local gate; the
+    # three were the redundant, and slowest-throughput, half of the battery.
 
     cargo-test:
+      # `cargo-nextest`, not `cargo test`, for two measured reasons (myne-md/myne#1034,
+      # on a warm `target/pre-push` tree).
+      #
+      # 1. `cargo test` runs the tests of a binary as THREADS in ONE process, so a
+      #    test that reads process-global state answers differently depending on
+      #    its neighbours. `myne-core`'s
+      #    `device_identity::tests::a_host_registered_store_answers_for_the_crate`
+      #    red a whole-workspace run, then passed alone, passed at
+      #    `--test-threads=1` (the whole lib, 275 s) and passed on a second
+      #    threaded run. A gate that reds for reasons unrelated to the commit
+      #    gets `--no-verify`'d, and then it is not a gate.
+      # 2. `cargo test` stops at the FIRST failing binary: one run aborted at 67 s
+      #    on `myne-core --lib` and never reached the remaining ~3 000 tests.
+      #
+      # `--no-fail-fast` is not on the command because it is declared in
+      # `.config/nextest.toml`'s default profile, so the command the docs show is
+      # the whole command. It is load-bearing rather than decoration: nextest's
+      # DEFAULT is fail-fast (injected: one red test cancelled 38 of 61 and
+      # reported them as "not run"). Every CI invocation passes the flag for the
+      # same reason. The whole workspace is 6 319 tests, green, in 80 s.
+      #
+      # CI has always run nextest (`.woodpecker/main.yml`, `--profile ci`), so this
+      # is not a new dependency, it is the local gate catching up with the remote
+      # one. The profiles differ on purpose: CI carries `retries = 2` and this uses
+      # the DEFAULT profile, so a flake stays visible on the machine that can fix
+      # it. Landed with cargo-nextest 0.9.151; the CI runner comes from the
+      # prebuilt image, and the two flags used here are long-stable.
+      #
+      # Deliberately NOT run: doctests (nextest never runs them, the workspace has
+      # none, and `cargo test --workspace --doc` spends 64 s compiling fifteen
+      # empty harnesses to prove it) and sccache (CI's `RUSTC_WRAPPER`, which a
+      # warm incremental checkout is exactly the case it does not help).
+      #
+      # One red this does NOT fix, so nobody reads the above as a cure-all:
+      # `protocol`'s dudect timing test is load-sensitive, not process-sensitive.
+      # It red t = 12.87 with a clean control while this session's own `du` sweeps
+      # ran, and passes alone, under nextest, and under twelve busy CPU processes.
+      # Isolation does nothing for that one; it is as flaky as it was.
       glob:
         - "*.{rs,toml,lock}"
         - "**/*.{rs,toml,lock}"
       env:
         CARGO_TARGET_DIR: target/pre-push
-      run: cargo test --workspace
+      run: |
+        if ! command -v cargo-nextest >/dev/null 2>&1; then
+          # A gate that cannot run must never pass quietly.
+          echo "cargo-test: cargo-nextest is not on PATH, so this gate did NOT run."
+          echo "  Fix:  brew install cargo-nextest    # CI runs the same runner"
+          echo "  Then: cargo nextest run --workspace"
+          exit 1
+        fi
+        cargo nextest run --workspace
 
     pnpm-build:
       # Globbed to the trees `pnpm build` actually compiles. A Rust-only or
