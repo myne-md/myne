@@ -1432,6 +1432,9 @@ export async function closeSettings(session: Session): Promise<void> {
  *  NOT start or configure a server: the caller owns that, because only the
  *  caller knows whether it is enrolling against an ephemeral one or a seeded
  *  endpoint. */
+export { waitForEnrolled };
+import { waitForEnrolled } from "./enrolment";
+
 export async function unlockAndEnroll(
   session: Session,
   account: string,
@@ -1447,7 +1450,7 @@ export async function unlockAndEnroll(
   await (await session.byTestId("sync.enroll.account-input")).sendKeys(account);
   await (await session.byTestId("sync.enroll.password-input")).sendKeys(password);
   await (await session.byTestId("sync.enroll.submit")).click();
-  await session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+  await waitForEnrolled(session);
   await closeSettings(session);
 }
 

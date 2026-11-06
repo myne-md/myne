@@ -46,6 +46,7 @@ import {
   unlockToEditor,
   waitForSaved,
 } from "./support/flows";
+import { waitForEnrolled } from "./support/enrolment";
 
 const driver = harnessSupported();
 const server = syncServerSupported();
@@ -151,7 +152,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
         await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
         await (await a.session.byTestId("sync.enroll.submit")).click();
-        await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+        await waitForEnrolled(a.session);
         await closeSettings(a.session);
 
         // A note, so the vault is not the empty-genesis case (which has its own
@@ -248,7 +249,7 @@ describeCanary("two-device sync canary (MYND-428)", () => {
         await (await a.session.byTestId("sync.enroll.account-input")).sendKeys(account);
         await (await a.session.byTestId("sync.enroll.password-input")).sendKeys(password);
         await (await a.session.byTestId("sync.enroll.submit")).click();
-        await a.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+        await waitForEnrolled(a.session);
         await closeSettings(a.session);
 
         // A note to replicate. `createNote` writes the `.myn` (backend

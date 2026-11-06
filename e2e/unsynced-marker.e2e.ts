@@ -97,6 +97,12 @@ describe.skipIf(!supported)("um · unsynced-edit marker (MYND-574 task 23)", () 
       await a.session.byTestId("notes.row-unsynced", { timeoutMs: 20_000 });
       await a.session.byTestId("editor.unsynced-marker", { timeoutMs: 20_000 });
       expect(await unsyncedIds(a.session)).toHaveLength(1);
+    } catch (e) {
+      // These three launch the app directly rather than through `scenario()`, so a
+      // red here used to arrive with no picture — the same blind spot the fleet
+      // helper had.
+      await a.saveArtifacts("um1-unsynced-marker");
+      throw e;
     } finally {
       await a.teardown();
     }
@@ -115,7 +121,12 @@ describe.skipIf(!supported)("um · unsynced-edit marker (MYND-574 task 23)", () 
       },
     });
     try {
-      await unlockAndEnroll(a.session, account, password);
+      try {
+        await unlockAndEnroll(a.session, account, password);
+      } catch (e) {
+        await a.saveArtifacts("um2-enrol");
+        throw e;
+      }
       await pageSeatInvoke(a.session, "plugin:sync|sync_now", {}, 30_000);
 
       // **The ack is made IMPOSSIBLE for the first half, not merely unlikely.**

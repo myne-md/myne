@@ -32,6 +32,7 @@ import {
   dismissImporterOffer,
 } from "./flows";
 import { seedVault } from "./fixtures";
+import { waitForEnrolled } from "./enrolment";
 
 /** A session, as every helper below takes it. */
 export type Session = AppSession["session"];
@@ -173,7 +174,7 @@ export async function startOwnerIdentity(owner: AppSession, account: string): Pr
   await (await owner.session.byTestId("sync.enroll.account-input")).sendKeys(account);
   await (await owner.session.byTestId("sync.enroll.password-input")).sendKeys(OWNER_PASSWORD);
   await (await owner.session.byTestId("sync.enroll.submit")).click();
-  await owner.session.byTestId("sync.enroll.approved", { timeoutMs: 30_000 });
+  await waitForEnrolled(owner.session);
   await closeSettings(owner.session);
   // The identity is unlocked from the Sync panel's Identity block, which is collapsed
   // by default (myne-md/myne#831); the roster no longer carries its own grid.
