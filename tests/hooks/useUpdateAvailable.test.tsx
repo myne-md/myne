@@ -199,9 +199,17 @@ describe("the install's progress stream", () => {
     await settle();
     // A name that drifted from `PROGRESS_EVENT` in Rust is a bar that never
     // moves and says nothing about why, so the constant is asserted rather than
-    // trusted.
+    // trusted. The ORIGINAL module is imported, not the mock's own initialiser:
+    // `expect(mock.progressEvent).toBe("update:progress")` compared the mock to
+    // itself and stayed green when the real constant was changed to
+    // "update:progress-DRIFT" (measured, myne-md/myne#1022 review).
+    const real =
+      await vi.importActual<typeof import("../../src/platform/update")>(
+        "../../src/platform/update",
+      );
+    expect(real.UPDATE_PROGRESS_EVENT).toBe("update:progress");
+    expect(h.state.progressEvent).toBe(real.UPDATE_PROGRESS_EVENT);
     expect(h.state.progressHandler).not.toBeNull();
-    expect(h.state.progressEvent).toBe("update:progress");
   });
 
   it("reports the host's ticks, and keeps the byte counts through the later phases", async () => {

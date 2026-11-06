@@ -55,19 +55,33 @@ const update = vi.hoisted(() => ({
   progressHandler: null as null | ((event: { payload: unknown }) => void),
   unlisten: vi.fn(),
 }));
-vi.mock("../../src/platform/update", () => ({
-  getAutoCheck: update.autoCheck,
-  updateCheck: update.check,
-  updateInstall: update.install,
-  UPDATE_PROGRESS_EVENT: update.progressEvent,
-}));
-vi.mock("../../src/platform/event", () => ({
-  listen: (name: string, handler: (event: { payload: unknown }) => void) => {
-    if (name !== update.progressEvent) return Promise.reject(new Error(name));
-    update.progressHandler = handler;
-    return Promise.resolve(update.unlisten);
-  },
-}));
+// The REAL constant, read from the un-mocked module inside each factory, so a drift
+// between the hook's `listen` name and `src/platform/update.ts` fails here instead of
+// a bar that silently never moves. Handing the hook the mock's own `progressEvent`
+// made this file compare a variable to itself (myne-md/myne#1022 review).
+vi.mock("../../src/platform/update", async () => {
+  const real = await vi.importActual<typeof import("../../src/platform/update")>(
+    "../../src/platform/update",
+  );
+  return {
+    getAutoCheck: update.autoCheck,
+    updateCheck: update.check,
+    updateInstall: update.install,
+    UPDATE_PROGRESS_EVENT: real.UPDATE_PROGRESS_EVENT,
+  };
+});
+vi.mock("../../src/platform/event", async () => {
+  const real = await vi.importActual<typeof import("../../src/platform/update")>(
+    "../../src/platform/update",
+  );
+  return {
+    listen: (name: string, handler: (event: { payload: unknown }) => void) => {
+      if (name !== real.UPDATE_PROGRESS_EVENT) return Promise.reject(new Error(name));
+      update.progressHandler = handler;
+      return Promise.resolve(update.unlisten);
+    },
+  };
+});
 
 const lockVault = vi.hoisted(() => vi.fn(() => Promise.resolve()));
 vi.mock("../../src/lib/vault-unlock", () => ({ lockVault }));

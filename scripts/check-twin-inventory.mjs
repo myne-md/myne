@@ -287,9 +287,10 @@ const CURATED_TWINS = [
   // `mobile/src/app/flows/MemorySheet.tsx` (myne-md/myne#697). **Removed on
   // purpose**: the desktop half was DELETED in myne-md/myne#1020 at the owner's
   // request, so there is no pair left to curate, and the phone's sheet is now a
-  // surface one client ships alone. That is a fact for the ROSTER, where it is
-  // recorded as `absent`, not for this list, which exists to name two files that
-  // both exist and cannot be paired by path.
+  // surface one client ships alone. This list exists to name two files that BOTH
+  // exist and cannot be paired by path, so a pair with one half deleted cannot
+  // live here and cannot be re-verdicted either: the removal is recorded in
+  // `docs/decisions/ui/0790`, not as a roster row.
   {
     a: "src/notes/dailyNote.ts",
     b: "mobile/src/lib/daily.ts",

@@ -235,8 +235,9 @@ pub async fn update_check<R: Runtime>(app: AppHandle<R>) -> Result<UpdateStatus,
 ///
 /// One event per transport chunk would be thousands of IPC round trips for a
 /// 200 MiB artifact, and the UI cannot paint faster than about 60 Hz anyway. A
-/// step of one percent of the total keeps the bar within half a percent of the
-/// truth while capping the stream at about a hundred ticks; the 64 KiB floor
+/// step of one percent of the total keeps the bar within ONE percent of the
+/// truth, because a tick fires on a full step rather than on half of one, while
+/// capping the stream at about a hundred ticks; the 64 KiB floor
 /// stops a small artifact from reporting every chunk, and 256 KiB is the fallback
 /// for an origin that sent no `Content-Length` (where there is no total to take a
 /// percentage of). Everything is capped at 4 MiB so a very large artifact still
@@ -304,21 +305,33 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
 
     let started = std::time::Instant::now();
     let chunk_app = app.clone();
-    let mut downloaded: u64 = 0;
+    // SHARED, not a plain `u64` (myne-md/myne#1022 review). The chunk closure is
+    // `move`, and `u64` is `Copy`, so a plain counter means the closure increments
+    // its own copy and every read after `download` returns sees zero: the failure
+    // records and the `update_installed` line would all report `bytes = 0` on a
+    // transfer that moved 149 MiB, which is the one number those lines exist for.
+    // No lint catches it; a reviewer did.
+    let downloaded = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
     let mut last_reported: u64 = 0;
+    // The counter as the closures see it, and the two ways out of them.
+    let counter = std::sync::Arc::clone(&downloaded);
     let bytes = update
         .download(
             move |chunk: usize, total: Option<u64>| {
-                downloaded += chunk as u64;
-                let complete = total.is_some_and(|total| downloaded >= total);
-                if complete || downloaded - last_reported >= progress_step(total) {
-                    last_reported = downloaded;
+                use std::sync::atomic::Ordering;
+                let now = counter.fetch_add(chunk as u64, Ordering::Relaxed) + chunk as u64;
+                let complete = total.is_some_and(|total| now >= total);
+                if complete || now - last_reported >= progress_step(total) {
+                    last_reported = now;
                     // Discarded on purpose: an emit fails when the window is gone,
                     // and a closed window must not abort an install that is
                     // otherwise fine.
                     let _ = chunk_app.emit(
                         PROGRESS_EVENT,
-                        UpdateProgress::Downloading { downloaded, total },
+                        UpdateProgress::Downloading {
+                            downloaded: now,
+                            total,
+                        },
                     );
                 }
             },
@@ -335,10 +348,18 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
         )
         .await
         .map_err(|error| {
+            // The stage comes from the kind, not from the call: `download` runs the
+            // minisign check itself, so a bad signature arrives here with
+            // `FailureKind::Verification` and must be filed as `verify` rather than
+            // as a dead transfer (myne-md/myne#1022 review; without this the
+            // `install_stage` arm is unreachable from any production path).
             failed(
-                "download",
+                install_stage(classify(&error)),
                 error,
-                Some((downloaded, started.elapsed().as_millis() as u64)),
+                Some((
+                    downloaded.load(std::sync::atomic::Ordering::Relaxed),
+                    started.elapsed().as_millis() as u64,
+                )),
             )
         })?;
 
@@ -351,12 +372,22 @@ pub async fn update_install<R: Runtime>(app: AppHandle<R>) -> Result<(), UpdateC
         failed(
             install_stage(classify(&error)),
             error,
-            Some((downloaded, started.elapsed().as_millis() as u64)),
+            Some((
+                downloaded.load(std::sync::atomic::Ordering::Relaxed),
+                started.elapsed().as_millis() as u64,
+            )),
         )
     })?;
 
     let elapsed_ms = started.elapsed().as_millis() as u64;
-    tracing::info!(event = "update_installed", bytes = downloaded, elapsed_ms);
+    // The artifact's own length, which is the whole transfer by definition: the
+    // shared counter and this cannot disagree on the success path, and this half
+    // cannot be zero while the install succeeded.
+    tracing::info!(
+        event = "update_installed",
+        bytes = bytes.len() as u64,
+        elapsed_ms
+    );
     // The last line this process writes before it hands over. Nothing after it in the
     // log means the restart itself did not reach the new build; the complement is the
     // `app_started` record the logging install writes on every run.
@@ -407,6 +438,28 @@ mod tests {
     use crate::io_failure_kind::IoFailureKind;
     use std::io::ErrorKind;
     use tauri_plugin_updater::Error;
+
+    /// The throttling rule, branch by branch (myne-md/myne#1022 review). It is the
+    /// one knob between "the bar moves" and "the bar is frozen", and replacing its
+    /// body with a constant left every test in this tree green. `clamp` also panics
+    /// on inverted bounds, and a panic inside the download callback aborts an
+    /// install that would otherwise have finished.
+    #[test]
+    fn the_progress_step_is_a_percentage_inside_a_floor_and_a_cap() {
+        // No `Content-Length`: no total to take a percentage of.
+        assert_eq!(progress_step(None), 256 * 1024);
+        // One percent of a small artifact is under the floor, so the floor wins.
+        assert_eq!(progress_step(Some(2 * 1024 * 1024)), 64 * 1024);
+        // One percent of a large artifact is over the cap, so the cap wins.
+        assert_eq!(progress_step(Some(1024 * 1024 * 1024)), 4 * 1024 * 1024);
+        // A zero or absent total is the floor rather than a division by zero.
+        assert_eq!(progress_step(Some(0)), 64 * 1024);
+        // …and the middle is the percentage itself.
+        assert_eq!(
+            progress_step(Some(64 * 1024 * 1024)),
+            64 * 1024 * 1024 / 100
+        );
+    }
 
     /// The invariant that used to be a comment and nothing more: a failure to write
     /// the bundle must not be reported as a network problem.
