@@ -3452,7 +3452,6 @@
       "helper": "Permite mover las notas a un archivo, fuera de la lista principal. Al desactivarlo, todas las notas archivadas vuelven a su carpeta, se desarchivan todas las carpetas archivadas y se ocultan los controles del archivo. Se aplica a toda la bóveda, en todos los dispositivos.",
       "label": "Archivado",
       "off": "Desactivado",
-      "on": "Activado",
       "saveError": "No se pudo actualizar el ajuste de archivado."
     },
     "attachmentCompression": {
@@ -4223,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Sin configurar",
-        "offline": "Sin conexión",
-        "conflicts_one": "{{count}} conflicto",
-        "conflicts_many": "{{count}} de conflictos",
-        "conflicts_other": "{{count}} conflictos"
+        "conflicts_many": "{{count}} de conflictos"
       }
     },
     "data": {

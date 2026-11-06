@@ -3334,7 +3334,6 @@
       "helper": "노트를 아카이브로 옮겨 기본 목록에서 보이지 않게 합니다. 이 설정을 끄면 보관된 모든 노트가 원래 폴더로 복원되고, 보관된 모든 폴더의 보관이 해제되며, 아카이브 컨트롤이 숨겨집니다. 이 설정은 모든 기기에서 보관함 전체에 적용됩니다.",
       "label": "아카이브",
       "off": "끔",
-      "on": "켬",
       "saveError": "아카이브 설정을 업데이트하지 못했습니다."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "너무 약함"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "설정되지 않음",
-        "offline": "오프라인",
-        "conflicts_one": "충돌 {{count}}건",
-        "conflicts_other": "충돌 {{count}}건"
-      }
     },
     "data": {
       "exported_one": "노트 {{count}}개 내보냄 → {{label}}",

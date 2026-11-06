@@ -3334,7 +3334,6 @@
       "helper": "Lad noter blive flyttet til et arkiv, så de holdes ude af hovedlisten. Slår du dette fra, gendannes alle arkiverede noter til deres mappe, alle arkiverede mapper tages ud af arkivet, og arkivknapperne skjules. Det gælder hele boksen, på alle enheder.",
       "label": "Arkivering",
       "off": "Fra",
-      "on": "Til",
       "saveError": "Kunne ikke opdatere arkiveringsindstillingen."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "For svag"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Ikke konfigureret",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
-        "conflicts_other": "{{count}} konflikter"
-      }
     },
     "data": {
       "exported_one": "Eksporterede {{count}} note → {{label}}",

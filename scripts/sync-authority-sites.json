@@ -38,6 +38,10 @@
       "classify_key_load(crate::plugins::sync::device_identity::load(), site)": {
         "count": 1,
         "reason": "The resolver's own single read of the key at rest. If this line moves out of sync::authority the guard fires, which is the whole rule."
+      },
+      "let key = classify_key_load(crate::plugins::sync::device_identity::load_at_rest(), site);": {
+        "count": 1,
+        "reason": "The resolver's own STORE-ONLY read, and the only constructor of `KeyAtRestProof`. It is not a second answer to \"may this device sign\": that stays `resolve_device`'s, from `load_key`, because a rung-3 PIN key signs from RAM for one process. This one answers the narrower question the binding claim and the vault doctor ask - does a key survive this process - and it must live here so a proof cannot be minted anywhere else (myne-md/myne#1027)."
       }
     },
     "core/src/plugins/sync/commands.rs": {

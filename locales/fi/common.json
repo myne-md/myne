@@ -3334,7 +3334,6 @@
       "helper": "Salli muistiinpanojen siirtäminen arkistoon, pois päälistalta. Tämän poistaminen käytöstä palauttaa jokaisen arkistoidun muistiinpanon kansioonsa, poistaa jokaisen arkistoidun kansion arkistosta ja piilottaa arkistointitoiminnot. Se koskee koko holvia jokaisella laitteella.",
       "label": "Arkistointi",
       "off": "Pois",
-      "on": "Päällä",
       "saveError": "Arkistointiasetusta ei voitu päivittää."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "Liian heikko"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Ei määritetty",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} ristiriita",
-        "conflicts_other": "{{count}} ristiriitaa"
-      }
     },
     "data": {
       "exported_one": "Vietiin {{count}} muistiinpano → {{label}}",

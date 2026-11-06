@@ -63,6 +63,14 @@ const PREVIEW_STYLE: CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+/** The one line under the block that explains its own vocabulary. */
+const NOTE_STYLE: CSSProperties = {
+  marginTop: "var(--space-2)",
+  fontSize: "var(--text-sm)",
+  lineHeight: 1.5,
+  color: "var(--fg-3)",
+};
+
 function Block({
   children,
   ...rest
@@ -240,6 +248,15 @@ export function DiagnosticsPanel() {
               <pre style={PREVIEW_STYLE} data-testid="about.diagnostic-block-preview">
                 {diagnosticBlock ?? ""}
               </pre>
+              {/* The vault's five facts are the ONE place this block can carry the
+                  word `unknown`, and it is a real answer there rather than a
+                  placeholder: the doctor says so when the question was never asked
+                  (myne-md/myne#1003). Measured on an owner's paste, four of them in
+                  a row read as four faults, so the token is explained once here
+                  instead of hoping a reader knows (myne-md/myne#1029). */}
+              <div style={NOTE_STYLE} data-testid="about.diagnostic-unknown-note">
+                {t("settings.about.diagnosticUnknownNote")}
+              </div>
               <div>
                 <Button
                   variant="secondary"

@@ -3334,7 +3334,6 @@
       "helper": "Izinkan catatan dipindahkan ke Arsip, terpisah dari daftar utama. Mematikan ini akan mengembalikan setiap catatan yang diarsipkan ke foldernya, membatalkan pengarsipan setiap folder yang diarsipkan, dan menyembunyikan kontrol arsip. Ini berlaku untuk seluruh brankas, di semua perangkat.",
       "label": "Pengarsipan",
       "off": "Mati",
-      "on": "Hidup",
       "saveError": "Tidak dapat memperbarui pengaturan pengarsipan."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "Terlalu lemah"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Belum disiapkan",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflik",
-        "conflicts_other": "{{count}} konflik"
-      }
     },
     "data": {
       "exported_one": "Mengekspor {{count}} catatan → {{label}}",

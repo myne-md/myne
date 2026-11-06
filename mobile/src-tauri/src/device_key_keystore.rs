@@ -13,7 +13,8 @@
 //! `docs/dev/device-matrix.md`.
 
 use myne_core::plugins::sync::device_identity::{
-    from_item_bytes, install_host_provider, to_item_bytes, DeviceKeyProvider, DeviceKeyStoreError,
+    from_item_bytes, install_host_provider, log_key_op, to_item_bytes, DeviceKeyProvider,
+    DeviceKeyStoreError,
 };
 
 /// Install the Android Keystore store as `core`'s device-key provider.
@@ -59,16 +60,22 @@ impl<R: tauri::Runtime> DeviceKeyProvider for KeystoreProvider<R> {
 
     fn store(&self, pair: &protocol::device_key::DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
         let store = self.store()?;
-        store
+        let sealed = store
             .seal(&to_item_bytes(pair))
-            .map_err(|_| DeviceKeyStoreError::Backend)
+            .map_err(|_| DeviceKeyStoreError::Backend);
+        // The shared line every other platform arm writes (myne-md/myne#1027). On the phone the
+        // Keystore is where the key lives, so a diagnostics paste without it cannot answer "was
+        // this device's signing key ever written?".
+        log_key_op("store", if sealed.is_ok() { "ok" } else { "refused" });
+        sealed
     }
 
     fn destroy(&self) {
         if let Ok(store) = self.store() {
             // Best-effort: the erase's own guarantee is about vault content, so a
             // Keystore refusal must not fail it.
-            let _ = store.delete();
+            let ok = store.delete().is_ok();
+            log_key_op("delete", if ok { "ok" } else { "refused" });
         }
     }
 }

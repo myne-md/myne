@@ -13,11 +13,19 @@
 // Crockford fingerprint (§6.3 / SYNC-17) for the eye-compare against the device
 // that approved it. Two things are load-bearing and neither is decoration:
 //
-//   - The poll fires `sync_now`, which is what CLAIMS the per-device token once
-//     the other device has approved. A device sitting on this screen is the only
-//     thing that turns an approval into a pull, so the approving device's own
+//   - The poll fires `sync_now`, which is what CLAIMS a vault's per-device token
+//     once the other device has approved. A device sitting on this screen is the
+//     only thing that turns an approval into a pull, so the approving device's own
 //     screen ("this code appears once the new device finishes its first sync")
-//     cannot resolve without it.
+//     cannot resolve without it. **On a person-plane vault there is no such token**
+//     (its credential is the person session's), and the thing that unblocks the
+//     pull is the DEVICE credential `sync_person_claim_device` installs. That used
+//     to be driven by the join wizard alone, so a phone whose approval landed after
+//     the wizard closed waited here for a pull nothing could author. This screen
+//     drives it too now, because it is the screen that outlives the wizard.
+//   - What the screen may NOT do is wait silently: the status it is already being
+//     handed every second answers "why is there no code", and it used to be thrown
+//     away, so a stuck device and a working one looked identical.
 //   - A mismatch ABORTS the join: `sync_reset_local` un-enrols this device so it
 //     stops trusting possibly forked data. Closing the screen IS the claim that it
 //     worked, so a failed abort must not be swallowed (`design-notes/ui/0482`).
@@ -30,6 +38,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Screen, Title, FooterBar, Button, Banner } from "../../components";
 import { syncResetLocal } from "../../lib/sync";
+import { personClaimDevice } from "../../lib/personAccount";
+import { invoke } from "../../platform/core";
+import { syncStatusView } from "@myne/sync-status-view";
+import type { SyncStatus } from "../../lib/use-sync-status";
 import { useHeadFingerprintCompare } from "../../hooks/useHeadFingerprintCompare";
 import { usePrefs } from "../../lib/use-prefs";
 import { useIdleAutoLock } from "../../hooks/useIdleAutoLock";
@@ -56,6 +68,79 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
   /** The un-enrol failed — the device is STILL enrolled, and the screen must say
    *  so instead of closing (`design-notes/ui/0482`). */
   const [abortFailed, setAbortFailed] = useState(false);
+  // The status this screen is handed and used to discard. A plain read rather than
+  // `useSyncStatus`, deliberately: that hook also subscribes to the sync event stream,
+  // and this screen needs the answer to one question, not a subscription.
+  const [syncStatus, setSyncStatus] = useState<SyncStatus | null>(null);
+  // Once a wait has outlived any ordinary approval, silence is the defect: the code
+  // is not coming and the user has no way to tell why. 20 s is generous for an
+  // approval a person makes by tapping a button, and it is not a timeout: nothing
+  // closes on it, one sentence appears.
+  const [waited, setWaited] = useState(false);
+
+  /**
+   * Drive the two things that turn an approval into a pull, and report the third.
+   *
+   * `sync_person_claim_device` is idempotent: a device that already holds its token
+   * answers `approved` immediately, a still-pending one answers `approved: false`, and
+   * a session that ended answers `PersonSessionRequired`. So this is safe to poll from
+   * the screen that outlives the join wizard, which is the whole point: the wizard was
+   * the only caller, and an approval that landed after it closed left the device with an
+   * empty token — a pull nothing could author, on a screen with no way to say so.
+   *
+   * Nothing navigates on a successful claim. The approval is not the comparison: the code
+   * still has to arrive, and the hook above is what watches for it.
+   */
+  const approvalPolled = step === "pending";
+  useEffect(() => {
+    if (!approvalPolled || !HAS_TAURI) return;
+    let cancelled = false;
+    const tick = () => {
+      void personClaimDevice()
+        .catch(() => {
+          // Pending, or a session that ended: both are ordinary here, and both are
+          // answered by what the status read below reports.
+        })
+        .then(() =>
+          invoke<SyncStatus>("plugin:sync|sync_status")
+            .then((s) => {
+              if (!cancelled) setSyncStatus(s);
+            })
+            .catch(() => {
+              /* the poll is best effort: a failed read leaves the last one */
+            }),
+        );
+    };
+    tick();
+    const timer = setInterval(() => {
+      if (!cancelled) tick();
+    }, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [approvalPolled]);
+
+  useEffect(() => {
+    if (step !== "pending") return;
+    const timer = setTimeout(() => setWaited(true), 20_000);
+    return () => clearTimeout(timer);
+  }, [step]);
+
+  /** Why the code has not arrived, in the same words the sync panel uses.
+   *
+   * `error` speaks immediately because it is a definite fault; the other two wait for the
+   * deadline, because `not_enrolled` and `disabled` are also the ordinary reading for a
+   * device that has simply not been approved yet. **This is the half that was missing**:
+   * the screen called `sync_now` every second, ignored what came back, and left a device
+   * that could never pull looking exactly like one that was about to.
+   */
+  const stalled =
+    syncStatus !== null &&
+    (syncStatus.state === "error" ||
+      (waited && (syncStatus.state === "disabled" || syncStatus.state === "not_enrolled")))
+      ? syncStatusView(syncStatus, t).label
+      : null;
 
   /**
    * The user's exit, and the one place that decides the marker. The rule is one
@@ -163,6 +248,14 @@ export function ApprovalWaitFlow({ vaultId, onApproved, onCancel }: ApprovalWait
           >
             {t("join.waitingHint")}
           </div>
+          {/* The cause, once there is one to name. Outside the title rather than
+              replacing it: the wait is still a wait, and what the user needs is the
+              reason it is not ending. */}
+          {stalled !== null ? (
+            <div style={{ marginTop: "var(--space-4)" }} data-testid="sync.join.stalled">
+              <Banner kind="warning">{stalled}</Banner>
+            </div>
+          ) : null}
         </div>
         {/* Cancel leaves the wait. What that means is the CALLER's answer: the
             stage locks the vault and re-probes, because this screen has no

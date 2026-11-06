@@ -3334,7 +3334,6 @@
       "helper": "Låt anteckningar flyttas till ett arkiv, utanför huvudlistan. Att stänga av detta återställer varje arkiverad anteckning till sin mapp, avarkiverar varje arkiverad mapp och döljer arkivkontrollerna. Det gäller hela valvet, på alla enheter.",
       "label": "Arkivering",
       "off": "Av",
-      "on": "På",
       "saveError": "Kunde inte uppdatera arkiveringsinställningen."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "För svagt"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Inte konfigurerat",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
-        "conflicts_other": "{{count}} konflikter"
-      }
     },
     "data": {
       "exported_one": "Exporterade {{count}} anteckning → {{label}}",

@@ -593,7 +593,7 @@ const ROSTER = [
   // naming it is a verdict about nothing: `absent` cannot stand in for it either,
   // because this guard resolves BOTH paths and rejects an entry whose file is
   // gone. What the removal changed is recorded where it belongs, in
-  // `design-notes/ui/0786-*.md`, and the surviving divergence is a one-line
+  // `design-notes/ui/0790-*.md`, and the surviving divergence is a one-line
   // note there: memory on the desktop is Settings-only now, while the phone keeps
   // its in-flow sheet.
   {
