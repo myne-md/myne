@@ -46,13 +46,13 @@ Repo: https://github.com/myne-md/myne.git
 # Four build blocks, one per ABI, because F-Droid installs the highest
 # versionCode a device can run and therefore every architecture needs its own.
 # The digit order is F-Droid's (armeabi-v7a < arm64-v8a < x86 < x86_64), applied
-# by the `sed` in `prebuild`: 0.15.0 derives versionCode 15000, so the four APKs
+# by the `sed` in `prebuild`: 0.16.0 derives versionCode 16000, so the four APKs
 # carry 150001..150004 and `versionCode:` below is that final value, matching the
 # changelog filenames in `fastlane/metadata/android/en-US/changelogs/`.
 Builds:
   # armeabi-v7a, 32-bit ARM. versionCode 150001.
-  - versionName: 0.15.0
-    versionCode: 150001
+  - versionName: 0.16.0
+    versionCode: 160001
     # OWED: the commit SHA the release tag points at, e.g.
     # `git rev-parse v0.10.1`. A placeholder here fails `fdroid lint` by name.
     commit: REPLACE_WITH_RELEASE_COMMIT
@@ -132,8 +132,8 @@ Builds:
     ndk: 29.0.14206865
 
   # arm64-v8a. versionCode 150002.
-  - versionName: 0.15.0
-    versionCode: 150002
+  - versionName: 0.16.0
+    versionCode: 160002
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -178,8 +178,8 @@ Builds:
     ndk: 29.0.14206865
 
   # x86 (emulator and some tablets). versionCode 150003.
-  - versionName: 0.15.0
-    versionCode: 150003
+  - versionName: 0.16.0
+    versionCode: 160003
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
@@ -224,8 +224,8 @@ Builds:
     ndk: 29.0.14206865
 
   # x86_64 (emulator). versionCode 150004.
-  - versionName: 0.15.0
-    versionCode: 150004
+  - versionName: 0.16.0
+    versionCode: 160004
     commit: REPLACE_WITH_RELEASE_COMMIT
     sudo:
       - apt-get update
