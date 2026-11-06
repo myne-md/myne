@@ -180,6 +180,7 @@ import type { VaultSummary } from "../../types/vault-summary";
 import type { EditorFlowProps } from "./types";
 import type { VaultId } from "../../lib/stage";
 import { SettingsSheet, applyStoredTheme, type Panel } from "./SettingsSheet";
+import { IdentityFlow } from "./IdentityFlow";
 import { isRegularSizeClass, useSizeClass } from "../../formfactor/SizeClassContext";
 import { ListDrawer } from "./editor/sheets/ListDrawer";
 import { applyCaret, snapshotCaret, type CaretSnapshot } from "./editor/caretRestore";
@@ -1138,6 +1139,19 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   const [copied, setCopied] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /**
+   * The identity-unlock door Settings → Sync opens (myne-md/myne#1029).
+   *
+   * Mounted HERE rather than at the shell, and the placement is the fix's other
+   * half: a blocked sync row is one that names "unlock your identity", and the
+   * phone had no surface that could perform the act because `IdentityFlow` mounted
+   * on the zero-vault stage only. Rendering it from the shell instead would mean
+   * `StageSwitch` returns the overlay INSTEAD of the editor, which unmounts this
+   * component and loses `editing`, the note the user was reading, every time they
+   * opened the door. As an overlay beside the Settings sheet the editor stays
+   * mounted, and `.m-screen` is `position: relative`, so `inset: 0` covers it.
+   */
+  const [identityDoorOpen, setIdentityDoorOpen] = useState(false);
   // First-run AI onboarding (myne-md/myne#805): offered once per device after
   // the first unlock. The localStorage flag is written when the sheet closes.
   const [aiOnboardingOpen, setAiOnboardingOpen] = useState<boolean>(
@@ -5114,7 +5128,43 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
           onLock={onLock}
           onDeleteVaultSuccess={onDeleteVaultSuccess}
           onShowApprovalCode={onShowApprovalCode}
+          // The sync row's identity repair (myne-md/myne#1029). The sheet closes
+          // first for the same reason the approval code's does: a sheet left
+          // mounted under a full-screen overlay is how a phone ends up with a
+          // settings panel over the screen it just opened.
+          onUnlockIdentity={() => {
+            setSettingsOpen(false);
+            setSettingsPanel(undefined);
+            setIdentityDoorOpen(true);
+          }}
         />
+      )}
+      {/* The identity repair, over the editor (myne-md/myne#1029). Above the
+          Settings sheet's own layer (`--z-modal` over the sheet's 40), because the
+          sheet closes as this opens and an unlucky frame must not show both. */}
+      {identityDoorOpen && (
+        <div
+          data-testid="editor.identity-door"
+          style={{ position: "absolute", inset: 0, zIndex: "var(--z-modal)" }}
+        >
+          <IdentityFlow
+            onCancel={() => setIdentityDoorOpen(false)}
+            // Nothing is installed from this mount, so its landing is the exit.
+            onAccepted={() => setIdentityDoorOpen(false)}
+            // Present ⇒ this mount IS the repair door: the flow lands on the phrase
+            // grid and calls this once the phrase is accepted instead of landing on
+            // its home.
+            //
+            // What the command guarantees, and what it does not: `sync_person_unlock`
+            // mints this device's signing key and then runs the binding claim, which
+            // is BEST-EFFORT (`claim_own_binding_best_effort` logs its outcome and
+            // returns). A store that cannot hold a key still leaves the row
+            // unsettled, so this close is not a promise that sync now works; the
+            // panel's own polled status is the answer, and that is the surface the
+            // reader has to trust (myne-md/myne#1029 review).
+            onUnlocked={() => setIdentityDoorOpen(false)}
+          />
+        </div>
       )}
       {/* SF5 share-import confirmation toast (§9.20, SYNC-18) - self-contained,
           listens for the drain result; renders in every layout branch. */}

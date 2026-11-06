@@ -74,12 +74,12 @@ export type SyncStatus =
  * The repair a state offers, when one is a user action.
  *
  * Named rather than implied because the caller owns the control: desktop renders a button in the
- * indicator. What this module decides is WHETHER the action applies, which is the part that was
- * duplicated and drifted. **The phone reads no action at all today**, because its editor stage has
- * no person-identity entry to route to: `personUnlock` is reachable only from `IdentityFlow`, and
- * that flow renders on the zero-vault stage alone. So a blocked phone says what is wrong and
- * offers no control, which is honest, and closing that is a navigation change in `mobile/`, not a
- * sentence in this module (myne-md/myne#1027 review, recorded as a residual there).
+ * indicator, and the phone renders a row in Settings → Sync. What this module decides is WHETHER
+ * the action applies, which is the part that was duplicated and drifted. Both clients read it as of
+ * myne-md/myne#1029; before that the phone read no action at all, because `personUnlock` was
+ * reachable only from `IdentityFlow` and that flow mounted on the zero-vault stage alone, so a
+ * blocked phone printed "Unlock your identity to sync" above no control, a sentence naming an act
+ * its client could not perform.
  */
 export type SyncStatusAction = "unlock_identity" | "repair_device";
 

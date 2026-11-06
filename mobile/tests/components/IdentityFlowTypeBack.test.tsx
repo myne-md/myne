@@ -10,7 +10,7 @@
 // no signal until they lost the device, and an identity cannot be recovered
 // without it.
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const personSetup = vi.hoisted(() => vi.fn());
@@ -28,15 +28,28 @@ vi.mock("../../src/lib/personAccount", () => ({
   personLock,
   // The gate shows the account number once it lands on home (myne-md/myne#911).
   personAccountNumber,
+  personRegister,
+  personListVaults,
 }));
-vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint }));
+const syncGetEndpoint = vi.hoisted(() => vi.fn());
+const personRegister = vi.hoisted(() => vi.fn());
+/** Every `t(key, params)` this mount made, so a copy assertion can see the params.
+ *  The mock returns the key (the mobile AGENTS.md convention), which drops them. */
+const tCalls = vi.hoisted(() => [] as Array<[string, unknown]>);
+const personListVaults = vi.hoisted(() => vi.fn());
+vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, syncGetEndpoint }));
 // `useTranslation` echoes keys, so the header's back chevron is reachable by the
 // `common.back` KEY it labels itself with. The `initReactI18next` stub is not
 // decoration: the flow reaches the shared `@myne/i18n` runtime transitively,
 // whose module body calls `i18n.use(initReactI18next)`, and a mock without it
 // throws on import. Same shape as `IdentityFlowAccept.test.tsx`.
 vi.mock("react-i18next", () => ({
-  useTranslation: () => ({ t: (key: string) => key }),
+  useTranslation: () => ({
+    t: (key: string, params?: unknown) => {
+      tCalls.push([key, params]);
+      return key;
+    },
+  }),
   initReactI18next: { type: "3rdParty", init: () => {} },
 }));
 
@@ -72,9 +85,26 @@ beforeEach(() => {
   personListInvites.mockReset().mockResolvedValue([]);
   personLock.mockReset().mockResolvedValue(undefined);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
+  // The register step reads the device's endpoint on entry, and this flow writes
+  // no server of its own: the address decides whether `Continue` may proceed.
+  // No server configured by default, which is the shape most of this file's cases
+  // were written against: the ceremony ends with one "Continue". The register arm
+  // has its own case below.
+  syncGetEndpoint.mockReset().mockResolvedValue({ endpoint_url: "", invite_code: "" });
+  personRegister.mockReset().mockResolvedValue({
+    phrase: null,
+    fingerprint_hex: "fingerprint",
+    person_id_hex: "person",
+    identity_code: "code",
+    approved: true,
+  });
+  personListVaults.mockReset().mockResolvedValue([]);
 });
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  tCalls.length = 0;
+});
 
 /** Walk gate -> server -> create, and land on the phrase step. */
 async function reachPhrase(reveal: boolean): Promise<void> {
@@ -116,6 +146,32 @@ function phraseContinue(): HTMLButtonElement {
 /** The challenge step's Continue (finishes the ceremony). */
 function typebackContinue(): HTMLButtonElement {
   return screen.getByTestId("identity-flow.typeback-continue") as HTMLButtonElement;
+}
+
+/**
+ * A device that holds no identity until the create call lands, and `reserved`
+ * afterwards: the probe answers "nothing" once (which is what opens the gate) and
+ * `reserved` from then on, which is what makes the home offer registration.
+ */
+function probeAsFreshlyCreated(): void {
+  personStatus.mockReset();
+  personStatus
+    .mockResolvedValueOnce({
+      enrolled: false,
+      identity_unlocked: false,
+      person_id_hex: null,
+      identity_code: null,
+      sealed_keypair_present: false,
+      state: null,
+    })
+    .mockResolvedValue({
+      enrolled: false,
+      identity_unlocked: true,
+      person_id_hex: "person",
+      identity_code: "code",
+      sealed_keypair_present: true,
+      state: "reserved",
+    });
 }
 
 describe("IdentityFlow phrase type-back (myne-md/myne#855)", () => {
@@ -191,5 +247,78 @@ describe("IdentityFlow phrase type-back (myne-md/myne#855)", () => {
     // …and the two typed words survived the round trip.
     fireEvent.click(phraseContinue());
     expect(inputs().filter((el) => el.value.length > 0)).toHaveLength(2);
+  });
+});
+
+/**
+ * The ceremony ends by registering, so the same words are never asked for twice
+ * (myne-md/myne#1029).
+ *
+ * Measured: an owner typed the 24 words at creation, four of them back on this
+ * step, and then ALL 24 again on the register step. That register act is what mints
+ * the device id a binding row needs, so the friction sat on the one path that makes
+ * phrase-free sync possible. It now happens HERE, with the phrase this screen is
+ * already holding, and nothing carries the words past the ceremony.
+ */
+describe("IdentityFlow: the ceremony registers the identity it just made", () => {
+  it("registers with the phrase it already holds instead of asking again", async () => {
+    syncGetEndpoint.mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: "" });
+    probeAsFreshlyCreated();
+    await reachTypeback();
+    // The step says what the button does, before it is pressed.
+    // The step NAMES the host the words are about to go to: the ceremony sends
+    // them to a stored address rather than one typed beside them (myne-md/myne#1029
+    // review, and the desktop's own 2026-10-24 ordering decision).
+    expect(
+      tCalls.some(
+        ([key, params]) =>
+          key === "identityFlow.phrase.registerHint" &&
+          (params as { server?: string } | undefined)?.server === "sync.example",
+      ),
+      "the type-back hint does not name the host the phrase is about to go to",
+    ).toBe(true);
+    for (const el of inputs()) {
+      fireEvent.change(el, { target: { value: PHRASE[position(el)] } });
+    }
+    fireEvent.click(typebackContinue());
+
+    await waitFor(() => expect(personRegister).toHaveBeenCalledTimes(1));
+    // The exact words this ceremony created, and no second entry of them.
+    expect(personRegister.mock.calls[0][0]).toBe(PHRASE.join(" "));
+  });
+
+  it("says so on the step when the registration is refused", async () => {
+    // The step's primary action can fail, and an invisible refusal is the worst
+    // shape here: the button re-enables, sync stays as blocked as before, and the
+    // user believes the device registered (myne-md/myne#1029 review).
+    syncGetEndpoint.mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: "" });
+    personRegister.mockRejectedValueOnce({ kind: "Transport" });
+    probeAsFreshlyCreated();
+    await reachTypeback();
+    for (const el of inputs()) {
+      fireEvent.change(el, { target: { value: PHRASE[position(el)] } });
+    }
+    fireEvent.click(typebackContinue());
+
+    const banner = await screen.findByTestId("identity-flow.typeback-error");
+    expect(banner.textContent).toBe("identityFlow.register.failed");
+    // …and the step is still the type-back step, so the words the ceremony holds
+    // were not thrown away by the failure.
+    expect(inputs()).toHaveLength(4);
+  });
+
+  it("keeps 'Later' as the exit that does not register", async () => {
+    syncGetEndpoint.mockResolvedValue({ endpoint_url: "https://sync.example", invite_code: "" });
+    probeAsFreshlyCreated();
+    await reachTypeback();
+    for (const el of inputs()) {
+      fireEvent.change(el, { target: { value: PHRASE[position(el)] } });
+    }
+    fireEvent.click(screen.getByTestId("identity-flow.typeback-later"));
+
+    // The home's own register block is where a deferred identity is registered,
+    // with the address it asks for first.
+    await screen.findByTestId("identity-flow.home-register-open");
+    expect(personRegister).not.toHaveBeenCalled();
   });
 });

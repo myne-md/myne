@@ -168,6 +168,17 @@ export function DiagnosticsBlock() {
         <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", marginTop: "var(--space-2)" }}>
           {t("settings.about.diagnosticsLogNote")}
         </div>
+        <div
+          data-testid="settings.diagnostics.unknown-note"
+          style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", marginTop: "var(--space-2)" }}
+        >
+          {/* The vault's five facts are the one place this block can carry the word
+              `unknown`, and it is a real answer there rather than a placeholder: the
+              doctor says so when the question was never asked (myne-md/myne#1003).
+              Measured on an owner's paste from this client, four in a row read as
+              four faults (myne-md/myne#1029). */}
+          {t("settings.about.diagnosticUnknownNote")}
+        </div>
       </div>
     </ListGroup>
   );
