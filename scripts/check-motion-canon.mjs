@@ -123,6 +123,15 @@ const INFINITE_ALLOWLIST = new Map([
     "The transcription busy meter. Same class as the two above; it animates " +
       "transform (not height, since myne-md/myne#773) and carries data-motion=\"essential\".",
   ],
+  [
+    "myne-update-progress-sweep",
+    "The updating screen's indeterminate bar (myne-md/myne#1020). Determinate " +
+      "whenever the host reported a Content-Length, and this shape only when it did " +
+      "not, which leaves no denominator to measure against. A bar frozen at 0% for a " +
+      "multi-minute download reads as hung, which is MYND-630's argument one " +
+      "indicator over. Carries data-motion=\"essential\", so reduced motion slows the " +
+      "sweep rather than freezing it.",
+  ],
 ]);
 
 /**

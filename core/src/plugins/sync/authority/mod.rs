@@ -45,7 +45,13 @@ use crate::vault_io::VaultIo;
 /// Exhaustive on purpose: the cycle's failure class, the log line and the sentence the
 /// user reads are all derived from this, so a new cause is a compile error at every
 /// consumer rather than a sixth silent `None`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// `Serialize` gives the vault doctor's report its wire token (myne-md/myne#1003), and
+/// `serde(rename_all = "snake_case")` makes that token the SAME string [`Self::as_str`]
+/// returns. `a_serialized_cause_is_the_logged_token` pins the two together, because two
+/// spellings of one vocabulary is how a log line and a bug report come to disagree.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum AuthorityMissing {
     /// The head context itself could not be built: unreadable `vault.meta`, no group key
     /// in the unlocked slot, or a roster that does not verify. Nothing about the user's
@@ -180,6 +186,74 @@ fn classify_key_load(
             KeyAtRest::Unreadable
         }
     }
+}
+
+/// A key read that is PROVEN to be at rest, rather than merely loadable.
+///
+/// The unit of proof is the type, not a comment, because the difference is the whole defect
+/// (myne-md/myne#1027): `load_key` answers from the session slot first, so a key that exists
+/// only in this process reads as `Present`, and a claim that trusted that answer published a
+/// `v2` binding row for a key no store held. The device then could not author a head, every
+/// cycle ran pull-only, and the UI said "Synced".
+///
+/// Two things follow from the private field:
+///   * the only way to obtain one is [`load_proven_at_rest`], which reads the store and nothing
+///     else, so a caller cannot pass a `load_key` result off as at-rest;
+///   * a test cannot mint one by hand, so a fixture cannot take the shortcut that hid this for
+///     two releases (the creation-claim test literally installed a session key and called it
+///     "a key at rest").
+///
+/// It is deliberately NOT what the resolution uses: "may this device sign right now" is a
+/// different question, and a rung-3 PIN unlock answers it from RAM for the length of one
+/// process.
+pub struct KeyAtRestProof(KeyAtRest);
+
+impl KeyAtRestProof {
+    /// The ladder's answer about the store.
+    #[must_use]
+    pub fn at_rest(&self) -> &KeyAtRest {
+        &self.0
+    }
+
+    /// A proof for TESTS ONLY, so the read-back's three negative arms can be asserted without
+    /// a keychain.
+    ///
+    /// The production property is unchanged: `cfg(test)` code cannot ship, so no non-test
+    /// caller can name an at-rest answer it did not read. What it deliberately does NOT do is
+    /// let a test pretend a SESSION key is at rest. That mistake is `for_test(KeyAtRest::
+    /// Present(..))` and it is visible at the call site, which is the opposite of the fixture
+    /// myne-md/myne#1027 removed (a `load_or_create` call that quietly answered from RAM).
+    #[cfg(test)]
+    #[must_use]
+    pub fn for_test(key: KeyAtRest) -> Self {
+        Self(key)
+    }
+}
+
+/// Read the key at rest and prove it, logging the result either way.
+///
+/// The log line is half the point (myne-md/myne#1027): a `Present` that no later read can
+/// reproduce is the state that cost a day of forensics, and "absent" used to be silent by
+/// design, which made a device with a store and no key indistinguishable from a dead one.
+/// Only the binding claim calls this today, never the per-cycle resolution, so the
+/// line stays rare enough to be worth reading.
+#[must_use = "the proof is the answer"]
+pub fn load_proven_at_rest(site: &'static str) -> KeyAtRestProof {
+    let key = classify_key_load(crate::plugins::sync::device_identity::load_at_rest(), site);
+    // Bounded tokens only: `check-tracing-discipline.mjs` R1/R2 read this line.
+    let result = match key {
+        KeyAtRest::Present(_) => "present",
+        KeyAtRest::Absent => "absent",
+        KeyAtRest::Unreadable => "unreadable",
+    };
+    tracing::info!(
+        stage = "sync_authority",
+        event = "device_key_at_rest",
+        site,
+        result,
+        "the device key store was read"
+    );
+    KeyAtRestProof(key)
 }
 
 /// Whether a row CLAIMS that its device holds a key: live, and carrying public halves.
@@ -690,5 +764,29 @@ mod tests {
             !row_publishes_halves(&entry),
             "a tombstone claims nothing, whatever halves it left behind"
         );
+    }
+
+    /// The report's wire token and the diagnostic log's token are ONE vocabulary. A
+    /// renamed variant would otherwise land a `serde` name in a bug report and a
+    /// different `as_str` name in the log that is supposed to explain it.
+    #[test]
+    fn a_serialized_cause_is_the_logged_token() {
+        for cause in [
+            AuthorityMissing::NoHeadContext,
+            AuthorityMissing::NoPersonSession,
+            AuthorityMissing::NoDeviceId,
+            AuthorityMissing::NoKeyAtRest,
+            AuthorityMissing::KeyUnreadable,
+            AuthorityMissing::NoBindingRow,
+            AuthorityMissing::RowNamesDifferentKey,
+            AuthorityMissing::RowUnverified,
+            AuthorityMissing::KeyMissingWhileBound,
+        ] {
+            assert_eq!(
+                serde_json::to_string(&cause).unwrap(),
+                format!("\"{}\"", cause.as_str()),
+                "{cause:?}"
+            );
+        }
     }
 }

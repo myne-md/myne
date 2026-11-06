@@ -54,9 +54,7 @@
       "scopeQuestion": "Cosa l'agente può leggere",
       "scopeFolders": "Cartelle",
       "scopeApplies": "Si applica al prossimo messaggio. Le note cestinate, archiviate e modello sono sempre escluse.",
-      "blockedScope": "Non c'è ancora nulla su cui far lavorare l'agente: ogni nota è esclusa dall'AI, oppure la cassaforte è vuota.",
       "preparing": "Preparazione…",
-      "blockedScopeSidebar": "Non c'è ancora nulla su cui chiedere qui: la cartella di questa nota è esclusa dall'AI.",
       "needsScope": "Scegli una cartella qui sotto, oppure apri una nota, così l'agente ha qualcosa su cui lavorare.",
       "scopeExcluded_one": "{{count}} esclusa dall'AI",
       "scopeExcluded_many": "{{count}} escluse dall'AI",
@@ -3454,7 +3452,6 @@
       "helper": "Consenti di spostare le note in un Archivio, tenendole fuori dall'elenco principale. Disattivando questa opzione ogni nota archiviata torna nella sua cartella, ogni cartella archiviata viene rimossa dall'archivio e i controlli dell'archivio vengono nascosti. Vale per l'intera cassaforte, su ogni dispositivo.",
       "label": "Archiviazione",
       "off": "Disattivata",
-      "on": "Attivata",
       "saveError": "Impossibile aggiornare l'impostazione di archiviazione."
     },
     "attachmentCompression": {
@@ -4225,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Non configurato",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflitto",
-        "conflicts_many": "{{count}} conflitti",
-        "conflicts_other": "{{count}} conflitti"
+        "conflicts_many": "{{count}} conflitti"
       }
     },
     "data": {

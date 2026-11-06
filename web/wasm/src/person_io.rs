@@ -83,6 +83,15 @@ impl<'a> SessionPersonIo<'a> {
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 impl VaultIo for SessionPersonIo<'_> {
+    /// `false`, and this is the whole reason the member exists: the two person files live in
+    /// `PERSON_FILES` for the session and nowhere else, so a credential minted here would be a
+    /// verifier on the account whose secret dies with the tab. Core asks this question instead of
+    /// testing `target_arch`, which is what keeps "which host is this" out of the crate
+    /// (`decisions/protocol/0784`).
+    fn keeps_person_credential_at_rest(&self) -> bool {
+        false
+    }
+
     async fn read(&self, path: &Path) -> IoResult<Vec<u8>> {
         if let Some(key) = volatile_key(path) {
             return PERSON_FILES.with(|files| match files.borrow().get(&key) {

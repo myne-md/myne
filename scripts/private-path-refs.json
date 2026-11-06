@@ -107,6 +107,7 @@
     "docs/decisions/process/0516-work-that-skips-the-planning-front-half-keeps-the-tail.md",
     "docs/decisions/process/0540-the-manual-half-of-a-release-is-a-machine-checked-roster-gated-by-a.md",
     "docs/decisions/process/0576-the-app-independent-decrypter-is-an-in-repo-member-shipping-native-binaries.md",
+    "docs/decisions/process/0782-a-release-cleans-the-tracker-before-it-freezes-publishes-last-.md",
     "docs/decisions/protocol/0049-vault-creation-flow-backend-session-pattern-root-key-never-c.md",
     "docs/decisions/protocol/0066-phase-1-unlock-error-discipline-7-3-non-distinguishing-rule.md",
     "docs/decisions/protocol/0067-phase-1-unlock-ui-semantics-vault-unlock-follows-recovery-fl.md",

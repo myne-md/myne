@@ -62,7 +62,6 @@
 // the server's to state, and the token is how it states it.
 
 import { invoke } from "../platform/core";
-import { clearApprovalWait, isApprovalWait } from "@myne/client-core/approval-wait";
 import { has } from "../platform/capabilities";
 import type { SyncStatus } from "../hooks/useSyncStatus";
 
@@ -82,7 +81,7 @@ import type { SyncStatus } from "../hooks/useSyncStatus";
  * is an unexplained empty vault; the cost of the first is the dead end this
  * whole change exists to remove.
  */
-export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean> {
+export async function awaitingApprovalVerdict(): Promise<boolean> {
   // Answers `false` outright wherever a vault may be the only copy, which is the
   // desktop client. A desktop device can be pending too (enrol from Settings,
   // quit before another device approves), and routing it to a wait screen would
@@ -98,12 +97,11 @@ export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean
   // `tests/stage/web-boot-routing.test.ts` drove it per client; it is driven per
   // client here instead (`tests/lib/pendingApprovalVerdict.test.ts`).
   if (has("localOnlyVault")) return false;
-  // The join's own answer, written down when it came back `pending`
-  // (`@myne/client-core/approval-wait`). Checked before the two reads because it
-  // is the only one of the three that was told by the SERVER: the reads below
-  // are inferences, and an unparseable state file or an unresolvable vault root
-  // answers `not_enrolled` for a device that has just joined. That is how the
-  // mobile half of this fix shipped and never fired (myne-md/myne#535).
+  // No marker read here, on purpose. The join's own answer is written down by the
+  // client whose join it was (`@myne/client-core/approval-wait`), and that is
+  // mobile: desktop and web install a vault that already exists on the device, so
+  // neither has a join that could mark one. A read here would answer `false` on
+  // every path, and the desktop arm above returns before it regardless.
   try {
     // 1. Has this device ever adopted a head? Asked FIRST, and the order is a
     //    correctness property rather than a preference.
@@ -143,19 +141,8 @@ export async function awaitingApprovalVerdict(vaultId?: string): Promise<boolean
       // Synced before, so approved before, and the vault holds what it pulled.
       // It belongs in the editor whatever the network is doing, and 0363 is
       // explicit that its reload owes no re-approval prompt.
-      //
-      // An observed approval also retires the marker: left in place it would
-      // route this device to the wait on every later boot.
-      if (vaultId !== undefined) clearApprovalWait(vaultId);
       return false;
     }
-
-    // The join's own answer, checked AFTER the baseline and BEFORE the status.
-    // After the baseline because a non-null head is an observed approval and has
-    // to retire the marker, which it cannot do if the marker answers first;
-    // before the status because the status is an inference that answers
-    // `not_enrolled` for a device whose enrolment record it could not read.
-    if (vaultId !== undefined && isApprovalWait(vaultId)) return true;
 
     // 2. Is this device enrolled at all? A container with no enrolment is not
     //    waiting for anything: `sync_reset_local` leaves exactly that state, and

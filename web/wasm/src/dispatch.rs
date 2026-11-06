@@ -1860,6 +1860,21 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
             }
         }
 
+        // myne-md/myne#1003. The five facts, read in the browser from the same builder the
+        // cycle uses. `person_vault_io()` rather than `vault_io()` for the reason the arm
+        // above gives: the session's own two files live in the Worker's memory, so the
+        // vault io answers `NotFound` for them and every session fact would read closed.
+        "plugin:sync|sync_vault_doctor" => {
+            let person_io = person_vault_io_ref();
+            let report = myne_core::plugins::sync::doctor::read(
+                host_ctx(),
+                person_io,
+                crate::session::state(),
+            )
+            .await;
+            Outcome::ok(&report)
+        }
+
         // Task 23. Whole-body shared, because unlike `sync_status` it has no
         // host-shaped input to leave behind — no live-status cell, no
         // `Manager::try_state`. The browser is the client that needs it most:

@@ -136,9 +136,14 @@ describeE2E("deleting the vault erases the OPFS container", () => {
       await session.execute(
         "document.querySelector('[data-testid=\"settings.vault-tab-danger\"]').click();",
       );
-      await session.execute(
-        "document.querySelector('[data-testid=\"settings.delete-vault-cta\"]').click();",
-      );
+      // No reveal CTA since myne-md/myne#1020: the typed-confirmation field is on
+      // screen in the danger topic, and the desktop scenarios wait on the same
+      // testid. Clicking a control that no longer exists null-dereferences inside
+      // the page and fails the scenario before any OPFS assertion runs, which reads
+      // as a broken client rather than a stale test (myne-md/myne#1022 review).
+      await session.waitForElement(testIdSelector("delete-vault.confirm-input"), {
+        timeoutMs: 15_000,
+      });
 
       // THE COPY, by full-literal equality. The web client's vault is not the
       // only copy, so `localOnlyVault` is absent and this branch must render —

@@ -143,6 +143,22 @@ pub trait VaultIo: Send + Sync {
     /// half-written one.
     async fn write(&self, path: &Path, bytes: &[u8], opts: WriteOpts) -> IoResult<()>;
 
+    /// Whether a person credential written through [`Self::write`] survives the session.
+    ///
+    /// `true` for every filesystem, and the default states that. The browser's wrapper answers
+    /// `false` because it holds `person-auth.json` and the sealed keypair in the Worker's memory
+    /// and nowhere else (`web/wasm/src/person_io.rs`, myne-md/myne#911 task 13): every OTHER
+    /// file it is handed does persist, which is why this is a question about one class of file
+    /// rather than about the implementation.
+    ///
+    /// The one caller is the device-credential mint (`decisions/protocol/0784`), and the reason
+    /// it asks the seam instead of the target arch is the seam's own rule: `myne-core` has no
+    /// business knowing which host it runs on. A verifier minted where the secret cannot be kept
+    /// is a verifier on the account that nobody can authenticate with.
+    fn keeps_person_credential_at_rest(&self) -> bool {
+        true
+    }
+
     /// Every stored copy of a singleton file, **newest first**.
     ///
     /// An empty list means the file does not exist; an `Err` means the store

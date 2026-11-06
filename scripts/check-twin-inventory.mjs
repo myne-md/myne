@@ -282,15 +282,15 @@ const CURATED_TWINS = [
       "while the desktop side uses the settings primitives; the commands, " +
       "testids and the ai_enabled gate are the shared answer both must keep.",
   },
-  {
-    a: "src/notes/components/MemoryPopover.tsx",
-    b: "mobile/src/app/flows/MemorySheet.tsx",
-    what: "the in-chat memory surface: the live roster beside the conversation, with delete (myne-md/myne#697)",
-    why:
-      "A popover has no phone posture, so the mobile twin is a bottom sheet " +
-      "opened from the AI flow's memory button. Same roster, same delete " +
-      "path, same report-don't-empty read; editing lives in Settings on both.",
-  },
+  // The in-chat memory surface used to be curated here as
+  // `src/notes/components/MemoryPopover.tsx` against
+  // `mobile/src/app/flows/MemorySheet.tsx` (myne-md/myne#697). **Removed on
+  // purpose**: the desktop half was DELETED in myne-md/myne#1020 at the owner's
+  // request, so there is no pair left to curate, and the phone's sheet is now a
+  // surface one client ships alone. This list exists to name two files that BOTH
+  // exist and cannot be paired by path, so a pair with one half deleted cannot
+  // live here and cannot be re-verdicted either: the removal is recorded in
+  // `docs/decisions/ui/0790`, not as a roster row.
   {
     a: "src/notes/dailyNote.ts",
     b: "mobile/src/lib/daily.ts",
@@ -588,14 +588,15 @@ const ROSTER = [
     reason:
       "Same surface, different client posture (myne-md/myne#697). Desktop uses the settings primitives; mobile owns its styles with stacked confirms and inline two-tap delete. Commands, testids and the ai_enabled gate are the shared answer; presentation is per-client by design.",
   },
-  {
-    a: "src/notes/components/MemoryPopover.tsx",
-    b: "mobile/src/app/flows/MemorySheet.tsx",
-    verdict: "screen",
-    destination: "undecided",
-    reason:
-      "Same surface, different client posture (myne-md/myne#697): a popover has no phone form, so the mobile twin is a bottom sheet. Roster, delete path and the report-don't-empty read are shared; the container is per-client by design.",
-  },
+  // The in-chat memory pair (`src/notes/components/MemoryPopover.tsx` against
+  // `mobile/src/app/flows/MemorySheet.tsx`) is DELETED from this roster, not
+  // re-verdicted (myne-md/myne#1020). The desktop half no longer exists, and a row
+  // naming it is a verdict about nothing: `absent` cannot stand in for it either,
+  // because this guard resolves BOTH paths and rejects an entry whose file is
+  // gone. What the removal changed is recorded where it belongs, in
+  // `docs/decisions/ui/0790-*.md`, and the surviving divergence is a one-line
+  // note there: memory on the desktop is Settings-only now, while the phone keeps
+  // its in-flow sheet.
   {
     a: "src/App.tsx",
     b: "mobile/src/App.tsx",
@@ -768,9 +769,9 @@ const ROSTER = [
     a: "src/lib/themes.ts",
     b: "mobile/src/lib/themes.ts",
     verdict: "decision",
-    destination: "undecided",
+    destination: "stays per-client",
     reason:
-      "Custom-theme listing and application over the MYT1 blob. The palette is synced vault content, so what a theme means cannot differ per client.",
+      "Custom-theme listing and application over the MYT1 blob. The palette is synced vault content, so what a theme means cannot differ per client. The WRAPPERS stay per-client because the refresh boundary each one owes is a property of its own shell: desktop's half carries the store nonce and the sync bridge (`myne://themes-changed` into `src/screens/Editor.tsx` and the paint effect in `src/App.tsx`, myne-md/myne#943), while mobile's Settings sheet reads the store once per visit on purpose (rows must not shift under a finger) and its paint boundary is the stage entry in `mobile/src/app/AppShell.tsx`. Mobile has no counterpart to the desktop list refresh, and myne#943 scoped that out deliberately rather than leaving it undiscovered;",
   },
   {
     a: "src/lib/transcribe.ts",
@@ -1188,7 +1189,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Is this device enrolled but not yet approved (myne-md/myne#535), asked once per entry into the editor because it cannot be answered before unlock: `sync_join_account` writes the account's real meta and unlocks the vault BEFORE the enrolment that comes back pending. One question with one answer, and the mobile copy is a deliberate exception to it rather than a drift — the desktop twin bails out on `localOnlyVault` because awaiting approval there does not block local use and the Settings panel shows the wait, while mobile's Settings panel carries only the APPROVER's side of the compare, so the wait is the only surface a joining phone has left that can show its code. A shared core would take that difference as a flag (whether this client has another surface that can display the code), and nobody has decided it. The two-read ORDER is shared and load-bearing on both: baseline first, because status-first can find the token already claimed and return past the compare.",
+      "Is this device enrolled but not yet approved (myne-md/myne#535), asked once per entry into the editor because it cannot be answered before unlock: `sync_join_account` writes the account's real meta and unlocks the vault BEFORE the enrolment that comes back pending. One question with one answer, and the mobile copy is a deliberate exception to it rather than a drift: the desktop twin bails out on `localOnlyVault` because awaiting approval there does not block local use and the Settings panel shows the wait, while mobile's Settings panel carries only the APPROVER's side of the compare, so the wait is the only surface a joining phone has left that can show its code. A shared core would take that difference as a flag (whether this client has another surface that can display the code), and nobody has decided it. The read ORDER used to be shared and is no longer: this side answers the join's own marker BEFORE the baseline, because a joined vault's first pull lands a head on the locked-to-unlocked edge and a baseline-first verdict retired the marker that owed the compare. The desktop copy never asks: its accept lands the vault on the `pending-approval` stage at accept time (`decisions/sync/0767`), so it has no marker to order and no writer of one.",
   },
 
   {

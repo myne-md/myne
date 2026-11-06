@@ -203,6 +203,25 @@ function mount(focusAnchorId?: string): void {
   render(<EditorPanel {...(focusAnchorId === undefined ? {} : { focusAnchorId })} />);
 }
 
+/** Lets React commit before the DOM is read.
+ *
+ *  MEASURED, not reasoned: this file failed nine assertions with "not yet" on
+ *  four pipelines in a row during the v0.13.0 release, the first of them a 5 s
+ *  timeout on the registry walk, while the same tree passed two other runs of the
+ *  same suite. Every read below was separated from its render by one microtask,
+ *  and React 19 performs its commit from the scheduler rather than inside that
+ *  microtask, so a busy runner reads the DOM before the commit lands. One
+ *  MACROtask inside `act` lets the scheduler run first.
+ *
+ *  No claim changed: only the assumption about WHEN the commit lands. A preview
+ *  that never renders still fails, naming the topic.
+ */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+}
+
 beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockImplementation(() => Promise.resolve(undefined));
@@ -233,9 +252,7 @@ describe("the Editor panel's topics", () => {
       cleanup();
       openTopic(topic.id);
       mount();
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
       const mine = document.querySelector(
         `[data-testid="settings.editor-topic-${topic.id}"]`,
       );
@@ -270,9 +287,7 @@ describe("the Editor panel's topics", () => {
       cleanup();
       openTopic(topicId);
       mount();
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
       expect(
         document.querySelector(`[data-testid="${testId}"]`),
         `${testId} no longer resolves in topic ${topicId}`,
@@ -288,9 +303,7 @@ describe("the Editor panel's topics", () => {
       cleanup();
       openTopic(topic.id);
       mount();
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
       const preview = document.querySelector('[data-testid="settings.editor-preview"]');
       expect(preview, `the preview vanished on topic ${topic.id}`).not.toBeNull();
       expect(preview?.getAttribute("data-topic")).toBe(topic.id);
@@ -310,9 +323,7 @@ describe("every search entry lands in the topic it names", () => {
       cleanup();
       openTopic(topic.id);
       mount();
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
       const found = new Set<string>();
       for (const entry of entries) {
         const anchored = document.querySelector(
@@ -336,9 +347,7 @@ describe("every search entry lands in the topic it names", () => {
         cleanup();
         openTopic(topic.id);
         mount(entry.id);
-        await act(async () => {
-          await Promise.resolve();
-        });
+        await flush();
         if (document.querySelector(`[data-setting-anchor="${entry.id}"]`) !== null) {
           found.add(entry.id);
         }
@@ -364,7 +373,11 @@ describe("every search entry lands in the topic it names", () => {
       }
     }
     expect(problems).toEqual([]);
-  });
+    // Six topics, a mount each and two queries per registry entry is thousands of
+    // DOM reads. On the runner that failed the assertions above this walk crossed
+    // the suite's 5 s default while asserting nothing wrong, so the walk gets its
+    // own ceiling. Every claim above is unchanged.
+  }, 30_000);
 });
 
 describe("the preview follows the active topic", () => {
@@ -374,9 +387,7 @@ describe("the preview follows the active topic", () => {
     // which specimen the topic produces, not that a preview exists.
     openTopic("text");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(document.querySelector('[data-testid="settings.editor-preview"] p')).not.toBeNull();
     expect(document.querySelector('[data-testid="settings.editor-preview-task"]')).toBeNull();
     expect(document.querySelector('[data-testid="settings.editor-preview-toolbar"]')).toBeNull();
@@ -384,9 +395,7 @@ describe("the preview follows the active topic", () => {
     cleanup();
     openTopic("tasks");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(
       document.querySelector('[data-testid="settings.editor-preview-task"]'),
       "the Tasks topic must show the task specimen",
@@ -400,18 +409,14 @@ describe("the preview follows the active topic", () => {
   it("shows the toolbar band only where the toolbar is the subject", async () => {
     openTopic("editing");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(document.querySelector('[data-testid="settings.editor-preview-toolbar"]')).not.toBeNull();
     expect(document.querySelector('[data-testid="settings.editor-preview-datetime"]')).not.toBeNull();
 
     cleanup();
     openTopic("text");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(document.querySelector('[data-testid="settings.editor-preview-toolbar"]')).toBeNull();
     expect(document.querySelector('[data-testid="settings.editor-preview-datetime"]')).toBeNull();
   });
@@ -426,9 +431,7 @@ describe("the preview follows the active topic", () => {
       cleanup();
       openTopic(topicId);
       mount();
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await flush();
       // Waited rather than read once, because the panel's preview column and the
       // active topic are two subscriptions and the column only disappears when
       // the second one has settled. A single microtask flush was enough on a
@@ -449,9 +452,7 @@ describe("the preview follows the active topic", () => {
     cleanup();
     openTopic("tasks");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(document.querySelector('[data-testid="settings.editor-preview"]')).not.toBeNull();
   });
 });
@@ -467,9 +468,7 @@ describe("the preview reflects the settings the requester named", () => {
       setDateTimeDisplay({ ...DEFAULT_DISPLAY, dateFormat: "iso", timeFormat: "24h" });
     });
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     const band = () =>
       (document.querySelector('[data-testid="settings.editor-preview-datetime"]')?.textContent ?? "").trim();
     expect(band()).toContain("2026-08-01");
@@ -490,9 +489,7 @@ describe("the preview reflects the settings the requester named", () => {
     };
     openTopic("editing");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     const shown = (id: string) =>
       document.querySelector(`[data-testid="settings.editor-preview-toolbar-${id}"]`);
     expect(shown("italic"), "a default-shown button is missing from the specimen").not.toBeNull();
@@ -513,9 +510,7 @@ describe("the preview reflects the settings the requester named", () => {
     cleanup();
     openTopic("editing");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(shown("bold")).not.toBeNull();
   });
 
@@ -527,9 +522,7 @@ describe("the preview reflects the settings the requester named", () => {
     prefsState.value = { ...BASE_PREFS, spell_enabled: null };
     openTopic("writing");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     const demo = () => document.querySelector('[data-testid="settings.editor-preview-spell"]');
     expect(demo(), "an unset spell pref means ON, so the demo belongs here").not.toBeNull();
     expect((demo()?.textContent ?? "").length).toBeGreaterThan(0);
@@ -539,9 +532,7 @@ describe("the preview reflects the settings the requester named", () => {
     cleanup();
     openTopic("writing");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(demo()).toBeNull();
 
     // And the same setting on the Text topic draws no spell demo at all: the
@@ -550,9 +541,7 @@ describe("the preview reflects the settings the requester named", () => {
     cleanup();
     openTopic("text");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(demo()).toBeNull();
   });
 
@@ -563,9 +552,7 @@ describe("the preview reflects the settings the requester named", () => {
     // disagree.
     openTopic("tasks");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     const chip = () =>
       document.querySelector('[data-testid="settings.editor-preview-task-chip"]') as HTMLElement | null;
     const label = () => document.querySelector('[data-testid="settings.editor-preview-task-label"]');
@@ -584,9 +571,7 @@ describe("the preview reflects the settings the requester named", () => {
     cleanup();
     openTopic("tasks");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     expect(chip()?.getAttribute("data-chip-color")).toBe("danger");
     expect(chip()?.getAttribute("data-icon-only")).toBe("true");
     expect(chip()?.style.color).toBe("var(--danger)");
@@ -606,9 +591,7 @@ describe("the preview reflects the settings the requester named", () => {
     };
     openTopic("text");
     mount();
-    await act(async () => {
-      await Promise.resolve();
-    });
+    await flush();
     const specimen = document.querySelector('[data-testid="settings.editor-preview"]');
     // `typographyStyleFromKeys` sets the custom properties on the wrapper and the
     // sample reads them through `var(...)`, so the wrapper carries the resolved

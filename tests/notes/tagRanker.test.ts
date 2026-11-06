@@ -92,6 +92,74 @@ describe("rankTagCandidates", () => {
     const out = rankTagCandidates([], ["[]", '"', "[ ]", "''", "real"]);
     expect(out).toEqual([{ tag: "real", isNew: true }]);
   });
+
+  // myne-md/myne#1025: the pass offered whatever the model emitted. A one-line
+  // reply of `(#Writing with Markdown, Tasks, Links and tags, Make it yours,
+  // Trash)` became five chips, and two of them carried a parenthesis: the comma
+  // split leaves the wrapping parens on the outermost pieces, and a strip list
+  // of `[]`/quotes cannot see them. Accepting one wrote a tag no inline `#tag`
+  // can ever match.
+  describe("legality gate (§3.7.2)", () => {
+    it("drops the pieces of a parenthesised model list, keeping the legal one", () => {
+      const out = rankTagCandidates([], [
+        "(#Writing with Markdown",
+        "Tasks",
+        "Links and tags",
+        "Make it yours",
+        "Trash)",
+      ]);
+      expect(out).toEqual([{ tag: "Tasks", isNew: true }]);
+    });
+
+    it("does not salvage a paren by trimming it, the candidate goes", () => {
+      // The tempting one-line fix (strip `(`/`)` in cleanTagToken) leaves
+      // `#Writing with Markdown`, which is still not a tag body. A candidate is
+      // either legal or it is not offered at all.
+      expect(rankTagCandidates([], ["(rust)", "(", ")"])).toEqual([]);
+    });
+
+    it("drops every whitespace form, hyphenated forms survive", () => {
+      expect(rankTagCandidates([], ["machine learning", "links and tags"])).toEqual([]);
+      expect(rankTagCandidates([], ["machine-learning"])).toEqual([
+        { tag: "machine-learning", isNew: true },
+      ]);
+    });
+
+    it("drops developer spellings the inline grammar denies (accepted cost)", () => {
+      // `c++`, `c#` and `node.js` are real frontmatter tags a user may keep, but
+      // the parser cannot express any of them (`+`, `#`, `.` are denied), so a
+      // chip for one would write a tag the user can never type again.
+      expect(rankTagCandidates([], ["c++", "c#", "node.js", "don't"])).toEqual([]);
+    });
+
+    it("keeps nested, non-ASCII, emoji and numeric-only bodies", () => {
+      // §3.7.3's numeric-only reject is a RECOGNITION rule, not a legality one
+      // (frontmatter has always accepted `1984`), so it is deliberately absent.
+      expect(
+        rankTagCandidates([], ["area/sub", "日本語", "🧵", "1984", "dev_ops"]),
+      ).toEqual([
+        { tag: "area/sub", isNew: true },
+        { tag: "日本語", isNew: true },
+        { tag: "🧵", isNew: true },
+        { tag: "1984", isNew: true },
+        { tag: "dev_ops", isNew: true },
+      ]);
+    });
+
+    it("never proposes a junk tag the vault already carries", () => {
+      // The existing-vocabulary side stays permissive on purpose (§3.7.6): a
+      // user's file keeps what it has. A candidate that folds onto such an entry
+      // is dropped by the gate above rather than shown as an accepted-looking
+      // chip, so no input reaches the vocabulary loop with junk, and no test can
+      // prove that loop is ungated (an injection there keeps every test green).
+      // What IS observable is that the loop still collapses onto an existing
+      // tag's canonical casing.
+      expect(rankTagCandidates(["(#x"], ["(#x"])).toEqual([]);
+      expect(rankTagCandidates(["Machine-Learning"], ["machine-learning"])).toEqual([
+        { tag: "Machine-Learning", isNew: false },
+      ]);
+    });
+  });
 });
 
 // #192 — the single place both the chip's display text and the fold key come

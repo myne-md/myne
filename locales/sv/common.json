@@ -53,9 +53,7 @@
       "scopeQuestion": "Vad agenten kan läsa",
       "scopeFolders": "Mappar",
       "scopeApplies": "Gäller ditt nästa meddelande. Borttagna, arkiverade och mall-anteckningar lämnas alltid utanför.",
-      "blockedScope": "Inget för agenten att arbeta med ännu: varje anteckning är undantagen från AI, eller så är valvet tomt.",
       "preparing": "Förbereder…",
-      "blockedScopeSidebar": "Inget att fråga om här ännu: den här anteckningens mapp är undantagen från AI.",
       "needsScope": "Välj en mapp nedan, eller öppna en anteckning, så att agenten har något att arbeta med.",
       "scopeExcluded_one": "{{count}} undantagen från AI",
       "scopeExcluded_other": "{{count}} undantagna från AI"
@@ -3336,7 +3334,6 @@
       "helper": "Låt anteckningar flyttas till ett arkiv, utanför huvudlistan. Att stänga av detta återställer varje arkiverad anteckning till sin mapp, avarkiverar varje arkiverad mapp och döljer arkivkontrollerna. Det gäller hela valvet, på alla enheter.",
       "label": "Arkivering",
       "off": "Av",
-      "on": "På",
       "saveError": "Kunde inte uppdatera arkiveringsinställningen."
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "För svagt"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Inte konfigurerat",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
-        "conflicts_other": "{{count}} konflikter"
-      }
     },
     "data": {
       "exported_one": "Exporterade {{count}} anteckning → {{label}}",

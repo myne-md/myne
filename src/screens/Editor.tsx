@@ -161,6 +161,8 @@ import {
   PREFS_SYNC_APPLIED_EVENT,
 } from "../lib/prefs";
 import { bumpPrefsNonce } from "../notes/prefsNonce";
+import { subscribeToEvents } from "../lib/subscribe";
+import { THEMES_SYNC_APPLIED_EVENT, bumpThemesNonce } from "../lib/themesSignal";
 import { flushGraphLayoutNow } from "../notes/graphLayoutPersist";
 import { showAttachmentToast } from "../editor/attachments/toast";
 import {
@@ -1557,31 +1559,29 @@ function EditorChrome({
     };
   }, []);
 
-  // MYND-478: the sync loop merges remote `vault.prefs` changes onto disk and
-  // emits `PREFS_SYNC_APPLIED_EVENT` (never for the user's own IPC writes -
-  // their own resolve is the signal). Bridge it into the two local refresh
-  // signals so an incoming vault rename / shared-pref change shows live: the
-  // switcher's window event (chip + rows) and the prefs nonce (usePrefs
-  // consumers). Subscribe ONCE; no-op outside Tauri.
+  // The sync loop merges remote vault content onto disk and emits one
+  // contentless event per merge (never for the user's own IPC writes, whose own
+  // resolve is the signal). Each event is bridged into the local refresh signals
+  // it belongs to, so an incoming change shows live in whatever is already open:
+  //
+  //  * `PREFS_SYNC_APPLIED_EVENT` (MYND-478) into the switcher's window event
+  //    (chip + rows) and the prefs nonce (`usePrefs` consumers), because an
+  //    incoming vault rename or shared-pref change has to reach both.
+  //  * `THEMES_SYNC_APPLIED_EVENT` (myne#943) into the theme store nonce, which
+  //    re-reads an open Appearance panel's custom-theme list.
+  //
+  // `subscribeToEvents` holds the lifecycle for both (a handle that arrives after
+  // unmount is released, and a failed subscription warns rather than rejecting),
+  // so this effect is wiring and nothing else.
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const handle = await listen(PREFS_SYNC_APPLIED_EVENT, () => {
-          if (cancelled) return;
-          notifyVaultPrefsChanged();
-          bumpPrefsNonce();
-        });
-        if (cancelled) handle();
-        else unlisten = handle;
-      } catch {
-        // Not inside Tauri (browser dev shim) → no sync events.
-      }
-    })();
+    const unsubscribePrefs = subscribeToEvents([PREFS_SYNC_APPLIED_EVENT], () => {
+      notifyVaultPrefsChanged();
+      bumpPrefsNonce();
+    });
+    const unsubscribeThemes = subscribeToEvents([THEMES_SYNC_APPLIED_EVENT], bumpThemesNonce);
     return () => {
-      cancelled = true;
-      if (unlisten !== undefined) unlisten();
+      unsubscribePrefs();
+      unsubscribeThemes();
     };
   }, []);
 
@@ -2644,7 +2644,6 @@ function EditorChrome({
                   anchor ?? null,
                 )
               }
-              onShowToast={(message) => showToastMessage(message)}
             />
           </SidebarPane>
         )}
@@ -4885,7 +4884,6 @@ const EMPTY_FOLDERS: readonly string[] = [];
 
 function RightSidebar({
   onOpenSettings,
-  onShowToast,
   stripClearance = 0,
   notes,
   notesWritten,
@@ -4894,7 +4892,6 @@ function RightSidebar({
   // a fault and lands ON the control that clears it rather than at the top of
   // a panel (myne-md/myne#771).
   onOpenSettings?: (panel?: string, anchor?: string) => void;
-  onShowToast?: (message: string) => void;
   /** Room kept clear at the strip's inline END, for the controls that float in
    *  the window's top-right corner (`RIGHT_CLEARANCE`, computed by the caller
    *  because only it knows whether they are shown). See the strip's own comment
@@ -5224,7 +5221,6 @@ function RightSidebar({
         ) : active === "ai-chat" ? (
           <AiChatTab
             onOpenSettings={onOpenSettings}
-            onShowToast={onShowToast}
             // The automatic-apply path writes out of band of any pane's own
             // autosave loop, exactly as the manual one does, so it owes the
             // same reload (myne-md/myne#551). The handler above states both

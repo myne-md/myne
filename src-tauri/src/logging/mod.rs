@@ -127,6 +127,17 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) -> Result<Arc<LogSink>, LogInitError
 
     install(Some(Arc::clone(&sink)));
 
+    // The complement of the self-update path's last line: a run that reached here
+    // started cleanly, so `update_restarting` with nothing after it is the one shape
+    // that proves a restart did not land. Without a per-run record there is nothing
+    // to compare against, because the file header is written once per FILE rather
+    // than once per start. Two static strings, no path and no clock.
+    tracing::info!(
+        event = "app_started",
+        version = env!("CARGO_PKG_VERSION"),
+        platform = std::env::consts::OS
+    );
+
     if let Some(e) = reconcile_error {
         tracing::warn!(
             event = "diagnostic_log_erase_incomplete",

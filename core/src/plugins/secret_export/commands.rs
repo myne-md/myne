@@ -53,6 +53,33 @@ pub async fn save_secret_text_from_host(
     path: String,
     contents: String,
 ) -> Result<(), SecretExportError> {
+    // **A bearer credential leaving the vault is the one write in the tree that
+    // deserves a record either way.** The user can lose this file, leave it in a
+    // synced folder, or hand the machine to someone else, and every one of those
+    // reports arrives after the fact with nothing to date it. The path is NOT
+    // logged (it names the user's directory layout); the act and its outcome are.
+    let outcome = write_secret_text(host, path, contents).await;
+    match &outcome {
+        Ok(()) => tracing::info!(event = "secret_export_written", stage = "write"),
+        // A closed tag rather than `?error`: `SecretExportError` carries only a
+        // bounded `IoFailureKind` today, and a tag is what keeps a future variant
+        // with a path in it from reaching a file the user is invited to publish.
+        Err(error) => tracing::warn!(
+            event = "secret_export_failed",
+            stage = "write",
+            kind = error.kind()
+        ),
+    }
+    outcome
+}
+
+/// The command's body: validate the destination, then write the secret with the
+/// two properties this payload requires.
+async fn write_secret_text(
+    host: &dyn HostCtx,
+    path: String,
+    contents: String,
+) -> Result<(), SecretExportError> {
     // First non-doc statement: bound the secret's lifetime to a Zeroizing wrapper.
     let contents = Zeroizing::new(contents);
     let dest = std::path::PathBuf::from(&path);
@@ -113,6 +140,47 @@ mod tests {
             std::fs::read_to_string(&dest).expect("read back"),
             "correct horse battery staple"
         );
+    }
+
+    /// The command itself, driven end to end, which nothing did before: every other
+    /// test here calls the validator or the atomic writer directly, so the wrapper
+    /// that now writes the record had no coverage at all.
+    ///
+    /// Both directions, because an event that only ever fires is as unverified as one
+    /// that never does: a written secret records the act, and a refused destination
+    /// records the refusal instead.
+    #[test]
+    #[tracing_test::traced_test]
+    fn the_command_records_the_export_and_a_refusal() {
+        let base = ScopedTempDir::new("secret-export-emission").expect("tempdir");
+        let host = crate::host::test_host::TestHost::new(base.path());
+        let out = ScopedTempDir::new("secret-export-emission-out").expect("tempdir");
+
+        let dest = out.path().join("phrase.txt");
+        let written = crate::test_support::block_on(save_secret_text_from_host(
+            &host,
+            dest.to_string_lossy().into_owned(),
+            "correct horse battery staple".into(),
+        ));
+        written.expect("a destination outside app data is written");
+        assert!(logs_contain("event=\"secret_export_written\""));
+
+        // A destination inside the app data tree is the refusal a page that skipped
+        // the save dialog runs into.
+        let refused = crate::test_support::block_on(save_secret_text_from_host(
+            &host,
+            base.path()
+                .join("data")
+                .join("vaults")
+                .join("x")
+                .join("kit.txt")
+                .to_string_lossy()
+                .into_owned(),
+            "phrase".into(),
+        ));
+        assert_eq!(refused, Err(SecretExportError::InvalidDestination));
+        assert!(logs_contain("event=\"secret_export_failed\""));
+        assert!(logs_contain("kind=\"invalid_destination\""));
     }
 
     #[test]

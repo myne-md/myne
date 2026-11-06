@@ -169,6 +169,21 @@ pub async fn import_read_dir(
     root: String,
     path: String,
 ) -> Result<Vec<ImportDirEntry>, ImportReadError> {
+    // An import that shows nothing has one of two causes: an empty folder, or a
+    // read the boundary refused. The screen says the same sentence for both, and the
+    // `ImportReadError` is closed (no path, no OS message), so the record costs
+    // nothing a user would mind sending.
+    let outcome = read_dir_of_import_root(root, path).await;
+    if let Err(ref error) = outcome {
+        tracing::warn!(event = "import_read_failed", stage = "read_dir", kind = ?error);
+    }
+    outcome
+}
+
+async fn read_dir_of_import_root(
+    root: String,
+    path: String,
+) -> Result<Vec<ImportDirEntry>, ImportReadError> {
     let (canon_root, dir) = validate_within_root_pair(&root, &path)?;
     tauri::async_runtime::spawn_blocking(move || {
         let mut entries = Vec::new();
@@ -202,6 +217,14 @@ pub async fn import_read_dir(
 /// copy survives, which Tauri owns). Never writes plaintext to disk.
 #[tauri::command]
 pub async fn import_read_file(root: String, path: String) -> Result<String, ImportReadError> {
+    let outcome = read_one_import_file(root, path).await;
+    if let Err(ref error) = outcome {
+        tracing::warn!(event = "import_read_failed", stage = "read_file", kind = ?error);
+    }
+    outcome
+}
+
+async fn read_one_import_file(root: String, path: String) -> Result<String, ImportReadError> {
     let file = validate_within_root(&root, &path)?;
     tauri::async_runtime::spawn_blocking(move || {
         let bytes = Zeroizing::new(std::fs::read(&file).map_err(io)?);
@@ -234,6 +257,30 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
+    }
+
+    /// The command itself, driven rather than the validator under it: no test called
+    /// `import_read_dir`, so the record it now writes had no coverage at all.
+    ///
+    /// `#[tokio::test]` is unavailable here (the workspace does not enable its macros),
+    /// so the runtime is built by hand and driven on THIS thread, which is what keeps
+    /// the emitted record inside the span `traced_test` captures.
+    #[test]
+    #[tracing_test::traced_test]
+    fn a_refused_read_is_recorded() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .expect("a test runtime");
+        let t = TempTree::new("refused-emission");
+        let outside = t.root.join("..").join("elsewhere.md");
+        let outcome = rt.block_on(import_read_dir(
+            t.root.to_str().unwrap().to_string(),
+            outside.to_str().unwrap().to_string(),
+        ));
+        assert!(matches!(outcome, Err(ImportReadError::PathRejected)));
+        assert!(logs_contain("event=\"import_read_failed\""));
+        assert!(logs_contain("stage=\"read_dir\""));
     }
 
     #[test]

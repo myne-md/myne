@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 //
 // Component tests for `src/components/settings/VaultPanel.tsx`. Drives the
-// three sub-views (idle / change-password / delete-vault) and the vault-label
+// two sub-views (idle / change-password), the danger zone's always-visible
+// confirm form (myne-md/myne#1020) and the vault-label
 // rename control, asserting the real handler wiring: callback fan-out on
 // success, error-banner mapping, force-relock dispatch for the suspicion
 // variants, and the disk-targeted vault-delete path. The two heavy child forms
@@ -81,8 +82,13 @@ vi.mock("../../src/components/DeleteVaultConfirmForm", () => ({
     inFlight?: boolean;
     partialFailContext: { kind: string; remainingCount?: number } | null;
     variant?: "owner" | "member";
+    layout?: "panel" | "inline";
   }) => (
-    <div data-testid="dvcf" data-variant={props.variant ?? "owner"}>
+    <div
+      data-testid="dvcf"
+      data-variant={props.variant ?? "owner"}
+      data-layout={props.layout ?? "panel"}
+    >
       <span data-testid="dvcf.inflight">{String(props.inFlight)}</span>
       {props.partialFailContext != null && (
         <div data-testid="dvcf.partial">{props.partialFailContext.kind}</div>
@@ -147,13 +153,15 @@ describe("VaultPanel — idle view", () => {
   it("renders the change-password CTA in the vault topic and the danger zone in its own", async () => {
     renderPanel();
     expect(screen.getByTestId("settings.change-password-cta")).toBeTruthy();
-    // The erase is a topic of its own, so it is not on the default screen.
-    expect(screen.queryByText("Delete vault…")).toBeNull();
+    // The erase is a topic of its own, so it is not on the default screen: the
+    // confirm form mounts with the danger topic and nothing else (myne-md/myne#1020
+    // replaced the CTA that used to live here with the form itself).
+    expect(screen.queryByTestId("dvcf")).toBeNull();
     // The label loads from prefs on mount.
     await waitFor(() => expect(prefsRead).toHaveBeenCalled());
     cleanup();
     renderPanel({}, "danger");
-    expect(screen.getByText("Delete vault…")).toBeTruthy();
+    expect(screen.getByTestId("dvcf")).toBeTruthy();
     expect(screen.queryByTestId("settings.change-password-cta")).toBeNull();
   });
 
@@ -313,17 +321,33 @@ describe("VaultPanel — change password", () => {
 });
 
 describe("VaultPanel — delete vault", () => {
-  it("Delete vault… opens the confirm sub-view; Cancel returns to idle", () => {
+  // **One step, not two** (myne-md/myne#1020, at the owner's request). The
+  // section used to hold a CTA whose only job was to replace the panel with this
+  // form. The form is now mounted with the section, in its inline layout, and the
+  // assertions that follow are the shape of that: no CTA to press, no Cancel to
+  // press because nothing was opened, and the typed gate still between the user
+  // and the erase.
+  it("mounts the confirm form in the section, with no reveal step", () => {
     renderPanel({}, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
-    expect(screen.getByTestId("dvcf")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("dvcf.cancel"));
-    expect(screen.queryByTestId("dvcf")).toBeNull();
+    const form = screen.getByTestId("dvcf");
+    expect(form.getAttribute("data-layout")).toBe("inline");
+    expect(screen.queryByTestId("settings.delete-vault-cta")).toBeNull();
+    expect(screen.queryByText("Delete vault…")).toBeNull();
+  });
+
+  it("states the destruction claim once, in the form", () => {
+    // The section's own helper paragraph went with the two-step reveal: it said
+    // what the form's disclosure says, one line above it.
+    renderPanel({}, "danger");
+    expect(
+      screen.queryByText(
+        "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
+      ),
+    ).toBeNull();
   });
 
   it("success targets the vault it was given + fires onDeleteVaultSuccess", async () => {
     const props = renderPanel({}, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
     });
@@ -339,7 +363,6 @@ describe("VaultPanel — delete vault", () => {
       detail: { remaining_count: 3 },
     });
     const props = renderPanel({}, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
     });
@@ -359,7 +382,6 @@ describe("VaultPanel — delete vault", () => {
   // vault" — resolved from a cache the quick-unlock path never stamped.
   it("refuses to delete when no vault id has resolved", async () => {
     const props = renderPanel({ vaultId: null }, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
     });
@@ -370,7 +392,6 @@ describe("VaultPanel — delete vault", () => {
   it("bug-canary reject (VaultNotUnlocked) shows no post-fail banner, no success", async () => {
     deleteVault.mockRejectedValueOnce({ kind: "VaultNotUnlocked" });
     const props = renderPanel({}, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
     await act(async () => {
       fireEvent.click(screen.getByTestId("dvcf.submit"));
     });
@@ -384,22 +405,21 @@ describe("VaultPanel — delete vault", () => {
     memberVaultStatus.mockResolvedValueOnce(true);
     renderPanel({}, "danger");
 
-    // The probe settles the section into the member arm.
-    const cta = await screen.findByText("Remove from this device");
-    // The owner's irreversible sentence is absent, not corrected after it.
+    // The probe settles the section into the member arm. The variant is what the
+    // form reads to pick its copy, and it is the whole reason the panel does not
+    // state the owner claim itself.
+    await waitFor(() =>
+      expect(screen.getByTestId("dvcf").getAttribute("data-variant")).toBe("member"),
+    );
     expect(
       screen.queryByText(
         "Permanently delete this vault and all notes. Cannot be undone. Recovery phrase will not restore the vault.",
       ),
     ).toBeNull();
-
-    fireEvent.click(cta);
-    expect(screen.getByTestId("dvcf").getAttribute("data-variant")).toBe("member");
   });
 
-  it("an owner vault keeps the owner copy and the owner variant", () => {
+  it("an owner vault keeps the owner variant", () => {
     renderPanel({}, "danger");
-    fireEvent.click(screen.getByText("Delete vault…"));
     expect(screen.getByTestId("dvcf").getAttribute("data-variant")).toBe("owner");
   });
 });

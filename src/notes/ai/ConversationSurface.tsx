@@ -71,7 +71,6 @@ import { reviewCardBelongsToTurn } from "./reviewOwnership";
 import { bumpPrefsNonce } from "../prefsNonce";
 import { AgentProgress, endStatusLabel } from "../agent/components/AgentProgress";
 import { AgentFootprint } from "../agent/components/AgentFootprint";
-import type { ChatComposerSurface } from "../components/ChatComposer";
 import { undoResultText, useUndoLastRun } from "../agent/useUndoLastRun";
 import { AnsweredByIndicator } from "../../components/AnsweredByIndicator";
 import { CAPTION_STYLE } from "../components/sharedStyles";
@@ -867,17 +866,6 @@ const ChatTurnView = memo(function ChatTurnView({
  *  composer, and the modals a conversation owns (diff, revert confirm, history,
  *  memory are the CALLER's frame and stay there). */
 export interface ConversationSurfaceProps {
-  /**
-   * Which surface this is (myne-md/myne#848).
-   *
-   * Required rather than defaulted: the composer's zero state says different
-   * things here, and a default would let a third mount inherit the wrong
-   * sentence without anything naming it. The two are the agent pane, where the
-   * user came looking for an agent and has to pick what it works on, and the
-   * sidebar chat, where a note is open beside the box and the scope is simply
-   * that note.
-   */
-  surface: ChatComposerSurface;
   /** Explicit "Insert into note" action for a ready summary. */
   onInsert?: (text: string) => void;
   /** The open note: the agent's default scope in the composer. */
@@ -955,7 +943,6 @@ export interface ConversationSurfaceStatus {
 }
 
 export function ConversationSurface({
-  surface,
   onInsert,
   openNoteId = null,
   openNoteTitle = null,
@@ -1359,7 +1346,6 @@ export function ConversationSurface({
       {runOpen ? <AgentProgress /> : null}
 
       <ChatComposer
-        surface={surface}
         openNoteId={openNoteId}
         openNoteTitle={openNoteTitle}
         anchoredNoteId={anchoredNoteId}

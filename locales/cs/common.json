@@ -55,9 +55,7 @@
       "scopeQuestion": "Co může agent přečíst",
       "scopeFolders": "Složky",
       "scopeApplies": "Platí pro vaši další zprávu. Poznámky v koši, archivu a šablony jsou vždy vynechány.",
-      "blockedScope": "Agent zatím nemá na čem pracovat: všechny poznámky jsou vyloučeny z AI, nebo je trezor prázdný.",
       "preparing": "Připravuje se…",
-      "blockedScopeSidebar": "Tady se zatím není na co ptát: složka této poznámky je vyloučena z AI.",
       "needsScope": "Vyberte níže složku nebo otevřete poznámku, aby agent měl na čem pracovat.",
       "scopeExcluded_one": "{{count}} vyloučena z AI",
       "scopeExcluded_few": "{{count}} vyloučeny z AI",
@@ -3572,7 +3570,6 @@
       "helper": "Umožní přesouvat poznámky do archivu mimo hlavní seznam. Vypnutím se každá archivovaná poznámka obnoví do své složky, každá archivovaná složka se z archivu vyjme a ovládací prvky archivu se skryjí. Platí pro celý trezor, na všech zařízeních.",
       "label": "Archivace",
       "off": "Vypnuto",
-      "on": "Zapnuto",
       "saveError": "Nastavení archivace se nepodařilo aktualizovat."
     },
     "attachmentCompression": {
@@ -4358,12 +4355,8 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Není nastaveno",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} konflikt",
         "conflicts_few": "{{count}} konflikty",
-        "conflicts_many": "{{count}} konfliktu",
-        "conflicts_other": "{{count}} konfliktů"
+        "conflicts_many": "{{count}} konfliktu"
       }
     },
     "data": {

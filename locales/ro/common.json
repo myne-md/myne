@@ -54,9 +54,7 @@
       "scopeQuestion": "Ce poate citi agentul",
       "scopeFolders": "Dosare",
       "scopeApplies": "Se aplică la următorul tău mesaj. Notele șterse, arhivate și șabloanele sunt mereu excluse.",
-      "blockedScope": "Încă nu e nimic de lucrat pentru agent: fiecare notă este exclusă din AI sau seiful este gol.",
       "preparing": "Se pregătește…",
-      "blockedScopeSidebar": "Încă nu e nimic despre care să întrebi aici: dosarul acestei note este exclus din AI.",
       "needsScope": "Alege un dosar mai jos sau deschide o notă, ca agentul să aibă la ce lucra.",
       "scopeExcluded_one": "{{count}} exclusă din AI",
       "scopeExcluded_few": "{{count}} excluse din AI",
@@ -3454,7 +3452,6 @@
       "helper": "Permite mutarea notelor într-o Arhivă, ținută în afara listei principale. Dezactivarea acestei opțiuni readuce fiecare notă arhivată în folderul ei, dezarhivează fiecare folder arhivat și ascunde controalele arhivei. Se aplică întregului seif, pe fiecare dispozitiv.",
       "label": "Arhivare",
       "off": "Dezactivat",
-      "on": "Activat",
       "saveError": "Setarea de arhivare nu a putut fi actualizată."
     },
     "attachmentCompression": {
@@ -4225,11 +4222,7 @@
     },
     "sync": {
       "summary": {
-        "notSetUp": "Neconfigurat",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_few": "{{count}} conflicte",
-        "conflicts_other": "{{count}} conflicte"
+        "conflicts_few": "{{count}} conflicte"
       }
     },
     "data": {

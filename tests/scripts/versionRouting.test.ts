@@ -185,5 +185,9 @@ describe("the guard still runs over the tree", () => {
     });
     expect(out).toContain("version-routing: ok");
     expect(out).toContain("This number must only go down");
-  });
+    // The claim is the guard's own verdict, not the machine's speed. This spawns
+    // a node process that walks every Rust and TypeScript file in the checkout,
+    // and on the loaded CI runner that crossed the suite's 5 s default three
+    // pipelines in a row (v0.13.0) without the guard ever printing a failure.
+  }, 30_000);
 });

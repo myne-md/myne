@@ -271,7 +271,14 @@ if (existsSync(tarball)) {
   run("tar", ["-czf", tarball, "-C", join(BUNDLE, "macos"), `${CONF.productName}.app`]);
   rmSync(`${tarball}.sig`, { force: true });
   if (process.env.TAURI_SIGNING_PRIVATE_KEY) {
-    run("pnpm", ["tauri", "signer", "sign", tarball]);
+    // `--app-version` is not optional here. The client ships `requireSignedVersion: true`,
+    // so its updater requires the signature's trusted comment to name the version it
+    // signed. `tauri build` embeds that field itself, but a bare `signer sign` produces a
+    // signature with no version at all: it verifies cryptographically, and the client then
+    // rejects it AFTER the whole download with `MissingSignedVersion`, which the app shows
+    // as "did not finish". v0.11.4 shipped exactly that for macOS because this call is the
+    // one signer invocation the bundler does not make.
+    run("pnpm", ["tauri", "signer", "sign", "--app-version", CONF.version, tarball]);
   } else {
     console.error(
       "\nWARNING: the updater archive was rebuilt from the repaired app, so its previous\n" +

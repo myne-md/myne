@@ -53,9 +53,7 @@
       "scopeQuestion": "Wakala anaweza kusoma nini",
       "scopeFolders": "Folda",
       "scopeApplies": "Inahusu ujumbe wako ujao. Madokezo yaliyotupwa, yaliyowekwa kwenye kumbukumbu na violezo daima yanatengwa.",
-      "blockedScope": "Bado hakuna cha kufanyia kazi: kila dokezo limetengwa na AI, au kasha ni tupu.",
       "preparing": "Inajiandaa…",
-      "blockedScopeSidebar": "Bado hakuna cha kuuliza hapa: folda ya dokezo hili imetengwa na AI.",
       "needsScope": "Chagua folda hapa chini, au fungua dokezo, ili wakala awe na cha kufanyia kazi.",
       "scopeExcluded_one": "dokezo {{count}} limetengwa na AI",
       "scopeExcluded_other": "madokezo {{count}} yametengwa na AI"
@@ -3336,7 +3334,6 @@
       "helper": "Ruhusu madokezo kuhamishiwa kwenye Kumbukumbu, yakiwa nje ya orodha kuu. Kuzima hii kunarudisha kila dokezo lililowekwa kwenye kumbukumbu kwenye folda yake, kunaondoa kila folda iliyowekwa kwenye kumbukumbu kutoka humo, na kuficha vidhibiti vya kumbukumbu. Inahusu kasha zima, kwenye kila kifaa.",
       "label": "Uwekaji kwenye kumbukumbu",
       "off": "Imezimwa",
-      "on": "Imewashwa",
       "saveError": "Imeshindwa kusasisha mpangilio wa uwekaji kwenye kumbukumbu."
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "Dhaifu mno"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Haijasanidiwa",
-        "offline": "Nje ya mtandao",
-        "conflicts_one": "Mgongano {{count}}",
-        "conflicts_other": "Migongano {{count}}"
-      }
     },
     "data": {
       "exported_one": "Imehamisha dokezo {{count}} → {{label}}",

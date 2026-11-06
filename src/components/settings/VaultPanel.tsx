@@ -138,11 +138,6 @@ const HELPER_TEXT_STYLE: CSSProperties = {
   margin: 0,
 };
 
-const HELPER_TEXT_MUTED_STYLE: CSSProperties = {
-  ...HELPER_TEXT_STYLE,
-  color: "var(--fg-3)",
-};
-
 
 const LABEL_HELPER_STYLE: CSSProperties = {
   fontSize: "var(--text-sm)",
@@ -311,7 +306,7 @@ const ROOT_STYLE: CSSProperties = {
 };
 
 
-type View = "idle" | "change-password" | "delete-vault";
+type View = "idle" | "change-password";
 
 /**
  * Map a `VaultChangePasswordError` to the form-level banner copy.
@@ -538,87 +533,68 @@ export function VaultPanel({
     );
   }
 
-  if (view === "delete-vault") {
-    const handleDeleteSubmit = () => {
-      setInFlight(true);
-      void (async () => {
-        try {
-          // Id-targeted erase (SYNC-6), and the id is REQUIRED since #250:
-          // an unresolved target means we do not know which vault the user is
-          // looking at, and this button is irreversible. Refuse, do not guess.
-          if (vaultId == null) {
-            if (import.meta.env.DEV) {
-              // eslint-disable-next-line no-console
-              console.warn(
-                "[VaultPanel] delete refused: no resolved active vault id",
-              );
-            }
-            return;
-          }
-          await deleteVault(vaultId);
-          if (!mountedRef.current) return;
-          // Resolve = full success. Slot is Empty + vault dir gone.
-          // Notify parent to reprobe; boot routing picks the return
-          // surface by remaining vault count (picker/unlock/welcome),
-          // Editor unmounts, SettingsModal unmounts in cascade. inFlight
-          // clear is harmless because the component is about to unmount.
-          setInFlight(false);
-          onDeleteVaultSuccess();
-        } catch (raw) {
-          if (!mountedRef.current) return;
-          setInFlight(false);
-          const e = raw as VaultDeleteError;
-          // Resolve the vault path lazily on reject — the success
-          // path doesn't need it. UI-side resolution mirrors the
-          // backend's `paths::vault_dir` derivation.
-          //
-          // `null` where the platform has no such path (phase3-web-client task
-          // 72). `path.appDataDir` is a typed refusal in the browser seam, and
-          // an unguarded call here would throw INSIDE this catch block —
-          // swallowing the mapping and leaving the user with a failed delete and
-          // no banner at all. The capability is the same one that selects the
-          // copy: a client whose vault is not the only copy has no directory to
-          // send anyone to either.
-          const vaultDirPath = await vaultDirDisplayPath(vaultId);
-          if (!mountedRef.current) return;
-          const mapping = mapDeleteVaultError(e, vaultDirPath);
-          if (mapping.kind === "partial-fail") {
-            setDeletePartialFail(mapping.context);
-            return;
-          }
-          // Bug-canary: VaultBusyAuth / VaultNotUnlocked /
-          // VaultNotFound. No banner. Dev-only warn so the underlying
-          // routing bug surfaces in development.
+  const handleDeleteSubmit = () => {
+    setInFlight(true);
+    void (async () => {
+      try {
+        // Id-targeted erase (SYNC-6), and the id is REQUIRED since #250:
+        // an unresolved target means we do not know which vault the user is
+        // looking at, and this button is irreversible. Refuse, do not guess.
+        if (vaultId == null) {
           if (import.meta.env.DEV) {
             // eslint-disable-next-line no-console
             console.warn(
-              "[VaultPanel] vault_delete rejected (UI/router bug indicator):",
-              e,
+              "[VaultPanel] delete refused: no resolved active vault id",
             );
           }
+          return;
         }
-      })();
-    };
+        await deleteVault(vaultId);
+        if (!mountedRef.current) return;
+        // Resolve = full success. Slot is Empty + vault dir gone.
+        // Notify parent to reprobe; boot routing picks the return
+        // surface by remaining vault count (picker/unlock/welcome),
+        // Editor unmounts, SettingsModal unmounts in cascade. inFlight
+        // clear is harmless because the component is about to unmount.
+        setInFlight(false);
+        onDeleteVaultSuccess();
+      } catch (raw) {
+        if (!mountedRef.current) return;
+        setInFlight(false);
+        const e = raw as VaultDeleteError;
+        // Resolve the vault path lazily on reject: the success
+        // path doesn't need it. UI-side resolution mirrors the
+        // backend's `paths::vault_dir` derivation.
+        //
+        // `null` where the platform has no such path (phase3-web-client task
+        // 72). `path.appDataDir` is a typed refusal in the browser seam, and
+        // an unguarded call here would throw INSIDE this catch block,
+        // swallowing the mapping and leaving the user with a failed delete and
+        // no banner at all. The capability is the same one that selects the
+        // copy: a client whose vault is not the only copy has no directory to
+        // send anyone to either.
+        const vaultDirPath = await vaultDirDisplayPath(vaultId);
+        if (!mountedRef.current) return;
+        const mapping = mapDeleteVaultError(e, vaultDirPath);
+        if (mapping.kind === "partial-fail") {
+          setDeletePartialFail(mapping.context);
+          return;
+        }
+        // Bug-canary: VaultBusyAuth / VaultNotUnlocked /
+        // VaultNotFound. No banner. Dev-only warn so the underlying
+        // routing bug surfaces in development.
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.warn(
+            "[VaultPanel] vault_delete rejected (UI/router bug indicator):",
+            e,
+          );
+        }
+      }
+    })();
+  };
 
-    return (
-      <DeleteVaultConfirmForm
-        onSubmit={handleDeleteSubmit}
-        onCancel={() => {
-          setView("idle");
-        }}
-        onContinueAfterPartial={() => {
-          // Same terminal effect as the happy-path Submit — slot is
-          // already Empty (zeroize-before-unlink fired on the IPC
-          // reject path too). Stage transition to welcome.
-          setDeletePartialFail(null);
-          onDeleteVaultSuccess();
-        }}
-        inFlight={inFlight}
-        partialFailContext={deletePartialFail}
-        variant={memberVault ? "member" : "owner"}
-      />
-    );
-  }
+
 
   // Persist the vault label. Empty draft ⇒ clear the label (`null`); a
   // non-empty draft sets it. On success, update `savedLabel` so the Save
@@ -831,10 +807,24 @@ export function VaultPanel({
       {/* The danger zone, and what "danger" means here (MYND-574 task 72).
           Where the local vault may be the only copy it is a destruction; where
           it is a cache of a sync-held vault it is a sign-out that takes this
-          browser's copy with it. Same CTA, same testid, same command — different
-          promise, because the desktop promise would be false on the other
-          client in the direction that loses a user's trust rather than their
-          data. */}
+          browser's copy with it. Same field, same button, same command,
+          different promise, because the desktop promise would be false on the
+          other client in the direction that loses a user's trust rather than
+          their data.
+
+          **One step, not two** (myne-md/myne#1020, at the owner's request). The
+          section used to hold a button that REPLACED the panel with
+          `DeleteVaultConfirmForm`, so destroying a vault cost a press to reveal
+          a field and a press to use it. The field is here now. What that
+          deliberately does NOT do is make the erase cheaper to reach: the typed
+          `DELETE` gate is unchanged and the button stays disabled until it is
+          satisfied, so the extra press was ceremony rather than friction.
+
+          The section states no disclosure of its own. The form carries it
+          (`copy.primary`, and it is capability-shaped: an owner vault's erase,
+          a browser cache's sign-out, a member's departure), so the helper
+          paragraph that used to sit here would have been the same claim written
+          twice, one line apart. */}
       <SettingsSection
         tone="danger"
         title={
@@ -843,34 +833,24 @@ export function VaultPanel({
             : t("settings.vault.localEraseHeading")
         }
       >
-        {/* A member vault's copy is not the vault. The owner sentence below
-            ("permanently delete ... recovery phrase will not restore") is false
-            for a member in the dangerous direction, so it is ABSENT rather than
-            corrected: the confirm form carries the shared-vault disclosure
-            verbatim, and this section only has to name the action. */}
-        {!memberVault && (
-          <p style={HELPER_TEXT_MUTED_STYLE}>
-            {capabilities.has("localOnlyVault")
-              ? t("settings.vault.dangerZoneHelper")
-              : t("settings.vault.localEraseHelper")}
-          </p>
-        )}
-        <div>
-          <Button
-            variant="danger"
-            data-testid="settings.delete-vault-cta"
-            onClick={() => {
-              setDeletePartialFail(null);
-              setView("delete-vault");
-            }}
-          >
-            {memberVault
-              ? t("settings.deleteVault.memberSubmit")
-              : capabilities.has("localOnlyVault")
-                ? t("settings.vault.deleteVaultButton")
-                : t("settings.vault.localEraseButton")}
-          </Button>
-        </div>
+        <DeleteVaultConfirmForm
+          layout="inline"
+          onSubmit={handleDeleteSubmit}
+          onCancel={() => {
+            /* Nothing opened, so there is nothing to go back to and the inline
+               layout draws no Cancel. The prop is still required, and swallowed
+               partial-failure state is the one thing that must not survive a
+               layout change, so it is reset here. */
+            setDeletePartialFail(null);
+          }}
+          onContinueAfterPartial={() => {
+            setDeletePartialFail(null);
+            onDeleteVaultSuccess();
+          }}
+          inFlight={inFlight}
+          partialFailContext={deletePartialFail}
+          variant={memberVault ? "member" : "owner"}
+        />
       </SettingsSection>
       </SettingsTopicPanel>
     </div>

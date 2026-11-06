@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Reset the TWO dev instances `pnpm dev:two` brings up, so a manual sync test can
+# Reset the TWO dev instances `pnpm start` brings up, so a manual sync test can
 # start from zero: both app-data dirs, the in-repo sync server store, the stale
 # single-instance sockets, and the per-vault Keychain keys of the dev vaults.
 #
-# WHY a sibling script and not a flag on `dev:two`: that script is a long-lived
+# WHY a sibling script and not a flag on `pnpm start`: that command is a long-lived
 # foreground process whose whole job is to hold these files open, so a reset can
 # only run after it exits — and the dev vault ids have to be read out of those
 # directories BEFORE they are deleted, because the Keychain accounts are keyed by
-# them.
+# them. It is also not a keypress in that menu, deliberately: one stray character
+# must not delete a vault.
 #
-# WHY it is narrow. `dev:two` exists to keep a manual sync test off the user's
+# WHY it is narrow. `pnpm start` exists to keep a manual sync test off the user's
 # own vault, and a reset that "cleans everything" is the one thing that would
 # undo that:
 #   - `md.myne.desktop` — the real app and the real vault — is NEVER touched.
@@ -26,20 +27,29 @@
 # desktop client keeps no vault state there, so they are not part of the state a
 # reset is for.
 #
-# macOS only, matching `dev:two`: the app-data layout, and every Keychain-backed
-# secret in this app (`core/src/vault_label`, `core/src/plugins/quick_unlock`),
-# is Apple-only. Another platform exits rather than guess at a path.
+# macOS only, matching `pnpm start`'s keychain-backed instances: the app-data
+# layout, and every Keychain-backed secret in this app (`core/src/vault_label`,
+# `core/src/plugins/quick_unlock`), is Apple-only. Another platform exits rather
+# than guess at a path.
 #
 # Usage:
-#   pnpm dev:two:reset          # prints the plan, then asks
-#   pnpm dev:two:reset --yes    # no prompt (scripted teardown)
+#   pnpm dev:reset          # prints the plan, then asks
+#   pnpm dev:reset --yes    # no prompt (scripted teardown)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 APP_IDS=(md.myne.desktop.a md.myne.desktop.b)
-SYNC_STORE="$PWD/.opencode/dev-sync-store"
+# A dev session whose sync port was taken runs with a suffixed store, so the reset has
+# to match every store this checkout has ever created, not just the default. Built with
+# an explicit loop rather than `nullglob`, and read only behind a length check, for the
+# same reason `VAULT_IDS` below is: macOS bash 3.2 refuses `"${arr[@]}"` on an empty
+# array under `set -u`.
+SYNC_STORES=()
+for store in "$PWD"/.opencode/dev-sync-store*; do
+  [ -d "$store" ] && SYNC_STORES+=("$store")
+done
 
-usage() { echo "usage: pnpm dev:two:reset [--yes]"; }
+usage() { echo "usage: pnpm dev:reset [--yes]"; }
 
 ASSUME_YES=0
 for arg in "$@"; do
@@ -58,7 +68,7 @@ for arg in "$@"; do
 done
 
 if [ "$(uname -s)" != "Darwin" ]; then
-  echo "!! dev:two is a macOS workflow and this reset only knows the macOS layout." >&2
+  echo "!! dev:reset is a macOS workflow and this reset only knows the macOS layout." >&2
   exit 1
 fi
 
@@ -73,7 +83,7 @@ if command -v lsof >/dev/null 2>&1; then
   if [ -n "$LIVE" ]; then
     echo "!! a dev instance is still running:" >&2
     echo "$LIVE" >&2
-    echo "!! stop 'pnpm dev:two' (Ctrl-C) and re-run." >&2
+    echo "!! stop 'pnpm start' (q or Ctrl-C) and re-run." >&2
     exit 1
   fi
 fi
@@ -100,7 +110,12 @@ echo "This will remove:"
 for id in "${APP_IDS[@]}"; do
   echo "  app data    ~/Library/Application Support/$id"
 done
-echo "  sync store  $SYNC_STORE"
+echo "  sync stores"
+if [ "${#SYNC_STORES[@]}" -gt 0 ]; then
+  for store in "${SYNC_STORES[@]}"; do echo "              $store"; done
+else
+  echo "              (none found)"
+fi
 echo "  sockets     /tmp/md_myne_desktop_{a,b}_si.sock (stale ones only)"
 if [ "${#VAULT_IDS[@]}" -gt 0 ]; then
   echo "  keychain    dev-vault keys for: ${VAULT_IDS[*]}"
@@ -134,11 +149,13 @@ for id in "${APP_IDS[@]}"; do
 done
 
 echo "==> removing the local sync server store"
-if [ -d "$SYNC_STORE" ]; then
-  rm -rf "$SYNC_STORE"
-  echo "    removed $SYNC_STORE"
+if [ "${#SYNC_STORES[@]}" -eq 0 ]; then
+  echo "    absent  (none found)"
 else
-  echo "    absent  $SYNC_STORE"
+  for store in "${SYNC_STORES[@]}"; do
+    rm -rf "$store"
+    echo "    removed $store"
+  done
 fi
 
 # A socket left by a hard kill (the plugin only unlinks it on a clean
@@ -197,4 +214,4 @@ else
 fi
 
 echo
-echo "==> reset done. 'pnpm dev:two' brings up a fresh, unenrolled pair."
+echo "==> reset done. 'pnpm start' brings up a fresh, unenrolled pair."

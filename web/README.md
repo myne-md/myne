@@ -43,20 +43,20 @@ web/
 
 ```bash
 ./scripts/build-wasm.sh   # wasm-bindgen glue into web/wasm/pkg/ — needed FIRST
-pnpm web:local    # ONE command: dev client on :1421 + a local sync server
 pnpm web:dev      # Vite dev server on :1421 (desktop dev keeps :1420)
 pnpm web:build    # typecheck + production bundle into web/dist/
 pnpm web:preview  # serve the built bundle
 pnpm test:e2e:web # the browser E2E lane (needs a WebDriver on :4544)
 ```
 
-`pnpm web:local` is the contributor's way in. It builds the wasm package if it is
-missing, starts `myne-server` on `127.0.0.1:8787` with its store under
-`.opencode/dev-sync-store*/` (a run that has to move off that port gets a store of its
-own, so two servers never write one directory), and serves the dev client pointed at
-that server through `/config.json`. Both halves are needed because this client cannot be
-opened any other way from this tree: it refuses to boot without cross-origin isolation, and
-it has no offline first run, so a sync server is not optional either. `pnpm web:dev`
+`pnpm start` is the contributor's way in, and the `w` key is the web client: it builds
+the wasm package if it is missing, starts `myne-server` on `127.0.0.1:8787` with its
+store under `.opencode/dev-sync-store*/` (a run that has to move off that port gets a
+store of its own, so two servers never write one directory), and serves the dev client
+pointed at that server through `/config.json`. Both halves are needed because this client
+cannot be opened any other way from this tree: it refuses to boot without cross-origin
+isolation, and it has no offline first run, so a sync server is not optional either.
+`pnpm web:dev`
 stays for the case where a server is already running, and serves the same headers and
 the same `/config.json` (`MYNE_DEV_SYNC_ORIGIN` overrides the origin it names).
 

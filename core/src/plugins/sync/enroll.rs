@@ -119,6 +119,19 @@ pub struct EnrollOutcome {
     pub device_id: [u8; 16],
 }
 
+impl EnrollOutcome {
+    /// The token, when the device is approved and the server issued one.
+    ///
+    /// One method rather than the `approved && !token.is_empty()` pair at each site: the pair is
+    /// asked in three places (the sync cycle's claim, the register path and the install decision)
+    /// and a change to either spelling silently makes one of them keep the account token where
+    /// the other would take its own.
+    #[must_use]
+    pub fn approved_token(&self) -> Option<&[u8]> {
+        (self.approved && !self.token.is_empty()).then_some(self.token.as_slice())
+    }
+}
+
 /// Enrollment failures.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EnrollError {
@@ -376,6 +389,37 @@ pub fn install_device_credential(
         409 => Err(EnrollError::AlreadyInstalled),
         _ => Err(EnrollError::BadResponse),
     }
+}
+
+/// Authenticate as `device_id` with `secret`, i.e. by naming `dev:<device_id>` as the SCRAM
+/// username. The one implementation behind both callers: [`install_own_credential`], which
+/// installs the verifier first, and the device-admission ceremony, where the OTHER device
+/// installed it and this side only logs in.
+///
+/// The nonce is the caller's, the same shape [`enroll`] and [`enroll_with_username`] take:
+/// a caller that cannot choose it cannot be tested against a canned server.
+///
+/// `EnrollPath::Password` is not a claim of the password path: the path only selects the
+/// gate for a device the server has not seen, and a row that is not approved yet answers
+/// `approved: false` here exactly as it does on the account credential, so a caller holding
+/// a device secret cannot reach around the approval gate with it.
+pub fn device_login(
+    transport: &dyn SyncTransport,
+    person_id: &[u8; 16],
+    device_id: [u8; 16],
+    secret: &[u8],
+    client_nonce: &str,
+) -> Result<EnrollOutcome, EnrollError> {
+    let username = device_credential_username(&device_id);
+    enroll_with_username(
+        transport,
+        person_id,
+        secret,
+        EnrollPath::Password,
+        client_nonce,
+        device_id,
+        Some(&username),
+    )
 }
 
 /// Replace the account's SCRAM verifier (`POST /auth/verifier`, **authed**).
@@ -852,7 +896,16 @@ mod tests {
 
     // Build the canned init + final responses a correct server would send, so the
     // enroll flow's proof + mutual-auth check exercise the real crypto.
-    fn wire_server(t: &FakeTransport, device_id: &[u8; 16], approved: bool, token_hex: &str) {
+    fn wire_server(t: &FakeTransport, approved: bool, token_hex: &str) {
+        wire_server_for(t, &hex_encode(&ACCOUNT), approved, token_hex);
+    }
+
+    // The same canned pair for an explicit SCRAM username, which is what a DEVICE
+    // credential names (`dev:<id>`) rather than the account's own hex. The server signature
+    // is computed over that username, so a handshake the client did not address to its own
+    // credential fails mutual auth here instead of passing on a mirror that always assumed
+    // the account.
+    fn wire_server_for(t: &FakeTransport, username: &str, approved: bool, token_hex: &str) {
         let client_nonce = "cn";
         let combined = "cnsn";
         let init = format!(
@@ -861,22 +914,11 @@ mod tests {
         );
         t.on(HttpMethod::Post, "/auth/scram/init", 200, init.into_bytes());
 
-        // The server signature the client will verify (same crypto). The SCRAM
-        // username the client derives is hex(ACCOUNT) — mirror it here.
-        let out = scram_client_proof(
-            SECRET,
-            SALT,
-            1,
-            &hex_encode(&ACCOUNT),
-            client_nonce,
-            combined,
-            &[],
-        );
+        let out = scram_client_proof(SECRET, SALT, 1, username, client_nonce, combined, &[]);
         let final_json = format!(
             "{{\"approved\":{approved},\"token_hex\":\"{token_hex}\",\"server_signature_b64\":\"{}\"}}",
             B64.encode(out.server_signature)
         );
-        let _ = device_id;
         t.on(
             HttpMethod::Post,
             "/auth/scram/final",
@@ -889,7 +931,7 @@ mod tests {
     fn enroll_approved_returns_token_and_distinct_device_id() {
         let t = FakeTransport::new();
         let dev = [0x07u8; 16];
-        wire_server(&t, &dev, true, "deadbeef");
+        wire_server(&t, true, "deadbeef");
         let out = enroll(&t, &ACCOUNT, SECRET, EnrollPath::Recovery, "cn", dev).unwrap();
         assert!(out.approved);
         assert_eq!(out.token, vec![0xde, 0xad, 0xbe, 0xef]);
@@ -902,10 +944,169 @@ mod tests {
     fn enroll_pending_returns_no_token() {
         let t = FakeTransport::new();
         let dev = [0x08u8; 16];
-        wire_server(&t, &dev, false, "");
+        wire_server(&t, false, "");
         let out = enroll(&t, &ACCOUNT, SECRET, EnrollPath::Password, "cn", dev).unwrap();
         assert!(!out.approved);
         assert!(out.token.is_empty());
+    }
+
+    // The merged approval flow (`decisions/protocol/0784`): the joining device installs its
+    // OWN credential once an existing device has approved its row, then authenticates under it.
+    // Four things are load-bearing and each is asserted rather than implied: the install goes
+    // out under the ACCOUNT session (a pending device has no token of its own), the verifier
+    // sent is the one handed in, the install precedes the handshake that uses it, and the
+    // handshake names `dev:<id>` rather than the account.
+    //
+    // The subject is `person_account::install_and_authenticate`, the function the register and
+    // claim paths call, and it takes a `&dyn SyncTransport` so this needs no server: without
+    // that seam the only proof that the client installs anything at all is one scenario on a
+    // lane CI can skip.
+    #[test]
+    fn the_device_installs_then_names_itself_in_the_handshake() {
+        let t = FakeTransport::new();
+        let dev = [0x21u8; 16];
+        t.on(
+            HttpMethod::Post,
+            "/auth/devices/credential",
+            200,
+            b"{\"ok\":true}".to_vec(),
+        );
+        wire_server_for(&t, &device_credential_username(&dev), true, "cafe");
+
+        let credential = mint_device_credential(SECRET).unwrap();
+        let out = crate::plugins::sync::person_account::install_and_authenticate(
+            &t,
+            "account-session-token",
+            ACCOUNT,
+            dev,
+            SECRET,
+            &credential,
+            "cn",
+        )
+        .expect("install + login");
+        assert_eq!(out.approved_token(), Some(&[0xca, 0xfe][..]));
+
+        let reqs = t.requests();
+        let install = reqs
+            .iter()
+            .find(|r| r.1 == "/auth/devices/credential")
+            .expect("the install is posted");
+        assert_eq!(
+            install.3.as_deref(),
+            Some("account-session-token"),
+            "installed under the account session: a pending device has no token of its own"
+        );
+        let body: serde_json::Value = serde_json::from_slice(&install.2).expect("install json");
+        assert_eq!(body["device_id_hex"], hex_encode(&dev));
+        assert_eq!(
+            body["username"],
+            device_credential_username(&dev),
+            "the server refuses any username but the canonical dev: form"
+        );
+        assert_eq!(body["salt_hex"], credential.salt_hex);
+        assert_eq!(body["iterations"], credential.iterations);
+        assert_eq!(body["stored_key_hex"], credential.stored_key_hex);
+        assert_eq!(body["server_key_hex"], credential.server_key_hex);
+
+        assert!(
+            reqs.iter()
+                .position(|r| r.1 == "/auth/devices/credential")
+                .zip(reqs.iter().position(|r| r.1 == "/auth/scram/init"))
+                .is_some_and(|(install_at, init_at)| install_at < init_at),
+            "the verifier must exist before the handshake that uses it: {reqs:?}"
+        );
+        let init = reqs
+            .iter()
+            .find(|r| r.1 == "/auth/scram/init")
+            .expect("the login follows the install");
+        let init_body: serde_json::Value = serde_json::from_slice(&init.2).expect("init json");
+        assert_eq!(init_body["username"], device_credential_username(&dev));
+        assert_eq!(init_body["account_hash_hex"], hex_encode(&ACCOUNT));
+        assert!(
+            reqs.iter().all(|r| r.1 != "/auth/devices/approve"),
+            "the approval is the human's tap; nothing here may approve a device"
+        );
+    }
+
+    // A refused install stops the flow rather than going on to a handshake that could only fail:
+    // the caller then keeps the account token it already holds (`token_after_install`). 409 is
+    // the refusal worth its own arm, because it is the only one that says THIS device id already
+    // holds a different verifier, i.e. a second salt was minted somewhere, which is the mistake
+    // the mint's non-rotation exists to prevent.
+    #[test]
+    fn a_refused_install_does_not_reach_the_handshake() {
+        let t = FakeTransport::new();
+        let dev = [0x22u8; 16];
+        t.on(
+            HttpMethod::Post,
+            "/auth/devices/credential",
+            409,
+            b"{\"error_code\":\"already_installed\"}".to_vec(),
+        );
+        let credential = mint_device_credential(SECRET).unwrap();
+        let err = crate::plugins::sync::person_account::install_and_authenticate(
+            &t,
+            "tok",
+            ACCOUNT,
+            dev,
+            SECRET,
+            &credential,
+            "cn",
+        )
+        .expect_err("a 409 must not be swallowed");
+        assert_eq!(format!("{err:?}"), "AlreadyInstalled");
+        assert!(
+            t.requests().iter().all(|r| r.1 != "/auth/scram/init"),
+            "no handshake after a refused install"
+        );
+    }
+
+    // The install approves the row server-side, so a device whose row is NOT approved yet must
+    // come back without a token. This is the property that keeps the merged flow from being a
+    // self-approval: the credential is a proof of this device's secret, never a way around the
+    // human tap.
+    #[test]
+    fn a_credential_on_an_unapproved_row_gets_no_token() {
+        let t = FakeTransport::new();
+        let dev = [0x23u8; 16];
+        t.on(
+            HttpMethod::Post,
+            "/auth/devices/credential",
+            409,
+            b"{}".to_vec(),
+        );
+        let credential = mint_device_credential(SECRET).unwrap();
+        let refused = crate::plugins::sync::person_account::install_and_authenticate(
+            &t,
+            "tok",
+            ACCOUNT,
+            dev,
+            SECRET,
+            &credential,
+            "cn",
+        );
+        assert!(refused.is_err(), "an unapproved row yields no session");
+
+        // And the same server answering the install, with the handshake reporting pending:
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Post,
+            "/auth/devices/credential",
+            200,
+            b"{\"ok\":true}".to_vec(),
+        );
+        wire_server_for(&t, &device_credential_username(&dev), false, "");
+        let pending = crate::plugins::sync::person_account::install_and_authenticate(
+            &t,
+            "tok",
+            ACCOUNT,
+            dev,
+            SECRET,
+            &credential,
+            "cn",
+        )
+        .expect("the call is well formed");
+        assert_eq!(pending.approved_token(), None);
     }
 
     // The declared path is what the server's approval gate reads, so the string
@@ -923,7 +1124,7 @@ mod tests {
         ] {
             let t = FakeTransport::new();
             let dev = [0x0bu8; 16];
-            wire_server(&t, &dev, true, "aa");
+            wire_server(&t, true, "aa");
             enroll(&t, &ACCOUNT, SECRET, path, "cn", dev).expect("handshake");
 
             let final_req = t
@@ -1100,7 +1301,7 @@ mod tests {
     fn enroll_init_sends_hash_hex_username() {
         let t = FakeTransport::new();
         let dev = [0x07u8; 16];
-        wire_server(&t, &dev, true, "deadbeef");
+        wire_server(&t, true, "deadbeef");
         enroll(&t, &ACCOUNT, SECRET, EnrollPath::Recovery, "cn", dev).unwrap();
         let reqs = t.requests();
         let req = reqs

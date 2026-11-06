@@ -53,9 +53,7 @@
       "scopeQuestion": "智能体可读取的内容",
       "scopeFolders": "文件夹",
       "scopeApplies": "适用于你的下一条消息。回收站、归档和模板笔记始终被排除。",
-      "blockedScope": "暂时没有可供智能体处理的内容：所有笔记都被排除在 AI 之外，或保险库为空。",
       "preparing": "正在准备…",
-      "blockedScopeSidebar": "这里暂时没有可询问的内容：此笔记所在的文件夹被排除在 AI 之外。",
       "needsScope": "请在下方选择一个文件夹，或打开一篇笔记，好让智能体有可处理的内容。",
       "scopeExcluded_other": "{{count}} 项被排除在 AI 之外",
       "scopeExcluded_one": "{{count}} 项被排除在 AI 之外"
@@ -3336,7 +3334,6 @@
       "helper": "允许将笔记移入存档，使其不出现在主列表中。关闭此项会将每篇已存档的笔记恢复到其所在文件夹，取消每个已存档文件夹的存档状态，并隐藏存档控件。它作用于整个保险库，在所有设备上生效。",
       "label": "存档",
       "off": "关闭",
-      "on": "开启",
       "saveError": "无法更新存档设置。"
     },
     "attachmentCompression": {
@@ -4091,12 +4088,6 @@
       "tooWeak": "太弱"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "未设置",
-        "offline": "离线",
-        "conflicts_one": "{{count}} 个冲突",
-        "conflicts_other": "{{count}} 个冲突"
-      }
     },
     "data": {
       "exported_one": "已导出 {{count}} 篇笔记 → {{label}}",

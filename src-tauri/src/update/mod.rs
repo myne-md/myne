@@ -203,6 +203,47 @@ pub enum UpdateStatus {
     },
 }
 
+/// The event name the install streams its progress on.
+///
+/// A constant rather than a literal at the `emit` and at the listener, because a
+/// typo on either side is a bar that never moves and reports nothing about why:
+/// the WebView's `listen` on a name nothing emits simply never fires, so the
+/// failure is a permanently indeterminate progress bar rather than an error.
+/// `src/platform/update.ts` carries the same string; that duplication is the
+/// seam's (the TypeScript side cannot import a Rust constant) and
+/// `tests/screens/UpdatingScreen.test.tsx` drives the rendering against it.
+pub const PROGRESS_EVENT: &str = "update:progress";
+
+/// What the install is doing, as the WebView is told it.
+///
+/// Three phases, and the split is what the host can actually testify to rather
+/// than a decoration of one "installing" state:
+///
+/// - `Downloading` is byte progress from the transport. `total` is `null` when
+///   the origin sends no `Content-Length`, which is why the UI has an
+///   indeterminate shape instead of inventing a percentage.
+/// - `Verifying` is emitted after the last chunk and before the artifact is
+///   touched, because that is exactly where `Update::download` verifies its
+///   minisign signature. Naming it is worth the phase: it is the step where a
+///   tampered artifact is caught, and it is invisible otherwise.
+/// - `Installing` is everything after the verified bytes exist: unpacking the
+///   `.dmg`, replacing the AppImage, running the Windows installer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(tag = "phase", rename_all = "snake_case")]
+pub enum UpdateProgress {
+    /// Bytes arriving. `downloaded` counts UP from zero for this attempt.
+    Downloading {
+        /// Bytes received so far in this attempt.
+        downloaded: u64,
+        /// The whole artifact's size, when the origin declared one.
+        total: Option<u64>,
+    },
+    /// The download finished and its signature is being checked.
+    Verifying,
+    /// The verified artifact is being written into place.
+    Installing,
+}
+
 /// Why an update check failed, as a closed set the UI can render.
 ///
 /// Coarse on purpose: this is a presentation vocabulary, not a mirror of the
@@ -262,6 +303,45 @@ mod tests {
         })
         .unwrap();
         assert_eq!(v.get("notes"), Some(&serde_json::Value::Null));
+    }
+
+    #[test]
+    fn progress_serializes_with_its_phase_tag_and_a_nullable_total() {
+        // The wire shape the TypeScript union is written against, so a renamed
+        // tag or a field that stopped being nullable fails here rather than in a
+        // bar that silently never moves.
+        assert_eq!(
+            serde_json::to_value(UpdateProgress::Downloading {
+                downloaded: 1024,
+                total: Some(4096),
+            })
+            .unwrap(),
+            serde_json::json!({
+                "phase": "downloading",
+                "downloaded": 1024,
+                "total": 4096,
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(UpdateProgress::Downloading {
+                downloaded: 1024,
+                total: None,
+            })
+            .unwrap(),
+            serde_json::json!({
+                "phase": "downloading",
+                "downloaded": 1024,
+                "total": null,
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(UpdateProgress::Verifying).unwrap(),
+            serde_json::json!({ "phase": "verifying" })
+        );
+        assert_eq!(
+            serde_json::to_value(UpdateProgress::Installing).unwrap(),
+            serde_json::json!({ "phase": "installing" })
+        );
     }
 
     #[test]

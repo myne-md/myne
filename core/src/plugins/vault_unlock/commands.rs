@@ -3331,6 +3331,11 @@ mod tests {
     /// with it.
     #[test]
     fn lock_runs_the_full_teardown_and_empties_the_index() {
+        // This is the one test that drives `lock_from_host`, which clears the
+        // PROCESS-GLOBAL device-key slot. The creation-time binding claim installs a key
+        // into that same slot (myne-md/myne#1001), so the two are serialized here rather
+        // than left to the scheduler.
+        let _serialized = crate::test_support::device_key_slot_guard();
         rt().block_on(async {
             let scratch = scratch_vault();
             let (meta_bytes, _) = seed_vault_meta("lock-teardown-pw");
