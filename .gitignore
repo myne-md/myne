@@ -132,3 +132,4 @@ web/bench/pkg/
 # output the release procedure creates here and deletes once every file is
 # published. Never committed; the provenance is the tag, not the tree.
 /dist-release/
+.e2e-tmp/
