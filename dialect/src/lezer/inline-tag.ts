@@ -53,6 +53,34 @@ function isAllowedTagChar(charCode: number): boolean {
   return true;
 }
 
+/**
+ * Whether `text` is a legal inline-tag BODY (§3.7.2): one or more code points,
+ * none of them denied. The `#` marker is not part of the body, so a caller
+ * holding `#tag` must strip it first.
+ *
+ * Exported because a surface that PROPOSES a tag has to answer the same
+ * question the tokenizer answers. The tag-suggestion band is the first: it used
+ * to offer whatever the model emitted, so a one-line reply like
+ * `(#Writing with Markdown, Tasks, …)` became five chips, two of them carrying a
+ * parenthesis, and accepting one wrote a tag no inline `#tag` can ever match
+ * (myne-md/myne#1025). Built on {@link isAllowedTagChar} rather than restated,
+ * because a second spelling of one grammar is how a suggestion and the tag index
+ * come to disagree (myne-md/myne#983).
+ *
+ * §3.7.3's numeric-only reject is NOT applied here: it keeps prose like "Suite
+ * #200" from being read as a tag, which is a recognition concern, not a
+ * statement that `1984` is an illegal tag value, and frontmatter has always
+ * accepted one. Iterates UTF-16 code units exactly like the tokenizer's scan, so
+ * the two cannot differ on a surrogate pair. Pure.
+ */
+export function isTagBody(text: string): boolean {
+  if (text.length === 0) return false;
+  for (let i = 0; i < text.length; i++) {
+    if (!isAllowedTagChar(text.charCodeAt(i))) return false;
+  }
+  return true;
+}
+
 function isNumericOnly(tag: string): boolean {
   if (tag.length === 0) return false;
   for (let i = 0; i < tag.length; i++) {

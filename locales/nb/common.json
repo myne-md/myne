@@ -3334,7 +3334,6 @@
       "helper": "La notater flyttes til et arkiv, holdt utenfor hovedlisten. Slår du dette av, gjenopprettes alle arkiverte notater til sine mapper, alle arkiverte mapper fjernes fra arkivet, og arkivkontrollene skjules. Det gjelder hele hvelvet, på alle enheter.",
       "label": "Arkivering",
       "off": "Av",
-      "on": "På",
       "saveError": "Kunne ikke oppdatere arkiveringsinnstillingen."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "For svakt"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Ikke konfigurert",
-        "offline": "Frakoblet",
-        "conflicts_one": "{{count}} konflikt",
-        "conflicts_other": "{{count}} konflikter"
-      }
     },
     "data": {
       "exported_one": "Eksporterte {{count}} notat → {{label}}",

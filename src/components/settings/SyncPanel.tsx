@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "../../platform/event";
+import { invoke } from "../../platform/core";
 import { SyncStatusIndicator } from "../sync/SyncStatusIndicator";
 import { EndpointConfig } from "../sync/EndpointConfig";
 import { EnrollDeviceForm } from "../sync/EnrollDeviceForm";
@@ -200,7 +201,7 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
     setDoctor(null);
     if (failingDetail === null) return;
     let live = true;
-    void readVaultDoctor()
+    void readVaultDoctor(invoke)
       .then((report) => {
         if (live) setDoctor(report);
       })

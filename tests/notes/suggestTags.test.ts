@@ -141,4 +141,26 @@ describe("runTagSuggestionPass", () => {
       }),
     ).rejects.toEqual({ kind: "failed" });
   });
+
+  it("offers no chip for a parenthesised, comma-separated model line (myne#1025)", async () => {
+    // The whole pass, over the exact reply that produced the reported band on a
+    // first-run example vault: the tags are the note's own wikilink titles, and
+    // the wrapping parens land on the outermost two pieces after the comma
+    // split. Only the legal piece may reach a chip; the rest is not a tag and
+    // must not become one.
+    const suggest = vi
+      .fn()
+      .mockResolvedValue(
+        "(#Writing with Markdown, Tasks, Links and tags, Make it yours, Trash)",
+      );
+    const out = await runTagSuggestionPass({
+      noteId: "note-1",
+      noteBody: "b",
+      noteFolder: "Getting started/",
+      existingTags: [],
+      excludedFolders: [],
+      suggest,
+    });
+    expect(out.suggestions).toEqual([{ tag: "Tasks", isNew: true }]);
+  });
 });

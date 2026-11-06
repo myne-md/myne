@@ -46,6 +46,7 @@ const personAcceptInvite = vi.hoisted(() => vi.fn());
 const personJoinVault = vi.hoisted(() => vi.fn());
 const personAccountNumber = vi.hoisted(() => vi.fn());
 const syncSetEndpoint = vi.hoisted(() => vi.fn());
+const syncGetEndpoint = vi.hoisted(() => vi.fn());
 const listRoster = vi.hoisted(() => vi.fn());
 const setMyMemberName = vi.hoisted(() => vi.fn());
 
@@ -72,7 +73,7 @@ vi.mock("../../src/lib/personAccount", () => ({
   personJoinVault,
   personAccountNumber,
 }));
-vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, listRoster }));
+vi.mock("../../src/lib/sync", () => ({ syncSetEndpoint, syncGetEndpoint, listRoster }));
 // `setMyMemberName` is stubbed because the command is the boundary this tier does
 // not cross, but `memberNameErrorKey` is kept REAL so the sibling accept spec's
 // assertions against the shared mapper are not invalidated by this file's mock.
@@ -173,6 +174,7 @@ beforeEach(() => {
   personAcceptInvite.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   personJoinVault.mockReset().mockResolvedValue(ACCEPTED_VIEW);
   syncSetEndpoint.mockReset().mockResolvedValue(undefined);
+  syncGetEndpoint.mockReset().mockResolvedValue({ endpoint_url: "", invite_code: "" });
   // The name step is never reached from a join, but the accept spec's own path
   // passes through it and this module is shared state across both files' mocks.
   listRoster.mockReset().mockResolvedValue({ members: [], authority: "member", group_key_epoch: 1 });

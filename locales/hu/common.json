@@ -3334,7 +3334,6 @@
       "helper": "Engedélyezi, hogy a jegyzetek az Archívumba kerüljenek, kihagyva a fő listából. Kikapcsolva minden archivált jegyzet visszakerül a mappájába, minden archivált mappa kikerül az archívumból, és elrejti az archívum vezérlőit. Az egész széfre érvényes, minden eszközön.",
       "label": "Archiválás",
       "off": "Ki",
-      "on": "Be",
       "saveError": "Nem sikerült frissíteni az archiválási beállítást."
     },
     "attachmentCompression": {
@@ -4089,12 +4088,6 @@
       "tooWeak": "Túl gyenge"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Nincs beállítva",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} ütközés",
-        "conflicts_other": "{{count}} ütközés"
-      }
     },
     "data": {
       "exported_one": "{{count}} jegyzet exportálva → {{label}}",

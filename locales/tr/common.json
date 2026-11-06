@@ -3307,7 +3307,6 @@
       "helper": "Notların, ana listeden ayrı tutulan bir Arşiv’e taşınmasına izin verin. Bunu kapatmak arşivlenmiş her notu kendi klasörüne geri yükler, arşivlenmiş her klasörü arşivden çıkarır ve arşiv denetimlerini gizler. Tüm kasa için, her cihazda geçerlidir.",
       "label": "Arşivleme",
       "off": "Kapalı",
-      "on": "Açık",
       "saveError": "Arşivleme ayarı güncellenemedi."
     },
     "attachmentCompression": {
@@ -4062,12 +4061,6 @@
       "tooWeak": "Çok zayıf"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Kurulmadı",
-        "offline": "Çevrimdışı",
-        "conflicts_one": "{{count}} çakışma",
-        "conflicts_other": "{{count}} çakışma"
-      }
     },
     "data": {
       "exported_one": "{{count}} not dışa aktarıldı → {{label}}",

@@ -3186,6 +3186,12 @@
       "diagnosticLogReadError": "Myne could not read the diagnostic logging setting, so it is shown as off.",
       "diagnosticBlockLabel": "Report details",
       "diagnosticBlockHelper": "Exactly what Copy puts on your clipboard. Nothing is sent anywhere; you decide what to share.",
+      "diagnostics": "Diagnostics",
+      "diagnosticsIntro": "What Myne knows about this device right now. Nothing is sent anywhere; you decide what to share.",
+      "diagnosticsReading": "Reading…",
+      "diagnosticCopied": "Copied",
+      "diagnosticsLogNote": "There is no log file on this device for this block to hand over: the saved diagnostic log is a desktop feature.",
+      "diagnosticUnknownNote": "unknown is an answer, not a fault. That reading stopped before it asked its question, so it reports nothing either way.",
       "diagnosticCopy": "Copy diagnostics",
       "diagnosticCopyDone": "Diagnostics copied",
       "diagnosticCopyFailed": "Could not copy. Select the text above and copy it by hand.",
@@ -3384,7 +3390,6 @@
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
       "label": "Archiving",
       "off": "Off",
-      "on": "On",
       "saveError": "Could not update the archiving setting."
     },
     "attachmentCompression": {
@@ -4327,12 +4332,6 @@
       "strong": "Strong"
     },
     "sync": {
-      "summary": {
-        "notSetUp": "Not set up",
-        "offline": "Offline",
-        "conflicts_one": "{{count}} conflict",
-        "conflicts_other": "{{count}} conflicts"
-      }
     },
     "data": {
       "exported_one": "Exported {{count}} note → {{label}}",
@@ -4853,6 +4852,7 @@
       "syncing": "Syncing…",
       "syncNow": "Sync now",
       "errorIdentityLocked": "Unlock your identity to sync",
+      "uploadsBlocked": "Uploads paused: this device cannot sign the vault head",
       "errorTls": "Couldn’t verify the sync server’s HTTPS connection",
       "unlockIdentityCta": "Unlock identity",
       "errorDeviceKeyMissing": "The signing key this device published is not here, so sync cannot run",
@@ -5614,7 +5614,10 @@
       "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
-      "continue": "Continue"
+      "continue": "Continue",
+      "registerCta": "Save and register",
+      "registerLater": "Later",
+      "registerHint": "Registering adds this identity to {{server}}, the sync server this device already uses, so people can invite you and your vaults can sync. Later keeps it on this device only, and the identity home can register it then."
     },
     "typeback": {
       "title": "Confirm your phrase"

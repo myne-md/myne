@@ -14,6 +14,7 @@
 import { type CSSProperties, type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
+import { syncStatusView } from "@myne/sync-status-view";
 import type { SyncStatus } from "../lib/use-sync-status";
 import type { VaultId } from "../lib/stage";
 import {
@@ -184,69 +185,6 @@ function primaryBtn(disabled: boolean): CSSProperties {
 const HELP: CSSProperties = { marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" };
 const NOTICE: CSSProperties = { marginTop: 14, fontSize: 14, lineHeight: 1.55, color: "var(--fg-2)" };
 
-/** Honest status dot + label — state, never a wall-clock (AS6/AS15). */
-function statusView(status: SyncStatus | null, t: TFunction): { color: string; label: string } {
-  switch (status?.state) {
-    case undefined:
-    case "disabled":
-      return { color: "var(--line-3)", label: t("settings.archive.off") };
-    case "not_enrolled":
-      return { color: "var(--line-3)", label: t("settings.sync.summary.notSetUp") };
-    case "pending":
-      return { color: "var(--warning)", label: t("sync.status.awaitingApproval") };
-    case "idle":
-      return { color: "var(--success)", label: t("settings.archive.on") };
-    case "syncing":
-      return { color: "var(--accent)", label: t("sync.status.syncing") };
-    case "error":
-      // Class-scoped details, mirroring the desktop indicator's arms
-      // (`src/components/sync/SyncStatusIndicator.tsx`) because a phone reaches
-      // exactly the same classes out of the same core, and the shared copy
-      // already exists for every one of them (myne-md/myne#938 task 13).
-      //
-      // The rule this replaces: everything but a TLS failure read "Offline", so a
-      // locked identity, a frozen account, a full disk and a removed device all
-      // told the user the same false thing and pointed at a network that was
-      // working. "Offline" now means the one class it names, `sync_failed`, which
-      // is what `FailureClass::Transport` and `Other` both report.
-      switch (status.detail) {
-        case "auth_failed":
-          return { color: "var(--danger)", label: t("sync.status.errorAuth") };
-        case "rate_limited":
-          return { color: "var(--warning)", label: t("sync.status.errorRateLimited") };
-        case "quota_exceeded":
-          return { color: "var(--danger)", label: t("sync.status.errorQuota") };
-        case "payload_too_large":
-          return { color: "var(--danger)", label: t("sync.status.errorTooLarge") };
-        case "frozen":
-          return { color: "var(--danger)", label: t("sync.status.errorFrozen") };
-        // A shared vault refuses to sync until the person identity is unlocked
-        // for this session. Its own copy because the fix is a specific user
-        // action, and "Offline" would send them looking at the network.
-        case "identity_locked":
-          return { color: "var(--warning)", label: t("sync.status.errorIdentityLocked") };
-        case "storage_full":
-          return { color: "var(--warning)", label: t("sync.status.errorStorageFull") };
-        case "device_revoked":
-          return { color: "var(--danger)", label: t("sync.status.errorDeviceRevoked") };
-        // Not an offline device either: certificate and server-name validation
-        // must be fixed before this client can reconnect.
-        case "tls_failure":
-          return { color: "var(--danger)", label: t("sync.status.errorTls") };
-        case "sync_failed":
-          return { color: "var(--warning)", label: t("settings.sync.summary.offline") };
-        // A detail this build does not know (a newer core, a renamed class) is
-        // not evidence of a transport failure, so it gets the generic copy.
-        default:
-          return { color: "var(--danger)", label: t("sync.status.error") };
-      }
-    case "conflicts":
-      return {
-        color: "var(--danger)",
-        label: t("settings.sync.summary.conflicts", { count: status.count }),
-      };
-  }
-}
 
 // ── SY-01 · Sync hub ─────────────────────────────────────────────────────────
 
@@ -275,10 +213,20 @@ export interface SyncHubPanelProps {
    *  verdict answers. Optional so a caller with no vault in scope renders none.
    */
   onShowApprovalCode?: () => void;
+  /** Open the identity-unlock door for this device (myne-md/myne#1029).
+   *
+   *  The shared view decides WHETHER this state offers a repair (`view.action`),
+   *  and this is what the phone has to route it to. Until it existed the row
+   *  printed "Unlock your identity to sync" and rendered no control at all,
+   *  because the phone's only identity surface mounted on the zero-vault stage:
+   *  a sentence naming an act the client could not perform. Optional so an
+   *  isolated render still shows just the row's label.
+   */
+  onUnlockIdentity?: () => void;
 }
 
 /** SY-01: the honest enrollment status + force-sync + drill-down entry points. */
-export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers, onShowApprovalCode }: SyncHubPanelProps) {
+export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoint, onOpenEnroll, onOpenDevices, onOpenMembers, onShowApprovalCode, onUnlockIdentity }: SyncHubPanelProps) {
   const { t } = useTranslation();
   const [endpoint, setEndpoint] = useState<string | null>(null);
   // Read-at-rest usage projection (MYND-570). `null` = unavailable → section omitted.
@@ -290,12 +238,13 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
   // KNOWN rather than defaulting either way: `unknown` would otherwise print the
   // owner's label over the member's numbers, or the reverse.
   const plane = useMemberVault(vaultId);
-  const view = statusView(status, t);
-  // "Sync now" is only meaningful with an authed session to sync — a cycle while
-  // disabled / not-enrolled / pending returns NotReady, so hide it there rather
-  // than promise a sync that can't run (mirrors the old SY-08 detail sheet).
-  const canSyncNow =
-    status?.state !== "disabled" && status?.state !== "not_enrolled" && status?.state !== "pending";
+  // The shared mapping, the same one the desktop indicator calls (myne-md/myne#1027).
+  const view = syncStatusView(status, t);
+  // Whether "Sync now" is a promise this state can keep is the SHARED view's answer, not a
+  // local one: the phone used to hold a fourth copy of the rule, and it offered the button
+  // while uploads were blocked, where a cycle uploads nothing and then flashes a success
+  // (myne-md/myne#1027). One mapping, one answer, both clients.
+  const canSyncNow = view.syncNowUseful;
   // "Add this device" is the enrol entry point for a device that is not a
   // member — and dead UI for one that is. It used to render unconditionally, so
   // an already-syncing phone was invited to enrol again; `sync_enroll` mints a
@@ -342,7 +291,7 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
         <Row testId="sync.settings.status">
           <span style={rowLabel}>{t("sync.settings.statusLabel")}</span>
           <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--fg-2)" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: view.color, flex: "none" }} />
+            <span style={{ width: 9, height: 9, borderRadius: "50%", background: view.dotColor, flex: "none" }} />
             <span style={{ fontSize: 15 }}>{view.label}</span>
           </div>
         </Row>
@@ -368,6 +317,22 @@ export function SyncHubPanel({ status, vaultId, onSyncNow, syncing, onOpenEndpoi
             <span style={{ ...rowLabel, color: syncing ? "var(--fg-3)" : "var(--accent)" }}>
               {syncing ? t("sync.status.syncing") : t("sync.status.syncNow")}
             </span>
+          </Row>
+        )}
+        {view.action !== null && onUnlockIdentity !== undefined && (
+          // The repair the sentence promises (myne-md/myne#1029). Deliberately
+          // NOT inside the `canSyncNow` block: in exactly these states a cycle
+          // uploads nothing, so "Sync now" is the wrong control and this is the
+          // only one that does anything. The two labels are the desktop
+          // indicator's (`sync.status.unlockIdentityCta` / `repairDeviceCta`): one
+          // vocabulary for one state, whichever client renders it.
+          <Row onClick={onUnlockIdentity} testId="sync.settings.unlock-identity">
+            <span style={{ ...rowLabel, color: "var(--accent)" }}>
+              {view.action === "repair_device"
+                ? t("sync.status.repairDeviceCta")
+                : t("sync.status.unlockIdentityCta")}
+            </span>
+            <RowChevron />
           </Row>
         )}
       </Group>

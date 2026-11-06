@@ -374,6 +374,39 @@ impl HeadAuthority {
             .is_some_and(super::head_authority::SignedHeadCtx::can_author)
     }
 
+    /// A context that can VERIFY a head but not sign one (myne-md/myne#1000).
+    ///
+    /// Built when the roster or its signer cannot be resolved from local state, which is the
+    /// state of every device that has just joined a vault: the roster's signer lives in
+    /// `vault.device-bindings`, and the only thing that downloads that file is the cycle this
+    /// context lets run. The head it can still verify is the owner's person-signed one, against
+    /// a half this device derived from the phrase or pinned out of band.
+    fn person_reader(
+        person: Option<protocol::PersonKeyPair>,
+        account_number_hash: [u8; protocol::vault_head::VAULT_HEAD_ACCOUNT_HASH_LEN],
+        owner_public: protocol::person_key::PersonPublicHalf,
+        person_held: bool,
+    ) -> Self {
+        Self {
+            ctx: Some(super::head_authority::SignedHeadCtx::person_only_reader(
+                person,
+                account_number_hash,
+                owner_public,
+            )),
+            device: super::authority::DeviceResolution::Unbound {
+                cause: super::authority::AuthorityMissing::NoHeadContext,
+                signers: Vec::new(),
+            },
+            person_held,
+        }
+    }
+
+    /// Whether this device can OPEN a head at all, which is a weaker question than
+    /// [`Self::can_author`] and the one the cycle's guard asks before refusing to run.
+    fn can_read(&self) -> bool {
+        self.ctx.is_some()
+    }
+
     fn missing(&self) -> super::authority::AuthorityMissing {
         super::authority::missing_for_cycle(self.ctx.is_some(), self.person_held, &self.device)
     }
@@ -419,17 +452,12 @@ pub(crate) async fn signed_head_ctx(
     let Some(b2b) = super::meta_kind::b2b_tail(&bytes) else {
         return HeadAuthority::no_context(person_held);
     };
-    let Some(group_key) = shared.group_bytes() else {
-        return HeadAuthority::no_context(person_held);
-    };
-    let Some(envelope) = protocol::person_invite::open_group_roster(
-        &group_key,
-        &b2b.base.account_number_hash,
-        b2b.group_key_epoch,
-        &b2b.signed_roster_envelope,
-    ) else {
-        return HeadAuthority::no_context(person_held);
-    };
+    // The OWNER's public half is resolved BEFORE the roster, because it is the one thing
+    // every later failure can still verify a head against. A device that has just joined
+    // has no copy of `vault.device-bindings`, so the roster's signer cannot be resolved and
+    // the whole cycle used to be refused before the pull that would deliver that file
+    // (myne-md/myne#1000). The person half is derived from the phrase or from the pinned
+    // identity code, so it is available in exactly that state.
     let Ok(sync_state) = super::state::read_sync_state(io, vault_dir).await else {
         return HeadAuthority::no_context(person_held);
     };
@@ -458,6 +486,31 @@ pub(crate) async fn signed_head_ctx(
             };
             code.public
         }
+    };
+    // The group key and the roster, which is where a joined device runs out of state: the
+    // envelope is sealed under the group key and its SIGNER is resolved from the binding
+    // store below. Both failures build a READ-ONLY context instead of refusing, so the pull
+    // that delivers the missing file can run (myne-md/myne#1000).
+    let Some(group_key) = shared.group_bytes() else {
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
+    };
+    let Some(envelope) = protocol::person_invite::open_group_roster(
+        &group_key,
+        &b2b.base.account_number_hash,
+        b2b.group_key_epoch,
+        &b2b.signed_roster_envelope,
+    ) else {
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
     };
     // ONE read of the key at rest, whose public half the roster verification needs below. It
     // used to be two reads with two error policies (`load_for_fallback` here, `load` further
@@ -489,7 +542,12 @@ pub(crate) async fn signed_head_ctx(
         &b2b.base.account_number_hash,
     )
     .ok() else {
-        return HeadAuthority::no_context(person_held);
+        return HeadAuthority::person_reader(
+            person,
+            b2b.base.account_number_hash,
+            owner_public,
+            person_held,
+        );
     };
     let roster_publics: Vec<protocol::person_key::PersonPublicHalf> = roster
         .members
@@ -562,6 +620,47 @@ pub(crate) async fn signed_head_ctx(
 /// a person-key rotation, and a cached copy would outlive the credential it
 /// names. `None` on an absent file (no identity on this device), an all-zero or
 /// unparseable one, or an empty token (an identity that never registered).
+/// What a cycle does about a B2B vault whose head this device may not author.
+///
+/// The refusal this replaced was one boolean, and it cost the only route out of
+/// `myne-md/myne#1000`: a device that had just joined could not resolve the roster's signer,
+/// so the whole cycle was refused BEFORE the pull — and the pull is the only thing that
+/// downloads `vault.device-bindings`, which is what resolves that signer. The state could not
+/// repair itself, and the user met an approval screen whose code never arrives.
+///
+/// `ReadOnly` is the arm that breaks the loop, and it is safe because the property the refusal
+/// protects is "never AUTHOR the downgraded `0x01` HMAC head": `PushGate::PollOnly` denies both
+/// the content push and the genesis head, so no head is authored at all. What the device may
+/// still do is verify and adopt a head its peer signed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HeadAuthorityVerdict {
+    /// Authoring works, or this vault needs no signed head: an ordinary cycle.
+    Author,
+    /// A head can be READ but not signed: run pull-only and report nothing as broken.
+    ReadOnly,
+    /// No head context at all, so not even a signature can be checked: refuse.
+    Refuse,
+}
+
+/// The one decision the cycle makes about a missing authoring authority.
+///
+/// A function rather than three lines in the middle of a 700-line builder because the three
+/// answers are the whole of `myne-md/myne#1000`, and a caller would otherwise have to stand up
+/// a server to see which arm it took.
+fn head_authority_verdict(
+    needs_signed_head: bool,
+    authority: &HeadAuthority,
+) -> HeadAuthorityVerdict {
+    if !needs_signed_head || authority.can_author() {
+        return HeadAuthorityVerdict::Author;
+    }
+    if authority.can_read() {
+        HeadAuthorityVerdict::ReadOnly
+    } else {
+        HeadAuthorityVerdict::Refuse
+    }
+}
+
 /// Which `FailureClass` a missing authority becomes, in one place.
 ///
 /// The mapping is the whole point of myne-md/myne#983: the class, the log and the UI sentence
@@ -695,7 +794,7 @@ pub async fn run_active_cycle_from_host(
     // screens fire `sync_now` about once a second and `useConflictMaterializer`
     // fires one on every `sync://changed`, which is precisely when a joining
     // device's first pull lands and the ceremony opens.
-    let gate = if !allow_push {
+    let mut gate = if !allow_push {
         super::orchestrator::PushGate::PollOnly
     } else if super::verify_hold::verify_hold().is_held(host.now_unix_millis()) {
         super::orchestrator::PushGate::VerifyHold
@@ -996,6 +1095,11 @@ pub async fn run_active_cycle_from_host(
     // thread. A vault with no tail keeps the `NTV5` HMAC head and resolves to `no_context`
     // here, which the guard never consults because it only fires on a tail-carrying vault.
     let authority = signed_head_ctx(host, io, &dir, state, &shared, is_owner).await;
+    // Why this cycle could not upload, when it could not (myne-md/myne#1027). Declared here so
+    // the ReadOnly arm can record it and the success arm can carry it back on the summary: the
+    // arm already LOGGED this and then dropped it, which is how a device that uploaded nothing
+    // for a day reported `Ran` with no caveat and the UI printed "Synced".
+    let mut upload_blocked: Option<&'static str> = None;
     // An `NTV6` vault's head is signature-authenticated. If no person identity is
     // held, the cycle must NOT silently fall back to the `NTV5` HMAC: that
     // authors a `0x01` head the `0x02` server refuses and wedges sync until the
@@ -1028,7 +1132,8 @@ pub async fn run_active_cycle_from_host(
                 return CycleOutcome::Failed(super::loop_control::FailureClass::Other);
             }
         };
-        if needs_signed_head && !authority.can_author() {
+        let verdict = head_authority_verdict(needs_signed_head, &authority);
+        if verdict != HeadAuthorityVerdict::Author {
             // The cause comes from `sync::authority`, which is the only place that knows
             // which half is missing (myne-md/myne#983). The class is derived from whether
             // opening the identity would FIX it, not from whether an identity happens to be
@@ -1036,16 +1141,34 @@ pub async fn run_active_cycle_from_host(
             // `identity_locked` for exactly as long as the two were conflated, and the
             // sentence sent the user to a fix that only sometimes applied.
             let cause = authority.missing();
-            let class = class_for_missing_authority(cause, authority.person_held);
-            tracing::warn!(
-                stage = "sync_cycle",
-                event = "b2b_head_authority_missing",
-                cause = cause.as_str(),
-                person_identity_held = authority.person_held,
-                identity_unlock_would_fix = cause.identity_unlock_would_fix(),
-                "this device cannot sign the vault head; refusing to author a downgraded head"
-            );
-            return CycleOutcome::Failed(class);
+            match verdict {
+                HeadAuthorityVerdict::ReadOnly => {
+                    tracing::warn!(
+                        stage = "sync_cycle",
+                        event = "b2b_head_authority_missing",
+                        cause = cause.as_str(),
+                        person_identity_held = authority.person_held,
+                        identity_unlock_would_fix = cause.identity_unlock_would_fix(),
+                        "this device cannot sign the vault head; running a pull-only cycle to \
+                         fetch the state that would let it"
+                    );
+                    gate = super::orchestrator::PushGate::PollOnly;
+                    upload_blocked = blocked_token(cause);
+                }
+                HeadAuthorityVerdict::Refuse => {
+                    let class = class_for_missing_authority(cause, authority.person_held);
+                    tracing::warn!(
+                        stage = "sync_cycle",
+                        event = "b2b_head_authority_missing",
+                        cause = cause.as_str(),
+                        person_identity_held = authority.person_held,
+                        identity_unlock_would_fix = cause.identity_unlock_would_fix(),
+                        "this device has no head context at all; refusing to run the cycle"
+                    );
+                    return CycleOutcome::Failed(class);
+                }
+                HeadAuthorityVerdict::Author => {}
+            }
         }
     }
 
@@ -1356,6 +1479,19 @@ pub async fn run_active_cycle_from_host(
             // existed nothing on disk did.
             super::state::record_sync_success(io, &vault_root_for_stamp, host.now_unix_millis())
                 .await;
+            // The OTHER clock (myne-md/myne#1027): "last success" is reachability, and a
+            // pull-only cycle stamps it, so a device that had uploaded nothing for a day still
+            // reported a success two minutes old. This one moves only when something went UP.
+            if pushed_anything(&summary) {
+                super::state::record_upload_success(
+                    io,
+                    &vault_root_for_stamp,
+                    host.now_unix_millis(),
+                )
+                .await;
+            }
+            let mut summary = summary;
+            summary.upload_blocked = upload_blocked;
             CycleOutcome::Ran(summary)
         }
         Ok(Err(e)) => {
@@ -1460,6 +1596,90 @@ pub async fn run_active_cycle_from_host(
     outcome
 }
 
+/// The cause token a pull-only cycle publishes.
+///
+/// The class is asked as if no identity were held: `class_for_missing_authority` answers `Other`
+/// whenever one IS held, on the reasoning that the user has nothing to do, which is true for the
+/// retry ladder and useless as a sentence. What the UI needs is what is missing, and
+/// `status_detail` is the one vocabulary every client already maps.
+///
+/// `Other` means no user action repairs it, and "Sync failed" would be a lie about a cycle that
+/// just succeeded, so it becomes the neutral token instead.
+///
+/// Split out because this is the branch's headline production decision and a test cannot drive
+/// `run_active_cycle_from_host` (it needs a host, a server and a live session). What a test at
+/// this seam buys is the vocabulary: the mapping from a cause to the token a user reads. It does
+/// not cover the assignment that publishes the token, and `0787` records that gap rather than
+/// pretending the seam closes it.
+fn blocked_token(cause: crate::plugins::sync::authority::AuthorityMissing) -> Option<&'static str> {
+    Some(
+        match class_for_missing_authority(cause, false).status_detail() {
+            "sync_failed" => "uploads_blocked",
+            detail => detail,
+        },
+    )
+}
+
+/// Whether a summary advanced anything on the server, which is what the upload clock records.
+///
+/// Split out with `blocked_token` for the same reason and with the same limit: the predicate is
+/// proved, the `if` around it is not.
+fn pushed_anything(summary: &super::orchestrator::SyncSummary) -> bool {
+    summary.pushed > 0
+        || summary.head_advanced
+        || summary.attachments_pushed > 0
+        || summary.tombstones_pushed > 0
+}
+
+/// The manual button's answer for a cycle that RAN.
+///
+/// Split out from the async shell so the rule is testable without a host, because the
+/// shell had this wrong: it answered `Idle` for every `Ran` and dropped the verdict the
+/// cycle had just computed, so one click of "Sync now" on a device that cannot sign
+/// painted "Synced". That is the same collapse the function's own doc comment forbids,
+/// reached through the one path the background loop does not cover (myne-md/myne#1027).
+fn ran_status(
+    upload_blocked: Option<&'static str>,
+    last_upload_at: Option<u64>,
+) -> super::status::SyncRuntimeStatus {
+    match upload_blocked {
+        Some(detail) => super::status::SyncRuntimeStatus::UploadsBlocked {
+            detail: detail.into(),
+            last_upload_at,
+        },
+        None => super::status::SyncRuntimeStatus::Idle,
+    }
+}
+
+/// Read the two persisted clocks. One place, because both arms of the manual
+/// button's answer need them and a second copy of the path resolution is a second
+/// place to get the vault root wrong.
+async fn read_clocks(
+    host: &dyn HostCtx,
+    io: &'static dyn crate::vault_io::VaultIo,
+    state: &VaultRuntimeState,
+) -> super::status::SyncClocks {
+    let none = super::status::SyncClocks {
+        last_success_at: None,
+        last_upload_at: None,
+    };
+    let Ok(dir) = crate::paths::active_vault_root_io_from_host(host, state.active_vault_id().await)
+    else {
+        return none;
+    };
+    match super::state::read_sync_state(io, &dir).await {
+        // The STRUCT, not a positional pair: `SyncClocks`' own doc says the two Option<u64> are
+        // kept together so a caller cannot pass one where the other belongs, and a tuple
+        // undoes exactly that in the two call sites below (the upload clock would land in
+        // `Error.last_success_at`, the staleness number a user reads).
+        Ok(s) => super::status::SyncClocks {
+            last_success_at: s.last_success_at_ms,
+            last_upload_at: s.last_upload_at_ms,
+        },
+        Err(_) => none,
+    }
+}
+
 /// Run one cycle NOW (the manual "Sync now" button) and report the resulting
 /// status.
 ///
@@ -1468,7 +1688,13 @@ pub async fn run_active_cycle_from_host(
 /// `NotReady` outcome must NOT collapse into `Idle`. Reporting "Synced" for a
 /// device that cannot sync is the exact dishonesty the status derivation exists
 /// to prevent, and clicking "Sync now" on an unenrolled device would otherwise
-/// flip the dot to green. Only a genuine `Ran` is `Idle`.
+/// flip the dot to green.
+///
+/// A `Ran` is `Idle` only when the cycle could upload. It used to mean "the cycle
+/// ran, therefore all is well", which is how one click on a device that cannot
+/// sign a head painted "Synced" over a day of dropped uploads (myne-md/myne#1027);
+/// `ran_status` is the one place that decides, and `UploadsBlocked` carries the
+/// cause.
 pub async fn sync_now_from_host(
     host: &dyn HostCtx,
     io: &'static dyn crate::vault_io::VaultIo,
@@ -1495,25 +1721,19 @@ pub async fn sync_now_from_host(
                 // this covers the manual path on top of it.
                 host.emit("sync://changed", EventPayload::Count(summary.pulled as u32));
             }
-            SyncRuntimeStatus::Idle
+            // A `Ran` that could not upload is NOT `Idle`: the cycle's own verdict travels
+            // on the summary, and answering "Synced" here would hide the very state this
+            // button has to be able to show (myne-md/myne#1027).
+            let clocks = read_clocks(host, io, state).await;
+            ran_status(summary.upload_blocked, clocks.last_upload_at)
         }
         CycleOutcome::Failed(class) => {
             // The manual button's answer carries the same clock the polled
             // status does, so a "Sync now" that fails does not blank out a
             // staleness warning the poll had already raised.
-            let last_success_at = match crate::paths::active_vault_root_io_from_host(
-                host,
-                state.active_vault_id().await,
-            ) {
-                Ok(dir) => super::state::read_sync_state(io, &dir)
-                    .await
-                    .ok()
-                    .and_then(|s| s.last_success_at_ms),
-                Err(_) => None,
-            };
             SyncRuntimeStatus::Error {
                 detail: class.status_detail().into(),
-                last_success_at,
+                last_success_at: read_clocks(host, io, state).await.last_success_at,
             }
         }
     }
@@ -1746,6 +1966,119 @@ mod tests {
     //! rule is about — which file the hash comes from, and what happens when the
     //! two disagree — is decided here, and the rest of the gather is a host, a
     //! runtime slot and a live server.
+
+    /// A pull-only cycle publishes a token, and the token is the sentence a user reads.
+    ///
+    /// **What this proves and what it does not.** It proves the VOCABULARY: which cause becomes
+    /// which token, including the `sync_failed` rewrite that exists because "Sync failed" would
+    /// slander a cycle that just succeeded. It does NOT prove the assignment that publishes it,
+    /// because that sits inside a cycle that needs a host, a server and a live session, and
+    /// deleting the assignment together with the `mut` it needs compiles and leaves this test
+    /// green. Measured rather than assumed: that injection was run. The missing call-site test is
+    /// a named residual in `decisions/sync/0787`, not a claim this comment makes.
+    #[test]
+    fn a_pull_only_cycle_names_what_is_missing() {
+        use super::blocked_token;
+        use crate::plugins::sync::authority::AuthorityMissing;
+
+        assert_eq!(
+            blocked_token(AuthorityMissing::KeyMissingWhileBound),
+            Some("device_key_missing"),
+            "a key this device published and no longer holds is the repairable cause"
+        );
+        assert_eq!(
+            blocked_token(AuthorityMissing::NoPersonSession),
+            Some("identity_locked"),
+            "no session and no key is the cause the identity phrase fixes"
+        );
+        assert_eq!(
+            blocked_token(AuthorityMissing::KeyUnreadable),
+            Some("uploads_blocked"),
+            "a store fault is the neutral token, because 'Sync failed' would slander a cycle \
+             that just succeeded"
+        );
+    }
+
+    /// Only a summary that actually advanced something stamps the upload clock.
+    ///
+    /// The predicate is proved here; its CALL SITE is not, for the same reason as above (the same
+    /// undrivable cycle). Deleting the `if` leaves `last_upload_at` absent for ever with every
+    /// test green, which was measured. `0787` carries it as a residual rather than this comment
+    /// claiming a deletion test it does not have.
+    #[test]
+    fn only_a_pushing_cycle_counts_as_an_upload() {
+        use super::pushed_anything;
+        use crate::plugins::sync::orchestrator::SyncSummary;
+
+        assert!(
+            !pushed_anything(&SyncSummary::default()),
+            "a cycle that moved nothing is not an upload, which is the whole defect: idle and \
+             unreachable-for-uploads looked identical"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                pushed: 1,
+                ..Default::default()
+            }),
+            "a pushed note is an upload"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                head_advanced: true,
+                ..Default::default()
+            }),
+            "a head that moved is an upload even with no blob of its own"
+        );
+        assert!(
+            pushed_anything(&SyncSummary {
+                attachments_pushed: 1,
+                ..Default::default()
+            }),
+            "an attachment is an upload"
+        );
+        assert!(
+            !pushed_anything(&SyncSummary {
+                pulled: 7,
+                ..Default::default()
+            }),
+            "a pure pull is NOT an upload, which is why this clock is separate from last_success_at"
+        );
+    }
+
+    /// The manual "Sync now" button must not answer `Idle` for a cycle that could not upload.
+    ///
+    /// The exact regression: `sync_now_from_host` matched `Ran(_)` and returned `Idle`
+    /// unconditionally, so the verdict the cycle had just computed was dropped on the one path
+    /// the background loop does not cover, and a click on a blocked device painted "Synced".
+    /// Removing the `upload_blocked` arm below compiles and leaves every other test green.
+    #[test]
+    fn a_manual_sync_that_cannot_upload_is_not_idle() {
+        use super::ran_status;
+        use crate::plugins::sync::status::SyncRuntimeStatus;
+
+        assert_eq!(
+            ran_status(None, Some(1)),
+            SyncRuntimeStatus::Idle,
+            "a clean cycle is still Idle, and carries no blocked cause"
+        );
+        match ran_status(Some("device_key_missing"), Some(1_700_000_000_000)) {
+            SyncRuntimeStatus::UploadsBlocked {
+                detail,
+                last_upload_at,
+            } => {
+                assert_eq!(detail, "device_key_missing");
+                assert_eq!(
+                    last_upload_at,
+                    Some(1_700_000_000_000),
+                    "the blocked answer carries the upload clock, which is the whole reason \
+                     the state exists"
+                );
+            }
+            other => {
+                panic!("a Ran cycle that could not upload answered {other:?}, not UploadsBlocked")
+            }
+        }
+    }
 
     /// The failure class a missing authority becomes, asserted for the four shapes that matter.
     ///
@@ -2101,5 +2434,63 @@ mod tests {
                 "a pulled tombstone must not be re-indexed, got {tail:?}"
             );
         });
+    }
+
+    /// `myne-md/myne#1000`'s three answers, asserted where they are decided.
+    ///
+    /// The defect was one boolean: a device that could not SIGN was refused a cycle, and the
+    /// pull that would have given it the state to sign with never ran. The middle arm is the
+    /// fix, and it is the one a future edit collapses by accident: `can_read` and `can_author`
+    /// differ only for a context built without the roster, so an edit that asks the louder
+    /// question here restores the deadlock while every other test in the crate stays green.
+    #[test]
+    fn a_cycle_reads_what_it_cannot_sign_and_refuses_only_without_a_context() {
+        use super::{head_authority_verdict, HeadAuthority, HeadAuthorityVerdict};
+        use protocol::PersonKeyPair;
+
+        // No context at all: nothing can be verified, so the cycle must not run.
+        assert_eq!(
+            head_authority_verdict(true, &HeadAuthority::no_context(true)),
+            HeadAuthorityVerdict::Refuse,
+            "without a head context not even a signature can be checked"
+        );
+
+        // A context that reads but cannot sign: the joined device's state.
+        let account = [0x61u8; 16];
+        let owner = PersonKeyPair::generate_raw(&[0x71; 64], &[0x72; 32], &[0x73; 32]);
+        let reader =
+            HeadAuthority::person_reader(Some(owner.clone()), account, owner.public_half(), true);
+        assert!(
+            !reader.can_author(),
+            "the fixture must be the state the arm exists for"
+        );
+        assert_eq!(
+            head_authority_verdict(true, &reader),
+            HeadAuthorityVerdict::ReadOnly,
+            "a device that cannot sign still pulls the state that lets it"
+        );
+
+        // And the ordinary vault, where the whole block is skipped.
+        let authoring = HeadAuthority {
+            ctx: Some(super::super::head_authority::SignedHeadCtx::new(
+                Some(owner.clone()),
+                account,
+                vec![owner.public_half()],
+            )),
+            device: super::super::authority::DeviceResolution::Unbound {
+                cause: super::super::authority::AuthorityMissing::NoHeadContext,
+                signers: Vec::new(),
+            },
+            person_held: true,
+        };
+        assert_eq!(
+            head_authority_verdict(true, &authoring),
+            HeadAuthorityVerdict::Author
+        );
+        assert_eq!(
+            head_authority_verdict(false, &reader),
+            HeadAuthorityVerdict::Author,
+            "an NTV5 vault needs no signed head, so the authority is never consulted"
+        );
     }
 }
