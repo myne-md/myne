@@ -721,6 +721,16 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
         // (SYNC-13) covers dataHome, so point every tmp class at it.
         XDG_RUNTIME_DIR: runtimeDir,
         TMPDIR: tmpDir,
+        // **A LIGHT colour scheme, chosen by the harness rather than inherited.**
+        // WebKitGTK answers `prefers-color-scheme` from the GTK theme, and on a
+        // Linux developer's desktop that is whatever they run — measured
+        // 2026-11-07: this seat is `prefer-dark` with `GTK_THEME=Adwaita-dark`, so
+        // the app booted dark and `graph-color-groups` gc1 compared the dark token
+        // against itself ("expected [217,140,193] to not deeply equal
+        // [217,140,193]") while the product was behaving correctly. A scenario that
+        // MEASURES a light-to-dark switch needs to start light on every seat, the
+        // same way it needs a fixed window size.
+        GTK_THEME: "Adwaita:light",
         // **This seat declares a Wayland-only session, and it is a measurement
         // rather than a ruse.** Desktop idle-lock reads MACHINE idle where the OS
         // exposes it, and on Linux that is X11's ScreenSaver

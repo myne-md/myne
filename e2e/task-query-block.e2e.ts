@@ -197,12 +197,13 @@ describeE2E("tq3 an all-dropped query refuses rather than showing the vault (MYN
         await waitForSaved(s);
 
         await createNote(s, "Review");
-        await typeIntoEditor(
+        // SEEDED, not typed, for the reason tq2 records: typing a fence lets the
+        // editor auto-close the backticks, so only the first line reaches the
+        // block and the "all clauses dropped" query is never all-dropped.
+        await seedEmbedIntoNote(
           s,
           ["```tasks", "group by heading", "hide task count", "```"].join("\n"),
         );
-        await waitForSaved(s);
-        await pressInEditor(s, ENTER_KEY); // caret out of the fence — see tq1
 
         // A misread query must not render the whole vault — that would look
         // like a correct enormous result.
