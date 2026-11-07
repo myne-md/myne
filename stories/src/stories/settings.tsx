@@ -54,7 +54,6 @@ import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
 import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
 import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
 import { McpSection } from "@app/components/settings/McpSection";
-import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
 import { NewNoteLocationSettings } from "@app/components/settings/NewNoteLocationSettings";
 import { PeriodicNotesSettings } from "@app/components/settings/PeriodicNotesSettings";
@@ -71,7 +70,6 @@ import {
   SettingsTopicPanel,
 } from "@app/components/settings/SettingsTabs";
 import { AI_PANEL_TOPICS } from "@app/components/settings/settingsTopics";
-import { SettleMigrationBlock } from "@app/components/settings/SettleMigrationBlock";
 import { SpellSettings } from "@app/components/settings/SpellSettings";
 import { StartupOpenSettings } from "@app/components/settings/StartupOpenSettings";
 import { StoragePanel } from "@app/components/settings/StoragePanel";
@@ -1159,21 +1157,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "settings/migratevaultform/default",
-    group: "settings",
-    surface: "MigrateVaultForm",
-    state: "default",
-    description:
-      "The whole-vault v0.1 → v0.2 migration form, user-initiated rather than a forced refuse-and-prompt. The recovery phrase is required and verified backend-side, so a missing phrase writes nothing; the copy is honest rather than alarming, and the one-way re-key is the single caution.",
-    tags: ["settings", "migration", "v0.1", "v0.2", "recovery-phrase", "one-way", "upgrade"],
-    fixture: PREFS_FIXTURE,
-    render: () => (
-      <Frame>
-        <MigrateVaultForm onMigrated={action("onMigrated")} />
-      </Frame>
-    ),
-  },
-  {
     id: "settings/networkpanel/default",
     // A `role="switch"` whose value is unresolved: this story does not answer
     // the command that drives the toggle, so `checked` is not a boolean and
@@ -1497,25 +1480,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
             </SettingsTopicPanel>
           </div>
         </div>
-      </Frame>
-    ),
-  },
-  {
-    id: "settings/settlemigrationblock/default",
-    group: "settings",
-    surface: "SettleMigrationBlock",
-    state: "default",
-    description:
-      "Settings → Vault's block offering to settle a completed migration. It renders only when the backend reports an unsettled legacy snapshot, and the fake host reports none, so the stage shows the `unreachable` reason rather than the block: when it does render it is the door that finalises the migration.",
-    unreachable: {
-      what: "the block offering to settle a completed migration",
-      why: "it renders only when the backend reports an unsettled legacy snapshot, and the fake host reports none",
-    },
-    tags: ["settings", "migration", "settle", "v0.1", "unsettled", "snapshot", "vault"],
-    fixture: PREFS_FIXTURE,
-    render: () => (
-      <Frame>
-        <SettleMigrationBlock onSettled={action("onSettled")} />
       </Frame>
     ),
   },

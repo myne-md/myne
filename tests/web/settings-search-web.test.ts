@@ -25,7 +25,6 @@ const WEB_ABSENT = [
   "biometricQuickUnlock",
   "osIdleAutoLock",
   "screenCaptureProtection",
-  "vaultMigration",
   "backup",
   "nativeSaveAs",
   "vaultCreation",

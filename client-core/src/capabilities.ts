@@ -21,8 +21,6 @@ export type Capability =
   | "screenCaptureProtection"
   /** The opt-in diagnostic log the user is invited to send on (myne-md/myne#860). */
   | "diagnosticLog"
-  /** Legacy single-vault → multi-vault migration. */
-  | "vaultMigration"
   /**
    * The identity phrase opening a person-wrapped (`NTV7`/`NTV8`) vault, where it
    * replaces the retired per-vault recovery phrase. Present on all three clients.
@@ -168,7 +166,6 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   osIdleAutoLock: true,
   screenCaptureProtection: true,
   diagnosticLog: true,
-  vaultMigration: true,
   personVaultCredential: true,
   personIdentity: true,
   personCredentialPersisted: true,

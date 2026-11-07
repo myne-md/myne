@@ -38,7 +38,6 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // cannot ask that.
   "screenCaptureProtection",
   // Legacy single-vault layout never existed in OPFS.
-  "vaultMigration",
   // The person identity is SESSION-only on this client (myne-md/myne#911 task
   // 13): the two person files (the sealed keypair and the device token) live in
   // the Worker's memory, so a reload asks for the 24 words again. An origin's
