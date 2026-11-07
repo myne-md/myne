@@ -438,7 +438,7 @@ pub async fn resolve_device(
 /// device resolution can run: a roster signed by a device key must be verifiable BY that
 /// device, which is a chicken and egg this split resolves without a second policy.
 #[must_use]
-fn verified_signers(
+pub(crate) fn verified_signers(
     map: &protocol::DeviceBindingsMap,
     roster_publics: &[PersonPublicHalf],
 ) -> Vec<DeviceHeadSigner> {

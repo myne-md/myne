@@ -144,6 +144,13 @@ export const EXCEPTIONS = [
       "an ASCII-lowercase grammar token validated against the closed period vocabulary before the write, not user text; the site's own comment carries the argument, and the VALUE (a folder path) is never logged",
   },
   {
+    file: "core/src/plugins/sync/engine.rs",
+    level: "warn",
+    field: "signer",
+    reason:
+      "the 16-byte author slot of a signed head, rendered by this site from a fixed-size array as exactly 32 lowercase hex characters or the literal `unknown`, so the only input that can lengthen it is a compile-time constant; it is the ONE datum an unresolved-signer wedge needs and no closed enum can carry it (myne-md/myne#1032)",
+  },
+  {
     file: "core/src/plugins/agent/host_commands.rs",
     level: "error",
     field: "reason",
