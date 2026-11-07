@@ -40,6 +40,7 @@ export const EVENT_FIELD_KEYS = {
   repeat: "repeat",
   remind: "remind",
   skip: "skip",
+  override: "override",
 } as const;
 
 /**
@@ -91,6 +92,17 @@ export type CalendarEvent = {
    * editing a note the user did not ask it to touch.
    */
   readonly skip: readonly CivilDate[];
+  /**
+   * The occurrences whose START TIME differs from the rule's
+   * (`override: 2026-11-10 14:00, 2026-11-17 13:30`).
+   *
+   * The narrowest shape that answers "not 09:00 this Tuesday": a date the rule
+   * already generates, and a new wall-clock time for it. The date stays, the day
+   * stays and the duration stays, so nothing here can disagree with the series
+   * about WHAT happens or WHEN it ends, which is what keeps this from becoming the
+   * second record `decisions/storage/0792` refuses (`0796` draws the bound).
+   */
+  readonly overrides: readonly EventInstant[];
 };
 
 /**
@@ -133,6 +145,7 @@ const FIELD_KEY_RES = {
   repeat: /^(repeat[ \t]*:[ \t]*)(.*)$/,
   remind: /^(remind[ \t]*:[ \t]*)(.*)$/,
   skip: /^(skip[ \t]*:[ \t]*)(.*)$/,
+  override: /^(override[ \t]*:[ \t]*)(.*)$/,
 } as const;
 
 const TIME_RE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
@@ -247,6 +260,15 @@ export function parseReminderLead(value: string): { raw: string; minutes: number
 export const MAX_SKIP_DATES = 366;
 
 /**
+ * How many retimed occurrences one note may carry.
+ *
+ * Smaller than the skip bound because an override is a bigger record: 120 is more
+ * than two years of a weekly series, and a longer list is a sign the user wants a
+ * second series rather than a hundred exceptions.
+ */
+export const MAX_OVERRIDES = 120;
+
+/**
  * Read `skip:` into civil dates.
  *
  * Separators are commas and whitespace, both accepted, because a user typing the
@@ -264,6 +286,54 @@ export function parseSkipDates(raw: string | null): readonly CivilDate[] {
     if (out.length >= MAX_SKIP_DATES) break;
   }
   return out;
+}
+
+/**
+ * Read `override:` into instants.
+ *
+ * One entry is `<date> <time>`; a bare date is dropped, because a bare date says
+ * nothing this vocabulary can act on (a cancellation is `skip:`). Unparseable
+ * entries are dropped for the same reason `parseSkipDates` drops them.
+ */
+export function parseOverrides(raw: string | null): readonly EventInstant[] {
+  if (raw === null) return [];
+  const out: EventInstant[] = [];
+  // Entries carry a space between date and time, so the list separator must be a
+  // comma only: splitting on whitespace would tear `2026-11-10 14:00` in half.
+  for (const entry of raw.split(",")) {
+    const instant = parseEventInstant(entry.trim());
+    if (instant === null || instant.time === null) continue;
+    if (!out.some((seen) => compareCivilDates(seen.date, instant.date) === 0)) out.push(instant);
+    if (out.length >= MAX_OVERRIDES) break;
+  }
+  return out;
+}
+
+/**
+ * `override:` with one date retimed, ordered, and the date replaced when it is
+ * already there.
+ *
+ * Ordering and uniqueness exist for the byte-stability reason `appendSkipDate`
+ * states: the field's bytes must be a function of its set, or two clients editing
+ * two occurrences in either order produce two files for one schedule.
+ */
+export function setOverride(raw: string | null, instant: EventInstant): string {
+  const kept = parseOverrides(raw).filter(
+    (seen) => compareCivilDates(seen.date, instant.date) !== 0,
+  );
+  return [...kept, instant]
+    .sort((left, right) => compareCivilDates(left.date, right.date))
+    .slice(0, MAX_OVERRIDES)
+    .map(formatEventInstant)
+    .join(", ");
+}
+
+/** `override:` without the entry for `date`, or `null` when there was none. */
+export function clearOverride(raw: string | null, date: CivilDate): string | null {
+  const parsed = parseOverrides(raw);
+  const kept = parsed.filter((seen) => compareCivilDates(seen.date, date) !== 0);
+  if (kept.length === parsed.length) return null;
+  return kept.map(formatEventInstant).join(", ");
 }
 
 /**
@@ -313,6 +383,7 @@ export function readEventFromFmBody(fmBody: string, options?: EventReadOptions):
   const repeatRaw = readField(fmBody, FIELD_KEY_RES.repeat);
   const remindRaw = readField(fmBody, FIELD_KEY_RES.remind);
   const skipRaw = readField(fmBody, FIELD_KEY_RES.skip);
+  const overrideRaw = readField(fmBody, FIELD_KEY_RES.override);
 
   let remind: ReminderLead | null = null;
   if (remindRaw !== null) {
@@ -339,6 +410,7 @@ export function readEventFromFmBody(fmBody: string, options?: EventReadOptions):
       repeat: repeatRaw === null ? null : parseRecurrenceRule(repeatRaw),
       remind,
       skip: parseSkipDates(skipRaw),
+      overrides: parseOverrides(overrideRaw),
     },
   };
 }

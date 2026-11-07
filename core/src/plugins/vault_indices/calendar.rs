@@ -114,6 +114,21 @@ impl EventInstant {
     }
 }
 
+/// An instant read back from a minute on the continuous wall-clock scale.
+///
+/// `has_time` is the ALL-DAY flag, not a property of the scale: an all-day point
+/// sits at its own midnight and must stay all-day after a projection, because a
+/// reader that turned it into `00:00` would render a timed event the user never
+/// made.
+fn instant_from_scale(scale: i64, has_time: bool) -> EventInstant {
+    let days = scale.div_euclid(1440);
+    let minutes = (scale.rem_euclid(1440)) as u32;
+    EventInstant {
+        days,
+        minutes: has_time.then_some(minutes),
+    }
+}
+
 fn parse_date(text: &str) -> Option<(i32, u32, u32)> {
     let bytes = text.as_bytes();
     if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
@@ -326,6 +341,45 @@ fn weekday_index(word: &str) -> Option<u32> {
 /// a longer list than the writer will produce, or two clients disagree about what
 /// the file says.
 pub const MAX_SKIP_DATES: usize = 366;
+
+/// How many retimed occurrences one note's `override:` field may contribute.
+///
+/// The dialect's `MAX_OVERRIDES` carries the same number: a reader must not honour
+/// a longer list than a writer will produce.
+pub const MAX_OVERRIDES: usize = 120;
+
+/// Read `override:` into `(day, minutes)` pairs, dropping what does not parse.
+///
+/// An entry is `<date> <time>`; a bare date is dropped, because the field exists to
+/// change a time and one without a time changes nothing.
+fn parse_overrides(raw: Option<&str>) -> Vec<(i64, u32)> {
+    let Some(raw) = raw else {
+        return Vec::new();
+    };
+    let mut out: Vec<(i64, u32)> = Vec::new();
+    for entry in raw.split(',') {
+        let Some(space) = entry.rfind(' ') else {
+            continue;
+        };
+        let (date_text, time_text) = entry.split_at(space);
+        let Some((y, m, d)) = parse_date(date_text.trim()) else {
+            continue;
+        };
+        let Some(minutes) = parse_time(time_text.trim()) else {
+            continue;
+        };
+        let day = days_from_civil(y, m, d);
+        if let Some(slot) = out.iter_mut().find(|(seen, _)| *seen == day) {
+            slot.1 = minutes;
+        } else {
+            out.push((day, minutes));
+        }
+        if out.len() >= MAX_OVERRIDES {
+            break;
+        }
+    }
+    out
+}
 
 /// The occurrence dates strictly after `from` (inclusive of `from` itself when the
 /// rule places one there), walked to `until` inclusive.
@@ -574,6 +628,12 @@ struct ParsedEvent {
     /// `decisions/storage/0795` settles: a cancellation belongs to the series note,
     /// so it syncs with it, dies with it, and needs no second store to hold it.
     skip: Vec<i64>,
+    /// The dates whose START TIME differs from the rule's, and that time in minutes.
+    ///
+    /// Bound to a date the rule already generates, and to a time only: the day and
+    /// the duration stay, so an override cannot contradict the series about what
+    /// happens (`decisions/storage/0796`).
+    overrides: Vec<(i64, u32)>,
 }
 
 /// Read `skip:` into day numbers, dropping anything that does not parse.
@@ -659,6 +719,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
     // it came from. It is never rendered, so no injection surface rides on it.
     let uid = property(record, "uid").map(str::to_string);
     let skip = parse_skip_dates(property(record, "skip"));
+    let overrides = parse_overrides(property(record, "override"));
 
     Some(Ok(ParsedEvent {
         start,
@@ -669,6 +730,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
         repeat_unrecognized,
         remind,
         skip,
+        overrides,
         uid,
     }))
 }
@@ -749,21 +811,27 @@ pub fn range(
                 continue;
             }
             let shift = (date - event.start.days) * 1440;
-            let occurs_at = event.start.scale() + shift;
+            // A retimed occurrence keeps its DAY and its DURATION: only the wall
+            // clock moves, so the row is still this series' row on this series' day.
+            let occurs_at = match event.overrides.iter().find(|(day, _)| *day == date) {
+                Some((_, minutes)) => date * 1440 + i64::from(*minutes),
+                None => event.start.scale() + shift,
+            };
             let occurs_end = occurs_at + duration;
             // Intersection, half-open at the end: an event that ends exactly when
             // the window opens is not in it.
             if occurs_end <= window_minutes_start || occurs_at > window_minutes_end {
                 continue;
             }
-            let start_instant = EventInstant {
-                days: date,
-                minutes: event.start.minutes,
-            };
-            let end_instant = event.end.map(|end| EventInstant {
-                days: end.days + (date - event.start.days),
-                minutes: end.minutes,
-            });
+            // Built from the minute scale rather than from the series' own fields,
+            // because a retimed occurrence moves BOTH ends: a 09:00-09:30 meeting
+            // overridden to 14:00 is 14:00-14:30, not 14:00-09:30. Deriving both
+            // from `occurs_at`/`occurs_end` is also what keeps a duration that
+            // crosses midnight on one day from being reported on two.
+            let start_instant = instant_from_scale(occurs_at, event.start.minutes.is_some());
+            let end_instant = event
+                .end
+                .map(|_| instant_from_scale(occurs_end, event.start.minutes.is_some()));
             answer.rows.push(CalendarRow {
                 note_id: note_id.clone(),
                 title: record.title.clone(),
@@ -1161,6 +1229,106 @@ mod tests {
                 "2026-11-17 09:15",
                 "2026-11-24 09:15",
             ]
+        );
+    }
+
+    #[test]
+    fn an_overridden_date_keeps_its_day_and_duration_and_moves_only_its_clock() {
+        let state = state_with(&[(
+            "standup",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03 09:15"),
+                ("end", "2026-11-03 09:45"),
+                ("repeat", "every tuesday"),
+                ("override", "2026-11-10 14:00"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        let starts: Vec<&str> = answer.rows.iter().map(|r| r.start.as_str()).collect();
+        let ends: Vec<&str> = answer
+            .rows
+            .iter()
+            .map(|r| r.end.as_deref().unwrap_or(""))
+            .collect();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-11-03 09:15",
+                "2026-11-10 14:00",
+                "2026-11-17 09:15",
+                "2026-11-24 09:15",
+            ],
+            "one date retimed, every sibling untouched"
+        );
+        // The duration follows the retimed start: 14:00-14:30, never 14:00-09:45.
+        assert_eq!(ends[1], "2026-11-10 14:30");
+        assert_eq!(ends[0], "2026-11-03 09:45");
+        // It is still this series' appearance, so it is skippable and retimeable again.
+        assert_eq!(answer.rows[1].occurrence_of.as_deref(), Some("standup"));
+        assert_eq!(
+            answer.rows[1].occurrence_date.as_deref(),
+            Some("2026-11-10")
+        );
+    }
+
+    #[test]
+    fn an_all_day_series_stays_all_day_after_a_projection() {
+        // The ever-present risk of deriving rows from a minute scale: an all-day
+        // point sits at midnight, and a reader that read it back as `00:00` would
+        // turn every all-day event into a timed one.
+        let state = state_with(&[(
+            "holiday",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03"),
+                ("repeat", "every week"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        assert!(!answer.rows.is_empty());
+        for row in &answer.rows {
+            assert!(row.all_day, "an all-day series must never gain a time");
+        }
+    }
+
+    #[test]
+    fn an_override_that_does_not_parse_leaves_the_series_alone() {
+        let state = state_with(&[(
+            "standup",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03 09:15"),
+                ("repeat", "every tuesday"),
+                ("override", "2026-11-10, not-a-time, 2026-11-17 25:00"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        let starts: Vec<&str> = answer.rows.iter().map(|r| r.start.as_str()).collect();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-11-03 09:15",
+                "2026-11-10 09:15",
+                "2026-11-17 09:15",
+                "2026-11-24 09:15"
+            ],
+            "a bare date and an impossible clock change nothing"
         );
     }
 

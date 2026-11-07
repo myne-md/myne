@@ -198,3 +198,27 @@ describe("cancelling one appearance", () => {
     expect(body).toContain("skip: 2026-11-05");
   });
 });
+
+describe("retiming one appearance", () => {
+  it("writes the typed clock onto the series note and keeps the day", async () => {
+    answer.rows = [projected("2026-11-05", "Standup", "standup")];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      "---\ntitle: Standup\nkind: event\nstart: 2026-11-03 09:15\nend: 2026-11-03 09:45\nrepeat: every tuesday\n---\n\n",
+    );
+    render(<CalendarSurface onClose={() => undefined} />);
+    fireEvent.click(await screen.findByTestId("calendar.cell.2026-11-05"));
+    fireEvent.click(await screen.findByTestId("calendar.retime.standup"));
+    fireEvent.change(await screen.findByTestId("calendar.retime.time-field"), {
+      target: { value: "14:00" },
+    });
+    fireEvent.click(screen.getByTestId("calendar.retime.save"));
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalled());
+    const [noteId, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(noteId).toBe("standup");
+    expect(body).toContain("override: 2026-11-05 14:00");
+    // The series' own start and end are untouched: only the one appearance moved.
+    expect(body).toContain("start: 2026-11-03 09:15");
+    expect(body).toContain("end: 2026-11-03 09:45");
+  });
+});

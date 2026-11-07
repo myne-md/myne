@@ -92,12 +92,16 @@ export {
 // the mobile screen, the `.ics` codec and the reminder pass.
 export {
   EVENT_FIELD_KEYS,
+  MAX_OVERRIDES,
   MAX_SKIP_DATES,
   appendSkipDate,
+  clearOverride,
   formatEventInstant,
   parseEventInstant,
+  parseOverrides,
   parseReminderLead,
   parseSkipDates,
+  setOverride,
   readEventFromFmBody,
 } from "./event";
 export type {

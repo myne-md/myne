@@ -23,7 +23,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Spinner } from "../../components";
+import { Button, Sheet, Spinner, TextField } from "../../components";
 import { vaultIndicesCalendarRange } from "../../lib/calendar";
 import { WEEKDAY_HEADERS, monthGrid, shiftAnchor, windowForView } from "@myne/calendar-grid";
 import type { CivilDate } from "@myne/dialect-civil-date";
@@ -33,6 +33,7 @@ import { tappable } from "../a11y/tappable";
 import { EventComposerSheet } from "./EventComposerSheet";
 import { EventWriteRefused } from "@myne/calendar-drag-write";
 import { skipOccurrence } from "@myne/calendar-skip";
+import { overrideOccurrence } from "@myne/calendar-override";
 import { noteRead, noteUpdate } from "../../lib/notes";
 
 /** Today, as the `YYYY-MM-DD` a cell and a composer both speak. */
@@ -57,6 +58,8 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   const [failed, setFailed] = useState(false);
   const [composing, setComposing] = useState<string | null>(null);
   const [skipFailed, setSkipFailed] = useState(false);
+  /** The row whose start time is being changed, and the time typed for it. */
+  const [retiming, setRetiming] = useState<{ row: CalendarRow; time: string } | null>(null);
 
   const load = useCallback(() => {
     const window = windowForView("month", anchor, 0);
@@ -97,6 +100,31 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
     },
     [load],
   );
+
+  /**
+   * Retime one appearance, through the writer the desktop pane uses.
+   *
+   * The day and the duration stay (`decisions/storage/0796`), so the sheet asks for
+   * a clock only; a date field here would be a move, and a move on an occurrence has
+   * no legal write on either client.
+   */
+  const retime = useCallback(async () => {
+    if (retiming === null) return;
+    setSkipFailed(false);
+    try {
+      await overrideOccurrence({
+        noteId: retiming.row.occurrenceOf ?? retiming.row.noteId,
+        occurrenceDate: retiming.row.occurrenceDate ?? retiming.row.start.slice(0, 10),
+        time: retiming.time,
+        io: { readNote: noteRead, writeNote: (id, body, base) => noteUpdate(id, body, base) },
+      });
+      setRetiming(null);
+    } catch (err) {
+      if (err instanceof EventWriteRefused) setSkipFailed(true);
+      else throw err;
+    }
+    await load();
+  }, [load, retiming]);
 
   const dayRows =
     selected === null ? [] : (rows ?? []).filter((row) => row.start.slice(0, 10) === selected);
@@ -252,6 +280,19 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
                         {t("calendar.occurrence.skip")}
                       </Button>
                     )}
+                    {row.occurrenceOf !== null && (
+                      <Button
+                        variant="ghost"
+                        full={false}
+                        {...tappable}
+                        data-testid={`calendar.retime.${row.noteId}`}
+                        onClick={() =>
+                          setRetiming({ row, time: row.allDay ? "" : row.start.slice(11, 16) })
+                        }
+                      >
+                        {t("calendar.occurrence.retime")}
+                      </Button>
+                    )}
                   </div>
                 ))
               )}
@@ -277,6 +318,25 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
         <p role="alert" style={{ flex: "none", padding: "var(--space-0) var(--space-4)", fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="calendar.skipFailed">
           {t("calendar.skipFailed")}
         </p>
+      )}
+
+      {retiming !== null && (
+        <Sheet onClose={() => setRetiming(null)} padded>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }} data-testid="calendar.retime-sheet">
+            <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-2)" }}>
+              {t("calendar.occurrence.retimeHint", { date: retiming.row.occurrenceDate ?? retiming.row.start.slice(0, 10) })}
+            </p>
+            <TextField
+              label={t("calendar.occurrence.retime")}
+              value={retiming.time}
+              onChange={(value) => setRetiming({ row: retiming.row, time: value })}
+              testId="calendar.retime.time-field"
+            />
+            <Button disabled={retiming.time === ""} onClick={() => void retime()} data-testid="calendar.retime.save">
+              {t("calendar.occurrence.retimeSave")}
+            </Button>
+          </div>
+        </Sheet>
       )}
 
       {failed && (
