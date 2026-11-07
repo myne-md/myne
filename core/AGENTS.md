@@ -80,7 +80,7 @@ Not a plugin core, which is why it sits at the crate root rather than under `plu
 
 **The whole module is behind the default-off `remote-ai` feature, and that gate is load-bearing.** The desktop auditable build is `cargo build -p myne-desktop --no-default-features`, which drops `local-inference` and, while this code lived inside that plugin, every line of remote-provider code with it. This crate compiles unconditionally, so an ungated move would have silently put the arm back into the audit build. Desktop's `local-inference` feature therefore implies `myne-core/remote-ai`; mobile enables it directly, having no local half to gate behind. `src-tauri/scripts/ai-no-network-check.sh` check 5 asserts both directions of that chain, and `AI_EGRESS_ROOTS` covers this directory.
 
-One caveat that belongs with the gate rather than in a commit message: **cargo unifies features across a workspace**, so `cargo test --workspace` always compiles this on. The feature only drops in an isolated single-package `--no-default-features` build, which is exactly how the audit build runs, and it protects nothing anywhere else.
+One caveat that belongs with the gate rather than in a commit message: **cargo unifies features across a workspace**, so `cargo nextest run --workspace` always compiles this on. The feature only drops in an isolated single-package `--no-default-features` build, which is exactly how the audit build runs, and it protects nothing anywhere else.
 
 Alongside them at the crate root: `search/` (the `MYS1` full-text engine + its encrypted persistence, shared, though only desktop feeds it), `inference/` (above), `atomic_write`, `paths`, `io_failure_kind`, `protocol_error_kind`, `vault_registry`, `vault_sweep`, `vault_id`, `vault_label` (the `MYL1` sealed label store: the per-vault keychain key + the device-local file the LOCKED picker reads a vault's name from), `vault_meta_hash`, `note_txn`, `content_nonce` (the ONE decryption-free `content_nonce` reader, which takes the base magic and the later generations as separate parameters, so a zero-generation reader is refused by the signature and a third generation is an append rather than a swap. A ONE-generation reader is still expressible (`later: &[]`) and is caught by `check-crypto-registries.mjs` rule 5 plus the unused-import lint rather than by the type; myne-md/myne#638), `note_nonce`, `attachment_nonce`, `export_naming`, `snapshot_store` + `snapshot_policy`, `text`, `singleton` + `double_buffer` (the web client's crash-recoverable container).
 
@@ -186,7 +186,7 @@ bash scripts/wasm-core-graph-check.sh         # the dependency graph must resolv
 cargo check -p myne-core --target aarch64-apple-ios
 ```
 
-CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`nextest … -p myne-desktop -p myne-core`), and the sync simulation (`plugins::sync::sim`) in its own `sync-sim` step off the end of the chain. Locally, `pre-push` runs `cargo clippy --workspace --all-targets` + `cargo test --workspace`, both of which cover this crate.
+CI runs this crate's tests inside the desktop lane's `cargo-test-tauri` step (`nextest … -p myne-desktop -p myne-core`), and the sync simulation (`plugins::sync::sim`) in its own `sync-sim` step off the end of the chain. Locally, `pre-push` runs `cargo clippy --workspace --all-targets` + `cargo nextest run --workspace`, both of which cover this crate.
 
 ## Gotchas
 

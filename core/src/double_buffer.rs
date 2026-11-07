@@ -46,7 +46,7 @@
 //! matters more than tidiness — **the wasm crate has no test runtime and no
 //! filesystem to fault-inject.** Here the algorithm runs against any
 //! [`VaultIo`], so the crash-recovery stop points are exercised over an
-//! in-memory store by `cargo test --workspace`, which every contributor runs at
+//! in-memory store by `cargo nextest run --workspace`, which every contributor runs at
 //! `pre-push`, rather than only in a browser nobody's pre-push has.
 //!
 //! Nothing about it is web-specific except who calls it: no OPFS, no JS, no

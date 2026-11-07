@@ -229,13 +229,45 @@ pub async fn sync_status<R: Runtime>(
     let live = app
         .try_state::<SyncRuntimeStatusCell>()
         .and_then(|c| c.get());
-    super::status::read_status(
+    let status = super::status::read_status(
         &crate::host::tauri_host::TauriHost::new(app.clone()),
         &crate::vault_io::StdVaultIo,
         state.inner(),
         live,
     )
-    .await
+    .await;
+    note_reported_status(status.as_ref().ok());
+    status
+}
+
+/// One line per CHANGE of the status this app hands its own UI (myne-md/myne#1033).
+///
+/// The defect this answers: a failure the core repairs, and a screen that keeps showing the
+/// old sentence, were indistinguishable from the outside. If the reported status stops moving
+/// while the cycles recover, the staleness is in the read; if it keeps reporting the stuck
+/// value, the core still believes it.
+fn note_reported_status(status: Option<&SyncRuntimeStatus>) {
+    // A bounded token per state, and the detail token beside it. NOT `?status`: the Debug shape
+    // of this enum carries a `String` and the two AS15 per-device clocks, and §7 sanctions `?`
+    // only over a CLOSED enum, so a `String`-carrying payload is exactly the unbounded field the
+    // rule cannot inspect (review of myne-md/myne#1033).
+    let (state, detail) = match status {
+        None => ("none".to_string(), ""),
+        Some(status) => (status.state_token(), status.detail_token()),
+    };
+    if !super::change_gate::first_sighting(
+        "reported_status",
+        super::change_gate::fold(&state, detail),
+    ) {
+        return;
+    }
+    tracing::info!(
+        stage = "sync_status",
+        event = "sync_status_changed",
+        state,
+        detail,
+        "the status this app reports to its own UI changed"
+    );
 }
 
 /// Report the five facts that decide whether this device can sync, as one verdict
