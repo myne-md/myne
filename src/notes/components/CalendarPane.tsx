@@ -83,9 +83,13 @@ import {
 } from "../calendar/occurrence";
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
 import { Fragment } from "react";
+import { useLiveVaultTasks, type VaultTask } from "../taskIndex";
 import { skipOccurrence } from "../calendar/skipWrite";
 import { overrideOccurrence } from "../calendar/overrideWrite";
 import { homeClockFor } from "../../lib/homeZone";
+
+/** A row the pane draws: an event's occurrence, or a due-bearing task. */
+type DisplayRow = CalendarRow & { readonly task?: VaultTask };
 
 /** How many days the agenda covers. A month of "what is coming" is what a person
  *  opens a calendar to answer. */
@@ -185,11 +189,50 @@ export function CalendarPane({
     if (capturing !== null) inputRef.current?.focus();
   }, [capturing]);
 
-  const rows = (range?.rows ?? []).map((row) => {
-    const span = optimistic[row.noteId];
-    if (span === undefined) return row;
-    return { ...row, start: span.start, end: span.end, allDay: span.allDay };
-  });
+  /**
+   * A due-bearing task drawn as a row.
+   *
+   * A task is a note with a date and an event is a note with a date, so a calendar
+   * that shows only one of them answers half of "what is on this week". The task
+   * carries `task` so the chip can be told apart and, more importantly, so no drag
+   * path can treat it as an event: patching `start` on a task's line would rewrite a
+   * line-task into something no reader agrees about.
+   *
+   * Completed tasks are left out. A calendar is a forward view, and a finished item
+   * keeps its own surface, which is the notes list and the done marker in the file.
+   */
+  const taskRows: DisplayRow[] = useLiveVaultTasks()
+    .filter((task) => task.due !== undefined && !task.completed)
+    .map((task) => {
+      const start = (task.due ?? "").replace("T", " ");
+      return {
+        noteId: task.noteId,
+        title: task.noteTitle ?? task.rawLine.replace(/^[-*+] \[[ xX]\] /, "").slice(0, 120),
+        folder: task.noteFolder,
+        calendar: null,
+        start,
+        end: null,
+        // A due date with no time is an all-day item, exactly as a `start` with no
+        // time is an all-day event (§3.10.2 uses one rule for both).
+        allDay: !start.includes(" "),
+        occurrenceOf: null,
+        occurrenceDate: null,
+        conflicts: false,
+        repeat: task.repeat ?? null,
+        repeatUnrecognized: false,
+        task,
+      } as DisplayRow;
+    })
+    .filter((row) => row.start !== "");
+
+  const rows: DisplayRow[] = [
+    ...(range?.rows ?? []).map((row) => {
+      const span = optimistic[row.noteId];
+      if (span === undefined) return row as DisplayRow;
+      return { ...row, start: span.start, end: span.end, allDay: span.allDay } as DisplayRow;
+    }),
+    ...taskRows,
+  ];
   const unreadable = range?.unreadable ?? [];
 
   /**
@@ -387,16 +430,30 @@ export function CalendarPane({
     />
   );
 
-  const chip = (row: CalendarRow, showTime: boolean) => (
+  const chip = (row: DisplayRow, showTime: boolean) => (
     <Button
       key={`${row.noteId}-${row.start}`}
       variant="ghost"
       data-testid="calendar.row"
       data-conflicts={row.conflicts ? "true" : undefined}
       data-occurrence={isProjected(row) ? "true" : undefined}
-      title={isProjected(row) ? t("calendar.occurrenceOf", { date: occurrenceDate(row) }) : undefined}
-      draggable
+      title={
+        row.task !== undefined
+          ? t("calendar.taskRow", { date: row.start.slice(0, 10) })
+          : isProjected(row)
+            ? t("calendar.occurrenceOf", { date: occurrenceDate(row) })
+            : undefined
+      }
+      data-task={row.task !== undefined ? "true" : undefined}
+      // A task is not draggable: its date is a `due:` field on a line (or on the
+      // note's frontmatter), not an event `start`, and the move writer would patch a
+      // field no reader of that line agrees about.
+      draggable={row.task === undefined}
       onDragStart={(event) => {
+        if (row.task !== undefined) {
+          event.preventDefault();
+          return;
+        }
         event.stopPropagation();
         setDrag({
           row,
@@ -480,6 +537,7 @@ export function CalendarPane({
       >
         {row.title ?? t("calendar.untitled")}
       </span>
+      {row.task !== undefined && <Icon name="check" size={10} />}
       {row.occurrenceOf !== null && <Icon name="rotate-ccw" size={10} />}
       <span
         role="separator"
