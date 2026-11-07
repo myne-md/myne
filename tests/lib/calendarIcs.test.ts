@@ -48,6 +48,7 @@ function row(overrides: Partial<CalendarRow>): CalendarRow {
     repeat: null,
     remind: "10m",
     repeatUnrecognized: false,
+    uid: null,
     ...overrides,
   };
 }
@@ -75,6 +76,19 @@ describe("exportIcsFile", () => {
     expect(content.match(/BEGIN:VEVENT/g)).toHaveLength(2);
     expect(content).toContain("Dentist");
     expect(content).toContain("work");
+  });
+
+  it("exports the note's own uid, and falls back to the note id", async () => {
+    await exportIcsFile(
+      [row({ noteId: "n1", uid: "team-standup@example.com" }), row({ noteId: "n2", uid: null })],
+      "2026-11-07",
+    );
+    const content = (invoked[0]?.args as { content: string }).content;
+    // The file's own identity survives the round trip, which is what makes a
+    // re-import match instead of duplicating; a hand-authored note has none, so
+    // its note id stands in.
+    expect(content).toContain("UID:team-standup@example.com");
+    expect(content).toContain("UID:n2");
   });
 
   it("does not export a rule the dialect does not recognise", async () => {

@@ -471,6 +471,10 @@ pub struct CalendarRow {
     /// True when the rule expression is outside the closed vocabulary. Such a row
     /// is still returned, because the event exists; what it cannot do is advance.
     pub repeat_unrecognized: bool,
+    /// The note's `uid:`, when it has one. The importer's match key, and the reason
+    /// it is on the row: see `ParsedEvent::uid`.
+    #[serde(default)]
+    pub uid: Option<String>,
 }
 
 /// The whole answer.
@@ -542,6 +546,14 @@ struct ParsedEvent {
     rule: Option<RecurrenceRule>,
     repeat_unrecognized: bool,
     remind: Option<String>,
+    /// The note's own `uid:`, when it carries one (`§3.10`).
+    ///
+    /// An `.ics` file has its own `UID`, and the importer writes it into the note
+    /// so a re-import can MATCH instead of duplicating (myne-md/myne#1037). The
+    /// row carries it for the same reason: the importer needs the set of uids this
+    /// vault already holds, and the alternative is a second index over events,
+    /// which is the second store `decisions/storage/0792` refuses.
+    uid: Option<String>,
 }
 
 fn property<'a>(record: &'a NoteRecord, key: &str) -> Option<&'a str> {
@@ -593,6 +605,10 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
     // (§3.10.4), and a reader that dropped it would leave the reminder pass with
     // no way to say the event has one.
     let remind = property(record, "remind").map(str::to_string);
+    // Not validated: a `uid` is an opaque identity the file or the user chose, and
+    // refusing one shape would make an imported event unmatchable against the file
+    // it came from. It is never rendered, so no injection surface rides on it.
+    let uid = property(record, "uid").map(str::to_string);
 
     Some(Ok(ParsedEvent {
         start,
@@ -602,6 +618,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
         rule,
         repeat_unrecognized,
         remind,
+        uid,
     }))
 }
 
@@ -703,6 +720,7 @@ pub fn range(
                 repeat: event.repeat_raw.clone(),
                 remind: event.remind.clone(),
                 repeat_unrecognized: event.repeat_unrecognized,
+                uid: event.uid.clone(),
             });
         }
     }
@@ -944,6 +962,38 @@ mod tests {
             .iter()
             .map(|r| format!("{}@{}", r.title.clone().unwrap_or_default(), r.start))
             .collect()
+    }
+
+    #[test]
+    fn the_row_carries_the_notes_own_uid() {
+        // The importer's match key (myne-md/myne#1037). A note written by an `.ics`
+        // import carries the file's `UID`; a hand-authored one carries none, and the
+        // distinction has to survive the read or a re-import duplicates.
+        let state = state_with(&[
+            (
+                "imported",
+                &[
+                    ("kind", "event"),
+                    ("start", "2026-11-05 10:00"),
+                    ("uid", "team-standup@example.com"),
+                ],
+            ),
+            (
+                "authored",
+                &[("kind", "event"), ("start", "2026-11-05 11:00")],
+            ),
+        ]);
+        let answer = range(
+            &state,
+            instant("2026-11-04"),
+            instant("2026-11-10 23:59"),
+            Bound::unbounded(),
+        );
+        let uids: Vec<Option<String>> = answer.rows.iter().map(|r| r.uid.clone()).collect();
+        assert_eq!(
+            uids,
+            vec![Some("team-standup@example.com".to_string()), None,]
+        );
     }
 
     #[test]
