@@ -154,7 +154,44 @@ impl KeyAtRest {
 /// else is [`KeyAtRest::Unreadable`], and the warning names the caller's `site` so a
 /// broken store is attributable rather than a mystery shared by four call sites.
 pub fn load_key(site: &'static str) -> KeyAtRest {
-    classify_key_load(crate::plugins::sync::device_identity::load(), site)
+    let key = classify_key_load(crate::plugins::sync::device_identity::load(), site);
+    // A `Present` stays SILENT on purpose: it is the healthy answer on every cycle, and a
+    // line per cycle would drown the two that matter. The two negative answers say where they
+    // were asked (myne-md/myne#1033), because "this device has no key at rest" was reachable
+    // from four call sites with nothing in the log saying which one asked.
+    //
+    // Change-gated, not per call: `Absent` is the ordinary steady state on a platform with no
+    // store (the browser, Linux without a Secret Service, a member's second device), and this
+    // function runs three times per cycle. Ungated, it wrote roughly 1 400 records a day into a
+    // log that rotates at 1 MiB, which would erase the evidence it exists to keep (review of
+    // myne-md/myne#1033).
+    let result = match key {
+        KeyAtRest::Present(_) => "present",
+        KeyAtRest::Absent => "absent",
+        KeyAtRest::Unreadable => "unreadable",
+    };
+    note_key_at_rest(site, result);
+    key
+}
+
+/// Emit [`load_key`]'s answer only when it CHANGES, per `site`.
+///
+/// The slot is the SITE, not one global, so a second `load_key` caller cannot forget or suppress
+/// the first one's state. `present` is a tag of its own rather than an early return: the reader's
+/// question is "when did this start, and when did it stop", and returning on the healthy answer
+/// means the recovery edge is never emitted (review of myne-md/myne#1033).
+fn note_key_at_rest(site: &'static str, result: &'static str) {
+    if !super::change_gate::first_sighting(site, super::change_gate::fold(result, "")) {
+        return;
+    }
+    // Bounded tokens only (`check-tracing-discipline.mjs` R1/R2 read this line).
+    tracing::warn!(
+        stage = "sync_authority",
+        event = "device_key_not_readable",
+        site,
+        result,
+        "the device key could not be read for the authority decision"
+    );
 }
 
 /// The ladder's mapping, split from the read so the four outcomes are testable without a
