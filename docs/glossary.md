@@ -206,6 +206,12 @@ What the AI assistant remembers about the user across runs: a small, curated set
 
 Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; `threat-model.md` TB12/TB13 (2026-09-10 amendments)
 
+### **all-day event** &nbsp; 📦 *Product*
+
+An [event note](#event-note) whose `start` carries a date and no time. It is not a second kind of event: the same frontmatter field holds a wall clock in both cases, and "all day" is the absence of the time half. Reminders treat it differently for one reason, which is the only place the distinction is load-bearing: a relative lead measured from midnight would fire at midnight, so an all-day event anchors on `calendar.day_reminder_anchor`, a device-local time of day (default 09:00). The anchor is a preference, never synced.
+
+Used in: `spec/markdown-dialect.md` §3.10; `myne-md/myne#1037`
+
 ### **seed memory** &nbsp; 📦 *Product*
 
 *(Alias: `seed_memory`, "Teach Myne your vault"; the reviewed one-shot pass from a vault into [agent memory](#agent-memory).)*
@@ -934,6 +940,12 @@ A user-authored color palette — distinct from the built-in Light/Dark [Theme p
 
 Originally selected for Myne's minimal graph view, but **superseded 2026-06-08 by [d3-force](#d3-force) + a hand-rolled canvas renderer** (see `decisions.md` 2026-06-08). The leaner decomposition — a dep only for the force-simulation, with render/interaction hand-rolled — cleared `dependency-policy.md` "The bar" Q1 where the full framework did not. Retained here for historical reference.
 
+### **calendar** &nbsp; 📦 *Product*
+
+The pane that lists, draws and authors [event notes](#event-note), and nothing more: it owns no store, no schema and no merge unit of its own (`decisions/storage/0792`). A user's several calendars are a `calendar:` value on each event plus a name-to-design-token map in prefs (`colours.<name>`), so "work" and "personal" are labels over one note set rather than containers. **Myne-divergent** in the way that matters to a reader coming from another notes app: this is not a view over [line-tasks](#line-task) and it deliberately does not consume their `due`, `remind` or `repeat` semantics. A [task](#line-task) answers what is owed; an event answers what is on Thursday at 14:00, and the two vocabularies stay separate so neither has to grow exceptions for the other.
+
+Used in: `spec/markdown-dialect.md` §3.10; `decisions/storage/0792`; `myne-md/myne#1037`
+
 ### **d3-force** &nbsp; 🛠️ *Tooling*
 
 The force-directed-layout simulation library (`d3-force`, ISC) used for Myne's minimal graph view in Phase 1. It computes node positions only; the canvas render, pan/zoom/hit-test, and interaction are hand-rolled (no graph framework). Lazy-loaded into a separate panel rather than rendered in the editor surface. Chosen over [Cytoscape.js](#cytoscapejs) per `decisions.md` 2026-06-08 — the Envelope-A scale target (smooth to low-thousands of nodes, controlled degradation above) shrinks the dependency question to "force-simulation only", which `dependency-policy.md` Q1 then resolves to the hand-roll-plus-leaf-dep form.
@@ -1324,6 +1336,12 @@ The 1-byte generation tag (`extractor_version`) on an [`MYE1`](#mye1) extracted-
 
 Two properties are worth stating because they cost real work. The byte is **global, not per-format**, so a bump discards every cached extraction of every format — the `0x02`→`0x03` OCR bump re-runs ASR over every audio attachment for no gain; that cost is accepted and the structural fix is tracked separately. And because the OCR weights are *bundled* rather than user-chosen, the payload records no `model_hash` for them, which makes this byte their only staleness signal: **changing the bundled OCR weights requires bumping it.** (MYND-328, MYND-441)
 
+### **event note** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
+
+A note with `kind: event` and the frontmatter vocabulary in `spec/markdown-dialect.md` §3.10: `start` (required), `end` (optional), `repeat` (the closed rule set of §3.8.7, shared with [line-tasks](#line-task)), `remind` (a relative lead such as `30m`), `uid` and `calendar`. It is an ordinary note in every other respect: one encrypted [`MY01`](#my01) blob, in the search index, in every export and backup, splice-edited, synced as a note. That is the whole point of the shape. A separate event store would need its own writer, its own merge unit and its own readers, and would be invisible to search, export and backup until all three learned it, so an event is a fact the note carries rather than a folder it lives in. A drag to another day writes exactly one field, which gives two devices one field to reconcile.
+
+Used in: `spec/markdown-dialect.md` §3.10; `decisions/storage/0792`; `myne-md/myne#1037`
+
 ### **fall-to-rebuild** &nbsp; 📋 *Protocol*
 
 The fallback path for loading the [search index](#search-index) when the cached `vault.search` blob (`spec/protocol.md` §9.6) cannot be trusted or used — blob absent, magic / version mismatch, AEAD-verification failure, or an unreadable staleness manifest. Instead of incrementally reconciling the cached index against the notes, the client **rebuilds it from scratch** by decrypting every `.myn`. Rebuild always recovers the correct index, so `vault.search` carries no integrity-of-search burden: a disk attacker who deletes or corrupts it costs the user one slower unlock, nothing more. The complement of the **incremental reconcile** happy path (re-index only the notes whose `content_nonce` changed) — fall-to-rebuild is the always-correct safety net beneath it (`decisions.md` 2026-05-31).
@@ -1630,6 +1648,12 @@ Used in: `docs/decisions/sync/0627-hosted-sync-access-is-gated-by-a-server-confi
 The asynchronous delivery of a [vault invite](#vault-invite) (`decisions/protocol/0603`, myne-md/myne#711). The owner's authenticated session posts the invite SEALED to the recipient's [person account](#person-account); the server stores it opaquely and releases it to that account on claim. The outer routing frame carries only the recipient account id and the vault id, so the server reads no fingerprint, no public half and no group key. The QR or pasted code remains only as the out-of-band SAS compare channel. Routes: `POST /b2b/invites`, `GET /b2b/invites`, `POST /b2b/invites/{invite_id}/claim`, `DELETE /b2b/invites/{invite_id}` (the recipient's refusal, which drops the sealed payload and leaves a payload-free tombstone so the sender's list can say "declined" rather than "not accepted yet", `decisions/protocol/0732`), plus the owner-side three-state list `GET /b2b/vaults/{account_hash}/invites` (`decisions/protocol/0605`).
 
 Used in: `docs/decisions/protocol/0603-b2b-member-sync-wire-and-signed-head.md`; `docs/decisions/protocol/0732-an-invitation-decline-is-a-real-server-side-delete.md`; `docs/spec/server-protocol.md` §3.1
+
+### **iCalendar (`.ics`) import and export** &nbsp; 📦 *Product*
+
+The calendar's only interop path, and it is file based: the user names an `.ics` file and Myne reads it, or names a destination and Myne writes one. **No network, no CalDAV, no third-party origin**: a sync subscription would be the only egress path in the app, which is why it was refused rather than deferred. The reader is strict and holds nothing: no evaluator, no URL dereference (a `URL` property is carried as text and never fetched), a hard byte cap, and a refusal rather than a guess on anything it cannot represent. Its risk posture is recorded in `threat-model.md` §7 because a shared meeting invite is attacker-supplied in the ordinary case. A `TZID` is converted once, at the import boundary, on the device that imports, and the value at rest stays a wall clock (`decisions/editor/0793`); `uid` is kept so a re-import matches instead of duplicating.
+
+Used in: `threat-model.md` §7; `decisions/editor/0793`; `myne-md/myne#1037`
 
 ### **heading record** &nbsp; 📦 *Product*
 
@@ -2150,6 +2174,12 @@ Used in: `decisions/ui/0731`; `mobile/src/app/flows/PhotoNoteSheet.tsx`
 A [remote AI provider](#remote-ai-provider) declining a request under **its own** rules: an account guardrail, a workspace policy, a model the plan does not carry. Its shape is what makes it a term rather than a detail: the provider answers **HTTP 200** and puts an `error` member in the body where the answer belongs, so at the transport layer it is indistinguishable from success. Distinct from a *credential* rejection (401/403), from a *cost* decline (402/429, the quota causes), and from a transport refusal, which is nothing accepting the connection at all. Distinguishing it needs only whether that member is **present**; its text is attacker-influenceable and is never read, logged, stored or shown, because the reply structs type it `Option<serde::de::IgnoredAny>`, which deserializes any value and retains nothing. The user-facing consequence is the reason the term exists: a policy refusal is fixed at the provider, so telling the user to rephrase is wrong advice, and telling them nothing was sent is a false statement, because the note text had already left.
 
 Used in: `decisions.md` 2026-08-15; myne-md/myne#466
+
+### **projected occurrence** &nbsp; 📦 *Product*
+
+One instance of a recurring [event note](#event-note), computed at render time from its `repeat` rule rather than stored. Nothing in the vault enumerates occurrences: there is no occurrence table, no exception list and no per-instance id, so a weekly event is one note and a month of them is one note read twelve times. The consequence is deliberate and worth stating where a reader will meet it: "not this week" is a separate one-off note, not an edit to a series, and a series imported across a daylight-saving change can drift by an hour because the arithmetic is wall-clock (`decisions/editor/0793`).
+
+Used in: `spec/markdown-dialect.md` §3.10; `myne-md/myne#1037`
 
 ### **effective backend** &nbsp; 📦 *Product*
 
