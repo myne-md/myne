@@ -62,6 +62,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExtractedTestModule } from "./lib/test-module-files.mjs";
 
 // `mobile/src-tauri/src` joined on myne-md/myne#479, and its absence had cost
 // exactly what this guard exists to prevent. Mobile's local `workspace` plugin
@@ -387,6 +388,7 @@ const argv = process.argv.slice(2);
 const all = argv.length ? argv.filter((f) => f.endsWith(".rs")) : ROOTS.flatMap((r) => walk(r));
 const files = all.filter((f) => {
   const rel = relative(process.cwd(), f).split(sep).join("/");
+  if (isExtractedTestModule(rel)) return false;
   return ROOTS.some((r) => rel === r || rel.startsWith(r + "/"));
 });
 
