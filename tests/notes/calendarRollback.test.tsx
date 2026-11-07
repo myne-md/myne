@@ -98,6 +98,7 @@ async function renderPane(node: React.ReactNode): Promise<{ host: HTMLElement; c
 }
 
 beforeEach(() => {
+  taskFixture.rows = [];
   written.length = 0;
   created.length = 0;
   refuseWith = null;
@@ -359,6 +360,91 @@ describe("starting an event from the grid", () => {
     // Clicking a chip opens the NOTE. A form opening on top of it would be the pane
     // fighting itself, and the user would see a new note instead of the one they hit.
     expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    cleanup();
+  });
+});
+
+// ── Tasks on the calendar ────────────────────────────────────────────────────
+//
+// A due-bearing task is a note with a date, exactly as an event is, so a calendar
+// showing only one of them answers half of "what is on this week". The second
+// assertion matters as much as the first: a task is NOT an event, and a drag that
+// treated it as one would patch a field no reader of that line agrees about.
+
+const taskFixture = vi.hoisted(() => ({ rows: [] as unknown[] }));
+
+vi.mock("../../src/notes/taskIndex", async (importActual) => {
+  const actual = await importActual<typeof import("../../src/notes/taskIndex")>();
+  // Controllable rather than fixed: this mock is in the same file as the drag tests,
+  // and a task standing on a day by default would quietly change what those measure.
+  return { ...actual, useLiveVaultTasks: () => taskFixture.rows };
+});
+
+describe("tasks on the calendar", () => {
+  it("draws a due task on its day and leaves the completed one out", async () => {
+    taskFixture.rows = [
+      {
+        noteId: "task-note",
+        noteTitle: "Weekly review",
+        noteFolder: "Notes/",
+        lineIndex: 3,
+        rawLine: "- [ ] Weekly review [due:: 2026-11-06]",
+        completed: false,
+        oversized: false,
+        due: "2026-11-06",
+      },
+      {
+        noteId: "done-note",
+        noteTitle: "Finished thing",
+        noteFolder: "Notes/",
+        lineIndex: 4,
+        rawLine: "- [x] Finished thing [due:: 2026-11-06]",
+        completed: true,
+        oversized: false,
+        due: "2026-11-06",
+      },
+    ];
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const taskRows = Array.from(host.querySelectorAll('[data-task="true"]'));
+    expect(taskRows).toHaveLength(1);
+    expect(taskRows[0].textContent).toContain("Weekly review");
+    // A calendar is a forward view: a finished item keeps its own surface instead of
+    // appearing as work still to do.
+    expect(host.textContent).not.toContain("Finished thing");
+    cleanup();
+  });
+
+  it("does not let a task be dragged like an event", async () => {
+    taskFixture.rows = [
+      {
+        noteId: "task-note",
+        noteTitle: "Weekly review",
+        noteFolder: "Notes/",
+        lineIndex: 3,
+        rawLine: "- [ ] Weekly review [due:: 2026-11-06]",
+        completed: false,
+        oversized: false,
+        due: "2026-11-06",
+      },
+    ];
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const taskRow = host.querySelector('[data-task="true"]') as HTMLElement;
+    expect(taskRow.getAttribute("draggable")).toBe("false");
+    const target = host.querySelector('[data-date="2026-11-07"]') as HTMLElement;
+    act(() => {
+      taskRow.dispatchEvent(new Event("dragstart", { bubbles: true }));
+    });
+    await act(async () => {
+      target.dispatchEvent(new Event("drop", { bubbles: true }));
+    });
+    await act(async () => {});
+    // No write at all: a move writer aimed at a task would rewrite the line's own
+    // fields, and nothing would report it because the file still parses.
+    expect(written).toHaveLength(0);
     cleanup();
   });
 });

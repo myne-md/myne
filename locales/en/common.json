@@ -6201,6 +6201,7 @@
       "remindNone": "No reminder",
       "calendarLabel": "Calendar (a name)"
     },
-    "skipFailed": "That occurrence could not be cancelled. It is still in the calendar."
+    "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
+    "taskRow": "A task due {date}"
   }
 }
