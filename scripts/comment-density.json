@@ -29,7 +29,7 @@
     "core/src/plugins/agent/apply.rs": 660,
     "core/src/plugins/agent/edit.rs": 370,
     "core/src/plugins/agent/engine.rs": 155,
-    "core/src/plugins/agent/error.rs": 254,
+    "core/src/plugins/agent/error.rs": 199,
     "core/src/plugins/agent/frontmatter.rs": 81,
     "core/src/plugins/agent/hide.rs": 122,
     "core/src/plugins/agent/history.rs": 169,
