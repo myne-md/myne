@@ -762,11 +762,17 @@ pub async fn vault_migrate_abort_from_host(
     ] {
         let _ = io.remove_file(&vault_root.join(stale)).await;
     }
-    if let Ok(mut sync_state) = crate::plugins::sync::state::read_sync_state(io, &vault_root).await
-    {
+    // Through the one writer: a roll-back clears a flag on a record a cycle may be
+    // holding, and it must not carry that cycle's cursor back to the value it had when
+    // the roll-back started (myne-md/myne#964).
+    let _ = crate::plugins::sync::state::update_sync_state(io, &vault_root, |sync_state| {
+        if !sync_state.rekey_rebase_pending {
+            return ((), crate::plugins::sync::state::Persist::No);
+        }
         sync_state.rekey_rebase_pending = false;
-        let _ = crate::plugins::sync::state::write_sync_state(io, &vault_root, &sync_state).await;
-    }
+        ((), crate::plugins::sync::state::Persist::Yes)
+    })
+    .await;
     let _ = io.remove_dir_all(&legacy).await;
 
     drop(_quiesce);
@@ -1525,66 +1531,73 @@ async fn rebase_sync_plane_after_rekey(
         agent_memory_catalog_sync_id, agent_personality_sync_id, catalog_sync_id,
         chats_catalog_sync_id, prefs_sync_id, themes_sync_id,
     };
-    use crate::plugins::sync::state::{mark_vault_meta_dirty, read_sync_state, write_sync_state};
+    use crate::plugins::sync::state::{mark_vault_meta_dirty, update_sync_state, Persist};
 
-    let Ok(mut state) = read_sync_state(io, vault_root).await else {
-        // Present and unreadable — NOT the same as absent, and the one case where
-        // writing would destroy the cursor, the VV log and every CAS baseline.
-        // Leave it alone; sync is already in a state a human has to look at.
-        return;
-    };
-    if state.device_id_hex.is_none() {
-        return; // never enrolled — there is no sync plane to re-base
-    }
-    state.rekey_rebase_pending = true;
-    for id in [
-        catalog_sync_id(old_root_key),
-        prefs_sync_id(old_root_key),
-        themes_sync_id(old_root_key),
-        // The conversations catalog (myne-md/myne#675): same root_key-derived
-        // sync-id shape as the three above, so the old id strands a server
-        // record on re-key and owes the same orphan tombstone. The
-        // per-conversation files do NOT appear here: their sync blob-ids are
-        // the client-minted conversation ids, not root_key derivations, so a
-        // re-key does not strand them.
-        chats_catalog_sync_id(old_root_key),
-        // The agent-memory catalog + personality (myne-md/myne#697): same
-        // root_key-derived sync-id shape, so the same orphan tombstone. The
-        // per-entry files do NOT appear here: their sync blob-ids are the
-        // client-minted entry ids, not root_key derivations.
-        agent_memory_catalog_sync_id(old_root_key),
-        agent_personality_sync_id(old_root_key),
-    ] {
-        let hex = crate::plugins::sync::to_hex(&id);
-        // Queue the tombstone BEFORE dropping the baseline (#443): the removal
-        // takes the `base_version` with it, and that version is what the
-        // tombstone push CASes against. A singleton this device never pushed
-        // has no baseline and therefore nothing stranded — there is no server
-        // record under that id to reclaim.
-        if let Some(baseline) = state.blobs.get(&hex) {
-            let mut nonce = [0u8; 24];
-            if getrandom::getrandom(&mut nonce).is_ok() {
-                state.pending_orphan_tombstones.push(
-                    crate::plugins::sync::state::OrphanTombstone {
-                        blob_id_hex: hex.clone(),
-                        base_version: baseline.version,
-                        content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
-                    },
-                );
-            }
+    // ONE locked mutation, and the reason is myne-md/myne#964: the flag and the dropped
+    // baselines are decided here, while a cycle on another task holds its own copy of
+    // this record. Reading it here and writing the whole thing back would take that
+    // cycle's cursor with it, and the cycle's own next checkpoint would take these
+    // back. `update_sync_state` reads under the writer lock, so both land.
+    //
+    // Present and unreadable is still NOT the same as absent: the update fails, nothing
+    // is written, and sync is left in a state a human has to look at rather than one
+    // this migration invented.
+    let rebased = update_sync_state(io, vault_root, |state| {
+        if state.device_id_hex.is_none() {
+            return ((), Persist::No); // never enrolled — there is no sync plane to re-base
         }
-        state.blobs.remove(&hex);
-    }
-    // Asserted rather than assumed: the new ids must not collide with the old
-    // ones, or the removals above would delete a baseline the new generation is
-    // about to need. They are HKDF outputs under different roots, so this holds
-    // by construction — but the removal is destructive and the check is free.
-    debug_assert!(prefs_sync_id(old_root_key) != prefs_sync_id(new_root_key));
-    if write_sync_state(io, vault_root, &state).await.is_err() {
+        state.rekey_rebase_pending = true;
+        for id in [
+            catalog_sync_id(old_root_key),
+            prefs_sync_id(old_root_key),
+            themes_sync_id(old_root_key),
+            // The conversations catalog (myne-md/myne#675): same root_key-derived
+            // sync-id shape as the three above, so the old id strands a server
+            // record on re-key and owes the same orphan tombstone. The
+            // per-conversation files do NOT appear here: their sync blob-ids are
+            // the client-minted conversation ids, not root_key derivations, so a
+            // re-key does not strand them.
+            chats_catalog_sync_id(old_root_key),
+            // The agent-memory catalog + personality (myne-md/myne#697): same
+            // root_key-derived sync-id shape, so the same orphan tombstone. The
+            // per-entry files do NOT appear here: their sync blob-ids are the
+            // client-minted entry ids, not root_key derivations.
+            agent_memory_catalog_sync_id(old_root_key),
+            agent_personality_sync_id(old_root_key),
+        ] {
+            let hex = crate::plugins::sync::to_hex(&id);
+            // Queue the tombstone BEFORE dropping the baseline (#443): the removal
+            // takes the `base_version` with it, and that version is what the
+            // tombstone push CASes against. A singleton this device never pushed
+            // has no baseline and therefore nothing stranded — there is no server
+            // record under that id to reclaim.
+            if let Some(baseline) = state.blobs.get(&hex) {
+                let mut nonce = [0u8; 24];
+                if getrandom::getrandom(&mut nonce).is_ok() {
+                    state.pending_orphan_tombstones.push(
+                        crate::plugins::sync::state::OrphanTombstone {
+                            blob_id_hex: hex.clone(),
+                            base_version: baseline.version,
+                            content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
+                        },
+                    );
+                }
+            }
+            state.blobs.remove(&hex);
+        }
+        // Asserted rather than assumed: the new ids must not collide with the old
+        // ones, or the removals above would delete a baseline the new generation is
+        // about to need. They are HKDF outputs under different roots, so this holds
+        // by construction — but the removal is destructive and the check is free.
+        debug_assert!(prefs_sync_id(old_root_key) != prefs_sync_id(new_root_key));
+        ((), Persist::Yes)
+    })
+    .await;
+    if rebased.is_err() {
         tracing::warn!(
             target: "vault_migrate",
             event = "sync_rebase_state_write_failed",
-            "post-migration sync re-base flag not persisted; the next cycle may alarm"
+            "post-migration sync re-base bookkeeping not persisted; the next cycle may alarm"
         );
         return;
     }

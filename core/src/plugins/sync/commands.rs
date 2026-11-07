@@ -967,12 +967,17 @@ pub async fn start_b2b_migration_from_host(
             // signed), so the next cycle must re-base rather than reject the
             // server's still-HMAC head as a forgery (decisions/protocol/0603,
             // Q2 revised: the head format is keyed off the vault generation).
-            if let Ok(mut sync_state) = super::state::read_sync_state(io, &root).await {
-                if !sync_state.rekey_rebase_pending {
-                    sync_state.rekey_rebase_pending = true;
-                    let _ = super::state::write_sync_state(io, &root, &sync_state).await;
+            // Only when the flag is not already set, and only through the one writer:
+            // a cycle may be running on another task while this migration completes,
+            // and its cursor must survive the flag being raised (#964).
+            let _ = super::state::update_sync_state(io, &root, |sync_state| {
+                if sync_state.rekey_rebase_pending {
+                    return (false, super::state::Persist::No);
                 }
-            }
+                sync_state.rekey_rebase_pending = true;
+                (true, super::state::Persist::Yes)
+            })
+            .await;
             // The vault is `NTV6` now: seal the person-identity carrier under the
             // held root_key so a later unlock installs the session with no phrase
             // (myne-md/myne#792). Best-effort.

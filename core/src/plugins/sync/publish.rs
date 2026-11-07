@@ -47,7 +47,7 @@ use crate::plugins::sync::config::{config_path_from_host, read_config, SyncEndpo
 use crate::plugins::sync::devices::SyncDeviceError;
 use crate::plugins::sync::http_transport::build_transport;
 use crate::plugins::sync::person_auth;
-use crate::plugins::sync::state::{read_sync_state, write_sync_state};
+use crate::plugins::sync::state::{read_sync_state, update_sync_state, Persist};
 use crate::plugins::sync::token_store::TokenStore as _;
 use crate::plugins::sync::transport::{
     HttpMethod, NamespacedTransport, SyncTransport, TransportResponse,
@@ -268,20 +268,20 @@ pub async fn publish_vault(
     // legacy vault onto a credential it does not have, and its next cycle would
     // park at `NotReady` with nothing saying why. The legacy arm therefore
     // records the ACT and leaves the addressing exactly as it was.
-    let mut state = read_sync_state(io, vault_root)
-        .await
-        .map_err(|_| SyncDeviceError::Transport)?;
-    let newly_published = record_publish(
-        &mut state,
-        person_born,
-        &namespace_hex,
-        server_meta_hash.as_deref(),
-        &local_meta_hash,
-        now_unix_millis(host),
-    );
-    write_sync_state(io, vault_root, &state)
-        .await
-        .map_err(|_| SyncDeviceError::Transport)?;
+    let now_ms = now_unix_millis(host);
+    let newly_published = update_sync_state(io, vault_root, |state| {
+        let newly = record_publish(
+            state,
+            person_born,
+            &namespace_hex,
+            server_meta_hash.as_deref(),
+            &local_meta_hash,
+            now_ms,
+        );
+        (newly, Persist::Yes)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Transport)?;
 
     // Nudge the status indicator and the device roster. Publishing changes what
     // the indicator should say (a person-born vault goes from "not enrolled" to
@@ -576,11 +576,12 @@ pub async fn repair_if_unbound(
     }
     // Stamp BEFORE the request: a server that answers with an error is exactly the
     // one that must not be asked again on the next `sync_now` a second later.
-    let mut stamped = state.clone();
-    stamped.last_bindings_check_ms = Some(now);
-    write_sync_state(io, vault_root, &stamped)
-        .await
-        .map_err(|_| SyncDeviceError::Transport)?;
+    update_sync_state(io, vault_root, |state| {
+        state.last_bindings_check_ms = Some(now);
+        ((), Persist::Yes)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Transport)?;
 
     let bindings = super::person_discovery::discover_bindings(host, io).await?;
     if !needs_repair(Some(namespace.as_str()), &bindings) {

@@ -1968,56 +1968,53 @@ pub async fn enroll_device_from_host(
     // its token by re-running the handshake under the unlocked `root_key` once
     // an existing device approves it.
     //
-    // NOT `unwrap_or_default()`. This is a read-modify-WRITE, so defaulting on a
-    // failed read would persist a blank state over a real one: cursor, VV log,
-    // per-blob CAS baselines and `meta_baseline_hex` gone in a single step — the
-    // device re-enrols as brand new AND the meta phase reads the absent baseline
-    // as "only the server changed" and overwrites a locally-newer `vault.meta`.
-    // An ABSENT file still defaults (that is `read_sync_state`'s own `Ok`); what
-    // must not be swallowed is a file that exists and did not parse.
-    let mut st = super::state::read_sync_state(io, &token_dir)
-        .await
-        .map_err(|_| {
-            tracing::error!(
-                stage = "read_sync_state",
-                error_kind = "Internal",
-                "sync-state.json unreadable; refusing to overwrite it with a fresh identity"
-            );
-            SyncDeviceError::Internal
-        })?;
-    st.account_hash_hex = Some({
-        // Pure formatting over `account.hash`, re-derived here rather than
-        // threaded out of the closure: it is four lines and no state.
-        let mut h = String::with_capacity(32);
-        for b in &account.hash {
-            h.push_str(&format!("{b:02x}"));
-        }
-        h
-    });
-    st.device_id_hex = Some(device_id_hex.clone());
-    // #267: PROPAGATE, and before the token write.
+    // The read happens INSIDE `update_sync_state`, under the writer lock, and that is
+    // both halves of the rule at once. A failed read fails the update rather than
+    // defaulting, because defaulting would persist a blank state over a real one:
+    // cursor, VV log, per-blob CAS baselines and `meta_baseline_hex` gone in a single
+    // step — the device re-enrols as brand new AND the meta phase reads the absent
+    // baseline as "only the server changed" and overwrites a locally-newer
+    // `vault.meta`. An ABSENT file still defaults (that is `read_sync_state`'s own
+    // `Ok`); what is not swallowed is a file that exists and did not parse. And the
+    // snapshot is taken under the lock, so a cycle writing its cursor at the same
+    // moment keeps it (myne-md/myne#964).
     //
-    // Discarding this failure produced a device that held a valid token and no
-    // identity — and every downstream gate reads as fine: the cycle's `NotReady`
-    // check is quiet, `status_from` maps (token, enrolled) → `Idle`, and the
-    // UI's enrol-gate treats `idle` as "already enrolled" and hides the way
-    // back. So enrolment reported SUCCESS and the device then refused to sync
-    // forever, with no surface offering a retry.
+    // #267: the failure still PROPAGATES, and still before the token write.
     //
-    // Ordered before the token write so a device that cannot persist identity
-    // never holds a token — the reverse order is exactly the state that cannot
-    // recover itself.
-    super::state::write_sync_state(io, &token_dir, &st)
-        .await
-        .map_err(|_| {
-            tracing::warn!(
-                stage = "write_sync_state",
-                error_kind = "Internal",
-                "device identity could not be persisted; failing enrolment rather than \
-                 leaving a token with no identity"
-            );
-            SyncDeviceError::Internal
-        })?;
+    // Discarding it produced a device that held a valid token and no identity — and
+    // every downstream gate reads as fine: the cycle's `NotReady` check is quiet,
+    // `status_from` maps (token, enrolled) → `Idle`, and the UI's enrol-gate treats
+    // `idle` as "already enrolled" and hides the way back. So enrolment reported
+    // SUCCESS and the device then refused to sync forever, with no surface offering a
+    // retry.
+    //
+    // Ordered before the token write so a device that cannot persist identity never
+    // holds a token — the reverse order is exactly the state that cannot recover
+    // itself.
+    super::state::update_sync_state(io, &token_dir, |st| {
+        st.account_hash_hex = Some({
+            // Pure formatting over `account.hash`, re-derived here rather than
+            // threaded out of the closure: it is four lines and no state.
+            let mut h = String::with_capacity(32);
+            for b in &account.hash {
+                h.push_str(&format!("{b:02x}"));
+            }
+            h
+        });
+        st.device_id_hex = Some(device_id_hex.clone());
+        ((), super::state::Persist::Yes)
+    })
+    .await
+    .map_err(|e| {
+        tracing::warn!(
+            stage = "update_sync_state",
+            error_kind = "Internal",
+            error = ?e,
+            "device identity could not be persisted; failing enrolment rather than \
+             leaving a token with no identity"
+        );
+        SyncDeviceError::Internal
+    })?;
 
     // The deferred token write (task 86) — see the closure for why it moved.
     if let Some(token) = stored_token {
@@ -2661,36 +2658,28 @@ pub async fn join_account_from_host(
     // Same rule as the enrolment path: a read-modify-write must not default over
     // an unreadable file, or it erases the cursor, the CAS baselines and
     // `meta_baseline_hex` in one step (task 86).
-    let mut st = super::state::read_sync_state(io, &token_dir)
-        .await
-        .map_err(|_| {
-            tracing::error!(
-                stage = "read_sync_state",
-                error_kind = "Internal",
-                "sync-state.json unreadable; refusing to overwrite it with a fresh identity"
-            );
-            SyncDeviceError::Internal
-        })?;
     // Baseline only when the bytes ON DISK are the ones this attempt wrote.
-    record_joined_identity(
-        &mut st,
-        &acct_hex,
-        &device_id_hex,
-        join_baseline_bytes(bootstrap, meta_bytes.as_slice()),
-    );
+    let written_meta = join_baseline_bytes(bootstrap, meta_bytes.as_slice());
     // #267 — the join path's byte-identical twin of the discard above. Same
-    // ordering, same reason: identity first, token only if it landed.
-    super::state::write_sync_state(io, &token_dir, &st)
-        .await
-        .map_err(|_| {
-            tracing::warn!(
-                stage = "write_sync_state",
-                error_kind = "Internal",
-                "device identity could not be persisted; failing the join rather than \
-                 leaving a token with no identity"
-            );
-            SyncDeviceError::Internal
-        })?;
+    // ordering, same reason: identity first, token only if it landed. And the same
+    // locked read as the enrolment path: an unreadable record fails the join rather
+    // than being overwritten with a fresh identity, and a concurrent cycle's cursor
+    // survives (myne-md/myne#964).
+    super::state::update_sync_state(io, &token_dir, |st| {
+        record_joined_identity(st, &acct_hex, &device_id_hex, written_meta);
+        ((), super::state::Persist::Yes)
+    })
+    .await
+    .map_err(|e| {
+        tracing::warn!(
+            stage = "update_sync_state",
+            error_kind = "Internal",
+            error = ?e,
+            "device identity could not be persisted; failing the join rather than \
+             leaving a token with no identity"
+        );
+        SyncDeviceError::Internal
+    })?;
 
     if let Some(token) = stored_token {
         super::token_store::default_store()
