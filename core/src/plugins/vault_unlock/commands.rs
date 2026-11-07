@@ -1224,20 +1224,6 @@ async fn unlock_with_credential(
     io: &dyn VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), VaultUnlockError> {
-    // Both arms already hold `Zeroizing`, so every early-return path
-    // (VaultAlreadyUnlocked, UnlockInProgress, IO failure, parse failure) drops
-    // the wrapper and zeroes the bytes.
-    //
-    // Which credential opened the vault decides whether the `NTV7` to `NTV8`
-    // upgrade may run at the tail (myne-md/myne#938 review): the phrase is the door
-    // of a user who has lost the password, so it must never be the unlock that
-    // removes it. Read here, before the derivation match consumes `credential`.
-    let upgrade_authority = if matches!(&credential, UnlockCredential::Password(_)) {
-        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordProven
-    } else {
-        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordNotProven
-    };
-
     // Host clock, not `Instant::now()`: the latter PANICS on
     // `wasm32-unknown-unknown` (std falls to its `unsupported` time backend).
     // Monotonic rather than wall-clock because this measures an elapsed
@@ -1655,34 +1641,6 @@ async fn unlock_with_credential(
         duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "vault unlocked successfully"
     );
-
-    // myne-md/myne#938, `protocol.md` §10.4.3: an `NTV7` vault drops the person
-    // wrap of `root_key` on the unlock that opens it, silently and atomically.
-    //
-    // HERE rather than in the command wrapper, because this is the one tail every
-    // unlocking credential shares: the password path and the identity-phrase path
-    // both land on it, and so does every client (the wrapper is `tauri-ipc`-gated
-    // and the web client never calls it). A failure is swallowed by
-    // `upgrade_on_unlock`: the vault is open either way and the next unlock
-    // retries, so no unlock can fail because a rewrite could not land.
-    //
-    // The credential decides whether it runs at all. The person wrap is the only
-    // door for a user who opened this vault with their phrase because they no
-    // longer know the password, so truncating it on THAT unlock would destroy the
-    // credential they just used. `PasswordNotProven` leaves the frame alone and the
-    // next password unlock performs the upgrade.
-    //
-    // The identity session installed above is deliberately NOT touched: this
-    // rewrite removes a credential from the file, and the person session is what
-    // lets the user keep syncing without typing the phrase again.
-    crate::plugins::vault_migrate::ntv8::upgrade_on_unlock(
-        io,
-        vault_path,
-        state,
-        vault_id,
-        upgrade_authority,
-    )
-    .await;
 
     Ok(())
 }
@@ -3717,12 +3675,10 @@ mod tests {
             assert_eq!(*derived.root_key, root_key);
 
             // And the frame on disk is STILL `NTV7`, because this unlock did not
-            // prove the password. The upgrade truncates the person wrap, which is the
-            // only door for a user who opened the vault with their phrase because
-            // they forgot their password: running it here would destroy the very
-            // credential that just worked, in the same act. The password path does
-            // perform it, and that is asserted in `vault_migrate::ntv8` and in
-            // `unlock_with_credential`'s own password case (myne-md/myne#938 review).
+            // prove the password. The in-place rewrite that used to run here was
+            // removed with the version-migration surface; what remains holding this
+            // is the rule that an act must never destroy the credential that just
+            // worked, and a phrase unlock proves no password.
             let after = std::fs::read(scratch.path()).expect("read the frame");
             assert_eq!(
                 &after[..4],

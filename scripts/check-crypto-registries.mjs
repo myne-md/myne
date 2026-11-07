@@ -297,22 +297,6 @@ const KNOWN = [
       "path is retired.",
   },
   {
-    rule: "magic-parity",
-    file: "core/src/plugins/vault_migrate/mod.rs",
-    contains: "VAULT_META_MAGIC",
-    missing: "VAULT_META_NTV6_MAGIC,VAULT_META_NTV7_MAGIC,VAULT_META_NTV8_MAGIC",
-    why:
-      "The v0.1 to v0.2 ON-DISK migration reads a `MYV1` `vault.meta` and writes `NTV5`; an " +
-      "`NTV6` (or person-born `NTV7`) vault never reaches it, because the B2B `NTV5` to `NTV6` " +
-      "migration, and the `NTV7` birth that supersedes it, live in " +
-      "`core/src/plugins/vault_migrate/b2b.rs` (which names `VAULT_META_NTV6_MAGIC`) and `core/src/plugins/vault_migrate/ntv7.rs` (which writes `NTV7`). This " +
-      "function reads only the v0.1 base (`parse_vault_meta`) behind the generation dispatcher, " +
-      "the legitimate single-generation-reader shape rule 5's header names. It became visible " +
-      "to rule 5 only when the family table learned the `_NTV<n>_MAGIC` spelling, which is why " +
-      "the third vault-meta generation is the one that surfaced it. Delete this entry if this " +
-      "function ever gains an `NTV6` arm.",
-  },
-  {
     rule: "length-prefix",
     file: "protocol/src/attachments_catalog.rs",
     contains: ".len() as u16",
@@ -324,26 +308,6 @@ const KNOWN = [
       "written, and a future fix to the writer would not reach this site. " +
       "Fix: add `push_length_prefixed_u16_be` to the existing `use crate::aead::{…}` and " +
       "replace the two `extend_from_slice` lines with one call, then delete this entry.",
-  },
-  {
-    rule: "raw-nonce",
-    file: "core/src/plugins/vault_migrate/mod.rs",
-    contains: "encode_vault_meta_v0_2_raw(",
-    why:
-      "The `vault.meta` family has no non-`_raw` sibling in EITHER generation — there is no " +
-      "`encode_vault_meta` and no `encode_vault_meta_v0_2`, so the remedy this rule names does " +
-      "not exist for this call. The property the suffix stands for does hold and is visible at " +
-      "the call site: all five salts/nonces are filled by `fill_random` (a `getrandom` call with " +
-      "a typed `MigrationError::Csprng`) in the eight lines directly above, and each buffer is " +
-      "used once for one freshly-minted `root_key`. " +
-      "A wrapper here would be a pass-through: the function also takes the new `root_key` and " +
-      "`items_key`, which the migration must generate itself because the rest of the migration " +
-      "re-keys every blob under them — so moving five `getrandom` calls behind the crate boundary " +
-      "would hide the randomness rather than supply it, and would cost a public API plus a " +
-      "randomness-failure variant on `ProtocolError` (which is serialized to the TS side). " +
-      "Reviewed 2026-08-11 when this guard was found red on `develop`: it landed 2026-08-04 and " +
-      "the violations arrived with the 2026-08-10 migration engine, i.e. past a `--no-verify`. " +
-      "Delete this entry if a non-`_raw` `vault.meta` constructor is ever added.",
   },
 ];
 
