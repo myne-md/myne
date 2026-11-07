@@ -21,10 +21,11 @@
 
 use protocol::device_key::DeviceKeyPair;
 use protocol::person_key::{PersonKeyPair, PersonPublicHalf};
+pub use protocol::vault_head::DeviceHeadSigner;
 use protocol::vault_head::{
     head_author_id, open_device_signed_vault_head, open_signed_vault_head, sign_device_vault_head,
-    sign_vault_head, DeviceHeadSigner, SealedHead, VaultHead, VaultHeadError, DEVICE_ID_LEN,
-    HEAD_AUTHOR_ID_LEN, VAULT_HEAD_ACCOUNT_HASH_LEN, VAULT_HEAD_FORMAT_V2, VAULT_HEAD_FORMAT_V3,
+    sign_vault_head, SealedHead, VaultHead, VaultHeadError, DEVICE_ID_LEN, HEAD_AUTHOR_ID_LEN,
+    VAULT_HEAD_ACCOUNT_HASH_LEN, VAULT_HEAD_FORMAT_V2, VAULT_HEAD_FORMAT_V3,
 };
 
 /// The device that signs this vault's heads on this box: its id (the VV actor) and the
@@ -245,13 +246,41 @@ impl SignedHeadCtx {
     /// decides which verifier runs. Trying both would mean a second ML-DSA verification
     /// on every head from an unfamiliar signer.
     pub fn open(&self, record: &[u8]) -> Result<VaultHead, VaultHeadError> {
+        self.open_with(record, &[])
+    }
+
+    /// The same, plus device halves fetched after a first refusal (myne-md/myne#1032).
+    ///
+    /// `extra` is consulted ONLY when the held set cannot verify a `0x03` record. A head from a
+    /// device this context has not met publishes its halves in `vault.device-bindings`, which the
+    /// caller can fetch once and retry with, and an empty `extra` makes this identical to
+    /// [`Self::open`]: that is what keeps the ordinary path unchanged.
+    ///
+    /// The retry also covers a peer that RE-BOUND its key: its row on this device still names the
+    /// old halves, so the first attempt finds the signer and the signature fails. Both shapes are
+    /// one question, "can these halves verify this head", so both arms retry.
+    pub fn open_with(
+        &self,
+        record: &[u8],
+        extra: &[DeviceHeadSigner],
+    ) -> Result<VaultHead, VaultHeadError> {
         match signed_record_format(record)? {
-            VAULT_HEAD_FORMAT_V3 => open_device_signed_vault_head(
-                record,
-                &self.device_signers,
-                &self.account_number_hash,
-            )
-            .map(|(head, _device)| head),
+            VAULT_HEAD_FORMAT_V3 => {
+                let first = open_device_signed_vault_head(
+                    record,
+                    &self.device_signers,
+                    &self.account_number_hash,
+                );
+                if first.is_ok() || extra.is_empty() {
+                    return first.map(|(head, _device)| head);
+                }
+                open_device_signed_vault_head(record, extra, &self.account_number_hash)
+                    .map(|(head, _device)| head)
+                    // Report the FIRST attempt's refusal, not the retry's: it names the state
+                    // this device was actually in (an unknown signer, or a signer whose halves
+                    // are stale), and that is what the caller classifies and logs.
+                    .map_err(|_| first.err().unwrap_or(VaultHeadError::SignatureMismatch))
+            }
             _ => open_signed_vault_head(record, &self.roster_publics, &self.account_number_hash)
                 .map(|(head, _author)| head),
         }
@@ -263,7 +292,11 @@ impl SignedHeadCtx {
 /// Offset arithmetic, stated once: `ed25519_sig(64) || mldsa_sig(3309) || signer(16) ||
 /// canonical`, and `canonical = domain_prefix(10) || protocol_version(1) ||
 /// head_format_version(1) || …`. So the byte sits at `64 + 3309 + 16 + 10 + 1`.
-fn signed_record_format(record: &[u8]) -> Result<u8, VaultHeadError> {
+///
+/// `pub(crate)` because the pull has to answer one question about a record it will not open
+/// ("is this the device-signed form a binding-store fetch can repair?") before it decides
+/// whether a refusal is its own error (myne-md/myne#1032).
+pub(crate) fn signed_record_format(record: &[u8]) -> Result<u8, VaultHeadError> {
     let offset = protocol::person_key::PERSON_ED25519_SIG_LEN
         + protocol::person_key::PERSON_MLDSA_SIG_LEN
         + DEVICE_ID_LEN
@@ -273,6 +306,16 @@ fn signed_record_format(record: &[u8]) -> Result<u8, VaultHeadError> {
         .get(offset)
         .copied()
         .ok_or(VaultHeadError::RecordTooShort)
+}
+
+/// The 16-byte signer id a signed head record names, the author slot every signed format
+/// carries. `None` when the record is too short to hold it.
+pub(crate) fn signed_record_signer(record: &[u8]) -> Option<[u8; DEVICE_ID_LEN]> {
+    let start =
+        protocol::person_key::PERSON_ED25519_SIG_LEN + protocol::person_key::PERSON_MLDSA_SIG_LEN;
+    record
+        .get(start..start + DEVICE_ID_LEN)
+        .and_then(|slot| <[u8; DEVICE_ID_LEN]>::try_from(slot).ok())
 }
 
 /// The authoring/verification authority for one vault.
@@ -329,6 +372,23 @@ impl HeadAuthority<'_> {
                 protocol::vault_head::open_vault_head(root_key, record)
             }
             HeadAuthority::Signed(ctx) => ctx.open(record),
+        }
+    }
+
+    /// The same, with device halves fetched after a first refusal (myne-md/myne#1032).
+    ///
+    /// A single-keychain (`NTV5`) head has no device signer at all, so the extras are unused
+    /// there and the behaviour is [`Self::open`] exactly.
+    pub fn open_with(
+        &self,
+        record: &[u8],
+        extra: &[DeviceHeadSigner],
+    ) -> Result<VaultHead, VaultHeadError> {
+        match self {
+            HeadAuthority::Mac { root_key } => {
+                protocol::vault_head::open_vault_head(root_key, record)
+            }
+            HeadAuthority::Signed(ctx) => ctx.open_with(record, extra),
         }
     }
 }
@@ -404,6 +464,97 @@ mod tests {
         let opened = ctx.open(&sealed.record).expect("device head verifies");
         assert_eq!(opened.head_format_version, VAULT_HEAD_FORMAT_V3);
         assert_eq!(opened.seq, 1);
+    }
+
+    /// A peer's head whose signer this context has not met is verifiable with the halves a
+    /// binding-store fetch produces, and NOT without them (myne-md/myne#1032).
+    ///
+    /// The shipped deadlock, exactly: device A binds its key and authorises its first `0x03`
+    /// head; the row publishing A's halves travels in `vault.device-bindings`, which only the
+    /// pull that head blocks can deliver; the reader refuses, reports tampering, and never
+    /// adopts the row. `open` alone cannot see the head, and `open_with` can — which is the
+    /// whole repair, so both halves are asserted here.
+    #[test]
+    fn a_peer_head_is_readable_with_fetched_halves_and_not_without_them() {
+        let account = [0x57u8; 16];
+        let peer = device(0x61, 0x21);
+        let peer_half = DeviceHeadSigner {
+            device_id: peer.device_id,
+            public: peer.key.public_half(),
+        };
+        let peer_ctx =
+            SignedHeadCtx::new(None, account, Vec::new()).with_device(peer, vec![peer_half]);
+        let sealed = peer_ctx
+            .sign(&head(account), &mut Rng(21))
+            .expect("the peer authors its own head");
+
+        // This device: a DIFFERENT device's signer set, no knowledge of the peer.
+        let own = device(0x62, 0x22);
+        let own_half = DeviceHeadSigner {
+            device_id: own.device_id,
+            public: own.key.public_half(),
+        };
+        let reader = SignedHeadCtx::new(None, account, Vec::new()).with_device(own, vec![own_half]);
+
+        assert_eq!(
+            reader.open(&sealed.record).unwrap_err(),
+            protocol::vault_head::VaultHeadError::AuthorUnknown,
+            "an unmet signer is the refusal that a fetched row can repair"
+        );
+        let opened = reader
+            .open_with(&sealed.record, std::slice::from_ref(&peer_half))
+            .expect("with the peer's halves the same head verifies");
+        assert_eq!(opened.head_format_version, VAULT_HEAD_FORMAT_V3);
+        assert_eq!(opened.seq, 1);
+        assert!(
+            reader
+                .open_with(&sealed.record, &[own_half_of_other_key(&account)])
+                .is_err(),
+            "and a row for the WRONG halves is still refused: the retry is not a bypass"
+        );
+    }
+
+    /// A peer that RE-BOUND its key: this device holds the device id with the old halves, so the
+    /// first attempt finds the signer and the signature fails. That is the mirror image of the
+    /// unmet-signer case and the same repair, which is why the retry is on the whole open rather
+    /// than on `AuthorUnknown` alone (myne-md/myne#1032, second half).
+    #[test]
+    fn a_rebound_peer_verifies_through_the_fetched_halves() {
+        let account = [0x58u8; 16];
+        let id = 0x31u8;
+        let reborn = device(0x71, id);
+        let reborn_half = DeviceHeadSigner {
+            device_id: reborn.device_id,
+            public: reborn.key.public_half(),
+        };
+        let sealed = SignedHeadCtx::new(None, account, Vec::new())
+            .with_device(reborn, vec![reborn_half])
+            .sign(&head(account), &mut Rng(31))
+            .expect("the re-bound device authors a head");
+
+        // This device still holds the OLD halves for the same device id.
+        let stale = DeviceHeadSigner {
+            device_id: [id; DEVICE_ID_LEN],
+            public: device(0x72, id).key.public_half(),
+        };
+        let reader = SignedHeadCtx::new(None, account, Vec::new()).with_readers(vec![stale]);
+        assert_eq!(
+            reader.open(&sealed.record).unwrap_err(),
+            protocol::vault_head::VaultHeadError::SignatureMismatch,
+            "the stale row names the device, so the failure is the signature and not the author"
+        );
+        assert!(reader
+            .open_with(&sealed.record, std::slice::from_ref(&reborn_half))
+            .is_ok());
+    }
+
+    /// Halves for some other device are not a licence to open this head.
+    fn own_half_of_other_key(account: &[u8; 16]) -> DeviceHeadSigner {
+        let _ = account;
+        DeviceHeadSigner {
+            device_id: [0x99u8; DEVICE_ID_LEN],
+            public: device(0x63, 0x99).key.public_half(),
+        }
     }
 
     /// And the other side of the same coin: with neither authority the context refuses

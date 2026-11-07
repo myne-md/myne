@@ -35,7 +35,7 @@
 //! The first three are **not** gated on wasm32, and that is deliberate: they
 //! carry the classification logic and the failure-shape decisions, which are the
 //! parts most likely to be wrong, and gating them would put them beyond
-//! `cargo test --workspace`. See `Cargo.toml` for the full reasoning.
+//! `cargo nextest run --workspace`. See `Cargo.toml` for the full reasoning.
 
 /// Object URLs for decrypted attachments (task 44).
 ///
@@ -115,7 +115,7 @@ pub mod awareness;
 /// the router's enrolment arm calls into it, and that arm is deliberately not
 /// gated either (`dispatched_names_match_the_router` runs on the host). The
 /// SCHEDULER it drives is shared with desktop and covered by
-/// `cargo test --workspace` in `myne-core`.
+/// `cargo nextest run --workspace` in `myne-core`.
 pub mod sync_loop;
 
 /// The Worker's session state — one [`myne_core::plugins::vault_unlock::state::VaultRuntimeState`]
@@ -124,7 +124,7 @@ pub mod session;
 
 /// The cross-language constants the OPFS bridge depends on.
 ///
-/// Host-compiled on every target so `cargo test --workspace` covers it: the
+/// Host-compiled on every target so `cargo nextest run --workspace` covers it: the
 /// numeric failure-kind mapping is duplicated in Rust and TypeScript by
 /// necessity (it crosses the wasm boundary on every failing call), and a comment
 /// saying "keep these in sync" is not a mechanism.

@@ -28,7 +28,7 @@
 //! proven end-to-end against the real server by
 //! `orchestrator::tests::two_devices_replicate_a_note`.
 
-use super::head_authority::HeadAuthority;
+use super::head_authority::{DeviceHeadSigner, HeadAuthority};
 use super::transport::{HttpMethod, SyncTransport, TransportError};
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
@@ -176,6 +176,21 @@ pub enum PullError {
     CursorExpired,
     /// The pulled head failed MAC / structural verification.
     HeadInvalid,
+    /// The pulled head is a `0x03` record whose signing DEVICE this context cannot verify
+    /// (myne-md/myne#1032).
+    ///
+    /// Separate from [`PullError::HeadInvalid`] because the two need opposite handling and mean
+    /// opposite things to the user. A device that has just bound its key publishes its row in
+    /// `vault.device-bindings`, which arrives in the very pull whose head it signed, and the
+    /// head is verified BEFORE the page's metas are applied. So the first head from a device this
+    /// context has not met is unverifiable BY CONSTRUCTION, and reporting it as `HeadInvalid`
+    /// emitted the tampering banner and aborted before the metas, so the row could never arrive:
+    /// the vault deadlocked every other device of the account on first contact. A device whose
+    /// row publishes STALE halves (a re-bound key) lands here too, which is why the caller
+    /// retries the whole open against refreshed halves rather than one specific arm.
+    ///
+    /// A signature that fails against halves nothing can refresh stays `HeadInvalid`.
+    HeadSignerUnknown,
     /// The recomputed `head_id` ≠ the wire `head_id_hex` (server inconsistency).
     HeadIdMismatch,
     /// **Rollback rejected** — the head's VV regressed below the baseline
@@ -253,6 +268,10 @@ pub fn pull_page(
     local: &HashMap<[u8; 16], [u8; 24]>,
     reconcile: bool,
     rekey_rebase: bool,
+    // Device halves fetched AFTER a first refusal, for a `0x03` head this context could not
+    // verify (myne-md/myne#1032). Empty on the ordinary attempt, which is what keeps the
+    // ordinary path identical: no extra signer is consulted.
+    extra_signers: &[DeviceHeadSigner],
 ) -> Result<PullPage, PullError> {
     // `reconcile=1` is a full-manifest walk (§11.2): the server exempts it from the
     // cursor-expired floor so the walk can drain a vault whose reclaim floor sits
@@ -303,7 +322,7 @@ pub fn pull_page(
             let record = B64
                 .decode(hw.record_b64.as_bytes())
                 .map_err(|_| PullError::BadResponse)?;
-            let opened = head_authority.open(&record);
+            let opened = head_authority.open_with(&record, extra_signers);
             // A head that will not open under a root_key this device just
             // REPLACED is the expected shape, not a forgery (#429). Take its id —
             // `SHA-256(record)`, keyless — as the CAS parent for the head this
@@ -320,6 +339,44 @@ pub fn pull_page(
                 Err(_) if rekey_rebase => {
                     unverifiable_head_id = Some(head_id);
                     None
+                }
+                // The two refusals a binding-store fetch can repair, ON THEIR ERROR and only on
+                // a `0x03` record (review of myne-md/myne#1032):
+                //
+                //   * `AuthorUnknown`: this context does not hold the signing device's halves
+                //     at all, which is the first-contact shape;
+                //   * `SignatureMismatch`: it holds halves for that device, but the peer
+                //     RE-BOUND its key and the row here is stale.
+                //
+                // Classifying by the record's format byte instead would have swept a structural
+                // fault into the repairable class, and every `0x03` refusal into it, which is how
+                // a forged head would have earned a retry it should not get.
+                Err(err @ (VaultHeadError::AuthorUnknown | VaultHeadError::SignatureMismatch))
+                    if super::head_authority::signed_record_format(&record)
+                        == Ok(protocol::vault_head::VAULT_HEAD_FORMAT_V3) =>
+                {
+                    // The integrity alert this ends in is silent at the UI layer, so the ONE
+                    // place that still holds the refused record says what it was: which
+                    // refusal, the signed format byte and the signer the record names. Without
+                    // it a wedge of this class is indistinguishable from a network blip in the
+                    // log, which is the forensics gap myne-md/myne#1032 was filed for.
+                    let signer = match super::head_authority::signed_record_signer(&record) {
+                        Some(id) => hex_lower(&id),
+                        None => "unknown".to_string(),
+                    };
+                    tracing::warn!(
+                        stage = "sync_pull",
+                        event = "head_signer_unresolved",
+                        cause = match err {
+                            VaultHeadError::AuthorUnknown => "author_unknown",
+                            _ => "signature_mismatch",
+                        },
+                        format = super::head_authority::signed_record_format(&record).unwrap_or(0),
+                        signer = %signer,
+                        "the head names a device this vault context cannot verify; fetching the \
+                         device-binding store"
+                    );
+                    return Err(PullError::HeadSignerUnknown);
                 }
                 Err(_) => return Err(PullError::HeadInvalid),
                 Ok(vault_head) => {
@@ -385,6 +442,7 @@ pub fn pull_to_stable(
     local: &HashMap<[u8; 16], [u8; 24]>,
     reconcile: bool,
     rekey_rebase: bool,
+    extra_signers: &[DeviceHeadSigner],
 ) -> Result<PullPage, PullError> {
     let mut cursor = start_cursor;
     let mut acc: HashMap<[u8; 16], ChangedBlob> = HashMap::new();
@@ -402,6 +460,7 @@ pub fn pull_to_stable(
             local,
             reconcile,
             rekey_rebase,
+            extra_signers,
         )?;
         if page.unverifiable_head_id.is_some() {
             unverifiable_head_id = page.unverifiable_head_id;
@@ -1214,7 +1273,18 @@ mod tests {
             200,
             pull_body("", 0, None),
         );
-        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page = pull_page(
+            &t,
+            &mac(),
+            "tok",
+            &[],
+            0,
+            &HashMap::new(),
+            false,
+            false,
+            &[],
+        )
+        .unwrap();
         assert_eq!(page.next_cursor, 0);
         assert!(page.head.is_none());
         assert!(page.changed.is_empty());
@@ -1239,7 +1309,7 @@ mod tests {
         );
 
         let local = HashMap::new(); // blob unknown locally → changed
-        let page = pull_page(&t, &mac(), "tok", &baseline, 1, &local, false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &baseline, 1, &local, false, false, &[]).unwrap();
         let vh = page.head.unwrap();
         assert_eq!(vh.dominance, Dominance::Extension);
         assert_eq!(vh.head_id, head_id);
@@ -1261,7 +1331,7 @@ mod tests {
         );
         let mut local = HashMap::new();
         local.insert([0x01u8; 16], [0xaau8; 24]); // same content_nonce → not changed
-        let page = pull_page(&t, &mac(), "tok", &[], 0, &local, false, false).unwrap();
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &local, false, false, &[]).unwrap();
         assert!(page.changed.is_empty());
     }
 
@@ -1286,12 +1356,208 @@ mod tests {
                 0,
                 &HashMap::new(),
                 false,
-                false
+                false,
+                &[],
             )
             .unwrap_err(),
             PullError::RollbackRejected
         );
     }
+
+    /// A `0x03` head whose signing device this context cannot verify is its OWN error, so the
+    /// cycle can fetch the row that publishes those halves and retry (myne-md/myne#1032).
+    ///
+    /// The shipped deadlock in one assertion: reporting `HeadInvalid` made the caller emit the
+    /// tampering alert and abort before the page's metas, so the very blob carrying the signer
+    /// could never arrive. Both directions are pinned: device-signed and unverifiable is
+    /// repairable, a `0x02` head whose author is not in the roster is not, because no blob fetch
+    /// produces a person half.
+    #[test]
+    fn a_peer_device_head_is_repairable_and_a_person_head_is_not() {
+        fn hex_of(bytes: &[u8]) -> String {
+            let mut out = String::new();
+            for b in bytes {
+                out.push_str(&format!("{b:02x}"));
+            }
+            out
+        }
+        fn b64_of(bytes: &[u8]) -> String {
+            use base64::Engine as _;
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        }
+        let account = [0x33u8; 16];
+        let head_for = |format: u8| protocol::vault_head::VaultHead {
+            head_format_version: format,
+            account_number_hash: account,
+            manifest_hash: [0x55; 32],
+            seq: 1,
+            prev_head_hash: Vec::new(),
+            version_vector: vv(&[(0x0d, 1)]),
+        };
+
+        // (1) Device-signed, signer unknown to this reader.
+        let peer = protocol::device_key::DeviceKeyPair::generate_raw(&[0x91; 32], &[0x92; 32]);
+        let peer_id = [0x0du8; 16];
+        let sealed = protocol::vault_head::sign_device_vault_head(
+            &head_for(protocol::vault_head::VAULT_HEAD_FORMAT_V3),
+            &peer_id,
+            &peer,
+            &mut EngineRng(3),
+        )
+        .unwrap();
+        let rec = b64_of(&sealed.record);
+        let id = hex_of(&sealed.head_id);
+        let stranger = protocol::device_key::DeviceKeyPair::generate_raw(&[0x93; 32], &[0x94; 32]);
+        let reader = super::HeadAuthority::Signed(Box::leak(Box::new(
+            crate::plugins::sync::head_authority::SignedHeadCtx::new(None, account, Vec::new())
+                .with_readers(vec![super::DeviceHeadSigner {
+                    device_id: [0x0eu8; 16],
+                    public: stranger.public_half(),
+                }]),
+        )));
+        let t = FakeTransport::new();
+        t.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body("", 1, Some((&rec, &id))),
+        );
+        assert_eq!(
+            pull_page(
+                &t,
+                &reader,
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
+            PullError::HeadSignerUnknown,
+            "a device-signed head this context cannot verify is repairable, not a forgery"
+        );
+        let peer_half = super::DeviceHeadSigner {
+            device_id: peer_id,
+            public: peer.public_half(),
+        };
+        let page = pull_page(
+            &t,
+            &reader,
+            "tok",
+            &[],
+            0,
+            &HashMap::new(),
+            false,
+            false,
+            std::slice::from_ref(&peer_half),
+        )
+        .expect("the fetched halves verify the same bytes");
+        assert_eq!(page.head.expect("a verified head").head.seq, 1);
+
+        // (1b) Device-signed, and this reader DOES hold halves for that device, with the stale
+        // ones a peer left behind before it re-bound its key. The refusal is `SignatureMismatch`,
+        // not `AuthorUnknown`, and it is repairable by the same fetch: the row here is stale, the
+        // served one is not. Without this arm the re-bound shape reports the tampering alert and
+        // never repairs.
+        let stale_reader = super::HeadAuthority::Signed(Box::leak(Box::new(
+            crate::plugins::sync::head_authority::SignedHeadCtx::new(None, account, Vec::new())
+                .with_readers(vec![super::DeviceHeadSigner {
+                    device_id: peer_id,
+                    public: stranger.public_half(),
+                }]),
+        )));
+        assert_eq!(
+            pull_page(
+                &t,
+                &stale_reader,
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
+            PullError::HeadSignerUnknown,
+            "stale halves for the right device are repairable, not a forgery"
+        );
+
+        // (2) Person-signed, author not in this reader's roster.
+        let person = protocol::person_key::PersonKeyPair::generate_raw(
+            &[0x35; 64],
+            &[0x36; 32],
+            &[0x37; 32],
+        );
+        let author = crate::plugins::sync::head_authority::SignedHeadCtx::new(
+            Some(person.clone()),
+            account,
+            vec![person.public_half()],
+        );
+        let sealed_person = author
+            .sign(
+                &head_for(protocol::vault_head::VAULT_HEAD_FORMAT_V2),
+                &mut EngineRng(5),
+            )
+            .unwrap();
+        let no_roster = super::HeadAuthority::Signed(Box::leak(Box::new(
+            crate::plugins::sync::head_authority::SignedHeadCtx::new(None, account, Vec::new()),
+        )));
+        let t2 = FakeTransport::new();
+        t2.on(
+            HttpMethod::Get,
+            "/sync/pull?cursor=0",
+            200,
+            pull_body(
+                "",
+                1,
+                Some((
+                    &b64_of(&sealed_person.record),
+                    &hex_of(&sealed_person.head_id),
+                )),
+            ),
+        );
+        assert_eq!(
+            pull_page(
+                &t2,
+                &no_roster,
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
+            PullError::HeadInvalid,
+            "a person-signed head with no roster half is not repairable by a blob fetch"
+        );
+    }
+
+    struct EngineRng(u64);
+    impl rand_core::TryRng for EngineRng {
+        type Error = core::convert::Infallible;
+        fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+            Ok(0)
+        }
+        fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+            Ok(0)
+        }
+        fn try_fill_bytes(&mut self, dst: &mut [u8]) -> Result<(), Self::Error> {
+            use sha2::Digest as _;
+            let ctr = self.0.wrapping_add(1);
+            self.0 = ctr;
+            let digest = sha2::Sha256::digest(ctr.to_le_bytes());
+            for chunk in dst.chunks_mut(digest.len()) {
+                chunk.copy_from_slice(&digest[..chunk.len()]);
+            }
+            Ok(())
+        }
+    }
+    impl rand_core::TryCryptoRng for EngineRng {}
 
     #[test]
     fn tampered_head_record_rejected() {
@@ -1307,7 +1573,17 @@ mod tests {
             200,
             pull_body("", 1, Some((&bad, &id))),
         );
-        let r = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false);
+        let r = pull_page(
+            &t,
+            &mac(),
+            "tok",
+            &[],
+            0,
+            &HashMap::new(),
+            false,
+            false,
+            &[],
+        );
         assert!(matches!(
             r,
             Err(PullError::HeadInvalid)
@@ -1340,13 +1616,24 @@ mod tests {
 
         // Default: indistinguishable from a forgery, and treated as one.
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(
+                &t,
+                &mac(),
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
             PullError::HeadInvalid,
             "an unopenable head must stay fatal when this device did not re-key"
         );
 
         // Re-basing: the head is not verified, and only its id is taken.
-        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true)
+        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true, &[])
             .expect("a re-basing device accepts the stale-generation head");
         assert!(
             page.head.is_none(),
@@ -1376,7 +1663,7 @@ mod tests {
             pull_body("", 1, Some((&rec, &lying_id))),
         );
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true).unwrap_err(),
+            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, true, &[]).unwrap_err(),
             PullError::HeadIdMismatch
         );
     }
@@ -1391,7 +1678,18 @@ mod tests {
             b"{\"error_code\":\"cursor_expired\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 5, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(
+                &t,
+                &mac(),
+                "tok",
+                &[],
+                5,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
             PullError::CursorExpired
         );
     }
@@ -1406,7 +1704,18 @@ mod tests {
             b"{\"error_code\":\"unauthenticated\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(
+                &t,
+                &mac(),
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
             PullError::Unauthenticated
         );
     }
@@ -1429,7 +1738,18 @@ mod tests {
             b"{\"error_code\":\"device_revoked\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(
+                &t,
+                &mac(),
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
             PullError::DeviceRevoked
         );
     }
@@ -1443,7 +1763,18 @@ mod tests {
             let t = FakeTransport::new();
             t.on(HttpMethod::Get, "/sync/pull?cursor=0", 401, body);
             assert_eq!(
-                pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+                pull_page(
+                    &t,
+                    &mac(),
+                    "tok",
+                    &[],
+                    0,
+                    &HashMap::new(),
+                    false,
+                    false,
+                    &[]
+                )
+                .unwrap_err(),
                 PullError::Unauthenticated
             );
         }
@@ -1556,7 +1887,18 @@ mod tests {
             b"{\"error_code\":\"device_revoked_soon\"}".to_vec(),
         );
         assert_eq!(
-            pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap_err(),
+            pull_page(
+                &t,
+                &mac(),
+                "tok",
+                &[],
+                0,
+                &HashMap::new(),
+                false,
+                false,
+                &[]
+            )
+            .unwrap_err(),
             PullError::Unauthenticated
         );
     }
@@ -1590,6 +1932,7 @@ mod tests {
             &HashMap::new(),
             false,
             false,
+            &[],
         )
         .unwrap();
         assert_eq!(page.next_cursor, 1);
@@ -1637,7 +1980,8 @@ mod tests {
                 1,
                 &HashMap::new(),
                 false,
-                false
+                false,
+                &[],
             )
             .unwrap_err(),
             PullError::CursorExpired
@@ -1652,6 +1996,7 @@ mod tests {
             &HashMap::new(),
             true,
             false,
+            &[],
         )
         .unwrap();
         assert_eq!(page.next_cursor, 1);
@@ -1685,8 +2030,18 @@ mod tests {
             200,
             pull_body("", 6, None),
         );
-        let page =
-            pull_to_stable(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page = pull_to_stable(
+            &t,
+            &mac(),
+            "tok",
+            &[],
+            0,
+            &HashMap::new(),
+            false,
+            false,
+            &[],
+        )
+        .unwrap();
         assert_eq!(page.next_cursor, 6);
         assert_eq!(
             page.changed.len(),
@@ -2280,7 +2635,18 @@ mod tests {
             200,
             pull_body(meta, 1, None),
         );
-        let page = pull_page(&t, &mac(), "tok", &[], 0, &HashMap::new(), false, false).unwrap();
+        let page = pull_page(
+            &t,
+            &mac(),
+            "tok",
+            &[],
+            0,
+            &HashMap::new(),
+            false,
+            false,
+            &[],
+        )
+        .unwrap();
         assert_eq!(page.changed.len(), 1);
         assert_eq!(page.changed[0].id, [0xEE; 16]);
         assert_eq!(page.changed[0].attachment_id, Some([0xEE; 32]));

@@ -91,6 +91,44 @@ pub enum SyncRuntimeStatus {
     },
 }
 
+impl SyncRuntimeStatus {
+    /// The state as ONE bounded token, for a log field (myne-md/myne#1033).
+    ///
+    /// Exists so the diagnostic log never needs `?status`: that Debug shape carries a `String`
+    /// and the two AS15 per-device clocks, and `threat-model.md` §7 sanctions `?` only over a
+    /// CLOSED enum.
+    ///
+    /// Read from the SERDE tag rather than from a hand-kept match over the variants. The two
+    /// answer the same question, the tag is the copy the UI already consumes, and a variant added
+    /// to the enum would otherwise leave the log speaking the old vocabulary with nothing to
+    /// notice it (review of myne-md/myne#1033). One serialise per status CHANGE, which is the
+    /// gate's own frequency, not per cycle.
+    #[must_use]
+    pub fn state_token(&self) -> String {
+        serde_json::to_value(self)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("state")
+                    .and_then(|state| state.as_str())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "unknown".to_string())
+    }
+
+    /// The bounded cause tag the state carries, or `""`. Every token this returns comes from
+    /// the closed vocabulary in `loop_control::FailureClass::status_detail` and the cycle's
+    /// blocked tokens, never from user data.
+    #[must_use]
+    pub fn detail_token(&self) -> &str {
+        match self {
+            SyncRuntimeStatus::Error { detail, .. }
+            | SyncRuntimeStatus::UploadsBlocked { detail, .. } => detail.as_str(),
+            _ => "",
+        }
+    }
+}
+
 /// A live sync-status overlay (SYNC-36): the background loop / `sync_now`
 /// publishes `Syncing` while a cycle runs, `Error` after a failed cycle, and `Blocked` after a
 /// cycle that succeeded and could not upload; [`overlay_status`] overlays it on the derived base
