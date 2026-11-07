@@ -6186,7 +6186,13 @@
       "badTime": "A time is written like 09:00, 24-hour.",
       "create": "Add to the calendar",
       "cancel": "Cancel",
-      "createFailed": "The event could not be saved."
+      "createFailed": "The event could not be saved.",
+      "repeatNever": "Once",
+      "repeatDaily": "Daily",
+      "repeatWeekly": "Weekly",
+      "repeatMonthly": "Monthly",
+      "remindNone": "No reminder",
+      "calendarLabel": "Calendar (a name)"
     }
   }
 }

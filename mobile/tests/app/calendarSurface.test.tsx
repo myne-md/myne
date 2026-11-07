@@ -54,6 +54,10 @@ function row(date: string, title: string) {
 }
 
 beforeEach(async () => {
+  // The write assertions read `noteCreate`'s calls, so each case starts from an
+  // empty record: `mock.calls[0]` otherwise belongs to whichever composer case ran
+  // first, which is a green test measuring the previous test.
+  vi.clearAllMocks();
   await i18n.changeLanguage("en");
   answer.rows = [];
   failure.on = false;
@@ -110,13 +114,33 @@ describe("EventComposerSheet", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalled());
     // The BYTES, not the input object: an event is a note, so the contract is what
     // lands in the file, and it has to be what the desktop writer emits too.
-    const body = vi.mocked(noteCreate).mock.calls[0]?.[0] as string;
+    const body = vi.mocked(noteCreate).mock.calls.at(-1)?.[0] as string;
     // The title lands in the FRONTMATTER, not as an H1: `patchTitleField` writes
     // the field the dialect reads, and this note has no body to carry a heading.
     expect(body).toMatch(/title: Standup/);
     expect(body).toMatch(/kind:\s*event/);
     expect(body).toMatch(/start:\s*2026-11-05 09:00/);
     expect(body).toMatch(/folder:\s*Calendar/);
+  });
+
+  it("writes the repeat phrase and the reminder lead the dialect spells", async () => {
+    const { formatRecurrenceRule } = await import("@myne/dialect/recurrence");
+    const { noteCreate } = await import("../../src/lib/notes");
+    render(
+      <EventComposerSheet date="2026-11-05" onClose={() => undefined} onCreated={() => undefined} />,
+    );
+    fireEvent.change(screen.getByTestId("calendar.composer.title-field"), {
+      target: { value: "Standup" },
+    });
+    fireEvent.click(await screen.findByTestId("calendar.composer.repeat-weekly"));
+    fireEvent.click(screen.getByTestId("calendar.composer.remind-1h"));
+    fireEvent.click(screen.getByTestId("calendar.composer.create"));
+    await waitFor(() => expect(vi.mocked(noteCreate)).toHaveBeenCalled());
+    const body = vi.mocked(noteCreate).mock.calls.at(-1)?.[0] as string;
+    // The phrase the composer offers IS the phrase the shared formatter emits for
+    // that rule, so the two clients cannot spell one rule two ways.
+    expect(body).toContain(`repeat: ${formatRecurrenceRule({ kind: "interval", unit: "week", count: 1 })}`);
+    expect(body).toContain("remind: 1h");
   });
 
   it("refuses an unreadable time rather than writing one", async () => {
