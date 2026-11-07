@@ -1144,7 +1144,7 @@ pub async fn adopt_person_device_identity_best_effort(
         )
     })
     .await;
-    // `true` means the adoption completed — including the case where both fields were
+    // `true` means the adoption completed, including the case where both fields were
     // already right and nothing needed writing, which is the idempotent path the callers
     // and the test below both rely on.
     written.is_ok()

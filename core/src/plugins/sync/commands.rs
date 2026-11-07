@@ -970,14 +970,7 @@ pub async fn start_b2b_migration_from_host(
             // Only when the flag is not already set, and only through the one writer:
             // a cycle may be running on another task while this migration completes,
             // and its cursor must survive the flag being raised (#964).
-            let _ = super::state::update_sync_state(io, &root, |sync_state| {
-                if sync_state.rekey_rebase_pending {
-                    return (false, super::state::Persist::No);
-                }
-                sync_state.rekey_rebase_pending = true;
-                (true, super::state::Persist::Yes)
-            })
-            .await;
+            let _ = super::state::arm_rekey_rebase(io, &root).await;
             // The vault is `NTV6` now: seal the person-identity carrier under the
             // held root_key so a later unlock installs the session with no phrase
             // (myne-md/myne#792). Best-effort.

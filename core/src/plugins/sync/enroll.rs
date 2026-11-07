@@ -217,6 +217,39 @@ fn hex_decode(s: &str) -> Option<Vec<u8>> {
         .collect()
 }
 
+/// Map a failed identity persist to the enrolment error, at the severity the failure
+/// deserves.
+///
+/// `update_sync_state` fails two ways with two different remedies, and collapsing them
+/// into one `warn!` hides the half a human has to act on: a record that exists and did
+/// not parse (look at the file) is not a write that failed (try again). myne-md/myne#964
+/// merged the two reads, so this is where the distinction survives.
+fn identity_persist_failed(
+    e: crate::plugins::sync::config::SyncConfigError,
+    verb: &'static str,
+) -> SyncDeviceError {
+    if matches!(e, crate::plugins::sync::config::SyncConfigError::Parse) {
+        tracing::error!(
+            stage = "update_sync_state.read",
+            operation = verb,
+            error_kind = "Internal",
+            error = ?e,
+            "sync-state.json exists and did not parse; refusing rather than overwriting a \
+             record a human has to look at"
+        );
+    } else {
+        tracing::warn!(
+            stage = "update_sync_state.write",
+            operation = verb,
+            error_kind = "Internal",
+            error = ?e,
+            "device identity could not be persisted; refusing rather than leaving a token \
+             with no identity"
+        );
+    }
+    SyncDeviceError::Internal
+}
+
 /// Generate a fresh client-CSPRNG device_id (distinct from any server token).
 pub fn generate_device_id() -> [u8; 16] {
     let mut id = [0u8; 16];
@@ -1972,7 +2005,7 @@ pub async fn enroll_device_from_host(
     // both halves of the rule at once. A failed read fails the update rather than
     // defaulting, because defaulting would persist a blank state over a real one:
     // cursor, VV log, per-blob CAS baselines and `meta_baseline_hex` gone in a single
-    // step — the device re-enrols as brand new AND the meta phase reads the absent
+    // step: the device re-enrols as brand new AND the meta phase reads the absent
     // baseline as "only the server changed" and overwrites a locally-newer
     // `vault.meta`. An ABSENT file still defaults (that is `read_sync_state`'s own
     // `Ok`); what is not swallowed is a file that exists and did not parse. And the
@@ -1981,7 +2014,7 @@ pub async fn enroll_device_from_host(
     //
     // #267: the failure still PROPAGATES, and still before the token write.
     //
-    // Discarding it produced a device that held a valid token and no identity — and
+    // Discarding it produced a device that held a valid token and no identity, and
     // every downstream gate reads as fine: the cycle's `NotReady` check is quiet,
     // `status_from` maps (token, enrolled) → `Idle`, and the UI's enrol-gate treats
     // `idle` as "already enrolled" and hides the way back. So enrolment reported
@@ -1989,7 +2022,7 @@ pub async fn enroll_device_from_host(
     // retry.
     //
     // Ordered before the token write so a device that cannot persist identity never
-    // holds a token — the reverse order is exactly the state that cannot recover
+    // holds a token: the reverse order is exactly the state that cannot recover
     // itself.
     super::state::update_sync_state(io, &token_dir, |st| {
         st.account_hash_hex = Some({
@@ -2005,16 +2038,7 @@ pub async fn enroll_device_from_host(
         ((), super::state::Persist::Yes)
     })
     .await
-    .map_err(|e| {
-        tracing::warn!(
-            stage = "update_sync_state",
-            error_kind = "Internal",
-            error = ?e,
-            "device identity could not be persisted; failing enrolment rather than \
-             leaving a token with no identity"
-        );
-        SyncDeviceError::Internal
-    })?;
+    .map_err(|e| identity_persist_failed(e, "enrolment"))?;
 
     // The deferred token write (task 86) — see the closure for why it moved.
     if let Some(token) = stored_token {
@@ -2670,16 +2694,7 @@ pub async fn join_account_from_host(
         ((), super::state::Persist::Yes)
     })
     .await
-    .map_err(|e| {
-        tracing::warn!(
-            stage = "update_sync_state",
-            error_kind = "Internal",
-            error = ?e,
-            "device identity could not be persisted; failing the join rather than \
-             leaving a token with no identity"
-        );
-        SyncDeviceError::Internal
-    })?;
+    .map_err(|e| identity_persist_failed(e, "join"))?;
 
     if let Some(token) = stored_token {
         super::token_store::default_store()

@@ -350,14 +350,22 @@ impl SyncState {
         }
     }
 
-    /// Adopt the fields a RUNNING cycle changed between the record it loaded (`base`)
-    /// and the record it has now — see [`persist_cycle_state`] for why only those.
+    /// Adopt the changes a RUNNING cycle made between the record it loaded (`base`) and
+    /// the record it has now. [`persist_cycle_state`] says why only those.
     ///
     /// **The `Self { … }` pattern is exhaustive on purpose: no `..`.** A field added to
     /// this record stops the function compiling, and that is the moment to decide which
-    /// side owns it — the cycle (bind it and compare it below) or a command (bind it as
+    /// side owns it: the cycle (bind it and merge it below) or a command (bind it as
     /// `_` under the comment below). A roster kept in a test instead would be a second
     /// copy of this list, and the two drift the first time only one of them is edited.
+    ///
+    /// **Two fields are merged per ENTRY and not per field**, because both are
+    /// collections a command also writes into: `blobs` gets a per-blob CAS baseline from
+    /// `resolve_conflict`, a group rotation and both re-key paths, and
+    /// `pending_orphan_tombstones` gets a queued reclaim from those same two. A cycle
+    /// touches both on nearly every run that moved anything, so adopting either whole
+    /// would delete the command's entry and restore a retired sync-id's baseline, which
+    /// is the loss this whole change exists to stop, one level down (myne-md/myne#964).
     fn adopt_cycle_changes(&mut self, base: &Self, cycle: &Self) {
         let Self {
             cursor,
@@ -391,21 +399,70 @@ impl SyncState {
         if *vv_log != base.vv_log {
             self.vv_log.clone_from(vv_log);
         }
-        if *blobs != base.blobs {
-            self.blobs.clone_from(blobs);
-        }
+        self.adopt_blob_baselines(&base.blobs, blobs);
         if *corpus_complete != base.corpus_complete {
             self.corpus_complete = *corpus_complete;
         }
         if *meta_baseline_hex != base.meta_baseline_hex {
             self.meta_baseline_hex.clone_from(meta_baseline_hex);
         }
-        if *pending_orphan_tombstones != base.pending_orphan_tombstones {
-            self.pending_orphan_tombstones
-                .clone_from(pending_orphan_tombstones);
-        }
+        self.adopt_orphan_tombstones(&base.pending_orphan_tombstones, pending_orphan_tombstones);
         if *rekey_rebase_pending != base.rekey_rebase_pending {
             self.rekey_rebase_pending = *rekey_rebase_pending;
+        }
+    }
+
+    /// Merge the per-blob CAS baselines the cycle changed onto the record on disk.
+    ///
+    /// The unit is the BLOB, not the map: an entry the cycle did not touch is left
+    /// exactly as the file has it, so a conflict resolution, a rotation or a re-key that
+    /// landed while the cycle was on the wire keeps its baseline.
+    ///
+    /// A blob this cycle REMOVED is removed from disk even if a command wrote it back.
+    /// That is the one same-key case, and the cycle's removal is the later decision: it
+    /// means "this baseline must go", which is what a re-key arm says about every id it
+    /// stranded.
+    fn adopt_blob_baselines(
+        &mut self,
+        base: &std::collections::BTreeMap<String, BlobSyncState>,
+        cycle: &std::collections::BTreeMap<String, BlobSyncState>,
+    ) {
+        for (id, entry) in cycle {
+            if base.get(id) != Some(entry) {
+                self.blobs.insert(id.clone(), entry.clone());
+            }
+        }
+        for id in base.keys() {
+            if !cycle.contains_key(id) {
+                self.blobs.remove(id);
+            }
+        }
+    }
+
+    /// Merge the orphan-tombstone queue the cycle drained onto the record on disk.
+    ///
+    /// A cycle only ever REMOVES from this queue (its push phase clears what it just
+    /// reclaimed); a command appends. So the merge is: drop what this cycle drained, keep
+    /// what a command queued while it was in flight, and append anything the cycle added
+    /// (nothing today, stated so a future writer is not silently dropped here).
+    fn adopt_orphan_tombstones(&mut self, base: &[OrphanTombstone], cycle: &[OrphanTombstone]) {
+        let base_ids: std::collections::BTreeSet<&str> =
+            base.iter().map(|t| t.blob_id_hex.as_str()).collect();
+        let cycle_ids: std::collections::BTreeSet<&str> =
+            cycle.iter().map(|t| t.blob_id_hex.as_str()).collect();
+        self.pending_orphan_tombstones.retain(|t| {
+            // Asleep on disk only because this cycle has not drained it yet.
+            !base_ids.contains(t.blob_id_hex.as_str()) || cycle_ids.contains(t.blob_id_hex.as_str())
+        });
+        for queued in cycle {
+            if !base_ids.contains(queued.blob_id_hex.as_str())
+                && !self
+                    .pending_orphan_tombstones
+                    .iter()
+                    .any(|t| t.blob_id_hex == queued.blob_id_hex)
+            {
+                self.pending_orphan_tombstones.push(queued.clone());
+            }
         }
     }
 }
@@ -676,9 +733,16 @@ static WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 ///
 /// Its own type rather than a `bool` because one caller answers `No` for a reason that
 /// is a rule of the product rather than an optimisation: the two coalesced clocks
-/// ([`SUCCESS_STAMP_COALESCE_MS`]) read this record every cycle and change it about
-/// once an hour, and writing on the other cycles would turn the file's mtime into a
-/// per-cycle log of when the device was awake and online.
+/// ([`SUCCESS_STAMP_COALESCE_MS`]) read this record every cycle and move about once an
+/// hour, and answering `Yes` on the cycles they did not move buys two whole-record
+/// rewrites an hour and nothing else.
+///
+/// **It does not bound the file's mtime, and the record must not claim it does.** The
+/// cycle persists its advanced cursor on every successful run, so `sync-state.json` is
+/// still rewritten once per cycle and a device on the 30-second poll still leaves a
+/// once-per-cycle at-rest trace of when it was awake and online. `threat-model.md` AS15
+/// records that as a residual rather than as a bound (myne-md/myne#1027,
+/// `decisions/sync/0787`), and an earlier draft of that amendment claimed more.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Persist {
     /// The record changed: write it.
@@ -692,8 +756,8 @@ pub enum Persist {
 ///
 /// # Why the read has to happen in here
 ///
-/// The shape this replaces — every caller reading a whole [`SyncState`], changing one
-/// field and writing the whole record back — loses a concurrent writer's change
+/// The shape this replaces, where every caller read a whole [`SyncState`], changed one
+/// field and wrote the whole record back, loses a concurrent writer's change
 /// whenever two are in flight: both read the same snapshot, and the last write wins
 /// with the loser's field gone (myne-md/myne#964). Nothing reports it. The fields are
 /// written by different callers and each loss costs something different: a `cursor`
@@ -739,7 +803,7 @@ pub async fn update_sync_state<T>(
 /// structural rather than historical: it loads the record once, then mutates it as the
 /// phases report back across a network round trip, so its copy IS the record for as long
 /// as it runs. What it must not do is write that copy back whole, because a publish, an
-/// enrolment or a member rotation can land in between — so it passes the record it
+/// enrolment or a member rotation can land in between, so it passes the record it
 /// LOADED (`base`) and the record it holds (`cycle`), and only the fields that differ
 /// between the two are adopted. Everything else keeps whatever the file says, which is
 /// what makes this a merge rather than a clobber.
@@ -754,6 +818,27 @@ pub async fn update_sync_state<T>(
 /// the cycle sets, persists, and later sets BACK is still a change at the second
 /// checkpoint. The whole-corpus flag does exactly that: a cycle clears it on entry
 /// (myne#292) and recomputes it at the end, so comparing against the pre-cycle snapshot
+/// Arm the next cycle to re-base its baseline instead of rejecting the server's head as
+/// a forgery, and say whether this call is the one that armed it.
+///
+/// Both migration paths that move the head format need exactly this, and it is one
+/// question with one answer (`decisions/protocol/0603`: the head format is keyed off the
+/// vault generation). It is written here, once, because the failure of a half-applied
+/// edit is a sync stall that reads as a forged head rather than as a compile error.
+pub async fn arm_rekey_rebase(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<bool, SyncConfigError> {
+    update_sync_state(io, dir, |state| {
+        if state.rekey_rebase_pending {
+            return (false, Persist::No);
+        }
+        state.rekey_rebase_pending = true;
+        (true, Persist::Yes)
+    })
+    .await
+}
+
 /// would read the recomputed `true` as "unchanged" and never persist it.
 pub async fn persist_cycle_state(
     io: &dyn crate::vault_io::VaultIo,
@@ -786,7 +871,7 @@ async fn write_record(
     Ok(())
 }
 
-/// Seed a WHOLE record — **test and fixture code only**, and the cfg is the point.
+/// Seed a WHOLE record. **Test and fixture code only**, and the cfg is the point.
 ///
 /// A production caller holding a [`SyncState`] it read earlier is exactly the stale
 /// snapshot myne-md/myne#964 is about, so the crate exposes no way to make that call:
@@ -965,6 +1050,7 @@ async fn stamp_clock(
 mod tests {
     use super::*;
     use protocol::VAULT_HEAD_FORMAT_V1;
+    use std::collections::BTreeMap;
 
     // ── the seam, filled in for this module's tests ─────────────────────────
     //
@@ -1516,7 +1602,7 @@ mod tests {
     /// This is the case myne-md/myne#964 was filed for and had no test for: two
     /// mutations in flight at once, each changing a different field. It replaces the
     /// ignored test that asserted the same invariant against the unlocked writer, and it
-    /// asserts the invariant rather than the defect — both changes must be present once
+    /// asserts the invariant rather than the defect: both changes must be present once
     /// both writers return.
     ///
     /// Two parts of the fixture exist to make the DEFECT reachable, because a test that
@@ -1597,8 +1683,8 @@ mod tests {
     /// The other half of myne-md/myne#964. A cycle holds its own copy of the record for
     /// the length of a network round trip, and commands keep writing through
     /// [`super::update_sync_state`] the whole time. When the cycle persists, the fields it
-    /// CHANGED must land and the fields it did not must keep whatever the file says —
-    /// otherwise a publish or an enrolment that landed mid-cycle is undone by the cycle's
+    /// CHANGED must land and the fields it did not must keep whatever the file says.
+    /// Otherwise a publish or an enrolment that landed mid-cycle is undone by the cycle's
     /// next checkpoint, which is the same defect with the loss on the other side.
     #[test]
     fn a_cycle_checkpoint_adopts_only_the_fields_it_changed() {
@@ -1646,12 +1732,144 @@ mod tests {
         std::fs::remove_dir_all(&dir).ok();
     }
 
+    /// **A collection is merged per ENTRY, and that is the granularity that matters.**
+    ///
+    /// `blobs` and `pending_orphan_tombstones` are the two fields a cycle touchés on
+    /// almost every run AND a command writes into: `resolve_conflict` stores a CAS
+    /// baseline, a group rotation and both re-key paths store one and queue a reclaim.
+    /// Adopting either collection whole deletes the command's entry while it looks like
+    /// a correct "the cycle changed this field, so take its copy" merge, which is why
+    /// the loss was invisible on inspection (three dimensions and this test's shape).
+    ///
+    /// Red if either merge is written per field: the command's baseline and its queued
+    /// tombstone both disappear.
+    #[test]
+    fn a_cycle_checkpoint_merges_the_two_shared_collections_per_entry() {
+        let dir = tmpdir("cycle-merge-entry");
+        std::fs::remove_file(dir.join(SYNC_STATE_FILE)).ok();
+        write_sync_state(
+            &dir,
+            &SyncState {
+                blobs: BTreeMap::from([("aa".repeat(16), blob_state(1))]),
+                ..SyncState::default()
+            },
+        )
+        .unwrap();
+
+        let mut base = read_sync_state(&dir).unwrap();
+        let mut cycle = base.clone();
+        // The cycle pushes one blob and drains the queue as it reclaims it.
+        cycle.blobs.insert("bb".repeat(16), blob_state(2));
+        cycle
+            .pending_orphan_tombstones
+            .push(orphan("ff".repeat(16)));
+
+        // ... and while it is on the wire a command resolves a conflict on a third
+        // blob and queues a reclaim of its own.
+        rt(super::update_sync_state(&IO, &dir, |state| {
+            state.blobs.insert("cc".repeat(16), blob_state(3));
+            state
+                .pending_orphan_tombstones
+                .push(orphan("ee".repeat(16)));
+            ((), Persist::Yes)
+        }))
+        .expect("command write");
+
+        rt(super::persist_cycle_state(&IO, &dir, &mut base, &cycle)).expect("cycle checkpoint");
+
+        let after = read_sync_state(&dir).unwrap();
+        assert_eq!(
+            after.blobs.get(&"bb".repeat(16)).map(|b| b.version),
+            Some(2),
+            "the cycle's own baseline lands"
+        );
+        assert_eq!(
+            after.blobs.get(&"cc".repeat(16)).map(|b| b.version),
+            Some(3),
+            "a baseline the command wrote mid-cycle survives the checkpoint"
+        );
+        assert_eq!(
+            after.blobs.get(&"aa".repeat(16)).map(|b| b.version),
+            Some(1),
+            "a baseline neither side touched is left alone"
+        );
+        let queued: Vec<&str> = after
+            .pending_orphan_tombstones
+            .iter()
+            .map(|t| t.blob_id_hex.as_str())
+            .collect();
+        assert!(
+            queued.contains(&"ee".repeat(16).as_str()),
+            "a reclaim the command queued mid-cycle survives: {queued:?}"
+        );
+        assert!(
+            queued.contains(&"ff".repeat(16).as_str()),
+            "the cycle's own queued reclaim is persisted: {queued:?}"
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// A cycle's REMOVAL of a baseline wins even over a command that wrote the same key
+    /// back, because the cycle decided later and the removal is what keeps a retired
+    /// sync-id from being re-pushed at a stale CAS base.
+    #[test]
+    fn a_cycle_checkpoint_removes_the_baselines_it_dropped() {
+        let dir = tmpdir("cycle-merge-remove");
+        std::fs::remove_file(dir.join(SYNC_STATE_FILE)).ok();
+        write_sync_state(
+            &dir,
+            &SyncState {
+                blobs: BTreeMap::from([
+                    ("aa".repeat(16), blob_state(1)),
+                    ("bb".repeat(16), blob_state(2)),
+                ]),
+                ..SyncState::default()
+            },
+        )
+        .unwrap();
+
+        let mut base = read_sync_state(&dir).unwrap();
+        let mut cycle = base.clone();
+        cycle.blobs.remove(&"aa".repeat(16));
+
+        rt(super::persist_cycle_state(&IO, &dir, &mut base, &cycle)).expect("cycle checkpoint");
+
+        let after = read_sync_state(&dir).unwrap();
+        assert!(
+            !after.blobs.contains_key(&"aa".repeat(16)),
+            "a baseline the cycle dropped stays dropped"
+        );
+        assert_eq!(
+            after.blobs.get(&"bb".repeat(16)).map(|b| b.version),
+            Some(2)
+        );
+
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    fn blob_state(version: u64) -> BlobSyncState {
+        BlobSyncState {
+            version,
+            content_nonce_hex: "11".repeat(24),
+            doc_heads_hex: Vec::new(),
+        }
+    }
+
+    fn orphan(id: String) -> OrphanTombstone {
+        OrphanTombstone {
+            blob_id_hex: id,
+            base_version: 7,
+            content_nonce_hex: "22".repeat(24),
+        }
+    }
+
     /// **A value the cycle carries back to where it started is still a change.**
     ///
     /// `corpus_complete` is cleared on cycle entry and recomputed at the end, so a cycle
     /// that legitimately ends with it set changes it TWICE and its final value equals the
     /// snapshot the cycle loaded. A merge that compared only pre-cycle against final would
-    /// call that "unchanged" and never persist the recomputed `true` — leaving the
+    /// call that "unchanged" and never persist the recomputed `true`, leaving the
     /// attachment sweep declining forever, which is the state myne#292 is about.
     #[test]
     fn a_cycle_checkpoint_persists_a_value_carried_back_to_its_starting_point() {
@@ -1693,7 +1911,7 @@ mod tests {
     ///
     /// Two effects, both needed: it forces a second mutation to interleave, and it makes
     /// the first one's read the pre-write bytes even though the write lands before that
-    /// reader resumes — a stale snapshot, deterministically.
+    /// reader resumes: a stale snapshot, deterministically.
     struct YieldsAfterRead(crate::vault_io::test_io::MemoryVaultIo);
 
     impl YieldsAfterRead {
