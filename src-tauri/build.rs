@@ -430,6 +430,14 @@ fn main() {
                 .commands(&["vault_export_markdown", "vault_export_cancel"]),
         )
         .plugin(
+            "text-file",
+            // The calendar's `.ics` exchange (myne-md/myne#1037): one plaintext
+            // file out to a user-named path, one in from a user-picked path, both
+            // capped at 1 MiB so a file the app writes is a file it would also
+            // import. Lock-step with `permissions/text_file/default.toml`.
+            tauri_build::InlinedPlugin::new().commands(&["export_text_file", "import_text_file"]),
+        )
+        .plugin(
             "secret-export",
             // Recovery-kit / account-number `.txt` save (vault-creation
             // PhraseStep/AccountStep). `save_secret_text` is the ONLY path that

@@ -6156,6 +6156,22 @@
       "thisIsOne": "This is one occurrence of a series, on {{date}}. To change it, edit the series or add a one-off on this day.",
       "editSeries": "Edit the series",
       "addOneOff": "Add a one-off on this day"
-    }
+    },
+    "import": "Import an .ics file",
+    "export": "Export as .ics",
+    "imported": "Imported {{count}} events from {{filename}}",
+    "importRefused": {
+      "too-large": "That file is larger than Myne will read (1 MiB). Only a calendar file that size is a whole vault, not a schedule.",
+      "malformed-property": "That file is not an .ics calendar: a line is neither NAME:value nor NAME;param:value.",
+      "unreadable-start": "That file carries a start time Myne cannot read, so nothing was imported.",
+      "unknown-zone": "That file names a time zone this device does not know, so nothing was imported.",
+      "value-shape-mismatch": "That file marks an event as a date and also gives it a time, so nothing was imported.",
+      "unreadable-rule": "That file repeats on a rule Myne does not support, so nothing was imported.",
+      "missing-start": "That file has an event with no start time, and an event without a start is not a place on a calendar.",
+      "no-events": "That file has no events in it."
+    },
+    "exported": "Wrote {{count}} events to {{filename}}",
+    "exportFailed": "Could not write that .ics file.",
+    "exportEmpty": "There is nothing in the calendar to export yet."
   }
 }

@@ -414,6 +414,7 @@ pub fn run() {
         .plugin(plugins::update::init())
         .plugin(plugins::backup::init())
         .plugin(plugins::export::init())
+        .plugin(plugins::text_file::init())
         .plugin(plugins::secret_export::init())
         .plugin(plugins::vault_creation::init())
         .plugin(plugins::vault_unlock::init())

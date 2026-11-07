@@ -37,6 +37,13 @@ import { useLocalToday } from "../useLocalToday";
 import { useDateTimeDisplay } from "../../lib/useDateTimeDisplay";
 import { usePrefs } from "../../hooks/usePrefs";
 import { createEvent } from "../createEvent";
+import { importIcsIntoVault } from "../calendar/icsImport";
+import {
+  canImportIcs,
+  exportIcsFile,
+  ICS_EXPORT_WINDOW,
+} from "../../lib/calendarIcs";
+import { toast } from "../../components/toast/toastStore";
 import { noteRead } from "../readNote";
 import { noteUpdate } from "../updateNote";
 import {
@@ -642,6 +649,52 @@ export function CalendarPane({
           label={t("calendar.form.title")}
           iconSize={14}
           onClick={() => setComposing(formatCivilDate(anchor))}
+        />
+        {/* `.ics` exchange. In the pane header rather than the palette because it
+            is a control for the view you are already in, and it is the only path
+            in or out of another calendar (myne-md/myne#1037). */}
+        {/* Import is desktop-only: it needs a path-taking open dialog, and the
+            browser client has none. Export is not, because a download needs no
+            dialog, so the two affordances do not share a gate. */}
+        {canImportIcs() && (
+        <IconButton
+          icon="file-plus"
+          label={t("calendar.import")}
+          iconSize={14}
+          onClick={() => {
+            void importIcsIntoVault().then((outcome) => {
+              if (outcome.kind === "cancelled") return;
+              if (outcome.kind === "refused") {
+                toast({
+                  message: t(`calendar.importRefused.${outcome.reason}`),
+                  variant: "error",
+                  testId: "calendar.ics-toast",
+                });
+                return;
+              }
+              toast({
+                message: t("calendar.imported", {
+                  filename: outcome.filename,
+                  count: outcome.created,
+                }),
+                variant: "success",
+                testId: "calendar.ics-toast",
+              });
+            });
+          }}
+        />
+        )}
+        <IconButton
+          icon="download"
+          label={t("calendar.export")}
+          iconSize={14}
+          onClick={() => {
+            void vaultIndicesCalendarRange(
+              ICS_EXPORT_WINDOW.start,
+              ICS_EXPORT_WINDOW.end,
+              false,
+            ).then((wide) => exportIcsFile(wide.rows, formatCivilDate(anchor)));
+          }}
         />
         {failure !== null && (
           <span role="alert" style={{ color: "var(--danger)", fontSize: "var(--text-xs)" }} data-testid="calendar.writeRefused">
