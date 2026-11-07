@@ -13,17 +13,24 @@
 // refusal is the codec's named reason (`start-unreadable`, `no-events`, ...), not
 // "something went wrong", because the user's next move differs per reason.
 //
-// **Re-importing the same file creates the events again.** The importer carries
-// each event's `uid` into the note, so the field that makes a match possible is on
-// disk, but the vault has no read that answers "which uids do I already hold" yet:
-// `CalendarRow` does not carry `uid`, and inventing a second index for it here
-// would be the second store this feature refused. The consequence is stated on the
-// issue rather than papered over: a repeat import duplicates, and the fix is the
-// `uid` on the range row, not a guess in this file.
+// # Re-import matches, it does not duplicate
+//
+// Each event's `uid` goes into the note, and the vault's existing uids come from the
+// SAME range read the pane uses (`CalendarRow.uid`), so the match key has one owner:
+// the event index. A second index over events would be the second store this feature
+// deliberately does not have (`decisions/storage/0792`).
+//
+// Two honest limits, both reported rather than hidden. A hand-authored event that
+// was never exported carries no `uid`, so importing a file that names it creates a
+// second note: the vault cannot know two notes describe one meeting. And a file whose
+// events were EDITED between imports updates nothing, because this writer only
+// creates. Both are stated on myne-md/myne#1037 rather than dressed up as
+// convergence.
 
-import { readIcsFile } from "../../lib/calendarIcs";
+import { ICS_EXPORT_WINDOW, readIcsFile } from "../../lib/calendarIcs";
 import { parseEventInstant } from "@myne/dialect/event";
 import { createEvent } from "../createEvent";
+import { vaultIndicesCalendarRange } from "../vaultIndices";
 
 /** What one import did. */
 export type IcsImportOutcome =
@@ -33,7 +40,7 @@ export type IcsImportOutcome =
       readonly kind: "imported";
       readonly filename: string;
       readonly created: number;
-      /** Events the codec read but this writer could not place. */
+      /** Events already in the vault by `uid`, so nothing was written for them. */
       readonly skipped: number;
       readonly warnings: number;
     };
@@ -51,9 +58,32 @@ export async function importIcsIntoVault(): Promise<IcsImportOutcome> {
   const { name, result } = picked;
   if (result.kind !== "ok") return { kind: "refused", reason: result.kind };
 
+  // The uids this vault already holds, from the one read that answers "what is on
+  // my calendar". A locked vault or a failed read returns nothing, and an import
+  // then creates everything: refusing the whole file because the index is
+  // unreadable would be worse than an import a user can undo one note at a time.
+  const held = new Set<string>();
+  try {
+    const existing = await vaultIndicesCalendarRange(
+      ICS_EXPORT_WINDOW.start,
+      ICS_EXPORT_WINDOW.end,
+      false,
+    );
+    for (const row of existing.rows) {
+      if (row.uid !== null) held.add(row.uid);
+    }
+  } catch {
+    // Deliberately silent, with the consequence stated in the outcome: the import
+    // still runs, and `skipped` then means "not matched" rather than "not held".
+  }
+
   let created = 0;
   let skipped = 0;
   for (const event of result.events) {
+    if (held.has(event.uid)) {
+      skipped += 1;
+      continue;
+    }
     const start = parseEventInstant(event.start);
     if (start === null) {
       // The codec already validated the shape, so this is a disagreement between

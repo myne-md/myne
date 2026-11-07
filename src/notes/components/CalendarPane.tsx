@@ -673,10 +673,17 @@ export function CalendarPane({
                 return;
               }
               toast({
-                message: t("calendar.imported", {
-                  filename: outcome.filename,
-                  count: outcome.created,
-                }),
+                message:
+                  outcome.skipped > 0
+                    ? t("calendar.importedSkipped", {
+                        filename: outcome.filename,
+                        count: outcome.created,
+                        skipped: outcome.skipped,
+                      })
+                    : t("calendar.imported", {
+                        filename: outcome.filename,
+                        count: outcome.created,
+                      }),
                 variant: "success",
                 testId: "calendar.ics-toast",
               });

@@ -249,6 +249,14 @@ export interface CalendarRow {
   readonly remind: string | null;
   /** True when the rule is outside the closed §3.8.7 vocabulary. */
   readonly repeatUnrecognized: boolean;
+  /**
+   * The note's own `uid:`, when it carries one.
+   *
+   * The importer's match key and the reason it is here: an `.ics` file has its own
+   * `UID`, the import writes it into the note, and a re-import has to be able to
+   * ask "do I already hold this one" (myne-md/myne#1037).
+   */
+  readonly uid: string | null;
 }
 
 /** Why a note that claims to be an event cannot be shown as one (§3.10.4). */

@@ -80,14 +80,17 @@ export function canImportIcs(): boolean {
  * that carries the series is the one with no `occurrenceOf`, which is also the
  * one a write targets, so the two agree by construction.
  *
- * `uid` is the note id: stable across renames, unique in the vault, and the key
- * the importer uses to match instead of duplicating.
+ * `uid` is the note's own `uid:` when it has one, because that is the identity the
+ * file this event came from carried, and matching on it is what makes a re-import
+ * idempotent. A hand-authored event has none, and its NOTE ID stands in: stable
+ * across renames and unique in the vault, so a round trip through Myne still
+ * matches on the way back in.
  */
 function rowsToIcsEvents(rows: readonly CalendarRow[]): IcsEvent[] {
   return rows
     .filter((row) => row.occurrenceOf === null)
     .map((row) => ({
-      uid: row.noteId,
+      uid: row.uid ?? row.noteId,
       title: row.title ?? "",
       start: row.start,
       end: row.end,
