@@ -1,13 +1,9 @@
 // Tauri IPC wrappers for the `prefs` plugin (MYND-160).
-//
-// - `prefsRead()` — Slot::Unlocked-gated read of vault.prefs; resolves
-//   to `PrefsView` with fall-back-to-defaults semantics applied on
-//   the Rust side per spec § 9.5.5. Frontend never observes
-//   absent / AEAD-fail / parse-fail as distinct outcomes.
-// - `setScreenCaptureProtection(enabled)` — per-field setter; commits
-//   to disk first, then re-applies native screen-capture protection.
-//   Disk-then-native ordering is load-bearing for UI / disk
-//   consistency per MYND-160 grill Q5.2.
+// - `prefsRead()` — Slot::Unlocked-gated read of vault.prefs; resolves   to `PrefsView` with
+// fall-back-to-defaults semantics applied on   the Rust side per spec § 9.5.5. Frontend never observes
+// absent / AEAD-fail / parse-fail as distinct outcomes. - `setScreenCaptureProtection(enabled)` — per-field
+// setter; commits   to disk first, then re-applies native screen-capture protection.   Disk-then-native
+// ordering is load-bearing for UI / disk   consistency per MYND-160 grill Q5.2.
 
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
@@ -226,7 +222,6 @@ export interface PrefsView {
   /**
    * Whether speech-to-text may run on this vault's audio attachments
    * (MYND-592). Defaults to `true`; persisted only when `false`.
-   *
    * Deliberately NOT `ai_enabled`: transcription ships a bundled model, runs
    * on-device and is invoked one file at a time by the user, so it is a
    * product feature rather than part of the AI beta opt-in. The host re-reads
@@ -393,7 +388,6 @@ export interface PrefsView {
   /**
    * Whether automatic on-device tag suggestion runs on this vault's notes
    * (MYND-651). Defaults to `false`; persisted only when `true`.
-   *
    * The second half of a two-key gate — the tag pass runs only when this AND
    * {@link PrefsView.ai_enabled} are on, and the host re-reads both before it
    * touches the model, so the UI gate is discovery, not enforcement. Shared
@@ -407,7 +401,6 @@ export interface PrefsView {
    * The **remote** AI provider this account has named, or `null` for the
    * default — which is not "off" but **unreachable**: with no provider named
    * there is no remote path to reach (`decisions.md` 2026-08-09).
-   *
    * Deliberately unlike {@link PrefsView.ai_enabled}, which is device-local:
    * that one answers "should this machine spend its CPU on inference", while
    * naming a remote provider is a statement about where this vault's notes may
@@ -418,11 +411,9 @@ export interface PrefsView {
    * **Which provider** the one-time consent was given for, or `null`. **A
    * gate, not a display flag** — the host's request path checks it, so a UI
    * that skipped the screen still cannot send.
-   *
    * A name rather than a boolean because consent is per provider: the screen
    * names the recipient, so the request path compares this to the active
    * selection instead of trusting that some setter cleared a flag.
-   *
    * **Device-local since myne-md/myne#456**, and it was account-scoped until
    * then. The old behaviour is what SYNC-22 recorded as an accepted residual:
    * a newly enrolled device inherited the selection, the consent AND the key,
@@ -433,13 +424,11 @@ export interface PrefsView {
   ai_provider_consent: string | null;
   /**
    * **Which model** at {@link PrefsView.ai_provider} answers, or `null`.
-   *
    * There is no default and the client ships no fallback (SYNC-24): the value
    * comes from the list the provider itself reports. `null` means *not chosen*,
    * and the host refuses rather than substituting one — a pinned model tag rots
    * faster than the release that pinned it, and on a metered API a default
    * nobody chose is a bill nobody chose.
-   *
    * Unlike the key it sits beside, this one **does** cross IPC: a published
    * model name is not a credential, and the panel renders the selection back.
    */
@@ -491,7 +480,6 @@ export interface PrefsView {
    * period, which keeps its own three fields and is deliberately not migrated
    * in here (prefs merge per field, so a device on an older build would keep
    * writing the flat ones and the two would silently diverge).
-   *
    * Flat rather than nested so the Phase 2 field clock is per SETTING: a folder
    * edit on one device and a template edit on another, to the same period in
    * the same round, both survive. An entry naming a period this build has no UI
@@ -546,12 +534,10 @@ export interface PrefsView {
   /**
    * Display timezone override (myne#279) — an IANA zone identifier, or `null` ≡
    * the host's own zone.
-   *
    * **Display only.** It decides what the app treats as "today" and how a stored
    * wall-clock value is printed. It never enters a `.myn` file, so a note never
    * records where its author was: `dialect/src/taskFields.ts` keeps note times
    * zone-free and this does not walk that back.
-   *
    * It DOES live in the encrypted `vault.prefs` blob, which is pushed and pulled
    * like every other prefs field. Corrected by myne-md/myne#609, which found
    * this comment claiming "never enters a blob or the sync wire" and then found
@@ -841,7 +827,6 @@ export interface PrefsView {
 
 /**
  * The read that is currently in flight, and the nonce it was started at.
- *
  * See {@link prefsRead}. Held at module scope because the callers that need to
  * share it are separate React hook instances that cannot see each other.
  */
@@ -850,10 +835,8 @@ let inFlightRead: { readonly at: number; readonly promise: Promise<PrefsView> } 
 
 /**
  * Read vault.prefs from the unlocked vault; defaults to safer state.
- *
  * CONCURRENT CALLS AT THE SAME NONCE SHARE ONE ROUND-TRIP (myne-md/myne#556),
  * and that is a correctness fix rather than an optimisation.
- *
  * Every mounted `usePrefs` subscribes to the prefs nonce, and a bump notifies
  * all of them in ONE synchronous loop — so a single settings change made
  * fourteen instances call this function in the same tick, each triggering a
@@ -861,24 +844,20 @@ let inFlightRead: { readonly at: number; readonly promise: Promise<PrefsView> } 
  * subkey, decrypt `vault.prefs`, deserialize). Most of those concurrent reads
  * FAILED, with `Io`. Measured in a browser, instrumenting this function and
  * adding no traffic of its own, on one Settings write:
- *
  *     read-ok als=60   x6      <- six instances reloaded and got the new value
  *     read-fail Io     x10     <- and the rest did not
  *     read-ok als=60   x1
  *     read-fail Io     x8
- *
  * `usePrefs`'s `reload` catches and keeps the current cache ("safer state per
  * spec 9.5.5"), so every instance that lost the race stayed on DEFAULT_PREFS,
  * silently, for the rest of the session — with WHICH instances lost varying per
  * run. The case that surfaced it is auto-lock: `Editor.tsx`'s instance kept
  * `auto_lock_seconds: null`, so `useIdleAutoLock` never armed and the vault
  * never locked on idle, while Settings showed the timeout the user had chosen.
- *
  * Keyed on the NONCE, not on time. Sharing an in-flight read with a caller that
  * arrived after a WRITE published would hand back pre-write bytes; the nonce is
  * exactly the "something changed" signal, so a caller at a higher nonce starts
  * its own read. Callers at the same nonce cannot be asking for different bytes.
- *
  * A rejection is shared too, which is intended: one failure reported to every
  * waiter beats ten separate ones, and there is nothing left to retry against.
  */
@@ -893,9 +872,8 @@ export async function prefsRead(): Promise<PrefsView> {
   try {
     return await promise;
   } finally {
-    // Only clear OUR entry: a newer read (higher nonce) may have replaced it
-    // while this one was still settling, and clearing that would leave the next
-    // burst uncoalesced.
+// Only clear OUR entry: a newer read (higher nonce) may have replaced it while this one was still settling,
+// and clearing that would leave the next burst uncoalesced.
     if (inFlightRead === entry) inFlightRead = null;
   }
 }
@@ -908,7 +886,6 @@ export function __resetPrefsReadForTest(): void {
 
 /**
  * Toggle screen-capture protection.
- *
  * Critical ordering on the backend: vault.prefs disk write succeeds
  * first, then `screen_capture::apply` runs. A rejected promise means
  * the disk write failed — neither the persisted preference nor the
@@ -917,7 +894,6 @@ export function __resetPrefsReadForTest(): void {
  */
 /**
  * THE write path for every `vault.prefs` setter in this module (#251).
- *
  * Invokes the prefs command and, on success, bumps the prefs nonce — the ONE
  * mechanism by which sibling `usePrefs` instances re-read disk truth
  * (`src/hooks/usePrefs.ts`). That bump used to be an optional second line in
@@ -928,7 +904,6 @@ export function __resetPrefsReadForTest(): void {
  * off. The rule was documented two functions away, and documentation was not
  * enough — a developer writing a new setter copies a neighbour, and some
  * neighbours were wrong.
- *
  * Skipping the bump is still possible, but it now costs an explicit
  * `{ bump: false }` carrying its reason — a visible choice in review rather
  * than an invisible omission. `scripts/check-prefs-nonce.mjs` holds the rule:
@@ -939,10 +914,9 @@ async function writePref<T = void>(
   args: Record<string, unknown>,
   opts: { bump?: boolean } = {},
 ): Promise<T> {
-  // Generic since myne-md/myne#613: the five set-field setters return how many
-  // additions the reserved byte budget refused, and the import surface reports
-  // that as a shortfall. Every other setter still resolves to `void`, which is
-  // the default, so no other call site changes.
+// Generic since myne-md/myne#613: the five set-field setters return how many additions the reserved byte
+// budget refused, and the import surface reports that as a shortfall. Every other setter still resolves to
+// `void`, which is the default, so no other call site changes.
   const out = await invoke<T>(command, args);
   if (opts.bump !== false) bumpPrefsNonce();
   return out;
@@ -955,7 +929,6 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
 /**
  * What a caller did to a `vault.prefs` set field: entries it added, entries it
  * removed (myne-md/myne#613).
- *
  * There is deliberately no "make the set equal this list" form. That form is the
  * defect: the backend used to receive a whole set and derive the removals by
  * diffing it against the stored one, so a caller holding a view that predated a
@@ -975,7 +948,6 @@ export interface SetMutation {
   /**
    * Subtrees to remove: every STORED entry at or under one of these folded
    * prefixes, whether or not this caller has ever seen it.
-   *
    * The verb exists because `remove` cannot express a folder deletion honestly.
    * Deleting `Projects/` means deleting whatever is stored under it, and only
    * the write knows what that is: this caller's list is a React view that four
@@ -984,20 +956,17 @@ export interface SetMutation {
    * than the removal, so the folder comes back on every device. Re-reading prefs
    * here narrows that window and does not close it, and it would have to be
    * written once per client per operation.
-   *
    * An entry that folds to the empty string is IGNORED by the core rather than
    * treated as the root. Do not rely on a sentinel: pass nothing for a no-op.
    */
   /**
    * Entries to add ONLY where no removal of them is on record: absent from the
    * stored set AND carrying a removal clock.
-   *
    * For a REPAIR rather than a user act. The unlock back-fill registers folders
    * that LIVE notes prove exist, and that is a state a peer's deletion has not
    * reached yet, because notes and prefs travel separately. With a plain `add`
    * the repair is stamped `now_ms`, beats the peer's removal clock, and puts the
    * folder back on every device permanently with nobody having asked for it.
-   *
    * A genuine user act still wins, because at-fill uses `add`.
    */
   addUnlessRemoved?: string[];
@@ -1005,7 +974,6 @@ export interface SetMutation {
   /**
    * Subtrees to re-root: every STORED entry at or under `from` is rewritten with
    * `to` in place of that prefix.
-   *
    * One verb rather than a remove plus an add, because as two halves a rename
    * can half-apply under the byte budget: the removals land, each stamps a
    * deletion that propagates to every device, and the additions are refused,
@@ -1016,7 +984,6 @@ export interface SetMutation {
 
 /**
  * The mutation a caller performed, derived from ITS OWN before and after.
- *
  * This looks like the diff that caused myne-md/myne#613 and is the opposite of
  * it, so the distinction is worth stating. The defect was the BACKEND diffing a
  * caller's snapshot against the DISK: a peer's entry the snapshot never saw
@@ -1025,7 +992,6 @@ export interface SetMutation {
  * stays correct however stale the caller's view is relative to the disk. An
  * entry the caller never knew about appears in neither side and is therefore
  * never mentioned, which is precisely the property that was missing.
- *
  * Use it where a component holds both states. Where a planner already reports
  * what it removed, pass that instead: a stated removal beats a derived one.
  */
@@ -1044,19 +1010,16 @@ export function mutationFrom(
 /**
  * Add to and remove from the deliberate_folders set (the carrier for empty /
  * deliberately-created folders, MYND-144).
- *
  * Takes VERBS, not a set. It took the whole desired set until myne-md/myne#613,
  * and that is what let a caller holding a stale view claim a deletion it never
  * made: the sync stamper derives removals from `before \ after`, so a peer's
  * addition the caller never saw read as an intentional delete and travelled to
  * every device. Folded-identity dedup is the CORE's job now
  * (`apply_set_mutation`), not the caller's.
- *
  * Returns how many additions the reserved byte budget refused, which is zero in
  * every ordinary case. A rejected promise means the disk write failed and the
  * caller's optimistic UI must revert; {@link registerDeliberateFolders} wraps
  * both outcomes into one verdict for the surfaces that show a notice.
- *
  * Bumps the prefs nonce on success (like every sibling folder-set setter, e.g.
  * {@link setArchivedFolders}) so OTHER `usePrefs` consumers — the palette's
  * "Move note to folder…" picker reads `deliberate_folders` from the prefs blob,
@@ -1071,7 +1034,6 @@ export async function mutateDeliberateFolders(
 
 /**
  * What a deliberate-folders registration ended up doing (myne-md/myne#613).
- *
  * Three outcomes rather than a boolean, because the two failures need opposite
  * user treatment and collapsing them produces a notice that is wrong for one of
  * them. `budget-full` is actionable (delete a folder) and permanent until the
@@ -1085,9 +1047,7 @@ const DELIBERATE_RETRY_MS = 300;
 /**
  * Register folders, retrying ONCE on a transient failure, and classify the
  * result for a surface that shows a notice.
- *
  * The split is on whether the user can do anything:
- *
  *   - A thrown write is retried after {@link DELIBERATE_RETRY_MS}, because there
  *     is nothing for the user to do about a disk hiccup and a notice they
  *     cannot act on trains them to dismiss notices. Only a SECOND failure is
@@ -1095,7 +1055,6 @@ const DELIBERATE_RETRY_MS = 300;
  *   - A budget refusal is reported immediately and is NOT retried: the reserve
  *     is full, the next attempt refuses identically, and the remedy (delete a
  *     folder) is the user's.
- *
  * One retry, not a backoff loop. The caller is a click, the surface is already
  * showing the folder optimistically, and a second failure 300 ms later is
  * evidence enough that this is not a hiccup. A longer schedule would leave a
@@ -1107,7 +1066,7 @@ export async function registerDeliberateFolders(
   try {
     return (await mutateDeliberateFolders(mutation)) > 0 ? "budget-full" : "ok";
   } catch {
-    // Transient, probably. Give it one more go before saying anything.
+// Transient, probably. Give it one more go before saying anything.
   }
   await new Promise((r) => setTimeout(r, DELIBERATE_RETRY_MS));
   try {
@@ -1129,14 +1088,11 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Name the remote AI provider, or pass `null` to clear it (myne#415).
- *
  * Clearing also clears the consent and the key host-side — a key for a
  * provider nobody selected is a credential with no owner, and a surviving
  * consent would silently pre-approve the next provider the user picks.
- *
  * A value outside the host's known set is **refused**, not stored, so the
  * promise rejects rather than leaving a selection the request path ignores.
- *
  * **Changing the provider cuts the chat-history seed, the same way changing
  * `ai_excluded_folders` does (myne-md/myne#617 review).** Since #617 an agent
  * run is seeded with the visible transcript, so without this a conversation
@@ -1144,14 +1100,12 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
  * afterwards. The consent screen enumerates what leaves the device and does not
  * name the conversation so far, so the seed would cross a boundary under a
  * consent that never mentioned it.
- *
  * **Cut on every change, including clearing to `null`.** Clearing sends future
  * runs to a local model runtime, which `threat-model.md` TB12 is a trust
  * boundary in its own right (a separately distributed daemon on the same
  * machine), so "clearing is free" is not true, only cheaper. One rule is
  * learnable and two are not, which is the argument `docs/decisions/ai/0553`
  * already makes about the seed itself.
- *
  * **The cut lives here rather than in `usePrefs`**, unlike the exclusion one,
  * because this binding is the single point every provider change passes
  * through: `AiPanel` calls it from three places (clear, re-select an already
@@ -1164,7 +1118,6 @@ export async function setAiProvider(provider: string | null): Promise<void> {
 
 /**
  * Record (or withdraw) the one-time consent for the named provider (myne#415).
- *
  * This is the persistence, not the enforcement: the host re-reads it before
  * every remote request, so calling it without having shown the screen buys a
  * stored `true` and nothing else.
@@ -1177,11 +1130,9 @@ export async function setAiProviderConsent(
 
 /**
  * Store the provider API key, or pass `null` to **revoke** it (myne#415).
- *
  * One-way by design: the value goes in and never comes back out — there is no
  * command that returns it, and {@link PrefsView} carries no field for it. Read
  * {@link aiProviderHasKey} to decide between "Add key" and "Replace key".
- *
  * Revocation propagates to the account's other devices as an LWW write of
  * `null`, which is what makes "revoke" mean more than "revoke here".
  */
@@ -1192,7 +1143,6 @@ export async function setAiProviderKey(key: string | null): Promise<void> {
 /**
  * Choose which of the provider's models answers, or pass `null` to clear it
  * (myne#415, SYNC-24).
- *
  * The candidate list comes from {@link listProviderModels}, never from a
  * constant in this tree — that is the whole resolution, not an implementation
  * detail. Changing or clearing the provider clears this host-side, because a
@@ -1216,7 +1166,6 @@ export async function setMeetingAiPrompt(prompt: string | null): Promise<void> {
 /**
  * Whether a provider API key is stored — the boolean the UI reads **instead
  * of** the key (myne#415).
- *
  * Not a `writePref`, so it bumps no nonce: it is a read. It answers `false`
  * rather than throwing when the vault is locked or the blob is unreadable,
  * because "no key" is the safe answer for a control that only chooses a label.
@@ -1279,7 +1228,6 @@ export async function setDeveloperMode(enabled: boolean): Promise<void> {
  * Persist `chat_history_budget`: how many characters of visible chat history
  * an agent run may be seeded with (myne-md/myne#617). `null` clears the
  * override and returns the run to the host's own default.
- *
  * **The value is CLAMPED host-side, and this wrapper deliberately does not
  * clamp it.** The bound is what limits how much of the user's plaintext one run
  * can send to a provider, multiplied by the loop's iteration ceiling, so it has
@@ -1297,7 +1245,6 @@ export async function setChatHistoryBudget(budget: number | null): Promise<void>
  * encoding as `deliberate_folders` (the Rust codec NFC-sorts + exact-dedups).
  * The caller passes the entire desired set; a rejected promise means the disk
  * write failed and the caller's optimistic UI must revert.
- *
  * **The seed cut lives here, beside the one in [`setAiProvider`], rather than in
  * `usePrefs`.** This binding is the single point every exclusion write passes
  * through, and the two controls bound the same thing, so splitting them across
@@ -1339,7 +1286,6 @@ export async function mutateCliExcludedFolders(
  * codec NFC-sorts + exact-dedups). The caller passes the entire desired set; a
  * rejected promise means the disk write failed and the caller's optimistic UI
  * must revert.
- *
  * Bumps the prefs nonce after a successful write so the sidebar surfaces that
  * read `archived_folders` through their OWN `usePrefs` instance (saved-view
  * results, new-tab quick-open) re-read disk truth and drop / restore the
@@ -1475,14 +1421,12 @@ export async function setFavorites(favorites: string[]): Promise<void> {
 
 /**
  * Toggle one note in the favorites sequence, against DISK truth (#252).
- *
  * `favorites` is persisted as a whole sequence, so a caller that derives the
  * next value from its own `usePrefs` snapshot writes back whatever that
  * snapshot was missing. The command palette did exactly that: starring note A
  * from the sidebar and then palette-toggling note B persisted `[B]`, dropping
  * A — and since `favorites` is `SharedDiscipline::SequenceLww`, the truncation
  * was pushed to the account and won on every other device.
- *
  * Reading first makes the write depend on what is STORED rather than on which
  * surface rendered most recently. Surfaces that already hold the live sequence
  * (the sidebar, which owns the optimistic row state and its revert) keep using
@@ -1590,7 +1534,6 @@ export async function setRibbonVisible(visible: boolean): Promise<void> {
  * (pass `null` otherwise). When a folder is given the backend also registers it
  * in `deliberate_folders` so it survives empty. Disk-first, no native
  * side-effect; a rejected promise means the write failed.
- *
  * Bumps the prefs nonce after a successful write so the sidebar's note-creation
  * path — which reads the location pref through its OWN `usePrefs` instance,
  * separate from the Settings modal's — sees the new value immediately.
@@ -1652,10 +1595,8 @@ export type PeriodSetting = "folder" | "format" | "template";
  * editing two settings of the same period in one round both keep their edit.
  * Pass `value = null` to clear the entry; the backend removes the key, which
  * the merge represents as a stamped absence rather than as "never had it".
- *
  * A `folder` value is also registered as a deliberate folder backend-side, so
  * the folder shows in the sidebar before its first note exists.
- *
  * The backend refuses a setting outside the three, and a period that is not a
  * bare lowercase word, because a period carrying a dot would make the key ambiguous.
  */
@@ -1673,13 +1614,11 @@ export async function setPeriodicNoteSetting(
  * entry, not the whole map: entries are written by different devices and merged
  * per key, so a whole-map write would let one client's stale view clobber a
  * peer's rename.
- *
  * There is deliberately **no clear/delete counterpart**. `device_names` merges
  * per key by UNION (`sync-protocol.md` §10.2), so removing a key does not
  * propagate — it resurrects from the first peer that still holds it. Renaming
  * always works (it stamps a fresh clock and wins LWW). The backend refuses a
  * blank name, so an empty submit is a no-op the caller should treat as "cancel".
- *
  * `selfName` marks the UNATTENDED write a device makes on its own behalf when it
  * has never had a name (myne-md/myne#973). It is not a hint: the backend refuses
  * that write on a member session, when this device has no `vault.prefs` yet (the
@@ -1702,18 +1641,15 @@ export async function setDeviceName(
 /**
  * The running device's platform token (MYND-548) — `"macos"`, `"windows"`,
  * `"linux"`, `"ios"`, `"android"`, straight from Rust's `std::env::consts::OS`.
- *
  * The enrollment forms seed their "Name this device" field from it, mapping the
  * token to a display word through the i18n catalogue. **Do not derive the
  * platform from `navigator` instead** — that would be a second default-name
  * heuristic diverging per client, which is exactly what keeping names in one
  * synced map is meant to prevent.
- *
  * Memoised, because the answer is a compile-time constant of the running binary
  * and this is an IPC round trip. Desktop has one caller today and mobile's twin
  * has four; the memo is here anyway so the two modules stay comparable, which is
  * how a fix to one reaches the other.
- *
  * Only a SUCCESS is cached. A rejected promise held here would turn one
  * transient IPC failure into a permanently wrong answer for the process.
  */
@@ -1816,12 +1752,10 @@ export async function mutateSpellLanguages(
  * - a non-empty array → override the command to those chords;
  * - an empty array (`[]`) → explicit-unbind (the command has no shortcut);
  * - `null` → remove the override entry (revert to the in-code default).
- *
  * The backend NFC-sorts + dedupes the chord set for canonical byte-stability, so
  * pass the raw desired set. Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
  * Non-load-bearing.
- *
  * Bumps the prefs nonce after a successful write so the live keybinding engine —
  * which reads the keymap through its OWN `usePrefs` instance, separate from the
  * Settings modal's — re-reads disk truth and the rebound shortcut takes effect
@@ -1840,7 +1774,6 @@ export async function setKeymapBinding(
  * show it (the default). Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
  * Non-load-bearing.
- *
  * Unlike the other simple setters, this bumps the prefs nonce after a
  * successful write so that the sidebar — which reads prefs through its OWN
  * `usePrefs` instance, separate from the Settings modal's — re-reads disk truth
@@ -1892,7 +1825,6 @@ export async function setAutoTagEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Set whether THIS DEVICE shows task reminders (MYND-618).
- *
  * Device-local: it never syncs, because whether a given machine should be
  * interrupted is a property of that machine rather than of the vault.
  */
@@ -1903,7 +1835,6 @@ export async function setRemindersEnabled(enabled: boolean): Promise<void> {
 /**
  * Set how many days ahead this device registers reminders with the OS, or
  * `null` to fall back to the built-in horizon (MYND-618).
- *
  * Shorter is more private, not merely cheaper: pending reminder times leave the
  * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
  */
@@ -1953,7 +1884,6 @@ export async function setTimeFormat(value: string | null): Promise<void> {
 /**
  * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
  * identifier, or `null` to follow the host's own zone.
- *
  * Display only: it never reaches a note, so a note never records where its
  * author was. It DOES ride the encrypted `vault.prefs` blob; device-local is a
  * MERGE classification, not a transmission one. The long form is on
@@ -2037,12 +1967,10 @@ export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> 
 /**
  * Approve (or re-approve) one external MCP connection, freezing `folders` as what
  * it may read (external-mcp-connection, myne-md/myne#923).
- *
  * Returns whether the grant was ACCEPTED. `false` is not an error: §9.5.4
  * requires an over-budget addition to be declined rather than failing the whole
  * write, so the caller says "this grant would not fit" and the stored grant is
  * left exactly as it was.
- *
  * **The exclusion list is the only thing this call can narrow**, and it is the
  * one call that decides what an external program can read: everything in the
  * vault except these folders, with each entry taking its subtree with it. The
@@ -2053,7 +1981,6 @@ export async function setCliRateLimitDisabled(disabled: boolean): Promise<void> 
  * nothing". `writeFolders` is the opposite sense: an empty list grants no write at
  * all, and a folder named there that the same approval leaves out of the read
  * scope is refused by the host rather than silently dropped.
- *
  * A grant written under the retired allow-list model cannot be expressed here at
  * all: the host refuses that one at call time with `reapproval_required`, and
  * approving it again is what rewrites it under this model.
@@ -2066,10 +1993,9 @@ export async function setMcpConnectionGrant(
   return await writePref<boolean>("plugin:prefs|set_mcp_connection_grant", {
     name,
     excludedFolders: [...excludedFolders],
-    // An ALLOW list, and the opposite sense to the field above: empty here means
-    // "write nowhere", while an empty exclusion list means "read everything".
-    // Always sent, never omitted: an omitted field would read as "write nowhere"
-    // on the host, so a re-approval would silently revoke every write.
+// An ALLOW list, and the opposite sense to the field above: empty here means "write nowhere", while an empty
+// exclusion list means "read everything". Always sent, never omitted: an omitted field would read as "write
+// nowhere" on the host, so a re-approval would silently revoke every write.
     writeFolders: [...writeFolders],
   });
 }
@@ -2077,7 +2003,6 @@ export async function setMcpConnectionGrant(
 /**
  * Revoke one external MCP connection. Its next call is refused, and the others are
  * untouched.
- *
  * Returns whether a grant was actually removed. Revoking a name with no grant is a
  * successful no-op rather than an error: the user's intent ("this name may not
  * call") is already true, and the row they clicked was simply stale.
@@ -2089,11 +2014,9 @@ export async function revokeMcpConnection(name: string): Promise<boolean> {
 /**
  * Accept one queued out-of-scope write (external-mcp-connection task 13): extend
  * that connection's write grant by EXACTLY the folder it named, and drop the row.
- *
  * The folder is the whole decision. There is no "accept and allow everything
  * under it", because the write grant is an allow list of names, and widening by a
  * subtree is the surprise the grant exists to prevent.
- *
  * Returns whether the WRITE grant changed. `false` covers a stale row (its
  * connection revoked, or the folder excluded since it was queued) as well as one
  * that did not fit the prefs budget; the caller re-reads the view, so the row
@@ -2111,7 +2034,6 @@ export async function acceptMcpWriteRequest(
 
 /**
  * Re-root every folder path an external MCP grant holds, after a folder rename.
- *
  * The read scope is a deny list, and a deny list fails OPEN on a rename: an
  * excluded folder renamed to a new key stops matching, so the notes under it
  * become readable by an approved client with no prompt and no act by the person
@@ -2119,7 +2041,6 @@ export async function acceptMcpWriteRequest(
  * property. This is the call that closes it, made by the rename transaction
  * beside the `deliberate_folders` rewrite rather than by anything a client can
  * reach.
- *
  * Not an approval: no stamp, no model and no member changes, and a rename that
  * touched nothing writes nothing. Resolves with how many entries moved.
  */
@@ -2223,9 +2144,7 @@ export async function setViewOrder(order: string[]): Promise<void> {
  * Persist this DEVICE's approval of one saved view (view-manifests): a
  * device-local map of `{view id: approved version}`, so approval never travels
  * to another device (an approval is a decision somebody made HERE).
- *
  * Two shapes, one command:
- *
  * - `definition` omitted: the plain APPROVAL action. `version` is the definition
  *   version being approved; pass `undefined` to CLEAR this device's approval of
  *   `viewId`. Nothing else about the view changes.
@@ -2234,7 +2153,6 @@ export async function setViewOrder(order: string[]): Promise<void> {
  *   the user's own view unapproved, and one write is the only way to promise
  *   that. An IMPORTED update deliberately does not use this shape: new bytes
  *   from elsewhere are a new decision.
- *
  * "Approved" is an equality against the stored version (Rust
  * `is_view_approved`), so bumping a view's version revokes this device's
  * approval with nothing to clear. The backend refuses (`InvalidValue`) when
@@ -2254,7 +2172,6 @@ export async function setViewApproval(
  * (view-manifests). The host does both: the read is bounded by the manifest cap
  * (so an oversized file is refused rather than truncated) and the parse is
  * `protocol::parse_view_manifest`, the only authority on the grammar.
- *
  * A refusal arrives as `ViewManifestReadError` with the reader's named reason
  * (`src/types/view-manifest-error.ts`), which the import dialog renders: the key
  * this build does not know, the marker it will not let a view write, and so on.
@@ -2270,7 +2187,6 @@ export async function readViewManifest(targetPath: string): Promise<SavedView> {
  * `vault.prefs` uses, so the file an export writes is the file an import reads
  * byte for byte; a WebView-side `JSON.stringify` would be a second opinion about
  * those bytes.
- *
  * `targetPath` must come from the OS save dialog: the dialog IS the export
  * consent, and its "Replace" prompt is what authorizes `overwrite=true` (SYNC-2).
  * This does not touch `vault.prefs`, so nothing here bumps the prefs nonce.

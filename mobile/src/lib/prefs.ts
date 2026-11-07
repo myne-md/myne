@@ -223,9 +223,7 @@ export interface PrefsView {
    * **DEVICE-LOCAL** (`sync-protocol.md` §10.2), deliberately unlike the
    * compression switch above it: this is a per-device compute budget, and OCR
    * runs in-process on the phone that imports the image, so the device paying
-   * the cost owns the switch. Reached this client's mirror when the row that
-   * writes it did (myne-md/myne#880); the import path already read the pref to
-   * select its extractor, so the phone obeyed a value it could not set.
+   * the cost owns the switch. Reached this client's mirror when the writing row did (myne-md/myne#880): the import path already read the pref to select its extractor, so the phone obeyed a value it could not set.
    */
   attachment_ocr_enabled: boolean;
   /**
@@ -281,10 +279,7 @@ export interface PrefsView {
    * frontend mirror of the Rust `folder_matches_excluded`, so a note gated on
    * one path is gated on the other.
    *
-   * Reached this client's mirror when the row that writes it did
-   * (myne-md/myne#880): the phone already ENFORCED the list and reported its
-   * count, and could not author it. Write via
-   * {@link mutateAiExcludedFolders}, which takes verbs rather than a whole set.
+   * Reached this client's mirror when the writing row did (myne-md/myne#880): the phone already ENFORCED the list and reported its count, yet could not author it. Write via {@link mutateAiExcludedFolders}, which takes verbs rather than a whole set.
    */
   ai_excluded_folders: string[];
   /**
@@ -308,9 +303,7 @@ export interface PrefsView {
    * (meeting-ai), or `null` for the built-in default.
    *
    * **SHARED / scalar last-write-wins**: it is vault content, so it reaches the
-   * account's other devices. Reached this client's mirror when the row that
-   * writes it did (myne-md/myne#880), which matters most here because the phone
-   * is where meeting capture actually happens.
+   * account's other devices. Reached this client's mirror when the writing row did (myne-md/myne#880), which matters most here because the phone is where meeting capture actually happens.
    */
   meeting_ai_prompt: string | null;
   /*
@@ -477,13 +470,7 @@ export interface PrefsView {
    * Absent in vaults that configured no period → the Rust decoder defaults it
    * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
    *
-   * **Read and written on mobile since myne-md/myne#880.** It used to be
-   * read-only here, deliberately: the write half was withheld because mobile
-   * shipped no periodic-notes settings panel, and a grant for a command the
-   * WebView never sends would widen the reachable surface for nothing. The panel
-   * landed (`mobile/src/components/PeriodicNotesBlock.tsx`) and the wrapper,
-   * `setPeriodicNoteSetting`, arrived with it, which is the order the paragraph
-   * that stood here asked for.
+   * **Read and written on mobile since myne-md/myne#880** (panel in `mobile/src/components/PeriodicNotesBlock.tsx` + wrapper `setPeriodicNoteSetting`), per the ordering rule above.
    */
   periodic_notes: Record<string, string>;
   /**
@@ -791,25 +778,11 @@ export async function prefsRead(): Promise<PrefsView> {
  * The twin of `src/lib/prefs.ts`'s chokepoint, and it exists for the same reason
  * (#251, ported to mobile by myne-md/myne#486).
  *
- * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read
- * (`./use-prefs.ts`), and mobile has four independent mount sites (`EditorFlow`,
- * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`), so a skipped bump
- * is a stale open editor rather than a latent defect. Why the rule exists, and
- * what the 29-scattered-call-sites shape it replaced cost, is in
- * `scripts/check-prefs-nonce.mjs`'s header, which now covers this module too.
+ * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read (`./use-prefs.ts`); mobile has four independent mount sites (`EditorFlow`, `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`), so a skipped bump is a stale open editor, not a latent defect. Why the rule exists and what the 29-scattered-call-sites shape it replaced cost is in `scripts/check-prefs-nonce.mjs`'s header (this module is covered too).
  *
- * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing
- * claims disk truth changed when it did not, and no re-read races a write that
- * is still in flight (`./prefsNonce.ts` states that ordering as its rule).
- * `mobile/tests/prefs-nonce.test.ts` holds this half specifically, because the
- * guard reads call shapes and would stay green with the bump hoisted above the
- * `invoke`. A few `EditorFlow` writers keep their own `.catch(ignorePrefsWriteFailure)`;
- * that catch is there to stop an unhandled rejection on a `void`-ed call, and
- * its own comment records why the bump inside it buys nothing.
+ * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing claims disk truth changed when it did not, and no re-read races a write still in flight (`./prefsNonce.ts` states that ordering). `mobile/tests/prefs-nonce.test.ts` holds this half, because the guard reads call shapes and would stay green with the bump hoisted above the `invoke`. A few `EditorFlow` writers keep `.catch(ignorePrefsWriteFailure)` to stop an unhandled rejection on a `void`-ed call; that catch's own comment records why the bump inside it buys nothing.
  *
- * Skipping the bump stays possible via `{ bump: false }`, which costs an explicit
- * argument carrying its reason: a visible choice in review rather than an
- * invisible omission.
+ * Skipping the bump stays possible via `{ bump: false }`, an explicit argument carrying its reason — a visible choice in review, not an invisible omission.
  */
 async function writePref<T = void>(
   command: string,
@@ -1283,8 +1256,7 @@ export async function mutateAiExcludedFolders(mutation: SetMutation): Promise<nu
 
 /**
  * Characters of chat history an agent run may be seeded with (myne-md/myne#617),
- * or `null` to restore the host's default. Reached mobile in
- * myne-md/myne#880.
+ * or `null` to restore the host's default. Reached mobile in myne-md/myne#880.
  *
  * **DEVICE-LOCAL**, unlike its neighbours in the AI cluster: it bounds how much
  * of this machine's plaintext one run sends to a provider, multiplied by the
@@ -1308,8 +1280,7 @@ export async function setChatHistoryBudget(budget: number | null): Promise<void>
 
 /**
  * Whether attachment text extraction may read images and scanned PDFs (image
- * OCR, MYND-441). Reached mobile in myne-md/myne#880, and the remedy here is a
- * control rather than a feature: OCR already RUNS in-process on this device
+ * OCR, MYND-441). Reached mobile in myne-md/myne#880; the remedy here is a control rather than a feature: OCR already RUNS in-process on this device
  * (`mobile/src-tauri/src/plugins/attachments/import_mobile.rs` injects the shared
  * `extract_image_only` into the import path), so the device paying the compute
  * cost had no way to turn it off.
@@ -1329,8 +1300,7 @@ export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Replace the meeting AI prompt, or pass `null` to restore the built-in default
- * (meeting-ai). Reached mobile in myne-md/myne#880, which matters more here than
- * elsewhere: the phone is where meeting capture actually happens, so the device
+ * (meeting-ai). Reached mobile in myne-md/myne#880, which matters more here than elsewhere: the phone is where meeting capture actually happens, so the device
  * that records the meeting could not author the instruction that processes it.
  *
  * An all-whitespace value is treated as a clear host-side, and a value longer
@@ -1388,13 +1358,7 @@ export type PeriodSetting = "folder" | "format" | "template";
  * A `folder` value is also registered as a deliberate folder backend-side, so
  * the folder shows in the sidebar before its first note exists.
  *
- * **Landed with the panel, which is the order the `periodic_notes` field
- * comment asked for.** That comment said the write half was deliberately absent
- * because mobile shipped no periodic-notes settings panel, and that a grant for
- * a command the WebView never sends would widen the reachable surface for
- * nothing. The panel landed in `mobile/src/components/PeriodicNotesBlock.tsx`
- * (myne-md/myne#880), so the wrapper, the ACL row and the surface arrive
- * together.
+ * **Landed with the panel** (myne-md/myne#880, `mobile/src/components/PeriodicNotesBlock.tsx`) per the `periodic_notes` field comment's ordering rule; the wrapper, ACL row and surface arrive together.
  *
  * Twin of `src/lib/prefs.ts::setPeriodicNoteSetting`.
  */
@@ -1713,8 +1677,7 @@ export async function setEditorDefaultViewMode(value: string | null): Promise<vo
 /**
  * Set the editor focus-mode dim-inactive toggle (MYND-348). Pass `true` to dim
  * inactive paragraphs, `false` to leave them lit. Disk-first, no native
- * side-effect; bumps the prefs nonce on success. Same contract as
- * {@link setEditorLineNumbers}. Non-load-bearing.
+ * side-effect; bumps the prefs nonce on success. Same contract as {@link setEditorLineNumbers}. Non-load-bearing.
  */
 export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
@@ -1761,13 +1724,7 @@ export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
 }
 
-/* ---- AI (myne-md/myne#456) -------------------------------------------------
- *
- * Five writes and one read. The read is the odd one and it is the interesting
- * one: the key must never cross into page context, so there is no getter for it
- * anywhere and the UI decides between "Add key" and "Replace key" from a
- * boolean.
- */
+// AI (myne-md/myne#456): five writes and one read; the key never crosses into page context, so there is no getter for it anywhere and the UI decides "Add key" vs "Replace key" from a boolean.
 
 /**
  * Turn the AI beta on or off for THIS device.
