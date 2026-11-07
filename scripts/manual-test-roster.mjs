@@ -5835,11 +5835,16 @@ export const ROSTER = Object.freeze([
       "e2e/sync-replication.e2e.ts",
       "e2e/sync-attachments.e2e.ts",
       "e2e/prefs-sync.e2e.ts",
-      "e2e/device-join-qr.e2e.ts",
+      // `e2e/device-join-qr.e2e.ts` and `e2e/person-device-enrolment.e2e.ts` were
+      // removed with their subjects: the QR door renders only for a person-born
+      // vault, which the fixture generator cannot create (it writes the
+      // account-keyed NTV5 frame), and the two-sided device-admission ceremony's
+      // surface was withdrawn by decisions/protocol/0764 with its replacement
+      // (myne-md/myne#957) unbuilt. Naming a file that no longer exists is the
+      // claim `check-manual-test-roster` exists to refuse, and it did.
       "e2e/sync-cert-reverify.e2e.ts",
       "e2e/invite-code-gate.e2e.ts",
       "e2e/publish-vault.e2e.ts",
-      "e2e/person-device-enrolment.e2e.ts",
     ],
     manual: [
       {

@@ -103,6 +103,20 @@ E2E_ENV="$E2E_ENV $E2E_CARGO_JOBS $E2E_CARGO_CODEGEN_UNITS $E2E_CARGO_OPT_LEVEL 
 # the only way to reach a `describeE2E.flaky` spec from here; `MYNE_E2E_AI=1`
 # needs the `local-inference-stub` build as well (see `e2e-ai-buildrun.sh`).
 E2E_ENV="$E2E_ENV MYNE_E2E_QUARANTINE=${MYNE_E2E_QUARANTINE:-0} MYNE_E2E_AI=${MYNE_E2E_AI:-0}"
+
+# **The three knobs `docs/dev/e2e.md` documents as code env vars.** They were read
+# by the vitest config and the harness, but never FORWARDED across the container
+# boundary, so `MYNE_E2E_SHARDS=1 pnpm test:e2e` silently ran four workers and a
+# run described as single-shard was nothing of the kind (measured 2026-11-06: the
+# summed file time of a "one shard" run was 7429 s against 1878 s of wall clock).
+# Forwarded only when set, so an unset variable keeps the machine-derived default
+# the config implements rather than pinning it here.
+for knob in MYNE_E2E_SHARDS MYNE_E2E_TIMEOUT_SCALE MYNE_E2E_WAIT_PROFILE; do
+  value="${!knob:-}"
+  if [ -n "$value" ]; then
+    E2E_ENV="$E2E_ENV $knob=$value"
+  fi
+done
 # `MYNE_E2E_RETRIES=0` is how `e2e/AGENTS.md` says to hunt flake, and no runner
 # used to offer it: with the config's default of 2, a failing attempt is erased
 # from the report and the flake rate reads as zero however bad it is.
