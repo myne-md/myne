@@ -41,6 +41,10 @@ export default defineConfig({
       // alias added only to vite.config.ts passes the build and fails every suite.
       { find: "@myne/calendar-skip", replacement: sib("../src/notes/calendar/skipWrite.ts") },
       { find: "@myne/calendar-drag-write", replacement: sib("../src/notes/calendar/dragWrite.ts") },
+      // The retime writer (decisions/storage/0796), aliased for the reason the skip
+      // writer is: one speller of the field, so two clients cannot produce two
+      // orderings of one list.
+      { find: "@myne/calendar-override", replacement: sib("../src/notes/calendar/overrideWrite.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The same three the bench mirrors (myne-md/myne#1027): the status vocabulary the phone
       // shares with the desktop, and the two pure modules the diagnostics block is built from.

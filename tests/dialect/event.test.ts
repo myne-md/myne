@@ -16,11 +16,14 @@ import { describe, expect, it } from "vitest";
 import { readKindFromFmBody } from "../../src/dialect/surgery";
 import {
   appendSkipDate,
+  clearOverride,
   formatEventInstant,
   parseEventInstant,
   parseReminderLead,
+  parseOverrides,
   parseSkipDates,
   readEventFromFmBody,
+  setOverride,
 } from "../../src/dialect/event";
 
 function fm(...lines: string[]): string {
@@ -278,5 +281,39 @@ describe("appendSkipDate: the one spelling of the field", () => {
 
   it("answers null when the date is already skipped, so the writer does nothing", () => {
     expect(appendSkipDate("2026-11-10", { year: 2026, month: 11, day: 10 })).toBeNull();
+  });
+});
+
+describe("override: one occurrence retimed", () => {
+  it("reads date+time pairs and keeps them in file order", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-03 09:00", "repeat: every tuesday", "override: 2026-11-10 14:00, 2026-11-17 13:30"),
+    );
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.overrides).toEqual([
+      { date: { year: 2026, month: 11, day: 10 }, time: "14:00" },
+      { date: { year: 2026, month: 11, day: 17 }, time: "13:30" },
+    ]);
+  });
+
+  it("drops a bare date, because an override changes a TIME and a date alone changes nothing", () => {
+    expect(parseOverrides("2026-11-10, 2026-11-17 13:30")).toHaveLength(1);
+  });
+
+  it("writes one entry per date, ordered, replacing a date that is already there", () => {
+    const first = setOverride(null, { date: { year: 2026, month: 11, day: 17 }, time: "13:30" });
+    const second = setOverride(first, { date: { year: 2026, month: 11, day: 10 }, time: "14:00" });
+    const replaced = setOverride(second, { date: { year: 2026, month: 11, day: 17 }, time: "15:00" });
+    expect(second).toBe("2026-11-10 14:00, 2026-11-17 13:30");
+    expect(replaced).toBe("2026-11-10 14:00, 2026-11-17 15:00");
+    // Order of writing cannot change the bytes, which is what keeps two clients
+    // from conflicting over one schedule.
+    expect(setOverride(setOverride(null, { date: { year: 2026, month: 11, day: 10 }, time: "14:00" }), { date: { year: 2026, month: 11, day: 17 }, time: "13:30" })).toBe(second);
+  });
+
+  it("clears one date and answers null when there was none", () => {
+    expect(clearOverride("2026-11-10 14:00, 2026-11-17 13:30", { year: 2026, month: 11, day: 10 })).toBe("2026-11-17 13:30");
+    expect(clearOverride("2026-11-10 14:00", { year: 2026, month: 11, day: 10 })).toBe("");
+    expect(clearOverride(null, { year: 2026, month: 11, day: 10 })).toBeNull();
   });
 });

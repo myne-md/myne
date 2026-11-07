@@ -34,12 +34,16 @@ export type { NoteKind, CoverRef } from "./surgery";
 // readers rather than in a calendar module.
 export {
   EVENT_FIELD_KEYS,
+  MAX_OVERRIDES,
   MAX_SKIP_DATES,
   appendSkipDate,
+  clearOverride,
   formatEventInstant,
   parseEventInstant,
+  parseOverrides,
   parseReminderLead,
   parseSkipDates,
+  setOverride,
   readEventFromFmBody,
 } from "./event";
 export type {

@@ -83,6 +83,7 @@ import {
 } from "../calendar/occurrence";
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
 import { skipOccurrence } from "../calendar/skipWrite";
+import { overrideOccurrence } from "../calendar/overrideWrite";
 
 /** How many days the agenda covers. A month of "what is coming" is what a person
  *  opens a calendar to answer. */
@@ -143,6 +144,8 @@ export function CalendarPane({
    * `createEvent`, so the two paths produce the same record.
    */
   const [composing, setComposing] = useState<string | null>(null);
+  /** The time the user typed for a retimed occurrence, held per row. */
+  const [retime, setRetime] = useState<string>("");
   const [reload, setReload] = useState(0);
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -224,6 +227,37 @@ export function CalendarPane({
       setReload((n) => n + 1);
     },
     [ws],
+  );
+
+  /**
+   * Give one appearance a different start time.
+   *
+   * The day and the duration stay (`decisions/storage/0796`), so what the user
+   * types is a clock and not a date: a field that also took a date would be a move,
+   * and a move on an occurrence has no legal write.
+   */
+  const retimeRow = useCallback(
+    async (row: CalendarRow) => {
+      setFailure(null);
+      try {
+        await overrideOccurrence({
+          noteId: seriesNoteId(row),
+          occurrenceDate: occurrenceDate(row),
+          time: retime,
+          io: {
+            readNote: noteRead,
+            writeNote: (id, body, base) => noteUpdate(id, body, base),
+            flushDirtyPanes: ws.flushAll,
+          },
+        });
+        setOccurrence(null);
+        setRetime("");
+      } catch (err) {
+        setFailure(err instanceof EventWriteRefused ? err.reason : null);
+      }
+      setReload((n) => n + 1);
+    },
+    [retime, ws],
   );
 
   const dropOn = useCallback(
@@ -804,6 +838,21 @@ export function CalendarPane({
             }}
           >
             {t("calendar.occurrence.addOneOff")}
+          </Button>
+          <Input
+            type="time"
+            aria-label={t("calendar.occurrence.retime")}
+            value={retime}
+            onChange={(event) => setRetime(event.target.value)}
+            data-testid="calendar.occurrence.retime-field"
+          />
+          <Button
+            variant="ghost"
+            disabled={retime === ""}
+            onClick={() => void retimeRow(occurrence.row)}
+            data-testid="calendar.occurrence.retime"
+          >
+            {t("calendar.occurrence.retime")}
           </Button>
           <Button variant="ghost" onClick={() => void skipRow(occurrence.row)} data-testid="calendar.occurrence.skip">
             {t("calendar.occurrence.skip")}
