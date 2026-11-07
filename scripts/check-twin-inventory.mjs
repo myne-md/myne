@@ -1848,8 +1848,7 @@ function emitProjection(roster, target = PROJECTION) {
  * The document says "Do not edit by hand" and the header calls it a projection,
  * and until this existed nothing enforced either: a hand edit to it is a
  * docs-only commit, which `pnpm-build`'s `code-paths` filter skips, so CI never
- * looked. `scripts/decisions-index.mjs --check` guards its generated index the
- * same way and for the same reason.
+ * looked.
  */
 function checkProjection(roster, target = PROJECTION) {
   const want = projectionBody(roster);
