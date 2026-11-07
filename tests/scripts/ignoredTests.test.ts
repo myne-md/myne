@@ -84,12 +84,12 @@ describe("check-ignored-tests", () => {
   it("passes on the tree as committed, and says what it counted", () => {
     const { code, out } = guard();
     expect(code, out).toBe(0);
-    expect(out).toMatch(/3 deferred #\[ignore]/);
+    expect(out).toMatch(/2 deferred #\[ignore]/);
     // The opt-outs are named in the count's absence: three reasoned #[ignore]s in
     // core/ are NOT deferrals, and the guard must not claim them. So the count below is
     // the roster's size and never the tree's: a reasoned ignore that claims no defect is
     // simply not in `scripts/ignored-tests.json`.
-    expect(out).not.toMatch(/4 deferred/);
+    expect(out).not.toMatch(/3 deferred/);
   });
 
   it("names a tracking issue in the roster for every real deferral", () => {
@@ -97,7 +97,9 @@ describe("check-ignored-tests", () => {
     const issues = r.ignored.map((e: { issue: string | null }) => e.issue).sort();
     // Written out in full rather than counted: a deferral nobody reviewed is exactly a new
     // issue number appearing here, and adding one is supposed to make somebody read this.
-    expect(issues).toEqual(["759", "760", "964"]);
+    // `964` left this list on 2026-11-07: the writer lock landed, so the deferral it
+    // recorded is an ordinary test now (myne-md/myne#964, `decisions/sync/0792`).
+    expect(issues).toEqual(["759", "760"]);
   });
 
   it("rule 1: a deferral that names no issue fails", () => {
@@ -147,7 +149,7 @@ describe("check-ignored-tests", () => {
     // is the ROSTER's, never the tree's, and the two are deliberately different numbers.
     const { code, out } = guard();
     expect(code, out).toBe(0);
-    expect(out).toMatch(/3 deferred/);
+    expect(out).toMatch(/2 deferred/);
   });
 
   it("does not read a NEGATED 'not a known-bug RED' as a claim", () => {
