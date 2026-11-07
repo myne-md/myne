@@ -31,6 +31,7 @@
       "@myne/calendar-skip": ["../src/notes/calendar/skipWrite.ts"],
       "@myne/calendar-drag-write": ["../src/notes/calendar/dragWrite.ts"],
       "@myne/calendar-override": ["../src/notes/calendar/overrideWrite.ts"],
+      "@myne/home-zone": ["../src/lib/homeZone.ts"],
       "@myne/sync-staleness": ["../src/lib/sync-staleness.ts"],
       "@myne/sync-status-view": ["../src/lib/sync-status-view.ts"],
       "@myne/diagnostics": ["../src/lib/diagnostics.ts"],

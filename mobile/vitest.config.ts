@@ -45,6 +45,10 @@ export default defineConfig({
       // writer is: one speller of the field, so two clients cannot produce two
       // orderings of one list.
       { find: "@myne/calendar-override", replacement: sib("../src/notes/calendar/overrideWrite.ts") },
+      // The second clock's rule (decisions/storage/0797): one function decides what a
+      // stored wall clock reads as in the user's home zone, so the phone and the pane
+      // cannot disagree by an hour.
+      { find: "@myne/home-zone", replacement: sib("../src/lib/homeZone.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The same three the bench mirrors (myne-md/myne#1027): the status vocabulary the phone
       // shares with the desktop, and the two pure modules the diagnostics block is built from.

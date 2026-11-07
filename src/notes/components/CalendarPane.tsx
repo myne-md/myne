@@ -84,6 +84,7 @@ import {
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
 import { skipOccurrence } from "../calendar/skipWrite";
 import { overrideOccurrence } from "../calendar/overrideWrite";
+import { homeClockFor } from "../../lib/homeZone";
 
 /** How many days the agenda covers. A month of "what is coming" is what a person
  *  opens a calendar to answer. */
@@ -450,6 +451,21 @@ export function CalendarPane({
       {showTime && (
         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)", flex: "0 0 auto" }}>
           {row.allDay ? t("calendar.allDay") : row.start.slice(11)}
+          {(() => {
+            // The second clock (decisions/storage/0797): the note's time is a wall
+            // clock and stays one, so this is an addition to the READING rather
+            // than anything stored. `homeClockFor` answers null when the preference
+            // is unset or is the device's own zone, which is the common case and
+            // must cost the row nothing.
+            const home = homeClockFor(row.start.replace(" ", "T"));
+            if (home === null) return null;
+            const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
+            return (
+              <span data-testid="calendar.row.home-clock" style={{ marginLeft: "var(--space-1)" }}>
+                {`· ${home.time}${day}`}
+              </span>
+            );
+          })()}
         </span>
       )}
       <span
