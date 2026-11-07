@@ -12,7 +12,7 @@
 //! as "file not found", so a vault whose quota ran out reports itself missing.
 //! [`tests`] reads the TypeScript source and fails if the two disagree.
 //!
-//! Compiled on **every** target, not just wasm32, so `cargo test --workspace`
+//! Compiled on **every** target, not just wasm32, so `cargo nextest run --workspace`
 //! covers it — the wasm-only modules are beyond every gate that runs in
 //! `pre-push`.
 

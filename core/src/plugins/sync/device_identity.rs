@@ -370,7 +370,15 @@ mod imp {
     use zeroize::Zeroizing;
 
     /// `errSecItemNotFound`: the item is absent (never created, or wiped).
-    const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+    pub(crate) const ERR_SEC_ITEM_NOT_FOUND: i32 = -25300;
+
+    /// `errSecInteractionNotAllowed` (-25308): the keychain is locked and this process may not
+    /// prompt. Reachable at a background cycle, and the status that made the first version of
+    /// the shape probe answer "delete".
+    pub(crate) const ERR_SEC_INTERACTION_NOT_ALLOWED: i32 = -25308;
+
+    /// `errSecAuthFailed` (-25293).
+    pub(crate) const ERR_SEC_AUTH_FAILED: i32 = -25293;
 
     /// The query every operation on the device-key item uses.
     ///
@@ -404,20 +412,155 @@ mod imp {
     /// keychain. Three call sites: the migration read below, the migration's own delete
     /// of the moved copy, and the erase.
     ///
-    /// On iOS this addresses the SAME item as [`query_options`], because iOS has no
-    /// file-based keychain and ignores the flag. That is why every caller is gated on
-    /// [`HAS_SEPARATE_FILE_KEYCHAIN`]: a "delete the legacy copy" that ran on iOS would
-    /// delete the key it was called for.
+    /// On a platform with ONE keychain (iOS, and macOS 27 as measured in myne-md/myne#1033)
+    /// this addresses the SAME item as [`query_options`] and the flag is ignored, so a "delete
+    /// the legacy copy" would delete the key it was called for. Every caller is therefore gated
+    /// on [`has_separate_file_keychain`], which answers by measurement rather than by OS name.
     fn file_keychain_options() -> PasswordOptions {
         PasswordOptions::new_generic_password(DEVICE_KEYCHAIN_SERVICE, DEVICE_KEYCHAIN_ACCOUNT)
     }
 
-    /// macOS keeps a file-based keychain BESIDE the data protection one. iOS has only the
-    /// latter and ignores the flag, so there the two option sets address the SAME item,
-    /// which makes every "delete the legacy copy" below a delete of the key it was called
-    /// for. Everything that names the file-based keychain is therefore macOS-only, and
-    /// this constant is the one place that says so.
-    const HAS_SEPARATE_FILE_KEYCHAIN: bool = cfg!(target_os = "macos");
+    /// macOS keeps a file-based keychain BESIDE the data protection one — on SOME macOS
+    /// versions. iOS has only the latter and ignores the flag, so there the two option sets
+    /// address the SAME item, which makes every "delete the legacy copy" below a delete of the
+    /// key it was called for.
+    ///
+    /// **This used to be `cfg!(target_os = "macos")`, and on macOS 27 that statement is FALSE.**
+    /// Measured (myne-md/myne#1033): an item written through [`query_options`] is returned by
+    /// the legacy query too (`file_present=true` in the `device_key_store_readback` line), so
+    /// the two addresses are one store. The read path then deleted the key it had just read —
+    /// the device key lived exactly as long as the first successful read after the write, which
+    /// is why every vault lock and every relaunch met "the signing key this device published is
+    /// not here" while the phone on the same account was fine (`cfg!(macos)` is false there).
+    ///
+    /// So the question is answered by MEASUREMENT, once per process, and the answer decides
+    /// whether any delete may run at all. Unknown answers to `false`, because "do not delete" is
+    /// the safe direction: an undeleted legacy item is a narrow, legacy-only backup risk, while a
+    /// wrong delete is the whole device key.
+    fn has_separate_file_keychain() -> bool {
+        static ANSWER: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        if let Some(answer) = ANSWER.get() {
+            return *answer;
+        }
+        let Some(distinct) = probe_separate_file_keychain() else {
+            // INCONCLUSIVE, and deliberately NOT cached: the next call asks again. Caching
+            // `false` would disable the migration read for the whole process over a keychain
+            // that was merely busy; caching `true` would re-arm the delete. Neither is a
+            // measurement, and making the measurement is this function's whole job.
+            return false;
+        };
+        // `set` rather than a plain store so two threads racing the probe agree on ONE answer.
+        let _ = ANSWER.set(distinct);
+        *ANSWER.get().unwrap_or(&distinct)
+    }
+
+    /// The measurement itself. `None` is "could not ask", which is not the same answer as either
+    /// `Some(true)` or `Some(false)` and must not be collapsed into one.
+    ///
+    /// The three outcomes are the point (review of myne-md/myne#1033): only
+    /// `ERR_SEC_ITEM_NOT_FOUND` on the legacy read is evidence that the two addresses are
+    /// distinct. Any other status there — a locked login keychain at a background cycle
+    /// (`errSecInteractionNotAllowed`), a refused ACL prompt, a transient backend error — read as
+    /// "the item is not there" would answer "delete", i.e. re-arm the very delete that destroyed
+    /// the device key. An interlock that fails open on an error is not an interlock.
+    fn probe_separate_file_keychain() -> Option<bool> {
+        if !cfg!(target_os = "macos") {
+            return Some(false);
+        }
+        // A canary written through the data protection query and looked for through the legacy
+        // one, carrying the SAME accessibility class as the real item, so a leftover probe is not
+        // a new backup-travelling shape. No ACL: the question is about the ADDRESS, and an ACL
+        // write needs an entitlement this probe should not require.
+        let mut write = PasswordOptions::new_generic_password(CANARY_SERVICE, CANARY_ACCOUNT);
+        write.use_protected_keychain();
+        match SecAccessControl::create_with_protection(
+            Some(ProtectionMode::AccessibleWhenUnlockedThisDeviceOnly),
+            0,
+        ) {
+            Ok(access_control) => write.set_access_control(access_control),
+            Err(_) => return None,
+        }
+        if set_generic_password_options(b"probe", write).is_err() {
+            tracing::info!(
+                stage = "device_key_keychain",
+                event = "legacy_keychain_probe",
+                answer = "inconclusive",
+                "the canary could not be written; nothing is deleted and the next call re-probes"
+            );
+            return None;
+        }
+        let legacy = generic_password(PasswordOptions::new_generic_password(
+            CANARY_SERVICE,
+            CANARY_ACCOUNT,
+        ));
+        // Remove the canary through both addresses before answering, whichever arm is taken. A
+        // refused probe delete is logged rather than swallowed: a leftover item in the user's
+        // login keychain is exactly the write an erase must never leave behind.
+        let mut delete_protected =
+            PasswordOptions::new_generic_password(CANARY_SERVICE, CANARY_ACCOUNT);
+        delete_protected.use_protected_keychain();
+        for (op, options) in [
+            ("probe_delete_dpk", delete_protected),
+            (
+                "probe_delete_legacy",
+                PasswordOptions::new_generic_password(CANARY_SERVICE, CANARY_ACCOUNT),
+            ),
+        ] {
+            if let Err(e) = delete_generic_password_options(options) {
+                if e.code() != ERR_SEC_ITEM_NOT_FOUND {
+                    tracing::warn!(
+                        stage = "device_key_keychain",
+                        event = "probe_delete_failed",
+                        op,
+                        status = e.code(),
+                        "the keychain-shape probe item could not be removed"
+                    );
+                }
+            }
+        }
+        let answer = classify_probe_answer(legacy.as_ref().map(|_| ()).map_err(|e| e.code()));
+        match answer {
+            Some(distinct) => tracing::info!(
+                stage = "device_key_keychain",
+                event = "legacy_keychain_probe",
+                answer = if distinct { "distinct" } else { "aliased" },
+                "the keychain shape was measured once for this process"
+            ),
+            None => tracing::info!(
+                stage = "device_key_keychain",
+                event = "legacy_keychain_probe",
+                answer = "inconclusive",
+                status = legacy.as_ref().err().map(|e| e.code()).unwrap_or(0),
+                "the legacy read was refused; nothing is deleted and the next call re-probes"
+            ),
+        }
+        answer
+    }
+
+    /// What ONE legacy read means, split from the FFI so all three outcomes are testable
+    /// without a keychain (review of myne-md/myne#1033).
+    ///
+    /// This is the interlock that decides whether any delete in this module may run, so the
+    /// direction that matters is the one that is NOT an answer: only `ERR_SEC_ITEM_NOT_FOUND` is
+    /// evidence that the two addresses are distinct. Every other status — a locked login keychain
+    /// at a background cycle, a refused ACL prompt, a transient backend error — answers "could not
+    /// ask", which must not become `false` (no delete) *or* `true` (delete). Reading it as `true`
+    /// is the shipped defect: it deleted the key the read had just read.
+    pub(crate) fn classify_probe_answer(legacy: Result<(), i32>) -> Option<bool> {
+        match legacy {
+            // The legacy address answers, so it IS the same store: no delete anywhere.
+            Ok(()) => Some(false),
+            // The one status that is evidence: the item is not reachable from that address.
+            Err(code) if code == ERR_SEC_ITEM_NOT_FOUND => Some(true),
+            // Any other refusal says nothing about the shape.
+            Err(_) => None,
+        }
+    }
+
+    /// Service/account of the throwaway item [`has_separate_file_keychain`] writes. Its own
+    /// service, so a probe can never collide with a family that holds a real secret.
+    const CANARY_SERVICE: &str = "md.myne.devicekey.probe";
+    const CANARY_ACCOUNT: &str = "keychain-shape";
 
     /// Delete the file-based copy, if any, and say so when the delete is REFUSED.
     ///
@@ -426,19 +569,44 @@ mod imp {
     /// logged at `error` rather than `warn`: nothing else in the tree will ever notice,
     /// and the next `load()` retries it.
     fn discard_file_keychain_copy(op: &'static str) {
-        if !HAS_SEPARATE_FILE_KEYCHAIN {
+        if !has_separate_file_keychain() {
             return;
         }
+        delete_file_keychain_copy(op, false);
+    }
+
+    /// The shape if it has already been measured, without measuring it: the healthy read path
+    /// asks this so it never becomes a write (review of myne-md/myne#1033).
+    fn known_keychain_shape() -> Option<bool> {
+        static ANSWER: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+        ANSWER.get().copied()
+    }
+
+    /// The delete itself, shared with [`destroy`] so the device key's deletion policy is decided
+    /// in one place (review of myne-md/myne#1033). `erase` raises the refusal from `warn` to
+    /// `error`: an erase that left a copy behind broke a promise, while a cleanup will retry.
+    fn delete_file_keychain_copy(op: &'static str, erase: bool) {
         if let Err(e) = delete_generic_password_options(file_keychain_options()) {
             if e.code() != ERR_SEC_ITEM_NOT_FOUND {
-                tracing::error!(
-                    stage = "device_key_keychain",
-                    event = "device_key_legacy_delete_failed",
-                    op,
-                    status = e.code(),
-                    "the file-based copy of the device key could not be deleted; it is \
-                     still in the keychain that backups carry, and the next read retries"
-                );
+                if erase {
+                    tracing::error!(
+                        stage = "device_key_keychain",
+                        event = "device_key_legacy_delete_failed",
+                        op,
+                        status = e.code(),
+                        "the legacy copy of the device key survived an ERASE; it is still in \
+                         the keychain that backups carry"
+                    );
+                } else {
+                    tracing::error!(
+                        stage = "device_key_keychain",
+                        event = "device_key_legacy_delete_failed",
+                        op,
+                        status = e.code(),
+                        "the file-based copy of the device key could not be deleted; it is \
+                         still in the keychain that backups carry, and the next read retries"
+                    );
+                }
             }
         }
     }
@@ -450,16 +618,31 @@ mod imp {
         match generic_password(query_options()).map(Zeroizing::new) {
             Ok(bytes) => {
                 // A copy that outlived a refused delete, or that a migration never got to
-                // remove, is still in the keychain that travels in backups. One syscall on
-                // the ordinary path, and the cleanup is self-healing rather than depending
-                // on one migration attempt having succeeded.
-                discard_file_keychain_copy("cleanup");
+                // remove, is still in the keychain that travels in backups. The cleanup is
+                // self-healing rather than depending on one migration attempt having succeeded.
+                //
+                // It runs only once the shape is KNOWN (review of myne-md/myne#1033): asking
+                // here would mean this read writes, reads and deletes a canary item, up to three
+                // times per cycle, inside the one function every authority decision calls. The
+                // migration and the erase paths measure the shape, and this arm picks the answer
+                // up from there.
+                if known_keychain_shape().is_some() {
+                    discard_file_keychain_copy("cleanup");
+                }
                 from_item_bytes(&bytes).map(Some)
             }
             // Absent here is the ordinary first-run state, and it is also where a
             // pre-#959 build's item would NOT be found. The migration read is what tells
             // those two apart, and it is why this arm is not simply `Ok(None)`.
-            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => migrate_from_file_keychain(),
+            //
+            // Logged as of myne-md/myne#1033: absent used to be SILENT, so "the item is not
+            // there" and "the read was refused by a status this build swallows" produced the
+            // same empty log, and the shipped defect (a write that reports ok, reads back in
+            // this process and is not found by the next launch) could not be named at all.
+            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => {
+                super::log_key_op("get", "absent");
+                migrate_from_file_keychain()
+            }
             Err(e) => {
                 log_keychain_err("get", &e);
                 Err(DeviceKeyStoreError::Backend)
@@ -512,12 +695,12 @@ mod imp {
     /// through. Deleting the arm instead would strand the key of anyone who ran such a
     /// build, which is the failure it exists to avoid.
     fn migrate_from_file_keychain() -> Result<Option<DeviceKeyPair>, DeviceKeyStoreError> {
-        // On iOS the two option sets address the same item, so this is not a migration
-        // there: it is a second read of the same place, and the write it would do is a
-        // rewrite of the item that is already there.
-        if !HAS_SEPARATE_FILE_KEYCHAIN {
-            return Ok(None);
-        }
+        // The READ runs unconditionally, and only the write-back and the delete are gated on the
+        // probe (review of myne-md/myne#1033). Reading the legacy address on a one-keychain macOS
+        // is harmless — the data protection read that led here just answered not-found, so this
+        // address answers the same — while SKIPPING the read would answer `Ok(None)` for a key
+        // that really exists there, and `load_or_create` would then mint a replacement over it,
+        // permanently orphaning a key that peers still verify heads against.
         match generic_password(file_keychain_options()).map(Zeroizing::new) {
             Ok(bytes) => {
                 // An item that does not DECODE is not a reason to disable the device: the
@@ -533,6 +716,8 @@ mod imp {
                 // that can write migrates it then, and until then the device keeps signing
                 // with a key it already had.
                 match store(&pair) {
+                    // Deleting the moved copy is the GATED half: on one keychain it deletes the
+                    // item the store above just wrote.
                     Ok(()) => discard_file_keychain_copy("migrate_delete"),
                     Err(err) => tracing::warn!(
                         stage = "device_key_keychain",
@@ -545,7 +730,10 @@ mod imp {
                 }
                 Ok(Some(pair))
             }
-            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => Ok(None),
+            Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => {
+                super::log_key_op("get_legacy", "absent");
+                Ok(None)
+            }
             Err(e) => {
                 log_keychain_err("migrate_get", &e);
                 Err(DeviceKeyStoreError::Backend)
@@ -556,6 +744,25 @@ mod imp {
     pub fn store(pair: &DeviceKeyPair) -> Result<(), DeviceKeyStoreError> {
         let result = store_inner(pair);
         super::log_key_op("store", if result.is_ok() { "ok" } else { "refused" });
+        if result.is_ok() {
+            // myne-md/myne#1033: which keychain did the item land in, and is it readable
+            // back at all? "store ok" alone was not enough to tell a write that vanished
+            // from a write that is visible only inside this process.
+            tracing::info!(
+                stage = "device_key_keychain",
+                event = "device_key_store_readback",
+                // `Zeroizing` on both, for the reason `load()` states: the buffer holds both
+                // private seeds, and this line adds a third reader of them (review of
+                // myne-md/myne#1033).
+                dpk_present = generic_password(query_options())
+                    .map(Zeroizing::new)
+                    .is_ok(),
+                file_present = generic_password(file_keychain_options())
+                    .map(Zeroizing::new)
+                    .is_ok(),
+                "the device key was read back after the store"
+            );
+        }
         result
     }
 
@@ -589,7 +796,14 @@ mod imp {
         // a device that no longer claims that person (`0733` decision 4). Erasing in the
         // other order leaves that resurrection reachable whenever the legacy delete is
         // refused.
-        discard_file_keychain_copy("delete_file_keychain");
+        // UNCONDITIONAL, i.e. NOT behind the keychain-shape probe (review of
+        // myne-md/myne#1033): an erase must not depend on a measurement, because a probe that
+        // answered "inconclusive" would leave the legacy copy behind for the next unlock's
+        // migration to move back in, and the whole promise of this function is that the key is
+        // gone. On an aliased keychain this addresses the same item as the delete below and
+        // tolerates `ERR_SEC_ITEM_NOT_FOUND` for the same reason. The DELETE lives in
+        // `delete_file_keychain_copy` so its policy is stated once.
+        delete_file_keychain_copy("delete_file_keychain", true);
         let result = match delete_generic_password_options(query_options()) {
             Ok(()) => "ok",
             Err(e) if e.code() == ERR_SEC_ITEM_NOT_FOUND => "absent",
@@ -906,7 +1120,41 @@ mod tests {
     /// signature. So the provider's own answers are read from the provider, and the
     /// only claim made through `load()` is a claim a fall-through cannot fake: that
     /// the key it returns is the one this provider minted.
+    /// The interlock's three outcomes, and the direction that is NOT an answer
+    /// (review of myne-md/myne#1033).
+    ///
+    /// This is the decision that gates every delete in the module, and it ships in a change whose
+    /// whole point is that the wrong answer destroys the device signing key. `Some(true)` means
+    /// "two addresses, delete the legacy copy"; the first version answered `true` for ANY error
+    /// from the legacy read, so a locked login keychain at a background cycle re-armed the delete
+    /// that had destroyed the key. `None` must stay `None`: it is neither permission nor refusal,
+    /// and `has_separate_file_keychain` answers `false` (no delete) without caching it so the next
+    /// call asks again.
     #[test]
+    fn only_a_missing_legacy_item_proves_two_keychains() {
+        assert_eq!(
+            imp::classify_probe_answer(Ok(())),
+            Some(false),
+            "the legacy address answered, so the two addresses are one store"
+        );
+        assert_eq!(
+            imp::classify_probe_answer(Err(imp::ERR_SEC_ITEM_NOT_FOUND)),
+            Some(true),
+            "the one status that is evidence the item is not reachable there"
+        );
+        for other in [
+            imp::ERR_SEC_INTERACTION_NOT_ALLOWED,
+            imp::ERR_SEC_AUTH_FAILED,
+            -34018,
+        ] {
+            assert_eq!(
+                imp::classify_probe_answer(Err(other)),
+                None,
+                "a refusal is not an answer, and must never read as permission to delete"
+            );
+        }
+    }
+
     fn a_host_registered_store_answers_for_the_crate() {
         let _serialized = device_key_slot_guard();
         clear_session_key();
