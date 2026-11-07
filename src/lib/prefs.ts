@@ -40,10 +40,8 @@ export type ThemeChoice = "light" | "dark" | "amoled";
  */
 export type NewNoteLocation = "root" | "current" | "specific";
 
-/** Canonical default for {@link PrefsView.new_note_location} when unset. */
 export const DEFAULT_NEW_NOTE_LOCATION: NewNoteLocation = "root";
 
-/** Map a stored / unknown `new_note_location` value to a valid mode. */
 export function normalizeNewNoteLocation(value: string | null): NewNoteLocation {
   return value === "current" || value === "specific" || value === "root"
     ? value
@@ -59,17 +57,14 @@ export function normalizeNewNoteLocation(value: string | null): NewNoteLocation 
  */
 export type StartupOpen = "last" | "empty" | "specific";
 
-/** Canonical default for {@link PrefsView.startup_open} when unset. */
 export const DEFAULT_STARTUP_OPEN: StartupOpen = "last";
 
-/** Map a stored / unknown `startup_open` value to a valid mode. */
 export function normalizeStartupOpen(value: string | null): StartupOpen {
   return value === "empty" || value === "specific" || value === "last"
     ? value
     : DEFAULT_STARTUP_OPEN;
 }
 
-/** Mirrors `protocol::PrefsView` (Rust side). */
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
  *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
  *  `ViewType` (serde lowercase). */
@@ -83,7 +78,6 @@ export type SortDirection = "asc" | "desc";
  *  renames) and the query engine's `PropertyOp`. */
 export type PropertyOp = "==" | "!=" | ">" | "<" | ">=" | "<=" | "contains";
 
-/** A within-group sort: a property key + a direction. Mirrors Rust `ViewSort`. */
 export interface ViewSort {
   key: string;
   direction: SortDirection;
@@ -111,16 +105,12 @@ export type FilterNode =
 export interface SavedView {
   /** Stable unique id (a UUIDv7 in practice). */
   id: string;
-  /** User-visible view name. */
-  name: string;
-  /** Render type (`table` / `cards` / `list` / `board`). */
-  view_type: ViewType;
+    name: string;
+    view_type: ViewType;
   /** The filter AST (an `{ kind: "all" }` leaf for an unfiltered view). */
   filters: FilterNode;
-  /** Optional within-group sort. */
-  sort?: ViewSort;
-  /** Optional groupBy property key. */
-  group_by?: string;
+    sort?: ViewSort;
+    group_by?: string;
   /** Ordered display columns (the `.base` `order` list); a sequence. */
   columns?: string[];
   /** Optional card width in integer pixels (cards view). */
@@ -167,7 +157,6 @@ export interface SavedView {
 export interface ColorGroup {
   /** Stable unique id (a UUIDv7 in practice). */
   id: string;
-  /** User-visible rule name. */
   name: string;
   /** The color-palette key (a design-token name; the UI offers only the
    *  fixed palette, never free-form entry). */
@@ -231,7 +220,7 @@ export interface PrefsView {
   transcription_enabled: boolean;
   /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
-   * the default-ON policy (SYNC-15). Serialized from Rust `Option<bool>`.
+   * the default-ON policy (SYNC-15).
    */
   spell_enabled: boolean | null;
   /**
@@ -247,7 +236,7 @@ export interface PrefsView {
    * absent from the map uses its in-code default; the effective binding is
    * `override ?? default`. Three states: key absent ≡ default; a non-empty array
    * ≡ override; an empty array (`[]`) ≡ explicitly unbound (no shortcut). Defaults
-   * to `{}` (no overrides). Serialized from Rust `BTreeMap<String, Vec<String>>`
+   * to `{}` (no overrides).
    * (each chord set NFC-sorted + deduped on disk; the whole field omitted when
    * empty). Read-only here; write via {@link setKeymapBinding}.
    */
@@ -256,7 +245,7 @@ export interface PrefsView {
    * Unix epoch seconds of the vault's last backup export (MYND-58,
    * spec §9.5.2). `null` ≡ never backed up. Drives the 30-day backup
    * reminder banner. Written by an UNLOCKED export only (the documented
-   * locked-export wrinkle). Serialized from Rust `Option<u64>`.
+   * locked-export wrinkle).
    */
   last_backup_at: number | null;
   /**
@@ -265,7 +254,7 @@ export interface PrefsView {
    * default instruction is used; a non-empty value is used verbatim and replaces
    * the default section machinery. It scopes to the meeting AI feature only.
    * Serialized from Rust `Option<String>`; omitted from the encrypted blob when
-   * `null`. Non-load-bearing. Write via {@link setMeetingAiPrompt}.
+   * `null`. Write via {@link setMeetingAiPrompt}.
    */
   meeting_ai_prompt: string | null;
   /**
@@ -275,7 +264,7 @@ export interface PrefsView {
    * {@link PrefsView.new_note_location_folder}). `null` ≡ the default `"root"`,
    * applied client-side. A free enum string on the wire (Rust `Option<String>`);
    * the client validates + maps an unknown value to the default. Omitted from the
-   * encrypted blob when `null`. Non-load-bearing. Write via
+   * encrypted blob when `null`. Write via
    * {@link setNewNoteLocation}.
    */
   new_note_location: string | null;
@@ -294,7 +283,7 @@ export interface PrefsView {
    * by {@link PrefsView.startup_open_note}). `null` ≡ the default `"last"`,
    * applied client-side. A free enum string on the wire (Rust `Option<String>`);
    * the client validates + maps an unknown value to the default. Omitted from the
-   * encrypted blob when `null`. Non-load-bearing. Write via
+   * encrypted blob when `null`. Write via
    * {@link setStartupOpen}.
    */
   startup_open: string | null;
@@ -317,7 +306,7 @@ export interface PrefsView {
    * AI opt-in toggle (local-ai epic, ai-ux-surface MYND-408, SYNC-12). `false`
    * ≡ AI off (the default). Serialized from Rust `bool`; omitted from the
    * encrypted blob when `false` (byte-identical to a pre-feature vault). The
-   * whole AI surface is gated on this. Non-load-bearing.
+   * whole AI surface is gated on this.
    */
   ai_enabled: boolean;
   /**
@@ -338,14 +327,14 @@ export interface PrefsView {
    * blob when true, so a vault predating the field reads as enabled. Turning it
    * off stops the background extraction worker but never deletes cached
    * results. Device-local (`sync-protocol.md` §10.2): per-device compute
-   * budget. Non-load-bearing.
+   * budget.
    */
   attachment_ocr_enabled: boolean;
   /**
    * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
    * MYND-408, SYNC-14) — canonical trailing-slash form. Same encoding as
    * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
-   * defaulted to `[]`. Non-load-bearing.
+   * defaulted to `[]`.
    */
   ai_excluded_folders: string[];
   /** Characters of chat history an agent run may be seeded with. `null` means
@@ -357,7 +346,7 @@ export interface PrefsView {
    * (the default). Serialized from Rust `bool`; omitted from the encrypted
    * blob when `false` (byte-identical to a pre-feature vault). Gates the AI
    * opt-in and the local-model override pickers. Device-local
-   * (`sync-protocol.md` §10.2). Non-load-bearing.
+   * (`sync-protocol.md` §10.2).
    */
   developer_mode: boolean;
   /**
@@ -367,16 +356,15 @@ export interface PrefsView {
    * in this set (and its subtree) drops out of the working-set sidebar/tree
    * while its notes stay resolvable (backlink / graph / search) — the
    * folder-level twin of the per-note `archived:` marker. Write via
-   * {@link setArchivedFolders}. Non-load-bearing.
+   * {@link setArchivedFolders}.
    */
   archived_folders: string[];
   /**
    * Active workspace slot id (MYND-308) — the workspace slot the editor restores
    * on unlock. `null` ≡ unset → the host applies its default (first / last-used)
    * workspace policy. A free string stored verbatim (NFC on the wire); the
-   * client owns the slot-id interpretation. Serialized from Rust
-   * `Option<String>`; omitted from the encrypted blob when `null` (byte-identical
-   * to a pre-feature vault). Non-load-bearing. Canonical key sorts FIRST.
+   * client owns the slot-id interpretation. omitted from the encrypted blob when `null` (byte-identical
+   * to a pre-feature vault). Canonical key sorts FIRST.
    */
   active_workspace: string | null;
   /**
@@ -453,13 +441,13 @@ export interface PrefsView {
    * ignores the built-in Light/Dark/System choice. `null` ≡ no custom theme
    * selected (use `theme`), and so is a name with no live entry in the store —
    * the pointer is deliberately NOT rewritten in that case, since a re-add on
-   * another device revives the theme. Serialized from Rust `Option<String>`.
+   * another device revives the theme.
    */
   custom_theme: string | null;
   /**
    * Daily-notes date-format string (MYND-191) — e.g. `YYYY-MM-DD`. `null` ≡ the
    * canonical default `YYYY-MM-DD`, applied host-side (blank-when-default).
-   * Serialized from Rust `Option<String>`.
+   *
    */
   daily_date_format: string | null;
   /**
@@ -485,7 +473,7 @@ export interface PrefsView {
    * the same round, both survive. An entry naming a period this build has no UI
    * for decodes and is ignored, which is what makes a fourth period free.
    * Absent in vaults that configured no period → the Rust decoder defaults it
-   * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   * to `{}`.
    */
   periodic_notes: Record<string, string>;
   /**
@@ -521,7 +509,7 @@ export interface PrefsView {
    * `"dmmmy"`. `null` ≡ `"system"` (follow the OS locale). A free enum string on
    * the wire (Rust `Option<String>`); the client validates + maps an unknown
    * value to the default. Omitted from the encrypted blob when `null`.
-   * Non-load-bearing cosmetic. Canonical key slot: after `daily_template`,
+   * Canonical key slot: after `daily_template`,
    * before `deliberate_folders`.
    */
   date_format: string | null;
@@ -554,14 +542,14 @@ export interface PrefsView {
    * `"normal"` | `"wide"` | `"full"`. `null` ≡ the canonical default
    * `"normal"`. A free enum string on the wire (Rust `Option<String>`); the
    * client validates + maps an unknown value to the default. Omitted from the
-   * encrypted blob when `null`. Non-load-bearing cosmetic.
+   * encrypted blob when `null`.
    */
   editor_content_width: string | null;
   /**
    * Editor default view-mode preset (MYND-299) — `"live"` | `"reading"` |
    * `"source"`. `null` ≡ the host-applied default. A free enum string on the
    * wire (Rust `Option<String>`); the client validates + maps an unknown value
-   * to the default. Omitted from the encrypted blob when `null`. Non-load-bearing.
+   * to the default. Omitted from the encrypted blob when `null`.
    * Canonical key slot: after `editor_content_width`, before
    * `editor_focus_dim_inactive`.
    */
@@ -570,7 +558,7 @@ export interface PrefsView {
    * Editor focus-mode dim-inactive toggle (MYND-348). `null` ≡ unset → the host
    * applies its default focus-mode policy. `true` dims inactive paragraphs,
    * `false` leaves them lit. Serialized from Rust `Option<bool>`; omitted from
-   * the encrypted blob when `null`. Non-load-bearing cosmetic. Canonical key
+   * the encrypted blob when `null`. Canonical key
    * slot: after `editor_default_view_mode`, before `editor_focus_typewriter`.
    */
   editor_focus_dim_inactive: boolean | null;
@@ -578,7 +566,7 @@ export interface PrefsView {
    * Editor focus-mode typewriter-scrolling toggle (MYND-348). `null` ≡ unset →
    * the host applies its default focus-mode policy. `true` keeps the caret
    * vertically centered, `false` scrolls normally. Serialized from Rust
-   * `Option<bool>`; omitted from the encrypted blob when `null`. Non-load-bearing
+   * `Option<bool>`; omitted from the encrypted blob when `null`.
    * cosmetic. Canonical key slot: after `editor_focus_dim_inactive`, before
    * `editor_font_family`.
    */
@@ -607,7 +595,7 @@ export interface PrefsView {
    * unset → the host applies the default-OFF policy (prose-first; the gutter is
    * opt-in). `true` shows the gutter, `false` hides it. Serialized from Rust
    * `Option<bool>`; omitted from the encrypted blob when `null` (byte-identical
-   * to a pre-feature vault). Non-load-bearing cosmetic.
+   * to a pre-feature vault).
    */
   editor_line_numbers: boolean | null;
   /**
@@ -617,7 +605,7 @@ export interface PrefsView {
    * editor. Serialized from Rust `Option<bool>`; omitted from the encrypted blob
    * when `null` (byte-identical to a pre-feature vault). **Device-local**: the
    * vim choice never crosses devices in the Phase 2 prefs merge — a physical
-   * keyboard and a touch keyboard want different answers. Non-load-bearing.
+   * keyboard and a touch keyboard want different answers.
    */
   editor_vim_mode: boolean | null;
   /**
@@ -626,7 +614,7 @@ export interface PrefsView {
    * behaviour). `true` hides the archive entry points (sidebar button, context
    * menu actions); `false` keeps them. Serialized from Rust `Option<bool>`;
    * omitted from the encrypted blob when `null` (byte-identical to a pre-feature
-   * vault). Non-load-bearing — the underlying `archived:` frontmatter surgery is
+   * vault). the underlying `archived:` frontmatter surgery is
    * untouched; this flag only gates the UI surfaces.
    */
   archive_disabled: boolean | null;
@@ -640,7 +628,7 @@ export interface PrefsView {
    * decision, so this value never travels in a merge. Rationale:
    * `docs/decisions.md` "CLI terminal access is a default-off, unlock-gated
    * local socket with a folder exclusion list (MYND-490)" and
-   * `docs/threat-model.md` §7. Non-load-bearing.
+   * `docs/threat-model.md` §7.
    */
   cli_enabled: boolean;
   /**
@@ -650,7 +638,7 @@ export interface PrefsView {
    * defaulted to `[]`. **Shared(SetUnion)**: an exclusion added on one device
    * must never be lost in a merge with a device that lacks it. Enforcement of
    * the exclusion (filtering CLI reads/writes) is a separate concern from this
-   * codec field. Non-load-bearing.
+   * codec field.
    */
   cli_excluded_folders: string[];
   /**
@@ -662,7 +650,7 @@ export interface PrefsView {
    * the identical effect. Serialized from Rust `Option<bool>`; omitted from
    * the encrypted blob when `null`, same shape as
    * {@link PrefsView.archive_disabled}. **Device-local**
-   * (`sync-protocol.md` §10.2): a machine-local performance knob. Non-load-bearing.
+   * (`sync-protocol.md` §10.2): a machine-local performance knob.
    */
   cli_rate_limit_disabled: boolean | null;
   /**
@@ -700,7 +688,7 @@ export interface PrefsView {
    * short label. Shared + synced, merged per key by UNION with a
    * `device_names/<key>` LWW clock (`sync-protocol.md` §10.2) — which is why
    * there is no "clear a name" path: a removed key resurrects from any peer
-   * that still holds it. Serialized from Rust `BTreeMap<String, String>`.
+   * that still holds it.
    */
   device_names: Record<string, string>;
   /**
@@ -778,7 +766,7 @@ export interface PrefsView {
    * **or** a canonical trailing-slash folder path, discriminated by the trailing
    * `/`) to a color-slot name. Notes and folders both take a color (folders also
    * get an icon; notes do not). Absent in vaults with no color → the Rust decoder
-   * defaults it to `{}`. Serialized from Rust `BTreeMap<String, String>`.
+   * defaults it to `{}`.
    */
   item_colors: Record<string, string>;
   /**
@@ -1482,7 +1470,7 @@ export async function setCustomTheme(customTheme: string | null): Promise<void> 
 /**
  * Set the daily-notes date-format string (MYND-191), e.g. `YYYY-MM-DD`. The
  * backend atomic-writes vault.prefs disk-first with no native side-effect; a
- * rejected promise means the disk write failed. Non-load-bearing.
+ * rejected promise means the disk write failed.
  */
 export async function setDailyDateFormat(format: string): Promise<void> {
   await writePref("plugin:prefs|set_daily_date_format", { format });
@@ -1727,7 +1715,7 @@ export async function setVaultIcon(icon: string | null): Promise<void> {
  * Set the spell-check enabled toggle (MYND-267). Persists an explicit choice;
  * the default-ON policy (SYNC-15) is applied host-side at read time when the
  * field is unset. Disk-first, no native side-effect; a rejected promise means
- * the write failed and the caller's optimistic UI must revert. Non-load-bearing.
+ * the write failed and the caller's optimistic UI must revert.
  */
 export async function setSpellEnabled(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_spell_enabled", { enabled });
@@ -1755,7 +1743,7 @@ export async function mutateSpellLanguages(
  * The backend NFC-sorts + dedupes the chord set for canonical byte-stability, so
  * pass the raw desired set. Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
- * Non-load-bearing.
+ *
  * Bumps the prefs nonce after a successful write so the live keybinding engine —
  * which reads the keymap through its OWN `usePrefs` instance, separate from the
  * Settings modal's — re-reads disk truth and the rebound shortcut takes effect
@@ -1773,7 +1761,7 @@ export async function setKeymapBinding(
  * `false` to hide the "last edited" line under each sidebar note row, `true` to
  * show it (the default). Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
- * Non-load-bearing.
+ *
  * Unlike the other simple setters, this bumps the prefs nonce after a
  * successful write so that the sidebar — which reads prefs through its OWN
  * `usePrefs` instance, separate from the Settings modal's — re-reads disk truth
@@ -1849,7 +1837,7 @@ export async function setReminderHorizonDays(days: number | null): Promise<void>
  * and the caller's optimistic UI must revert. Bumps the prefs nonce on success
  * so the open editor (which reads prefs through its OWN `usePrefs`, separate
  * from the Settings modal's) re-reads disk truth and re-renders live — same
- * chokepoint discipline as {@link setShowNoteTimestamps}. Non-load-bearing.
+ * chokepoint discipline as {@link setShowNoteTimestamps}.
  */
 export async function setEditorTextSize(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_editor_text_size", { value });
@@ -1918,7 +1906,7 @@ export async function setEditorFontFamily(value: string | null): Promise<void> {
  * optimistic UI must revert. Bumps the prefs nonce on success so the open editor
  * (which reads prefs through its OWN `usePrefs`, separate from the Settings
  * modal's) re-reads disk truth and reconfigures its line-number compartment live
- * — same chokepoint discipline as {@link setEditorTextSize}. Non-load-bearing.
+ * — same chokepoint discipline as {@link setEditorTextSize}.
  */
 export async function setEditorLineNumbers(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_line_numbers", { enabled: value });
@@ -1932,7 +1920,7 @@ export async function setEditorLineNumbers(value: boolean): Promise<void> {
  * the open editor (which reads prefs through its OWN `usePrefs`, separate from
  * the Settings modal's) re-reads disk truth and reconfigures its vim compartment
  * live — same chokepoint discipline as {@link setEditorLineNumbers}.
- * Non-load-bearing.
+ *
  */
 export async function setEditorVimMode(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_vim_mode", { enabled: value });
@@ -1947,7 +1935,7 @@ export async function setEditorVimMode(value: boolean): Promise<void> {
  * re-read disk truth and re-render their archive surfaces live — same chokepoint
  * discipline as {@link setEditorLineNumbers}. The auto-unarchive of existing
  * archived notes when disabling is orchestrated by the caller BEFORE this write.
- * Non-load-bearing.
+ *
  */
 export async function setArchiveDisabled(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_archive_disabled", { enabled: value });
@@ -2093,7 +2081,7 @@ export async function setEditorDefaultViewMode(value: string | null): Promise<vo
  * Set the editor focus-mode dim-inactive toggle (MYND-348). Pass `true` to dim
  * inactive paragraphs, `false` to leave them lit. Disk-first, no native
  * side-effect; bumps the prefs nonce on success. Same contract as
- * {@link setEditorLineNumbers}. Non-load-bearing.
+ * {@link setEditorLineNumbers}.
  */
 export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
@@ -2103,7 +2091,7 @@ export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
  * Set the editor focus-mode typewriter-scrolling toggle (MYND-348). Pass `true`
  * to keep the caret vertically centered, `false` for normal scrolling.
  * Disk-first, no native side-effect; bumps the prefs nonce on success. Same
- * contract as {@link setEditorLineNumbers}. Non-load-bearing.
+ * contract as {@link setEditorLineNumbers}.
  */
 export async function setEditorFocusTypewriter(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_focus_typewriter", { enabled: value });
