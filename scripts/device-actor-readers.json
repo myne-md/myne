@@ -88,7 +88,7 @@
         "reason": "Guards THIS record's own sync plane: `state.blobs` is a field of the same file, so an enrolment-less state has no baselines to re-base whatever a person credential says."
       }
     },
-    "core/src/plugins/sync/orchestrator.rs": {
+    "core/src/plugins/sync/orchestrator_tests.rs": {
       "seeded.device_id_hex = Some(hex(&dev));": {
         "count": 1,
         "reason": "WRITE in a test fixture: seeds the vault record so a cycle has an identity to author under."

@@ -164,6 +164,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import { RUST_CLIENT_TREES } from "./lib/shared-roots.mjs";
+import { isExtractedTestModule } from "./lib/test-module-files.mjs";
 
 // `--root <dir>` points the scan at a synthetic tree, which is how this
 // guard's own tests inject each defect it claims to catch (root AGENTS.md:
@@ -332,6 +333,7 @@ function* walk(dir) {
       if (name === "target" || name === "pkg" || name === "node_modules") continue;
       yield* walk(full);
     } else if (name.endsWith(".rs")) {
+      if (isExtractedTestModule(full)) continue;
       yield full;
     }
   }
