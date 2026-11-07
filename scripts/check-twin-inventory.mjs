@@ -534,6 +534,16 @@ const ROSTER = [
     reason: "Re-export shim, byte-identical.",
   },
   {
+    // myne-md/myne#1037 added this one: the event record's instant formatter, which
+    // the phone's composer needs and had nowhere to reach. Same shape as its eight
+    // siblings, so the same verdict, and the header line above now counts ten.
+    a: "src/dialect/event.ts",
+    b: "mobile/src/dialect/event.ts",
+    verdict: "delegated",
+    destination: "@myne/dialect",
+    reason: "Re-export shim, byte-identical.",
+  },
+  {
     a: "src/dialect/templateEngine.ts",
     b: "mobile/src/dialect/templateEngine.ts",
     verdict: "delegated",
