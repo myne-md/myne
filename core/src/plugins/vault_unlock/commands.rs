@@ -3638,11 +3638,9 @@ mod tests {
     /// phrase broke" instead of "the phrase is no longer a vault credential on
     /// this generation".
     ///
-    /// This unlock also UPGRADES the vault (myne-md/myne#938, `protocol.md`
-    /// §10.4.3), so the assertion below is on the in-memory frame this test built
-    /// rather than on the file: the file is `NTV8` by the time this returns, which
-    /// is what [`the_first_unlock_drops_the_person_wrap_and_keeps_the_session`]
-    /// pins.
+    /// The unlock no longer upgrades the frame: the `NTV7` -> `NTV8` in-place
+    /// truncation went with the version-migration surface, so the file is
+    /// whatever this test built and nothing rewrites it underneath the assertion.
     #[test]
     fn the_identity_phrase_still_opens_an_ntv7_vault_and_keeps_its_person_wrap() {
         rt().block_on(async {
@@ -4110,77 +4108,6 @@ mod tests {
                 root.join("notes/a.myn").exists(),
                 "promotion must not delete note blobs; the pull replaces them, and \
                  removing them here discards content before its replacement lands"
-            );
-        });
-    }
-
-    /// The first unlock of an `NTV7` vault drops the person wrap, moves the CAS
-    /// anchor to the bytes it wrote, and keeps everything the session needs
-    /// (myne-md/myne#938, `protocol.md` §10.4.3).
-    ///
-    /// Three separate things are asserted because three separate things can be
-    /// got wrong here, and each of them fails silently:
-    ///
-    /// 1. **The file.** A generation claim with nothing behind it would be the
-    ///    worst shape: the frame must be the `NTV7` one truncated, carrying the
-    ///    same group tail and no person wrap.
-    /// 2. **The anchor.** The unlock captured the hash of the bytes it READ, so a
-    ///    rewrite that does not move `vault_meta_bytes_hash` makes the next
-    ///    `change_password` fail `VaultMetaChangedExternally`, a user whose
-    ///    password change reports tampering because the app upgraded its own file.
-    /// 3. **The session.** The upgrade removes a credential from disk; it must not
-    ///    touch the group tier or the person session, or the user loses sync
-    ///    (the exact symptom myne-md/myne#938 was filed for) by upgrading.
-    #[test]
-    fn the_first_unlock_drops_the_person_wrap_and_keeps_the_session() {
-        rt().block_on(async {
-            let (meta_bytes, root_key, _pair) = seed_person_vault_ntv7("person-born-pw");
-            let scratch = scratch_vault();
-            scratch.write_meta(&meta_bytes);
-            let before = std::fs::read(scratch.path()).expect("read NTV7");
-
-            let state = VaultRuntimeState::default();
-            unlock_with_path(
-                "person-born-pw".to_string(),
-                None,
-                scratch.path(),
-                &state,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await
-            .expect("the password opens the NTV7 vault");
-
-            // 1. The file is the truncated frame, and it is a real frame.
-            let after = std::fs::read(scratch.path()).expect("read NTV8");
-            assert_eq!(&after[..4], b"NTV8", "the unlock must upgrade the frame");
-            assert_eq!(
-                after.len() + protocol::PERSON_WRAP_LEN,
-                before.len(),
-                "the person wrap is gone and nothing else moved"
-            );
-            assert_eq!(&after[6..], &before[6..after.len()]);
-            assert!(protocol::has_b2b_tail(&after));
-
-            // 2. The anchor follows the bytes on disk, not the bytes read.
-            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(
-                unlocked.vault_meta_bytes_hash,
-                crate::vault_meta_hash::vault_meta_sha256(after.as_slice()),
-                "the CAS anchor must move with the upgrade or change-password reports tampering"
-            );
-            // 3. The session is intact: same root key (nothing was re-derived),
-            //    and still group-tier (every shared singleton is sealed under it).
-            assert_eq!(
-                unlocked.owner_root_key().expect("root key").as_slice(),
-                root_key.as_slice()
-            );
-            assert!(
-                matches!(
-                    unlocked.shared_singleton_key(),
-                    crate::plugins::vault_unlock::state::SharedSingletonKey::Group(_)
-                ),
-                "the upgrade must not drop the group tier"
             );
         });
     }
