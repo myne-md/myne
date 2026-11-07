@@ -6177,6 +6177,16 @@
     "title": "Calendar",
     "close": "Close the calendar",
     "noEvents": "Nothing on this day",
-    "conflict": "overlaps another event"
+    "conflict": "overlaps another event",
+    "composer": {
+      "title": "New event",
+      "titleLabel": "What is it?",
+      "start": "Starts",
+      "end": "Ends (optional)",
+      "badTime": "A time is written like 09:00, 24-hour.",
+      "create": "Add to the calendar",
+      "cancel": "Cancel",
+      "createFailed": "The event could not be saved."
+    }
   }
 }

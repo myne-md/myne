@@ -30,6 +30,15 @@ import type { CivilDate } from "@myne/dialect-civil-date";
 import type { CalendarRow } from "@myne/vault-indices";
 import { monthLabel } from "@myne/calendar-format";
 import { tappable } from "../a11y/tappable";
+import { EventComposerSheet } from "./EventComposerSheet";
+
+/** Today, as the `YYYY-MM-DD` a cell and a composer both speak. */
+function todayDateString(): string {
+  const now = new Date();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${now.getFullYear()}-${month}-${day}`;
+}
 
 /** Today, as the civil date the calendar speaks. */
 function todayCivil(): CivilDate {
@@ -43,6 +52,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [rows, setRows] = useState<readonly CalendarRow[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [composing, setComposing] = useState<string | null>(null);
 
   const load = useCallback(() => {
     const window = windowForView("month", anchor, 0);
@@ -108,6 +118,16 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
         </Button>
         <Button variant="ghost" full={false} {...tappable} data-testid="calendar.today" onClick={() => setAnchor(todayCivil())}>
           {t("calendar.today")}
+        </Button>
+        <Button
+          variant="ghost"
+          full={false}
+          {...tappable}
+          aria-label={t("calendar.composer.title")}
+          data-testid="calendar.add"
+          onClick={() => setComposing(selected ?? todayDateString())}
+        >
+          +
         </Button>
         <Button variant="ghost" full={false} {...tappable} aria-label={t("calendar.close")} data-testid="calendar.close" onClick={onClose}>
           ✕
@@ -194,6 +214,19 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
             </div>
           )}
         </div>
+      )}
+
+      {composing !== null && (
+        <EventComposerSheet
+          date={composing}
+          onClose={() => setComposing(null)}
+          onCreated={() => {
+            const day = composing;
+            setComposing(null);
+            setSelected(day);
+            load();
+          }}
+        />
       )}
 
       {failed && (
