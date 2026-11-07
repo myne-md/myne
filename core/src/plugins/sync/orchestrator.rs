@@ -25,7 +25,7 @@ use super::conflict::{
 };
 use super::dictionary_payload::{merge_personal_dictionaries, PersonalDictionaryData};
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
-use super::head_authority::{HeadAuthority, SignedHeadCtx};
+use super::head_authority::{DeviceHeadSigner, HeadAuthority, SignedHeadCtx};
 use super::state::{
     clear_vault_meta_dirty, read_head_baseline, read_sync_state, vault_meta_is_dirty,
     write_head_baseline, write_sync_state, BlobSyncState, SyncState,
@@ -976,6 +976,154 @@ fn member_names_sync_id(shared: &SharedSingletonKey) -> Option<[u8; 16]> {
 /// for that rule to demand.
 fn read_member_names_nonce(bytes: &[u8]) -> Option<[u8; 24]> {
     read_singleton_nonce(bytes, &MEMBER_NAMES_BLOB_MAGIC, &[])
+}
+
+/// What one binding-store refresh settled (myne-md/myne#1032).
+///
+/// Three outcomes, because the difference between the last two is a user-facing one: a vault that
+/// does not vouch for a device is an integrity event, while a fetch that never happened is a
+/// transient failure the UI already has a sentence for. Collapsing them into "no signers" reported
+/// a network blip as tampering (review of myne-md/myne#1032).
+enum SignerRefresh {
+    /// Halves the signed roster vouches for, which the context did not already hold.
+    Signers(Vec<DeviceHeadSigner>),
+    /// Asked, and the vault does not vouch for this device.
+    NotVouched,
+    /// The question could not be answered; the carried error is the class to report.
+    CouldNotAsk(PullError),
+}
+
+/// The device halves to retry an unverifiable `0x03` head with (myne-md/myne#1032).
+///
+/// The row that publishes a peer's signing halves travels in `vault.device-bindings`, and the pull
+/// that its head blocks is the only route to that blob: the head is verified before the page's
+/// metas are applied, so the very response carrying the row is refused. This breaks that circle by
+/// fetching the ONE blob the group key addresses, decoding it (AEAD, so a forged copy closes), and
+/// returning the halves the signed roster vouches for.
+///
+/// Read-only. The store's own sync phase persists and pushes the merged result on a later cycle;
+/// nothing here writes, and nothing here adopts a head.
+///
+/// An empty answer means "the vault's own binding store does not know this device either", which
+/// the caller reports as it found it.
+async fn refresh_head_signers(
+    io: &dyn crate::vault_io::VaultIo,
+    transport: &dyn SyncTransport,
+    token: &str,
+    shared: &SharedSingletonKey,
+    vault_root: &Path,
+    head_authority: &HeadAuthority<'_>,
+) -> SignerRefresh {
+    // A verification set comes from a roster this device has VERIFIED; without one there is
+    // nothing to check a fetched row against, and an unverified row must never become a signer
+    // (`authority`'s "verification is not optional").
+    let HeadAuthority::Signed(ctx) = head_authority else {
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    if ctx.roster_publics.is_empty() {
+        // No verified roster means no row can be checked, so the question cannot be answered —
+        // and an unverified row must never become a signer (`authority`'s "verification is not
+        // optional").
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    }
+    let Some(group) = shared.group_bytes() else {
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    let Some(id) = device_bindings_sync_id(shared) else {
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    let Ok(resolved) =
+        crate::plugins::device_binding::resolve_bindings_from_group_key(io, &group, vault_root)
+            .await
+    else {
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    let key = resolved.borrow();
+    let bytes = match download_blob_backoff(transport, token, &id) {
+        Ok(bytes) => bytes,
+        // A fetch that did not happen is NOT the vault saying "this device is not mine", so it
+        // must not become an integrity verdict. The transport's own error carries the right
+        // class (revoked, unauthenticated, offline) and the UI already has copy for each.
+        Err(err) => {
+            tracing::warn!(
+                stage = "sync_head_signers",
+                event = "binding_store_fetch_failed",
+                "the device-binding store could not be fetched to verify a peer's head; the \
+                 refusal stands"
+            );
+            return SignerRefresh::CouldNotAsk(err);
+        }
+    };
+    let Ok(remote) = protocol::decode_device_binding_blob(
+        key.key,
+        key.account_number_hash,
+        key.group_key_epoch,
+        &bytes,
+    ) else {
+        // Served bytes that do not open under this vault's group key prove nothing and add no
+        // signer. §11.3 in one line.
+        tracing::warn!(
+            stage = "sync_head_signers",
+            event = "binding_store_refused",
+            "the served device-binding blob did not decode; no signer is added"
+        );
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    // An UNREADABLE local store is "could not ask", not "nothing is bound" (review of
+    // myne-md/myne#1032): an empty local side would let a stale served copy resurrect a tombstone
+    // this device holds, and the signer it adds would be one the vault has withdrawn.
+    let Ok(local) =
+        crate::plugins::device_binding::read_device_bindings_in_dir(io, vault_root, &key).await
+    else {
+        return SignerRefresh::CouldNotAsk(PullError::HeadInvalid);
+    };
+    // MERGE, not replace: a served copy older than this device's cannot resurrect a tombstone, and
+    // `merge_device_bindings`' one refusal (one device, two people, one version) has no winner, in
+    // which case the local truth is all that is used.
+    let merged = match protocol::merge_device_bindings(&local, &remote) {
+        Ok(merged) => merged,
+        Err(_) => {
+            // The one refusal that is not corruption: one device bound to two people at one
+            // version. The local truth is all that is used, and the case is logged because it is
+            // the one shape where the retry cannot succeed.
+            tracing::warn!(
+                stage = "sync_head_signers",
+                event = "binding_store_merge_conflict",
+                "the served device-binding store conflicts with the local one; the retry uses \
+                 local truth only"
+            );
+            local
+        }
+    };
+    let signers = super::authority::verified_signers(&merged, &ctx.roster_publics);
+    // Only the halves the context does not already hold: a retry with an unchanged set would ask
+    // the same question twice.
+    let extra: Vec<DeviceHeadSigner> = signers
+        .into_iter()
+        .filter(|candidate| {
+            !ctx.device_signers.iter().any(|held| {
+                held.device_id == candidate.device_id && held.public == candidate.public
+            })
+        })
+        .collect();
+    if extra.is_empty() {
+        // Asked, and the vault does not vouch for that device: this IS the integrity answer.
+        tracing::warn!(
+            stage = "sync_head_signers",
+            event = "binding_store_silent",
+            "the fetched device-binding store knows no new signer for this head"
+        );
+        return SignerRefresh::NotVouched;
+    }
+    // `info`, not `warn`: this is the ordinary first-contact recovery, and it repeats until the
+    // bindings phase persists the fetched row (review of myne-md/myne#1032).
+    tracing::info!(
+        stage = "sync_head_signers",
+        event = "binding_store_refreshed",
+        extra = extra.len(),
+        "fetched the device-binding store to verify a peer's device-signed head"
+    );
+    SignerRefresh::Signers(extra)
 }
 
 /// The device-binding family's reserved 16-byte sync-plane blob-id, the
@@ -4025,17 +4173,13 @@ async fn sync_device_bindings_phase(
         crate::plugins::device_binding::read_verified_bindings_bytes(io, vault_root, &key).await;
     let local_nonce = local_bytes.as_deref().and_then(read_device_bindings_nonce);
 
-    // Decrypting the local store costs an HKDF, a full AEAD open and a whole-map JSON
-    // parse, so it happens ONLY on the two paths that read the plaintext: the
-    // remote-reconcile merge and the virgin-store check.
-    let decode_local = || {
-        local_bytes
-            .as_deref()
-            .and_then(|b| {
-                decode_device_binding_blob(key.key, key.account_number_hash, key.group_key_epoch, b)
-                    .ok()
-            })
-            .unwrap_or_default()
+    // The local map, through the family's own reader: ABSENT reads as the empty map and an
+    // undecodable store is an ERROR, so the two cannot be flattened into one answer here
+    // (review of myne-md/myne#1032; the chats catalogue one phase up already answers it this
+    // way). Treating a damaged store as empty makes `merge(empty, remote) == remote`, which is
+    // read below as "the server's copy is complete" and written back over the local file.
+    let read_local = || async {
+        crate::plugins::device_binding::read_device_bindings_in_dir(io, vault_root, &key).await
     };
 
     let id_hex = hex(bindings_id);
@@ -4080,7 +4224,22 @@ async fn sync_device_bindings_phase(
                 return Ok(DeviceBindingsPhase::idle());
             }
         };
-        let local_map = decode_local();
+        // Read through the family's own reader: ABSENT is the empty map and an undecodable
+        // store is an ERROR, because flattening them makes `merge(empty, remote) == remote`,
+        // which the arm below reads as "the server copy is complete" and writes back over the
+        // local file (review of myne-md/myne#1032).
+        let local_map = match read_local().await {
+            Ok(map) => map,
+            Err(err) => {
+                tracing::warn!(
+                    stage = "device_bindings",
+                    event = "local_refused",
+                    error = ?err,
+                    "vault.device-bindings could not be read; no local mutation this cycle"
+                );
+                return Ok(DeviceBindingsPhase::idle());
+            }
+        };
         // The ONE refusal that is not corruption: two peers hold the same device under two
         // DIFFERENT people at the SAME version, which has no winner. Refusing leaves the
         // local store untouched and the cycle records no baseline, so the next cycle
@@ -4141,10 +4300,16 @@ async fn sync_device_bindings_phase(
     // nonce still equals the baseline's is provably byte-untouched since the last sync. A
     // vault where no device has claimed yet (no store, no baseline) is deliberately NOT
     // pushed; a store holding ONLY tombstones IS, because a removal must propagate.
+    // An unreadable store is NOT dirty here: this arm pushes the bytes it read, and the
+    // question "is the local file ahead of the baseline" needs a store it can read. The
+    // family's reader has already answered the damage case above by returning early when the
+    // remote changed, and a damaged local file with no remote change is left for the next
+    // cycle rather than pushed over a good server copy.
+    let local_map_empty = read_local().await.map(|m| m.is_empty()).unwrap_or(true);
     let local_nonce_hex = local_nonce.map(|n| hex(&n));
     let dirty = local_bytes.is_some()
         && local_nonce_hex != baseline_nonce_hex
-        && !(baseline_nonce_hex.is_none() && decode_local().is_empty());
+        && !(baseline_nonce_hex.is_none() && local_map_empty);
     Ok(DeviceBindingsPhase {
         dirty,
         applied_remote: false,
@@ -5483,68 +5648,100 @@ async fn sync_cycle_attempt(
     // pull take its id instead of reading it as a forgery; the head-authoring
     // block below re-bases onto that id and clears the flag.
     let rekey_rebase = state.rekey_rebase_pending;
-    let page = match engine::pull_to_stable(
-        transport,
-        head_authority,
-        token,
-        baseline_vv,
-        from_cursor,
-        &local,
-        false,
-        rekey_rebase,
-    ) {
-        Ok(p) => p,
-        Err(PullError::CursorExpired) => {
-            reconcile_ran = true;
-            state.cursor = 0;
-            write_sync_state(io, vault_root, state)
-                .await
-                .map_err(|_| SyncCycleError::Io)?;
-            engine::pull_to_stable(
-                transport,
-                head_authority,
-                token,
-                baseline_vv,
-                0,
-                &local,
-                true,
-                rekey_rebase,
-            )
-            .map_err(SyncCycleError::Pull)?
-        }
-        // A head that will not open is normally a forgery. On a device whose
-        // sibling just ran the §10.4.1 migration it is instead the expected
-        // consequence of a re-key, and the two are indistinguishable at the pull.
-        // Ask the one question that separates them (#429): is the server's
-        // `vault.meta` a NEWER generation than ours? Only the migration produces
-        // that, and no server can fabricate it — a v0.2 meta opens only under
-        // credentials the user holds.
-        // A head that will not open is normally a forgery. On a device whose
-        // sibling just ran the §10.4.1 migration it is instead the expected
-        // consequence of a re-key. The question below separates them; the
-        // `if let` binds the server's meta because this device is about to
-        // STAGE it (#447) rather than merely learn that it exists.
-        Err(PullError::HeadInvalid) => {
-            let Some(newer) =
-                server_meta_of_newer_generation(transport, token, io, vault_root).await
-            else {
-                return Err(SyncCycleError::Pull(PullError::HeadInvalid));
-            };
-            // Staged, never written over `vault.meta` (#447). The peer cannot
-            // verify these bytes — it has no key for the generation they belong
-            // to — so the only thing that may promote them is the user's own
-            // credential opening them at unlock. A server that serves a
-            // fabricated `NTV5` meta therefore costs a wasted Argon2id and
-            // nothing else; overwriting here would cost the vault, because
-            // `vault.meta` holds the only local copy of the wrapped `root_key`.
+    // Device halves fetched AFTER a first refusal (myne-md/myne#1032). Empty on the ordinary
+    // attempt; filled once when the head turns out to be signed by a device this context cannot
+    // verify, and the pull then runs again with them. Bounded to one fetch per attempt: a head
+    // that still will not open after the vault's own binding store has been consulted is
+    // reported as it is, not retried again.
+    let mut extra_signers: Vec<DeviceHeadSigner> = Vec::new();
+    let mut refreshed_signers = false;
+    // The cursor this loop walks from. The reconcile recovery restarts the walk at 0, and the
+    // bound is what keeps one attempt from fetching the same page forever.
+    let mut pull_cursor = from_cursor;
+    let page = loop {
+        match engine::pull_to_stable(
+            transport,
+            head_authority,
+            token,
+            baseline_vv,
+            pull_cursor,
+            &local,
+            reconcile_ran,
+            rekey_rebase,
+            &extra_signers,
+        ) {
+            Ok(p) => break p,
+            // Its own arm rather than a fold into `HeadInvalid`, because the two do different
+            // things: this one fetches the row that publishes the signer's halves and tries
+            // again, at most once.
+            Err(PullError::HeadSignerUnknown) if !refreshed_signers => {
+                refreshed_signers = true;
+                match refresh_head_signers(io, transport, token, shared, vault_root, head_authority)
+                    .await
+                {
+                    SignerRefresh::Signers(signers) => {
+                        extra_signers = signers;
+                        continue;
+                    }
+                    // Asked, and the vault does not vouch for that device.
+                    SignerRefresh::NotVouched => {
+                        return Err(SyncCycleError::Pull(PullError::HeadSignerUnknown))
+                    }
+                    // Could not ask: NOT an integrity claim.
+                    SignerRefresh::CouldNotAsk(err) => return Err(SyncCycleError::Pull(err)),
+                }
+            }
+            // The reconcile walk runs INSIDE this loop (review of myne-md/myne#1032): it used to
+            // be a `?` on its own `pull_to_stable`, so a device whose cursor was reclaimed met the
+            // peer's unverifiable head on that pull and went straight to the tampering alert with
+            // the repair never attempted — the first-contact-after-absence case this branch is
+            // for.
+            Err(PullError::CursorExpired) if !reconcile_ran => {
+                reconcile_ran = true;
+                state.cursor = 0;
+                write_sync_state(io, vault_root, state)
+                    .await
+                    .map_err(|_| SyncCycleError::Io)?;
+                pull_cursor = 0;
+                continue;
+            }
+            // A head that will not open is normally a forgery. On a device whose
+            // sibling just ran the §10.4.1 migration it is instead the expected
+            // consequence of a re-key, and the two are indistinguishable at the pull.
+            // Ask the one question that separates them (#429): is the server's
+            // `vault.meta` a NEWER generation than ours? Only the migration produces
+            // that, and no server can fabricate it — a v0.2 meta opens only under
+            // credentials the user holds.
+            // The `if let` binds the server's meta because this device is about to
+            // STAGE it (#447) rather than merely learn that it exists.
             //
-            // Without this the loop had no exit: the peer locked, the user
-            // unlocked, the OLD local meta re-derived the OLD root, the next
-            // cycle met the same unopenable head, and it locked again.
-            crate::plugins::vault_migrate::adopt::stage_incoming_meta(io, vault_root, &newer).await;
-            return Err(SyncCycleError::RekeyedElsewhere);
+            // ONE arm for both error kinds, on purpose (review of myne-md/myne#1032): a
+            // re-key invalidates a device-signed head's signature exactly as it invalidates any
+            // other, so a `HeadSignerUnknown` that survives the refresh must still get this
+            // recovery. Two arms shadowed it for the whole `0x03` class.
+            Err(e @ (PullError::HeadInvalid | PullError::HeadSignerUnknown)) => {
+                let Some(newer) =
+                    server_meta_of_newer_generation(transport, token, io, vault_root).await
+                else {
+                    return Err(SyncCycleError::Pull(e));
+                };
+                // Staged, never written over `vault.meta` (#447). The peer cannot
+                // verify these bytes — it has no key for the generation they belong
+                // to — so the only thing that may promote them is the user's own
+                // credential opening them at unlock. A server that serves a
+                // fabricated `NTV5` meta therefore costs a wasted Argon2id and
+                // nothing else; overwriting here would cost the vault, because
+                // `vault.meta` holds the only local copy of the wrapped `root_key`.
+                //
+                // Without this the loop had no exit: the peer locked, the user
+                // unlocked, the OLD local meta re-derived the OLD root, the next
+                // cycle met the same unopenable head, and it locked again.
+                crate::plugins::vault_migrate::adopt::stage_incoming_meta(io, vault_root, &newer)
+                    .await;
+                return Err(SyncCycleError::RekeyedElsewhere);
+            }
+            Err(e) => return Err(SyncCycleError::Pull(e)),
         }
-        Err(e) => return Err(SyncCycleError::Pull(e)),
     };
 
     // --- reconcile the synced baseline (self-heal) ---

@@ -24,7 +24,14 @@ use super::fork_audit::ConvergenceVerdict;
 pub fn pull_error_is_integrity_failure(e: &PullError) -> bool {
     matches!(
         e,
-        PullError::RollbackRejected | PullError::HeadInvalid | PullError::HeadIdMismatch
+        PullError::RollbackRejected
+            | PullError::HeadInvalid
+            | PullError::HeadIdMismatch
+            // Only AFTER the repair has run once (myne-md/myne#1032): a `0x03` head whose signer
+            // survives a binding-store refresh names a device this vault does not vouch for, which
+            // is the same class of claim as a forged head. The ordinary first-contact case never
+            // reaches this function, because the cycle retries with the refreshed halves first.
+            | PullError::HeadSignerUnknown
     )
 }
 
@@ -45,6 +52,12 @@ mod tests {
         ));
         assert!(pull_error_is_integrity_failure(&PullError::HeadInvalid));
         assert!(pull_error_is_integrity_failure(&PullError::HeadIdMismatch));
+        // Escalation, after the repair has run (myne-md/myne#1032): a device-signed head whose
+        // signer survives a binding-store refresh is the vault saying "this device is not one of
+        // mine", which is the tampering class and not a transient failure.
+        assert!(pull_error_is_integrity_failure(
+            &PullError::HeadSignerUnknown
+        ));
     }
 
     #[test]
