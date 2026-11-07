@@ -86,13 +86,13 @@ export async function buildDigest(): Promise<string> {
 
 /** Mirror of the desktop shape; the command refuses before it can occur. */
 export interface VaultUsage {
-  used_bytes: number;
-  files: number;
+  entries: number;
+  bytes: number;
 }
 
 /** The active vault's on-disk footprint. Browser: rejects. */
-export async function measureVaultUsage(): Promise<VaultUsage> {
-  return await invoke<VaultUsage>("plugin:diagnostics|vault_usage");
+export async function measureVaultUsage(): Promise<VaultUsage | null> {
+  return await invoke<VaultUsage | null>("plugin:diagnostics|vault_usage");
 }
 
 /** Write a report bundle. Browser: rejects. */

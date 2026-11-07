@@ -3,8 +3,21 @@
 # this as an `InlinedPlugin`. Capability files reference these as
 # `diagnostics:default` (or the per-command identifiers below).
 #
-# The commands read and write the DEVICE-LOCAL `diagnostic-log.json` under
-# `<app_config_dir>`: never vault data, in any vault state, and never a path.
+# What the bundle reaches, stated as containment rather than as a list:
+#
+#   * the DEVICE-LOCAL `diagnostic-log.json` under `<app_config_dir>`, plus the
+#     log directory and the one crash record beside it;
+#   * the running executable's SHA-256 (myne-md/myne#991), which is the code
+#     payload of the installed bundle and nothing about the user;
+#   * one AGGREGATE read of the active vault directory's entry count and total
+#     size, in ANY vault state: locked, unlocked, and before any vault has ever
+#     been unlocked. It is granted that widely on purpose, because the fail-closed
+#     screen builds the same diagnostic block that Settings does.
+#
+# What stays inside, and what a reviewer should check against any new command
+# here: no vault CONTENT, no per-file size, no file name, no note id and never a
+# path. The vault read is numbers about a directory, which is what keeps this
+# bundle's reach a measurement rather than a disclosure.
 # Deliberately main-window-only: this surface renders in the main webview, so
 # no other capability may ever grant these.
 #
@@ -84,5 +97,5 @@ commands.allow = ["build_digest"]
 
 [[permission]]
 identifier = "allow-vault-usage"
-description = "Allow invoking diagnostics:vault_usage (measures the active vault directory: total bytes and how many files it is spread over. Sealed blobs only — no size per file, no name, no content, never a path)."
+description = "Allow invoking diagnostics:vault_usage (measures the active vault directory: how many entries it holds and their total size. Sealed blobs only, no per-file size, no name, no content, never a path, and it answers nothing at all when the directory cannot be read)."
 commands.allow = ["vault_usage"]

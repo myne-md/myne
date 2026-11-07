@@ -16,7 +16,7 @@
 // by construction and `navigator.storage.estimate()` describes the WebView's own
 // origin store instead of the vault directory. Both lines used to be absent for
 // that reason; the fix is two host commands, and the assertions below are that the
-// block carries what the host answered — plus that a host read which fails costs
+// block carries what the host answered, and that a host read which fails costs
 // its own lines and never the block.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -26,9 +26,9 @@ const host = vi.hoisted(() => ({
   served: null as { commit: string; bundleHash: string } | null,
   /** The host's answers, per command. Each case replaces the two it cares about. */
   digest: async (): Promise<string> => "sha256:host",
-  usage: async (): Promise<{ used_bytes: number; files: number }> => ({
-    used_bytes: 12 * 1024 * 1024,
-    files: 418,
+  usage: async (): Promise<{ entries: number; bytes: number } | null> => ({
+    entries: 418,
+    bytes: 12 * 1024 * 1024,
   }),
 }));
 
@@ -70,11 +70,12 @@ function field(text: string, key: string): string {
 beforeEach(() => {
   host.served = null;
   host.digest = async () => "sha256:host";
-  host.usage = async () => ({ used_bytes: 12 * 1024 * 1024, files: 418 });
+  host.usage = async () => ({ entries: 418, bytes: 12 * 1024 * 1024 });
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  Object.defineProperty(navigator, "storage", { value: undefined, configurable: true });
 });
 
 describe("the desktop block's host-side measures", () => {
@@ -86,10 +87,10 @@ describe("the desktop block's host-side measures", () => {
   it("reports the vault directory the host measured, and no quota for it", async () => {
     const text = await collectDiagnostics("none");
     expect(field(text, "storageUsedMb")).toBe("12");
-    expect(field(text, "storageFiles")).toBe("418");
+    expect(field(text, "storageEntries")).toBe("418");
     // A directory has no quota of its own. The disk's free space is a different
-    // fact, and the WebView origin's quota is a fact about a different store —
-    // printing either would be a true number answering the wrong question.
+    // fact, and the WebView origin's quota is a fact about a different store.
+    // Printing either would be a true number answering the wrong question.
     expect(hasField(text, "storageQuotaMb")).toBe(false);
   });
 
@@ -102,6 +103,25 @@ describe("the desktop block's host-side measures", () => {
     expect(field(text, "commit")).toBe("abc1234");
   });
 
+  it("prints no storage line rather than falling back to the origin store", async () => {
+    // A client that measures its vault has no use for the page's own estimate, and
+    // this is the case that separates the two: the estimate below WOULD answer, and
+    // it describes the WebView's origin store, which holds none of the vault. The
+    // host measure answering `null` means "could not read", and the block says so
+    // by saying nothing.
+    Object.defineProperty(navigator, "storage", {
+      value: {
+        estimate: async () => ({ usage: 7 * 1024 * 1024, quota: 200 * 1024 * 1024 }),
+      },
+      configurable: true,
+    });
+    host.usage = async () => null;
+    const text = await collectDiagnostics("none");
+    expect(hasField(text, "storageUsedMb")).toBe(false);
+    expect(hasField(text, "storageQuotaMb")).toBe(false);
+    expect(hasField(text, "storageEntries")).toBe(false);
+  });
+
   it("loses only its own lines when a host measure refuses", async () => {
     host.digest = async () => {
       throw new Error("refused");
@@ -110,10 +130,11 @@ describe("the desktop block's host-side measures", () => {
       throw new Error("refused");
     };
     const text = await collectDiagnostics("worker-fatal");
-    // Absent, never placeholdered: the same rule every unreadable field follows.
+    // Absent, never placeholdered, and never a fabricated zero: the same rule
+    // every unreadable field follows.
     expect(hasField(text, "bundleHash")).toBe(false);
     expect(hasField(text, "storageUsedMb")).toBe(false);
-    expect(hasField(text, "storageFiles")).toBe(false);
+    expect(hasField(text, "storageEntries")).toBe(false);
     // And the report itself survives, which is what the user came for.
     expect(field(text, "failureCode")).toBe("worker-fatal");
     expect(hasField(text, "version")).toBe(true);

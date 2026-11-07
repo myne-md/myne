@@ -47,19 +47,27 @@ export interface DiagnosticsEnv {
    * DIRECTORY rather than a store the page can ask about (myne-md/myne#991).
    *
    * Absent means this client has no such measure and the storage lines come from
-   * `navigator.storage.estimate()`. That fallback is the WRONG reading on
-   * desktop — it measures the WebView's own origin store, which holds none of the
-   * vault — which is why the desktop client supplies this.
+   * `navigator.storage.estimate()`, which for a browser store is the right
+   * reading. A client that supplies this measure prints nothing else: the page's
+   * own estimate would describe the WebView's origin store there, which holds none
+   * of the vault, so it is a true number about the wrong thing.
    */
-  vaultUsage?: () => Promise<VaultUsage>;
+  vaultUsage?: () => Promise<VaultUsage | null>;
 }
 
-/** A vault directory's footprint, as the host measured it. */
+/**
+ * A vault directory's footprint, as the host measured it.
+ *
+ * Declared HERE rather than in the platform seam, and the seam imports it: that is
+ * the direction the tree already uses (`src/platform/filePicker.ts` imports from
+ * `src/lib/attachments.ts`), and the other direction would drag a `@tauri-apps/*`
+ * importer into a client whose seam is a different module.
+ */
 export interface VaultUsage {
-  /** Total size of the entries under the vault directory. */
-  readonly used_bytes: number;
-  /** How many files and links the vault is spread over. */
-  readonly files: number;
+  /** Files, links and the directories between them, under the vault directory. */
+  readonly entries: number;
+  /** Total size of the files and links, in bytes. */
+  readonly bytes: number;
 }
 
 /**
@@ -97,8 +105,8 @@ const DOCTOR_DEADLINE_MS = 2000;
  * Longer than the vault read above, and deliberately: the digest is a pass over
  * an executable of tens of megabytes, and the walk visits every entry in the
  * vault. Neither is a key-store call that can wedge, so the wait is worth more
- * than the line — but it is still bounded, because a report a user is waiting to
- * copy must not hang on a network mount.
+ * than the line, but it is still bounded: a report a user is waiting to copy
+ * must not hang on a network mount.
  */
 const HOST_READ_DEADLINE_MS = 5000;
 
@@ -146,14 +154,24 @@ export async function gatherDiagnostics(env: DiagnosticsEnv): Promise<string> {
     // Storage estimation is permission- and engine-dependent; an unavailable reading drops
     // the two storage lines, never the copy.
   }
-  // A filesystem vault is measured by the HOST, and the page's own estimate is then
-  // NOT printed at all: on desktop it describes the WebView's origin store, which
-  // holds none of the vault, so it would put a true number about the wrong thing in a
-  // block whose only purpose is to be acted on. The quota line goes with it, because
-  // a directory has no quota — the disk's free space is a different fact.
-  const storageUsedMb = hostUsage === null ? mb(usage?.usage) : mb(hostUsage.used_bytes);
-  const storageQuotaMb = hostUsage === null ? mb(usage?.quota) : null;
-  const storageFiles = hostUsage === null ? null : hostUsage.files;
+  // A client that MEASURES its vault prints that measure, and prints nothing else.
+  // The page's own estimate is not a fallback here: on desktop it describes the
+  // WebView's origin store, which holds none of the vault, so falling back would put
+  // a true number about the wrong thing in a block whose only purpose is to be acted
+  // on. That covers the case where the host read refused or ran out of its deadline
+  // as well: the lines are then absent, which is the same answer every other
+  // unreadable field gives. A client with no such measure keeps its own estimate,
+  // which for a browser store is the right reading.
+  const measuresItsVault = env.vaultUsage !== undefined;
+  const storageUsedMb = measuresItsVault
+    ? hostUsage === null
+      ? null
+      : mb(hostUsage.bytes)
+    : mb(usage?.usage);
+  // No quota line either way on a measured vault: a directory has no quota of its
+  // own, and the disk's free space is a different fact.
+  const storageQuotaMb = measuresItsVault ? null : mb(usage?.quota);
+  const storageEntries = hostUsage === null ? null : hostUsage.entries;
   return buildDiagnostics({
     version: __APP_VERSION__,
     channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
@@ -174,6 +192,6 @@ export async function gatherDiagnostics(env: DiagnosticsEnv): Promise<string> {
     crossOriginIsolated: typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false,
     storageUsedMb,
     storageQuotaMb,
-    storageFiles,
+    storageEntries,
   });
 }
