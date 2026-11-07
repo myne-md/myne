@@ -191,6 +191,17 @@ export interface PrefsView {
    *  plaintext (`threat-model.md` §7), so a shorter horizon exposes less. */
   reminder_horizon_days: number | null;
   /**
+   * The calendar's own map (`protocol.md` §9.5.2), keyed by setting:
+   * `day_reminder_anchor` and `colours.<calendar name>`.
+   *
+   * OPTIONAL because the phone does not yet render a calendar colour: the desktop
+   * reads it through its own rich prefs view. Declaring it here is what lets the
+   * reminder pass count an all-day event's lead back from the user's chosen hour
+   * instead of the module default, and an absent map means exactly that default
+   * rather than a broken setting.
+   */
+  calendar_settings?: Record<string, string>;
+  /**
    * Show the per-note "last edited" timestamp under each sidebar note row
    * (sidebar-note-timestamps). `true` (the default) ≡ timestamps visible — the
    * pre-feature behaviour. Serialized from Rust `bool` with `default = true`;

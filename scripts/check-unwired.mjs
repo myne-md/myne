@@ -14,7 +14,9 @@
 //     the shipped bundle (tree-shaken). `web/src/worker/opfs.ts` skips its
 //     TOCTOU guard *because* it believes that lock is held.
 //   - `mobile/src/lib/reminderPass.ts` — `runBoundedReminderPass`, imported
-//     by two test files and nothing else.
+//     by two test files and nothing else. **Wired on 2026-11-08**
+//     (myne-md/myne#1037): `useMobileReminderPass` calls it from the unlocked
+//     editor, and its exemption is gone.
 //   - `mobile/src/lib/vault-unlock.ts` — `isVaultUnlocked`, zero call sites.
 //
 // The mobile examples above were found BY HAND, because the mobile tree was a
@@ -132,7 +134,11 @@ const EXEMPT = new Map([
   // The first three findings this guard produced against the mobile tree, which
   // it could not see until the client moved in-repo.
   ["mobile/src/lib/query-engine.ts", "UNWIRED — a pure `export * from \"@myne/editor/host/notes/queryEngine\"` shim. Every consumer imports that shared module directly, so the shim forwards for nobody. Dead rather than dangerous; the fix is deleting it."],
-  ["mobile/src/lib/reminderPass.ts", "UNWIRED — `runBoundedReminderPass`, the pass that applies the shared scheduling decision core (`@myne/reminder-schedule`) to the OS. Two test files import it; NOTHING in `mobile/src` or `mobile/src-tauri` calls it, so the reminders plugin is installed, the decision core is shared, and the step that would act on either never runs. Note the company it keeps two lines up: `src/lib/reminderLifecycle.ts` and `src/lib/reminderPermission.ts` are the same subsystem, inert on the desktop side. The reminder feature is partly unwired on BOTH clients."],
+  // `mobile/src/lib/reminderPass.ts` stood here with a four-line reason saying that
+  // nothing called it. myne-md/myne#1037 gave it a caller (`useMobileReminderPass`,
+  // from the unlocked editor) and removed the entry, because a stale exemption is a
+  // claim that reads as measured and is not.
+
   // ---- found the first time `src/notes` joined WATCHED (myne#587) ----------
   //
   // All four were already this guard's subject the whole time; the tree was
