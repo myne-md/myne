@@ -475,6 +475,28 @@ also supersedes the Tor-specific pin claims in the A4 row and in the glossary.
 
 **No adversary or asset rating changes and no trust boundary moves**: the reader is a process the user started, on the machine that already holds the plaintext, and it reaches the app over the same local command socket the `myne` CLI uses. What this does not bound is the user's own client, which is A7-class software the user installed; the consent screen, the read scope and the named write scope are what bound it, and the closed verb list is the sharpest of the three because no verb outside it exists to be called: a delete, a folder rename or an attachment change has no name a client can send, so the host has nothing to scope-check and refuses at the dispatch table. What the dispatched verbs add is the surface behind those bounds, and three properties hold it: every write re-reads the note from disk before deciding, an edit or a move is refused when the note has changed since the client saw it and when a live co-editing session owns it, and every write **to an existing note** takes its restore point BEFORE the first byte changes and is refused outright if that restore point cannot be taken, so a change a connection made is one the user can always put back. **A note CREATE is the one exception and it is arithmetic rather than an oversight**: its pre-write state is the note's absence, which a snapshot store that copies an existing blob cannot express, and the id does not exist until the write returns. A created note is undone by deleting it, and no verb in this surface deletes, so the only party who can remove one is the person who owns the vault. A grant also carries **no expiry**: an approval is standing until it is revoked, which is recorded here rather than left to be inferred, because a deadline on the write half would turn a client's write into a race that client cannot see (`decisions/security/0753`).
 
+### The agent's fifth tool reads a year of the calendar in one call (myne-md/myne#1037)
+
+- **What it is.** `calendar_range` answers the events between two dates to an agent run, inside the note scope
+  the user already approved. It is a READ tool: it proposes nothing and it writes nothing.
+- **What is new, given the run could already read every note in its scope anyway.** Bandwidth, not access. Before
+  this tool, assembling a year of a schedule meant reading notes one at a time, which is slow enough that a
+  steered model would not bother; now it is one request. The class of risk that changes is therefore exfiltration
+  efficiency rather than reach, and that is the honest description of it.
+- **Bounds, all host-side.** The window must be named by the model, is refused wider than 366 days with the bound
+  in the message, and the answer is capped at 500 rows. All three live where the query is constructed
+  (`vault_indices::calendar::bound_for_window`), not in the prompt, so a client change cannot loosen them.
+- **The exclusion set is re-read per call, with no in-flight carve-out.** SYNC-14 carries none, so a folder added
+  to `ai_excluded_folders` while a run is open stops being read at once, and a row whose note sits in an excluded
+  folder is dropped before the model sees it. The count of dropped rows is stated in the answer, because a silent
+  hole in a schedule reads as an empty schedule.
+- **What it deliberately omits.** No note bodies, no ids to read, no `uid` and no write verb. A row is times, a
+  title, a calendar name and a host-computed `conflict` flag, so the model is never asked to do interval
+  arithmetic over text it retrieved.
+- **Residual.** A run whose instructions were steered by note content can now pull a year of schedule in a single
+  request instead of many. The mitigations are the bounds above plus the existing grant model; there is no
+  per-tool consent, and this row is the record of that rather than a claim that it would have helped.
+
 ### The calendar's `.ics` reader is an untrusted-input surface (myne-md/myne#1037)
 
 - **What it is.** The calendar imports and exports `.ics` files as plaintext, chosen by the user through the OS picker.
