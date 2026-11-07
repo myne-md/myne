@@ -6173,6 +6173,10 @@
     "exported": "Wrote {{count}} events to {{filename}}",
     "exportFailed": "Could not write that .ics file.",
     "exportEmpty": "There is nothing in the calendar to export yet.",
-    "importedSkipped": "Imported {{count}} events from {{filename}}, and left {{skipped}} that this vault already has"
+    "importedSkipped": "Imported {{count}} events from {{filename}}, and left {{skipped}} that this vault already has",
+    "title": "Calendar",
+    "close": "Close the calendar",
+    "noEvents": "Nothing on this day",
+    "conflict": "overlaps another event"
   }
 }

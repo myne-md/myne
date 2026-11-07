@@ -150,6 +150,7 @@ import {
 } from "../../lib/photoNoteBody";
 import { emitAttachmentEmbed } from "../../lib/attachmentRef";
 import { AttachmentsSheet } from "./AttachmentsSheet";
+import { CalendarSurface } from "./CalendarSurface";
 import { PhotoNoteSheet, type PhotoNoteDestination } from "./PhotoNoteSheet";
 import { RecordingSheet } from "./RecordingSheet";
 import { VOICE_RECORD_EVENT } from "../../lib/voice-record-bridge";
@@ -266,6 +267,10 @@ const TAB_ORDER: Record<WorkspaceTab, number> = {
   "note-tasks": 2,
   search: 3,
   graph: 4,
+  // The calendar's sidebar row follows Graph, so its slide position does too; it
+  // has no bottom-bar column (the bar is at its budget, see `TabBar.tsx`), and
+  // this record is about the page transition rather than the bar.
+  calendar: 4,
   files: 5,
   templates: 6,
   // Last, matching its position in the bar. The comment above is the reason
@@ -4284,6 +4289,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
         {/* MYND-620 task 3: the vault-wide Tasks destination. Same shape as the
             Files destination above - one component serving both a full-screen
             destination and an editor sheet. */}
+        {tab === "calendar" && <CalendarSurface onClose={() => setTab("notes")} />}
         {tab === "tasks" && (
           <TaskSurface
             scope={{ kind: "vault" }}
@@ -5368,6 +5374,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
             onTasks={() => setTab("tasks")}
             {...(editing?.id === undefined ? {} : { onNoteTasks: () => setTab("note-tasks") })}
             onGraph={() => setTab("graph")}
+            onCalendar={() => setTab("calendar")}
             onFiles={() => setTab("files")}
             onTemplates={() => setTab("templates")}
             {...(prefs.ai_enabled ? { onChat: () => setTab("chat") } : {})}

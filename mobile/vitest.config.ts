@@ -30,6 +30,13 @@ export default defineConfig({
       // barrel fails to TRANSFORM without this line, and the file appears in
       // no count. The mirror is kept complete rather than only where today's
       // specs happen to reach it.
+      { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
+      // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
+      // the desktop pane and the agent tool's answers, so a cell and a row cannot
+      // disagree about which day a span falls on.
+      { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The same three the bench mirrors (myne-md/myne#1027): the status vocabulary the phone
       // shares with the desktop, and the two pure modules the diagnostics block is built from.

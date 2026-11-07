@@ -33,6 +33,13 @@ export default defineConfig(async () => ({
       // one number, or the two clients disagree about when their own vault is
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
+      { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
+      // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
+      // the desktop pane and the agent tool's answers, so a cell and a row cannot
+      // disagree about which day a span falls on.
+      { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The shared sync-status VOCABULARY (myne-md/myne#1027): the status union and the one
       // mapping from a status to a sentence. Aliased for the same reason as the staleness rule

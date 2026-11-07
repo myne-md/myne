@@ -45,6 +45,10 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   // The browser clipper is a desktop-side pairing host. No mobile plugin, no
   // pairing surface, and the extension talks to the desktop's socket by name.
   clipper: false,
+  // The calendar's `.ics` IMPORT needs a path-taking open dialog, and the phone's
+  // exchange is not built yet: the surface it needs is the calendar screen, and
+  // the share sheet is a write-only door. Export is not behind this gate.
+  icsImport: false,
   // On-device LLM: `plugins::local_inference` is registered and the AI chat,
   // review and transcript flows consume it.
   localAi: true,
