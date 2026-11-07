@@ -13,7 +13,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Sheet, Switch, TextField } from "../../components";
+import { Button, Segmented, Sheet, Switch, TextField } from "../../components";
 import { createEventNote, parseClock } from "../../lib/eventWrite";
 import type { EventInstant } from "../../dialect/event";
 import { parseCivilDate } from "@myne/dialect-civil-date";
@@ -36,6 +36,18 @@ function instantFor(date: string, clock: string | null): EventInstant | null {
   return { date: civil, time: `${hh}:${mm}` };
 }
 
+/**
+ * The dialect's canonical phrases, in the order the segments render.
+ *
+ * Hard-coded rather than built from `formatRecurrenceRule` because these four ARE
+ * the phrases that function emits for those rules; a test pins the pair so the
+ * spellings cannot drift apart silently.
+ */
+const REPEAT_VALUES: readonly string[] = ["", "every day", "every week", "every month"];
+
+/** The reminder leads the phone offers, as the file spells them. */
+const REMIND_VALUES: readonly string[] = ["", "10m", "1h", "1d"];
+
 export function EventComposerSheet({
   date,
   onClose,
@@ -51,6 +63,9 @@ export function EventComposerSheet({
   const [allDay, setAllDay] = useState(false);
   const [start, setStart] = useState("09:00");
   const [end, setEnd] = useState("");
+  const [repeat, setRepeat] = useState("");
+  const [remind, setRemind] = useState("");
+  const [calendar, setCalendar] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -69,6 +84,11 @@ export function EventComposerSheet({
         title: title.trim(),
         start: startInstant,
         end: endInstant,
+        // Empty means "the file carries no such field", which is the absence the
+        // readers treat as "one-off" and "no reminder" rather than a value.
+        repeat: repeat === "" ? null : repeat,
+        remind: remind === "" ? null : remind,
+        calendar: calendar.trim() === "" ? null : calendar.trim(),
       });
       onCreated();
     } catch {
@@ -127,6 +147,53 @@ export function EventComposerSheet({
             {error}
           </p>
         )}
+
+        {/* Repeat and reminder are four short choices each rather than the
+            desktop's full rule builder: a phone asks "does this repeat weekly"
+            and not "every second tuesday of the month". The values are the
+            dialect's own canonical phrases, so a rule is spelled one way in both
+            clients and the exotic rules stay on the form that can express them. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.repeat")}</span>
+          <Segmented
+            ariaLabel={t("calendar.form.repeat")}
+            options={[
+              t("calendar.composer.repeatNever"),
+              t("calendar.composer.repeatDaily"),
+              t("calendar.composer.repeatWeekly"),
+              t("calendar.composer.repeatMonthly"),
+            ]}
+            active={REPEAT_VALUES.indexOf(repeat)}
+            onChange={(index) => setRepeat(REPEAT_VALUES[index] ?? "")}
+            testIdPrefix="calendar.composer.repeat"
+            optionValues={["never", "daily", "weekly", "monthly"]}
+          />
+        </div>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{t("calendar.form.remind")}</span>
+          <Segmented
+            ariaLabel={t("calendar.form.remind")}
+            options={[
+              t("calendar.composer.remindNone"),
+              "10m",
+              "1h",
+              "1d",
+            ]}
+            active={REMIND_VALUES.indexOf(remind)}
+            onChange={(index) => setRemind(REMIND_VALUES[index] ?? "")}
+            testIdPrefix="calendar.composer.remind"
+            optionValues={["none", "10m", "1h", "1d"]}
+          />
+        </div>
+
+        <TextField
+          label={t("calendar.composer.calendarLabel")}
+          value={calendar}
+          onChange={setCalendar}
+          testId="calendar.composer.calendar-field"
+          autoCapitalize="words"
+        />
 
         <Button disabled={!canCreate} onClick={() => void create()} data-testid="calendar.composer.create">
           {t("calendar.composer.create")}
