@@ -21,6 +21,7 @@
 // that are registered at a time, the less is exposed. It is a privacy bound
 // first and a resource bound second.
 
+import { parseReminderLead } from "@myne/dialect/event";
 import type { VaultTask } from "../notes/taskIndex";
 
 // Re-exported so a consumer of this module needs only this module. Mobile
@@ -197,6 +198,128 @@ export function parseLocalInstant(at: string): Date {
 }
 
 /**
+ * An event note as the reminder pass sees it.
+ *
+ * The pass reads events through the SAME range query the calendar pane, the mobile
+ * screen and the agent tool use (`vault_indices_calendar_range`), so an event's
+ * reminder cannot disagree with the event. This type is that row's shape, narrowed
+ * to the four fields a registration needs: a row with no `remind` registers
+ * nothing, which is what makes the field the switch.
+ */
+export type EventReminderSource = {
+  readonly noteId: string;
+  /** The occurrence's start in the emitted form (`§3.10.2`). */
+  readonly start: string;
+  readonly allDay: boolean;
+  /** `YYYY-MM-DD` of this occurrence, so each appearance has its own identity. */
+  readonly occurrenceDate?: string | null;
+  /** The raw lead (`30m`, `2h`, `1d`), as the file holds it. */
+  readonly remind?: string | null;
+};
+
+/** Everything the pass schedules, in one value, so a caller cannot forget a source. */
+export type ReminderSources = {
+  readonly tasks: readonly VaultTask[];
+  readonly events: readonly EventReminderSource[];
+  /**
+   * The wall-clock anchor an ALL-DAY event's reminder uses
+   * (`calendar.day_reminder_anchor`, default 09:00).
+   *
+   * Read as a preference rather than as a constant: an all-day event has no hour
+   * in the file, so somebody has to choose one, and midnight would fire while the
+   * user is asleep.
+   */
+  readonly dayAnchor?: string;
+};
+
+/** Identity of an occurrence's reminder: its series note plus the occurrence's date. */
+export function eventReminderId(event: EventReminderSource): string {
+  const day = event.occurrenceDate ?? event.start.slice(0, 10);
+  return `myne.reminder.event.${event.noteId}.${day}`;
+}
+
+/** `at` minus `minutes`, through the module's one local-stamp parser. */
+function minusMinutes(at: string, minutes: number): string {
+  return localStamp(new Date(parseLocalInstant(at).getTime() - minutes * 60_000));
+}
+
+/**
+ * The reminders event notes should have registered right now.
+ *
+ * The lead is subtracted from the occurrence's start, so a moved event carries its
+ * reminder with it: the id is stable per occurrence and `diffReminders` cancels and
+ * re-registers an id whose `at` moved.
+ *
+ * **A lead beyond the horizon registers nothing**, and that falls out of the window
+ * rather than needing a rule: 30 days before an event that is two hours away is 30
+ * days in the past, and the past is not scheduled. The authoring surface is where
+ * the refusal is stated (`CalendarEventForm`'s horizon line), because a scheduler
+ * that silently declined a reminder the user typed would be the worse failure.
+ */
+export function targetEventReminders(
+  events: readonly EventReminderSource[],
+  now: Date,
+  horizonDays: number = REMINDER_HORIZON_DAYS,
+  dayAnchor: string = CALENDAR_DAY_ANCHOR_DEFAULT,
+): PendingReminder[] {
+  const from = localStamp(now);
+  const to = `${horizonEndDate(now, horizonDays)}T23:59`;
+  const out: PendingReminder[] = [];
+  // `?? []`: a caller that omits the source must not take the whole pass down with
+  // it. The TYPE makes it required; this keeps a JavaScript caller from arming
+  // nothing at all instead of arming the tasks.
+  for (const event of events ?? []) {
+    const lead = event.remind ?? null;
+    if (lead === null || lead === "") continue;
+    const parsed = parseReminderLead(lead);
+    if (parsed === null) continue;
+    const base = event.allDay
+      ? `${event.occurrenceDate ?? event.start.slice(0, 10)}T${dayAnchor.slice(0, 5)}`
+      : instantOf(event.start);
+    const at = minusMinutes(base, parsed.minutes);
+    if (!withinWindow(at, from, to)) continue;
+    out.push({ id: eventReminderId(event), at });
+  }
+  out.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1));
+  return out;
+}
+
+/** The anchor an all-day event's reminder uses when the user never chose one. */
+export const CALENDAR_DAY_ANCHOR_DEFAULT = "09:00";
+
+/**
+ * Whether an instant is inside the registration window.
+ *
+ * One implementation for both sources: `at == from` is INSIDE (a stamp is
+ * minute-resolution, so an instant equal to now is due this minute), and the
+ * reasoning for that boundary is in `targetReminders`'s comment.
+ */
+function withinWindow(at: string, from: string, to: string): boolean {
+  return !(at < from || at > to);
+}
+
+/**
+ * Every reminder the vault should hold right now: line-tasks and event notes.
+ *
+ * Tasks and events are separate SOURCES with separate identities rather than one
+ * merged list, because they are separate record kinds: a task's reminder belongs to
+ * a line, an event's to an occurrence. What they share is everything that matters
+ * here — the window, the horizon and the content-free payload.
+ */
+export function targetRemindersFor(
+  sources: ReminderSources,
+  now: Date,
+  horizonDays: number = REMINDER_HORIZON_DAYS,
+): PendingReminder[] {
+  const tasks = targetReminders(sources.tasks, now, horizonDays);
+  const events = targetEventReminders(sources.events, now, horizonDays, sources.dayAnchor);
+  if (events.length === 0) return tasks;
+  const out = [...tasks, ...events];
+  out.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1));
+  return out;
+}
+
+/**
  * The reminders that SHOULD be registered right now.
  *
  * Excluded, each for its own reason:
@@ -353,6 +476,21 @@ export async function runReminderPass(
   clock: ReminderClock,
   horizonDays: number = REMINDER_HORIZON_DAYS,
 ): Promise<ReminderPassResult> {
+  return await runReminderPassFor({ tasks, events: [] }, notifier, clock, horizonDays);
+}
+
+/**
+ * The pass over BOTH sources.
+ *
+ * One pass rather than two, because two passes would each compute a diff against
+ * the same OS-held set and cancel each other's registrations.
+ */
+export async function runReminderPassFor(
+  sources: ReminderSources,
+  notifier: ReminderNotifier,
+  clock: ReminderClock,
+  horizonDays: number = REMINDER_HORIZON_DAYS,
+): Promise<ReminderPassResult> {
   let current: readonly PendingReminder[] = [];
   try {
     current = await notifier.listPending();
@@ -363,7 +501,7 @@ export async function runReminderPass(
     current = [];
   }
 
-  const target = targetReminders(tasks, clock(), horizonDays);
+  const target = targetRemindersFor(sources, clock(), horizonDays);
   const { schedule, cancel } = diffReminders(current, target);
 
   let scheduled = 0;

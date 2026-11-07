@@ -21,6 +21,7 @@ import {
   type LeafPane,
   type NamedWorkspaces,
   type PersistedAgentView,
+  type PersistedCalendarView,
   type PersistedTaskView,
   type ViewMode,
   type WorkspaceItem,
@@ -339,6 +340,19 @@ type ParsedItem = { item: WorkspaceItem } | "drop" | "invalid";
  * open tab. Reads the nested `taskView` shape, and ALSO migrates a pre-redesign
  * descriptor's `taskFilter`/`taskScope` so an open tab keeps its narrowing.
  */
+/** The calendar's persisted zoom, degrading an unknown name to the default. */
+function parseCalendarView(o: Record<string, unknown>): { calendarView?: PersistedCalendarView } {
+  const raw =
+    typeof o.calendarView === "object" && o.calendarView !== null
+      ? (o.calendarView as Record<string, unknown>)
+      : {};
+  const view = raw.view;
+  if (view === "month" || view === "week" || view === "day" || view === "agenda") {
+    return { calendarView: { view } };
+  }
+  return {};
+}
+
 function parseTaskView(o: Record<string, unknown>): { taskView?: PersistedTaskView } {
   const raw =
     typeof o.taskView === "object" && o.taskView !== null
@@ -493,6 +507,21 @@ function parseItem(t: unknown): ParsedItem {
         id: canonicalTabId("templates", o.id),
         ...pinned,
         ...viewMode,
+      },
+    };
+  }
+  // The calendar (myne-md/myne#1037) - a singleton like the task list, plus its
+  // per-tab zoom. Read-when-present and degrade to the default view rather than
+  // erroring: an unknown zoom from a future build must not reject the whole
+  // workspace blob and lose every open tab.
+  if (o.kind === "calendar") {
+    return {
+      item: {
+        kind: "calendar",
+        id: canonicalTabId("calendar", o.id),
+        ...pinned,
+        ...viewMode,
+        ...parseCalendarView(o),
       },
     };
   }

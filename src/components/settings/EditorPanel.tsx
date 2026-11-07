@@ -50,6 +50,7 @@ import { DefaultViewModeSettings } from "./DefaultViewModeSettings";
 import { FocusModeSettings } from "./FocusModeSettings";
 import { SpellSettings } from "./SpellSettings";
 import { PeriodicNotesSettings } from "./PeriodicNotesSettings";
+import { CalendarSettings } from "./CalendarSettings";
 import { ArchiveSettings } from "./ArchiveSettings";
 import { ViewsSettings } from "./ViewsSettings";
 import { ReminderHorizonSettings, ReminderSettings } from "./ReminderSettings";
@@ -302,6 +303,7 @@ const PREVIEW_BANDS: Record<EditorTopicId, readonly PreviewBand[]> = {
   writing: ["note", "spell"],
   tasks: ["taskChip"],
   periodic: [],
+  calendar: [],
   features: [],
 };
 
@@ -816,6 +818,16 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
           the right period before the shell looks for the anchor. */}
       <SettingsTopicPanel panelId="editor" topicId="periodic">
       <PeriodicNotesSettings focusAnchorId={focusAnchorId} />
+      </SettingsTopicPanel>
+
+      {/* Calendar (myne-md/myne#1037): the all-day reminder anchor and the
+          per-calendar colour map, both riding ONE prefs map
+          (`calendar_settings`). Its own topic for the reason the periodic block
+          has one: it is one concern, reachable from exactly one place. The
+          calendar's SURFACE is a pane and a phone screen, not a settings row —
+          this is the configuration only. */}
+      <SettingsTopicPanel panelId="editor" topicId="calendar">
+      <CalendarSettings />
       </SettingsTopicPanel>
 
       <SettingsTopicPanel panelId="editor" topicId="features">

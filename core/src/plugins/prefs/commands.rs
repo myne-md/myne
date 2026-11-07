@@ -4590,6 +4590,186 @@ pub(crate) async fn set_periodic_note_setting_with_dir(
     Ok(())
 }
 
+/// The settings the calendar map carries (myne-md/myne#1037). Unlike
+/// [`PERIOD_SETTINGS`] one of them is namespaced by an entity: a colour belongs
+/// to a `calendar:` name, so the key is `colours.<name>`.
+const CALENDAR_ANCHOR_SETTING: &str = "day_reminder_anchor";
+const CALENDAR_COLOUR_PREFIX: &str = "colours.";
+
+/// Slot::Unlocked-gated setter for one `calendar_settings` entry
+/// (myne-md/myne#1037). `Some(value)` sets it, `None` removes the key, which the
+/// Phase 2 merge represents as a stamped absence rather than as "this device
+/// never had it". Read-modify-write under the write mutex; disk-first;
+/// non-load-bearing.
+///
+/// Host-side validation exists because the codec deliberately performs none, and
+/// the three rules are each a key that nothing would ever read:
+///
+/// * the setting must be [`CALENDAR_ANCHOR_SETTING`] or carry the
+///   [`CALENDAR_COLOUR_PREFIX`] namespace, so a typo cannot write an entry that
+///   is dead on arrival;
+/// * the anchor must be `HH:MM` in 24-hour wall clock, the same shape the client
+///   writes, because a value the reader cannot parse is a preference that
+///   silently does nothing;
+/// * a calendar NAME must be one legal segment (non-empty, no `/`, no control
+///   character, bounded) and a colour must be a token name (lowercase ASCII,
+///   digits, `-`), because the token sheet is the client's and membership is
+///   resolved there. A hex literal is therefore refused here rather than stored
+///   and ignored: the calendar binds to design tokens, never to a literal.
+///
+/// The NAME is user text (a calendar label) and is never logged; see
+/// src-tauri/AGENTS.md "Secret-handling logging discipline".
+pub async fn set_calendar_setting_from_host(
+    host: &dyn HostCtx,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+) -> Result<(), PrefsWriteError> {
+    let dir =
+        vault_dir_from_host(host, state.active_vault_id().await).map_err(PrefsWriteError::from)?;
+    set_calendar_setting_with_dir(&dir, state, hooks, setting, value, io, host).await
+}
+
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn set_calendar_setting<R: Runtime>(
+    app: AppHandle<R>,
+    state: State<'_, VaultRuntimeState>,
+    hooks: State<'_, crate::hooks::Hooks>,
+    setting: String,
+    value: Option<String>,
+) -> Result<(), PrefsWriteError> {
+    set_calendar_setting_from_host(
+        &TauriHost::new(app),
+        state.inner(),
+        hooks.inner(),
+        setting,
+        value,
+        &crate::vault_io::StdVaultIo,
+    )
+    .await
+}
+
+/// Whether `HH:MM` is a real 24-hour wall clock time.
+fn is_wall_clock_hm(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    if bytes.len() != 5 || bytes[2] != b':' {
+        return false;
+    }
+    let digits_ok = bytes
+        .iter()
+        .enumerate()
+        .all(|(i, b)| i == 2 || b.is_ascii_digit());
+    if !digits_ok {
+        return false;
+    }
+    let hours: u32 = value[0..2].parse().unwrap_or(99);
+    let minutes: u32 = value[3..5].parse().unwrap_or(99);
+    hours < 24 && minutes < 60
+}
+
+/// Whether `name` is one legal calendar segment: non-empty, no separator, no
+/// control character, bounded like a folder segment.
+fn is_legal_calendar_name(name: &str) -> bool {
+    !name.is_empty()
+        && name.len() <= 255
+        && name == name.trim()
+        && !name.contains('/')
+        && !name.chars().any(|c| c.is_control())
+}
+
+/// Whether `value` is a design-token NAME (`moss`, `slate-2`), never a colour
+/// literal. Membership is the client's question; this is the shape, and it is the
+/// client's own predicate character for character:
+/// `TOKEN_KEY = /^[a-z0-9][a-z0-9-]*$/` in `src/notes/graphColorGroups.ts`, which
+/// is also what the renderer uses to decide a stored value is usable. A mismatch
+/// here would refuse a value the picker can produce, which reads as a broken
+/// control rather than as a validation rule.
+///
+/// The one addition is a length bound. `var(--…)` is resolved from a token sheet
+/// a person does not type, so 64 bytes cannot be reached from the picker; it
+/// exists so a tampered blob cannot hand a renderer an unbounded property name.
+fn is_token_name(value: &str) -> bool {
+    if value.is_empty() || value.len() > 64 {
+        return false;
+    }
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first.is_ascii_lowercase() || first.is_ascii_digit()) {
+        return false;
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Testable core of [`set_calendar_setting`].
+pub(crate) async fn set_calendar_setting_with_dir(
+    vault_dir: &Path,
+    state: &VaultRuntimeState,
+    hooks: &crate::hooks::Hooks,
+    setting: String,
+    value: Option<String>,
+    io: &dyn crate::vault_io::VaultIo,
+    host: &dyn HostCtx,
+) -> Result<(), PrefsWriteError> {
+    let is_anchor = setting == CALENDAR_ANCHOR_SETTING;
+    let colour_name = setting.strip_prefix(CALENDAR_COLOUR_PREFIX);
+    if !is_anchor && colour_name.is_none() {
+        return Err(PrefsWriteError::InvalidValue);
+    }
+    if is_anchor {
+        if let Some(v) = value.as_deref() {
+            if !is_wall_clock_hm(v) {
+                return Err(PrefsWriteError::InvalidValue);
+            }
+        }
+    }
+    if let Some(name) = colour_name {
+        if !is_legal_calendar_name(name) {
+            return Err(PrefsWriteError::InvalidValue);
+        }
+        if let Some(v) = value.as_deref() {
+            if !is_token_name(v) {
+                return Err(PrefsWriteError::InvalidValue);
+            }
+        }
+    }
+
+    let cleared = value.is_none();
+    // The logged entry is the setting's own kind, never the calendar name: a
+    // calendar label is user text (AS3-class vault structure) and the name is
+    // the only part of this key a person typed.
+    let logged_kind = if is_anchor { "anchor" } else { "colour" };
+
+    update_prefs_with_dir(
+        vault_dir,
+        state,
+        hooks,
+        |prefs| match value {
+            Some(v) => {
+                prefs.calendar_settings.insert(setting.clone(), v);
+            }
+            None => {
+                prefs.calendar_settings.remove(&setting);
+            }
+        },
+        io,
+        host,
+    )
+    .await?;
+
+    tracing::info!(
+        event = "prefs_written",
+        field = "calendar_settings",
+        entry = logged_kind,
+        cleared
+    );
+    Ok(())
+}
+
 /// Slot::Unlocked-gated setter for the new-note default-location pair (MYND-462,
 /// "Files" settings panel) — `new_note_location` (the mode: root/current/specific) +
 /// `new_note_location_folder` (the target folder when mode == "specific"). Set
@@ -7244,6 +7424,154 @@ mod tests {
 
     // periodic_notes setter (myne#177).
 
+    // calendar_settings setter (myne-md/myne#1037).
+
+    #[test]
+    fn set_calendar_setting_writes_the_anchor_and_the_colour_entries() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x51).await;
+            let io = crate::vault_io::StdVaultIo;
+            for (setting, value) in [
+                ("day_reminder_anchor", "08:30"),
+                ("colours.work", "group-teal"),
+                ("colours.personal", "group-olive"),
+            ] {
+                set_calendar_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    setting.into(),
+                    Some(value.into()),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await
+                .expect("set calendar setting");
+            }
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert_eq!(
+                prefs
+                    .calendar_settings
+                    .get("day_reminder_anchor")
+                    .map(String::as_str),
+                Some("08:30")
+            );
+            assert_eq!(
+                prefs
+                    .calendar_settings
+                    .get("colours.work")
+                    .map(String::as_str),
+                Some("group-teal")
+            );
+            assert_eq!(
+                prefs
+                    .calendar_settings
+                    .get("colours.personal")
+                    .map(String::as_str),
+                Some("group-olive")
+            );
+            // One entry per key, so a colour edit never rewrites the anchor: that
+            // is the per-key field clock the merge depends on (protocol.md §9.5.2).
+            assert_eq!(prefs.calendar_settings.len(), 3);
+        });
+    }
+
+    #[test]
+    fn set_calendar_setting_clears_by_removing_the_key() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x52).await;
+            let io = crate::vault_io::StdVaultIo;
+            set_calendar_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "colours.work".into(),
+                Some("group-teal".into()),
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("set");
+            set_calendar_setting_with_dir(
+                tmp.path(),
+                &state,
+                &noop_hooks(),
+                "colours.work".into(),
+                None,
+                &io,
+                &crate::host::NoopHost,
+            )
+            .await
+            .expect("clear");
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(!prefs.calendar_settings.contains_key("colours.work"));
+        });
+    }
+
+    #[test]
+    fn set_calendar_setting_refuses_a_value_nothing_would_read() {
+        rt().block_on(async {
+            let (tmp, state) = make_temp_vault_with_unlocked_state(0x53).await;
+            let io = crate::vault_io::StdVaultIo;
+            let cases = [
+                // Not a setting this build reads.
+                ("week_start", Some("monday")),
+                // An anchor that is not a real wall-clock time.
+                ("day_reminder_anchor", Some("24:00")),
+                ("day_reminder_anchor", Some("9:00")),
+                ("day_reminder_anchor", Some("09:60")),
+                // A colour that is a literal rather than a token name: the
+                // calendar binds to tokens so a theme can repaint it.
+                ("colours.work", Some("#ff0000")),
+                ("colours.work", Some("var(--group-teal)")),
+                ("colours.work", Some("Group-Teal")),
+                // A calendar name that is not one legal segment.
+                ("colours.Work/Home", Some("group-teal")),
+                ("colours.", Some("group-teal")),
+            ];
+            for (setting, value) in cases {
+                let result = set_calendar_setting_with_dir(
+                    tmp.path(),
+                    &state,
+                    &noop_hooks(),
+                    setting.into(),
+                    value.map(str::to_string),
+                    &io,
+                    &crate::host::NoopHost,
+                )
+                .await;
+                assert!(
+                    matches!(result, Err(PrefsWriteError::InvalidValue)),
+                    "{setting}={value:?} should be refused"
+                );
+            }
+
+            let prefs = prefs_read_with_dir(tmp.path(), &state, &io)
+                .await
+                .expect("read prefs");
+            assert!(prefs.calendar_settings.is_empty());
+        });
+    }
+
+    #[test]
+    fn is_token_name_matches_the_client_grammar() {
+        // The client's own predicate is `TOKEN_KEY = /^[a-z0-9][a-z0-9-]*$/`
+        // (src/notes/graphColorGroups.ts). If the two drift, a value one side
+        // accepts is refused by the other, which reads as a broken control.
+        for good in ["group-teal", "moss", "slate-2", "a", "x-", "0"] {
+            assert!(is_token_name(good), "{good}");
+        }
+        for bad in ["", "Group", "group teal", "#fff", "-x", "x_y", "var(--a)"] {
+            assert!(!is_token_name(bad), "{bad}");
+        }
+    }
+
     #[test]
     fn set_periodic_note_setting_writes_the_composed_key_and_registers_the_folder() {
         rt().block_on(async {
@@ -8494,6 +8822,7 @@ mod tests {
                     ai_provider_model: None,
                     meeting_ai_prompt: None,
                     bar_items_order: Vec::new(),
+                    calendar_settings: Default::default(),
                     cli_enabled: false,
                     cli_excluded_folders: Vec::new(),
                     cli_rate_limit_disabled: None,

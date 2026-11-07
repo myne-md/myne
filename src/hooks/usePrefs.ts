@@ -110,6 +110,7 @@ export const DEFAULT_PREFS: PrefsView = {
   daily_folder: null,
   daily_template: null,
   periodic_notes: {},
+  calendar_settings: {},
   favorites: [],
   item_order: {},
   editor_layout: null,

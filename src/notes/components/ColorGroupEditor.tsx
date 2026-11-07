@@ -25,10 +25,11 @@ import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import { Icon } from "../../components/primitives/Icon";
 import { Switch } from "../../components/primitives/Switch";
+import { ColorSwatchPicker } from "../../components/primitives/ColorSwatchPicker";
 import { collectFolderOptions } from "../../components/export/vaultExportFlow";
 import { usePrefs } from "../../hooks/usePrefs";
 import { setColorGroups, type ColorGroup } from "../../lib/prefs";
-import { colorGroupVar, GROUP_COLOR_KEYS } from "../graphColorGroups";
+import { colorGroupVar, GROUP_COLOR_KEYS, GROUP_COLOR_PALETTE } from "../graphColorGroups";
 import { useSelectedNote } from "../sidebarState";
 import { FilterBuilder, type FolderOption } from "./FilterBuilder";
 import { dragEdge, insertionLineStyle } from "./reorderDnd";
@@ -43,13 +44,12 @@ import {
 const EMPTY_DRAFT: FilterDraft = { combinator: "and", groups: [] };
 
 /** The task-4 categorical palette, the 8 `--group-*` design tokens, in the
- *  order {@link GROUP_COLOR_KEYS} fixes. Only the human labels live here; the
- *  KEYS are shared with the default tag grouping, because that assigns them in
- *  sequence and the sequence is precedence. */
-const PALETTE_LABELS = ["Olive", "Fern", "Teal", "Denim", "Indigo", "Violet", "Orchid", "Rose"];
-const PALETTE: ReadonlyArray<{ key: string; label: string }> = GROUP_COLOR_KEYS.map(
-  (key, i) => ({ key, label: PALETTE_LABELS[i]! }),
-);
+ *  order {@link GROUP_COLOR_KEYS} fixes. The keys AND the labels now live in
+ *  `graphColorGroups.ts` as {@link GROUP_COLOR_PALETTE} (myne-md/myne#1037): the
+ *  calendar's colour picker needed the same eight, and a second copy of a
+ *  key-to-label list is how two pickers disagree about what "the first colour"
+ *  means. */
+const PALETTE = GROUP_COLOR_PALETTE;
 
 const ROW_STYLE: CSSProperties = {
   position: "relative",
@@ -452,32 +452,15 @@ export function ColorGroupEditor({
 
               {pickingColorFor === rule.id && (
                 <div data-testid="editor.color-group-palette" style={SWATCH_PICKER_STYLE}>
-                  {PALETTE.map((entry) => (
-                    <button
-                      key={entry.key}
-                      type="button"
-                      aria-label={entry.label}
-                      title={entry.label}
-                      data-testid="editor.color-group-palette-swatch"
-                      data-color-key={entry.key}
-                      onClick={() => {
-                        updateRule(rule.id, { color: entry.key });
-                        setPickingColorFor(null);
-                      }}
-                      style={SWATCH_BUTTON_STYLE}
-                    >
-                      <span
-                        style={{
-                          ...SWATCH_PAINT_STYLE(entry.key),
-                          // The selection ring goes on the PAINT, not on the
-                          // hit box: a ring around the invisible 24px box
-                          // would float unattached to the dot it marks.
-                          outline:
-                            entry.key === rule.color ? "2px solid var(--accent)" : "none",
-                        }}
-                      />
-                    </button>
-                  ))}
+                  <ColorSwatchPicker
+                    palette={PALETTE}
+                    value={rule.color}
+                    testId="editor.color-group-palette-swatch"
+                    onChange={(key) => {
+                      updateRule(rule.id, { color: key });
+                      setPickingColorFor(null);
+                    }}
+                  />
                 </div>
               )}
             </div>

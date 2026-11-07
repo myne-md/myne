@@ -333,6 +333,30 @@ export const GROUP_COLOR_KEYS: ReadonlyArray<string> = [
   "group-rose",
 ];
 
+/** The palette's human labels, in {@link GROUP_COLOR_KEYS} order. */
+const GROUP_COLOR_LABELS = [
+  "Olive",
+  "Fern",
+  "Teal",
+  "Denim",
+  "Indigo",
+  "Violet",
+  "Orchid",
+  "Rose",
+] as const;
+
+/**
+ * The colour picker's palette: the eight `--group-*` design tokens with their
+ * labels, in the order {@link GROUP_COLOR_KEYS} fixes.
+ *
+ * Extracted from `ColorGroupEditor` when the calendar needed the same picker
+ * (myne-md/myne#1037): a second copy of the keys-and-labels pairs is how two
+ * pickers come to disagree about which colour "the first one" is, and the stored
+ * value on both surfaces is a bare token name, so one list has to own them.
+ */
+export const GROUP_COLOR_PALETTE: ReadonlyArray<{ key: string; label: string }> =
+  GROUP_COLOR_KEYS.map((key, i) => ({ key, label: GROUP_COLOR_LABELS[i]! }));
+
 /**
  * The rules a client should EVALUATE: the vault's authored ones, or the derived
  * default grouping by tag when there are none (myne-md/myne#727).

@@ -154,6 +154,9 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_daily_folder",
     "plugin:prefs|set_daily_template",
     "plugin:prefs|set_periodic_note_setting",
+    // myne-md/myne#1037: the calendar's two settings are vault content that must
+    // round-trip on every client, even before the web client grows the pane.
+    "plugin:prefs|set_calendar_setting",
     // myne-md/myne#699: the left-ribbon layout + visibility are vault content
     // that must round-trip on every client, even before the web client grows the
     // rail affordance.
@@ -430,6 +433,9 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:notes|note_search",
     // Task 14 — the pure in-RAM index queries plus the two storage-touching ones.
     "plugin:vault-indices|vault_indices_all_edges",
+    // myne-md/myne#1037: the calendar pane reads its window from the index on
+    // every client, so the web build answers this or the pane is empty there.
+    "plugin:vault-indices|vault_indices_calendar_range",
     // myne#216 — the vault-wide heading set behind the wikilink heading picker,
     // moved off a full-vault `note_read` sweep and onto the index. (Spelling the
     // picker's trigger literally here would unbalance the brackets this file's

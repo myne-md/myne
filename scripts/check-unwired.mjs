@@ -85,6 +85,12 @@ function isTestFile(rel) {
  * review. Wiring one up is a one-line deletion here.
  */
 const EXEMPT = new Map([
+  // The `.ics` codec is landed with its parser under test before its two commands
+  // exist: importing needs a bounded TEXT read of a picked file, and the seam
+  // deliberately hands the WebView opaque handles so bytes stay in Rust
+  // (`editor/src/host.ts` `PickedFile`). Adding that seam member is the remaining
+  // task on myne-md/myne#1037, and this entry is the reminder rather than a licence.
+  ["client-core/src/ics.ts", "the .ics import and export commands are its consumer; both wait on the bounded text-read seam member for a picked file (myne-md/myne#1037)"],
   ["web/src/main.tsx", "the web entry point — the bundler's input, imported by nothing"],
   ["src/main.tsx", "the desktop entry point, same reason"],
   ["web/src/platform/capabilities.ts", "platform-seam twin: its importer is the desktop file it is substituted FOR at build time"],

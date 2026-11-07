@@ -256,6 +256,8 @@ import { agentTabCollapse, useEditorLayout } from "./editorLayout";
 import { usePrefs } from "../hooks/usePrefs";
 import { useDateTimeDisplaySync } from "../hooks/useDateTimeDisplaySync";
 import { useReminderScheduler } from "../hooks/useReminderScheduler";
+import { useLiveCalendarEvents } from "../hooks/useLiveCalendarEvents";
+import { resolveCalendarDayAnchor } from "../lib/prefs";
 import { createInAppNotifier } from "../lib/reminderNotifier";
 import { useLiveVaultTasks } from "../notes/taskIndex";
 import { TASK_CHIP_INK } from "../notes/taskDisplay";
@@ -1201,6 +1203,10 @@ function EditorChrome({
   // while a reminder can still surface over a shared screen. It says a reminder
   // is due - the task surfaces say which.
   const reminderTasks = useLiveVaultTasks();
+  // Event notes are the pass's second source (myne-md/myne#1037): read through the
+  // calendar's own range query, over the horizon rather than a month.
+  const reminderEvents = useLiveCalendarEvents(barPrefs.reminder_horizon_days);
+  const calendarDayAnchor = resolveCalendarDayAnchor(barPrefs.calendar_settings);
   const reminderNotifier = useMemo(
     () =>
       createInAppNotifier({
@@ -1212,6 +1218,8 @@ function EditorChrome({
   useReminderScheduler({
     enabled: barPrefs.reminders_enabled,
     tasks: reminderTasks,
+    events: reminderEvents,
+    dayAnchor: calendarDayAnchor,
     notifier: reminderNotifier,
     horizonDays: barPrefs.reminder_horizon_days,
   });
@@ -3072,6 +3080,9 @@ function EditorChrome({
           ws.openGraph();
           requestGraphViewFilter({ kind: "orphans" });
         }}
+        onShowCalendar={() => {
+          ws.openCalendar();
+        }}
         onShowTasks={() => {
           setPaletteOpen(false);
           ws.openTasks();
@@ -3464,6 +3475,7 @@ type CommandPaletteHostProps = {
   onShowViews: () => void;
   onImportObsidian: () => void;
   onShowTasks: () => void;
+  onShowCalendar: () => void;
   onImportBaseView: () => void;
   onBackupVault: () => void;
   onRestoreBackup: () => void;
@@ -3516,6 +3528,7 @@ function CommandPaletteHost({
   onShowViews,
   onImportObsidian,
   onShowTasks,
+  onShowCalendar,
   onImportBaseView,
   onBackupVault,
   onExportVaultMarkdown,
@@ -4061,6 +4074,7 @@ function CommandPaletteHost({
       onShowViews,
       onImportObsidian,
       onShowTasks,
+  onShowCalendar,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
@@ -4117,6 +4131,7 @@ function CommandPaletteHost({
       onShowViews,
       onImportObsidian,
       onShowTasks,
+      onShowCalendar,
       onImportBaseView,
       onBackupVault,
       onExportVaultMarkdown,
