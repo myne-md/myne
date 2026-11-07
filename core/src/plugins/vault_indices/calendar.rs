@@ -269,8 +269,15 @@ pub fn parse_rule(raw: &str) -> Option<RecurrenceRule> {
     let words: Vec<&str> = rest.split_whitespace().collect();
     match words.as_slice() {
         [unit] => {
-            let unit = interval_unit(unit)?;
-            return Some(RecurrenceRule::Interval { unit, count: 1 });
+            // Falls THROUGH on a word that is not a unit rather than returning
+            // `None`: `every tuesday` reaches here as one word, and the `?` that
+            // used to sit on `interval_unit` ended the parse instead of trying
+            // tier 2. The dialect writes `every tuesday` for a single-weekday rule
+            // (`formatRecurrenceRule`), so the host read a weekly series as a
+            // one-off and every future occurrence vanished from the pane.
+            if let Some(unit) = interval_unit(unit) {
+                return Some(RecurrenceRule::Interval { unit, count: 1 });
+            }
         }
         [count, unit] => {
             if let Ok(n) = count.parse::<u32>() {
@@ -312,6 +319,13 @@ fn interval_unit(word: &str) -> Option<IntervalUnit> {
 fn weekday_index(word: &str) -> Option<u32> {
     WEEKDAYS.iter().position(|w| *w == word).map(|i| i as u32)
 }
+
+/// How many cancelled dates one note's `skip:` field may contribute.
+///
+/// The same number the dialect's `MAX_SKIP_DATES` carries: a reader must not honour
+/// a longer list than the writer will produce, or two clients disagree about what
+/// the file says.
+pub const MAX_SKIP_DATES: usize = 366;
 
 /// The occurrence dates strictly after `from` (inclusive of `from` itself when the
 /// rule places one there), walked to `until` inclusive.
@@ -554,6 +568,41 @@ struct ParsedEvent {
     /// vault already holds, and the alternative is a second index over events,
     /// which is the second store `decisions/storage/0792` refuses.
     uid: Option<String>,
+    /// The dates this series does not occur on (`skip:`), as day numbers.
+    ///
+    /// A field on the note rather than an exception table, which is what
+    /// `decisions/storage/0795` settles: a cancellation belongs to the series note,
+    /// so it syncs with it, dies with it, and needs no second store to hold it.
+    skip: Vec<i64>,
+}
+
+/// Read `skip:` into day numbers, dropping anything that does not parse.
+///
+/// Dropping rather than refusing is deliberate: a typo in a cancellation must not
+/// hide the series from its owner. The list is bounded by [`MAX_SKIP_DATES`], so a
+/// hand-edited note cannot make every range query walk a million dates.
+fn parse_skip_dates(raw: Option<&str>) -> Vec<i64> {
+    let Some(raw) = raw else {
+        return Vec::new();
+    };
+    let mut out: Vec<i64> = Vec::new();
+    for token in raw.split(|c: char| c == ',' || c.is_whitespace()) {
+        let token = token.trim();
+        if token.is_empty() {
+            continue;
+        }
+        let Some((y, m, d)) = parse_date(token) else {
+            continue;
+        };
+        let day = days_from_civil(y, m, d);
+        if !out.contains(&day) {
+            out.push(day);
+        }
+        if out.len() >= MAX_SKIP_DATES {
+            break;
+        }
+    }
+    out
 }
 
 fn property<'a>(record: &'a NoteRecord, key: &str) -> Option<&'a str> {
@@ -609,6 +658,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
     // refusing one shape would make an imported event unmatchable against the file
     // it came from. It is never rendered, so no injection surface rides on it.
     let uid = property(record, "uid").map(str::to_string);
+    let skip = parse_skip_dates(property(record, "skip"));
 
     Some(Ok(ParsedEvent {
         start,
@@ -618,6 +668,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
         rule,
         repeat_unrecognized,
         remind,
+        skip,
         uid,
     }))
 }
@@ -690,6 +741,13 @@ pub fn range(
         };
 
         for date in dates {
+            // A cancelled occurrence is absent from the answer rather than marked:
+            // the surface renders a list of what happens, and "happens on none of
+            // these days" has nothing to render. The series note stays, which is
+            // the difference between skipping a week and deleting the event.
+            if event.skip.contains(&date) {
+                continue;
+            }
             let shift = (date - event.start.days) * 1440;
             let occurs_at = event.start.scale() + shift;
             let occurs_end = occurs_at + duration;
@@ -1070,6 +1128,110 @@ mod tests {
             answer.rows.iter().any(|row| row.remind.is_none()),
             "an event with no lead must carry none rather than an empty string"
         );
+    }
+
+    #[test]
+    fn a_single_weekday_rule_reaches_tier_two_instead_of_being_read_as_a_one_off() {
+        // Found by injection while adding `skip:`: `every tuesday` is what
+        // `formatRecurrenceRule` writes for a one-day weekday rule, and tier 1's
+        // `interval_unit(unit)?` returned `None` for the whole expression, so the
+        // host read a weekly series as a single event. The dialect's own parse
+        // accepted it the entire time, which is what made the two readers disagree
+        // silently.
+        let state = state_with(&[(
+            "standup",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03 09:15"),
+                ("repeat", "every tuesday"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        let starts: Vec<&str> = answer.rows.iter().map(|r| r.start.as_str()).collect();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-11-03 09:15",
+                "2026-11-10 09:15",
+                "2026-11-17 09:15",
+                "2026-11-24 09:15",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_skipped_date_is_absent_from_the_answer_and_the_series_survives() {
+        // The whole point of `skip:` over an exception table: the cancellation is a
+        // field on the series note, so one note answers for the schedule and the
+        // rows it removes leave nothing behind to migrate later.
+        let state = state_with(&[(
+            "standup",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03 09:15"),
+                ("repeat", "every tuesday and thursday"),
+                ("skip", "2026-11-05, 2026-11-12"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        let starts: Vec<&str> = answer.rows.iter().map(|r| r.start.as_str()).collect();
+        assert_eq!(
+            starts,
+            vec![
+                "2026-11-03 09:15",
+                "2026-11-10 09:15",
+                "2026-11-17 09:15",
+                "2026-11-19 09:15",
+                "2026-11-24 09:15",
+                "2026-11-26 09:15",
+            ],
+            "the two cancelled dates must be gone and every other occurrence kept"
+        );
+        assert!(
+            answer
+                .rows
+                .iter()
+                .all(|row| row.occurrence_of.as_deref() == Some("standup")),
+            "the surviving rows still name the series, so it is skippable again"
+        );
+    }
+
+    #[test]
+    fn a_skip_entry_that_does_not_parse_does_not_hide_the_series() {
+        // A typo in a cancellation is a typo, not a broken event: refusing the
+        // event would hide the whole series from the person who mistyped one date.
+        let state = state_with(&[(
+            "standup",
+            &[
+                ("kind", "event"),
+                ("start", "2026-11-03 09:15"),
+                ("repeat", "every tuesday"),
+                ("skip", "2026-13-45, not-a-date, 2026-11-10"),
+            ],
+        )]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        let starts: Vec<&str> = answer.rows.iter().map(|r| r.start.as_str()).collect();
+        assert_eq!(
+            starts,
+            vec!["2026-11-03 09:15", "2026-11-17 09:15", "2026-11-24 09:15"],
+            "the readable date is honoured and the garbage changes nothing"
+        );
+        assert!(answer.unreadable.is_empty());
     }
 
     #[test]

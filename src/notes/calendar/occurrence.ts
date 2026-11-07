@@ -2,8 +2,14 @@
 //
 // A recurring event is ONE note. The range read projects it into one row per
 // occurrence inside the window, and each of those rows is **an appearance of the
-// note, not a record of its own**: §3.8.7 has no per-occurrence exceptions, so
-// there is nowhere for "this Thursday only, 11:00" to live.
+// note, not a record of its own**: §3.8.7 has no per-occurrence overrides, so there
+// is nowhere for "this Thursday only, 11:00" to live.
+//
+// A CANCELLATION is the one exception to that, and it is not an exception of the
+// same kind (`decisions/storage/0795`): "not this day" carries no time and nothing
+// that could disagree with the series, so it lives in the series note's own `skip:`
+// field and `skipWrite.ts` writes it. A MOVE still has no legal write, which is what
+// the refusal below is about.
 //
 // That makes a drag on an occurrence a gesture with no legal write. There are
 // exactly two honest answers, and this module owns both:

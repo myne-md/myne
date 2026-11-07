@@ -31,8 +31,25 @@ import { EventComposerSheet } from "../../src/app/flows/EventComposerSheet";
 // the subject here.
 vi.mock("../../src/lib/notes", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../src/lib/notes")>();
-  return { ...actual, noteCreate: vi.fn(async () => "note-id") };
+  return {
+    ...actual,
+    noteCreate: vi.fn(async () => "note-id"),
+    // The cancel path reads the series note and writes it back, so both halves are
+    // mocked: a test that mocked only the write would exercise a read it never
+    // supplied and pass on an empty body.
+    noteRead: vi.fn(async () => ""),
+    noteUpdate: vi.fn(async () => undefined),
+  };
 });
+
+function projected(date: string, title: string, seriesId: string) {
+  return {
+    ...row(date, title),
+    noteId: seriesId,
+    occurrenceOf: seriesId,
+    occurrenceDate: date,
+  };
+}
 
 function row(date: string, title: string) {
   return {
@@ -155,5 +172,29 @@ describe("EventComposerSheet", () => {
     });
     expect(await screen.findByTestId("calendar.composer.invalid")).toBeTruthy();
     expect(screen.getByTestId("calendar.composer.create")).toHaveProperty("disabled", true);
+  });
+});
+
+describe("cancelling one appearance", () => {
+  it("writes the date onto the series note and re-reads", async () => {
+    // The write path is shared with the desktop pane, so what this asserts is that
+    // the phone reaches it with the SERIES id and the occurrence's own date rather
+    // than with the series' start: getting that wrong cancels the first occurrence
+    // every time, which looks like "skip does nothing" to the user.
+    answer.rows = [projected("2026-11-05", "Standup", "standup")];
+    const notes = await import("../../src/lib/notes");
+    vi.mocked(notes.noteRead).mockResolvedValue(
+      "---\ntitle: Standup\nkind: event\nstart: 2026-11-03 09:15\nrepeat: every tuesday\n---\n\n",
+    );
+    render(<CalendarSurface onClose={() => undefined} />);
+    // The list is what the picked day shows, so the cell is pressed first: the
+    // affordance lives on the day, not on the month grid.
+    fireEvent.click(await screen.findByTestId("calendar.cell.2026-11-05"));
+    const skipButton = await screen.findByTestId("calendar.skip.standup");
+    fireEvent.click(skipButton);
+    await waitFor(() => expect(vi.mocked(notes.noteUpdate)).toHaveBeenCalled());
+    const [noteId, body] = vi.mocked(notes.noteUpdate).mock.calls.at(-1) ?? [];
+    expect(noteId).toBe("standup");
+    expect(body).toContain("skip: 2026-11-05");
   });
 });

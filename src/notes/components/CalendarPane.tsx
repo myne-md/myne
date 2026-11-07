@@ -82,6 +82,7 @@ import {
   type OccurrenceRefusal,
 } from "../calendar/occurrence";
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
+import { skipOccurrence } from "../calendar/skipWrite";
 
 /** How many days the agenda covers. A month of "what is coming" is what a person
  *  opens a calendar to answer. */
@@ -195,6 +196,36 @@ export function CalendarPane({
    * it is and the reason is on screen. A surface that kept the row where the user
    * dropped it would be claiming a write that never landed.
    */
+  /**
+   * Cancel one appearance of a series.
+   *
+   * The field is on the series note (`decisions/storage/0795`), so this is an
+   * ordinary note write and the pane re-reads afterwards: a row that vanished
+   * because the user cancelled it and a row that vanished because the host lost
+   * the write must not look the same.
+   */
+  const skipRow = useCallback(
+    async (row: CalendarRow) => {
+      setFailure(null);
+      try {
+        await skipOccurrence({
+          noteId: seriesNoteId(row),
+          occurrenceDate: occurrenceDate(row),
+          io: {
+            readNote: noteRead,
+            writeNote: (id, body, base) => noteUpdate(id, body, base),
+            flushDirtyPanes: ws.flushAll,
+          },
+        });
+        setOccurrence(null);
+      } catch (err) {
+        setFailure(err instanceof EventWriteRefused ? err.reason : null);
+      }
+      setReload((n) => n + 1);
+    },
+    [ws],
+  );
+
   const dropOn = useCallback(
     async (date: string) => {
       const gesture = drag;
@@ -338,6 +369,26 @@ export function CalendarPane({
         });
       }}
       onClick={() => ws.openNewTabInFocused(row.noteId)}
+      onContextMenu={
+        isProjected(row)
+          ? (event) => {
+              // The panel that explains what an occurrence is, reachable without
+              // dragging one: right-clicking a projected row offers the three
+              // answers (edit the series, add a one-off, cancel this one) instead
+              // of a menu with a fourth thing that would have no legal write.
+              event.preventDefault();
+              setOccurrence({
+                refusal: {
+                  reason: "belongs-to-series",
+                  seriesNoteId: seriesNoteId(row),
+                  occurrenceDate: occurrenceDate(row),
+                  title: row.title,
+                },
+                row,
+              });
+            }
+          : undefined
+      }
       style={{
         display: "flex",
         alignItems: "center",
@@ -753,6 +804,9 @@ export function CalendarPane({
             }}
           >
             {t("calendar.occurrence.addOneOff")}
+          </Button>
+          <Button variant="ghost" onClick={() => void skipRow(occurrence.row)} data-testid="calendar.occurrence.skip">
+            {t("calendar.occurrence.skip")}
           </Button>
           <IconButton icon="x" label={t("common.dismiss")} iconSize={12} onClick={() => setOccurrence(null)} />
         </div>
