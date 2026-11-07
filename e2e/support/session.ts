@@ -434,6 +434,65 @@ function ownedProcessIds(): number[] {
   return ids;
 }
 
+/**
+ * Kill a `tauri-driver` still holding one of OUR driver ports.
+ *
+ * `reapOwnedProcesses` reaps app trees, and an app tree carries the scenario's
+ * `XDG_DATA_HOME` to identify it. A tauri-driver does not: it is spawned
+ * `detached` by the harness, and when its parent dies (a worker interrupted, a
+ * scenario killed at its budget) it keeps the port bound with no child of its own
+ * to betray it. The port band is the handle instead: 4400-4600 belongs to this
+ * harness, the harness is its only client, and a process sitting on one of those
+ * ports IS this run's leftover.
+ *
+ * Measured 2026-11-07 on the host: `sync-replication`'s canary timed out for its
+ * whole 180 s budget while the log said `port 4444 was still answering; launched
+ * on 5444 instead` - the fallback kept the suite laundering a stale driver, and
+ * the two-device ceremonies paid for it.
+ */
+function reapStrayDrivers(ports: readonly number[]): number {
+  let killed = 0;
+  let entries: string[];
+  try {
+    entries = readdirSync("/proc");
+  } catch {
+    return 0;
+  }
+  for (const entry of entries) {
+    if (!/^\d+$/.test(entry)) continue;
+    const pid = Number(entry);
+    if (pid === process.pid) continue;
+    let cmdline: string;
+    try {
+      cmdline = readFileSync(`/proc/${entry}/cmdline`, "latin1");
+    } catch {
+      continue;
+    }
+    if (!cmdline.includes("tauri-driver")) continue;
+    const args = cmdline.split("\0");
+    const portIndex = args.findIndex((arg) => arg === "--port");
+    const nativeIndex = args.findIndex((arg) => arg === "--native-port");
+    const wanted = [args[portIndex + 1], args[nativeIndex + 1]].filter(
+      (value): value is string => value !== undefined,
+    );
+    if (!wanted.some((value) => ports.includes(Number(value)))) continue;
+    try {
+      process.kill(pid, "SIGKILL");
+      killed += 1;
+    } catch {
+      /* already gone */
+    }
+  }
+  if (killed > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[e2e] killed ${killed} stray tauri-driver process(es) holding our port band - ` +
+        "a driver outlived the scenario that spawned it",
+    );
+  }
+  return killed;
+}
+
 /** Kill every leftover app tree of THIS run, and say so. Returns how many were
  *  found: launch calls it before starting, teardown after finishing, so a leak
  *  shows up in the log of the scenario that produced it. */
@@ -590,6 +649,10 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
     console.warn(
       `[e2e] port ${ports.movedFrom} was still answering; launched on ${driverPort} instead`,
     );
+    // And then FIX it rather than step around it: the holder is ours (the band
+    // belongs to this harness), and leaving it alive means the next scenario pays
+    // the same tax on a different port.
+    reapStrayDrivers([ports.movedFrom, wantedDriverPort, wantedNativePort]);
   }
 
   const proc = spawn(
