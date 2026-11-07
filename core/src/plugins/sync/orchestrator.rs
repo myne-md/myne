@@ -27,8 +27,8 @@ use super::dictionary_payload::{merge_personal_dictionaries, PersonalDictionaryD
 use super::engine::{self, ChangedBlob, PullError, PushBlob, PushError};
 use super::head_authority::{DeviceHeadSigner, HeadAuthority, SignedHeadCtx};
 use super::state::{
-    clear_vault_meta_dirty, read_head_baseline, read_sync_state, vault_meta_is_dirty,
-    write_head_baseline, write_sync_state, BlobSyncState, SyncState,
+    clear_vault_meta_dirty, persist_cycle_state, read_head_baseline, read_sync_state,
+    update_sync_state, vault_meta_is_dirty, write_head_baseline, BlobSyncState, Persist, SyncState,
 };
 use super::transport::{HttpMethod, SyncTransport};
 use crate::attachment_nonce::{scan_attachments_manifest, AttachmentManifestEntry};
@@ -622,20 +622,19 @@ pub async fn resolve_conflict(
             .and_then(|s| s.parse().ok())
             .ok_or(SyncCycleError::Io)?;
         let nonce_hex = lines.next().unwrap_or("").to_string();
-        let mut state = read_sync_state(io, vault_root)
-            .await
-            .map_err(|_| SyncCycleError::Io)?;
-        state.blobs.insert(
-            id_hex.to_string(),
-            BlobSyncState {
-                version,
-                content_nonce_hex: nonce_hex,
-                doc_heads_hex: Vec::new(),
-            },
-        );
-        write_sync_state(io, vault_root, &state)
-            .await
-            .map_err(|_| SyncCycleError::Io)?;
+        update_sync_state(io, vault_root, |state| {
+            state.blobs.insert(
+                id_hex.to_string(),
+                BlobSyncState {
+                    version,
+                    content_nonce_hex: nonce_hex,
+                    doc_heads_hex: Vec::new(),
+                },
+            );
+            ((), Persist::Yes)
+        })
+        .await
+        .map_err(|_| SyncCycleError::Io)?;
     }
     let _ = io.remove_file(&dir.join(format!("{id_hex}.myn"))).await;
     let _ = io.remove_file(&meta_path).await;
@@ -5251,6 +5250,12 @@ pub async fn run_sync_cycle(
     let mut state = read_sync_state(io, vault_root)
         .await
         .map_err(|_| SyncCycleError::Io)?;
+    // The record as this cycle LOADED it. Every persist below goes through
+    // `persist_cycle_state`, which adopts only the fields that differ between this
+    // snapshot and `state`, so a publish / enrolment / rotation that lands while this
+    // cycle is on the wire is not undone by the cycle's next checkpoint
+    // (myne-md/myne#964).
+    let mut base = state.clone();
 
     // CLEAR the whole-corpus flag on entry (myne#292).
     //
@@ -5282,7 +5287,7 @@ pub async fn run_sync_cycle(
     // costs nothing.
     if state.corpus_complete {
         state.corpus_complete = false;
-        write_sync_state(io, vault_root, &state)
+        persist_cycle_state(io, vault_root, &mut base, &state)
             .await
             .map_err(|_| SyncCycleError::Io)?;
     }
@@ -5332,6 +5337,7 @@ pub async fn run_sync_cycle(
             attachment_keys,
             &head_authority,
             &mut state,
+            &mut base,
             &baseline_vv,
             baseline_seq,
             from_cursor,
@@ -5361,7 +5367,7 @@ pub async fn run_sync_cycle(
                 // Persist the advanced cursor + per-blob CAS state + meta baseline
                 // ONLY on success, so a failed retry never leaves a half-advanced
                 // cursor on disk.
-                write_sync_state(io, vault_root, &state)
+                persist_cycle_state(io, vault_root, &mut base, &state)
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
                 return Ok(summary);
@@ -5403,6 +5409,9 @@ async fn sync_cycle_attempt(
     attachment_keys: Option<AttachmentKeys<'_>>,
     head_authority: &HeadAuthority<'_>,
     state: &mut SyncState,
+    // What the cycle has already made the disk hold, for `persist_cycle_state`'s field
+    // diff. Mutable because the merge advances it after every write.
+    base: &mut SyncState,
     baseline_vv: &[VvEntry],
     baseline_seq: u64,
     from_cursor: u64,
@@ -5699,7 +5708,7 @@ async fn sync_cycle_attempt(
             Err(PullError::CursorExpired) if !reconcile_ran => {
                 reconcile_ran = true;
                 state.cursor = 0;
-                write_sync_state(io, vault_root, state)
+                persist_cycle_state(io, vault_root, base, state)
                     .await
                     .map_err(|_| SyncCycleError::Io)?;
                 pull_cursor = 0;
@@ -5787,7 +5796,7 @@ async fn sync_cycle_attempt(
         // repeat of the latest observation, so this avoids a redundant disk write every
         // cycle for a device already sitting on the current head.
         if !already_current {
-            write_sync_state(io, vault_root, state)
+            persist_cycle_state(io, vault_root, base, state)
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
         }
@@ -6640,7 +6649,7 @@ async fn sync_cycle_attempt(
         // half-advanced CURSOR reaching disk; `pull_to_stable` has already
         // returned a stable page by here, and `state.cursor` still moves only
         // below, after the whole loop.
-        write_sync_state(io, vault_root, state)
+        persist_cycle_state(io, vault_root, base, state)
             .await
             .map_err(|_| SyncCycleError::Io)?;
     }
@@ -7761,7 +7770,7 @@ async fn sync_cycle_attempt(
             // persist-on-success rule). Propagated rather than swallowed: a device
             // that cannot record what it just pushed is about to rebuild the #222
             // wedge, and it should say so instead of silently looping.
-            write_sync_state(io, vault_root, state)
+            persist_cycle_state(io, vault_root, base, state)
                 .await
                 .map_err(|_| SyncCycleError::Io)?;
         }
@@ -8024,7 +8033,9 @@ mod tests {
         dir: &Path,
         state: &SyncState,
     ) -> Result<(), super::super::config::SyncConfigError> {
-        blocking(super::write_sync_state(&IO, dir, state))
+        blocking(crate::plugins::sync::state::write_sync_state(
+            &IO, dir, state,
+        ))
     }
     #[allow(dead_code)]
     fn resolve_conflict(vault_root: &Path, id_hex: &str) -> Result<(), SyncCycleError> {

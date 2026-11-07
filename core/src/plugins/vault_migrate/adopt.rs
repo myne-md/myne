@@ -129,14 +129,19 @@ pub(crate) async fn promote_incoming_meta(io: &dyn VaultIo, vault_root: &Path, b
     // The meta phase's baseline must name what is now on disk. Left stale it
     // reads "this device changed its meta", and the next cycle argues with the
     // server about a generation it just adopted.
-    if let Ok(mut state) = crate::plugins::sync::state::read_sync_state(io, vault_root).await {
-        state.meta_baseline_hex = Some(crate::plugins::sync::orchestrator::sha256_hex(bytes));
-        // On a root-replacing promotion the old generation's singleton baselines
-        // are keyed by sync-ids derived from the OLD `root_key`, which this device
-        // no longer has and cannot re-derive, so they cannot be removed by name
-        // here. They are inert: nothing will ever look those keys up again.
-        let _ = crate::plugins::sync::state::write_sync_state(io, vault_root, &state).await;
-    }
+    // Through the locked mutation, because a cycle may be holding its own copy of this
+    // record while the promotion lands (myne-md/myne#964).
+    //
+    // On a root-replacing promotion the old generation's singleton baselines are keyed
+    // by sync-ids derived from the OLD `root_key`, which this device no longer has and
+    // cannot re-derive, so they cannot be removed by name here. They are inert: nothing
+    // will ever look those keys up again.
+    let baseline = Some(crate::plugins::sync::orchestrator::sha256_hex(bytes));
+    let _ = crate::plugins::sync::state::update_sync_state(io, vault_root, |state| {
+        state.meta_baseline_hex = baseline.clone();
+        ((), crate::plugins::sync::state::Persist::Yes)
+    })
+    .await;
 
     discard_incoming_meta(io, vault_root).await;
 }
