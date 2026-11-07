@@ -970,7 +970,15 @@ pub async fn start_b2b_migration_from_host(
             // Only when the flag is not already set, and only through the one writer:
             // a cycle may be running on another task while this migration completes,
             // and its cursor must survive the flag being raised (#964).
-            let _ = super::state::arm_rekey_rebase(io, &root).await;
+            if let Err(e) = super::state::arm_rekey_rebase(io, &root).await {
+                tracing::warn!(
+                    stage = "arm_rekey_rebase",
+                    error_kind = "Internal",
+                    error = ?e,
+                    "the re-base flag could not be persisted; the next cycle will refuse \
+                     the server's head as a forgery instead of re-basing"
+                );
+            }
             // The vault is `NTV6` now: seal the person-identity carrier under the
             // held root_key so a later unlock installs the session with no phrase
             // (myne-md/myne#792). Best-effort.

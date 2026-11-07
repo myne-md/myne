@@ -818,27 +818,6 @@ pub async fn update_sync_state<T>(
 /// the cycle sets, persists, and later sets BACK is still a change at the second
 /// checkpoint. The whole-corpus flag does exactly that: a cycle clears it on entry
 /// (myne#292) and recomputes it at the end, so comparing against the pre-cycle snapshot
-/// Arm the next cycle to re-base its baseline instead of rejecting the server's head as
-/// a forgery, and say whether this call is the one that armed it.
-///
-/// Both migration paths that move the head format need exactly this, and it is one
-/// question with one answer (`decisions/protocol/0603`: the head format is keyed off the
-/// vault generation). It is written here, once, because the failure of a half-applied
-/// edit is a sync stall that reads as a forged head rather than as a compile error.
-pub async fn arm_rekey_rebase(
-    io: &dyn crate::vault_io::VaultIo,
-    dir: &Path,
-) -> Result<bool, SyncConfigError> {
-    update_sync_state(io, dir, |state| {
-        if state.rekey_rebase_pending {
-            return (false, Persist::No);
-        }
-        state.rekey_rebase_pending = true;
-        (true, Persist::Yes)
-    })
-    .await
-}
-
 /// would read the recomputed `true` as "unchanged" and never persist it.
 pub async fn persist_cycle_state(
     io: &dyn crate::vault_io::VaultIo,
@@ -853,6 +832,29 @@ pub async fn persist_cycle_state(
     .await?;
     *base = cycle.clone();
     Ok(())
+}
+
+/// Arm the next cycle to re-base its baseline instead of rejecting the server's head as
+/// a forgery, and say whether this call is the one that armed it.
+///
+/// Both migration paths that move the head format need exactly this, and it is one
+/// question with one answer (`decisions/protocol/0603`: the head format is keyed off the
+/// vault generation). It is written here, once, because the failure of a half-applied
+/// edit is a sync stall that reads as a forged head rather than as a compile error, and
+/// because that failure is worth reporting: a caller that cannot raise the flag will
+/// watch the next cycle refuse the head and log nothing that names this.
+pub async fn arm_rekey_rebase(
+    io: &dyn crate::vault_io::VaultIo,
+    dir: &Path,
+) -> Result<bool, SyncConfigError> {
+    update_sync_state(io, dir, |state| {
+        if state.rekey_rebase_pending {
+            return (false, Persist::No);
+        }
+        state.rekey_rebase_pending = true;
+        (true, Persist::Yes)
+    })
+    .await
 }
 
 /// Write one record to `<dir>/sync-state.json` (atomic replace).
@@ -1271,6 +1273,41 @@ mod tests {
         .unwrap();
         assert!(matches!(read_sync_state(&dir), Err(SyncConfigError::Parse)));
         let _ = std::fs::remove_file(dir.join(SYNC_STATE_FILE));
+    }
+
+    /// **The chokepoint refuses a record it cannot read, and that refusal is the
+    /// invariant every migrated call site now leans on.**
+    ///
+    /// `update_sync_state` reads before it mutates, so a record that exists and did not
+    /// parse fails the whole update and nothing is written. That single check is what
+    /// stops a device re-enrolling as new (cursor, VV log, every CAS baseline and
+    /// `meta_baseline_hex` gone at once) now that the tolerant `unwrap_or_default()`
+    /// reads are gone, so it owes a rejection test rather than only the happy path the
+    /// other five callers exercise. Asserting the ERROR alone would pass on an
+    /// implementation that wrote the default and reported afterwards, which is why the
+    /// second assertion reads the bytes back.
+    #[test]
+    fn update_sync_state_refuses_an_unreadable_record_and_writes_nothing() {
+        let dir = tmpdir("update-refuses-torn");
+        let torn = br#"{"cursor":42,"vv_log":[],"bl"#;
+        std::fs::write(dir.join(SYNC_STATE_FILE), torn).unwrap();
+
+        let outcome = rt(super::update_sync_state(&IO, &dir, |state| {
+            state.cursor = 99;
+            ((), Persist::Yes)
+        }));
+
+        assert!(
+            matches!(outcome, Err(SyncConfigError::Parse)),
+            "an unreadable record must fail the update, not be replaced: {outcome:?}"
+        );
+        assert_eq!(
+            std::fs::read(dir.join(SYNC_STATE_FILE)).unwrap(),
+            torn.to_vec(),
+            "the bytes on disk must be untouched: the failed read cannot license a write"
+        );
+
+        std::fs::remove_file(dir.join(SYNC_STATE_FILE)).ok();
     }
 
     #[test]
