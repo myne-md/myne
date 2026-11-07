@@ -523,6 +523,10 @@ steps:
       - node scripts/check-core-io-seam.mjs
       # myne#442 — the version-routing ratchet (see the script header).
       - node scripts/check-version-routing.mjs
+      # The comment-volume ratchet: AGENTS.md rule 3 was the one rule with no
+      # guard, and 199,438 comment lines later it is the one that decayed. A file
+      # may lose comments, never gain them (see the script header).
+      - node scripts/check-comment-density.mjs
       # Web command-coverage guard (MYND-574 task 11): every IPC command name in
       # the shared tree is classified in `web/wasm/src/capability.rs`. Spans TS
       # and Rust, so no compiler on either side sees both halves.

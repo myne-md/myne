@@ -1009,6 +1009,15 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n-duplicates.mjs --check
 
+    comment-density:
+      # AGENTS.md rule 3 ("a comment earns its lines or it goes") had no guard and
+      # was the one rule that decayed: 199,438 comment lines across the shared
+      # trees, worst files 75-84% comments. A file may lose comments, never gain
+      # them; `--record` re-baselines with the growth in the diff.
+      # Deliberately NOT code-path filtered: any tree can grow a docblock.
+      glob: "*.{rs,ts,tsx,json}"
+      run: node scripts/check-comment-density.mjs
+
     beta-terms-version:
       # The beta-terms clauses and BETA_TERMS_VERSION must move together
       # (myne-ops#15). Editing a clause without bumping the version leaves every

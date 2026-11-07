@@ -481,6 +481,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-adversary-coverage.mjs` | the myne-range epic's anti-rot binding (myne-md/myne#553), in THIS repo so it cannot go… | `pre-commit` + CI `pnpm-build` |
 | `check-ornament-vocabulary.mjs` | the ornament vocabulary agrees across all THREE sources… | `pre-commit` + CI `pnpm-build` |
 | `check-token-parity.mjs` | the opposite question from `check-token-adoption.mjs` below, and the two together are the… | `pre-commit` + CI `pnpm-build` |
+| `check-comment-density.mjs` | ratchet: the recorded per-file comment count may shrink, never grow, so AGENTS.md rule 3 has a mechanism instead of an intention | `pre-commit` + CI `pnpm-build` |
 | `check-token-adoption.mjs` | ratchet: the per-file count of hardcoded visual values (colour literals, numeric… | `pre-commit` + CI `pnpm-build` |
 | `check-primitive-adoption.mjs` | ratchet: a raw `<button>`, `<input>`, `<select>` or `<textarea>` outside… | `pre-commit` + CI `pnpm-build` |
 | `check-hex-helpers.mjs` | ratchet, two halves. The ENCODER half: the lowercase-hex encoder and its predicate are… | `pre-commit` + CI `pnpm-build` |
