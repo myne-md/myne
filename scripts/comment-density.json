@@ -16,7 +16,7 @@
     "core/src/inference/cancellable_io.rs": 57,
     "core/src/inference/chatml.rs": 44,
     "core/src/inference/engine.rs": 908,
-    "core/src/inference/error.rs": 160,
+    "core/src/inference/error.rs": 113,
     "core/src/inference/model_download.rs": 127,
     "core/src/inference/provider_gate.rs": 249,
     "core/src/inference/provider_registry.rs": 798,
