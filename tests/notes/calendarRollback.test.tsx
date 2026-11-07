@@ -325,3 +325,40 @@ describe("the pane as a calendar", () => {
     cleanup();
   });
 });
+
+describe("starting an event from the grid", () => {
+  it("opens the composer for the day whose empty space was clicked", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const cell = host.querySelector('[data-date="2026-11-06"]') as HTMLElement;
+    act(() => {
+      cell.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await act(async () => {});
+    // The composer is seeded from the day, so the note lands where the user pointed
+    // rather than on today, which is the bug a "new event" button without a date has.
+    expect(host.querySelector('[data-testid="calendar.form"]')).not.toBeNull();
+    // Seeded with THAT day's date, not today's: the note must land where the user
+    // pointed, which is the bug a dateless "new event" button has.
+    const dateInputs = Array.from(host.querySelectorAll('input[type="date"]')) as HTMLInputElement[];
+    expect(dateInputs.some((input) => input.value === "2026-11-06")).toBe(true);
+    cleanup();
+  });
+
+  it("does not open it when the click landed on a row instead", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const chip = host.querySelector('[data-testid="calendar.row"]') as HTMLElement;
+    expect(chip).not.toBeNull();
+    act(() => {
+      chip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await act(async () => {});
+    // Clicking a chip opens the NOTE. A form opening on top of it would be the pane
+    // fighting itself, and the user would see a new note instead of the one they hit.
+    expect(host.querySelector('[data-testid="calendar.form"]')).toBeNull();
+    cleanup();
+  });
+});

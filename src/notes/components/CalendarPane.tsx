@@ -656,6 +656,16 @@ export function CalendarPane({
             event.preventDefault();
             void dropOn(cell.date);
           }}
+          onClick={(event) => {
+            // Empty space in a day is where a person reaches for a pen, so a click
+            // on the cell itself opens the composer for that day. `currentTarget`
+            // rather than `target`: a click on a chip, the header's `+` or the
+            // capture field must keep meaning what it already meant, and a handler
+            // that fired on every bubbled click would open a form under the user's
+            // finger every time they opened an event.
+            if (event.target !== event.currentTarget) return;
+            setComposing(cell.date);
+          }}
           style={{
             display: "flex",
             flexDirection: "column",
