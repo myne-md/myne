@@ -370,6 +370,16 @@ pub fn run() {
             // `try_state`→None (a safe no-op) until it lands, so foreground sync
             // works today. Mirrors the desktop `spawn_sync_loop(...)` wiring.
             myne_core::plugins::sync::loop_control::spawn_sync_loop(app.handle().clone());
+            // The `Slot::Recovering` absolute deadline (myne-md/myne#758, audit
+            // lead NV09). `recover_with_phrase` populates that slot from
+            // `myne-core` on every client, but only the desktop idle-lock tick
+            // ever expired it, so a phone left mid-recovery held the recovered
+            // `root_key` + `items_key` with no deadline at all. The deadline and
+            // the drop are shared; this is the timer this client was missing.
+            // Mirrors the desktop tick that already calls the same function.
+            myne_core::plugins::vault_unlock::recovering_ttl::spawn_recovering_ttl_timer(
+                app.handle().clone(),
+            );
             // The /sync/poke SSE listener (MYND-423 client half): while the app
             // is foregrounded + unlocked, a push on another device becomes a
             // pull here within seconds — baseline behaviour per the amended
