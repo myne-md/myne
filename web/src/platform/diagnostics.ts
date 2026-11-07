@@ -79,6 +79,22 @@ export async function reportManifest(): Promise<ReportManifest> {
   return await invoke<ReportManifest>("plugin:diagnostics|report_manifest");
 }
 
+/** The running build artefact's digest. Browser: rejects. */
+export async function buildDigest(): Promise<string> {
+  return await invoke<string>("plugin:diagnostics|build_digest");
+}
+
+/** Mirror of the desktop shape; the command refuses before it can occur. */
+export interface VaultUsage {
+  used_bytes: number;
+  files: number;
+}
+
+/** The active vault's on-disk footprint. Browser: rejects. */
+export async function measureVaultUsage(): Promise<VaultUsage> {
+  return await invoke<VaultUsage>("plugin:diagnostics|vault_usage");
+}
+
 /** Write a report bundle. Browser: rejects. */
 export async function saveReport(block: string, destination: string): Promise<void> {
   await invoke<void>("plugin:diagnostics|save_report", { block, destination });

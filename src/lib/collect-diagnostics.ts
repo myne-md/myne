@@ -14,6 +14,7 @@
 import type { HostWebView } from "./diagnostics";
 import { gatherDiagnostics, webViewLabel } from "./diagnostics-gather";
 import { servedBuildInfo } from "../platform/build-info";
+import { buildDigest, measureVaultUsage } from "../platform/diagnostics";
 import { invoke } from "../platform/core";
 import { HAS_TAURI } from "./app-window";
 
@@ -40,5 +41,16 @@ export async function collectDiagnostics(failureCode: string): Promise<string> {
     commit: served?.commit ?? (__BUILD_COMMIT__ === "unknown" ? null : __BUILD_COMMIT__),
     bundleHash: served?.bundleHash ?? null,
     failureCode,
+    // The two readings the page cannot take (myne-md/myne#991): the digest of the
+    // running executable, and the vault directory's footprint. Gated on the Tauri
+    // runtime rather than on a capability probe, because the browser arm's mirrors
+    // answer the typed refusal, and calling them there would be a round trip whose
+    // only possible outcome is the rejection the gather then has to swallow.
+    ...(HAS_TAURI
+      ? {
+          buildDigest: () => buildDigest(),
+          vaultUsage: () => measureVaultUsage(),
+        }
+      : {}),
   });
 }
