@@ -91,6 +91,7 @@ pub mod dictionary_payload;
 // how each piece became a seam call — in particular why driving the cycle needed
 // a NEW seam function (`task::run_blocking_future`) rather than either of the
 // two that already existed.
+pub mod change_gate;
 pub mod cycle;
 // One verdict over the five facts that decide whether this device can sync
 // (myne-md/myne#1003). A READER that consumes `cycle`'s authority builder rather than

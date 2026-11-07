@@ -661,6 +661,37 @@ fn head_authority_verdict(
     }
 }
 
+/// One line per CHANGE of the head-authority verdict (myne-md/myne#1033).
+///
+/// Change-gated rather than per-cycle: the question is answered every thirty seconds, and
+/// what a reader needs is the EDGE — when this device stopped being able to sign, and when it
+/// started again. A verdict that repeats is the state the previous line already described.
+fn note_authority_verdict(
+    verdict: HeadAuthorityVerdict,
+    cause: Option<super::authority::AuthorityMissing>,
+) {
+    // Bounded tokens only (`check-tracing-discipline.mjs` R1/R2 read this line).
+    let verdict_token = match verdict {
+        HeadAuthorityVerdict::Author => "author",
+        HeadAuthorityVerdict::ReadOnly => "read_only",
+        HeadAuthorityVerdict::Refuse => "refuse",
+    };
+    let cause_token = cause.map_or("none", super::authority::AuthorityMissing::as_str);
+    if !super::change_gate::first_sighting(
+        "authority_verdict",
+        super::change_gate::fold(verdict_token, cause_token),
+    ) {
+        return;
+    }
+    tracing::info!(
+        stage = "sync_cycle",
+        event = "head_authority_verdict",
+        verdict = verdict_token,
+        cause = cause_token,
+        "the head-authority verdict for this cycle changed"
+    );
+}
+
 /// Which `FailureClass` a missing authority becomes, in one place.
 ///
 /// The mapping is the whole point of myne-md/myne#983: the class, the log and the UI sentence
@@ -1133,6 +1164,19 @@ pub async fn run_active_cycle_from_host(
             }
         };
         let verdict = head_authority_verdict(needs_signed_head, &authority);
+        // One line per CHANGE of the answer to "may this device sign right now", at every
+        // verdict including `Author` (myne-md/myne#1033). The two refusals already warn, but
+        // nothing said when the state RECOVERED, so a repair that worked and a repaired screen
+        // that never refreshed looked identical, and the log could not answer which had
+        // happened.
+        note_authority_verdict(
+            verdict,
+            // `Author` has no missing cause, and `missing()` would answer one anyway (on a
+            // device-key device it reports `NoPersonSession`, which is not a fault at all). A
+            // recovery line reading `verdict=author cause=no_person_session` is the same class of
+            // lie as the stuck status this branch fixes (review of myne-md/myne#1033).
+            (verdict != HeadAuthorityVerdict::Author).then(|| authority.missing()),
+        );
         if verdict != HeadAuthorityVerdict::Author {
             // The cause comes from `sync::authority`, which is the only place that knows
             // which half is missing (myne-md/myne#983). The class is derived from whether
