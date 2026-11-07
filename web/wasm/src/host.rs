@@ -35,7 +35,7 @@ const APP_CONFIG_ROOT: &str = "/myne-config";
 ///
 /// Declared in [`crate::kdf_ceiling`], not here: it is a policy number rather
 /// than JS glue, and this module is `wasm32`-gated, so a constant living here
-/// would sit outside `cargo test --workspace`. Its rationale and the three
+/// would sit outside `cargo nextest run --workspace`. Its rationale and the three
 /// assertions that pin it to the protocol's own bounds are in that module.
 use crate::kdf_ceiling::MAX_KDF_MEMORY_KIB;
 

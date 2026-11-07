@@ -12,8 +12,8 @@
 
 | Sync layer | Where it is tested | Honest gap |
 |---|---|---|
-| **Crypto / byte-layout** | `protocol` unit tests (185 prefs incl. device_names) + `myne-test-vectors` byte-vectors run by `protocol/tests/vectors.rs` (vault-prefs 46 cases). Main-repo `cargo test --workspace` pre-push, companion cloned. | **Vector CI is DISABLED in both repos** while `myne-test-vectors` is private (M-R6) — a **local** byte-level gate, **not CI-enforced**. |
-| **Sync-engine logic** | ~140–150 `#[test]`s in `myne_core::plugins::sync` (pure-logic + `FakeTransport`). Main-repo `cargo test --workspace` (post-MYND-457 the engine is shared). | **Mobile CI does not duplicate them** — the shared-core gate is the main repo's, by design. |
+| **Crypto / byte-layout** | `protocol` unit tests (185 prefs incl. device_names) + `myne-test-vectors` byte-vectors run by `protocol/tests/vectors.rs` (vault-prefs 46 cases). Main-repo `cargo nextest run --workspace` pre-push, companion cloned. | **Vector CI is DISABLED in both repos** while `myne-test-vectors` is private (M-R6) — a **local** byte-level gate, **not CI-enforced**. |
+| **Sync-engine logic** | ~140–150 `#[test]`s in `myne_core::plugins::sync` (pure-logic + `FakeTransport`). Main-repo `cargo nextest run --workspace` (post-MYND-457 the engine is shared). | **Mobile CI does not duplicate them** — the shared-core gate is the main repo's, by design. |
 | **Multi-device convergence** | `sim.rs` 22-test convergence harness (real `myne-server` loopback). Main-repo secret-gated `sync-sim` Woodpecker step (filter repointed to `-p myne-core --lib plugins::sync::sim::` by MYND-457; self-skips without the server binary). | Convergence is proven against the loopback server, not against a hosted production server or across real network partitions. |
 | **IPC command contract** | Mobile `vitest run` (116 tests, 17 files) — types, error shapes, state machines, with `@tauri-apps/api/core` mocked. | **No real IPC** — the mock boundary means a Rust-side command regression is caught by `cargo test`, not by Vitest. |
 | **Sync UI flow-logic** (enroll / status / conflict) | The Playwright-vs-dev-server flow-logic layer (MYND-462 task 3), mobile CI, **mock IPC** — **never labeled "E2E"** (it drives the dev server, not the built app). | It exercises component/flow logic, **not** the device WebView, native lifecycle, or real transport. Device-level UI E2E is the SYNC-44 exemption (→ MYND-467). |
@@ -27,7 +27,7 @@
 - **Vector CI (M-R6):** the byte-vector coverage is **"locally gated; CI-gating pending vectors-repo access"** — **not** "CI-enforced". This wording is load-bearing: do not upgrade the claim until the `myne-test-vectors` repo is reachable by CI.
 - **Transport review-debt (R3):** the `rustls` cert-pin verifier + tls-exporter wiring is unreviewed; no "-PLUS" / channel-bound / verified-cert-trust claim may be made anywhere (spec, UI, marketing) until R3 lands.
 - **`head_fingerprint` (SYNC-17):** the SAS substrate's primitive-level review is still open — the enroll-time eye-compare must not ship before it closes.
-- **Shared-core gate location:** the sync engine's logic + convergence tests run in the **main repo's** `cargo test --workspace`; **mobile CI does not re-run them** (MYND-457 made the engine identical compiled code). A mobile-only CI green does not mean the sync engine is untested — it means it is tested upstream.
+- **Shared-core gate location:** the sync engine's logic + convergence tests run in the **main repo's** `cargo nextest run --workspace`; **mobile CI does not re-run them** (MYND-457 made the engine identical compiled code). A mobile-only CI green does not mean the sync engine is untested — it means it is tested upstream.
 - **Device-level UI E2E:** deferred; a real iOS/Android WebDriver / Appium-class harness is **MYND-467**, out of this epic. The manual `device-matrix.md` protocol is the interim.
 
 ## C. Testid-completeness audit (MYND-462 task 5 — run 2026-07-07)
