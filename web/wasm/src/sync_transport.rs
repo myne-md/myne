@@ -89,7 +89,7 @@ impl BrowserTransport {
     pub fn new(scheme: crate::sync_origin::Scheme, host: &str, port: u16) -> Self {
         Self {
             // Built by [`crate::sync_origin`], which is host-compiled so the
-            // default-port rule is covered by `cargo test --workspace` rather
+            // default-port rule is covered by `cargo nextest run --workspace` rather
             // than only by a browser run.
             origin: crate::sync_origin::origin_for(scheme, host, port),
         }

@@ -54,7 +54,7 @@ pnpm install
 pnpm tauri dev     # the full app (spawns Vite + the Rust core)
 pnpm test          # Vitest (unit + component specs)
 pnpm build         # typecheck + production bundle
-cargo test --workspace
+cargo nextest run --workspace   # the Rust gate pre-push runs (brew install cargo-nextest)
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 

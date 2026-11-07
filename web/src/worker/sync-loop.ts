@@ -5,7 +5,7 @@
 //
 // Nothing here DECIDES anything. The cadence, the focus rate-limit, the push
 // coalescing and the extend-only retry ladder are `SyncScheduler`'s, shared with
-// desktop and covered by `cargo test --workspace`; this file only delivers ticks
+// desktop and covered by `cargo nextest run --workspace`; this file only delivers ticks
 // and signals to it. Two clients that re-derived those answers would disclose at
 // two different granularities (`sync-protocol.md` §8.3, the A13 timing posture),
 // which is exactly the failure the shared scheduler exists to prevent.

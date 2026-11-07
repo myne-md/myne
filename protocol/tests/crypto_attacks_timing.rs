@@ -117,7 +117,7 @@ fn measure(n: usize, fixed: &[u8; 32], seed: u64, op: &dyn Fn(&[u8; 32])) -> Mea
     // It was not small. Measured on the same machine, same build: `real` sat
     // between 8 and 15 against a bound of 10 while `control` stayed near 2, so
     // the test failed roughly two runs in three, on a binary with no leak in
-    // it. Every push paid for it, because `cargo test --workspace` runs in
+    // it. Every push paid for it, because `cargo test --workspace` ran in
     // `pre-push`. Giving the fixed class an equally-sized array to walk drops
     // `real` to under 4 in absolute value and leaves `control` where it was.
     //

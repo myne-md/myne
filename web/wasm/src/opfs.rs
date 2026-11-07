@@ -68,7 +68,7 @@ extern "C" {
 /// call and are matched exhaustively. The two sides are kept in lockstep by
 /// [`crate::opfs_contract`], whose test reads the TypeScript source and compares
 /// — a comment saying "keep these in sync" is not a mechanism. That module is
-/// compiled on every target so `cargo test --workspace` covers it; this one is
+/// compiled on every target so `cargo nextest run --workspace` covers it; this one is
 /// wasm-only and is beyond every gate that runs in `pre-push`.
 fn kind_from_js(e: &JsValue) -> IoFailureKind {
     // The thrown value is a `MyneIoError` carrying `.kind`. Anything else — a
@@ -119,7 +119,7 @@ pub struct OpfsVaultIo;
 /// double-buffering and produce `vault.prefs.a.a`.
 ///
 /// So the container logic lives in core (host-compiled, fault-injectable, run by
-/// `cargo test --workspace`) and this is the store it drives. What is left in
+/// `cargo nextest run --workspace`) and this is the store it drives. What is left in
 /// this file is the OPFS boundary and the *policy* — which paths are singletons —
 /// and nothing that decides recency or framing.
 #[derive(Debug, Default, Clone, Copy)]

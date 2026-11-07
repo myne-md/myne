@@ -38,7 +38,7 @@
 //!
 //! `myne-mcp` is a different crate, so `CARGO_BIN_EXE_*` cannot reach it.
 //! [`shim_binary`] looks beside the test executable, which is where
-//! `cargo test --workspace` (the gate that matters) builds it. If it is absent
+//! `cargo nextest run --workspace` (the gate that matters) builds it. If it is absent
 //! the test FAILS with the command to run rather than skipping: a test that
 //! quietly skips when its subject is missing is a green tick over nothing.
 
