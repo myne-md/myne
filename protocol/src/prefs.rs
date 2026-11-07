@@ -1132,6 +1132,37 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// Calendar settings (myne-md/myne#1037) - a flat string map the client owns
+    /// both halves of, keyed by SETTING: `day_reminder_anchor` (an `HH:MM` local
+    /// wall-clock time, the anchor an all-day event's relative reminder counts
+    /// back from) and `colours.<calendar name>` (the design-token name that
+    /// calendar draws in, never a colour literal, so a custom theme repaints the
+    /// calendar with the rest of the app).
+    ///
+    /// **One map rather than two fields, and the shape is `periodic_notes`'s
+    /// verbatim**: a `BTreeMap<String, String>` gets lexicographic key order from
+    /// the canonical encoder for free, reuses the existing string-map codec, and
+    /// leaves the key grammar to the client, so a later calendar setting costs no
+    /// protocol change at all. A codec that validated either half would turn every
+    /// future setting into a format decision.
+    ///
+    /// Default empty; **omitted entirely from the canonical JSON when empty**, so
+    /// a vault that never touched a calendar setting is byte-identical to a
+    /// pre-myne#1037 `vault.prefs` (existing golden vectors unaffected, a
+    /// migration-less additive field on `MYP1`: no new magic, no new `SubkeyRole`,
+    /// no new AAD role, zero new crypto). **Non-load-bearing** (cosmetic plus
+    /// cold/derivable, AS-low): a replayed or tampered value can at worst draw one
+    /// calendar in the wrong colour or fire an all-day reminder at the wrong hour,
+    /// so it carries no protective-envelope clamp.
+    ///
+    /// Canonical key `calendar_settings`, which sorts after `bar_items_order`
+    /// (`ba` < `ca`), before `chat_history_budget` (`cal` < `cha`). That position
+    /// is the cursor-scanned region rather than the `strip_prefix` run, which is
+    /// where an additive field belongs for the reason `chat_history_budget`'s own
+    /// doc states at length.
+    #[serde(default)]
+    pub calendar_settings: BTreeMap<String, String>,
+
     /// How many characters of visible chat history an agent run may be seeded with
     /// (myne-md/myne#617). `None` means the host applies its own default.
     ///
@@ -1651,6 +1682,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -1999,6 +2031,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // calendar_settings (canonical key 'calendar_settings', after bar_items_order ['ba' < 'ca'],
+    // before chat_history_budget ['cal' < 'cha'], myne-md/myne#1037). The calendar's own settings
+    // map: the all-day reminder anchor and one colour token per `calendar:` name. The
+    // periodic_notes string-map encoder reused verbatim (lexicographic keys, NFC keys + values,
+    // omitted entirely when empty), because the codec validates no half of a client-owned key.
+    if !prefs.calendar_settings.is_empty() {
+        out.extend_from_slice(b"\"calendar_settings\":");
+        push_canonical_string_map(&mut out, &prefs.calendar_settings);
         out.push(b',');
     }
 
@@ -3310,6 +3353,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // calendar_settings (key 'cal': after bar_items_order ['ba' < 'ca'], before
+    // chat_history_budget ['cal' < 'cha'], myne-md/myne#1037). The folder_icons
+    // string-map parse reused verbatim, located from the same monotonic cursor as
+    // its neighbours. Absent -> empty, and an entry naming a setting this build
+    // does not know decodes and is ignored by the client rather than failing the
+    // blob.
+    let calendar_settings =
+        parse_optional_string_map_field(rest, &mut cursor, b"\"calendar_settings\":")?;
     // chat_history_budget (canonical key 'chat_history_budget', after
     // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
     // characters of chat history an agent run may be seeded with
@@ -3666,6 +3717,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_notes_enabled,
         hidden_bar_items,
         bar_items_order,
+        calendar_settings,
         chat_history_budget,
         cli_enabled,
         cli_excluded_folders,
@@ -5191,6 +5243,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -5280,6 +5333,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -5620,6 +5674,96 @@ mod tests {
         assert!(!parsed.reminders_enabled);
     }
 
+    // === calendar_settings (myne-md/myne#1037) ============================
+    //
+    // The calendar's two client-owned settings ride one flat map, so what has to
+    // be pinned is the same four things `periodic_notes` pins: the canonical
+    // position (so a neighbour is not swallowed), byte-identity when empty (the
+    // whole no-migration argument), a round trip, and forward compatibility for a
+    // key this build has never heard of.
+
+    #[test]
+    fn calendar_settings_encodes_between_bar_items_order_and_chat_history_budget() {
+        let prefs = PrefsView {
+            calendar_settings: map_of(&[
+                ("colours.personal", "moss"),
+                ("colours.work", "slate"),
+                ("day_reminder_anchor", "08:30"),
+            ]),
+            bar_items_order: alloc::vec![alloc::string::String::from("tags")],
+            chat_history_budget: Some(3000),
+            ..PrefsView::default()
+        };
+        let encoded = canonical_json_encode(&prefs);
+        assert_eq!(
+            core::str::from_utf8(&encoded).expect("utf8"),
+            concat!(
+                r#"{"bar_items_order":["tags"],"calendar_settings":{"colours.personal":"moss","#,
+                r#""colours.work":"slate","day_reminder_anchor":"08:30"},"#,
+                r#""chat_history_budget":3000,"screen_capture_protection":true}"#
+            )
+        );
+    }
+
+    #[test]
+    fn empty_calendar_settings_is_omitted_so_a_pre_feature_vault_is_byte_identical() {
+        let encoded = canonical_json_encode(&PrefsView::default());
+        assert_eq!(encoded.as_slice(), br#"{"screen_capture_protection":true}"#);
+        assert!(!encoded
+            .windows(b"calendar_settings".len())
+            .any(|w| w == b"calendar_settings"));
+    }
+
+    #[test]
+    fn calendar_settings_round_trips_through_blob() {
+        let original = PrefsView {
+            calendar_settings: map_of(&[
+                ("colours.personal", "moss"),
+                ("day_reminder_anchor", "09:00"),
+            ]),
+            ..PrefsView::default()
+        };
+        let prefs_key = derive_subkey(&fixed_root_key(), SubkeyRole::PrefsKey);
+        let account_hash = fixed_account_number_hash();
+        let blob =
+            encode_prefs_blob_raw(&prefs_key, &account_hash, &original, &fixed_prefs_nonce())
+                .expect("encode");
+        let decoded = decode_prefs_blob(&prefs_key, &account_hash, &blob).expect("decode");
+        assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn calendar_settings_keeps_a_setting_this_build_does_not_know() {
+        // The key grammar is the client's. A later setting (a week start, a
+        // default view) has to survive an older build's decode untouched, which is
+        // what keeps a third calendar setting free instead of a migration.
+        let plaintext = br#"{"calendar_settings":{"colours.work":"slate","week_start":"monday"},"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.calendar_settings,
+            map_of(&[("colours.work", "slate"), ("week_start", "monday")])
+        );
+        assert_eq!(
+            canonical_json_encode(&parsed).as_slice(),
+            plaintext.as_slice()
+        );
+    }
+
+    #[test]
+    fn calendar_settings_does_not_swallow_the_fields_that_follow_it() {
+        // The parser walks one monotonic forward cursor. The two immediate
+        // neighbours are what this pins: if the map parse over-consumed, the agent
+        // chat budget and the CLI door would both silently take their defaults.
+        let plaintext = br#"{"calendar_settings":{"day_reminder_anchor":"07:15"},"chat_history_budget":2500,"cli_enabled":true,"screen_capture_protection":true}"#;
+        let parsed = canonical_json_decode(plaintext).expect("decode");
+        assert_eq!(
+            parsed.calendar_settings,
+            map_of(&[("day_reminder_anchor", "07:15")])
+        );
+        assert_eq!(parsed.chat_history_budget, Some(2500));
+        assert!(parsed.cli_enabled);
+    }
+
     #[test]
     fn decoration_maps_round_trip_through_blob() {
         let original = PrefsView {
@@ -5764,6 +5908,7 @@ mod tests {
                 screen_capture_protection: true,
                 folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
+                calendar_settings: Default::default(),
                 chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
@@ -5855,6 +6000,7 @@ mod tests {
                 screen_capture_protection: false,
                 folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
+                calendar_settings: Default::default(),
                 chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
@@ -7352,6 +7498,7 @@ mod tests {
                 archive_disabled: Some(true),
                 auto_lock_seconds: Some(300),
                 bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+                calendar_settings: Default::default(),
                 chat_history_budget: Some(3000),
                 cli_enabled: true,
                 ..PrefsView::default()
@@ -7375,6 +7522,7 @@ mod tests {
         let original = PrefsView {
             auto_lock_seconds: Some(300),
             bar_items_order: alloc::vec![alloc::string::String::from("graph")],
+            calendar_settings: Default::default(),
             cli_enabled: true,
             custom_theme: Some(alloc::string::String::from("midnight")),
             ..PrefsView::default()
@@ -7729,6 +7877,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             color_groups: Vec::new(),
             show_note_timestamps: true,
@@ -7765,6 +7914,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -8380,6 +8530,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8475,6 +8626,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8573,6 +8725,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8666,6 +8819,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8819,6 +8973,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -8937,6 +9092,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -9041,6 +9197,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -9215,6 +9372,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -9333,6 +9491,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -9441,6 +9600,7 @@ mod tests {
         let prefs = PrefsView {
             auto_lock_seconds: Some(300),
             bar_items_order: alloc::vec!["graph".into(), "tags".into()],
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             custom_theme: Some("midnight".into()),
             ..PrefsView::default()
@@ -9464,6 +9624,7 @@ mod tests {
         ];
         let prefs = PrefsView {
             bar_items_order: order.clone(),
+            calendar_settings: Default::default(),
             ..PrefsView::default()
         };
         let encoded = canonical_json_encode(&prefs);
@@ -9546,6 +9707,7 @@ mod tests {
         // cli_excluded_folders < cli_rate_limit_disabled < custom_theme (c).
         let encoded = canonical_json_encode(&PrefsView {
             bar_items_order: alloc::vec!["graph".into()],
+            calendar_settings: Default::default(),
             cli_enabled: true,
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Work/")],
             cli_rate_limit_disabled: Some(true),
@@ -9571,6 +9733,7 @@ mod tests {
     fn cli_fields_round_trip_through_decode() {
         let original = PrefsView {
             bar_items_order: alloc::vec!["tags".into()],
+            calendar_settings: Default::default(),
             cli_enabled: true,
             cli_excluded_folders: alloc::vec![
                 alloc::string::String::from("Alpha/"),
@@ -9689,6 +9852,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
             cli_rate_limit_disabled: None,
@@ -9781,6 +9945,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -9876,6 +10041,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -10039,6 +10205,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -10176,6 +10343,7 @@ mod tests {
             screen_capture_protection: true,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -10509,6 +10677,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -10606,6 +10775,7 @@ mod tests {
             screen_capture_protection: false,
             folder_notes_enabled: false,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -10965,6 +11135,7 @@ mod tests {
                 screen_capture_protection: true,
                 folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
+                calendar_settings: Default::default(),
                 chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
@@ -11055,6 +11226,7 @@ mod tests {
                 screen_capture_protection: false,
                 folder_notes_enabled: false,
                 bar_items_order: Vec::new(),
+                calendar_settings: Default::default(),
                 chat_history_budget: None,
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
@@ -11171,6 +11343,11 @@ mod tests {
                 alloc::string::String::from("graph"),
             ],
             chat_history_budget: Some(3000),
+            // Empty here on purpose: this fixture's expected canonical JSON is a
+            // pinned vector, and an empty map emits no key at all, so the
+            // calendar's own arm is exercised by
+            // `calendar_settings_round_trip_and_omission` instead.
+            calendar_settings: Default::default(),
             // set array (sorted + deduped)
             cli_excluded_folders: alloc::vec![alloc::string::String::from("Private/")],
             cli_rate_limit_disabled: Some(true),
@@ -14188,6 +14365,7 @@ mod tests {
             auto_lock_seconds: Some(300),
             auto_tag_enabled: true,
             bar_items_order: alloc::vec![String::from("search"), String::from("graph")],
+            calendar_settings: Default::default(),
             daily_template: Some(String::from("Templates/Daily.md")),
             date_format: Some(String::from("iso")),
             deliberate_folders: alloc::vec![String::from("Archive/")],
@@ -14595,6 +14773,7 @@ mod tests {
         // (after, 'cus') to pin color_groups' canonical position ('col').
         let prefs = PrefsView {
             bar_items_order: alloc::vec!["graph".into()],
+            calendar_settings: Default::default(),
             color_groups: alloc::vec![
                 sample_color_group("g1", "Work"),
                 sample_color_group("g2", "Rest")

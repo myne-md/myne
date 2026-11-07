@@ -46,6 +46,7 @@ import {
   AGENT_TAB_ID,
   ATTACHMENTS_TAB_ID,
   GRAPH_TAB_ID,
+  CALENDAR_TAB_ID,
   TASKS_TAB_ID,
   TEMPLATES_TAB_ID,
   TAB_KIND_TAGS,
@@ -61,6 +62,7 @@ export {
   AGENT_TAB_ID,
   ATTACHMENTS_TAB_ID,
   GRAPH_TAB_ID,
+  CALENDAR_TAB_ID,
   TASKS_TAB_ID,
   TEMPLATES_TAB_ID,
 } from "./tabKinds";
@@ -146,6 +148,20 @@ export type WorkspaceItem =
       taskView?: PersistedTaskView;
     }
   /**
+   * The calendar (myne-md/myne#1037). A singleton like the graph and the task
+   * list. `calendarView` is **per-tab session state** in the same sense
+   * `taskView` is: which zoom a user is looking at is where they are, not a
+   * preference, and omit-when-default keeps a tab on the default view
+   * byte-identical to a descriptor from before this kind existed.
+   */
+  | {
+      kind: "calendar";
+      id: typeof CALENDAR_TAB_ID;
+      pinned?: boolean;
+      viewMode?: ViewMode;
+      calendarView?: PersistedCalendarView;
+    }
+  /**
    * The agent (myne-md/myne#771). A singleton like the graph and the task list.
    * `agentView` is **per-tab session state** in the same sense `taskView` is:
    * which conversation the tab is showing is where you are, not a preference.
@@ -198,6 +214,21 @@ export type PersistedTaskView = {
   sort?: TaskSort;
 };
 
+/** The calendar's four zooms. Month is the default because it is the one a
+ *  person opens a calendar for; the other three are a click away and are
+ *  remembered per tab. */
+export type CalendarView = "month" | "week" | "day" | "agenda";
+
+export const DEFAULT_CALENDAR_VIEW: CalendarView = "month";
+
+/**
+ * The persisted delta of a calendar tab's zoom. Omit-when-default, so a tab left
+ * on month is byte-identical to a descriptor from before this kind existed.
+ */
+export type PersistedCalendarView = {
+  view?: CalendarView;
+};
+
 /** Stable string key for an item - `"note:<id>"` / `"view:<id>"`. Used for
  *  set/equality comparisons over the heterogeneous tab strip. Ignores `pinned`
  *  (identity is `(kind,id)` only). */
@@ -239,6 +270,14 @@ export function graphItem(): WorkspaceItem {
 /** The vault-wide task-list tab item (singleton - see [`TASKS_TAB_ID`]). */
 export function tasksItem(): WorkspaceItem {
   return { kind: "tasks", id: TASKS_TAB_ID };
+}
+
+/** The calendar tab item (singleton - see [`CALENDAR_TAB_ID`]). */
+export function calendarItem(view?: CalendarView): WorkspaceItem {
+  const persisted = view === undefined ? undefined : calendarViewToPersisted(view);
+  return persisted === undefined
+    ? { kind: "calendar", id: CALENDAR_TAB_ID }
+    : { kind: "calendar", id: CALENDAR_TAB_ID, calendarView: persisted };
 }
 
 /** The attachment-library tab item (singleton - see [`ATTACHMENTS_TAB_ID`]). */
@@ -849,6 +888,47 @@ export function setTaskViewState(
     delete rest.taskView;
     const v = taskViewToPersisted(view);
     if (v !== undefined) rest.taskView = v;
+    return rest as WorkspaceItem;
+  };
+  return {
+    ...state,
+    root: updateLeaf(state.root, paneId, (leaf) => ({
+      ...leaf,
+      tabs: leaf.tabs.map(apply),
+      activeTab: leaf.activeTab === null ? null : apply(leaf.activeTab),
+    })),
+  };
+}
+
+/** The zoom a calendar tab is showing (omit-when-default: month). */
+export function calendarViewOf(item: WorkspaceItem): CalendarView {
+  if (item.kind !== "calendar") return DEFAULT_CALENDAR_VIEW;
+  return item.calendarView?.view ?? DEFAULT_CALENDAR_VIEW;
+}
+
+/** The persisted delta of a calendar zoom, or `undefined` when it is the default. */
+function calendarViewToPersisted(view: CalendarView): PersistedCalendarView | undefined {
+  return view === DEFAULT_CALENDAR_VIEW ? undefined : { view };
+}
+
+/**
+ * Set a calendar tab's zoom, and nothing else.
+ *
+ * Per-tab rather than per-vault on purpose (the `taskView` decision): the zoom is
+ * where you are, not how the product is configured, so two calendar tabs may sit
+ * on different months without either writing a preference.
+ */
+export function setCalendarViewState(
+  state: WorkspaceState,
+  paneId: PaneId,
+  view: CalendarView,
+): WorkspaceState {
+  const apply = (t: WorkspaceItem): WorkspaceItem => {
+    if (t.kind !== "calendar") return t;
+    const rest: Record<string, unknown> = { ...t };
+    delete rest.calendarView;
+    const v = calendarViewToPersisted(view);
+    if (v !== undefined) rest.calendarView = v;
     return rest as WorkspaceItem;
   };
   return {

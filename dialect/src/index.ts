@@ -28,6 +28,25 @@ export { extractFullText, extractBodyText } from "./visitors/fullText";
 export { headingSections } from "./visitors/headingSections";
 export type { HeadingSection } from "./visitors/headingSections";
 export type { NoteKind, CoverRef } from "./surgery";
+
+// The event vocabulary (myne-md/myne#1037, spec §3.10). One reader for all three
+// clients: an event is a note, so this belongs beside the other frontmatter
+// readers rather than in a calendar module.
+export {
+  EVENT_FIELD_KEYS,
+  formatEventInstant,
+  parseEventInstant,
+  parseReminderLead,
+  readEventFromFmBody,
+} from "./event";
+export type {
+  CalendarEvent,
+  EventInstant,
+  EventRead,
+  EventReadOptions,
+  EventUnreadableReason,
+  ReminderLead,
+} from "./event";
 export { stripDialectComments, hasDialectComment } from "./stripComments";
 export {
   buildInitialPlaintext,
@@ -61,6 +80,7 @@ export {
   readTrashedFromFmBody,
   DRAWING_KIND_VALUE,
   TASK_KIND_VALUE,
+  EVENT_KIND_VALUE,
   CANONICAL_KIND_VALUES,
   COVER_FIELD_KEY,
   FOLDER_INDEX_FLAG_VALUE,

@@ -1,0 +1,230 @@
+// The event vocabulary (myne-md/myne#1037, task 1). Spec: markdown-dialect.md §3.10.
+//
+// What each case is protecting, because a green reader proves nothing on its own:
+//
+// - the value-strict `kind` read is the IDENTITY of an event, so a quoted or
+//   capitalized value must read as an ordinary note rather than file someone's
+//   markdown into the calendar;
+// - a value that does not type is REFUSED and surfaced, never repaired (§3.8.3),
+//   which is why `2026-02-31` and an offset-bearing timestamp are cases here;
+// - `repeat` is delegated to the closed §3.8.7 vocabulary, so an unrecognized
+//   phrase must come back as unrecognized rather than as "no repeat": that
+//   difference is the one where a user believes a meeting repeats and finds out
+//   months later that it did not.
+
+import { describe, expect, it } from "vitest";
+import { readKindFromFmBody } from "../../src/dialect/surgery";
+import {
+  formatEventInstant,
+  parseEventInstant,
+  parseReminderLead,
+  readEventFromFmBody,
+} from "../../src/dialect/event";
+
+function fm(...lines: string[]): string {
+  return lines.join("\n");
+}
+
+describe("readEventFromFmBody: identity", () => {
+  it("reads kind: event as an event", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05 09:00"));
+    expect(read.state).toBe("ok");
+    if (read.state !== "ok") throw new Error("unreachable");
+    expect(read.event.start.time).toBe("09:00");
+    expect(read.event.allDay).toBe(false);
+  });
+
+  it("agrees with the value-strict kind reader", () => {
+    expect(readKindFromFmBody(fm("kind: event"))).toBe("event");
+  });
+
+  it("leaves a non-event note absent, including the other canonical kinds", () => {
+    for (const body of [
+      fm("title: notes"),
+      fm("kind: task", "start: 2026-11-05 09:00"),
+      fm("kind: drawing"),
+      fm('kind: "event"', "start: 2026-11-05"),
+      fm("kind: Event", "start: 2026-11-05"),
+      fm("kind: chore", "start: 2026-11-05"),
+    ]) {
+      expect(readEventFromFmBody(body), body).toEqual({ state: "absent" });
+    }
+  });
+
+  it("resolves a duplicated kind line on the first, like every other managed field", () => {
+    expect(readEventFromFmBody(fm("kind: event", "kind: task", "start: 2026-11-05")).state).toBe(
+      "ok",
+    );
+    expect(readEventFromFmBody(fm("kind: task", "kind: event", "start: 2026-11-05")).state).toBe(
+      "absent",
+    );
+  });
+});
+
+describe("readEventFromFmBody: the time shape", () => {
+  it("treats a date with no time as all day", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05"));
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.allDay).toBe(true);
+    expect(read.event.start).toEqual({ date: { year: 2026, month: 11, day: 5 }, time: null });
+  });
+
+  it("accepts both separators and both time precisions", () => {
+    for (const value of ["2026-11-05 09:00", "2026-11-05T09:00", "2026-11-05T09:00:30"]) {
+      const parsed = parseEventInstant(value);
+      expect(parsed, value).not.toBeNull();
+      expect(parsed?.time).toBe(value.length > 17 ? "09:00:30" : "09:00");
+    }
+  });
+
+  it("refuses what it cannot type rather than repairing it", () => {
+    for (const value of [
+      "2026-02-31",
+      "2026-13-01",
+      "2026-11-05T24:00",
+      "2026-11-05T09:60",
+      "2026-11-05T09:00:00Z",
+      "2026-11-05T09:00:00+03:00",
+      "2026-11-05 9:00",
+      "2026-11-05 09.00",
+      "05/11/2026",
+      "2026-11",
+    ]) {
+      expect(parseEventInstant(value), value).toBeNull();
+    }
+  });
+
+  it("round-trips the emitted form, and emits one separator only", () => {
+    const instant = parseEventInstant("2026-11-05T09:00");
+    if (instant === null) throw new Error("expected an instant");
+    expect(formatEventInstant(instant)).toBe("2026-11-05 09:00");
+    expect(parseEventInstant(formatEventInstant(instant))).toEqual(instant);
+  });
+});
+
+describe("readEventFromFmBody: the unreadable group", () => {
+  it("names a missing start", () => {
+    expect(readEventFromFmBody(fm("kind: event", "title: something"))).toEqual({
+      state: "unreadable",
+      reason: "start-missing",
+    });
+  });
+
+  it("names an unreadable start", () => {
+    expect(readEventFromFmBody(fm("kind: event", "start: next tuesday"))).toEqual({
+      state: "unreadable",
+      reason: "start-unreadable",
+    });
+  });
+
+  it("names an unreadable end", () => {
+    expect(readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "end: soon"))).toEqual({
+      state: "unreadable",
+      reason: "end-unreadable",
+    });
+  });
+
+  it("names an end before the start", () => {
+    expect(
+      readEventFromFmBody(fm("kind: event", "start: 2026-11-05 14:00", "end: 2026-11-05 09:00")),
+    ).toEqual({ state: "unreadable", reason: "end-before-start" });
+  });
+
+  it("names a timed end on an all-day start", () => {
+    expect(
+      readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "end: 2026-11-06 09:00")),
+    ).toEqual({ state: "unreadable", reason: "end-time-without-start-time" });
+  });
+
+  it("names an illegal calendar name", () => {
+    expect(readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "calendar: Work/Home"))).toEqual(
+      { state: "unreadable", reason: "calendar-unreadable" },
+    );
+  });
+});
+
+describe("readEventFromFmBody: the rest of the record", () => {
+  it("reads a multi-day event", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-05", "end: 2026-11-07", "calendar: Travel"),
+    );
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.end?.date).toEqual({ year: 2026, month: 11, day: 7 });
+    expect(read.event.calendar).toBe("Travel");
+  });
+
+  it("keeps the uid verbatim", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-05", "uid: 040000008200E00074C5B7101A82E008"),
+    );
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.uid).toBe("040000008200E00074C5B7101A82E008");
+  });
+
+  it("reads a quoted value and a trailing comment through the shared extractor", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", 'start: "2026-11-05 09:00" # standup', "calendar: 'Work'"),
+    );
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.start.time).toBe("09:00");
+    expect(read.event.calendar).toBe("Work");
+  });
+
+  it("delegates repeat to the closed vocabulary, and preserves an unrecognized rule", () => {
+    const known = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-05", "repeat: every tuesday and thursday"),
+    );
+    if (known.state !== "ok") throw new Error("expected ok");
+    expect(known.event.repeat?.ok).toBe(true);
+
+    const unknown = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-05", "repeat: every other blue moon"),
+    );
+    if (unknown.state !== "ok") throw new Error("expected ok");
+    expect(unknown.event.repeat?.ok).toBe(false);
+    expect(unknown.event.repeatRaw).toBe("every other blue moon");
+  });
+
+  it("has no repeat when the field is absent", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05"));
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.repeat).toBeNull();
+    expect(read.event.repeatRaw).toBeNull();
+  });
+});
+
+describe("readEventFromFmBody: the relative reminder lead", () => {
+  it("parses the three units into minutes", () => {
+    expect(parseReminderLead("30m")).toEqual({ raw: "30m", minutes: 30 });
+    expect(parseReminderLead("2h")).toEqual({ raw: "2h", minutes: 120 });
+    expect(parseReminderLead("1d")).toEqual({ raw: "1d", minutes: 1440 });
+    expect(parseReminderLead(" 15M ")).toEqual({ raw: "15M", minutes: 15 });
+  });
+
+  it("refuses zero and anything outside the grammar", () => {
+    for (const value of ["0m", "0d", "-5m", "5", "m", "5s", "5 weeks", "1.5h", "99999d"]) {
+      expect(parseReminderLead(value), value).toBeNull();
+    }
+  });
+
+  it("flags a lead past the horizon without dropping it", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "remind: 30d"), {
+      reminderHorizonDays: 7,
+    });
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.remind?.minutes).toBe(43200);
+    expect(read.event.remind?.beyondHorizon).toBe(true);
+
+    const short = readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "remind: 30m"), {
+      reminderHorizonDays: 7,
+    });
+    if (short.state !== "ok") throw new Error("expected ok");
+    expect(short.event.remind?.beyondHorizon).toBe(false);
+  });
+
+  it("reports no lead when the value does not parse, and never invents one", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "remind: soon"));
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.remind).toBeNull();
+  });
+});

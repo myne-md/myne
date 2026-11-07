@@ -637,6 +637,12 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
     // reason the field is a flat map rather than a map of nested objects: a
     // per-period value would have put both edits on one clock and dropped one.
     let periodic_notes = per_key!("periodic_notes", periodic_notes);
+    // calendar_settings (myne-md/myne#1037): keys are `day_reminder_anchor` and
+    // `colours.<calendar name>`, so a colour edit on one device and an anchor edit
+    // on another, in the same round, race on separate clocks and both survive.
+    // Same reason as `periodic_notes` above: one clock per KEY is what stops the
+    // two settings clobbering each other.
+    let calendar_settings = per_key!("calendar_settings", calendar_settings);
     // saved_views carries an opaque remainder alongside the rendered set: the
     // array entries this build could not represent (§9.5.2), kept so a re-write
     // does not delete a newer client's views. The two halves are ONE encoding
@@ -834,6 +840,8 @@ pub fn merge_prefs(local: &PrefsView, remote: &PrefsView) -> PrefsView {
         item_order,
         // periodic_notes (myne#177): per-setting map merge, same reason.
         periodic_notes,
+        // calendar_settings (myne-md/myne#1037): per-setting map merge, same reason.
+        calendar_settings,
         // ---- device-local: local wins, always -----------------------------
         active_workspace: local.active_workspace.clone(),
         // Device-local for the reason the classification table gives: a bound

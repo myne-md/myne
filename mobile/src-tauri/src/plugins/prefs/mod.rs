@@ -110,6 +110,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // prefs setter: this list, permissions/prefs/default.toml and
             // build.rs's inlined command list, or the ACL resolver fails closed.
             commands::set_periodic_note_setting,
+            commands::set_calendar_setting,
             // Graph colour groups (myne-md/myne#727), writable on mobile since
             // myne-md/myne#880. A WHOLE-LIST replace, because rule order is
             // precedence. Body is the SHARED `myne-core` prefs core; mobile only
