@@ -51,18 +51,42 @@ interface WireValue {
   value: unknown;
 }
 
+/**
+ * A driver call that never answers must say so in under a minute.
+ *
+ * `fetch` here inherits undici's 300 s `headersTimeout`, and when a driver accepts
+ * the connection but never replies the suite sat on that for five minutes and then
+ * reported a bare `TypeError: fetch failed` — no URL, no method, no clue which of
+ * the two devices was wedged (measured 2026-11-07 on `sync-replication`'s canary,
+ * 305 s). A WebDriver call is local: if it has not answered in a minute, waiting
+ * longer cannot help, and the SAME budget the waits use is the honest bound.
+ */
+const WIRE_TIMEOUT_MS = 60_000;
+
 async function wire<T>(
   baseUrl: string,
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
 ): Promise<T> {
-  const res = await fetch(`${baseUrl}${path}`, {
-    method,
-    headers: { "content-type": "application/json; charset=utf-8" },
-    // W3C requires a JSON body on every POST, even parameter-less ones.
-    body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}${path}`, {
+      method,
+      headers: { "content-type": "application/json; charset=utf-8" },
+      // W3C requires a JSON body on every POST, even parameter-less ones.
+      body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
+      signal: AbortSignal.timeout(WIRE_TIMEOUT_MS),
+    });
+  } catch (e) {
+    const name = (e as Error)?.name ?? "";
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw new Error(
+        `the driver at ${baseUrl} did not answer ${method} ${path} within ${WIRE_TIMEOUT_MS} ms`,
+      );
+    }
+    throw e;
+  }
   const payload = (await res.json()) as WireValue;
   if (!res.ok) {
     const err = payload.value as { error?: string; message?: string };
