@@ -438,14 +438,7 @@ pub async fn upgrade_vault_to_ntv7_from_host(
         // The head format moves to `0x02` signed with the generation, so the next
         // cycle must re-base rather than reject the server's still-HMAC head as a
         // forgery (`decisions/protocol/0603`).
-        let _ = crate::plugins::sync::state::update_sync_state(io, &root, |sync_state| {
-            if sync_state.rekey_rebase_pending {
-                return ((), crate::plugins::sync::state::Persist::No);
-            }
-            sync_state.rekey_rebase_pending = true;
-            ((), crate::plugins::sync::state::Persist::Yes)
-        })
-        .await;
+        let _ = crate::plugins::sync::state::arm_rekey_rebase(io, &root).await;
         // The vault is `NTV6` now: seal the person-identity carrier under the held
         // root_key so a later unlock installs the session with no phrase
         // (myne-md/myne#792). Best-effort, and NATIVE-ONLY: the carrier module is

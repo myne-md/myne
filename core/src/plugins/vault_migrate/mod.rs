@@ -1544,7 +1544,12 @@ async fn rebase_sync_plane_after_rekey(
     // this migration invented.
     let rebased = update_sync_state(io, vault_root, |state| {
         if state.device_id_hex.is_none() {
-            return ((), Persist::No); // never enrolled — there is no sync plane to re-base
+            // Never enrolled: there is no sync plane to re-base, and the dirty marker
+            // below must NOT be set. It is the user-facing "a credential change is
+            // still waiting for the server" signal, and the only things that clear it
+            // are a successful cycle and a rotation adoption, neither of which a device
+            // with no token can reach.
+            return (false, Persist::No);
         }
         state.rekey_rebase_pending = true;
         for id in [
@@ -1569,7 +1574,7 @@ async fn rebase_sync_plane_after_rekey(
             // Queue the tombstone BEFORE dropping the baseline (#443): the removal
             // takes the `base_version` with it, and that version is what the
             // tombstone push CASes against. A singleton this device never pushed
-            // has no baseline and therefore nothing stranded — there is no server
+            // has no baseline and therefore nothing stranded: there is no server
             // record under that id to reclaim.
             if let Some(baseline) = state.blobs.get(&hex) {
                 let mut nonce = [0u8; 24];
@@ -1588,18 +1593,22 @@ async fn rebase_sync_plane_after_rekey(
         // Asserted rather than assumed: the new ids must not collide with the old
         // ones, or the removals above would delete a baseline the new generation is
         // about to need. They are HKDF outputs under different roots, so this holds
-        // by construction — but the removal is destructive and the check is free.
+        // by construction, but the removal is destructive and the check is free.
         debug_assert!(prefs_sync_id(old_root_key) != prefs_sync_id(new_root_key));
-        ((), Persist::Yes)
+        (true, Persist::Yes)
     })
     .await;
-    if rebased.is_err() {
-        tracing::warn!(
-            target: "vault_migrate",
-            event = "sync_rebase_state_write_failed",
-            "post-migration sync re-base bookkeeping not persisted; the next cycle may alarm"
-        );
-        return;
+    match rebased {
+        Ok(true) => {}
+        Ok(false) => return, // never enrolled: nothing was re-based and nothing is dirty
+        Err(_) => {
+            tracing::warn!(
+                target: "vault_migrate",
+                event = "sync_rebase_state_write_failed",
+                "post-migration sync re-base bookkeeping not persisted; the next cycle may alarm"
+            );
+            return;
+        }
     }
     let _ = mark_vault_meta_dirty(io, vault_root).await;
 }
@@ -2199,6 +2208,48 @@ mod tests {
     /// in CI, which is the one failure its own comment says it exists to catch:
     /// a fixture that armed nothing and a fixture that armed six look identical
     /// from outside a test that does not run.
+    /// **A vault that never enrolled gets no state it cannot clear.**
+    ///
+    /// `rebase_sync_plane_after_rekey` returns before the dirty marker when the record
+    /// carries no device id, and that early return is load-bearing rather than tidy:
+    /// the marker is the user-facing "a credential change is still waiting for the
+    /// server" signal, and the only things that clear it are a successful cycle and a
+    /// rotation adoption. Neither is reachable without a token, so setting it here
+    /// would leave a permanent, unclearable notice on a vault that never finished
+    /// enrolling. Written because myne-md/myne#964 collapsed two early returns into one
+    /// locked read and dropped this one, and the only test on the path runs on a
+    /// fixture that HAS a device id, so it stayed green either way.
+    #[test]
+    fn a_rebase_on_a_never_enrolled_vault_leaves_no_dirty_marker() {
+        use crate::plugins::sync::state::SyncState;
+        use crate::plugins::sync::state::{read_sync_state, vault_meta_is_dirty, write_sync_state};
+        block_on(async {
+            let tmp = ScopedTempDir::new("vault-migrate-rebase-never-enrolled").unwrap();
+            let io = StdVaultIo;
+            let vault_root = tmp.path().to_path_buf();
+
+            // Never enrolled by construction: `SyncState::default()` carries no device id,
+            // and asserting that here would be a second read of the field the guard in
+            // `scripts/check-device-actor.mjs` rations.
+            let seeded = SyncState {
+                cursor: 7,
+                ..SyncState::default()
+            };
+            write_sync_state(&io, &vault_root, &seeded).await.unwrap();
+
+            rebase_sync_plane_after_rekey(&io, &vault_root, &OLD_ROOT, &[0x55; 32]).await;
+
+            assert!(
+                !vault_meta_is_dirty(&io, &vault_root).await,
+                "a never-enrolled vault must not be told its credential change is waiting \
+                 for a server it has no token for"
+            );
+            let after = read_sync_state(&io, &vault_root).await.unwrap();
+            assert_eq!(after.cursor, 7, "the record is otherwise untouched");
+            assert!(!after.rekey_rebase_pending, "nothing was armed");
+        });
+    }
+
     #[test]
     fn the_rebase_arms_one_tombstone_per_root_derived_singleton() {
         use crate::plugins::sync::state::read_sync_state;
