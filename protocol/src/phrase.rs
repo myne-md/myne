@@ -134,6 +134,13 @@ impl RecoveryPhrase {
 /// is invalid — please retry."). This is the single-pass cousin of
 /// [`RecoveryPhrase::join_normalized`], which canonicalizes a phrase
 /// Myne *generated* (already ASCII lowercase, no NFKD pass needed).
+// Return type is load-bearing: a bare `String` would leave the normalized phrase
+// un-zeroized. Asserted by coercion so it holds on every build, not only in tests.
+#[allow(dead_code)]
+fn assert_normalize_returns_a_zeroizing_string(s: &str) -> Zeroizing<String> {
+    normalize_user_phrase(s)
+}
+
 pub fn normalize_user_phrase(input: &str) -> Zeroizing<String> {
     // Pre-allocate against input byte length. NFKD can expand chars
     // (e.g. ﬁ → "fi" doubles), but the realistic 24-word phrase case
@@ -444,13 +451,5 @@ mod tests {
         // Pure whitespace input has no tokens to emit; output is empty.
         let normalized = normalize_user_phrase("   \t\n\u{00A0}  ");
         assert_eq!(normalized.as_str(), "");
-    }
-
-    #[test]
-    fn normalize_returns_zeroizing_string() {
-        // Compile-time shape check: the output must be `Zeroizing<String>`
-        // so the bytes wipe on drop. This test would fail to type-check
-        // if the signature drifted to a bare `String`.
-        let _zero: Zeroizing<String> = normalize_user_phrase("test");
     }
 }
