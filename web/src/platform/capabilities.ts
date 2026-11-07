@@ -92,6 +92,7 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // No API grants a page an arbitrary write path. Task 48's download flow is a
   // differently-shaped affordance, not this one.
   "nativeSaveAs",
+  "icsImport",
   // The sandboxed editor for the user's own on-disk files (myne-md/myne#788).
   // A page has no OS file ingress, no native open dialog and no handler
   // registration, and the surface exists to be independent of vault state in a
@@ -100,6 +101,10 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // entry is the other half of that decision, so a menu or palette entry can
   // never be offered against commands that refuse.
   "plainFile",
+  // The calendar's `.ics` IMPORT needs a path-taking open dialog, which a page
+  // has none of. Export is not in this set: it leaves through the download seam,
+  // which is not an IPC command at all (myne-md/myne#1037).
+  "icsImport",
   // `decisions.md` 2026-07-26: the 24-word recovery phrase is "never generated
   // by, displayed by, or typed into served code". Creation generates and shows
   // it; recovery types it. Both are normative removals, not scope cuts.

@@ -605,6 +605,15 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // no OS file ingress, no handler registration and no device-local vault
     // state to be independent of. All of its commands share this class.
     ("plain-file", Class::Unsupported),
+    // The calendar's `.ics` exchange (`src-tauri/src/plugins/text_file/`,
+    // myne-md/myne#1037) is a PATH-taking pair: a save dialog that returns a
+    // destination and an open dialog that returns a source. A served page has
+    // neither, and it does not need them: it exports through the download seam
+    // (`platform/download.ts` `deliverFile`, one user-initiated file) and has no
+    // import until it grows an ingest of its own. `Unsupported` rather than
+    // `Pending` because the browser is not owed this port: the surface it has is
+    // the one its platform can answer.
+    ("text-file", Class::Unsupported),
     // myne-md/myne#860: the opt-in device-local diagnostic log and the
     // bug-report surface. `Unsupported` rather than `Pending`, the same call
     // `plain-file` makes one line up: the bound issue's own scope sentence

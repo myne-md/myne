@@ -40,6 +40,15 @@ export type NewEventInput = {
   readonly repeat?: string | null;
   /** A relative lead: `30m`, `2h`, `1d`. */
   readonly remind?: string | null;
+  /**
+   * The event's stable identity, and the field an IMPORT sets.
+   *
+   * A hand-authored event leaves it out: `note_create` mints a UUIDv7 note id,
+   * which is the identity that matters for rename safety and for a drag. An
+   * `.ics` file carries its own `UID`, and keeping it is what let a later import
+   * match instead of duplicate (myne-md/myne#1037).
+   */
+  readonly uid?: string | null;
   readonly folder?: string | null;
 };
 
@@ -62,6 +71,9 @@ export function buildEventNoteBytes(input: NewEventInput): Uint8Array {
   }
   if (input.remind !== undefined && input.remind !== null && input.remind !== "") {
     bytes = patchFrontmatterField(bytes, "remind", input.remind);
+  }
+  if (input.uid !== undefined && input.uid !== null && input.uid !== "") {
+    bytes = patchFrontmatterField(bytes, "uid", input.uid);
   }
   return bytes;
 }
