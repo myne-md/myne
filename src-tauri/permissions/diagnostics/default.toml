@@ -24,6 +24,8 @@ permissions = [
     "allow-reveal-logs-folder",
     "allow-report-manifest",
     "allow-save-report",
+    "allow-build-digest",
+    "allow-vault-usage",
 ]
 
 [[permission]]
@@ -68,3 +70,19 @@ commands.allow = ["report_manifest"]
 identifier = "allow-save-report"
 description = "Allow invoking diagnostics:save_report (writes ONE plaintext bundle at a destination the user chose in the OS save dialog: the block as the surface renders it, every retained log file and the crash record; clears the record when the bundle included it)."
 commands.allow = ["save_report"]
+
+# The two host-side measures of the block itself (myne-md/myne#991). Both are
+# READS and neither takes an argument, so the WebView chooses neither a path nor
+# a file: `build_digest` hashes the executable this process is running from, and
+# `vault_usage` measures the vault directory the host already resolved. Neither
+# returns anything but numbers and a digest.
+
+[[permission]]
+identifier = "allow-build-digest"
+description = "Allow invoking diagnostics:build_digest (reads the running executable and returns its SHA-256, so a pasted diagnostic block names the build it came from; not the installer artefact's digest, and never a path)."
+commands.allow = ["build_digest"]
+
+[[permission]]
+identifier = "allow-vault-usage"
+description = "Allow invoking diagnostics:vault_usage (measures the active vault directory: total bytes and how many files it is spread over. Sealed blobs only — no size per file, no name, no content, never a path)."
+commands.allow = ["vault_usage"]

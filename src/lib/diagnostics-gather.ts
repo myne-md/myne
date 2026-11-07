@@ -32,6 +32,34 @@ export interface DiagnosticsEnv {
   bundleHash: string | null;
   /** The last recorded failure code, or the block's own spelling for "none recorded". */
   failureCode: string;
+  /**
+   * A host-side digest of the running build artefact, for a client that has no
+   * served bundle to fetch one from (myne-md/myne#991).
+   *
+   * Absent on a client whose build identity already arrives in `bundleHash`, and
+   * absent on one with no digest at all. Present, it is used ONLY when
+   * `bundleHash` is `null`, so a served value always wins: it is the one that
+   * names the artefact a deploy published.
+   */
+  buildDigest?: () => Promise<string>;
+  /**
+   * A host-side measure of the vault on disk, for a client whose vault is a
+   * DIRECTORY rather than a store the page can ask about (myne-md/myne#991).
+   *
+   * Absent means this client has no such measure and the storage lines come from
+   * `navigator.storage.estimate()`. That fallback is the WRONG reading on
+   * desktop — it measures the WebView's own origin store, which holds none of the
+   * vault — which is why the desktop client supplies this.
+   */
+  vaultUsage?: () => Promise<VaultUsage>;
+}
+
+/** A vault directory's footprint, as the host measured it. */
+export interface VaultUsage {
+  /** Total size of the entries under the vault directory. */
+  readonly used_bytes: number;
+  /** How many files and links the vault is spread over. */
+  readonly files: number;
 }
 
 /**
@@ -63,6 +91,17 @@ export function webViewLabel(ua: string, fallback: HostWebView | null): HostWebV
  */
 const DOCTOR_DEADLINE_MS = 2000;
 
+/**
+ * How long a host-side measure may take before the block is built without it.
+ *
+ * Longer than the vault read above, and deliberately: the digest is a pass over
+ * an executable of tens of megabytes, and the walk visits every entry in the
+ * vault. Neither is a key-store call that can wedge, so the wait is worth more
+ * than the line — but it is still bounded, because a report a user is waiting to
+ * copy must not hang on a network mount.
+ */
+const HOST_READ_DEADLINE_MS = 5000;
+
 /** Settle with the work's value, or with `null` at the deadline (or on a rejection). */
 function withinDeadline<T>(work: Promise<T>, ms: number): Promise<T | null> {
   return new Promise((resolve) => {
@@ -86,7 +125,20 @@ export async function gatherDiagnostics(env: DiagnosticsEnv): Promise<string> {
   // One read, one verdict: a second derivation here would be a second answer to a question
   // whose whole point is that it has one. A refusal, a missing vault and a read that never
   // settles all leave `null`, and the five lines are then ABSENT rather than placeholdered.
-  const doctor = await withinDeadline(readVaultDoctor(env.call), DOCTOR_DEADLINE_MS);
+  // Both host measures are bounded by the same deadline and awaited ALONGSIDE the
+  // doctor, not after it: the block is copied by a user who is waiting, and a
+  // digest pass over tens of megabytes on a cold disk must not be added to a key
+  // store read it has nothing to do with. A measure that never answers costs its
+  // own lines and never the block.
+  const [doctor, hostDigest, hostUsage] = await Promise.all([
+    withinDeadline(readVaultDoctor(env.call), DOCTOR_DEADLINE_MS),
+    env.buildDigest === undefined
+      ? Promise.resolve(null)
+      : withinDeadline(env.buildDigest(), HOST_READ_DEADLINE_MS),
+    env.vaultUsage === undefined
+      ? Promise.resolve(null)
+      : withinDeadline(env.vaultUsage(), HOST_READ_DEADLINE_MS),
+  ]);
   let usage: StorageEstimate | null = null;
   try {
     usage = (await navigator.storage?.estimate?.()) ?? null;
@@ -94,11 +146,22 @@ export async function gatherDiagnostics(env: DiagnosticsEnv): Promise<string> {
     // Storage estimation is permission- and engine-dependent; an unavailable reading drops
     // the two storage lines, never the copy.
   }
+  // A filesystem vault is measured by the HOST, and the page's own estimate is then
+  // NOT printed at all: on desktop it describes the WebView's origin store, which
+  // holds none of the vault, so it would put a true number about the wrong thing in a
+  // block whose only purpose is to be acted on. The quota line goes with it, because
+  // a directory has no quota — the disk's free space is a different fact.
+  const storageUsedMb = hostUsage === null ? mb(usage?.usage) : mb(hostUsage.used_bytes);
+  const storageQuotaMb = hostUsage === null ? mb(usage?.quota) : null;
+  const storageFiles = hostUsage === null ? null : hostUsage.files;
   return buildDiagnostics({
     version: __APP_VERSION__,
     channel: import.meta.env.MODE === "development" ? "Development" : "Stable",
     commit: env.commit,
-    bundleHash: env.bundleHash,
+    // A served hash names a published artefact, so it outranks a local digest; the
+    // host digest is the desktop's only reading, because a bundle cannot contain the
+    // hash of its own bytes (myne-md/myne#991).
+    bundleHash: env.bundleHash ?? hostDigest,
     failureCode: env.failureCode,
     vaultGeneration: doctor?.generation ?? null,
     vaultAuthority: doctor ? authorityToken(doctor.authority) : null,
@@ -109,7 +172,8 @@ export async function gatherDiagnostics(env: DiagnosticsEnv): Promise<string> {
     // models, OEM tokens and extension markers.
     engine: engineLabel(navigator.userAgent, env.webView),
     crossOriginIsolated: typeof crossOriginIsolated === "boolean" ? crossOriginIsolated : false,
-    storageUsedMb: mb(usage?.usage),
-    storageQuotaMb: mb(usage?.quota),
+    storageUsedMb,
+    storageQuotaMb,
+    storageFiles,
   });
 }

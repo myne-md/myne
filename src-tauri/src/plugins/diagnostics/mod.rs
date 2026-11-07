@@ -44,6 +44,7 @@
 
 pub mod commands;
 pub mod flag;
+pub mod measures;
 pub mod report;
 
 use tauri::{plugin::TauriPlugin, Runtime};
@@ -65,6 +66,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::reveal_logs_folder,
             commands::report_manifest,
             commands::save_report,
+            // The two host-side measures of the diagnostic block
+            // (myne-md/myne#991): the running artefact's digest and the vault
+            // directory's footprint. Registered here AND granted in
+            // `permissions/diagnostics/default.toml`; an ACL entry alone wires
+            // nothing.
+            commands::build_digest,
+            commands::vault_usage,
         ])
         .build()
 }

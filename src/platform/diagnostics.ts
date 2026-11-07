@@ -108,6 +108,42 @@ export async function reportManifest(): Promise<ReportManifest> {
 }
 
 /**
+ * The SHA-256 of the running executable, `sha256:`-prefixed (myne-md/myne#991).
+ *
+ * This is the desktop's only build-identity digest, because a bundle cannot
+ * contain the hash of its own bytes and this client has no served `version.json`
+ * to fetch one from. The VALUE covers the executable, not the installer a user
+ * downloaded: a `.dmg`, `.deb`, `AppImage` or `.msi` hashes differently from the
+ * program inside it, so nobody should match this against a published
+ * `SHA256SUMS`. What it answers is "same build as that other paste" and "did
+ * this binary change under an unchanged version string", which is what the
+ * surrounding `version` and `commit` lines are read for.
+ */
+export async function buildDigest(): Promise<string> {
+  return await invoke<string>("plugin:diagnostics|build_digest");
+}
+
+/** The active vault's on-disk footprint, as the host measured it. */
+export interface VaultUsage {
+  /** Total size of the entries under the vault directory, in bytes. */
+  used_bytes: number;
+  /** How many files and links the vault is spread over. */
+  files: number;
+}
+
+/**
+ * Measure the active vault directory (myne-md/myne#991).
+ *
+ * The block cannot take this reading in the page: `navigator.storage.estimate()`
+ * measures the WebView's own origin store, and a desktop vault is a directory of
+ * `.myn` files outside it. A pure read, so it works while the vault is locked —
+ * the fail-closed screen builds the same block.
+ */
+export async function measureVaultUsage(): Promise<VaultUsage> {
+  return await invoke<VaultUsage>("plugin:diagnostics|vault_usage");
+}
+
+/**
  * Write one plaintext report bundle to a destination the user chose.
  *
  * The destination comes from the OS save dialog, and the host re-validates it

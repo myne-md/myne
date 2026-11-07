@@ -17,6 +17,7 @@
 //! covered, which is stated here rather than implied by a green tick.
 
 use super::flag::{self, DiagnosticLogFlagError};
+use super::measures::{self, VaultUsage};
 use super::report::{self, ReportManifest};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::logging::crash::{self, CrashState};
@@ -29,8 +30,9 @@ use tauri_plugin_opener::OpenerExt;
 
 /// The plugin's one error surface.
 ///
-/// One closed arm today, because the switch has exactly one way to fail: a
-/// filesystem error on the flag file or on resolving its directory. It is a
+/// One closed arm today, because every command here fails exactly one way: a
+/// filesystem error on the flag file, on resolving its directory, on the
+/// executable it hashes or on the vault directory it measures. It is a
 /// separate type from [`DiagnosticLogFlagError`] so the command signatures stay
 /// uniform across the commands later tasks add, without the flag module having
 /// to grow arms that are not its business.
@@ -252,6 +254,86 @@ pub async fn save_report<R: Runtime>(
     Ok(())
 }
 
+/// The digest of the running build artefact (myne-md/myne#991).
+///
+/// The page cannot supply this: a bundle cannot contain the hash of its own
+/// bytes, and the desktop client has no served bundle to fetch one from, so
+/// `src/platform/build-info.ts` answers `null` there by construction. Hashing the
+/// running executable is the reading that exists.
+///
+/// **What this value does not match.** An installer artefact (`.dmg`, `.deb`,
+/// `AppImage`, `.msi`) hashes differently from the executable inside it, so this
+/// digest is not the published one. It answers "same build as that other
+/// report" and "did this binary change under an unchanged version string", which
+/// is what the block is read for; the installer's own identity is the `version`
+/// and `commit` lines beside it.
+///
+/// Cached for the life of the process. The read is a 64 KiB-at-a-time pass over
+/// a file of tens of megabytes, the value cannot change while the executable is
+/// the one running, and the panel is opened more than once: without the cache a
+/// second visit to Settings pays the whole cost again. A failure is cached too,
+/// so a build whose executable cannot be read does not re-read it per mount.
+#[tauri::command]
+pub async fn build_digest() -> Result<String, DiagnosticLogError> {
+    // CPU/IO-bound over the whole bundle → off the async worker (the
+    // attachments pattern): `crate::plugins::attachments::blocking_reads` states
+    // the rule for reads that must be synchronous by construction, and this one
+    // is not, so it belongs on a blocking worker rather than in the command.
+    tokio::task::spawn_blocking(cached_digest)
+        .await
+        .map_err(|_| DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })?
+        .map_err(|e| DiagnosticLogError::Io {
+            io_error_kind: from_io_error_kind(e.kind()),
+        })
+}
+
+/// [`build_digest`]'s body, with the process-wide cache and the one trace line.
+fn cached_digest() -> std::io::Result<String> {
+    use std::sync::OnceLock;
+    // `None` means "already failed", which is what stops a second attempt: the
+    // reason is in the log line written when the first one ran.
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    let cached = CACHED.get_or_init(|| {
+        std::env::current_exe()
+            .and_then(|exe| measures::digest_of_file(&exe))
+            .inspect_err(|e| {
+                // `kind` is the closed enum: no path and no OS message, the same
+                // rule every diagnostic line follows.
+                tracing::warn!(event = "build_digest_failed", io_error_kind = ?e.kind());
+            })
+            .ok()
+    });
+    cached
+        .clone()
+        .ok_or_else(|| std::io::Error::other("the running executable could not be hashed"))
+}
+
+/// The active vault's on-disk footprint (myne-md/myne#991).
+///
+/// `navigator.storage.estimate()` answers about the WebView's own origin store,
+/// which on desktop holds none of the vault: the notes live under
+/// `<app_data_dir>/vaults/<id>/` as `.myn` files. So the page's own figure is a
+/// true statement about the wrong thing, which is worse in a pasted block than no
+/// line at all.
+///
+/// **A pure read, so it takes no auth permit and needs no unlocked vault.** The
+/// block is built on the fail-closed screen as well as in Settings, and the
+/// directory can be measured in both: what it reports is the size of sealed
+/// blobs, never their content.
+#[tauri::command]
+pub async fn vault_usage<R: Runtime>(app: AppHandle<R>) -> Result<VaultUsage, DiagnosticLogError> {
+    let dir = crate::paths::vault_dir_path(&app).map_err(|_| DiagnosticLogError::Io {
+        io_error_kind: IoFailureKind::Other,
+    })?;
+    tokio::task::spawn_blocking(move || measures::usage_of_dir(&dir))
+        .await
+        .map_err(|_| DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })
+}
+
 /// The host-resolved stores a report may never be written into.
 ///
 /// **A named roster rather than an inline vector**, because the list is what
@@ -352,6 +434,27 @@ mod tests {
         assert!(!flag::read_flag(&path), "off before anything is written");
         flag::write_flag(&path, true).expect("set on");
         assert!(flag::read_flag(&path), "on after the setter");
+    }
+
+    #[test]
+    fn the_digest_command_body_reads_the_running_executable_and_caches_it() {
+        // The command wrapper needs a Tauri runtime, which a unit test has not got;
+        // its body does not, so the half worth pinning — that hashing THIS
+        // process's executable resolves and answers a well-formed digest — runs
+        // here. Without it the only evidence that `current_exe()` works on a given
+        // platform is a user reporting a missing `bundleHash` line.
+        let digest = cached_digest().expect("the test executable can be hashed");
+        assert!(
+            digest.starts_with(crate::plugins::diagnostics::measures::DIGEST_PREFIX),
+            "digest is not prefixed: {digest}"
+        );
+        assert_eq!(
+            digest.len(),
+            crate::plugins::diagnostics::measures::DIGEST_PREFIX.len() + 64
+        );
+        // Second call serves the cached value rather than re-hashing 20 MB: the same
+        // string is what the panel sees on every later mount.
+        assert_eq!(cached_digest().expect("cached digest"), digest);
     }
 
     #[test]
