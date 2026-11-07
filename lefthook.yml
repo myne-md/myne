@@ -248,6 +248,25 @@ pre-commit:
       # two-halves-pinned-by-hand shape as `e2e-toolchain` below.
       run: node scripts/check-playwright-image.mjs
 
+    pinned-ci-tools:
+      # myne#758 (audit NV02): every tool CI EXECUTES is provisioned at a pinned,
+      # hash-verified version first. Fourteen invocations ran sccache and
+      # cargo-nextest off a host mount that nothing in this repository put there,
+      # pinned or checksummed, while `cargo-deny` a few lines away downloaded a
+      # pinned prebuilt release and verified it. Three ways that comes back are
+      # invisible to every compiler: a new unpinned tool, a step that skips the
+      # provisioner, and a pin whose version and digests drift apart.
+      run: node scripts/check-pinned-ci-tools.mjs
+
+    arch-pkgbuild:
+      # myne#758 (audit NV11): the two Arch recipes and `flake.nix` state ONE
+      # release version, and the from-source recipe builds a commit rather than a
+      # tag. The from-source `pkgver` was a stable release behind while the other
+      # two had moved, and its `#tag=v$pkgver` + `sha256sums=('SKIP')` meant a
+      # force-pushed tag rebuilds different bytes under the same version. Both
+      # still build, so neither is visible to any compiler.
+      run: node scripts/check-arch-pkgbuild.mjs
+
     frontend-lock-teardown:
       # myne#529: the WebView half of `check-lock-teardown.mjs`, which held only
       # the Rust side. A module-scope store outlives every unmount, and neither
