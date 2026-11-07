@@ -204,13 +204,12 @@ export function ReminderSwitchBlock({
             />
           </div>
           {/* Which helper is true follows what this client can do, the same way
-              the desktop row's does. The desktop sentence ("Reminders are set
-              up this far in advance") is true where the pass runs and false
-              here, where `reminderPass.ts` has no caller, so an inert build
-              says so rather than saying nothing: a bare label over four day
-              counts leaves a user acting on the glossary's privacy reading with
-              no bound in force and no way to know it. Both flip together with
-              the line below. */}
+              the desktop row's does. The branch exists because a bare label over
+              four day counts would leave a user acting on the glossary's privacy
+              reading with no bound in force and no way to know it. It flipped to
+              the real sentence when `useMobileReminderPass` gave the pass a
+              caller (myne-md/myne#1037); a hostless build still says the other
+              one, and both flip together with the line below. */}
           <p style={helper} data-testid="settings.reminders-horizon-helper">
             {remindersReachTheOs()
               ? t("settings.reminders.horizonLabelHelper")

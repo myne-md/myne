@@ -71,6 +71,7 @@ import { useConflictMaterializer } from "../../lib/use-conflict-materializer";
 import { activeVaultId, listVaults, orderByLastUnlock } from "../../lib/vault-list";
 import { HAS_TAURI } from "../../lib/app-window";
 import { useIdleAutoLock } from "../../hooks/useIdleAutoLock";
+import { useMobileReminderPass } from "../../lib/useMobileReminderPass";
 import { consumePendingCapture, CAPTURE_EVENT, type CaptureMode } from "../../lib/deep-link";
 import {
   drainPendingCaptures,
@@ -2492,6 +2493,14 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // itself moved into the shared hook when the approval wait became a second
   // post-unlock screen that holds keys (myne-md/myne#535).
   useIdleAutoLock(onLock, prefs.auto_lock_seconds);
+
+  // Reminders, from the moment the vault is readable (myne-md/myne#1037).
+  //
+  // The hook sits HERE rather than in the app root because a reminder pass needs an
+  // unlocked vault: the task index and the calendar range both refuse before that.
+  // This is the same place `useIdleAutoLock` lives, and for the same reason — it is
+  // the one screen that only exists while the keys are in memory.
+  useMobileReminderPass();
 
   // Best-effort plaintext wipe on unmount.
   useEffect(() => {
