@@ -25,7 +25,7 @@ crate-type = ["cdylib"]
 # `src-tauri/scripts/ai-no-network-check.sh` — and the single lockfile at the
 # root IS the TB9 audit anchor.
 #
-# `cargo clippy --workspace --all-targets` and `cargo test --workspace` run in
+# `cargo clippy --workspace --all-targets` and `cargo nextest run --workspace` run in
 # `pre-push` for **everyone**, including contributors who never touch web, so a
 # member that only compiles under `cfg(target_arch = "wasm32")` would break
 # pre-push for them. The split below is what avoids that AND avoids the opposite
@@ -33,7 +33,7 @@ crate-type = ["cdylib"]
 #
 #   `[dependencies]`  — the pure logic: the capability table, the outcome
 #                       envelope, the router. Compiles and is UNIT-TESTED on the
-#                       host, so `cargo test --workspace` genuinely covers it.
+#                       host, so `cargo nextest run --workspace` genuinely covers it.
 #   wasm32-only       — the JS boundary and the CSPRNG registration, which have
 #                       no host meaning at all.
 #
