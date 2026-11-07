@@ -13,7 +13,7 @@
   "src/notes/components/NoteActionsMenu.tsx": 1,
   "src/notes/components/NoteRow.tsx": 1,
   "src/notes/components/OutlineTab.tsx": 1,
-  "src/notes/components/TabStrip.tsx": 4,
+  "src/notes/components/TabStrip.tsx": 3,
   "src/notes/components/TagBrowser.tsx": 1,
   "src/notes/components/UnlinkedMentionsSection.tsx": 1,
   "src/notes/components/ViewsSection.tsx": 1,
