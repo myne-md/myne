@@ -39,10 +39,12 @@
 // Android exposes to the share sheet", and both halves were wrong** (myne#491).
 // iOS declares no `UIFileSharingEnabled`, so the directory is invisible in the
 // Files app there and the share sheet is the user's only route to a file in it.
-// Android is the platform with no share sheet (`share_file.rs::present` is a
-// documented no-op, myne#505), and its copy of the directory is
+// Android's copy of the directory is
 // `Android/data/<pkg>/files/Documents`, which the system Files app has refused
-// to navigate into since Android 11 (API 30) while `minSdk` here is 24.
+// to navigate into since Android 11 (API 30) while `minSdk` here is 24. Neither
+// directory is browsable, so on both platforms the caller's destination chooser
+// is the only route a user has to the file: iOS's share sheet, or Android's
+// Storage Access Framework picker since myne#505.
 //
 // The correction matters at THIS file rather than only at the call sites,
 // because this is where a future export flow reads what the directory is.

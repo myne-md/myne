@@ -101,6 +101,13 @@ tauri-plugin-device-key = { path = "tauri-plugin-device-key" }
 # surface — no WebView commands, no capability entry; it delivers each shared
 # file to the WebView as a global `share-intent` event. Zero external crates.
 tauri-plugin-share-intent = { path = "tauri-plugin-share-intent" }
+# myne-md/myne#505: the Android OUTBOUND half, a Storage Access Framework
+# `ACTION_CREATE_DOCUMENT` picker, so an export the app wrote into its own
+# `Documents` directory can actually be handed to the user (a directory export
+# is zipped first). Same shape as share-intent one line up, one direction over:
+# committed Kotlin, Rust-only WebView surface, no capability entry. Zero external
+# crates.
+tauri-plugin-save-file = { path = "tauri-plugin-save-file" }
 # MYND-466: in-repo iOS AVFoundation QR scanner for device-join via QR. WebView
 # command `scan` (deny-by-default `qr-scan:default` capability, camera-gated,
 # NSCameraUsageDescription). iOS-only (SYNC-46); Android decode is MYND-465.
