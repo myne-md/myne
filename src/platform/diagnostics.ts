@@ -12,6 +12,8 @@
 
 import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
 
+import type { VaultUsage } from "../lib/diagnostics-gather";
+
 import { invoke } from "./core";
 
 /**
@@ -123,24 +125,21 @@ export async function buildDigest(): Promise<string> {
   return await invoke<string>("plugin:diagnostics|build_digest");
 }
 
-/** The active vault's on-disk footprint, as the host measured it. */
-export interface VaultUsage {
-  /** Total size of the entries under the vault directory, in bytes. */
-  used_bytes: number;
-  /** How many files and links the vault is spread over. */
-  files: number;
-}
 
 /**
  * Measure the active vault directory (myne-md/myne#991).
  *
  * The block cannot take this reading in the page: `navigator.storage.estimate()`
  * measures the WebView's own origin store, and a desktop vault is a directory of
- * `.myn` files outside it. A pure read, so it works while the vault is locked —
+ * `.myn` files outside it. A pure read, so it works while the vault is locked:
  * the fail-closed screen builds the same block.
+ *
+ * `null` when the directory cannot be read at all, which the block prints as no
+ * line rather than as `0 entries`: an empty vault and an unreadable one are two
+ * different readings, and the second must not be reported as the first.
  */
-export async function measureVaultUsage(): Promise<VaultUsage> {
-  return await invoke<VaultUsage>("plugin:diagnostics|vault_usage");
+export async function measureVaultUsage(): Promise<VaultUsage | null> {
+  return await invoke<VaultUsage | null>("plugin:diagnostics|vault_usage");
 }
 
 /**

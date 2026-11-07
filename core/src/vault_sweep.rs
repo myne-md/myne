@@ -246,23 +246,59 @@ pub(crate) fn aggregate_kinds(results: &[(PathBuf, Result<(), IoFailureKind>)]) 
 /// honest scope the gate-free sweep will actually remove, so the
 /// confirmation count never under-reports (the over-capture safety valve).
 pub fn count_residue(dir: &Path) -> usize {
-    fn count_children(dir: &Path, acc: &mut usize) {
+    footprint(dir).map_or(0, |found| found.entries)
+}
+
+/// What a read-only walk of one root holds: its entries and their size.
+///
+/// `entries` counts everything under the root, directories included, because
+/// that is the working set a sweep removes and the number [`count_residue`]
+/// reports. `bytes` sums the non-directories only: a directory's own `len` is
+/// its entry record, not content, and adding it would describe the filesystem
+/// rather than the vault.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
+pub struct Footprint {
+    /// Files, links and the directories between them, under the root.
+    pub entries: usize,
+    /// Total size of the files and links, in bytes.
+    pub bytes: u64,
+}
+
+/// Measure `dir` without removing anything, or `None` when the root itself
+/// cannot be read.
+///
+/// `None` is a distinction [`count_residue`] deliberately does not draw, and the
+/// reason this is a second entry point rather than its only one: "unreadable"
+/// and "empty" are the same count and two different readings, and a surface
+/// that prints `0` for the first states a fact it never measured. An unreadable
+/// SUBdirectory costs only its own share, the tolerance the sweep has too.
+///
+/// Used by the desktop diagnostic block (`src-tauri/src/plugins/diagnostics`),
+/// which reports a vault directory's size and entry count.
+pub fn footprint(dir: &Path) -> Option<Footprint> {
+    fn walk(dir: &Path, acc: &mut Footprint) {
         let Ok(entries) = std::fs::read_dir(dir) else {
             return;
         };
         for entry in entries.flatten() {
-            *acc += 1;
             let path = entry.path();
-            if std::fs::symlink_metadata(&path).is_ok_and(|m| m.is_dir()) {
-                count_children(&path, acc);
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            acc.entries += 1;
+            if meta.is_dir() {
+                walk(&path, acc);
+            } else {
+                acc.bytes = acc.bytes.saturating_add(meta.len());
             }
         }
     }
-    // No `dir.exists()` guard needed — `count_children` no-ops when
-    // `read_dir` fails, which it does on a missing directory.
-    let mut acc = 0;
-    count_children(dir, &mut acc);
-    acc
+    // The root is read twice: once to answer "can this be read at all", and once
+    // inside the walk. Cheap, and it keeps the two answers in one place.
+    std::fs::read_dir(dir).ok()?;
+    let mut acc = Footprint::default();
+    walk(dir, &mut acc);
+    Some(acc)
 }
 
 /// One vault root that still holds something on disk, as the repair surfaces

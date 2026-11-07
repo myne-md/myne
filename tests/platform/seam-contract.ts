@@ -84,7 +84,7 @@ export interface SeamModules {
     // mirror of each: a mirror whose signature drifted is a build that cannot
     // substitute the seam, and nothing else in the browser lane calls them.
     buildDigest: () => Promise<string>;
-    measureVaultUsage: () => Promise<{ used_bytes: number; files: number }>;
+    measureVaultUsage: () => Promise<{ entries: number; bytes: number } | null>;
     saveReport: (block: string, destination: string) => Promise<void>;
   };
   window: { getCurrentWindow: () => { destroy: () => Promise<void> } };
