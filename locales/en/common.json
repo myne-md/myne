@@ -3390,7 +3390,10 @@
         "theme": "Theme and accent",
         "sidebar": "In the sidebar",
         "customisation": "Customisation"
-      }
+      },
+      "homeZoneLabel": "Home time zone",
+      "homeZoneHelper": "Shown beside an event's time, as a second clock. This device is in {zone}. Nothing here is written into your notes.",
+      "homeZoneUnknown": "That is not a time zone this device recognises, so no second clock is shown."
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",

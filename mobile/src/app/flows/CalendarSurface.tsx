@@ -35,6 +35,22 @@ import { EventWriteRefused } from "@myne/calendar-drag-write";
 import { skipOccurrence } from "@myne/calendar-skip";
 import { overrideOccurrence } from "@myne/calendar-override";
 import { noteRead, noteUpdate } from "../../lib/notes";
+import { homeClockFor } from "@myne/home-zone";
+
+/**
+ * The second clock (`decisions/storage/0797`), appended to a row's own time.
+ *
+ * A phone is the device that travels, so this is where the feature earns its keep:
+ * "09:00 · evde 06:00" is the difference between a meeting that reads as a mistake
+ * and one that reads as an early start. Empty string when there is nothing to add,
+ * so a reader with no home zone sees exactly what it saw before.
+ */
+function secondClock(start: string): string {
+  const home = homeClockFor(start.replace(" ", "T"));
+  if (home === null) return "";
+  const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
+  return `  ·  ${home.time}${day}`;
+}
 
 /** Today, as the `YYYY-MM-DD` a cell and a composer both speak. */
 function todayDateString(): string {
@@ -264,6 +280,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
                     <div style={{ fontSize: "var(--text-base)", fontWeight: "var(--weight-medium, 500)" as unknown as number }}>{row.title ?? t("calendar.untitled")}</div>
                     <div style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>
                       {row.allDay ? t("calendar.allDay") : row.start.slice(11)}
+                      {row.allDay ? "" : secondClock(row.start)}
                       {row.calendar === null ? "" : `  ·  ${row.calendar}`}
                       {row.conflicts ? `  ·  ${t("calendar.conflict")}` : ""}
                     </div>

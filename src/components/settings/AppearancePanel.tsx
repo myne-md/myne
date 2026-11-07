@@ -34,6 +34,7 @@ import { Icon } from "../primitives/Icon";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { Switch } from "../primitives/Switch";
+import { Input } from "../primitives/Input";
 import { ERROR_STYLE, PANEL_ROOT_STYLE } from "./panel-styles";
 import { subscribePrefsNonce } from "../../notes/prefsNonce";
 import {
@@ -46,6 +47,7 @@ import {
 } from "../../lib/prefs";
 import { applyTheme } from "../../lib/theme";
 import { applyAccent, readAccent, writeAccent } from "../../lib/accentColor";
+import { deviceZone, readHomeZone, writeHomeZone } from "../../lib/homeZone";
 import { CustomThemesSection } from "./CustomThemesSection";
 import { BarCustomizeSettings } from "./BarCustomizeSettings";
 import { RibbonCustomizeSettings } from "./RibbonCustomizeSettings";
@@ -571,6 +573,11 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
   // pref's own omit-when-default polarity.
   const [showTaskMarkerState, setShowTaskMarkerState] = useState(true);
   const [markerError, setMarkerError] = useState<string | null>(null);
+  // Read once on mount and held in a draft: the field is free text ("Europe/Istan"
+  // passes through on its way to a valid identifier), so what is STORED is decided
+  // by `writeHomeZone`, which clears an unusable value rather than keeping it.
+  const [homeZoneDraft, setHomeZoneDraft] = useState<string>(() => readHomeZone() ?? "");
+  const [homeZoneError, setHomeZoneError] = useState<string | null>(null);
   // Read ordering, not display state: see the effect below.
   const prefsRequest = useRef(0);
   const prefsApplied = useRef(0);
@@ -759,6 +766,35 @@ export function AppearancePanel({ onOpenGraph, onDialogOpenChange }: AppearanceP
             ariaLabel={t("settings.appearance.taskMarkerAria")}
             ariaDescribedBy={helperId}
             testId="settings.task-marker-toggle"
+          />
+        )}
+      />
+
+      {/* The second clock (decisions/storage/0797). Device-local, like the accent
+          above it: an IANA identifier here never reaches a note, so a vault that
+          exports as plaintext still says "09:00" and nothing about where anybody
+          lives. Empty means "no second clock", which is the default. */}
+      <SettingRow
+        label={t("settings.appearance.homeZoneLabel")}
+        helper={t("settings.appearance.homeZoneHelper", { zone: deviceZone() || "unknown" })}
+        error={homeZoneError}
+        control={(helperId) => (
+          <Input
+            type="text"
+            aria-label={t("settings.appearance.homeZoneLabel")}
+            aria-describedby={helperId}
+            value={homeZoneDraft}
+            placeholder="Europe/Istanbul"
+            data-testid="settings.home-zone"
+            onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+              setHomeZoneDraft(event.target.value);
+              writeHomeZone(event.target.value);
+              setHomeZoneError(
+                event.target.value.trim() !== "" && readHomeZone() === null
+                  ? t("settings.appearance.homeZoneUnknown")
+                  : null,
+              );
+            }}
           />
         )}
       />
