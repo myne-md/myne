@@ -477,6 +477,7 @@ mod tests {
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
+    use myne_core::test_support::seed_real_vault_meta as seed_vault_meta;
 
     /// No-op `Hooks` for the `note_update_with_dir` index/snapshot side-effect:
     /// this test drives the hydrate/persist path directly, so the CRUD-side
@@ -498,32 +499,6 @@ mod tests {
             .enable_all()
             .build()
             .expect("multi-thread runtime")
-    }
-
-    /// Seed a parse-valid `vault.meta` whose `account_number_hash` is fixed.
-    /// The search codec only consumes `account_number_hash`; the other
-    /// fields just need to parse-pass. Mirrors the prefs-plugin test seeder.
-    fn seed_vault_meta(vault_dir: &Path, account_byte: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [account_byte; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            vault_dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
     }
 
     async fn unlocked_state() -> VaultRuntimeState {

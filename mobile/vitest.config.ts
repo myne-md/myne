@@ -116,6 +116,10 @@ export default defineConfig({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The shared label caption + section heading — mirror of vite.config.ts, which
+      // carries the rationale. An alias added only to the build passes `pnpm
+      // mobile:build` and fails every mobile suite with "Failed to resolve import".
+      { find: /^@myne\/field-label$/, replacement: sib("../src/components/primitives/FieldLabel.tsx") },
       // The last-run undo's LOGIC, shared rather than retyped. Its own header is
       // the argument: it carries three recorded defect fixes, each invisible
       // until it happens to a user, and it imports neither client's bindings:

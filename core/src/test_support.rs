@@ -143,11 +143,33 @@ impl Drop for ScopedTempDir {
     }
 }
 
-/// Write a REAL, structurally-parseable 345-byte `vault.meta` into `dir`
-/// with `account_number_hash` = `seed_byte` repeating (filler key material;
-/// parse-passes, never unlock-passes). Shared by the prefs + backup test
-/// suites — the restore validator's stage-5 parse needs a real header.
-pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
+/// Which frame a seeded `vault.meta` carries. The generation is the ONLY thing that
+/// varies between the copies this replaced (myne-md/myne#995): nine modules wrote out
+/// the same 345-byte `VaultMeta` literal and differed in the serializer call, so the
+/// reader under test could not tell which generation it was looking at without
+/// opening the module that seeded it.
+pub enum SeededMeta {
+    /// The v0.1 base (`MYV1`).
+    V01,
+    /// The v0.2 base (`NTV5`), which a generation-routed reader must see as v0.2.
+    V02,
+    /// The v0.2 base carrying a MEMBERSHIP: a B2B vault whose base holds the
+    /// single-account field.
+    V02WithMembership,
+}
+
+/// Write a REAL, structurally-parseable `vault.meta` into `dir` with
+/// `account_number_hash` = `seed_byte` repeating (filler key material;
+/// parse-passes, never unlock-passes) in the frame `shape` names.
+pub fn seed_vault_meta(dir: &Path, seed_byte: u8, shape: SeededMeta) {
+    let membership = match shape {
+        SeededMeta::V02WithMembership => Some(protocol::Membership {
+            nonce: [0x0A; 24],
+            enc: [0x0B; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
+            roster: None,
+        }),
+        _ => None,
+    };
     let meta = protocol::VaultMeta {
         account_number_hash: [seed_byte; 16],
         kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
@@ -160,14 +182,26 @@ pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
         items_key_id: [7u8; 16],
         items_key_nonce: [8u8; 24],
         enc_items_key: [9u8; 64],
-        membership: None,
+        membership,
         person_binding: None,
     };
-    std::fs::write(
-        dir.join("vault.meta"),
-        protocol::serialize_vault_meta(&meta),
-    )
-    .expect("seed vault.meta");
+    // The two serializers return FIXED-SIZE arrays of different lengths (`MYV1` is
+    // 345 bytes, the v0.2 base is longer), so the frame choice is a `Vec` rather than
+    // an `if` over one type.
+    let bytes: Vec<u8> = match shape {
+        SeededMeta::V01 => protocol::serialize_vault_meta(&meta).to_vec(),
+        SeededMeta::V02 | SeededMeta::V02WithMembership => {
+            protocol::serialize_vault_meta_v0_2(&meta).to_vec()
+        }
+    };
+    std::fs::write(dir.join("vault.meta"), bytes).expect("seed vault.meta");
+}
+
+/// The v0.1 frame, for the many suites that only need a parseable header. Shared by
+/// the prefs + backup test suites — the restore validator's stage-5 parse needs a real
+/// header — and by every module that used to carry its own copy of the literal.
+pub fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
+    seed_vault_meta(dir, seed_byte, SeededMeta::V01);
 }
 
 /// The guard every test that touches the process-global device-key slot takes.

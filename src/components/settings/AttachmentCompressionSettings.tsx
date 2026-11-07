@@ -23,44 +23,22 @@
 // Default state is ON, not off: starting from `false` and correcting after
 // the disk read would flash the wrong answer for effectively every vault.
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { Switch } from "../primitives/Switch";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { has } from "../../platform/capabilities";
 import { prefsRead, setAttachmentCompressionEnabled } from "../../lib/prefs";
 
 export function AttachmentCompressionSettings() {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        setEnabled(p.attachment_compression_enabled);
-      })
-      .catch(() => {
-        /* locked / no vault — leave the default ON */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await setAttachmentCompressionEnabled(next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback — never leave the UI asserting an unsaved value
-      setError(t("settings.attachmentCompression.errorSaveSetting"));
-    }
-  }
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.attachment_compression_enabled,
+    write: setAttachmentCompressionEnabled,
+    initial: true,
+    errorMessage: t("settings.attachmentCompression.errorSaveSetting"),
+  });
 
   const scope = has("imageCompression")
     ? t("settings.attachmentCompression.helperScopeEveryDevice")
@@ -74,7 +52,7 @@ export function AttachmentCompressionSettings() {
       control={(helperId) => (
         <Switch
           checked={enabled}
-          onChange={(next) => void toggle(next)}
+          onChange={(next) => void setEnabled(next)}
           ariaLabel={t("settings.attachmentCompression.label")}
           ariaDescribedBy={helperId}
           testId="settings.attachment-compression"

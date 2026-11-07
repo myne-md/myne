@@ -42,6 +42,7 @@ import {
 import type { SuspicionReason } from "../../lib/stage";
 import type { VaultUnlockError } from "../../types/vault-unlock-error";
 import type { UnlockFlowProps } from "./types";
+import { FieldLabel } from "@myne/field-label";
 
 // ── The destructive-confirm sheet's text roles ────────────────────────────────
 // Hoisted to one constant per role so the OWNER and MEMBER arms of the same
@@ -103,24 +104,6 @@ function Wordmark() {
 function VaultTitle({ size = 22, children }: { size?: number; children: ReactNode }) {
   return (
     <div style={{ marginTop: 8, fontSize: size, fontWeight: 600, letterSpacing: "-0.02em", color: "var(--fg-display)" }}>
-      {children}
-    </div>
-  );
-}
-
-/** Tighter-tracked uppercase field label (0.06em) used over inputs. */
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
       {children}
     </div>
   );

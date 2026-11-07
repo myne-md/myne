@@ -445,6 +445,31 @@ pre-commit:
       glob: "{src/**,web/src/**,editor/src/**,dialect/src/**,mobile/**,src-tauri/src/**,core/src/**,scripts/check-prefs-parity.mjs,scripts/check-ipc-binding-callers.mjs,scripts/prefs-parity.json,docs/dev/settings-parity.md}"
       run: node scripts/check-prefs-parity.mjs --check
 
+    duplication:
+      # myne#995. A renamed copy is invisible to every other gate in this file:
+      # jscpd measured 1.85% literal duplication over the same roots and that is
+      # not the complaint, and the diff-scoped `least-code` review dimension
+      # (#984) cannot see the copies that already shipped. The eleven `FieldLabel`
+      # definitions under `mobile/src` each arrived through a review structurally
+      # unable to notice the other ten.
+      #
+      # Two signals, because one is not enough. The clone half compares a
+      # NORMALISED skeleton (comments stripped, strings, numbers and non-keyword
+      # identifiers placeholdered) so a renamed copy still matches. The repeat half
+      # is the cheaper one and catches what the clone half cannot: an unexported
+      # `function`/`const`/`class` defined under one name in three or more
+      # files, which is exactly the `FieldLabel` family — those copies differ in
+      # prop order and in one margin, so no body comparison groups them at any
+      # threshold.
+      #
+      # `--check` also gates the generated docs/dev/duplication.md, which is why
+      # CI runs its own UNFILTERED `duplication` step: a hand edit to that
+      # projection is a docs-only commit this glob does not match. The record is
+      # re-baselined DOWNWARD only — `--emit` refuses a group it has never seen,
+      # because a re-baseline that comes back green licensed everything it found.
+      glob: "{src/**,core/src/**,protocol/src/**,editor/src/**,dialect/src/**,client-core/src/**,web/src/**,mobile/**,src-tauri/src/**,cli/src/**,mcp/src/**,scripts/check-duplication.mjs,scripts/duplication-groups.json,docs/dev/duplication.md}"
+      run: node scripts/check-duplication.mjs --check
+
     embed-layout-drift:
       # myne#409: the form-C embed-layout grammar is written in TypeScript
       # (canonical, source-consumed by all three clients) and, for the export

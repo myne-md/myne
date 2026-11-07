@@ -59,6 +59,7 @@ import { Banner, PhraseEntryGrid, Segmented } from "./index";
 // `typeof window` guard, so it threw off-DOM instead of answering `false`.
 import { HAS_TAURI } from "../lib/app-window";
 import { tappable } from "../app/a11y/tappable";
+import { FieldLabel, SectionLabel } from "@myne/field-label";
 
 // ── Shared panel primitives (settings-card geometry) ─────────────────────────
 
@@ -69,24 +70,6 @@ const usageValue: CSSProperties = {
   fontSize: 14,
   color: "var(--fg-2)",
 };
-
-function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 function Group({ children }: { children: ReactNode }) {
   return (
@@ -133,24 +116,6 @@ function RowChevron() {
     <svg width="8" height="13" viewBox="0 0 8 14" style={{ flex: "none" }}>
       <path d="M1 1l6 6-6 6" stroke="var(--line-2)" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  );
-}
-
-function FieldLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        marginBottom: 8,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-      }}
-    >
-      {children}
-    </div>
   );
 }
 

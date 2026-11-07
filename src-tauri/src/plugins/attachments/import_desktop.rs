@@ -105,7 +105,8 @@ mod tests {
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
     use crate::test_support::ScopedTempDir;
-    use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
+    use myne_core::test_support::seed_real_vault_meta as seed_vault_meta;
+    use protocol::{derive_subkey, SubkeyRole};
     use std::path::Path;
 
     fn rt() -> tokio::runtime::Runtime {
@@ -119,29 +120,6 @@ mod tests {
     const SEED_ITEMS: u8 = 0x99;
     const SEED_ITEMS_ID: u8 = 1;
     const SEED_ACCOUNT_HASH: u8 = 0x33;
-
-    fn seed_vault_meta(dir: &Path, seed: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
-    }
 
     async fn temp_vault() -> (ScopedTempDir, VaultRuntimeState) {
         let tmp = ScopedTempDir::new("attach-import-desktop").expect("scoped tempdir");
