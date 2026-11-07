@@ -7132,6 +7132,7 @@ pub(crate) async fn touch_mcp_connection_last_used_with_dir(
 mod tests {
     use super::*;
     use crate::plugins::vault_unlock::state::{fixture_unlocked_with_keys, test_vault_id};
+    use crate::test_support::seed_real_vault_meta;
     use crate::test_support::ScopedTempDir;
     use protocol::{encode_prefs_blob_raw, AEAD_NONCE_LEN};
 
@@ -8379,33 +8380,6 @@ mod tests {
         let unlocked = fixture_unlocked_with_keys(0x42, 0x99, 1);
         state.set_unlocked(test_vault_id(), unlocked).await;
         (tmp, state)
-    }
-
-    /// Build a real 345-byte vault.meta blob with `account_number_hash`
-    /// filled by `seed_byte` repeating. Other fields are filler bytes —
-    /// the prefs code only consumes account_number_hash, so the other
-    /// fields just need to parse-pass.
-    fn seed_real_vault_meta(dir: &Path, seed_byte: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed_byte; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
     }
 
     /// Compute the prefs_key the same way the production codec does,

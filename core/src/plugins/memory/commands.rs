@@ -1612,6 +1612,7 @@ pub async fn personality_write_with_dir(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::seed_real_vault_meta;
 
     /// `U+1F3F4` + one tag character per letter of `code` + `U+E007F`, the way
     /// England, Scotland and Wales are actually spelled.
@@ -1646,29 +1647,6 @@ mod tests {
             .enable_all()
             .build()
             .expect("runtime")
-    }
-
-    fn seed_real_vault_meta(dir: &std::path::Path, seed_byte: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed_byte; ACCOUNT_NUMBER_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
     }
 
     async fn unlocked_vault() -> (ScopedTempDir, VaultRuntimeState) {

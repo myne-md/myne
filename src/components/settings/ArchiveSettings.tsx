@@ -15,10 +15,10 @@
 // is persisted. The setter bumps the prefs nonce, so the sidebar (its own
 // `usePrefs`) re-reads and shows/hides the Archive button live (no remount).
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import {
   prefsRead,
   setArchiveDisabled,
@@ -30,30 +30,12 @@ export function ArchiveSettings() {
   const { t } = useTranslation();
   // `enabled` tracks whether ARCHIVING is on (the user-facing polarity), which is
   // the inverse of the stored `archive_disabled` flag.
-  const [enabled, setEnabled] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const ctx = useSelectedNote();
 
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        // null ≡ unset → archiving enabled (host default-OFF for the flag).
-        setEnabled(!(p.archive_disabled ?? false));
-      })
-      .catch(() => {
-        /* locked / no vault — leave default ON (archiving enabled) */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => !(p.archive_disabled ?? false),
+    write: async (next) => {
       if (!next) {
         // Disabling archiving: empty the Archive FIRST so nothing is stranded.
         const ids = archivedRecords(ctx.cache).map((r) => r.noteUuid);
@@ -65,38 +47,35 @@ export function ArchiveSettings() {
         }
         // Folder-archived subtrees (folder-archive) hide notes WITHOUT a per-note
         // marker, so bulkUnarchive can't reach them. Clear the whole
-        // archived_folders set too, else a folder stays hidden with no entry
-        // point once the archive UI is gone.
+        // archived_folders set too, else a folder stays hidden with no entry point
+        // once the archive UI is gone.
         //
         // myne#613: clearing has to SAY what it removes. There is no "make this
-        // empty" verb, deliberately, because that verb is what let a caller
-        // erase entries it had never seen. Read the stored set here rather than
-        // trusting a local copy, and if that read fails the clear does not
-        // happen: the catch below rolls the toggle back, which is the honest
-        // outcome when we cannot know what we would be removing.
+        // empty" verb, deliberately, because that verb is what let a caller erase
+        // entries it had never seen. Read the stored set here rather than trusting
+        // a local copy, and if that read fails the clear does not happen: the write
+        // callback throws, the hook converges the toggle on disk truth, which is the
+        // honest outcome when we cannot know what we would be removing.
         //
-        // The REACH of this clear grew inside myne#613 and the copy had to
-        // follow. `archived_folders` propagates removals now, so the clear
-        // reaches every device; before the removal clock a peer's clockless
-        // union restored it, which made the folder half effectively
-        // device-local while the note half above (`bulkUnarchiveWithSync`,
-        // which rewrites frontmatter) always propagated. So this change made
-        // the toggle coherent rather than making it destructive, and the
-        // helper string now says the scale out loud. Whether an action of this
-        // reach should also CONFIRM is a product decision about the whole
-        // toggle, note half included, and it is not this branch's to take.
+        // The REACH of this clear grew inside myne#613 and the copy had to follow.
+        // `archived_folders` propagates removals now, so the clear reaches every
+        // device; before the removal clock a peer's clockless union restored it,
+        // which made the folder half effectively device-local while the note half
+        // above (`bulkUnarchiveWithSync`, which rewrites frontmatter) always
+        // propagated. So this change made the toggle coherent rather than making it
+        // destructive, and the helper string now says the scale out loud. Whether an
+        // action of this reach should also CONFIRM is a product decision about the
+        // whole toggle, note half included, and it is not this branch's to take.
         const stored = (await prefsRead()).archived_folders;
         if (stored.length > 0) {
           await mutateArchivedFolders({ remove: stored });
         }
       }
       await setArchiveDisabled(!next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback
-      setError(t("settings.archive.saveError"));
-    }
-  }
+    },
+    initial: true,
+    errorMessage: t("settings.archive.saveError"),
+  });
 
   return (
     <SettingRow
@@ -106,7 +85,7 @@ export function ArchiveSettings() {
       control={(helperId) => (
         <Switch
           checked={enabled}
-          onChange={() => toggle(!enabled)}
+          onChange={() => void setEnabled(!enabled)}
           ariaLabel={t("settings.archive.label")}
           ariaDescribedBy={helperId}
           testId="settings.archive-disabled"

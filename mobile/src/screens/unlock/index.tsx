@@ -10,6 +10,7 @@ import {
 } from "../../components";
 import { usePlatform } from "../../formfactor/PlatformContext";
 import type { ScreenDef } from "../../gallery/types";
+import { FieldLabel } from "@myne/field-label";
 
 // ── Shared bits ──────────────────────────────────────────────────────────────
 
@@ -39,24 +40,6 @@ function AccountLine() {
   return (
     <div style={{ marginTop: 6, fontFamily: "var(--font-mono)", fontSize: 13, letterSpacing: "0.04em", color: "var(--line-3)" }}>
       MY‑4F2A‑9C17‑8E2D
-    </div>
-  );
-}
-
-/** Tighter-tracked uppercase field label (0.06em) used over inputs. */
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
-      {children}
     </div>
   );
 }

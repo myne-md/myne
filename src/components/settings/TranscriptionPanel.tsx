@@ -14,12 +14,12 @@
 // persisted value host-side before it decrypts anything, so a WebView that
 // forges or skips the setter gains nothing.
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { SettingsSection, SettingsSectionCounter } from "./SettingsSection";
 import { PANEL_ROOT_STYLE } from "./panel-styles";
 import { Switch } from "../primitives/Switch";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { prefsRead, setTranscriptionEnabled } from "../../lib/prefs";
 
 export function TranscriptionPanel() {
@@ -27,35 +27,13 @@ export function TranscriptionPanel() {
   // Starts ON, matching the persisted default: starting from `false` and
   // correcting after the disk read would flash the wrong answer for every
   // vault that never touched the setting — i.e. almost all of them.
-  const [enabled, setEnabled] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        setEnabled(p.transcription_enabled);
-      })
-      .catch(() => {
-        /* locked / no vault — leave the default ON */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await setTranscriptionEnabled(next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback — never leave the UI asserting an unsaved value
-      setError(t("settings.transcription.errorSaveSetting"));
-    }
-  }
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.transcription_enabled,
+    write: setTranscriptionEnabled,
+    initial: true,
+    errorMessage: t("settings.transcription.errorSaveSetting"),
+  });
 
   return (
     <div style={PANEL_ROOT_STYLE} data-testid="settings.transcription-panel">
@@ -75,7 +53,7 @@ export function TranscriptionPanel() {
           control={(helperId) => (
             <Switch
               checked={enabled}
-              onChange={(next) => void toggle(next)}
+              onChange={(next) => void setEnabled(next)}
               ariaLabel={t("settings.transcription.label")}
               ariaDescribedBy={helperId}
               testId="settings.transcription"

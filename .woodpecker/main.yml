@@ -458,6 +458,29 @@ steps:
     commands:
       - node scripts/check-prefs-parity.mjs --check
 
+  # ─── Tree-level duplication has an owner (#995) ──────────────────────────────
+  # No `when:` filter, for the reason bundle-record, twin-inventory and
+  # prefs-parity all carry: the `--check` half compares the GENERATED
+  # docs/dev/duplication.md against what `--emit` would write, so a docs/** file
+  # is one of its inputs and a hand edit to that projection is a docs-only commit
+  # the `code-paths` filter would skip. Do NOT add `when: *code-paths` here as a
+  # cleanup.
+  #
+  # It is its own step rather than a line inside `pnpm-build` so it needs no
+  # `pnpm install`: it reads TypeScript and Rust sources with node builtins only,
+  # and costs under two seconds.
+  #
+  # What no other gate can catch. A RENAMED copy is invisible to jscpd (1.85% of
+  # lines are literal duplicates, measured 2026-11-03, and that is not the
+  # complaint) and invisible to the diff-scoped `least-code` review: the eleven
+  # `FieldLabel` definitions under `mobile/src` each entered through a review that
+  # could not see the other ten. This is that question asked about the TREE,
+  # which is why it is a roster with two directions rather than a ceiling.
+  duplication:
+    image: node:25
+    commands:
+      - node scripts/check-duplication.mjs --check
+
   # ─── Translation coverage is measured rather than asserted (#589) ────────────
   # No `code-paths` filter, for exactly the reason bundle-record and
   # twin-inventory carry none: the `--check` half compares the GENERATED
@@ -1945,6 +1968,11 @@ steps:
       # Unfiltered for the same reason, listed for the same one: a deferral reason
       # that stops naming an open issue is a decision-entry edit away, and a gate
       # nobody is paged for is a gate that stays red.
+      # Unfiltered for the same reason, and listed for the same one: a stale
+      # docs/dev/duplication.md is a docs-only commit away, and a gate nobody is
+      # paged for is a gate that stays red.
+      - name: duplication
+        optional: true
       - name: ignored-tests
         optional: true
       - name: web-build

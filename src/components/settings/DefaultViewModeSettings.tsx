@@ -11,10 +11,10 @@
 // omit-when-default). The setter bumps the prefs nonce, so a newly-opened tab
 // picks up the new default (open tabs keep their per-tab mode).
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { Select } from "../primitives/Select";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { prefsRead, setEditorDefaultViewMode } from "../../lib/prefs";
 import { asViewMode, type ViewMode } from "../../editor/view-mode";
 
@@ -29,36 +29,16 @@ const OPTION_KEYS = [
 
 export function DefaultViewModeSettings() {
   const { t } = useTranslation();
-  const [mode, setMode] = useState<ViewMode>("live");
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        setMode(asViewMode(p.editor_default_view_mode));
-      })
-      .catch(() => {
-        /* locked / no vault — leave default live */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  const { value: mode, set: setMode, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => asViewMode(p.editor_default_view_mode),
+    write: (next) => setEditorDefaultViewMode(next === "live" ? null : next),
+    initial: "live",
+    errorMessage: t("settings.viewMode.errorSave"),
+  });
+  // keep choose wrapper? onChange calls choose(v as ViewMode). We'll make choose = setMode
   async function choose(next: ViewMode) {
-    const prev = mode;
-    setMode(next); // optimistic
-    try {
-      // "live" is the default — persist it as unset (null) to keep byte-stable
-      // omit-when-default; reading/source persist the explicit value.
-      await setEditorDefaultViewMode(next === "live" ? null : next);
-      setError(null);
-    } catch {
-      setMode(prev); // rollback
-      setError(t("settings.viewMode.errorSave"));
-    }
+    await setMode(next);
   }
 
   const options = OPTION_KEYS.map((o) => ({

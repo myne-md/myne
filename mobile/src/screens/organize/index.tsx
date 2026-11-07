@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, ScreenScroll, FooterBar, Button, Sheet } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { SectionLabel } from "@myne/field-label";
 
 /**
  * Organize-notes section (prefix NO). Light variant only — dark + amoled track
@@ -93,24 +94,6 @@ function PageTitle({ children, margin = "4px 4px 0" }: { children: ReactNode; ma
     <h1 style={{ margin, fontSize: 26, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--fg-display)" }}>
       {children}
     </h1>
-  );
-}
-
-/** Tracked uppercase section label. */
-function SectionLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
   );
 }
 

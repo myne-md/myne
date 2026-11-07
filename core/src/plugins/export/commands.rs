@@ -273,6 +273,7 @@ mod tests {
     use crate::plugins::vault_unlock::state::{
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
+    use crate::test_support::seed_real_vault_meta as seed_vault_meta;
     use crate::test_support::ScopedTempDir;
     use std::collections::HashSet;
     use std::fs;
@@ -294,31 +295,6 @@ mod tests {
             .expect("current-thread runtime build")
     }
 
-    /// Seed a parse-passing `vault.meta` (the prefs/catalog AAD identity
-    /// source) — mirror of the notes plugin's export seeder.
-    fn seed_vault_meta(vault_root: &Path) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [0x33; protocol::VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        fs::write(
-            vault_root.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
-    }
-
     /// Scratch vault (`<scratch>/vault/` with vault.meta + notes/) plus
     /// an unlocked runtime state keyed to the fixture material.
     async fn vault_fixture(slug: &str) -> (ScopedTempDir, PathBuf, VaultRuntimeState) {
@@ -326,7 +302,7 @@ mod tests {
         let vault_dir = scratch.path().join("vault");
         fs::create_dir_all(&vault_dir).unwrap();
         crate::paths::notes_dir_under(&vault_dir).unwrap();
-        seed_vault_meta(&vault_dir);
+        seed_vault_meta(&vault_dir, 0x33);
         let state = VaultRuntimeState::default();
         state
             .set_unlocked(
@@ -550,7 +526,7 @@ mod tests {
             let vault_dir = scratch.path().join("vault");
             fs::create_dir_all(&vault_dir).unwrap();
             crate::paths::notes_dir_under(&vault_dir).unwrap();
-            seed_vault_meta(&vault_dir);
+            seed_vault_meta(&vault_dir, 0x33);
             let state = VaultRuntimeState::default(); // nothing unlocked
             let dest = scratch.path().join("export-tree");
             assert!(matches!(
