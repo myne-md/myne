@@ -4809,9 +4809,9 @@ pub(crate) async fn sync_meta_phase(
             //
             // `>=` rather than `==`: an `NTV8` frame is the SAME move from this
             // device's side (the person wrap goes away) and the adopt arm below
-            // would write it with no local password proven, which is exactly what
-            // `vault_migrate::ntv8`'s `UpgradeAuthority::PasswordProven` exists to
-            // forbid. The staged copy is only ever tried by a password unlock
+            // would write it with no local password proven, which is the one thing
+            // the old in-place upgrade refused to do. The staged copy is only ever
+            // tried by a password unlock
             // (`vault_unlock`'s candidate order), so staging is what keeps the two
             // paths agreeing about when the wrap may move.
             if server_generation >= protocol::VaultMetaGeneration::Person {

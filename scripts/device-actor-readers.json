@@ -200,20 +200,6 @@
         "reason": "WRITE in a test fixture: marks the state as enrolled so the test exercises the unsynced path."
       }
     },
-    "core/src/plugins/vault_migrate/mod.rs": {
-      "after.device_id_hex.as_deref(),": {
-        "count": 1,
-        "reason": "Test fixture asserting the migration left the vault record's device id alone."
-      },
-      "if state.device_id_hex.is_none() {": {
-        "count": 1,
-        "reason": "Guards THIS record's own plane before re-basing its baselines: an enrolment-less state has none, whatever a person credential says."
-      },
-      "state.device_id_hex.is_some() && !state.rekey_rebase_pending": {
-        "count": 1,
-        "reason": "Asks whether this record's v0.2 generation was published: `rekey_rebase_pending` is a field of the same file, so the two are read together as one fact."
-      }
-    },
     "web/wasm/src/dispatch.rs": {
       "&a.device_id_hex,": {
         "count": 2,
