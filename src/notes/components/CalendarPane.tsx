@@ -82,6 +82,7 @@ import {
   type OccurrenceRefusal,
 } from "../calendar/occurrence";
 import { dayLabel, monthLabel, shortDayLabel } from "../calendar/format";
+import { Fragment } from "react";
 import { skipOccurrence } from "../calendar/skipWrite";
 import { overrideOccurrence } from "../calendar/overrideWrite";
 import { homeClockFor } from "../../lib/homeZone";
@@ -501,6 +502,36 @@ export function CalendarPane({
     </Button>
   );
 
+  /** `YYYY-MM-DDTHH:MM`, the device's own clock, in the shape a row's start uses. */
+  function currentMinute(): string {
+    const at = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  }
+
+  /** Whether the marker belongs above this row: the first row that starts later. */
+  const nowMarker = (rowTime: string) => rowTime > now.slice(11);
+
+  /**
+   * The "now" line.
+   *
+   * A calendar without one makes the reader do the arithmetic the app already knows:
+   * every day looks the same, including today. It carries `aria-hidden` because it is
+   * a position, not information a screen reader can use, and the day header already
+   * says which day this is.
+   */
+  const nowLine = () => (
+    <div
+      aria-hidden="true"
+      data-testid="calendar.now"
+      style={{ display: "flex", alignItems: "center", gap: "var(--space-1)", padding: "var(--space-0) 0" }}
+    >
+      <span style={{ width: "var(--space-1)", height: "var(--space-1)", borderRadius: "var(--radius-pill)", background: "var(--accent)" }} />
+      <span style={{ flex: "1 1 auto", borderTop: "1px solid var(--accent)" }} />
+      <span style={{ fontSize: "var(--text-xs)", color: "var(--accent)" }}>{now.slice(11, 16)}</span>
+    </div>
+  );
+
   const dayHeader = (date: string) => {
     const parsed = parseCivilDate(date);
     const weekday =
@@ -508,7 +539,16 @@ export function CalendarPane({
     return (
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-3)" }}>{weekday}</span>
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--fg-2)" }}>{date.slice(8)}</span>
+        <span
+          style={{
+            fontSize: "var(--text-xs)",
+            color: date === today ? "var(--accent)" : "var(--fg-2)",
+            fontWeight: date === today ? ("var(--weight-medium, 500)" as unknown as number) : undefined,
+          }}
+          data-testid={date === today ? "calendar.today-header" : undefined}
+        >
+          {date.slice(8)}
+        </span>
         <span style={{ flex: "1 1 auto" }} />
         <IconButton
           icon="plus"
@@ -629,7 +669,13 @@ export function CalendarPane({
         >
           {dayHeader(cell.date)}
           {capturing === cell.date && captureField(cell.date)}
-          {cell.rows.map((row) => chip(row, true))}
+          {cell.rows.map((row) => (
+            <Fragment key={`${row.noteId}-${row.start}`}>
+              {cell.date === today && nowMarker(row.start.slice(11)) ? nowLine() : null}
+              {chip(row, true)}
+            </Fragment>
+          ))}
+          {cell.date === today && cell.rows.every((row) => row.start.slice(11) <= now.slice(11)) && nowLine()}
         </div>
       ))}
     </div>
@@ -706,11 +752,77 @@ export function CalendarPane({
     }
   };
 
+  /**
+   * Where "now" is, re-read on a tick so the marker moves while the pane is open.
+   *
+   * One interval for the whole pane rather than a timer per row: the marker is a
+   * single line, and a calendar that recomputed a hundred cells a minute would be
+   * the reason a laptop's fan turns on while nobody is looking at it.
+   */
+  const [now, setNow] = useState<string>(() => currentMinute());
+  useEffect(() => {
+    const id = setInterval(() => setNow(currentMinute()), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
+  /**
+   * Keyboard navigation, on the pane rather than on the window.
+   *
+   * A calendar is a grid, so the arrows move through it the way every other calendar
+   * does: left and right by a day, up and down by a week. `t` jumps to today and `n`
+   * starts a note on the anchor day, which are the two things a keyboard user does
+   * most and the two that had no key at all.
+   *
+   * The handler is on the pane because the editor is where the caret usually lives:
+   * a window-level listener would eat an arrow key out of a paragraph the user is
+   * typing in, which is the failure mode that makes a shortcut worse than none.
+   */
+  const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target !== null && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+      return;
+    }
+    // The DAY is the unit the arrows move in, whatever the view shows: a week view
+    // that moved by a week on every keypress would have no way to reach tuesday, and
+    // a month view that did would be the only calendar in the world that does.
+    const shift = (days: number) => {
+      const next = addDays(anchor, days);
+      setAnchor(next);
+      event.preventDefault();
+    };
+    switch (event.key) {
+      case "ArrowLeft":
+        return shift(-1);
+      case "ArrowRight":
+        return shift(1);
+      case "ArrowUp":
+        return shift(-7);
+      case "ArrowDown":
+        return shift(7);
+      case "t":
+      case "T":
+        setAnchor(parseCivilDate(today) ?? todayCivilDate());
+        event.preventDefault();
+        return;
+      case "n":
+      case "N":
+        setCapturing(today);
+        event.preventDefault();
+        return;
+      default:
+        return;
+    }
+  };
+
   return (
     <div
       style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-3) 0" }}
       data-testid="calendar.pane"
       data-pane={paneId}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+      role="application"
+      aria-label={t("calendar.view.label")}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)", flexWrap: "wrap" }}>
         <Segmented

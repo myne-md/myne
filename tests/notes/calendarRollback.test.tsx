@@ -232,3 +232,96 @@ describe("dragging an occurrence of a series", () => {
     cleanup();
   });
 });
+
+// ── Orientation: where "now" is, and how a keyboard moves through the grid ────
+//
+// Both claims are about the pane as a CALENDAR rather than as a list. A day that
+// looks like every other day makes the reader do arithmetic the app already knows,
+// and a grid an arrow key cannot enter is a grid only a mouse can use.
+
+describe("the pane as a calendar", () => {
+  it("marks today's column and draws the now line once", async () => {
+    const today = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const stamp = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+    rangeRows = [
+      {
+        ...(defaultRows[0] as Record<string, unknown>),
+        noteId: "today-row",
+        start: `${stamp} 00:01`,
+        end: null,
+      },
+    ];
+    const { host, cleanup } = await renderPane(
+      <CalendarPane
+        paneId="pane-1"
+        item={calendarItem("week")}
+        initialAnchor={{
+          year: today.getFullYear(),
+          month: today.getMonth() + 1,
+          day: today.getDate(),
+        }}
+      />,
+    );
+    expect(host.querySelector('[data-testid="calendar.today-header"]')).not.toBeNull();
+    // Exactly one, however many rows the day holds: a marker per row would draw the
+    // same line several times and let a reader think there are several "nows".
+    expect(host.querySelectorAll('[data-testid="calendar.now"]')).toHaveLength(1);
+    cleanup();
+  });
+
+  it("moves the anchor by a day on an arrow and returns to today on `t`", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const pane = host.querySelector('[data-testid="calendar.pane"]') as HTMLElement;
+    expect(pane).not.toBeNull();
+    const dates = () =>
+      Array.from(host.querySelectorAll("[data-date]")).map((el) => el.getAttribute("data-date"));
+
+    // The week view holds seven days, so a one-day shift changes WHERE the window
+    // starts rather than which days are visible. Asserting the window's first day is
+    // the version of this test that would catch an arrow moving by a whole week.
+    const firstDay = dates()[0];
+    expect(firstDay).toBe("2026-11-02");
+    // Four presses from Thursday the 5th: Sunday the 8th still sits in the week that
+    // starts on the 2nd, and the fourth lands on Monday the 9th, whose week starts
+    // there. Asserting the window's first day is what catches an arrow that moves by
+    // a whole week instead of a day.
+    for (let index = 0; index < 4; index += 1) {
+      act(() => {
+        pane.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+      });
+      await act(async () => {});
+    }
+    expect(dates()[0]).toBe("2026-11-09");
+
+    act(() => {
+      pane.dispatchEvent(new KeyboardEvent("keydown", { key: "t", bubbles: true }));
+    });
+    await act(async () => {});
+    // Back to the machine's today, whichever month that is in.
+    expect(dates()).toContain(
+      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+    );
+    cleanup();
+  });
+
+  it("leaves a keypress alone while the user is typing in a field", async () => {
+    const { host, cleanup } = await renderPane(
+      <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={{ year: 2026, month: 11, day: 5 }} />,
+    );
+    const pane = host.querySelector('[data-testid="calendar.pane"]') as HTMLElement;
+    const field = document.createElement("input");
+    pane.appendChild(field);
+    const dates = () => Array.from(host.querySelectorAll("[data-date]")).map((el) => el.getAttribute("data-date"));
+    const before = dates();
+    act(() => {
+      field.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true }));
+    });
+    await act(async () => {});
+    // A window-level listener would move the calendar while the user types a time.
+    expect(dates()).toEqual(before);
+    cleanup();
+  });
+});
