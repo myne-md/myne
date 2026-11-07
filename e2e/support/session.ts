@@ -434,6 +434,16 @@ function ownedProcessIds(): number[] {
   return ids;
 }
 
+/** The first executable named `name` on PATH, or null. */
+function findOnPath(name: string): string | null {
+  for (const dir of (process.env.PATH ?? "").split(":")) {
+    if (dir === "") continue;
+    const candidate = join(dir, name);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 /**
  * Kill a `tauri-driver` still holding one of OUR driver ports.
  *
@@ -469,6 +479,19 @@ function reapStrayDrivers(ports: readonly number[]): number {
       continue;
     }
     if (!cmdline.includes("tauri-driver")) continue;
+    // **Only an ORPHAN.** A two-device scenario runs two drivers at once and both
+    // sit in the band, so an ownership rule of "in the band" would kill the peer
+    // this scenario is about to sync with — the same cascade an earlier version of
+    // `reapOwnedProcesses` caused one level up. A driver whose parent is still
+    // alive belongs to a scenario in flight; a driver whose parent is gone
+    // outlived it, which is the thing being reaped.
+    let ppid = 0;
+    try {
+      ppid = Number(readFileSync(`/proc/${entry}/stat`, "latin1").split(") ")[1]?.split(" ")[1]);
+    } catch {
+      continue;
+    }
+    if (ppid > 1 && existsSync(`/proc/${ppid}`)) continue;
     const args = cmdline.split("\0");
     const portIndex = args.findIndex((arg) => arg === "--port");
     const nativeIndex = args.findIndex((arg) => arg === "--native-port");
@@ -655,9 +678,24 @@ export async function launchApp(opts: LaunchOptions = {}): Promise<AppSession> {
     reapStrayDrivers([ports.movedFrom, wantedDriverPort, wantedNativePort]);
   }
 
+  // **One private D-Bus session bus PER DRIVER, when the host has one.**
+  //
+  // WebKitGTK's UI process needs a session bus to reach its own web/network
+  // processes, and every instance registers the same well-known name on it. On a
+  // host with a desktop session (a Linux dev box) two concurrent drivers therefore
+  // deadlock: measured 2026-11-07, the first `POST /session` answered in seconds and
+  // the second never answered at all, for the whole ten-minute budget — and with
+  // `dbus-run-session` around each driver both answered. A container has no session
+  // bus, which is why the suite never saw this there, and why "give each driver its
+  // own bus" and not "remove the bus" is the fix: no bus at all makes BOTH hang.
+  //
+  // Degrades to a plain spawn where `dbus-run-session` is absent, so the container
+  // path is unchanged.
+  const dbusRunSession = findOnPath("dbus-run-session");
+  const driverArgs = ["--port", String(driverPort), "--native-port", String(nativePort)];
   const proc = spawn(
-    driverBinary(),
-    ["--port", String(driverPort), "--native-port", String(nativePort)],
+    dbusRunSession ?? driverBinary(),
+    dbusRunSession === null ? driverArgs : ["--", driverBinary(), ...driverArgs],
     {
       // Own process GROUP: tauri-driver spawns WebKitWebDriver which spawns the
       // app binary; `detached` makes `proc` the group leader so teardown can
