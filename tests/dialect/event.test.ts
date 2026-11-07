@@ -15,9 +15,11 @@
 import { describe, expect, it } from "vitest";
 import { readKindFromFmBody } from "../../src/dialect/surgery";
 import {
+  appendSkipDate,
   formatEventInstant,
   parseEventInstant,
   parseReminderLead,
+  parseSkipDates,
   readEventFromFmBody,
 } from "../../src/dialect/event";
 
@@ -226,5 +228,55 @@ describe("readEventFromFmBody: the relative reminder lead", () => {
     const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-05", "remind: soon"));
     if (read.state !== "ok") throw new Error("expected ok");
     expect(read.event.remind).toBeNull();
+  });
+});
+
+describe("skip: the dates a series does not occur on", () => {
+  it("reads a comma-separated list and keeps it in file order", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-03 09:00", "repeat: every tuesday", "skip: 2026-11-10, 2026-11-17"),
+    );
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.skip).toEqual([
+      { year: 2026, month: 11, day: 10 },
+      { year: 2026, month: 11, day: 17 },
+    ]);
+  });
+
+  it("accepts whitespace instead of commas, because a hand-typed field uses both", () => {
+    expect(parseSkipDates("2026-11-10 2026-11-17")).toHaveLength(2);
+  });
+
+  it("drops what does not parse rather than hiding the series", () => {
+    const read = readEventFromFmBody(
+      fm("kind: event", "start: 2026-11-03", "repeat: every tuesday", "skip: soon, 2026-11-10"),
+    );
+    if (read.state !== "ok") throw new Error("a typo in a cancellation is not a broken event");
+    expect(read.event.skip).toEqual([{ year: 2026, month: 11, day: 10 }]);
+  });
+
+  it("carries no dates when the field is absent", () => {
+    const read = readEventFromFmBody(fm("kind: event", "start: 2026-11-03"));
+    if (read.state !== "ok") throw new Error("expected ok");
+    expect(read.event.skip).toEqual([]);
+  });
+});
+
+describe("appendSkipDate: the one spelling of the field", () => {
+  it("adds a date in ascending order regardless of the order it is added", () => {
+    const first = appendSkipDate(null, { year: 2026, month: 11, day: 17 });
+    const second = appendSkipDate(first, { year: 2026, month: 11, day: 10 });
+    const reversed = appendSkipDate(
+      appendSkipDate(null, { year: 2026, month: 11, day: 10 }),
+      { year: 2026, month: 11, day: 17 },
+    );
+    // Byte-for-byte equal, so two clients cancelling the same two dates in either
+    // order cannot produce a conflict neither of them made.
+    expect(second).toBe("2026-11-10, 2026-11-17");
+    expect(reversed).toBe(second);
+  });
+
+  it("answers null when the date is already skipped, so the writer does nothing", () => {
+    expect(appendSkipDate("2026-11-10", { year: 2026, month: 11, day: 10 })).toBeNull();
   });
 });

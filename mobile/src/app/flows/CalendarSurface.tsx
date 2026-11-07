@@ -31,6 +31,9 @@ import type { CalendarRow } from "@myne/vault-indices";
 import { monthLabel } from "@myne/calendar-format";
 import { tappable } from "../a11y/tappable";
 import { EventComposerSheet } from "./EventComposerSheet";
+import { EventWriteRefused } from "@myne/calendar-drag-write";
+import { skipOccurrence } from "@myne/calendar-skip";
+import { noteRead, noteUpdate } from "../../lib/notes";
 
 /** Today, as the `YYYY-MM-DD` a cell and a composer both speak. */
 function todayDateString(): string {
@@ -53,6 +56,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<readonly CalendarRow[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [composing, setComposing] = useState<string | null>(null);
+  const [skipFailed, setSkipFailed] = useState(false);
 
   const load = useCallback(() => {
     const window = windowForView("month", anchor, 0);
@@ -67,6 +71,33 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
   useEffect(load, [load]);
 
   const grid = rows === null ? [] : monthGrid(anchor, rows);
+  /**
+   * Cancel one appearance of a series from the phone.
+   *
+   * The write is the shared one (`@myne/calendar-skip`), so the field's bytes are
+   * the same ones the desktop pane writes; only the IO below it is the phone's.
+   * A refusal is shown, not swallowed: the row is re-read either way, and a row
+   * that came back because the write did not land must not look like one the user
+   * never cancelled.
+   */
+  const skip = useCallback(
+    async (row: CalendarRow) => {
+      setSkipFailed(false);
+      try {
+        await skipOccurrence({
+          noteId: row.occurrenceOf ?? row.noteId,
+          occurrenceDate: row.occurrenceDate ?? row.start.slice(0, 10),
+          io: { readNote: noteRead, writeNote: (id, body, base) => noteUpdate(id, body, base) },
+        });
+      } catch (err) {
+        if (err instanceof EventWriteRefused) setSkipFailed(true);
+        else throw err;
+      }
+      await load();
+    },
+    [load],
+  );
+
   const dayRows =
     selected === null ? [] : (rows ?? []).filter((row) => row.start.slice(0, 10) === selected);
 
@@ -208,6 +239,19 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
                       {row.calendar === null ? "" : `  ·  ${row.calendar}`}
                       {row.conflicts ? `  ·  ${t("calendar.conflict")}` : ""}
                     </div>
+                    {row.occurrenceOf !== null && (
+                      // Only an appearance offers this: a one-off event has nothing
+                      // to cancel, and deleting it is the delete it already has.
+                      <Button
+                        variant="ghost"
+                        full={false}
+                        {...tappable}
+                        data-testid={`calendar.skip.${row.noteId}`}
+                        onClick={() => void skip(row)}
+                      >
+                        {t("calendar.occurrence.skip")}
+                      </Button>
+                    )}
                   </div>
                 ))
               )}
@@ -227,6 +271,12 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
             load();
           }}
         />
+      )}
+
+      {skipFailed && (
+        <p role="alert" style={{ flex: "none", padding: "var(--space-0) var(--space-4)", fontSize: "var(--text-sm)", color: "var(--danger)" }} data-testid="calendar.skipFailed">
+          {t("calendar.skipFailed")}
+        </p>
       )}
 
       {failed && (

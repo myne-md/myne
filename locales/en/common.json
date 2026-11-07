@@ -6155,7 +6155,8 @@
     "occurrence": {
       "thisIsOne": "This is one occurrence of a series, on {{date}}. To change it, edit the series or add a one-off on this day.",
       "editSeries": "Edit the series",
-      "addOneOff": "Add a one-off on this day"
+      "addOneOff": "Add a one-off on this day",
+      "skip": "Cancel this one"
     },
     "import": "Import an .ics file",
     "export": "Export as .ics",
@@ -6193,6 +6194,7 @@
       "repeatMonthly": "Monthly",
       "remindNone": "No reminder",
       "calendarLabel": "Calendar (a name)"
-    }
+    },
+    "skipFailed": "That occurrence could not be cancelled. It is still in the calendar."
   }
 }

@@ -40,6 +40,15 @@ export default defineConfig(async () => ({
       // disagree about which day a span falls on.
       { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
       { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
+      // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
+      // Aliased rather than reimplemented: the field's bytes are a function of its
+      // set, so two writers would be two orderings and every sync would see a
+      // conflict nobody made.
+      { find: "@myne/calendar-skip", replacement: sib("../src/notes/calendar/skipWrite.ts") },
+      // The refusal vocabulary the skip writer raises, re-exported rather than
+      // redefined: a surface that catches its own copy of an error class catches
+      // nothing the writer throws.
+      { find: "@myne/calendar-drag-write", replacement: sib("../src/notes/calendar/dragWrite.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The shared sync-status VOCABULARY (myne-md/myne#1027): the status union and the one
       // mapping from a status to a sentence. Aliased for the same reason as the staleness rule

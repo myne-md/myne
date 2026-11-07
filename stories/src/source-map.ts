@@ -49,7 +49,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "BuildingIndexState": { file: "src/components/sync/BuildingIndexState.tsx", line: 28 },
   "Button": { file: "src/components/primitives/Button.tsx", line: 37 },
   "CalendarEventForm": { file: "src/notes/components/CalendarEventForm.tsx", line: 213 },
-  "CalendarPane": { file: "src/notes/components/CalendarPane.tsx", line: 97 },
+  "CalendarPane": { file: "src/notes/components/CalendarPane.tsx", line: 98 },
   "CalendarSettings": { file: "src/components/settings/CalendarSettings.tsx", line: 45 },
   "CenteredCard": { file: "src/components/primitives/CenteredCard.tsx", line: 65 },
   "ChatComposer": { file: "src/notes/components/ChatComposer.tsx", line: 354 },

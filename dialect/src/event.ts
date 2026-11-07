@@ -39,6 +39,7 @@ export const EVENT_FIELD_KEYS = {
   uid: "uid",
   repeat: "repeat",
   remind: "remind",
+  skip: "skip",
 } as const;
 
 /**
@@ -80,6 +81,16 @@ export type CalendarEvent = {
   /** The parsed rule. `ok: false` means "unrecognized", never "no repeat". */
   readonly repeat: ParsedRecurrence | null;
   readonly remind: ReminderLead | null;
+  /**
+   * The dates this series does NOT occur on (`skip: 2026-11-05, 2026-11-12`).
+   *
+   * A series with every occurrence cancelled still reads as an event: the note is
+   * the event, and the list is one of its fields, so an empty range answer is a
+   * legitimate result rather than a broken one. Unparseable entries are dropped
+   * here and left in the file, because a reader that rewrote the field would be
+   * editing a note the user did not ask it to touch.
+   */
+  readonly skip: readonly CivilDate[];
 };
 
 /**
@@ -121,6 +132,7 @@ const FIELD_KEY_RES = {
   uid: /^(uid[ \t]*:[ \t]*)(.*)$/,
   repeat: /^(repeat[ \t]*:[ \t]*)(.*)$/,
   remind: /^(remind[ \t]*:[ \t]*)(.*)$/,
+  skip: /^(skip[ \t]*:[ \t]*)(.*)$/,
 } as const;
 
 const TIME_RE = /^(\d{2}):(\d{2})(?::(\d{2}))?$/;
@@ -224,6 +236,56 @@ export function parseReminderLead(value: string): { raw: string; minutes: number
  * claims to be an event and does not say when), while a note with a `start` and
  * no `kind: event` is simply a note with a property named `start`.
  */
+/**
+ * How many cancelled dates one note may carry.
+ *
+ * A bound rather than trust: the field is user-editable text, and a hand-edited
+ * note with ten thousand dates would make every range query walk them. The same
+ * number bounds the wire, so a caller never sees a longer list than the readers
+ * will honour.
+ */
+export const MAX_SKIP_DATES = 366;
+
+/**
+ * Read `skip:` into civil dates.
+ *
+ * Separators are commas and whitespace, both accepted, because a user typing the
+ * field by hand writes either. Anything unparseable is dropped rather than
+ * refusing the event: a typo in a cancellation must not hide the series.
+ */
+export function parseSkipDates(raw: string | null): readonly CivilDate[] {
+  if (raw === null) return [];
+  const out: CivilDate[] = [];
+  for (const token of raw.split(/[, \t]+/)) {
+    if (token === "") continue;
+    const date = parseCivilDate(token);
+    if (date === null) continue;
+    if (!out.some((seen) => compareCivilDates(seen, date) === 0)) out.push(date);
+    if (out.length >= MAX_SKIP_DATES) break;
+  }
+  return out;
+}
+
+/**
+ * `skip:` with one more date, migrated and ordered, or `null` when the date is
+ * already there.
+ *
+ * The ONE place that spells the field, so the desktop pane and the phone's list
+ * cannot grow two orderings of the same list. Dates are unique and ascending,
+ * which makes the field's bytes a function of its set: without that, two clients
+ * cancelling two dates in either order would produce two different files for one
+ * schedule and every sync would see a conflict nobody made.
+ */
+export function appendSkipDate(raw: string | null, date: CivilDate): string | null {
+  const dates = parseSkipDates(raw);
+  if (dates.some((seen) => compareCivilDates(seen, date) === 0)) return null;
+  const next = [...dates, date]
+    .sort(compareCivilDates)
+    .slice(0, MAX_SKIP_DATES)
+    .map(formatCivilDate);
+  return next.join(", ");
+}
+
 export function readEventFromFmBody(fmBody: string, options?: EventReadOptions): EventRead {
   if (readKindFromFmBody(fmBody) !== EVENT_KIND_VALUE) return { state: "absent" };
 
@@ -250,6 +312,7 @@ export function readEventFromFmBody(fmBody: string, options?: EventReadOptions):
   const uid = readField(fmBody, FIELD_KEY_RES.uid);
   const repeatRaw = readField(fmBody, FIELD_KEY_RES.repeat);
   const remindRaw = readField(fmBody, FIELD_KEY_RES.remind);
+  const skipRaw = readField(fmBody, FIELD_KEY_RES.skip);
 
   let remind: ReminderLead | null = null;
   if (remindRaw !== null) {
@@ -275,6 +338,7 @@ export function readEventFromFmBody(fmBody: string, options?: EventReadOptions):
       repeatRaw,
       repeat: repeatRaw === null ? null : parseRecurrenceRule(repeatRaw),
       remind,
+      skip: parseSkipDates(skipRaw),
     },
   };
 }

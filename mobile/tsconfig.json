@@ -28,6 +28,8 @@
       "@myne/vault-indices": ["../src/notes/vaultIndices.ts"],
       "@myne/calendar-grid": ["../src/notes/calendar/grid.ts"],
       "@myne/calendar-format": ["../src/notes/calendar/format.ts"],
+      "@myne/calendar-skip": ["../src/notes/calendar/skipWrite.ts"],
+      "@myne/calendar-drag-write": ["../src/notes/calendar/dragWrite.ts"],
       "@myne/sync-staleness": ["../src/lib/sync-staleness.ts"],
       "@myne/sync-status-view": ["../src/lib/sync-status-view.ts"],
       "@myne/diagnostics": ["../src/lib/diagnostics.ts"],
