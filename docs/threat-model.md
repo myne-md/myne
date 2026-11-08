@@ -515,9 +515,13 @@ also supersedes the Tor-specific pin claims in the A4 row and in the glossary.
 - **What is NOT claimed.** No sandbox, no separate process, no fuzzing campaign yet. The residual is the same A7
   in-process one every parser in this tree carries: a defect in the reader runs where the keys are. The compensations are
   the strictness, the caps and the absence of any evaluation path, not isolation.
-- **The reminder anchor pref.** `calendar.day_reminder_anchor` is a device-local time of day for all-day reminders. It is a
-  preference, not a secret, and it is not synced, so it adds no correlation surface: two devices of one person may hold
-  different values and neither travels.
+- **The reminder anchor pref.** `calendar_settings["day_reminder_anchor"]` is the time of day an all-day event's reminder
+  counts back from. It is a preference, not a secret, and it is **shared**: it syncs inside the sealed `vault.prefs` blob
+  with a per-key merge (`docs/spec/protocol.md` §9.5.2, `sync-protocol.md` §10.2), so every device of the account reads
+  one value and, in a B2B vault, every member does. The server sees ciphertext only, and the value discloses a habitual
+  hour rather than a timezone or a location, which is why sharing it is acceptable where sharing a device-local
+  `reminders_enabled` would not be. Four surfaces of this branch said "device-local, never synced" while the code
+  classified the map shared; this paragraph is the corrected one.
 
 ## 8. Comparison vs. Adjacent Products
 

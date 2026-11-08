@@ -208,7 +208,7 @@ Used in: `protocol.md` §9.25/§9.26; `decisions/ai/0590`; `decisions/ai/0591`; 
 
 ### **all-day event** &nbsp; 📦 *Product*
 
-An [event note](#event-note) whose `start` carries a date and no time. It is not a second kind of event: the same frontmatter field holds a wall clock in both cases, and "all day" is the absence of the time half. Reminders treat it differently for one reason, which is the only place the distinction is load-bearing: a relative lead measured from midnight would fire at midnight, so an all-day event anchors on `calendar.day_reminder_anchor`, a device-local time of day (default 09:00). The anchor is a preference, never synced.
+An [event note](#event-note) whose `start` carries a date and no time. It is not a second kind of event: the same frontmatter field holds a wall clock in both cases, and "all day" is the absence of the time half. Reminders treat it differently for one reason, which is the only place the distinction is load-bearing: a relative lead measured from midnight would fire at midnight, so an all-day event anchors on `calendar_settings["day_reminder_anchor"]`, a SHARED preference (per-key merge, default 09:00, sealed inside `vault.prefs`). It is never written into a note.
 
 Used in: `spec/markdown-dialect.md` §3.10; `myne-md/myne#1037`
 
@@ -1338,7 +1338,7 @@ Two properties are worth stating because they cost real work. The byte is **glob
 
 ### **event note** &nbsp; 📦 *Product* (deep entry, *Myne-divergent*)
 
-A note with `kind: event` and the frontmatter vocabulary in `spec/markdown-dialect.md` §3.10: `start` (required), `end` (optional), `repeat` (the closed rule set of §3.8.7, shared with [line-tasks](#line-task)), `remind` (a relative lead such as `30m`), `uid` and `calendar`. It is an ordinary note in every other respect: one encrypted [`MY01`](#my01) blob, in the search index, in every export and backup, splice-edited, synced as a note. That is the whole point of the shape. A separate event store would need its own writer, its own merge unit and its own readers, and would be invisible to search, export and backup until all three learned it, so an event is a fact the note carries rather than a folder it lives in. A drag to another day writes exactly one field, which gives two devices one field to reconcile.
+A note with `kind: event` and the frontmatter vocabulary in `spec/markdown-dialect.md` §3.10: `start` (required), `end` (optional), `repeat` (the closed rule set of §3.8.7, shared with [line-tasks](#line-task)), `remind` (a relative lead such as `30m`), `uid`, `calendar`, `skip` (the dates the series does not occur on, `decisions/storage/0795`) and `override` (the dates it starts at a different clock, `0796`). It is an ordinary note in every other respect: one encrypted [`MY01`](#my01) blob, in the search index, in every export and backup, splice-edited, synced as a note. That is the whole point of the shape. A separate event store would need its own writer, its own merge unit and its own readers, and would be invisible to search, export and backup until all three learned it, so an event is a fact the note carries rather than a folder it lives in. A drag to another day writes exactly one field, which gives two devices one field to reconcile.
 
 Used in: `spec/markdown-dialect.md` §3.10; `decisions/storage/0792`; `myne-md/myne#1037`
 
@@ -2175,9 +2175,15 @@ A [remote AI provider](#remote-ai-provider) declining a request under **its own*
 
 Used in: `decisions.md` 2026-08-15; myne-md/myne#466
 
+### **home zone** &nbsp; 📦 *Product*
+
+The time zone a reader calls home, set once per device, whose clock is shown beside an [event note](#event-note)'s own time ("09:00 · 06:00"). It is a DEVICE-LOCAL preference held in `localStorage` (like the accent colour and the display language), never written into a note, so a vault that exports as plaintext still says `start: 2026-11-05 09:00` and nothing about where its owner lives. A value `Intl` cannot resolve is cleared rather than stored, because a stored zone that resolves to nothing shows no second clock at all and reads as a bug rather than as a setting. It does not make an event keep an absolute moment: that needs a zone on the note itself, which `spec/markdown-dialect.md` §3.10.2 refuses (`decisions/storage/0797`).
+
+Used in: `decisions/storage/0797`; `myne-md/myne#1037`
+
 ### **projected occurrence** &nbsp; 📦 *Product*
 
-One instance of a recurring [event note](#event-note), computed at render time from its `repeat` rule rather than stored. Nothing in the vault enumerates occurrences: there is no occurrence table, no exception list and no per-instance id, so a weekly event is one note and a month of them is one note read twelve times. The consequence is deliberate and worth stating where a reader will meet it: "not this week" is a separate one-off note, not an edit to a series, and a series imported across a daylight-saving change can drift by an hour because the arithmetic is wall-clock (`decisions/editor/0793`).
+One instance of a recurring [event note](#event-note), computed at render time from its `repeat` rule rather than stored. Nothing in the vault enumerates occurrences: there is no occurrence table and no per-instance id, so a weekly event is one note and a month of them is one note read twelve times. The series note itself carries the only two things that can differ per occurrence, and both are lists of dates inside it: `skip` (this series does not occur then, `decisions/storage/0795`) and `override` (it starts at a different clock that day, keeping its day and duration, `0796`). A per-occurrence MOVE to another day, or a change of its length, is still refused, and its answer is a separate one-off note. A series imported across a daylight-saving change can drift by an hour because the arithmetic is wall-clock (`decisions/editor/0793`).
 
 Used in: `spec/markdown-dialect.md` §3.10; `myne-md/myne#1037`
 
