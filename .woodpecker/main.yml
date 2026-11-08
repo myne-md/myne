@@ -546,6 +546,10 @@ steps:
       - node scripts/check-core-io-seam.mjs
       # myne#442 — the version-routing ratchet (see the script header).
       - node scripts/check-version-routing.mjs
+      # The comment-volume ratchet: AGENTS.md rule 3 was the one rule with no
+      # guard, and 199,438 comment lines later it is the one that decayed. A file
+      # may lose comments, never gain them (see the script header).
+      - node scripts/check-comment-density.mjs
       # Web command-coverage guard (MYND-574 task 11): every IPC command name in
       # the shared tree is classified in `web/wasm/src/capability.rs`. Spans TS
       # and Rust, so no compiler on either side sees both halves.
@@ -1894,10 +1898,66 @@ steps:
   # syntax — even inside a comment, a literal brace-substitution token makes
   # Woodpecker's envsubst pass fail config-compile ("unable to parse variable
   # name"), erroring the WHOLE pipeline before any step runs.
+  # ─── Cross-repo guards (audit Aşama 6) ──────────────────────
+  # Six guards compare this repo against a companion checkout, and every one of
+  # them reports "NOTHING COMPARED" and exits 0 where that checkout is absent -
+  # which, in a fresh worktree, is all of them. So the drift they exist to catch
+  # was verified by hand or not at all. This step is the missing half: it clones
+  # the companions and passes `--require-companion`, which turns an absent
+  # companion into a FAILURE rather than a shrug.
+  #
+  # It is one step rather than six because the cost is the clones, not the checks
+  # (six `git clone --depth 1` then six node scripts that read files).
+  #
+  # `myne_server_token` is the same GitHub PAT sync-sim uses: read access on the
+  # private myne-md repos. Absent (a fork PR), the step says so and exits 0, the
+  # same shape sync-sim uses - an absence of evidence must be stated, not
+  # disguised as a pass.
+  #
+  # NOT here: `check-referenced-digests.mjs`, which resolves `ghcr.io` digests
+  # over the network and is deliberately a by-hand step in the release runbook.
+  cross-repo-guards:
+    image: *ci_image
+    when:
+      - path: *code-path-globs
+        status: [success, failure]
+    depends_on:
+      - name: pnpm-build
+        optional: true
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
+      MYNE_SERVER_DIR: ../myne-server-src
+      MYNE_OPS_DIR: ../myne-ops-src
+      MYNE_WEBSITE_DIR: ../myne-website-src
+      MYNE_CLIPPER_DIR: ../myne-clipper-src
+      MYNE_BRANDING_DIR: ../myne-branding-src
+    commands:
+      - |
+        if [ -z "$${MYNE_SERVER_TOKEN:-}" ]; then
+          echo "myne_server_token not provided -> skipping cross-repo-guards (re-add the from_secret to enable)";
+          exit 0;
+        fi
+      - |
+        for repo in myne-server myne-ops myne-website myne-clipper myne-branding; do
+          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/$repo.git" "../$repo-src" || {
+            echo "clone of $repo failed"; exit 1; };
+        done
+      # `--require-companion` on every one: this step's whole point is that the
+      # comparison actually happened.
+      - node scripts/check-stream-timeout-drift.mjs --require-companion
+      - node scripts/check-selfhost-bundle-drift.mjs --require-companion
+      - node scripts/check-server-env-roster.mjs --require-companion
+      - node scripts/check-web-image-tag-drift.mjs --require-companion
+      - node scripts/check-clipper-wire.mjs --require-companion
+      - node scripts/check-branding-parity.mjs --require-companion
+
   notify-failure:
     image: alpine:3.21
     depends_on:
       - name: cargo-fmt
+        optional: true
+      - name: cross-repo-guards
         optional: true
       - name: cargo-clippy
         optional: true

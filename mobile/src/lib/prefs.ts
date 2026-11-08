@@ -75,8 +75,7 @@ export function normalizeStartupOpen(value: string | null): StartupOpen {
 
 /** Mirrors `protocol::PrefsView` (Rust side). */
 /** View render type (MYND-273, Saved Views). `map` is deliberately absent —
- *  it needs a Maps plugin and is not representable in v1. Mirrors Rust
- *  `ViewType` (serde lowercase). */
+ *  it needs a Maps plugin and is not representable in v1. Mirrors Rust `ViewType` (serde lowercase). */
 export type ViewType = "table" | "cards" | "list" | "board";
 
 /** Sort direction. Mirrors Rust `SortDirection` (serde lowercase). */
@@ -116,11 +115,9 @@ export type FilterNode =
  * One graph colour-group rule (myne-md/myne#727). Mirrors Rust
  * `protocol::color_group::ColorGroup`, and `filter` reuses {@link FilterNode},
  * the single canonical filter AST also used by {@link SavedView}.
- *
  * It reached this client's prefs mirror when the graph did: `color_groups` is
  * SHARED, whole-value-LWW vault content, so a phone that could not read it drew
- * a graph with no colour groups while the desktop it synced with drew all of
- * them, from the same vault.
+ * a graph with no colour groups while the desktop it synced with drew all of them, from the same vault.
  */
 export interface ColorGroup {
   id: string;
@@ -205,7 +202,6 @@ export interface PrefsView {
    * ≡ compression on — the codec OMITS the field on disk when `true`, so a
    * vault that never touched the toggle is byte-identical to a pre-feature
    * `vault.prefs`. Serialized from Rust `bool` with `default = true`.
-   *
    * **Shared** in the sync merge (`sync-protocol.md` §10.2) — a deliberate
    * divergence from device-local compute-budget toggles like `spell_enabled`:
    * this is a content-fidelity switch whose effect (irreversible pixel loss)
@@ -219,13 +215,10 @@ export interface PrefsView {
    * (image OCR, MYND-441). **Defaults to `true`**, omitted from the encrypted
    * blob when true, so a vault predating the field reads as enabled. Turning it
    * off stops the background extraction worker but never deletes cached results.
-   *
    * **DEVICE-LOCAL** (`sync-protocol.md` §10.2), deliberately unlike the
    * compression switch above it: this is a per-device compute budget, and OCR
    * runs in-process on the phone that imports the image, so the device paying
-   * the cost owns the switch. Reached this client's mirror when the row that
-   * writes it did (myne-md/myne#880); the import path already read the pref to
-   * select its extractor, so the phone obeyed a value it could not set.
+   * the cost owns the switch. Reached this client's mirror when the writing row did (myne-md/myne#880): the import path already read the pref to select its extractor, so the phone obeyed a value it could not set.
    */
   attachment_ocr_enabled: boolean;
   /**
@@ -237,21 +230,17 @@ export interface PrefsView {
   ai_enabled: boolean;
   /**
    * The remote AI provider the user named, or `null`.
-   *
    * Shared across devices (scalar LWW): naming a provider is a statement about
    * where this vault's notes may be sent, which is a fact about the account
-   * rather than about this phone. Deliberately unlike {@link
-   * PrefsView.ai_enabled} beside it.
+   * rather than about this phone. Deliberately unlike {@link PrefsView.ai_enabled} beside it.
    */
   ai_provider: string | null;
   /**
    * **Which provider** the consent was given for, or `null`. A gate, not a
    * display flag: the host's request path compares it to the active selection,
    * so a UI that skipped the screen still cannot send.
-   *
    * A name rather than a boolean because consent is per provider, so a stale
    * approval for a different recipient is unusable rather than transferable.
-   *
    * **Device-local** (myne-md/myne#456). The key still arrives by sync, so this
    * phone may hold a credential it has not been permitted to use, and that is
    * the intended shape: the credential is an account fact, the approval is a
@@ -260,43 +249,33 @@ export interface PrefsView {
   ai_provider_consent: string | null;
   /**
    * **Which model** at {@link PrefsView.ai_provider} answers, or `null`.
-   *
    * There is no default and no fallback: the value comes from the list the
    * provider itself reports. `null` means *not chosen*, and the host refuses
-   * rather than substituting one, because on a metered API a default nobody
-   * chose is a bill nobody chose.
+   * rather than substituting one, because on a metered API a default nobody chose is a bill nobody chose.
    */
   ai_provider_model: string | null;
   /**
    * Folders excluded from every AI read/index (local-ai epic, ai-ux-surface
    * MYND-408, SYNC-14), canonical trailing-slash form. Same encoding as
-   * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent →
-   * defaulted to `[]`.
-   *
+   * `deliberate_folders` (NFC-normalized, sorted, deduped set). Absent → defaulted to `[]`.
    * **An EGRESS CONTROL rather than a preference**, which is why
    * `sync-protocol.md` §10.2 classifies it `SetUnion { folded: true,
    * removals_propagate: false }`: an exclusion present on ANY device survives
    * every merge, so the union can only ever fail closed. The core honours it
    * (`hooks.ai_policy_changed`), and `src/lib/aiExcludedFolders.ts` is the
-   * frontend mirror of the Rust `folder_matches_excluded`, so a note gated on
-   * one path is gated on the other.
+   * frontend mirror of the Rust `folder_matches_excluded`, so a note gated on one path is gated on the other.
    *
-   * Reached this client's mirror when the row that writes it did
-   * (myne-md/myne#880): the phone already ENFORCED the list and reported its
-   * count, and could not author it. Write via
-   * {@link mutateAiExcludedFolders}, which takes verbs rather than a whole set.
+   * Reached this client's mirror when the writing row did (myne-md/myne#880): the phone already ENFORCED the list and reported its count, yet could not author it. Write via {@link mutateAiExcludedFolders}, which takes verbs rather than a whole set.
    */
   ai_excluded_folders: string[];
   /**
    * Characters of chat history an agent run may be seeded with
    * (myne-md/myne#617), or `null` for the host's default.
-   *
    * **DEVICE-LOCAL**: it bounds how much of THIS machine's plaintext one run
    * sends to a provider, multiplied by the loop's iteration ceiling, so a laptop
    * on a metered connection and a desktop on a fast one legitimately disagree.
    * A value that synced would let one device widen another's off-device volume
    * without anyone at that device choosing it.
-   *
    * The host CLAMPS the write (`MAX_HISTORY_BUDGET` in the Rust history
    * module), so the stored value can be lower than the one sent. Reached this
    * client's mirror when the row that writes it did (myne-md/myne#880); the
@@ -306,11 +285,8 @@ export interface PrefsView {
   /**
    * The instruction the meeting AI pass uses to turn a transcript into sections
    * (meeting-ai), or `null` for the built-in default.
-   *
    * **SHARED / scalar last-write-wins**: it is vault content, so it reaches the
-   * account's other devices. Reached this client's mirror when the row that
-   * writes it did (myne-md/myne#880), which matters most here because the phone
-   * is where meeting capture actually happens.
+   * account's other devices. Reached this client's mirror when the writing row did (myne-md/myne#880), which matters most here because the phone is where meeting capture actually happens.
    */
   meeting_ai_prompt: string | null;
   /*
@@ -318,8 +294,7 @@ export interface PrefsView {
    * point. `prefs_read` serializes the whole host-side `PrefsView`, so a key in
    * that struct would reach page context on every read, and from there a DOM
    * snapshot or any script running in the page. The host marks it serde-skip
-   * and answers `aiProviderHasKey` instead: the UI learns *whether*, never
-   * *what*.
+   * and answers `aiProviderHasKey` instead: the UI learns *whether*, never *what*.
    */
   /**
    * Spell-check enabled toggle (MYND-267). `null` ≡ unset → the host applies
@@ -358,16 +333,14 @@ export interface PrefsView {
    * {@link PrefsView.new_note_location_folder}). `null` ≡ the default `"root"`,
    * applied client-side. A free enum string on the wire (Rust `Option<String>`);
    * the client validates + maps an unknown value to the default. Omitted from the
-   * encrypted blob when `null`. Non-load-bearing. Write via
-   * {@link setNewNoteLocation}.
+   * encrypted blob when `null`. Non-load-bearing. Write via {@link setNewNoteLocation}.
    */
   new_note_location: string | null;
   /**
    * Target folder (canonical trailing-slash form) for new notes when
    * {@link PrefsView.new_note_location} is `"specific"` (MYND-462). `null`
    * otherwise. Designating it also registers the folder in `deliberate_folders`
-   * so it survives empty. Serialized from Rust `Option<String>`; omitted when
-   * `null`.
+   * so it survives empty. Serialized from Rust `Option<String>`; omitted when `null`.
    */
   new_note_location_folder: string | null;
   /**
@@ -377,16 +350,14 @@ export interface PrefsView {
    * by {@link PrefsView.startup_open_note}). `null` ≡ the default `"last"`,
    * applied client-side. A free enum string on the wire (Rust `Option<String>`);
    * the client validates + maps an unknown value to the default. Omitted from the
-   * encrypted blob when `null`. Non-load-bearing. Write via
-   * {@link setStartupOpen}.
+   * encrypted blob when `null`. Non-load-bearing. Write via {@link setStartupOpen}.
    */
   startup_open: string | null;
   /**
    * Target note UUID for startup when {@link PrefsView.startup_open} is
    * `"specific"` (MYND-462). `null` otherwise. A stale / deleted UUID falls back
    * to the empty editor client-side (the pref is never auto-cleared on a
-   * transient read miss). Serialized from Rust `Option<String>`; omitted when
-   * `null`.
+   * transient read miss). Serialized from Rust `Option<String>`; omitted when `null`.
    */
   startup_open_note: string | null;
   /**
@@ -450,13 +421,11 @@ export interface PrefsView {
    * Display date format (myne#279, reached mobile in myne-md/myne#609):
    * `"system"` | `"iso"` | `"dmy"` | `"mdy"` | `"dmmmy"`. `null` ≡ `"system"`,
    * which resolves against the app's OWN language rather than the OS locale.
-   *
    * A free enum string on the wire (Rust `Option<String>`) with no codec-level
    * validation, so a value written by a newer build decodes as unset rather than
    * failing the blob; the client maps an unknown value to the default. Omitted
    * from the encrypted blob when `null`. Non-load-bearing cosmetic. Canonical
    * key slot: after `daily_template`, before `deliberate_folders`.
-   *
    * **Shared, scalar-LWW.** It arrives by sync from whichever device set it,
    * which is why this field existed on the wire for a while before this client
    * could read it: the phone received the value and disregarded it.
@@ -469,7 +438,6 @@ export interface PrefsView {
    * period, which keeps its own three fields and is deliberately not migrated
    * in here (prefs merge per field, so a device on an older build would keep
    * writing the flat ones and the two would silently diverge).
-   *
    * Flat rather than nested so the Phase 2 field clock is per SETTING: a folder
    * edit on one device and a template edit on another, to the same period in
    * the same round, both survive. An entry naming a period this build has no UI
@@ -477,13 +445,7 @@ export interface PrefsView {
    * Absent in vaults that configured no period → the Rust decoder defaults it
    * to `{}`. Serialized from Rust `BTreeMap<String, String>`.
    *
-   * **Read and written on mobile since myne-md/myne#880.** It used to be
-   * read-only here, deliberately: the write half was withheld because mobile
-   * shipped no periodic-notes settings panel, and a grant for a command the
-   * WebView never sends would widen the reachable surface for nothing. The panel
-   * landed (`mobile/src/components/PeriodicNotesBlock.tsx`) and the wrapper,
-   * `setPeriodicNoteSetting`, arrived with it, which is the order the paragraph
-   * that stood here asked for.
+   * **Read and written on mobile since myne-md/myne#880** (panel in `mobile/src/components/PeriodicNotesBlock.tsx` + wrapper `setPeriodicNoteSetting`), per the ordering rule above.
    */
   periodic_notes: Record<string, string>;
   /**
@@ -526,8 +488,7 @@ export interface PrefsView {
    * `"source"`. `null` ≡ the host-applied default. A free enum string on the
    * wire (Rust `Option<String>`); the client validates + maps an unknown value
    * to the default. Omitted from the encrypted blob when `null`. Non-load-bearing.
-   * Canonical key slot: after `editor_content_width`, before
-   * `editor_focus_dim_inactive`.
+   * Canonical key slot: after `editor_content_width`, before `editor_focus_dim_inactive`.
    */
   editor_default_view_mode: string | null;
   /**
@@ -543,8 +504,7 @@ export interface PrefsView {
    * the host applies its default focus-mode policy. `true` keeps the caret
    * vertically centered, `false` scrolls normally. Serialized from Rust
    * `Option<bool>`; omitted from the encrypted blob when `null`. Non-load-bearing
-   * cosmetic. Canonical key slot: after `editor_focus_dim_inactive`, before
-   * `editor_font_family`.
+   * cosmetic. Canonical key slot: after `editor_focus_dim_inactive`, before `editor_font_family`.
    */
   editor_focus_typewriter: boolean | null;
   /**
@@ -556,8 +516,7 @@ export interface PrefsView {
   /**
    * Editor line-spacing preset (editor-typography) — `"tight"` | `"normal"` |
    * `"relaxed"`. `null` ≡ the canonical default `"normal"`. Stored as an enum
-   * string (not a float) so the codec stays float-free; the client maps the
-   * preset to a concrete line-height.
+   * string (not a float) so the codec stays float-free; the client maps the preset to a concrete line-height.
    */
   editor_line_spacing: string | null;
   /**
@@ -596,28 +555,22 @@ export interface PrefsView {
    * Display time format (myne#279, reached mobile in myne-md/myne#609):
    * `"system"` | `"24h"` | `"12h"`. `null` ≡ `"system"`. Same free-enum-string
    * discipline as {@link PrefsView.date_format}, and **shared** the same way, so
-   * it too arrives by sync. Canonical key slot: after `theme`, before
-   * `timezone`.
+   * it too arrives by sync. Canonical key slot: after `theme`, before `timezone`.
    */
   time_format: string | null;
   /**
    * Display timezone override (myne#279, reached mobile in myne-md/myne#609):
    * an IANA zone identifier, or `null` ≡ this device's own zone.
-   *
    * **Display only.** It decides what the app treats as "today" and how a real
    * instant is printed. `dialect/src/taskFields.ts` keeps note times zone-free
    * wall-clock and this does not walk that back: a reminder written as 09:00
-   * reads 09:00 on every device, and shifting it by an offset would invent an
-   * instant nobody wrote.
-   *
+   * reads 09:00 on every device, and shifting it by an offset would invent an instant nobody wrote.
    * Be exact about the reach, because the looser claim was written here first:
    * it never enters a `.myn` file, so a note never records where its author
    * was. It DOES live in the encrypted `vault.prefs` blob, which is pushed and
    * pulled like every other prefs field; device-local is a MERGE classification
    * (`PrefClass::DeviceLocal`, sync-protocol.md 10.2), meaning the local value
-   * survives the merge, and 10.2.1 has a newly enrolled device adopt it as a
-   * starting default.
-   *
+   * survives the merge, and 10.2.1 has a newly enrolled device adopt it as a starting default.
    * **Device-local**, deliberately unlike its two siblings above. The right zone
    * is a property of where a given device IS, so a phone that travels and a
    * computer that does not should not have to agree, and the merge is what
@@ -653,8 +606,7 @@ export interface PrefsView {
    * encodes the array as a canonical set (NFC-normalized, sorted, deduped).
    * Empty (the default — bar fully visible) is byte-identical to a pre-feature
    * vault. An unknown id is ignored at render. Serialized from Rust
-   * `Vec<String>`; absent in pre-feature vaults → the Rust decoder defaults
-   * it to `[]`.
+   * `Vec<String>`; absent in pre-feature vaults → the Rust decoder defaults it to `[]`.
    */
   hidden_bar_items: string[];
   /**
@@ -674,8 +626,7 @@ export interface PrefsView {
    * the host applies its default (the first visible tab in canonical order). A
    * free pointer the client interprets (unknown id → host default), the
    * {@link PrefsView.active_workspace} precedent class. Absent in pre-feature
-   * vaults → the Rust decoder defaults it to `null`. Serialized from Rust
-   * `Option<String>` (null | string).
+   * vaults → the Rust decoder defaults it to `null`. Serialized from Rust `Option<String>` (null | string).
    */
   right_panel_active_tab: string | null;
   /**
@@ -703,14 +654,12 @@ export interface PrefsView {
    * the format-action ids in the order the user arranged them. A sequence: the
    * backend preserves element order verbatim. Empty (the default — canonical
    * order) is byte-identical to a pre-feature vault. Absent → `[]`.
-   *
    * **Device-local** in the sync merge policy (`sync-protocol.md` §10.2.1, "local
    * wins — screen-size-dependent UI layout"): a phone's above-keyboard bar and a
    * desktop's floating toolbar are the same preference on incomparable form
    * factors, so this never propagates between clients. Each client resolves the
    * stored ids against its OWN vocabulary and drops the rest
-   * (`lib/formatBarItems.ts`), which is what makes a backup restore across
-   * clients harmless.
+   * (`lib/formatBarItems.ts`), which is what makes a backup restore across clients harmless.
    */
   editor_toolbar_order: string[];
   /**
@@ -791,25 +740,11 @@ export async function prefsRead(): Promise<PrefsView> {
  * The twin of `src/lib/prefs.ts`'s chokepoint, and it exists for the same reason
  * (#251, ported to mobile by myne-md/myne#486).
  *
- * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read
- * (`./use-prefs.ts`), and mobile has four independent mount sites (`EditorFlow`,
- * `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`), so a skipped bump
- * is a stale open editor rather than a latent defect. Why the rule exists, and
- * what the 29-scattered-call-sites shape it replaced cost, is in
- * `scripts/check-prefs-nonce.mjs`'s header, which now covers this module too.
+ * The bump is the ONLY mechanism by which sibling `usePrefs` instances re-read (`./use-prefs.ts`); mobile has four independent mount sites (`EditorFlow`, `SettingsSheet`, `AttachmentsSheet`, `SyncSettingsPanels`), so a skipped bump is a stale open editor, not a latent defect. Why the rule exists and what the 29-scattered-call-sites shape it replaced cost is in `scripts/check-prefs-nonce.mjs`'s header (this module is covered too).
  *
- * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing
- * claims disk truth changed when it did not, and no re-read races a write that
- * is still in flight (`./prefsNonce.ts` states that ordering as its rule).
- * `mobile/tests/prefs-nonce.test.ts` holds this half specifically, because the
- * guard reads call shapes and would stay green with the bump hoisted above the
- * `invoke`. A few `EditorFlow` writers keep their own `.catch(ignorePrefsWriteFailure)`;
- * that catch is there to stop an unhandled rejection on a `void`-ed call, and
- * its own comment records why the bump inside it buys nothing.
+ * Bumps on SUCCESS only: a rejected `invoke` throws before the bump, so nothing claims disk truth changed when it did not, and no re-read races a write still in flight (`./prefsNonce.ts` states that ordering). `mobile/tests/prefs-nonce.test.ts` holds this half, because the guard reads call shapes and would stay green with the bump hoisted above the `invoke`. A few `EditorFlow` writers keep `.catch(ignorePrefsWriteFailure)` to stop an unhandled rejection on a `void`-ed call; that catch's own comment records why the bump inside it buys nothing.
  *
- * Skipping the bump stays possible via `{ bump: false }`, which costs an explicit
- * argument carrying its reason: a visible choice in review rather than an
- * invisible omission.
+ * Skipping the bump stays possible via `{ bump: false }`, an explicit argument carrying its reason — a visible choice in review, not an invisible omission.
  */
 async function writePref<T = void>(
   command: string,
@@ -827,12 +762,10 @@ async function writePref<T = void>(
 
 /**
  * Toggle screen-capture protection.
- *
  * Critical ordering on the backend: vault.prefs disk write succeeds
  * first, then `screen_capture::apply` runs. A rejected promise means
  * the disk write failed — neither the persisted preference nor the
- * native state were modified, so the caller's optimistic UI MUST
- * revert.
+ * native state were modified, so the caller's optimistic UI MUST revert.
  */
 export async function setScreenCaptureProtection(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_screen_capture_protection", { enabled });
@@ -844,8 +777,7 @@ export async function setScreenCaptureProtection(enabled: boolean): Promise<void
  * it is encrypted and stored. This preference is **shared** (vault-wide): the
  * backend classifies it in the sync merge, so toggling it here also applies to
  * every other device on the vault, not just this phone. No native side-effect;
- * a rejected promise means the disk write failed and the caller's optimistic UI
- * must revert.
+ * a rejected promise means the disk write failed and the caller's optimistic UI must revert.
  */
 export async function setAttachmentCompressionEnabled(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_attachment_compression_enabled", { enabled });
@@ -853,7 +785,6 @@ export async function setAttachmentCompressionEnabled(enabled: boolean): Promise
 
 /**
  * Set whether THIS DEVICE shows task reminders (MYND-618/619).
- *
  * Device-local: it never syncs, because whether a given phone should be
  * interrupted is a property of that phone rather than of the vault. The field,
  * codec and core setter are the desktop feature's — mobile consumes them.
@@ -875,14 +806,12 @@ export async function setTranscriptionEnabled(enabled: boolean): Promise<void> {
 /**
  * Set how many days ahead this device registers reminders with the OS, or
  * `null` to fall back to the built-in horizon (MYND-618/619).
- *
  * **No mobile build hands a reminder to an operating system yet** (myne#508):
  * `reminderPass.ts` has no production caller, which `remindersReachTheOs()` in
  * `./reminders.ts` states and the settings screen gates its OS claims on. The
  * sentence below is therefore the reading this preference takes on from the
  * change that gives that pass a caller, not a description of today. The value
  * is written and persisted regardless, device-locally.
- *
  * Shorter is more private, not merely cheaper: pending reminder times leave the
  * AEAD envelope and sit in OS-owned plaintext (`threat-model.md` §7).
  */
@@ -891,9 +820,7 @@ export async function setReminderHorizonDays(days: number | null): Promise<void>
 }
 
 /**
- * What a caller did to a `vault.prefs` set field: entries it added, entries it
- * removed (myne-md/myne#613).
- *
+ * What a caller did to a `vault.prefs` set field: entries it added, entries it removed (myne-md/myne#613).
  * There is deliberately no "make the set equal this list" form. The backend used
  * to receive a whole set and derive the removals by diffing it against the
  * stored one, so a caller holding a view that predated a peer's addition claimed
@@ -907,7 +834,6 @@ export interface SetMutation {
   /**
    * Subtrees to remove: every STORED entry at or under one of these folded
    * prefixes, whether or not this caller has ever seen it.
-   *
    * `remove` cannot express a folder deletion honestly, because the caller's
    * list is the `usePrefs` cache: it starts at `DEFAULT_PREFS` and catches up
    * only through a nonce-bump round trip, and myne#613 gave this tree
@@ -915,20 +841,17 @@ export interface SetMutation {
    * that window states no removal for the just-registered entry, which then
    * survives on disk carrying a newer add clock than the removal, so the folder
    * comes back empty on every device.
-   *
    * An entry that folds to the empty string is ignored by the core rather than
    * treated as the root. Pass nothing for a no-op, never a sentinel.
    */
   /**
    * Entries to add ONLY where no removal of them is on record: absent from the
    * stored set AND carrying a removal clock.
-   *
    * For a REPAIR rather than a user act. The unlock back-fill registers folders
    * that LIVE notes prove exist, and that is a state a peer's deletion has not
    * reached yet, because notes and prefs travel separately. With a plain `add`
    * the repair is stamped `now_ms`, beats the peer's removal clock, and puts the
    * folder back on every device permanently with nobody having asked for it.
-   *
    * A genuine user act still wins, because at-fill uses `add`.
    */
   addUnlessRemoved?: string[];
@@ -943,7 +866,6 @@ export interface SetMutation {
 
 /**
  * The mutation a caller performed, derived from ITS OWN before and after.
- *
  * The distinction from the defect is the two sides: both are the caller's own
  * values, so an entry the caller never saw is in neither and is never claimed.
  * Kept byte-identical to `src/lib/prefs.ts::mutationFrom`; the two trees keep
@@ -967,8 +889,7 @@ export function mutationFrom(
  * desired set; v0.1 single-device writes it verbatim. Folded-identity dedup
  * (case-insensitivity) is the caller's responsibility — the Rust codec only
  * sorts + exact-dedups for canonical byte-stability. No native side-effect; a
- * rejected promise means the disk write failed and the caller's optimistic UI
- * must revert.
+ * rejected promise means the disk write failed and the caller's optimistic UI must revert.
  */
 export async function mutateDeliberateFolders(
   mutation: SetMutation,
@@ -978,7 +899,6 @@ export async function mutateDeliberateFolders(
 
 /**
  * What a deliberate-folders registration ended up doing (myne-md/myne#613).
- *
  * Three outcomes rather than a boolean, because the two failures need opposite
  * user treatment and collapsing them produces a notice that is wrong for one of
  * them. `budget-full` is actionable (delete a folder) and permanent until the
@@ -992,17 +912,12 @@ const DELIBERATE_RETRY_MS = 300;
 /**
  * Register folders, retrying ONCE on a transient failure, and classify the
  * result for a surface that shows a notice.
- *
  * The split is on whether the user can do anything:
- *
- *   - A thrown write is retried after {@link DELIBERATE_RETRY_MS}, because there
+ * - A thrown write is retried after {@link DELIBERATE_RETRY_MS}, because there
  *     is nothing for the user to do about a disk hiccup and a notice they
- *     cannot act on trains them to dismiss notices. Only a SECOND failure is
- *     reported.
+ *     cannot act on trains them to dismiss notices. Only a SECOND failure is reported.
  *   - A budget refusal is reported immediately and is NOT retried: the reserve
- *     is full, the next attempt refuses identically, and the remedy (delete a
- *     folder) is the user's.
- *
+ *     is full, the next attempt refuses identically, and the remedy (delete a folder) is the user's.
  * One retry, not a backoff loop. The caller is a click, the surface is already
  * showing the folder optimistically, and a second failure 300 ms later is
  * evidence enough that this is not a hiccup. A longer schedule would leave a
@@ -1097,7 +1012,6 @@ export async function setHiddenBarItems(items: string[]): Promise<void> {
  * side-effect; a rejected promise means the disk write failed and the caller's
  * optimistic UI must revert. The IPC payload key (`order`) matches the Rust
  * command's `order: Vec<String>` parameter.
- *
  * The command body is the SHARED `myne-core` prefs core desktop uses — mobile
  * only registers it. Device-local field: see {@link PrefsView.editor_toolbar_order}.
  */
@@ -1146,8 +1060,7 @@ export async function setRightPanelHiddenTabs(items: string[]): Promise<void> {
  * move actions. The caller passes the entire desired order; the backend preserves
  * element order verbatim (the sequence IS the payload). No native side-effect; a
  * rejected promise means the disk write failed and the caller's optimistic UI
- * must revert. The IPC payload key (`order`) matches the Rust command's
- * `order: Vec<String>` parameter.
+ * must revert. The IPC payload key (`order`) matches the Rust command's `order: Vec<String>` parameter.
  */
 export async function setRightPanelTabOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_right_panel_tab_order", { order });
@@ -1200,8 +1113,7 @@ export async function setDateFormat(value: string | null): Promise<void> {
 
 /**
  * Set (or clear) the display time format (myne#279). Pass
- * `"system"`/`"24h"`/`"12h"`, or `null` to clear to `"system"`. Shared, like
- * {@link setDateFormat}.
+ * `"system"`/`"24h"`/`"12h"`, or `null` to clear to `"system"`. Shared, like {@link setDateFormat}.
  */
 export async function setTimeFormat(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_time_format", { value });
@@ -1210,7 +1122,6 @@ export async function setTimeFormat(value: string | null): Promise<void> {
 /**
  * Set (or clear) the DISPLAY timezone override (myne#279). Pass an IANA zone
  * identifier, or `null` to follow this device's own zone.
- *
  * Display only: it never reaches a note. Device-local in the merge sense, so
  * unlike the two above a computer's choice never overwrites it here, which is
  * why a phone needs this control of its own. The value itself still rides the
@@ -1235,20 +1146,15 @@ export async function setCustomTheme(customTheme: string | null): Promise<void> 
 
 /**
  * Persist the full colour-group rule list (graph-connection-ux-polish, reached
- * mobile in myne-md/myne#880), a **WHOLE-LIST replace**, not a per-group
- * upsert/delete.
- *
+ * mobile in myne-md/myne#880), a **WHOLE-LIST replace**, not a per-group upsert/delete.
  * Order is rule precedence (first match wins), so unlike {@link setViewOrder}
  * there is no separate order field to reconcile: the caller passes the complete
  * desired sequence and the backend preserves it verbatim. A per-group merge
  * would be wrong in both directions: it could not express a reorder, and a
- * concurrent desktop edit to a different group would be silently lost rather
- * than last-writer-wins.
- *
+ * concurrent desktop edit to a different group would be silently lost rather than last-writer-wins.
  * Disk-first, no native side-effect; the 64 KiB `vault.prefs` cap fails the
  * write BEFORE touching disk, leaving the prior rules intact. A rejected promise
  * means the write failed and the caller's optimistic UI must revert.
- *
  * Twin of `src/lib/prefs.ts::setColorGroups`.
  */
 export async function setColorGroups(groups: ColorGroup[]): Promise<void> {
@@ -1259,22 +1165,18 @@ export async function setColorGroups(groups: ColorGroup[]): Promise<void> {
  * Add to and remove from the `ai_excluded_folders` set (local-ai epic,
  * ai-ux-surface MYND-408, SYNC-14): the folders AI never reads or indexes.
  * Reached mobile in myne-md/myne#880.
- *
  * **Takes VERBS, not the whole set**, and that is a correctness requirement
  * rather than a style: the sync stamper derives removals from `before \ after`,
  * so a caller holding a stale view would claim a deletion it never made and
  * travel it to every device. The wrapper took the whole desired set until
  * myne-md/myne#613; `mutationFrom` below is how a caller derives the verbs from
  * its OWN before and after, so an entry it never saw is claimed by neither.
- *
  * Returns how many additions the reserved byte budget refused, which is what
  * makes a refusal reportable instead of silent.
- *
  * §10.2 classifies this field `SetUnion { folded: true, removals_propagate:
  * false }`, deliberately unlike its neighbours: it is an EGRESS CONTROL, so its
  * union is monotone and a removal is never inherited from a peer. A client
  * cannot change that from here, and must not try.
- *
  * Twin of `src/lib/prefs.ts::mutateAiExcludedFolders`.
  */
 export async function mutateAiExcludedFolders(mutation: SetMutation): Promise<number> {
@@ -1283,15 +1185,12 @@ export async function mutateAiExcludedFolders(mutation: SetMutation): Promise<nu
 
 /**
  * Characters of chat history an agent run may be seeded with (myne-md/myne#617),
- * or `null` to restore the host's default. Reached mobile in
- * myne-md/myne#880.
- *
+ * or `null` to restore the host's default. Reached mobile in myne-md/myne#880.
  * **DEVICE-LOCAL**, unlike its neighbours in the AI cluster: it bounds how much
  * of this machine's plaintext one run sends to a provider, multiplied by the
  * loop's iteration ceiling, so a laptop on a metered connection and a desktop on
  * a fast one legitimately disagree. A value that synced would let one device
  * widen another's off-device volume without anyone at that device choosing it.
- *
  * **The value is CLAMPED host-side, and this wrapper deliberately does not clamp
  * it.** The bound is what limits the plaintext a run can send, so it has to hold
  * for every path that reaches the command rather than for the one that happened
@@ -1299,7 +1198,6 @@ export async function mutateAiExcludedFolders(mutation: SetMutation): Promise<nu
  * the day the real one stopped working. The row renders `max` from the SHARED
  * {@link CHAT_HISTORY_BUDGET_MAX}, which `tests/lib/chatHistoryBudget.test.ts`
  * holds to the Rust clamp, so the two cannot drift silently.
- *
  * Twin of `src/lib/prefs.ts::setChatHistoryBudget`.
  */
 export async function setChatHistoryBudget(budget: number | null): Promise<void> {
@@ -1308,19 +1206,15 @@ export async function setChatHistoryBudget(budget: number | null): Promise<void>
 
 /**
  * Whether attachment text extraction may read images and scanned PDFs (image
- * OCR, MYND-441). Reached mobile in myne-md/myne#880, and the remedy here is a
- * control rather than a feature: OCR already RUNS in-process on this device
+ * OCR, MYND-441). Reached mobile in myne-md/myne#880; the remedy here is a control rather than a feature: OCR already RUNS in-process on this device
  * (`mobile/src-tauri/src/plugins/attachments/import_mobile.rs` injects the shared
  * `extract_image_only` into the import path), so the device paying the compute
  * cost had no way to turn it off.
- *
  * **DEVICE-LOCAL** (`sync-protocol.md` §10.2): per-device compute budget, so a
  * desktop toggle cannot reach a phone. **Defaults to `true`**, and turning it off
  * stops the extraction worker but never deletes cached results.
- *
  * An unreadable prefs blob reads as ON in the import path, matching desktop: a
  * prefs read failure must not silently disable a search feature.
- *
  * Twin of `src/lib/prefs.ts::setAttachmentOcrEnabled`.
  */
 export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
@@ -1329,15 +1223,11 @@ export async function setAttachmentOcrEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Replace the meeting AI prompt, or pass `null` to restore the built-in default
- * (meeting-ai). Reached mobile in myne-md/myne#880, which matters more here than
- * elsewhere: the phone is where meeting capture actually happens, so the device
+ * (meeting-ai). Reached mobile in myne-md/myne#880, which matters more here than elsewhere: the phone is where meeting capture actually happens, so the device
  * that records the meeting could not author the instruction that processes it.
- *
  * An all-whitespace value is treated as a clear host-side, and a value longer
  * than 4000 bytes is refused. **SHARED / scalar last-write-wins**, so it reaches
- * the account's other devices; the value is user text stored in the encrypted
- * `vault.prefs`.
- *
+ * the account's other devices; the value is user text stored in the encrypted `vault.prefs`.
  * Twin of `src/lib/prefs.ts::setMeetingAiPrompt`.
  */
 export async function setMeetingAiPrompt(prompt: string | null): Promise<void> {
@@ -1365,8 +1255,7 @@ export async function setDailyFolder(folder: string): Promise<void> {
 /**
  * Set (or clear) the daily-notes template pointer (MYND-191). Pass a template
  * UUID to designate it, or `null` to clear it back to the "blank daily note"
- * state. Disk-first, no native side-effect; a rejected promise means the write
- * failed.
+ * state. Disk-first, no native side-effect; a rejected promise means the write failed.
  */
 export async function setDailyTemplate(templateId: string | null): Promise<void> {
   await writePref("plugin:prefs|set_daily_template", { templateId });
@@ -1378,24 +1267,15 @@ export type PeriodSetting = "folder" | "format" | "template";
 
 /**
  * Set (or clear) one weekly/monthly periodic-note setting (myne#177).
- *
  * The `periodic_notes` map is keyed `<period>.<setting>`, flat so the Phase 2
  * field clock is per SETTING: a folder edit on one device and a template edit on
  * another, to the same period in the same round, both survive. Pass
  * `value = null` to clear the entry; the backend removes the key, which the
  * merge represents as a stamped absence rather than as "never had it".
- *
  * A `folder` value is also registered as a deliberate folder backend-side, so
  * the folder shows in the sidebar before its first note exists.
  *
- * **Landed with the panel, which is the order the `periodic_notes` field
- * comment asked for.** That comment said the write half was deliberately absent
- * because mobile shipped no periodic-notes settings panel, and that a grant for
- * a command the WebView never sends would widen the reachable surface for
- * nothing. The panel landed in `mobile/src/components/PeriodicNotesBlock.tsx`
- * (myne-md/myne#880), so the wrapper, the ACL row and the surface arrive
- * together.
- *
+ * **Landed with the panel** (myne-md/myne#880, `mobile/src/components/PeriodicNotesBlock.tsx`) per the `periodic_notes` field comment's ordering rule; the wrapper, ACL row and surface arrive together.
  * Twin of `src/lib/prefs.ts::setPeriodicNoteSetting`.
  */
 export async function setPeriodicNoteSetting(
@@ -1414,7 +1294,6 @@ export async function setPeriodicNoteSetting(
  * (pass `null` otherwise). When a folder is given the backend also registers it
  * in `deliberate_folders` so it survives empty. Disk-first, no native
  * side-effect; a rejected promise means the write failed.
- *
  * Bumps the prefs nonce after a successful write so the sidebar's note-creation
  * path — which reads the location pref through its OWN `usePrefs` instance,
  * separate from the Settings modal's — sees the new value immediately.
@@ -1467,13 +1346,10 @@ export async function setFolderIcons(icons: Record<string, string>): Promise<voi
  * device list leads with. A single entry, not the whole map: entries are written
  * by different devices and merged per key, so a whole-map write would let this
  * client's stale view clobber a peer's rename.
- *
  * There is deliberately **no clear/delete counterpart**. `device_names` merges
  * per key by UNION (`sync-protocol.md` §10.2), so removing a key does not
  * propagate — it resurrects from the first peer that still holds it. The backend
- * refuses a blank name, so an empty submit is a no-op the caller treats as
- * "cancel".
- *
+ * refuses a blank name, so an empty submit is a no-op the caller treats as "cancel".
  * `selfName` marks the UNATTENDED write a device makes on its own behalf when it
  * has never had a name (myne-md/myne#973). It is not a hint: the backend refuses
  * that write on a member session, when this device has no `vault.prefs` yet (the
@@ -1498,16 +1374,13 @@ export async function setDeviceName(
  * straight from Rust's `std::env::consts::OS`. Seeds the enrollment forms'
  * suggested device name. **Do not sniff `navigator` instead** — one source keeps
  * the two clients from drifting into two default-name heuristics.
- *
  * Memoised, because the answer is a compile-time constant of the running binary
  * and this is an IPC round trip. Four callers ask it now (the enrollment form,
  * the clipboard-tier predicate, the device-name default, and the secret-save
  * delivery), and two of those are on paths where the user is waiting.
- *
  * Only a SUCCESS is cached. A rejected promise held here would turn one
  * transient IPC failure into a permanently wrong answer for the process, and
- * two of the callers read this to decide what a secret-handling affordance may
- * claim.
+ * two of the callers read this to decide what a secret-handling affordance may claim.
  */
 let platformProbe: Promise<string> | null = null;
 
@@ -1584,16 +1457,13 @@ export async function mutateSpellLanguages(
 
 /**
  * Set, unbind, or remove ONE command's keymap override (hotkeys epic, MYND-304).
- * Three states via the `chords` argument:
- * - a non-empty array → override the command to those chords;
+ * Three states via the `chords` argument: - a non-empty array → override the command to those chords;
  * - an empty array (`[]`) → explicit-unbind (the command has no shortcut);
  * - `null` → remove the override entry (revert to the in-code default).
- *
  * The backend NFC-sorts + dedupes the chord set for canonical byte-stability, so
  * pass the raw desired set. Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
  * Non-load-bearing.
- *
  * Bumps the prefs nonce after a successful write so the live keybinding engine —
  * which reads the keymap through its OWN `usePrefs` instance, separate from the
  * Settings modal's — re-reads disk truth and the rebound shortcut takes effect
@@ -1612,12 +1482,10 @@ export async function setKeymapBinding(
  * show it (the default). Disk-first, no native side-effect; a rejected promise
  * means the write failed and the caller's optimistic UI must revert.
  * Non-load-bearing.
- *
  * Unlike the other simple setters, this bumps the prefs nonce after a
  * successful write so that the sidebar — which reads prefs through its OWN
  * `usePrefs` instance, separate from the Settings modal's — re-reads disk truth
- * and reflects the toggle live (same chokepoint discipline as the saved-view
- * setters).
+ * and reflects the toggle live (same chokepoint discipline as the saved-view setters).
  */
 export async function setShowNoteTimestamps(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_show_note_timestamps", { enabled });
@@ -1656,8 +1524,7 @@ export async function setEditorContentWidth(value: string | null): Promise<void>
 
 /**
  * Set (or clear) the editor font-family preset (editor-typography) — pass
- * `"mono"`/`"sans"`, or `null` to clear to the `"mono"` default. Same contract
- * as {@link setEditorTextSize}.
+ * `"mono"`/`"sans"`, or `null` to clear to the `"mono"` default. Same contract as {@link setEditorTextSize}.
  */
 export async function setEditorFontFamily(value: string | null): Promise<void> {
   await writePref("plugin:prefs|set_editor_font_family", { value });
@@ -1713,8 +1580,7 @@ export async function setEditorDefaultViewMode(value: string | null): Promise<vo
 /**
  * Set the editor focus-mode dim-inactive toggle (MYND-348). Pass `true` to dim
  * inactive paragraphs, `false` to leave them lit. Disk-first, no native
- * side-effect; bumps the prefs nonce on success. Same contract as
- * {@link setEditorLineNumbers}. Non-load-bearing.
+ * side-effect; bumps the prefs nonce on success. Same contract as {@link setEditorLineNumbers}. Non-load-bearing.
  */
 export async function setEditorFocusDimInactive(value: boolean): Promise<void> {
   await writePref("plugin:prefs|set_editor_focus_dim_inactive", { enabled: value });
@@ -1761,21 +1627,13 @@ export async function setViewOrder(order: string[]): Promise<void> {
   await writePref("plugin:prefs|set_view_order", { order });
 }
 
-/* ---- AI (myne-md/myne#456) -------------------------------------------------
- *
- * Five writes and one read. The read is the odd one and it is the interesting
- * one: the key must never cross into page context, so there is no getter for it
- * anywhere and the UI decides between "Add key" and "Replace key" from a
- * boolean.
- */
+// AI (myne-md/myne#456): five writes and one read; the key never crosses into page context, so there is no getter for it anywhere and the UI decides "Add key" vs "Replace key" from a boolean.
 
 /**
  * Turn the AI beta on or off for THIS device.
- *
  * Device-local, so switching it off here does not switch it off on a laptop
  * that shares the vault. Since myne-md/myne#456 removed `developer_mode` from
- * the request-time gate, this is the only device-local switch on the remote
- * path besides the consent below.
+ * the request-time gate, this is the only device-local switch on the remote path besides the consent below.
  */
 export async function setAiEnabled(enabled: boolean): Promise<void> {
   await writePref("plugin:prefs|set_ai_enabled", { enabled });
@@ -1783,12 +1641,10 @@ export async function setAiEnabled(enabled: boolean): Promise<void> {
 
 /**
  * Name the remote provider, or pass `null` to clear it.
- *
  * Clearing also clears the consent and the key HOST-SIDE, and that pairing is
  * why this is one call rather than three: a key for a provider nobody selected
  * is a credential with no owner, and a surviving consent would silently
  * pre-approve the next provider the user picks.
- *
  * A value outside the host's known set is refused rather than stored, so the
  * promise rejects instead of leaving a selection the request path ignores.
  */
@@ -1798,7 +1654,6 @@ export async function setAiProvider(provider: string | null): Promise<void> {
 
 /**
  * Record (or withdraw) the consent for the named provider.
- *
  * **This is the persistence, not the enforcement.** The host re-reads it before
  * every remote request, so calling it without having shown the screen buys a
  * stored value and nothing else. The screen is what the user consented to; this
@@ -1812,10 +1667,8 @@ export async function setAiProviderConsent(
 
 /**
  * Store the provider API key, or pass `null` to **revoke** it.
- *
  * One-way by design: the value goes in and never comes back out. There is no
  * command that returns it and {@link PrefsView} carries no field for it.
- *
  * Revocation propagates to the account's other devices as an LWW write of
  * `null`, which is what makes "revoke" mean more than "revoke here": and it is
  * why the key stays shared while the consent does not.
@@ -1826,7 +1679,6 @@ export async function setAiProviderKey(key: string | null): Promise<void> {
 
 /**
  * Choose which of the provider's models answers, or `null` to clear it.
- *
  * The candidate list comes from the provider itself, never from a constant in
  * this tree: a pinned model tag rots faster than the release that pinned it.
  */
@@ -1836,11 +1688,9 @@ export async function setAiProviderModel(model: string | null): Promise<void> {
 
 /**
  * Whether a provider key is stored, without ever handing the key over.
- *
  * A boolean rather than the value, for the reason {@link PrefsView}'s comment
  * gives: the key is serde-skipped host-side precisely so it cannot reach page
  * context, and a getter here would be the door that reopens.
- *
  * Not a `writePref`, so no prefs-nonce bump: this reads.
  */
 export async function aiProviderHasKey(): Promise<boolean> {

@@ -374,7 +374,7 @@ Two jsdom facts worth knowing before designing a test around them, both measured
 
 ```
 myne/
-├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
+├── docs/                ← the PUBLIC contract: specs, threat model, glossary, design canon
 ├── src/                 ← React UI, shared by the desktop and web clients; src/editor is a re-export shim into @myne/editor, src/dialect shims @myne/dialect PLUS desktop-side dialect code never extracted (clip.ts, clip/, html/, text/)
 │   └── platform/        ← the platform seam: the ONLY place under src/ allowed to import @tauri-apps/*
 ├── web/                 ← Phase 3 desktop-browser client: same src/ tree, seam substituted at build time (pnpm web:dev / web:build)
@@ -482,6 +482,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-adversary-coverage.mjs` | the myne-range epic's anti-rot binding (myne-md/myne#553), in THIS repo so it cannot go… | `pre-commit` + CI `pnpm-build` |
 | `check-ornament-vocabulary.mjs` | the ornament vocabulary agrees across all THREE sources… | `pre-commit` + CI `pnpm-build` |
 | `check-token-parity.mjs` | the opposite question from `check-token-adoption.mjs` below, and the two together are the… | `pre-commit` + CI `pnpm-build` |
+| `check-comment-density.mjs` | ratchet: the recorded per-file comment count may shrink, never grow, so AGENTS.md rule 3 has a mechanism instead of an intention | `pre-commit` + CI `pnpm-build` |
 | `check-token-adoption.mjs` | ratchet: the per-file count of hardcoded visual values (colour literals, numeric… | `pre-commit` + CI `pnpm-build` |
 | `check-primitive-adoption.mjs` | ratchet: a raw `<button>`, `<input>`, `<select>` or `<textarea>` outside… | `pre-commit` + CI `pnpm-build` |
 | `check-hex-helpers.mjs` | ratchet, two halves. The ENCODER half: the lowercase-hex encoder and its predicate are… | `pre-commit` + CI `pnpm-build` |
@@ -492,7 +493,6 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-story-catalogue.mjs` | every story carries a `description` and at least one `tag` (search matches against them… | `pre-commit` + CI `pnpm-build` |
 | `check-foundations-coverage.mjs` | ratchet: every token in `client-core/src/tokens.css` is classified by a specimen group… | `pre-commit` + CI `pnpm-build` |
 | `tests/stories/a11yLevels.test.tsx` | the catalogue's accessibility GATE | `pnpm stories:test` / CI `vitest` |
-| `decisions-index.mjs` | `docs/decisions.md` is the generated index over `docs/decisions/`, and `--check` fails… | `pre-commit` |
 | `check-woodpecker-substitution.mjs` | no single-dollar brace-substitution token in ANY Woodpecker workflow file, comments… | `pre-commit` |
 | `check-woodpecker-split.mjs` | the ONE contract the two workflow files duplicate by design: the desktop release build's… | `pre-commit` + CI `pnpm-build` |
 | `scripts/lib/woodpecker-configs.mjs` (the roster behind both, plus `check-playwright-image.mjs`) | the one place that knows the CI config is `.woodpecker/`, imported rather than copied… | `pre-commit` |

@@ -9,9 +9,8 @@ docs/
 ├── vision.md              ← phased plan, anti-features (commitments)
 ├── threat-model.md        ← the A/AS/TB rosters (adversaries, assets, trust boundaries) — NORMATIVE
 ├── glossary.md            ← canonical terminology, one A–Z entry per term
-├── decisions.md           ← generated INDEX over docs/decisions/ (do not hand-edit)
-├── decisions/             ← the log itself: one file per decision, grouped by topic,
-│                          numbered NNNN in one global chronological sequence
+├── decisions.md           ← NOT the log: it says where the log lives and why it is not
+│                          published, because the log itself is private (see below)
 ├── questions.md           ← informal Q&A summaries of the specs (explicitly not normative)
 ├── dependency-policy.md   ← when a dependency may be added and how it is reviewed
 ├── self-host-policy.md    ← operator contract for a self-hosted sync server (normative)
@@ -46,14 +45,23 @@ If the change touches **sync**, add `spec/sync-protocol.md` (vault head, conflic
 
 ## Authoring discipline
 
-### The decisions log is append-only, and it is now one file per decision
+### The decisions log is private, and this directory keeps only the contract
 
-The log used to be a single 1.86 MB `decisions.md` carrying 489 entries, which is well past what
-anything can read in one pass, so in practice nobody read it and agents grepped it. It is now
-`docs/decisions/<topic>/<NNNN>-<slug>.md`, one file per decision, with `docs/decisions.md`
-regenerated as the index over them. The `decisions.md` path still exists and carries the full
-chronological table, so an existing reference of the form "see `decisions.md` 2026-06-09" still
-lands somewhere useful, at the cost of one hop to reach the entry itself.
+The log was `docs/decisions/<topic>/<NNNN>-<slug>.md`, one file per decision, append-only. It is
+**not published**: the owner's decisions are the maintainers' working record of why, not a second
+specification, and this repository is going public. The log now lives in the project's private
+companion repository, and `docs/decisions.md` here is a stub that says so.
+
+What that changes for an author, and what it does not:
+
+- **A reference stays as it was.** `decisions/protocol/0763` in a comment, a spec or a guard is an
+  IDENTIFIER, not a path in this repository. Do not rewrite these to the companion's path: that
+  would name a private repository from public prose, and `check-private-path-refs.mjs` treats a
+  public file naming a private path as a finding.
+- **A new decision is written where the log lives**, not here. Nothing in this repository checks
+  the log's shape any more, so a stale entry is caught by reading it, not by a hook.
+- **The contract is not the log.** Every guarantee in `threat-model.md` and every constant in
+  `spec/` stands on its own; a decision beside one is provenance.
 
 **The log was written with mixed heading levels**, 470 entries as `###` and 19 as `##`, and the
 first split matched `###` only, so those 19 were absorbed into the preceding entry's body. They
