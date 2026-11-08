@@ -155,6 +155,13 @@ pub fn run() {
         // `plugin:share-import|seal_share`. On iOS/desktop this registers a no-op
         // (the iOS Share Extension is a separate app-extension target).
         .plugin(tauri_plugin_share_intent::init())
+        // myne-md/myne#505: the Android OUTBOUND half of the same idea, the
+        // Storage Access Framework save picker, so an export written into the
+        // app's own `Documents` directory can be handed to the user instead of
+        // being stranded where no file manager will open it. In-repo Kotlin,
+        // Rust-only surface; `share_file.rs` drives it. On iOS/desktop this
+        // registers a no-op.
+        .plugin(tauri_plugin_save_file::init())
         // MYND-466: iOS AVFoundation QR scanner for device-join via QR. The one
         // WebView-facing command (`scan`) is under the deny-by-default
         // `qr-scan:default` capability (camera-gated). On desktop/Android it
@@ -512,11 +519,13 @@ pub fn run() {
                 });
             }
 
-            // Native file share/save (MYND-475). Export/download flows write the
-            // file to Documents (additive, no regression) and then emit
-            // SHARE_FILE_EVENT with the path; present the platform share sheet
-            // (iOS: UIActivityViewController → Save to Files) on the main thread
-            // so the user can pick a destination. Android is a documented no-op.
+            // Native file share/save (MYND-475, and the Android half myne-md/myne#505).
+            // Export/download flows write the file to Documents (additive, no
+            // regression) and then emit SHARE_FILE_EVENT with the path;
+            // `share_file::present` dispatches to the platform chooser: iOS's
+            // UIActivityViewController from the main thread, Android's SAF picker
+            // from a background task. The two threading contracts are opposite, so
+            // the dispatch lives behind that one call rather than here.
             {
                 let handle = app.handle().clone();
                 app.listen(share_file::SHARE_FILE_EVENT, move |event| {
@@ -525,7 +534,7 @@ pub fn run() {
                     else {
                         return;
                     };
-                    let _ = handle.run_on_main_thread(move || share_file::present(&payload.path));
+                    share_file::present(&handle, payload.path);
                 });
             }
             Ok(())

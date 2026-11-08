@@ -7,10 +7,10 @@
 // Where that leaves the user, per platform: on iOS the directory is invisible in
 // the Files app (no `UIFileSharingEnabled`) and the share sheet is the only route
 // to it; on Android it is `Android/data/<pkg>/files/Documents`, which the system
-// Files app has refused to navigate into since API 30, and the Android share
-// sheet is not implemented (myne-md/myne#505). Neither platform hands the user a
-// browsable copy on a current OS. See `../platform/path.ts` for the definition
-// site of that claim.
+// Files app has refused to navigate into since API 30, and the route there is the
+// Storage Access Framework picker myne-md/myne#505 wired. Neither platform hands
+// the user a browsable copy on a current OS, so the chooser is the delivery. See
+// `../platform/path.ts` for the definition site of that claim.
 //
 // The directory is excluded from platform cloud backup on both — a whole-vault
 // plaintext export is every note, and it was going to iCloud / Google Drive until
