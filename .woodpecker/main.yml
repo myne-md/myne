@@ -157,7 +157,21 @@ steps:
       # under `myne-agents/docs/`. Cloned into the workspace at the same path a developer's
       # checkout has it, so `scripts/lib/docs-tree.mjs` resolves without an override. The
       # anchor below is the one copy; a step that needs it aliases it.
-      - &clone-companion-docs git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-agents.git" myne-agents
+      - apt-get update && apt-get install -y --no-install-recommends git
+      - git config --global --add safe.directory '*'
+      - &clone-companion-docs |
+        # `myne-agents` is cloned once into the shared workspace, and every step that reads the
+        # documentation tree aliases this command. It is written to tolerate the race: steps in
+        # one pipeline run concurrently over one workspace, so two of them can reach this line at
+        # the same moment, and a plain `git clone myne-agents` fails for the loser with
+        # "destination path already exists". Clone aside, move in, and let the loser find the
+        # directory already there.
+        if [ ! -d myne-agents/docs ]; then
+          rm -rf .myne-agents-clone
+          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-agents.git" .myne-agents-clone
+          mv -n .myne-agents-clone myne-agents 2>/dev/null || true
+          rm -rf .myne-agents-clone
+        fi
       - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - /cache/tools/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
 
