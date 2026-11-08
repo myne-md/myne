@@ -115,6 +115,55 @@
 /** @type {readonly Entry[]} */
 export const ROSTER = Object.freeze([
   {
+    id: "calendar.events",
+    title: "The calendar: events, tasks, and the two clocks",
+    paths: [
+      "src/notes/components/CalendarPane.tsx",
+      "src/notes/components/CalendarEventForm.tsx",
+      "src/notes/calendar/",
+      "src/lib/calendarIcs.ts",
+      "src/lib/homeZone.ts",
+      "src/hooks/useLiveCalendarEvents.ts",
+      "src/components/settings/CalendarSettings.tsx",
+      "core/src/plugins/vault_indices/calendar.rs",
+      "src-tauri/src/plugins/text_file/",
+      "mobile/src/app/flows/CalendarSurface.tsx",
+      "mobile/src/app/flows/EventComposerSheet.tsx",
+      "mobile/src/lib/eventWrite.ts",
+      "mobile/src/lib/useMobileReminderPass.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
+
+    manual: [
+      {
+        how: "On the desktop, with the browser's own zone set to something other than the vault's home zone, open the calendar and set Appearance > Home time zone to a zone at least three hours away. Confirm every timed event shows two clocks and that the SECOND one moves while the first stays exactly as the file says. Then close the app, reopen it, and confirm the file still reads `start: 2026-11-05 09:00` with no zone, no offset and no extra field in the frontmatter.",
+        see: "Two clocks on a timed event, one unchanged `start:` line in the file. A FAIL is any zone or offset written into a note, or a second clock that does not change when the setting does.",
+        whyNotAutomated: "The first half is a display rule covered by unit tests; the half that matters is the ONE thing a display feature must never do, which is reach the file. That is a claim about stored bytes on a machine whose zone a harness can fake but whose settings sheet it cannot drive, so the observation is a person reading a frontmatter block.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        how: "On a real iPhone or Android phone, tap a day, tap +, and create an event with a title, a time and a weekly repeat. Then tap the same day's row for the NEXT week, tap 'Start this one at', enter a different clock, and confirm that week shows the new time while the following week keeps the series' own. Then cancel one further week with 'Cancel this one' and confirm that week is empty while the week after still shows the event.",
+        see: "One retimed week, one cancelled week, every other week unchanged, and the series note in the vault carrying `override:` and `skip:` rather than two extra notes. A FAIL is a series that moved as a whole, or a cancelled week that came back after a sync.",
+        whyNotAutomated: "The gesture and the write are covered by tests, but the claim is about what the NEXT week shows after two writes to the same note, on a client the tauri-driver lane cannot hold: it runs one Linux container, and the phone is where the composer, the day list and the two sheets live.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
+        tier: "core",
+      },
+      {
+        how: "On the phone, with reminders enabled and the notification permission granted, create an event starting in about twelve minutes with a `10m` reminder, lock the phone and wait. Then repeat with the app in the background rather than closed.",
+        see: "One notification, content-free, at the expected minute in both states. This is the check no harness can make: the permission, the background resume and the OS store behave differently on a device.",
+        whyNotAutomated: "Notification delivery is the platform's own scheduler. No in-process harness observes it, and a simulation would be testing the simulator: the failure this check exists for is a phone that holds no registration at all.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
+      },
+    ],
+    whyNotAutomated:
+      "The three claims here are a stored-bytes claim, a two-device-series claim and an OS-notification claim. The first is covered by unit tests, the second needs a phone driven by hand (the tauri-driver lane runs one Linux container and cannot hold a phone), and the third is the platform's own scheduling, which no in-process harness observes.",
+  },
+  {
     id: "ai.agent-mode",
     title: "Agent mode and its review card",
     paths: [
