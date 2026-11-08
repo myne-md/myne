@@ -114,6 +114,7 @@ describe("Command palette action registry", () => {
       "attachments.attach-file",
       "attachments.convert-imported",
       "attachments.open",
+      "calendar.show",
       "daily.open-today",
       "editor.cycle-content-width",
       "editor.cycle-default-view-mode",

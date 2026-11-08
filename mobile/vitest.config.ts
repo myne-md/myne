@@ -30,6 +30,25 @@ export default defineConfig({
       // barrel fails to TRANSFORM without this line, and the file appears in
       // no count. The mirror is kept complete rather than only where today's
       // specs happen to reach it.
+      { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
+      // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
+      // the desktop pane and the agent tool's answers, so a cell and a row cannot
+      // disagree about which day a span falls on.
+      { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
+      // Same alias as the build config; vitest resolves through this file, so an
+      // alias added only to vite.config.ts passes the build and fails every suite.
+      { find: "@myne/calendar-skip", replacement: sib("../src/notes/calendar/skipWrite.ts") },
+      { find: "@myne/calendar-drag-write", replacement: sib("../src/notes/calendar/dragWrite.ts") },
+      // The retime writer (decisions/storage/0796), aliased for the reason the skip
+      // writer is: one speller of the field, so two clients cannot produce two
+      // orderings of one list.
+      { find: "@myne/calendar-override", replacement: sib("../src/notes/calendar/overrideWrite.ts") },
+      // The second clock's rule (decisions/storage/0797): one function decides what a
+      // stored wall clock reads as in the user's home zone, so the phone and the pane
+      // cannot disagree by an hour.
+      { find: "@myne/home-zone", replacement: sib("../src/lib/homeZone.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The same three the bench mirrors (myne-md/myne#1027): the status vocabulary the phone
       // shares with the desktop, and the two pure modules the diagnostics block is built from.

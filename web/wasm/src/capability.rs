@@ -154,6 +154,9 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:prefs|set_daily_folder",
     "plugin:prefs|set_daily_template",
     "plugin:prefs|set_periodic_note_setting",
+    // myne-md/myne#1037: the calendar's two settings are vault content that must
+    // round-trip on every client, even before the web client grows the pane.
+    "plugin:prefs|set_calendar_setting",
     // myne-md/myne#699: the left-ribbon layout + visibility are vault content
     // that must round-trip on every client, even before the web client grows the
     // rail affordance.
@@ -430,6 +433,9 @@ pub const DISPATCHED: &[&str] = &[
     "plugin:notes|note_search",
     // Task 14 — the pure in-RAM index queries plus the two storage-touching ones.
     "plugin:vault-indices|vault_indices_all_edges",
+    // myne-md/myne#1037: the calendar pane reads its window from the index on
+    // every client, so the web build answers this or the pane is empty there.
+    "plugin:vault-indices|vault_indices_calendar_range",
     // myne#216 — the vault-wide heading set behind the wikilink heading picker,
     // moved off a full-vault `note_read` sweep and onto the index. (Spelling the
     // picker's trigger literally here would unbalance the brackets this file's
@@ -590,6 +596,15 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // no OS file ingress, no handler registration and no device-local vault
     // state to be independent of. All of its commands share this class.
     ("plain-file", Class::Unsupported),
+    // The calendar's `.ics` exchange (`src-tauri/src/plugins/text_file/`,
+    // myne-md/myne#1037) is a PATH-taking pair: a save dialog that returns a
+    // destination and an open dialog that returns a source. A served page has
+    // neither, and it does not need them: it exports through the download seam
+    // (`platform/download.ts` `deliverFile`, one user-initiated file) and has no
+    // import until it grows an ingest of its own. `Unsupported` rather than
+    // `Pending` because the browser is not owed this port: the surface it has is
+    // the one its platform can answer.
+    ("text-file", Class::Unsupported),
     // myne-md/myne#860: the opt-in device-local diagnostic log and the
     // bug-report surface. `Unsupported` rather than `Pending`, the same call
     // `plain-file` makes one line up: the bound issue's own scope sentence

@@ -6,6 +6,8 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@app/components/primitives/Button";
+import { ColorSwatchPicker } from "@app/components/primitives/ColorSwatchPicker";
+import { GROUP_COLOR_PALETTE } from "@app/notes/graphColorGroups";
 import { IconButton } from "@app/components/primitives/IconButton";
 import { Input } from "@app/components/primitives/Input";
 import { Textarea } from "@app/components/primitives/Textarea";
@@ -105,6 +107,24 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
         <Button variant="secondary" icon="plus">
           With icon
         </Button>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/colorswatchpicker/variants",
+    group: "primitives",
+    surface: "ColorSwatchPicker",
+    state: "variants",
+    description:
+      "A row of colour swatches, one selected. The paint is a var(--group-*) token rather than a hex value, so a theme switch repaints it; the selection ring sits on the dot rather than on the larger hit box, and each swatch is announced by its colour name with aria-pressed for the chosen one.",
+    tags: ["primitives", "colour", "swatch", "tokens", "picker", "accessibility"],
+    render: () => (
+      <Row>
+        <ColorSwatchPicker
+          palette={GROUP_COLOR_PALETTE}
+          value="group-teal"
+          onChange={action("onChange")}
+        />
       </Row>
     ),
   },

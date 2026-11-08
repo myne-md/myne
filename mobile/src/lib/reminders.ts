@@ -244,23 +244,23 @@ export function createExactAlarmApi(): ExactAlarmApi {
 /**
  * Whether this build hands any reminder to the operating system.
  *
- * **`false`, and that is a statement about the client rather than about the
- * platform.** The plugin below works and the OS would hold the registration;
- * what is missing is the caller. `mobile/src/lib/reminderPass.ts` holds
- * `runBoundedReminderPass`, the pass that would reconcile the vault's tasks
- * against what the OS is holding, and nothing in `mobile/src` calls it. The
- * repo already records that: `scripts/check-unwired.mjs` carries the module as
- * a known-UNWIRED exemption.
+ * **`true` on every build with a host, and that is now a statement about this
+ * client rather than about the platform.** It used to answer `false`
+ * unconditionally, because the pass existed and no production code called it:
+ * `runBoundedReminderPass` sat in `mobile/src/lib/reminderPass.ts` with tests and
+ * no caller, so the honest sentence in the settings sheet had to say reminders
+ * were not being registered.
  *
- * It exists because a settings sentence may not describe a mechanism that is
- * not running. "Reminders are registered through <date>" was rendered
- * unconditionally, and it was false on every mobile build (myne#508). The
- * desktop twin has said the same thing about itself since MYND-618, through
- * `reminderPlatform.ts::showsInAppOnlyLimitation`, which this mirrors.
+ * myne-md/myne#1037 gave that pass a caller (`useMobileReminderPass`, run from the
+ * unlocked editor) and the calendar as a second source, so the plugin, the
+ * permission and the platform's own store are the whole story again. A build with
+ * no host at all (the browser dev build) still answers `false`, and there the
+ * sentence that depends on this stays hidden rather than describing a mechanism
+ * that cannot run.
  *
- * Flips to a real check on the change that gives the pass a caller, and the
- * sentence returns with it.
+ * The desktop twin says the same thing about itself since MYND-618, through
+ * `reminderPlatform.ts::showsInAppOnlyLimitation`.
  */
 export function remindersReachTheOs(): boolean {
-  return false;
+  return HAS_TAURI;
 }

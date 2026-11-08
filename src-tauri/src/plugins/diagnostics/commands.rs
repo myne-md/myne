@@ -379,7 +379,7 @@ pub async fn vault_usage<R: Runtime>(
 /// [`GuardedStore::ALL`] is the hand-written roster a test can hold, which a type
 /// cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GuardedStore {
+pub(crate) enum GuardedStore {
     AppData,
     Log,
     Config,
@@ -387,11 +387,15 @@ enum GuardedStore {
 
 impl GuardedStore {
     /// The roster, and the order the refusal walks it in.
-    const ALL: [GuardedStore; 3] = [Self::AppData, Self::Log, Self::Config];
+    ///
+    /// Public within the crate because `text_file` guards the same three stores:
+    /// a second list would be a second opinion about which paths a page must not
+    /// write, and the two would drift the first time one gained a store.
+    pub(crate) const ALL: [GuardedStore; 3] = [Self::AppData, Self::Log, Self::Config];
 
     /// The directory, or `Err` when the host cannot resolve it. An unresolved
     /// store is a refusal at the caller, never a skipped comparison.
-    fn resolve<R: Runtime>(self, app: &AppHandle<R>) -> Result<PathBuf, ()> {
+    pub(crate) fn resolve<R: Runtime>(self, app: &AppHandle<R>) -> Result<PathBuf, ()> {
         let resolved = match self {
             Self::AppData => app.path().app_data_dir(),
             Self::Log => app.path().app_log_dir(),

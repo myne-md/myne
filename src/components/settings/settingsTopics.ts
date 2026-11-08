@@ -38,6 +38,7 @@ export type EditorTopicId =
   | "writing"
   | "tasks"
   | "periodic"
+  | "calendar"
   | "features";
 
 /**
@@ -264,6 +265,7 @@ export const EDITOR_PANEL_TOPICS: readonly SettingsTopicMeta[] = [
   { id: "writing", labelKey: "settings.editor.sections.writing" },
   { id: "tasks", labelKey: "settings.editor.sections.tasks" },
   { id: "periodic", labelKey: "settings.editor.topics.periodic" },
+  { id: "calendar", labelKey: "settings.editor.topics.calendar" },
   { id: "features", labelKey: "settings.editor.sections.features" },
 ];
 

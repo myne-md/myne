@@ -5,6 +5,7 @@
 // setter; commits   to disk first, then re-applies native screen-capture protection.   Disk-then-native
 // ordering is load-bearing for UI / disk   consistency per MYND-160 grill Q5.2.
 
+import { DEFAULT_DAY_ANCHOR, resolveDayAnchor } from "@myne/dialect/event";
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
 
@@ -476,6 +477,20 @@ export interface PrefsView {
    * to `{}`.
    */
   periodic_notes: Record<string, string>;
+  /**
+   * The calendar's own settings (myne-md/myne#1037), a flat map the client owns
+   * both halves of: `day_reminder_anchor` (an `HH:MM` wall-clock time, the hour
+   * an all-day event's relative reminder counts back from) and
+   * `colours.<calendar name>` (a design-TOKEN name, never a colour literal, so a
+   * custom theme repaints the calendar with everything else).
+   *
+   * Flat and per setting for the same reason as `periodic_notes`: the Phase 2
+   * field clock is `calendar_settings/<key>`, so a colour edit on one device and
+   * an anchor edit on another in the same round both survive. An entry naming a
+   * setting this build has no UI for decodes and is ignored. Absent in vaults
+   * that never changed one -> the Rust decoder defaults it to `{}`.
+   */
+  calendar_settings: Record<string, string>;
   /**
    * Favorited notes — an ordered list of note UUIDs surfaced in the sidebar's
    * Favorites section, in display order (MYND-183). A sequence: the backend
@@ -1594,6 +1609,59 @@ export async function setPeriodicNoteSetting(
   value: string | null,
 ): Promise<void> {
   await writePref("plugin:prefs|set_periodic_note_setting", { period, setting, value });
+}
+
+/** The default anchor for an all-day event's relative reminder (myne-md/myne#1037). */
+export const CALENDAR_DEFAULT_DAY_ANCHOR = DEFAULT_DAY_ANCHOR;
+
+/** The calendar settings this build writes. */
+export const CALENDAR_ANCHOR_SETTING = "day_reminder_anchor";
+
+/** The prefix a per-calendar colour entry carries in `calendar_settings`. */
+export const CALENDAR_COLOUR_PREFIX = "colours.";
+
+/**
+ * Set ONE calendar setting (myne-md/myne#1037):
+ * `calendar_settings["day_reminder_anchor"]` or
+ * `calendar_settings["colours.<calendar name>"]`.
+ *
+ * One entry at a time rather than the whole map, for the reason
+ * {@link setPeriodicNoteSetting} is: the entry is the Phase 2 field clock, so two
+ * devices editing two settings in one round both keep their edit. Pass
+ * `value = null` to clear it.
+ *
+ * The backend refuses a setting outside the two, an anchor that is not `HH:MM`,
+ * a calendar name that is not one legal segment, and a colour that is not a
+ * token name. The token SHEET is this client's question: a name the sheet does
+ * not carry renders in the default colour rather than being rejected here, so a
+ * theme that drops a token degrades instead of blocking a write.
+ */
+export async function setCalendarSetting(setting: string, value: string | null): Promise<void> {
+  await writePref("plugin:prefs|set_calendar_setting", { setting, value });
+}
+
+/** The all-day reminder anchor, falling back to the canonical default. */
+export function resolveCalendarDayAnchor(settings: Readonly<Record<string, string>>): string {
+  // The rule lives in the dialect now (`resolveDayAnchor`), because the phone reads
+  // the same SHARED pref and had no resolver at all: it fed the raw value to the
+  // scheduler, where a value that is not `HH:MM` produced `Invalid Date` and silently
+  // dropped every all-day reminder on that client.
+  return resolveDayAnchor(settings[CALENDAR_ANCHOR_SETTING]);
+}
+
+/**
+ * The token name a calendar draws in, or `undefined` when none is set.
+ *
+ * Returns the raw name even when this build's token sheet has never heard of it:
+ * resolving membership is the renderer's job, so a theme that adds a token and is
+ * read by an older build shows the default colour instead of refusing the entry.
+ */
+export function resolveCalendarColour(
+  settings: Readonly<Record<string, string>>,
+  calendarName: string,
+): string | undefined {
+  const raw = settings[`${CALENDAR_COLOUR_PREFIX}${calendarName}`];
+  return raw === undefined || raw === "" ? undefined : raw;
 }
 
 /**

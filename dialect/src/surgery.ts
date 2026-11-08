@@ -530,7 +530,7 @@ export function patchTitleField(bytes: Uint8Array, value: string): Uint8Array {
 // Extract the scalar value of a `title:` line into its logical string,
 // stripping surrounding quotes (single/double) and an unquoted trailing
 // `# comment`. Returns null for an empty value or a block-scalar form
-// (`title: |`). Shape-mirror of `extractTrashedScalar`.
+// (`title: |`). Shape-mirror of `extractFmScalar`.
 function extractTitleScalar(valuePortion: string): string | null {
   const trimmed = valuePortion.trim();
   if (trimmed === "") return null;
@@ -922,7 +922,7 @@ function isValidRfc3339(value: string): boolean {
 // Extract the scalar value of a `trashed:` line into its logical string,
 // stripping quotes / trailing comments. Returns null for block-scalar forms
 // (`trashed: |`) — a Myne-written marker is never a block scalar.
-function extractTrashedScalar(valuePortion: string): string | null {
+export function extractFmScalar(valuePortion: string): string | null {
   const trimmed = valuePortion.trim();
   if (trimmed === "") return null;
   if (/^[|>]/.test(trimmed)) return null;
@@ -950,7 +950,7 @@ export function readTrashedFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = TRASHED_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     if (value !== null && isValidRfc3339(value)) return value;
     return null;
   }
@@ -971,7 +971,7 @@ export function readUpdatedFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = UPDATED_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     if (value !== null && isValidRfc3339(value)) return value;
     return null;
   }
@@ -997,7 +997,7 @@ export function readDeletedFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = DELETED_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     if (value !== null && isValidRfc3339(value)) return value;
     return null;
   }
@@ -1013,7 +1013,7 @@ export function readDeletedFromFmBody(fmBody: string): string | null {
  * unprefixed-field collision mitigation as `trashed:` (§3.6.1; note-archive /
  * MYND-331). `archived:` is the 8th Myne-managed canonical FM field, joining
  * `updated:` / `title:` / `folder:` / `trashed:` / `template:` / `folder_index:`.
- * It shares `extractTrashedScalar` + `isValidRfc3339` with `trashed:` because the
+ * It shares `extractFmScalar` + `isValidRfc3339` with `trashed:` because the
  * two are structurally identical timestamp fields (a `/simplify` candidate is to
  * fold the two into one keyed timestamp-read helper).
  */
@@ -1022,7 +1022,7 @@ export function readArchivedFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = ARCHIVED_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     if (value !== null && isValidRfc3339(value)) return value;
     return null;
   }
@@ -1057,7 +1057,7 @@ export function readConflictOfFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = CONFLICT_OF_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     return value !== null && value.length > 0 ? value : null;
   }
   return null;
@@ -1498,7 +1498,7 @@ function isCanonicalFolderIndexFlag(valuePortion: string): boolean {
 // §3.6.1). Its value is a form-C attachment embed, which makes it the first
 // managed field whose value can legitimately contain a `#` or a `"` (a filename
 // can; an RFC 3339 timestamp and the literal `true` cannot). That is why the
-// read below goes through `extractTrashedScalar` — the shared scalar extractor
+// read below goes through `extractFmScalar` — the shared scalar extractor
 // every other value-strict field already uses — instead of matching the raw
 // line. The extractor only recognises a comment AFTER the closing quote, and
 // the value is quoted on disk (`needsYamlQuoting` returns true for a leading
@@ -1563,7 +1563,7 @@ export function readCoverValue(valuePortion: string): CoverRef | null {
   // carries both an escaped quote and a later `#`. Fall back to the shared
   // extractor for the plain-scalar form a user may have hand-written.
   const scalar =
-    parseDoubleQuotedYamlScalar(valuePortion) ?? extractTrashedScalar(valuePortion);
+    parseDoubleQuotedYamlScalar(valuePortion) ?? extractFmScalar(valuePortion);
   if (scalar === null) return null;
   const m = COVER_EMBED_RE.exec(scalar);
   if (m === null) return null;
@@ -1587,19 +1587,20 @@ export function readCoverFromFmBody(fmBody: string): CoverRef | null {
   return null;
 }
 
-// === kind: drawing — the drawing-note marker (drawing-notes SF2, MYND-499) ===
+// === kind: the note-class marker (drawing-notes SF2, MYND-499) ===
 //
 // `kind:` is the 7th Myne-managed canonical FM field (markdown-dialect.md
-// §3.6.1). Unlike the boolean flags it is a string enum; v1 defines exactly one
-// value, `drawing`, which routes the note to the Excalidraw canvas surface
-// instead of CodeMirror. The READ is value-strict (bespoke, mirrors
+// §3.6.1). Unlike the boolean flags it is a string enum, and it has three
+// canonical values today: `drawing` routes the note to the Excalidraw canvas
+// surface instead of CodeMirror, `task` marks a note-task (MYND-613), and
+// `event` marks a calendar event (myne-md/myne#1037, §3.10) without routing any
+// render surface at all. The READ is value-strict (bespoke, mirrors
 // `readTemplateFromFmBody`): a user's own non-canonical `kind:` (`kind: "drawing"`,
-// `kind: Drawing`, `kind: task`) reads as an ordinary note, so a stray `kind:`
+// `kind: Drawing`, `kind: chore`) reads as an ordinary note, so a stray `kind:`
 // never force-renders someone's markdown as a canvas — a collision footgun that
 // matters MORE here than for `template:`/`trashed:` because it drives the render
 // surface, not just visibility (§3.6.1). The WRITE is the generic keyed
-// `patchFrontmatterField` (the only value Myne writes is the canonical `drawing`,
-// a plain scalar).
+// `patchFrontmatterField` (every value Myne writes is a plain canonical scalar).
 
 /**
  * Set or clear the Myne-managed `done:` completion timestamp (MYND-613) — the
@@ -1641,7 +1642,7 @@ export function readDoneFromFmBody(fmBody: string): string | null {
   for (const line of lines) {
     const m = DONE_KEY_RE.exec(line);
     if (m === null) continue;
-    const value = extractTrashedScalar(m[2] ?? "");
+    const value = extractFmScalar(m[2] ?? "");
     if (value !== null && isValidRfc3339(value)) return value;
     return null;
   }
@@ -1655,17 +1656,33 @@ export const DRAWING_KIND_VALUE = "drawing";
 export const TASK_KIND_VALUE = "task";
 
 /**
+ * The canonical `kind:` value that marks a calendar event (myne-md/myne#1037).
+ *
+ * Unlike `drawing`, this value routes **no** render surface: an event note's body
+ * is ordinary markdown, exactly like a `task` note's. What it does route is the
+ * calendar's own read (markdown-dialect.md §3.10), and it is the identity the
+ * calendar uses instead of a folder, so an agent's write grant never has to
+ * match where the calendar lives.
+ */
+export const EVENT_KIND_VALUE = "event";
+
+/**
  * Every canonical `kind:` value. The field is a **value-strict enum**: anything
  * outside this set — quoted, capitalized, or unknown — reads as an ordinary note.
  */
-export const CANONICAL_KIND_VALUES = [DRAWING_KIND_VALUE, TASK_KIND_VALUE] as const;
+export const CANONICAL_KIND_VALUES = [
+  DRAWING_KIND_VALUE,
+  TASK_KIND_VALUE,
+  EVENT_KIND_VALUE,
+] as const;
 
 /** A canonical note class, or `null` for an ordinary markdown note. */
 export type NoteKind = (typeof CANONICAL_KIND_VALUES)[number] | null;
 
 /**
  * Set or clear the Myne-managed `kind:` frontmatter field. A canonical value
- * writes it (`kind: drawing`, `kind: task`); `null` deletes it (with empty-block
+ * writes it (`kind: drawing`, `kind: task`, `kind: event`); `null` deletes it
+ * (with empty-block
  * collapse). Touches only the `kind:` line, composing with `title:` /
  * `template:` / … without clobbering. Thin wrapper over
  * {@link patchFrontmatterField}.

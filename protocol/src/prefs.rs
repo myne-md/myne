@@ -1132,6 +1132,37 @@ pub struct PrefsView {
     #[serde(default)]
     pub bar_items_order: Vec<String>,
 
+    /// Calendar settings (myne-md/myne#1037) - a flat string map the client owns
+    /// both halves of, keyed by SETTING: `day_reminder_anchor` (an `HH:MM` local
+    /// wall-clock time, the anchor an all-day event's relative reminder counts
+    /// back from) and `colours.<calendar name>` (the design-token name that
+    /// calendar draws in, never a colour literal, so a custom theme repaints the
+    /// calendar with the rest of the app).
+    ///
+    /// **One map rather than two fields, and the shape is `periodic_notes`'s
+    /// verbatim**: a `BTreeMap<String, String>` gets lexicographic key order from
+    /// the canonical encoder for free, reuses the existing string-map codec, and
+    /// leaves the key grammar to the client, so a later calendar setting costs no
+    /// protocol change at all. A codec that validated either half would turn every
+    /// future setting into a format decision.
+    ///
+    /// Default empty; **omitted entirely from the canonical JSON when empty**, so
+    /// a vault that never touched a calendar setting is byte-identical to a
+    /// pre-myne#1037 `vault.prefs` (existing golden vectors unaffected, a
+    /// migration-less additive field on `MYP1`: no new magic, no new `SubkeyRole`,
+    /// no new AAD role, zero new crypto). **Non-load-bearing** (cosmetic plus
+    /// cold/derivable, AS-low): a replayed or tampered value can at worst draw one
+    /// calendar in the wrong colour or fire an all-day reminder at the wrong hour,
+    /// so it carries no protective-envelope clamp.
+    ///
+    /// Canonical key `calendar_settings`, which sorts after `bar_items_order`
+    /// (`ba` < `ca`), before `chat_history_budget` (`cal` < `cha`). That position
+    /// is the cursor-scanned region rather than the `strip_prefix` run, which is
+    /// where an additive field belongs for the reason `chat_history_budget`'s own
+    /// doc states at length.
+    #[serde(default)]
+    pub calendar_settings: BTreeMap<String, String>,
+
     /// How many characters of visible chat history an agent run may be seeded with
     /// (myne-md/myne#617). `None` means the host applies its own default.
     ///
@@ -1651,6 +1682,7 @@ impl Default for PrefsView {
         Self {
             screen_capture_protection: true,
             bar_items_order: Vec::new(),
+            calendar_settings: Default::default(),
             chat_history_budget: None,
             cli_enabled: false,
             cli_excluded_folders: Vec::new(),
@@ -1999,6 +2031,17 @@ fn canonical_json_encode(prefs: &PrefsView) -> Vec<u8> {
     if !prefs.bar_items_order.is_empty() {
         out.extend_from_slice(b"\"bar_items_order\":");
         push_ordered_string_array(&mut out, &prefs.bar_items_order);
+        out.push(b',');
+    }
+
+    // calendar_settings (canonical key 'calendar_settings', after bar_items_order ['ba' < 'ca'],
+    // before chat_history_budget ['cal' < 'cha'], myne-md/myne#1037). The calendar's own settings
+    // map: the all-day reminder anchor and one colour token per `calendar:` name. The
+    // periodic_notes string-map encoder reused verbatim (lexicographic keys, NFC keys + values,
+    // omitted entirely when empty), because the codec validates no half of a client-owned key.
+    if !prefs.calendar_settings.is_empty() {
+        out.extend_from_slice(b"\"calendar_settings\":");
+        push_canonical_string_map(&mut out, &prefs.calendar_settings);
         out.push(b',');
     }
 
@@ -3310,6 +3353,14 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
     // preserved verbatim (sort/dedup is encode-side and this field is a
     // sequence, so neither happens). Present-but-malformed → PlaintextParseFailed.
     let bar_items_order = parse_optional_array_field(rest, &mut cursor, b"\"bar_items_order\":")?;
+    // calendar_settings (key 'cal': after bar_items_order ['ba' < 'ca'], before
+    // chat_history_budget ['cal' < 'cha'], myne-md/myne#1037). The folder_icons
+    // string-map parse reused verbatim, located from the same monotonic cursor as
+    // its neighbours. Absent -> empty, and an entry naming a setting this build
+    // does not know decodes and is ignored by the client rather than failing the
+    // blob.
+    let calendar_settings =
+        parse_optional_string_map_field(rest, &mut cursor, b"\"calendar_settings\":")?;
     // chat_history_budget (canonical key 'chat_history_budget', after
     // bar_items_order ['b' < 'c'], before cli_enabled ['ch' < 'cl']). How many
     // characters of chat history an agent run may be seeded with
@@ -3666,6 +3717,7 @@ fn canonical_json_decode(plaintext: &[u8]) -> Result<PrefsView, PrefsBlobError> 
         folder_notes_enabled,
         hidden_bar_items,
         bar_items_order,
+        calendar_settings,
         chat_history_budget,
         cli_enabled,
         cli_excluded_folders,

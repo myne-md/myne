@@ -39,6 +39,7 @@
     "importer:default",
     "backup:default",
     "export:default",
+    "text-file:default",
     "pdf-export:default",
     "workspace:default",
     "graph-layout:default",

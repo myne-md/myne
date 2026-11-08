@@ -221,6 +221,98 @@ export async function vaultIndicesAllEdges(): Promise<
  * at any vault size without the edge dump. (Notes whose only links are broken
  * are not flagged here — that resolved-orphan refinement is TS-side, deferred.)
  */
+/** One row of the calendar's range read (myne-md/myne#1037). */
+export interface CalendarRow {
+  readonly noteId: string;
+  readonly title: string | null;
+  readonly folder: string | null;
+  readonly calendar: string | null;
+  /** The occurrence's start, in the emitted wall-clock form (`YYYY-MM-DD HH:MM`). */
+  readonly start: string;
+  readonly end: string | null;
+  readonly allDay: boolean;
+  /** Set on a projected occurrence: the series note id. A write targets it. */
+  readonly occurrenceOf: string | null;
+  /** Set on a projected occurrence: its own date, `YYYY-MM-DD`. */
+  readonly occurrenceDate: string | null;
+  /** Whether this row overlaps another row in the same answer. */
+  readonly conflicts: boolean;
+  /** The raw rule expression, preserved verbatim. */
+  readonly repeat: string | null;
+  /**
+   * The raw reminder lead, as the file holds it (`30m`, `2h`, `1d`), or `null`.
+   *
+   * Returned un-judged: whether a lead fits the reminder horizon is the caller's
+   * policy (§3.10.4), because the tier's horizon is a setting and not a property
+   * of the event.
+   */
+  readonly remind: string | null;
+  /** True when the rule is outside the closed §3.8.7 vocabulary. */
+  readonly repeatUnrecognized: boolean;
+  /**
+   * The note's own `uid:`, when it carries one.
+   *
+   * The importer's match key and the reason it is here: an `.ics` file has its own
+   * `UID`, the import writes it into the note, and a re-import has to be able to
+   * ask "do I already hold this one" (myne-md/myne#1037).
+   */
+  readonly uid: string | null;
+  /**
+   * The dates this series does not occur on, in canonical `YYYY-MM-DD`.
+   *
+   * Optional because the host added it after the field shipped, and a row from an
+   * older host is still a row: an absent list means "no cancellations known", which is
+   * the same reading a one-off has.
+   */
+  readonly skip?: readonly string[];
+}
+
+/** Why a note that claims to be an event cannot be shown as one (§3.10.4). */
+export type CalendarUnreadableReason =
+  | "start-missing"
+  | "start-unreadable"
+  | "end-unreadable"
+  | "end-before-start"
+  | "end-time-without-start-time"
+  | "calendar-unreadable";
+
+export interface CalendarUnreadableEvent {
+  readonly noteId: string;
+  readonly title: string | null;
+  readonly reason: CalendarUnreadableReason;
+}
+
+export interface CalendarRange {
+  readonly rows: readonly CalendarRow[];
+  readonly unreadable: readonly CalendarUnreadableEvent[];
+}
+
+/**
+ * The calendar's range read — the ONE interpretation of "what happens between
+ * these two instants", shared by the pane, the mobile screen, the reminder pass
+ * and the fifth agent tool (myne-md/myne#1037).
+ *
+ * `bounded` is the caller's choice, not a performance hint: the user's own
+ * surfaces ask unbounded, while anything handing rows to a model asks bounded, so
+ * "the whole calendar in one call" stays structurally unreachable from the model's
+ * side. A bounded read wider than 366 days is refused with the bound in the
+ * message; an unbounded one is never refused.
+ *
+ * `windowStart` / `windowEnd` are the event wall-clock shape (`2026-11-01`,
+ * `2026-11-30 23:59`), never an ISO instant: a zone cannot be smuggled into a
+ * query about a wall-clock schedule.
+ */
+export async function vaultIndicesCalendarRange(
+  windowStart: string,
+  windowEnd: string,
+  bounded: boolean,
+): Promise<CalendarRange> {
+  return await invoke<CalendarRange>(
+    "plugin:vault-indices|vault_indices_calendar_range",
+    { windowStart, windowEnd, bounded },
+  );
+}
+
 export async function vaultIndicesOrphans(): Promise<string[]> {
   return await invoke<string[]>("plugin:vault-indices|vault_indices_orphans");
 }

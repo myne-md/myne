@@ -82,11 +82,37 @@ export {
   readTrashedFromFmBody,
   DRAWING_KIND_VALUE,
   TASK_KIND_VALUE,
+  EVENT_KIND_VALUE,
   CANONICAL_KIND_VALUES,
   FOLDER_INDEX_FLAG_VALUE,
   COVER_FIELD_KEY,
   TEMPLATE_FLAG_VALUE,
 } from "./surgery";
+// The event vocabulary (myne-md/myne#1037, spec §3.10): one reader for the pane,
+// the mobile screen, the `.ics` codec and the reminder pass.
+export {
+  EVENT_FIELD_KEYS,
+  eventNoteBytes,
+  MAX_OVERRIDES,
+  MAX_SKIP_DATES,
+  appendSkipDate,
+  clearOverride,
+  formatEventInstant,
+  parseEventInstant,
+  parseOverrides,
+  parseReminderLead,
+  parseSkipDates,
+  setOverride,
+  readEventFromFmBody,
+} from "./event";
+export type {
+  CalendarEvent,
+  EventInstant,
+  EventRead,
+  EventReadOptions,
+  EventUnreadableReason,
+  ReminderLead,
+} from "./event";
 export { parseStream } from "./worker";
 export type { ParseStreamItem, ParseStreamResult } from "./worker";
 // Version-comparison core (MYND-334) — the one diff implementation behind the

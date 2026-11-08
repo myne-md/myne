@@ -67,6 +67,7 @@ export const NEW_TAB_PLACES: readonly {
   { id: "attachments.open", icon: "paperclip", labelKey: "notes.newTab.places.attachments" },
   { id: "graph.show", icon: "share-2", labelKey: "notes.newTab.places.graph" },
   { id: "tasks.show", icon: "list-todo", labelKey: "notes.newTab.places.tasks" },
+  { id: "calendar.show", icon: "calendar", labelKey: "notes.newTab.places.calendar" },
 ];
 
 /** Commands that never belong in the recent list: the places already have a
