@@ -88,6 +88,12 @@ describe("capability descriptor", () => {
       // restriction and deletes the artefact grep that enforced it, so the
       // absent capability is what keeps this module out.
       "vaultImport",
+      // myne-md/myne#1037. Importing an `.ics` file needs a path-taking open dialog,
+      // and a browser has no path to give: the File System Access API returns a
+      // handle, not a path, and the desktop import command takes one. Export is NOT
+      // absent, because it leaves through `platform/download.ts` rather than through
+      // this capability.
+      "icsImport",
       // `decisions.md` 2026-08-15, and the reason it is a SECOND capability
       // rather than a branch of `phraseRecovery`: one flag used to gate two
       // unrelated things, the recovery screen and the enrolment form's

@@ -42,6 +42,7 @@ export type Capability =
   | "backup"
   /** Native Save-As to a user-chosen path. */
   | "nativeSaveAs"
+  | "icsImport"
   /** Account and vault CREATION (generates and shows the recovery phrase). */
   | "vaultCreation"
   /** Recovery by typing the 24-word phrase. */
@@ -171,6 +172,7 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   personCredentialPersisted: true,
   backup: true,
   nativeSaveAs: true,
+  icsImport: true,
   vaultCreation: true,
   phraseRecovery: true,
   phraseEnrolment: true,

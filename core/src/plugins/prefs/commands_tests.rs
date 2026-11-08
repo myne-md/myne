@@ -1345,6 +1345,7 @@ fn prefs_read_returns_default_when_vault_prefs_tampered() {
             &prefs_key,
             &account_hash,
             &PrefsView {
+                calendar_settings: Default::default(),
                 attachment_compression_enabled: true,
                 developer_mode: false,
                 ribbon_items: None,

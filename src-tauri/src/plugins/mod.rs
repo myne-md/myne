@@ -73,6 +73,7 @@ pub mod screen_capture;
 pub mod secret_export;
 pub mod snapshots;
 pub mod sync;
+pub mod text_file;
 pub mod themes;
 pub mod update;
 pub mod vault_change_password;

@@ -237,7 +237,7 @@ afterEach(() => {
 });
 
 describe("the Editor panel's topics", () => {
-  it("declares six topics, and every one of them renders a non-empty body", async () => {
+  it("declares seven topics, and every one of them renders a non-empty body", async () => {
     expect(SETTINGS_PANEL_TOPICS.editor).toBe(EDITOR_PANEL_TOPICS);
     expect(EDITOR_PANEL_TOPICS.map((topic) => topic.id)).toEqual([
       "text",
@@ -245,6 +245,7 @@ describe("the Editor panel's topics", () => {
       "writing",
       "tasks",
       "periodic",
+      "calendar",
       "features",
     ]);
 
@@ -298,7 +299,8 @@ describe("the Editor panel's topics", () => {
     // present on each of those. The two with nothing to depict draw no column,
     // which the test below asserts (myne-md/myne#885 visual pass).
     for (const topic of EDITOR_PANEL_TOPICS.filter(
-      (meta) => meta.id !== "periodic" && meta.id !== "features",
+      (meta) =>
+        meta.id !== "periodic" && meta.id !== "calendar" && meta.id !== "features",
     )) {
       cleanup();
       openTopic(topic.id);

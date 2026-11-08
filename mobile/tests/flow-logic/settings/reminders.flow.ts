@@ -51,30 +51,30 @@ test.describe("mobile task-reminder settings", () => {
     await expect(page.getByTestId("settings.reminder-exact-row")).toHaveCount(0);
   });
 
-  test("the horizon line is not shown while nothing here registers with an OS", async ({
+  test("the horizon line names the delivery bound now that the pass has a caller", async ({
     page,
   }) => {
     // myne#508. "Reminders are registered through <date>" says an operating
-    // system is holding these, and on this client nothing is: the pass that
-    // would register them (`mobile/src/lib/reminderPass.ts`) has no production
-    // caller, which `scripts/check-unwired.mjs` records. The sentence rendered
-    // unconditionally, in 32 locales, and its own date was the only thing the
-    // horizon control moved.
-    //
-    // `remindersReachTheOs()` is the predicate, and it flips on the change that
-    // gives the pass a caller. This assertion flips with it.
+    // system is holding these, and it was gated on `remindersReachTheOs()`
+    // because the pass that would register them (`mobile/src/lib/reminderPass.ts`)
+    // had no production caller. myne-md/myne#1037 gave it one
+    // (`useMobileReminderPass`), so the predicate now answers `HAS_TAURI` and this
+    // is the change its own comment said would flip the assertion: the sentence
+    // is true here, and the inert helper is the one that is gone.
     await installMockIpc(page, { prefs: { reminder_horizon_days: 7 } });
     await page.goto("/");
     await openPrivacy(page);
 
     await expect(page.getByTestId("settings.reminders-horizon-picker")).toBeVisible();
-    await expect(page.getByTestId("settings.reminders-horizon")).toHaveCount(0);
+    await expect(page.getByTestId("settings.reminders-horizon")).toContainText(
+      "Reminders are registered through",
+    );
 
     // And the row says which of the two it is. A bare label over four day
     // counts would leave a user acting on the horizon's documented privacy
     // reading with no bound in force and no way to know it.
     await expect(page.getByTestId("settings.reminders-horizon-helper")).toHaveText(
-      "Saved on this device. Nothing reads it yet: this build does not deliver task reminders.",
+      "Reminders are set up this far in advance. Myne has to be open and unlocked for one to arrive.",
     );
   });
 
@@ -227,18 +227,18 @@ test.describe("mobile task-reminder settings", () => {
     await expect(group.getByRole("radio")).toHaveCount(4);
   });
 
-  test("the precise-delivery affordance is absent while nothing registers", async ({ page }) => {
-    // myne#508 gated `ExactAlarmBlock` on `remindersReachTheOs()`, the same
-    // predicate as the horizon line. It offers to make delivery precise, and
-    // asks Android for the exact-alarm special access to do it, for a pass that
-    // has no production caller: nothing is scheduled, so there is no
-    // imprecision to fix. Requesting a permission Google requires a Play
-    // Console declaration for, to improve a delivery that does not happen, is
-    // the shape a store review is meant to catch.
+  test("the precise-delivery affordance is offered, and asks nothing until pressed", async ({
+    page,
+  }) => {
+    // The same flip as the horizon line, and the same predicate: myne#508 gated
+    // `ExactAlarmBlock` on `remindersReachTheOs()` because nothing was scheduled,
+    // so there was no imprecision to fix. `useMobileReminderPass` schedules now
+    // (myne-md/myne#1037), which makes the row the honest answer.
     //
-    // Seeded with `approximate`, which is the case that USED to render the row
-    // and its fallback sentence, so this fails the moment the gate is dropped
-    // rather than passing on a platform that would have hidden it anyway.
+    // Seeded with `approximate`, the state that renders the row and offers the
+    // grant. The permission is still asked for ONLY on the press: opening
+    // Settings must not request Android's exact-alarm special access, and the
+    // counter is what makes that observable rather than assumed.
     await installMockIpc(page, {
       exactAlarm: "approximate",
       exactAlarmAfterRequest: "exact",
@@ -247,16 +247,25 @@ test.describe("mobile task-reminder settings", () => {
     await openPrivacy(page);
 
     await expect(page.getByTestId("settings.reminders-row")).toBeVisible();
-    await expect(page.getByTestId("settings.reminder-exact-row")).toHaveCount(0);
-    await expect(page.getByTestId("settings.reminder-exact-helper")).toHaveCount(0);
-
-    // And nothing was asked of the platform on the way past. The app never
-    // opens that screen on its own, and with the block gated there is no button
-    // that could.
+    await expect(page.getByTestId("settings.reminder-exact-row")).toBeVisible();
+    await expect(page.getByTestId("settings.reminder-exact-helper")).toBeVisible();
     expect(
       await page.evaluate(
         () => (window as unknown as { __exactAlarmRequests?: number }).__exactAlarmRequests,
       ),
     ).toBeUndefined();
+
+    await page.getByTestId("settings.reminder-exact-allow").click();
+
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () => (window as unknown as { __exactAlarmRequests?: number }).__exactAlarmRequests,
+        ),
+      )
+      .toBe(1);
+    // Granted, and the row stops offering what the user already did.
+    await expect(page.getByTestId("settings.reminder-exact-value")).toHaveText("On");
+    await expect(page.getByTestId("settings.reminder-exact-helper")).toHaveCount(0);
   });
 });

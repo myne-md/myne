@@ -21,6 +21,7 @@ fn fixed_prefs_nonce() -> [u8; AEAD_NONCE_LEN] {
 #[test]
 fn canonical_json_encodes_true_to_expected_bytes() {
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -110,6 +111,7 @@ fn canonical_json_encodes_true_to_expected_bytes() {
 #[test]
 fn canonical_json_encodes_false_to_expected_bytes() {
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -592,6 +594,7 @@ fn canonical_json_decodes_true() {
     assert_eq!(
         parsed,
         PrefsView {
+            calendar_settings: Default::default(),
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -683,6 +686,7 @@ fn canonical_json_decodes_false() {
     assert_eq!(
         parsed,
         PrefsView {
+            calendar_settings: Default::default(),
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -2587,6 +2591,7 @@ fn encode_emits_theme_last_dark_with_scp_false() {
 fn encode_emits_theme_after_all_other_fields() {
     // Full field-mix: a < d < e < f < i < s < t. theme sits last.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         chat_history_budget: None,
         attachment_compression_enabled: true,
         developer_mode: false,
@@ -3191,6 +3196,7 @@ fn encode_omits_deliberate_folders_when_empty() {
 fn encode_emits_sorted_keys_with_nonempty_folders() {
     // Keys sorted: deliberate_folders (d) before screen_capture_protection (s).
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3286,6 +3292,7 @@ fn encode_emits_sorted_keys_with_nonempty_folders() {
 #[test]
 fn encode_sorts_and_dedupes_folder_elements() {
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3384,6 +3391,7 @@ fn encode_escapes_quote_in_folder_name() {
     // `"` is allowed in a folder segment (Q5 forbidden set excludes it),
     // so JSON escaping is load-bearing.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3477,6 +3485,7 @@ fn encode_escapes_quote_in_folder_name() {
 fn encode_nfc_normalizes_folder_elements() {
     // Decomposed "é" (e + U+0301) → NFC precomposed (U+00E9) at encode.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3628,6 +3637,7 @@ fn full_blob_round_trip_with_deliberate_folders() {
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let account_hash = fixed_account_number_hash();
     let original = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3744,6 +3754,7 @@ fn encode_emits_favorites_and_item_order_in_canonical_key_position() {
     // favorites, screen_capture_protection last. item_order is
     // HETEROGENEOUS — a folder path interleaved between note UUIDs.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -3849,6 +3860,7 @@ fn encode_preserves_order_does_not_sort_or_dedupe() {
     // encoder must NOT sort and NOT dedupe (contrast canonical_folder_list
     // which does both). The duplicate "zzz" must survive verbatim.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4022,6 +4034,7 @@ fn full_blob_round_trip_with_all_fields() {
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let account_hash = fixed_account_number_hash();
     let original = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4140,6 +4153,7 @@ fn encode_places_hidden_bar_items_between_folder_icons_and_item_colors() {
     // item_colors (i). The set-array is sorted + exact-deduped on encode
     // (graph/word-count out of order + a duplicate collapse to a clean set).
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4494,6 +4508,7 @@ fn encode_omits_auto_lock_seconds_when_none() {
 fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
     // Canonical key order: auto_lock_seconds (a) < screen_capture_protection (s).
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         chat_history_budget: None,
         attachment_compression_enabled: true,
         developer_mode: false,
@@ -4587,6 +4602,7 @@ fn encode_emits_auto_lock_seconds_first_in_canonical_order() {
 fn encode_emits_all_three_fields_in_canonical_order() {
     // a < d < s: auto_lock_seconds, deliberate_folders, screen_capture_protection.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4682,6 +4698,7 @@ fn encode_auto_lock_seconds_zero_has_no_leading_zeros() {
     // no trailing ".0"). The clamp/always-on policy lives in the Tauri
     // layer; the codec faithfully persists whatever integer it is given.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4842,6 +4859,7 @@ fn full_blob_round_trip_with_auto_lock_seconds() {
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let account_hash = fixed_account_number_hash();
     let original = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -4977,6 +4995,7 @@ fn encode_emits_editor_layout_in_canonical_key_position() {
     // canonical order: left_collapsed < left_width < right_collapsed <
     // right_width.
     let prefs = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -5307,6 +5326,7 @@ fn round_trip_toggled_off() {
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let account_hash = fixed_account_number_hash();
     let original = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -5403,6 +5423,7 @@ fn round_trip_via_getrandom_convenience() {
     let prefs_key = derive_subkey(&root_key, SubkeyRole::PrefsKey);
     let account_hash = fixed_account_number_hash();
     let original = PrefsView {
+        calendar_settings: Default::default(),
         attachment_compression_enabled: true,
         developer_mode: false,
         attachment_ocr_enabled: true,
@@ -5761,6 +5782,7 @@ fn emit_prefs_vectors_for_paste() {
         &prefs_key_a,
         &account_hash_a,
         &PrefsView {
+            calendar_settings: Default::default(),
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -5851,6 +5873,7 @@ fn emit_prefs_vectors_for_paste() {
         &prefs_key_a,
         &account_hash_a,
         &PrefsView {
+            calendar_settings: Default::default(),
             attachment_compression_enabled: true,
             developer_mode: false,
             attachment_ocr_enabled: true,
@@ -5949,6 +5972,7 @@ fn emit_prefs_vectors_for_paste() {
     // the set-vs-sequence array discipline for each. `canonical_json_encode`
     // self-validates the key order + discipline at mint (round-trip below).
     let prefs_populated = PrefsView {
+        calendar_settings: Default::default(),
         // A populated value, so this vector exercises the encoder arm as
         // well as the field's presence (myne-md/myne#617).
         // inverse-default bools (default true → emitted only when false)
@@ -10376,4 +10400,113 @@ fn emit_view_approval_prefs_vectors() {
 
     std::fs::write("/tmp/myne_view_approval_prefs_cases.json", dump.as_bytes())
         .expect("write view-approval prefs cases dump");
+}
+
+/// Generator for the calendar's own settings map `vault-prefs` cases (myne-md/myne#1037).
+///
+/// `cargo test -p protocol --lib emit_calendar_settings_prefs_vectors -- --ignored`
+///
+/// It pins the map between both canonical neighbours, which is the load-bearing half:
+/// the decoder scans that region forward, so an older client steps over the key and
+/// reads the rest correctly. The nonce is `0xE4` because `0xE0`-`0xE3` are already
+/// spent, and two plaintexts under one (key, nonce) share a keystream.
+#[test]
+#[ignore = "vector emitter: run with --ignored --nocapture to print the JSON for myne-test-vectors"]
+fn emit_calendar_settings_prefs_vectors() {
+    extern crate std;
+
+    let root_a: [u8; 32] = [0x42; 32];
+    let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
+    let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
+
+    // `0xE4` is a free byte: `0xE0`-`0xE3` are already spent on the meeting-ai and
+    // set-entry-clock cases, and a shared (root_key, account_number_hash, nonce)
+    // seals two plaintexts under one keystream.
+    let nonce_cs: [u8; AEAD_NONCE_LEN] = [0xE4; AEAD_NONCE_LEN];
+    let mut settings = BTreeMap::new();
+    settings.insert(String::from("day_reminder_anchor"), String::from("08:30"));
+    settings.insert(String::from("colours.work"), String::from("moss"));
+    let prefs_cs = PrefsView {
+        bar_items_order: alloc::vec![String::from("aaa")],
+        calendar_settings: settings,
+        chat_history_budget: Some(4096),
+        ..PrefsView::default()
+    };
+    let canonical = canonical_json_encode(&prefs_cs);
+    let blob_cs = encode_prefs_blob_raw(&prefs_key_a, &account_hash_a, &prefs_cs, &nonce_cs)
+        .expect("encode calendar-settings");
+    let decoded = decode_prefs_blob(&prefs_key_a, &account_hash_a, &blob_cs).expect("decode");
+    assert_eq!(
+        decoded, prefs_cs,
+        "calendar-settings must round-trip exactly"
+    );
+
+    // Omit-when-empty: the same neighbours with no settings carry no key at all,
+    // which is the byte-identity argument §9.5.2 makes for a vault that never set
+    // one.
+    let prefs_empty = PrefsView {
+        calendar_settings: BTreeMap::new(),
+        ..prefs_cs.clone()
+    };
+    let canonical_empty = canonical_json_encode(&prefs_empty);
+    assert!(
+        !alloc::string::String::from_utf8_lossy(&canonical_empty).contains("calendar_settings"),
+        "an empty calendar_settings map must be omitted entirely, got {}",
+        alloc::string::String::from_utf8_lossy(&canonical_empty),
+    );
+
+    let mut dump = alloc::string::String::new();
+    dump.push_str(",\n    {\n");
+    dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/encrypt-calendar-settings\",\n");
+    dump.push_str("      \"description\": \"The calendar's own settings map (myne-md/myne#1037): day_reminder_anchor plus a colours.<name> token, pinned between both canonical neighbours bar_items_order (b) < calendar_settings (c) < chat_history_budget (c). The slot is the load-bearing half: the decoder scans this region forward, so an older client steps over the unknown key and reads the following fields correctly. Keys are lexicographic inside the map (day_reminder_anchor < colours.work sorts after it only by the map's own ordering, so both spellings are pinned). An EMPTY map is OMITTED ENTIRELY, so a vault that never set a calendar setting stays byte-identical to its pre-feature self and a pre-feature reader is unaffected. Generated by emit_calendar_settings_prefs_vectors in protocol/src/prefs.rs.\",\n");
+    dump.push_str("      \"case_kind\": \"encrypt\",\n");
+    dump.push_str(&alloc::format!(
+        "      \"input_root_key_hex\": \"{}\",\n",
+        hex_lower(&root_a)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"input_account_number_hash_hex\": \"{}\",\n",
+        hex_lower(&account_hash_a)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"input_plaintext_canonical_utf8_hex\": \"{}\",\n",
+        hex_lower(&canonical)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"input_prefs_nonce_hex\": \"{}\",\n",
+        hex_lower(&nonce_cs)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"informational_prefs_key_hex\": \"{}\",\n",
+        hex_lower(&*prefs_key_a)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"expected_prefs_blob_hex\": \"{}\"\n",
+        hex_lower(&blob_cs)
+    ));
+    dump.push_str("    },\n");
+    dump.push_str("    {\n");
+    dump.push_str("      \"vector_id\": \"vault-prefs/v0.1/decrypt-calendar-settings\",\n");
+    dump.push_str("      \"description\": \"Round-trip with encrypt-calendar-settings: the same blob decodes back to a PrefsView carrying the two settings between bar_items_order and chat_history_budget under the same root_key + account_number_hash. A decoder that does not know the field tolerates it per the 9.5.2 forward-compat rule and reads it as an EMPTY map, which is the state that means 'no calendar setting was ever chosen' rather than 'the defaults were chosen'.\",\n");
+    dump.push_str("      \"case_kind\": \"decrypt_ok\",\n");
+    dump.push_str(&alloc::format!(
+        "      \"input_blob_hex\": \"{}\",\n",
+        hex_lower(&blob_cs)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"input_root_key_hex\": \"{}\",\n",
+        hex_lower(&root_a)
+    ));
+    dump.push_str(&alloc::format!(
+        "      \"input_account_number_hash_hex\": \"{}\",\n",
+        hex_lower(&account_hash_a)
+    ));
+    // The schema requires the decoded payload too, and it is the half a port
+    // checks itself against: the blob hex alone only proves the decryption ran.
+    dump.push_str(&alloc::format!(
+        "      \"expected_plaintext_canonical_utf8_hex\": \"{}\"\n",
+        hex_lower(&canonical)
+    ));
+    dump.push_str("    }");
+    std::println!("{dump}");
 }

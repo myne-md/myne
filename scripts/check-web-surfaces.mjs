@@ -489,6 +489,22 @@ const V = {
 
   "src/lib/spell.ts": ["adapted", "Unreachable where `spellCheck` is absent; the editor host omits the `spell` member."],
   "src/lib/stage.ts": ["adapted", "Boot routing branches on capabilities: an empty web client goes to account-entry, a corrupt one to re-sync (task 85)."],
+  "src/components/settings/CalendarSettings.tsx": [
+    "ported",
+    "The calendar's two settings ride the same `calendar_settings` prefs map on every client, and the web client reads prefs through the same seam, so the panel is the same panel. Its colour values are design-token names and its anchor is a 48-choice list, so nothing here needs a host.",
+  ],
+  "src/lib/calendarIcs.ts": [
+    "adapted",
+    "It SHIPS: the pane imports it statically and the export arm runs on web through `platform/download.ts` `deliverFile`. What the web client cannot do is the IMPORT half, and that is a capability rather than a substitution: `icsImport` is in the web descriptor's absent set, so `has(\"icsImport\")` is false and the import affordance never renders. An earlier verdict here said `excluded` with no absence marker, which the guard's own header records twice as the wrong shape: a module that ships and is unreachable is not an excluded module, and the marker is what makes the claim checkable.",
+  ],
+  "src/lib/homeZone.ts": [
+    "ported",
+    "The second clock is a display rule over `Intl`, which the browser has in full. It ships and the web calendar shows it, which is the point: the note stays zone-free on every client, and only the reading gains a clock.",
+  ],
+  "src/hooks/useLiveCalendarEvents.ts": [
+    "typed-unsupported",
+    "The hook wraps the calendar range read, and `vault_indices_calendar_range` is one of the commands the web dispatcher answers with a typed refusal (`web/wasm/src/capability.rs`). The module ships and is unreachable, which is the verdict this list exists to name rather than hide.",
+  ],
   "src/lib/sync-staleness.ts": [
     "ported",
     "Pure arithmetic over the last-successful-sync timestamp, plus the copy that says so after three days. It belongs on web MORE than on desktop, not less: a desktop vault works offline indefinitely, while the web client is sync-required (`decisions.md` 2026-07-26), so a sync that stopped working is the difference between a vault that is merely idle and one the user cannot reach from anywhere else.",

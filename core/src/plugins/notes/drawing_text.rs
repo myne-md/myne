@@ -117,6 +117,27 @@ mod tests {
         assert!(!is_drawing(b"plain note, no frontmatter"));
     }
 
+    /// The third canonical `kind:` value (myne-md/myne#1037) reads here exactly
+    /// as the TS reader reads it: an event is NOT a drawing, so the search fold
+    /// keeps indexing an event note's ordinary markdown body while the calendar
+    /// reads the same note through its own vocabulary.
+    ///
+    /// This test is the drift lock rather than a formality. The two readers
+    /// answer "what class is this note" for different consumers (render dispatch
+    /// in TS, the search fold here), so a value one of them learns and the other
+    /// does not is a note that renders one way and indexes another. It is also
+    /// what proves `event` needs no Rust arm of its own: the calendar's range
+    /// query reads the typed property rows in the index, so this file's only
+    /// obligation is to not misclassify the value.
+    #[test]
+    fn event_kind_is_not_a_drawing() {
+        assert!(!is_drawing(b"---\nkind: event\n---\n\nbody"));
+        assert!(!is_drawing(
+            b"---\nkind: event\nstart: 2026-11-05 09:00\n---\n\nbody"
+        ));
+        assert!(!is_drawing(b"---\nkind: Event\n---\n\nbody"));
+    }
+
     #[test]
     fn is_drawing_agrees_with_ts_reader_on_indent_and_spacing() {
         // Shapes the TS `readKindFromFmBody` (KIND_KEY_RE) accepts — the Rust

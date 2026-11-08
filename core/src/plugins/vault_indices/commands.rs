@@ -15,6 +15,7 @@
 //!
 //! See: ../../AGENTS.md "Secret-handling logging discipline".
 
+use super::calendar::CalendarRange;
 use super::error::VaultIndicesError;
 use super::persist::{decode_snapshot, encode_snapshot, reconcile_delta};
 use super::state::{
@@ -300,6 +301,62 @@ pub async fn vault_indices_tasks(
     indices: State<'_, VaultIndicesState>,
 ) -> Result<Vec<VaultTask>, VaultIndicesError> {
     vault_indices_tasks_from_host(runtime.inner(), indices.inner()).await
+}
+
+/// The calendar's range read (myne-md/myne#1037).
+///
+/// `bounded` is the caller's choice and it is the SECURITY half of this command,
+/// not a performance option: the user's own pane may ask for any window, while the
+/// fifth agent tool asks bounded, so "the whole calendar in one call" is
+/// structurally unreachable from the model's side. The window is parsed here from
+/// the same wall-clock shape the event fields carry (`markdown-dialect.md` §3.10.2),
+/// so a caller cannot smuggle an offset or a zone into a query.
+pub async fn vault_indices_calendar_range_from_host(
+    runtime: &VaultRuntimeState,
+    indices: &VaultIndicesState,
+    window_start: String,
+    window_end: String,
+    bounded: bool,
+) -> Result<CalendarRange, VaultIndicesError> {
+    if runtime.slot_kind_active().await != SlotKind::Unlocked {
+        return Err(VaultIndicesError::SlotNotUnlocked);
+    }
+    let start = crate::plugins::vault_indices::calendar::EventInstant::parse(&window_start)
+        .ok_or(VaultIndicesError::CalendarWindowUnreadable)?;
+    let end = crate::plugins::vault_indices::calendar::EventInstant::parse(&window_end)
+        .ok_or(VaultIndicesError::CalendarWindowUnreadable)?;
+    let bound = crate::plugins::vault_indices::calendar::bound_for_window(start, end, bounded)
+        .map_err(|refusal| match refusal {
+            crate::plugins::vault_indices::calendar::WindowRefusal::Unreadable => {
+                VaultIndicesError::CalendarWindowUnreadable
+            }
+            crate::plugins::vault_indices::calendar::WindowRefusal::TooWide { max_days } => {
+                VaultIndicesError::CalendarWindowTooWide { max_days }
+            }
+        })?;
+    Ok(crate::plugins::vault_indices::calendar::range(
+        indices, start, end, bound,
+    ))
+}
+
+/// IPC wrapper.
+#[cfg(all(feature = "tauri-ipc", not(target_arch = "wasm32")))]
+#[tauri::command]
+pub async fn vault_indices_calendar_range(
+    runtime: State<'_, VaultRuntimeState>,
+    indices: State<'_, VaultIndicesState>,
+    window_start: String,
+    window_end: String,
+    bounded: bool,
+) -> Result<CalendarRange, VaultIndicesError> {
+    vault_indices_calendar_range_from_host(
+        runtime.inner(),
+        indices.inner(),
+        window_start,
+        window_end,
+        bounded,
+    )
+    .await
 }
 
 /// Structurally-isolated ("orphan") note ids — zero in+out raw edges

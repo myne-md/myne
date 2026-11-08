@@ -83,6 +83,12 @@ export const TEMPLATES_TAB_ID = "templates";
  *  `agentView` decides whether it shows the hub list or a focused run. */
 export const AGENT_TAB_ID = "agent";
 
+/** The calendar (myne-md/myne#1037). One calendar per vault, like the graph and
+ *  the task list: an event is a note, and a vault has one schedule, so opening
+ *  the calendar twice reveals the first tab rather than splitting the same
+ *  month across two panes. */
+export const CALENDAR_TAB_ID = "calendar";
+
 export type TabKind = WorkspaceItem["kind"];
 
 export interface TabKindSpec {
@@ -171,6 +177,17 @@ export const TAB_KINDS: readonly TabKindSpec[] = [
     labelKey: "notes.pane.tasksTab",
     showsFocusedNote: false,
     openCommandId: "tasks.show",
+  },
+  {
+    kind: "calendar",
+    singletonId: CALENDAR_TAB_ID,
+    icon: "calendar",
+    labelKey: "notes.pane.calendarTab",
+    // The calendar shows events, not the focused note, so the note floats
+    // (backlinks, outline, the "..." menu) stay off it: an event note opened from
+    // a cell is an ordinary note tab.
+    showsFocusedNote: false,
+    openCommandId: "calendar.show",
   },
   {
     kind: "agent",

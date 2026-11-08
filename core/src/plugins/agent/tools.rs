@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The four tools an agent run may call, and nothing else.
+//! The five tools an agent run may call, and nothing else.
 //!
 //! The count is a ceiling rather than a starting point. Every tool is a surface
 //! an instruction embedded in a note the model read can aim at, so the number is
 //! a security decision: list the scope by title, read one note in full, search
 //! the scope, and search the whole vault. A fifth tool is a change to that
 //! decision, not an addition to this file.
+//!
+//! **The fifth is the calendar** (myne-md/myne#1037, grill Q15): a window read,
+//! bounded by the host so "the whole calendar in one call" is not expressible, and
+//! clamped by the same exclusion set as every other tool. Its argument is in
+//! `design-notes/ai/` and its risk row in `docs/threat-model.md` §7.
 //!
 //! **The fourth was such a change, and this line was not updated with it.** The
 //! header said "three" for as long as `search_vault` had existed, which is the
@@ -33,6 +38,7 @@ use super::frontmatter::folder_of;
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
 use crate::folder_key::{canonical_excluded, folder_matches_excluded};
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -460,6 +466,176 @@ mod tests {
 
     fn no_exclusions() -> StubExclusions {
         StubExclusions(Vec::new())
+    }
+
+    // ── The calendar tool ────────────────────────────────────────────────────
+
+    /// A calendar reader that answers whatever the test set it to, so the tool's
+    /// own behaviour (refusal text, exclusion filter, ordering) is what is measured
+    /// rather than the host query underneath it.
+    struct StubCalendar(Result<Vec<CalendarRow>, CalendarRefusal>);
+
+    #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+    #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+    impl CalendarReader for StubCalendar {
+        async fn range(&self, _from: &str, _to: &str) -> Result<Vec<CalendarRow>, CalendarRefusal> {
+            self.0.clone()
+        }
+    }
+
+    fn row(note_id: &str, title: &str, start: &str) -> CalendarRow {
+        CalendarRow {
+            note_id: note_id.to_string(),
+            title: Some(title.to_string()),
+            folder: Some("Calendar/".to_string()),
+            calendar: Some("work".to_string()),
+            start: start.to_string(),
+            end: None,
+            all_day: false,
+            occurrence_of: None,
+            occurrence_date: None,
+            conflicts: false,
+            repeat: None,
+            remind: None,
+            repeat_unrecognized: false,
+            uid: None,
+            skip: Vec::new(),
+        }
+    }
+
+    /// A run whose approved scope is exactly `ids`, so a test can say what the tool
+    /// is allowed to see rather than relying on an absent filter.
+    fn scoped(ids: &[&str]) -> AgentRunState {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids.iter().map(|id| id.to_string()).collect());
+        runs
+    }
+
+    #[test]
+    fn calendar_range_renders_one_line_per_row_and_names_the_window() {
+        block(async {
+            let reader = StubCalendar(Ok(vec![
+                row("a", "Standup", "2026-11-05 09:00"),
+                row("b", "Dentist", "2026-11-06 14:30"),
+            ]));
+            let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
+                "2026-11-01",
+                "2026-11-30",
+                Some(&reader),
+                &records(&[("a", "Standup"), ("b", "Dentist")]),
+                &no_exclusions(),
+            )
+            .await
+            .unwrap();
+            assert!(prose.contains("2026-11-01"), "{prose}");
+            assert!(prose.contains("2 entr"), "{prose}");
+            let payload = payload.expect("rows are the payload");
+            assert_eq!(payload.lines().count(), 2);
+            assert!(payload.contains("Standup"));
+        });
+    }
+
+    #[test]
+    fn calendar_range_drops_a_row_whose_note_is_in_an_excluded_folder() {
+        block(async {
+            // SYNC-14 has no in-flight carve-out, so the tool re-reads the set and drops
+            // the row itself rather than trusting the caller to have filtered.
+            let mut excluded_row = row("b", "Dentist", "2026-11-06 14:30");
+            excluded_row.folder = Some("Private/".to_string());
+            let reader = StubCalendar(Ok(vec![
+                row("a", "Standup", "2026-11-05 09:00"),
+                excluded_row,
+            ]));
+            let mut recs = records(&[("a", "Standup"), ("b", "Dentist")]);
+            recs.get_mut("b").unwrap().folder = Some("Private".to_string());
+            let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
+                "2026-11-01",
+                "2026-11-30",
+                Some(&reader),
+                &recs,
+                &StubExclusions(vec!["Private".to_string()]),
+            )
+            .await
+            .unwrap();
+            assert!(prose.contains("1 entr"), "{prose}");
+            assert!(prose.contains("left out"), "{prose}");
+            let payload = payload.expect("one row survives");
+            assert!(!payload.contains("Dentist"));
+        });
+    }
+
+    #[test]
+    fn calendar_range_never_answers_a_note_outside_the_approved_scope() {
+        // Found by review: the tool filtered folders and not the run's scope, so a run
+        // approved for one note could read every event title in the vault. The other
+        // read tools all consult the scope (`read_note` refuses `OutOfScope`), and the
+        // threat model says in writing that this one does too.
+        block(async {
+            let reader = StubCalendar(Ok(vec![
+                row("a", "Standup", "2026-11-05 09:00"),
+                row("b", "Boarding pass", "2026-11-06 14:30"),
+            ]));
+            let (prose, payload) = calendar_range(
+                &scoped(&["a"]),
+                "r",
+                "2026-11-01",
+                "2026-11-30",
+                Some(&reader),
+                &records(&[("a", "Standup"), ("b", "Boarding pass")]),
+                &no_exclusions(),
+            )
+            .await
+            .unwrap();
+            let body = payload.unwrap_or_default();
+            assert!(body.contains("Standup"), "{body}");
+            assert!(!body.contains("Boarding pass"), "{body}");
+            assert!(prose.contains("1"), "{prose}");
+        });
+    }
+
+    #[test]
+    fn calendar_range_states_the_bound_when_the_window_is_too_wide() {
+        block(async {
+            // The message has to carry the number: "too wide" alone tells a model to
+            // guess, and a model that guesses twice has spent the run.
+            let reader = StubCalendar(Err(CalendarRefusal::WindowTooWide { max_days: 366 }));
+            let (prose, payload) = calendar_range(
+                &scoped(&[]),
+                "r",
+                "2020-01-01",
+                "2026-12-31",
+                Some(&reader),
+                &records(&[]),
+                &no_exclusions(),
+            )
+            .await
+            .unwrap();
+            assert!(prose.contains("366"), "{prose}");
+            assert!(payload.is_none());
+        });
+    }
+
+    #[test]
+    fn calendar_range_says_unavailable_instead_of_ending_the_run() {
+        block(async {
+            let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
+                "2026-11-01",
+                "2026-11-30",
+                None,
+                &records(&[]),
+                &no_exclusions(),
+            )
+            .await
+            .unwrap();
+            assert!(prose.contains("not available"), "{prose}");
+            assert!(payload.is_none());
+        });
     }
 
     struct StubSearcher(Vec<SearchHit>);
@@ -997,4 +1173,198 @@ mod tests {
         assert!(out.in_scope.is_empty());
         assert!(out.elsewhere.is_empty());
     }
+}
+
+// ── Tool 5: the calendar ─────────────────────────────────────────────────────
+//
+// **The fifth tool, and the reason the ceiling moved.** This module's header says
+// the count is a security decision, so a fifth tool is a change to that decision
+// rather than an addition, and `design-notes/ai/` carries the argument (the
+// calendar's own grill, Q15, myne-md/myne#1037). The shape that argument buys is
+// this: a read the model may ASK for, bounded so that "the whole calendar in one
+// call" is not expressible, and clamped by the SAME exclusion set every other
+// tool asks for.
+
+/// The widest window one `calendar_range` call may cover, in days.
+///
+/// The host refuses a wider one and states the bound in the message
+/// (`vault_indices::calendar::bound_for_window`), so this constant is the
+/// model-visible half of a rule the host enforces. It is not a performance limit:
+/// a year is enough to answer "what am I doing next week" and too little to
+/// reconstruct a life.
+/// Re-exported rather than restated: the number the MODEL is told and the number the
+/// HOST enforces are one rule, and two constants with nothing tying them is how the
+/// prompt and the refusal drift apart (`MAX_EMBED_DIMENSION_PX` is the precedent).
+pub use super::super::vault_indices::calendar::MAX_WINDOW_DAYS as CALENDAR_MAX_WINDOW_DAYS;
+
+/// Why a calendar read could not answer.
+///
+/// A refusal is CONTENT, not an error: the model is told what went wrong so it can
+/// ask differently, the same posture the scope tools take. An error would end a
+/// run the user could have carried on.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CalendarRefusal {
+    /// The window did not parse as the event wall-clock shape, or its end
+    /// precedes its start.
+    WindowUnreadable,
+    /// The window is wider than [`CALENDAR_MAX_WINDOW_DAYS`], with the bound
+    /// carried so the message can state it.
+    WindowTooWide { max_days: i64 },
+    /// No calendar is readable on this client (locked vault, no index).
+    Unavailable,
+}
+
+/// The seam a `calendar_range` call reads through.
+///
+/// A trait rather than a snapshot, unlike `records` in `LoopDeps`, because the
+/// WINDOW comes from the model's own arguments: the read cannot happen until the
+/// model has named it. The clamp is still not the caller's, and deliberately: an
+/// implementation is expected to ask the host for a BOUNDED read, which is where
+/// the 366-day refusal and the row cap live.
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+pub trait CalendarReader: Send + Sync {
+    /// The rows in `from..to`, bounded the way a model's read must be.
+    async fn range(
+        &self,
+        from: &str,
+        to: &str,
+    ) -> Result<Vec<crate::plugins::vault_indices::calendar::CalendarRow>, CalendarRefusal>;
+}
+
+/// A [`CalendarReader`] with no calendar behind it.
+///
+/// The honest shape for a client that cannot answer: the tool reports that the
+/// calendar is unreadable instead of failing the run, which is what `NoScopeSearch`
+/// does for the same reason one tool up.
+pub struct NoCalendar;
+
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+impl CalendarReader for NoCalendar {
+    async fn range(&self, _from: &str, _to: &str) -> Result<Vec<CalendarRow>, CalendarRefusal> {
+        Err(CalendarRefusal::Unavailable)
+    }
+}
+
+/// Tool 5: what is on the calendar between two dates.
+///
+/// Returns `(prose, payload)` in the split `tool_result` expects: the sentence
+/// around the rows is host prose and the rows themselves carry a TITLE and a
+/// CALENDAR NAME, both of which are text a user or an `.ics` file wrote, so they go
+/// last and unadorned.
+///
+/// Two rules the model has to be able to see:
+///
+/// * **The exclusion set is re-read, like every other read tool.** A folder added to
+///   `ai_excluded_folders` mid-run stops being read at once (SYNC-14), so a row
+///   whose note sits in an excluded folder is dropped here rather than filtered by
+///   the caller.
+/// * **A refusal states the bound.** "Too wide" without the number tells a model to
+///   guess, and a model that guesses twice has spent the run.
+pub async fn calendar_range(
+    runs: &AgentRunState,
+    run_id: &str,
+    from: &str,
+    to: &str,
+    reader: Option<&dyn CalendarReader>,
+    records: &BTreeMap<String, NoteRecord>,
+    exclusions: &dyn ExclusionSource,
+) -> Result<(String, Option<String>), AgentError> {
+    let Some(reader) = reader else {
+        return Ok(calendar_unavailable());
+    };
+    let rows = match reader.range(from, to).await {
+        Ok(rows) => rows,
+        Err(CalendarRefusal::WindowUnreadable) => {
+            return Ok((
+                format!(
+                    "calendar_range could not read that window. Both ends must be \
+                     YYYY-MM-DD, or YYYY-MM-DD HH:MM, and `to` must not come before \
+                     `from`. I asked for `{from}` to `{to}`.\n"
+                ),
+                None,
+            ));
+        }
+        Err(CalendarRefusal::WindowTooWide { max_days }) => {
+            return Ok((
+                format!(
+                    "calendar_range was refused: that window is wider than {max_days} \
+                     days. Ask for a narrower range and call again; the calendar is \
+                     answered a window at a time, never in one call.\n"
+                ),
+                None,
+            ));
+        }
+        Err(CalendarRefusal::Unavailable) => return Ok(calendar_unavailable()),
+    };
+
+    // The SCOPE comes first, and it is resolved before anything is filtered:
+    // `search_scope`'s comment above states the reason, and this tool was the one
+    // read path that skipped it. Without it a run approved for one note could read
+    // every event title, time and calendar name in the vault, which is the widening
+    // the threat model says this tool does not perform.
+    let scope = runs.scope(run_id)?;
+    let excluded = excluded_now(exclusions).await?;
+    let in_scope: Vec<&CalendarRow> = rows
+        .iter()
+        .filter(|row| scope.contains(&row.note_id))
+        .collect();
+    let out_of_scope = rows.len() - in_scope.len();
+    let kept: Vec<&CalendarRow> = in_scope
+        .into_iter()
+        .filter(|row| !record_excluded(records, &row.note_id, &excluded))
+        .collect();
+    let dropped = out_of_scope + (rows.len() - out_of_scope - kept.len());
+
+    let mut prose = format!(
+        "calendar_range found {} entr(y/ies) between {from} and {to}, in start order. \
+         A row that overlaps another says `conflict`.\n",
+        kept.len()
+    );
+    if dropped > 0 {
+        prose.push_str(&format!(
+            "{} entr(y/ies) were left out because their note is in a folder the user \
+             excludes from the assistant.\n",
+            dropped
+        ));
+    }
+    if kept.is_empty() {
+        return Ok((prose, None));
+    }
+    let payload = kept
+        .iter()
+        .map(|row| {
+            let mut line = format!(
+                "{start}  {title}",
+                start = row.start,
+                title = row.title.clone().unwrap_or_default()
+            );
+            if let Some(end) = &row.end {
+                line.push_str(&format!("  until {end}"));
+            }
+            if row.all_day {
+                line.push_str("  all-day");
+            }
+            if let Some(calendar) = &row.calendar {
+                line.push_str(&format!("  [{calendar}]"));
+            }
+            if row.conflicts {
+                line.push_str("  conflict");
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok((prose, Some(payload)))
+}
+
+fn calendar_unavailable() -> (String, Option<String>) {
+    (
+        "calendar_range is not available right now: this device has no readable \
+         calendar, which usually means the vault is locked. Carry on without it, or \
+         tell the user what you need.\n"
+            .to_string(),
+        None,
+    )
 }

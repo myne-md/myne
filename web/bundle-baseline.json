@@ -1,8 +1,8 @@
 {
-  "note": "Re-baselined 2026-10-06 for myne-md/myne#785, the design-system epic (#772). The shared component CSS layer, the AI surface (#771) and the onboarding recovery kit (#468) add about 39.5 KiB gzip to first load, 350.5 -> 390.0 KiB, which is 11.3% over the previous baseline and past its 10% margin. Measured from a complete build, the same way CI measures it (`pnpm web:build` with the wasm present, wasm itself off the critical path). Recording this is a decision rather than drift: the growth is the epic's own, and the largest entry chunks (`dist-BfqsS-mQ`, `common-ZLBLBwUP`, `client-CsSlk31R`) are the design-system and app-shell code. KNOWN AND NOT ADDRESSED HERE: the AI hub is developer-mode gated, so some of its weight could move behind a lazy boundary; that is a follow-up, not a blocker for this epic.",
+  "note": "Re-baselined 2026-11-08 for the calendar (myne-md/myne#1037), measured from a complete build the same way CI measures it (`web:build` with the wasm artefact present, wasm itself still off the critical path). Two facts made this a re-baseline rather than a shrink. The previous 390.0 KiB was itself stale: `develop` at acbe2d6e measures 426.5 KiB gzip, 36.5 KiB above it and 2.5 KiB inside its 10% margin, so the number described a tree several features old. And the calendar is not on the critical path at all: the pane is code-split, and what the feature adds is 8.7 KiB in the app shell that the new tab kind, its commands and its capability entries land in; first load goes 390.0 -> 435.8 KiB gzip. KNOWN AND NOT ADDRESSED HERE: the new margin is worth about one more feature of this size (cap 479.4), and the spell dictionary (27.3 KiB) is still on the critical path while only the editor needs it; a lazy boundary there is a follow-up, not a blocker for this feature.",
   "marginPct": 10,
   "initial": {
-    "rawBytes": 1253425,
-    "gzipBytes": 399329
+    "rawBytes": 1418037,
+    "gzipBytes": 446261
   }
 }

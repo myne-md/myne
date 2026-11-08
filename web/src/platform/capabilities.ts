@@ -77,6 +77,7 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // No API grants a page an arbitrary write path; the browser download flow is a
   // differently-shaped affordance, not this one.
   "nativeSaveAs",
+  "icsImport",
   // The sandboxed editor for the user's own on-disk files (myne-md/myne#788): a
   // page has no OS file ingress, no native open dialog and no handler
   // registration, and the surface must work independent of vault state in a way

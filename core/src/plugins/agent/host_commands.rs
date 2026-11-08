@@ -56,7 +56,9 @@ use crate::plugins::agent::apply::{
     RefusedSetting, SettingRejection,
 };
 use crate::plugins::agent::engine::AgentEngine;
-use crate::plugins::agent::host_adapters::{NoteReadAdapter, RestoreAdapter, WriteAdapter};
+use crate::plugins::agent::host_adapters::{
+    HostCalendar, NoteReadAdapter, RestoreAdapter, WriteAdapter,
+};
 use crate::plugins::agent::prompt::ProposedSetting;
 use crate::plugins::agent::run::AppliedRun;
 use crate::plugins::agent::setting::{PrefTarget, SettingIntent};
@@ -894,6 +896,14 @@ pub async fn step<R: Runtime>(
         host: TauriHost::new(app.clone()),
         state: vault,
     };
+    // The calendar the fifth tool reads through. It answers through the SAME host
+    // command the pane and the phone call, and it asks for a BOUNDED read: the
+    // 366-day refusal and the row cap live there, so a model-side change cannot
+    // widen what a run may see (myne-md/myne#1037).
+    let calendar = HostCalendar {
+        runtime: vault,
+        indices,
+    };
     let records = indices.snapshot();
     let exclusions = HostExclusions {
         app: app.clone(),
@@ -933,6 +943,7 @@ pub async fn step<R: Runtime>(
         engine,
         reader: &reader,
         searcher,
+        calendar: Some(&calendar),
         records: &records,
         exclusions: &exclusions,
         memory,

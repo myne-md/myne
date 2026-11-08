@@ -421,7 +421,7 @@ describe("check-prefs-parity, the tree as it stands", () => {
     const out = run();
     expect(out.code).toBe(0);
     expect(out.out).toContain(
-      "prefs-parity: ok (82 command(s): 51 both, 29 desktop-only, 0 mobile-only, 2 no-ui",
+      "prefs-parity: ok (83 command(s): 51 both, 30 desktop-only, 0 mobile-only, 2 no-ui",
     );
     // A real guard run over the whole tree: ~3.5 s alone, past the 5 s default
     // under a full `pnpm test`, so it carries the same budget as the three

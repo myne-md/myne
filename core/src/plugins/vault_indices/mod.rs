@@ -16,6 +16,7 @@
 //!
 //! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".
 
+pub mod calendar;
 pub mod commands;
 pub mod error;
 pub mod persist;

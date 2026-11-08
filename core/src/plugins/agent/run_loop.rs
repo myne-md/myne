@@ -29,8 +29,8 @@ use super::prompt::{
 use super::run::AgentRunState;
 use super::scope::ExclusionSource;
 use super::tools::{
-    list_scope, read_note, render_scope_entry, search_scope, search_vault, NoteReader,
-    ScopeSearcher,
+    calendar_range, list_scope, read_note, render_scope_entry, search_scope, search_vault,
+    CalendarReader, NoteReader, ScopeSearcher,
 };
 use crate::plugins::vault_indices::state::NoteRecord;
 use serde::Serialize;
@@ -389,6 +389,12 @@ pub struct LoopDeps<'a> {
     pub engine: &'a dyn AgentEngine,
     pub reader: &'a dyn NoteReader,
     pub searcher: &'a dyn ScopeSearcher,
+    /// The calendar the fifth tool reads through (myne-md/myne#1037).
+    ///
+    /// `None` where a client cannot answer, the same shape `memory` takes: the tool
+    /// then reports that the calendar is unreadable and the run carries on, rather
+    /// than failing a run the user could have continued by asking differently.
+    pub calendar: Option<&'a dyn CalendarReader>,
     /// The `remember` verb's seam to the memory plugin (myne-md/myne#697).
     /// `None` when the surface is unavailable (no `ai_enabled`, no memory
     /// store): the verb then answers with a model-readable refusal instead of
@@ -1154,6 +1160,30 @@ async fn drive_inner(
                         transcript.push(repeat_notice());
                     }
                 }
+                AgentAction::CalendarRange { from, to } => {
+                    let fresh = asked.insert(format!("calendar_range:{from}:{to}"));
+                    productive |= fresh;
+                    let (prose, payload) = calendar_range(
+                        runs,
+                        run_id,
+                        &from,
+                        &to,
+                        deps.calendar,
+                        deps.records,
+                        deps.exclusions,
+                    )
+                    .await?;
+                    tracing::debug!(
+                        target: "myne_core::agent",
+                        event = "tool",
+                        verb = "calendar_range",
+                        rows = payload.as_deref().map(|p| p.lines().count()).unwrap_or(0),
+                    );
+                    transcript.push(tool_result(prose, payload));
+                    if !fresh {
+                        transcript.push(repeat_notice());
+                    }
+                }
                 AgentAction::ProposeEdit {
                     note_id,
                     anchor,
@@ -1891,6 +1921,7 @@ mod tests {
             offered_settings,
             engine,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: recs,
             exclusions: &*NO_EXCL,
@@ -1966,6 +1997,7 @@ mod tests {
             offered_settings: &[],
             engine,
             reader: &Reader,
+            calendar: None,
             searcher: &NoHits,
             records: recs,
             exclusions: &*NO_EXCL,
@@ -2099,6 +2131,7 @@ mod tests {
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: &recs,
             exclusions: &*NO_EXCL,
@@ -2151,6 +2184,7 @@ mod tests {
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: &recs,
             exclusions: &*NO_EXCL,
@@ -3408,6 +3442,7 @@ mod tests {
             memory: None,
             engine: &forever,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: &recs,
             language: None,
@@ -3454,6 +3489,7 @@ mod tests {
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: &recs,
             exclusions: &*NO_EXCL,
@@ -3853,6 +3889,7 @@ mod tests {
             offered_settings: &[],
             engine: &engine,
             reader: &Reader,
+            calendar: None,
             searcher: &Searcher,
             records: &recs,
             exclusions: &excl,

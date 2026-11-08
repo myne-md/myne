@@ -39,6 +39,15 @@ pub enum AgentAction {
     /// [`super::tools::search_vault`] for why that split is the security
     /// boundary rather than a rendering choice.
     SearchVault { query: String },
+    /// Tool 5 (deferred): what is on the calendar between two dates.
+    ///
+    /// The window is the event wall-clock shape, so a zone or an offset cannot be
+    /// smuggled into a query about a schedule. The BOUND is not this variant's: a
+    /// read wider than [`super::tools::CALENDAR_MAX_WINDOW_DAYS`] is refused by
+    /// the host with the bound in the message, which is what keeps "the whole
+    /// calendar in one call" structurally unreachable from the model's side
+    /// (myne-md/myne#1037, grill Q15).
+    CalendarRange { from: String, to: String },
     /// Verb 1: propose an anchored edit to a note in scope.
     ProposeEdit {
         note_id: String,
@@ -151,11 +160,12 @@ impl AgentAction {
     /// (myne-md/myne#848).
     /// `the_instructions_and_the_parser_agree_on_the_vocabulary` checks both
     /// directions against this list.
-    pub const ALL: [&'static str; 13] = [
+    pub const ALL: [&'static str; 14] = [
         "list_scope",
         "read_note",
         "search_scope",
         "search_vault",
+        "calendar_range",
         "propose_edit",
         "append_to_note",
         "move_note",
@@ -181,6 +191,7 @@ impl AgentAction {
             Self::ReadNote { .. } => "read_note",
             Self::SearchScope { .. } => "search_scope",
             Self::SearchVault { .. } => "search_vault",
+            Self::CalendarRange { .. } => "calendar_range",
             Self::ProposeEdit { .. } => "propose_edit",
             Self::AppendToNote { .. } => "append_to_note",
             Self::MoveNote { .. } => "move_note",
@@ -307,6 +318,7 @@ const BASE_INSTRUCTIONS: &str = concat!(
         "{\"action\":\"read_note\",\"note_id\":\"...\"}\n",
         "{\"action\":\"search_scope\",\"query\":\"...\"}\n",
         "{\"action\":\"search_vault\",\"query\":\"...\"}\n",
+        "{\"action\":\"calendar_range\",\"from\":\"2026-11-01\",\"to\":\"2026-11-30\"}\n",
         "{\"action\":\"propose_edit\",\"note_id\":\"...\",\"anchor\":\"...\",\"replacement\":\"...\"}\n",
         "{\"action\":\"append_to_note\",\"note_id\":\"...\",\"text\":\"...\"}\n",
         "{\"action\":\"move_note\",\"note_id\":\"...\",\"folder\":\"...\"}\n",
@@ -1205,6 +1217,9 @@ mod tests {
                 "read_note" => r#"{"action":"read_note","note_id":"n"}"#,
                 "search_scope" => r#"{"action":"search_scope","query":"q"}"#,
                 "search_vault" => r#"{"action":"search_vault","query":"q"}"#,
+                "calendar_range" => {
+                    r#"{"action":"calendar_range","from":"2026-11-01","to":"2026-11-30"}"#
+                }
                 "propose_edit" => {
                     r#"{"action":"propose_edit","note_id":"n","anchor":"a","replacement":"b"}"#
                 }

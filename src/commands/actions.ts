@@ -1416,6 +1416,25 @@ const showIsolatedGraphAction: CommandAction = {
   },
 };
 
+const showCalendarAction: CommandAction = {
+  // The identifier is FROZEN here for the reason `tasks.show` records: command
+  // ids carry migration weight the moment a user rebinds one.
+  id: "calendar.show",
+  ribbon: { icon: "calendar" },
+  get label() {
+    return i18n.t("commands.actions.showCalendar.label");
+  },
+  get category() {
+    return i18n.t("commands.actions.category.editor");
+  },
+  kbd: "⌘⇧K",
+  defaultBinding: "Mod-Shift-k",
+  visibility: (ctx) => (ctx.stageName === "editor" ? "show" : "hidden"),
+  run: (ctx) => {
+    ctx.onShowCalendar();
+  },
+};
+
 const showTasksAction: CommandAction = {
   // The identifier is FROZEN here. Command ids carry migration weight the
   // moment a user rebinds one — a rename silently drops their keybinding — so
@@ -1762,6 +1781,7 @@ const ALL_COMMAND_ACTIONS: readonly CommandAction[] = Object.freeze([
   showGraphAction,
   showIsolatedGraphAction,
   showTasksAction,
+  showCalendarAction,
   showTagsAction,
   showViewsAction,
   importBaseViewAction,
