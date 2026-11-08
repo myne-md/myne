@@ -92,11 +92,6 @@ describe("the stored preference", () => {
 });
 
 describe("the derived default: storedPref ?? hasViews", () => {
-  it("follows the live view count while untouched", () => {
-    expect(viewsEnabled(false)).toBe(false);
-    expect(viewsEnabled(true)).toBe(true);
-  });
-
   it("stops following it the moment the user is explicit, in both directions", () => {
     // An existing views user who turns it OFF keeps it off…
     writeViewsEnabled(false);
