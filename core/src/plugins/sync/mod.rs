@@ -169,6 +169,8 @@ pub mod roster;
 pub mod rustls_transport;
 #[cfg(test)]
 mod sim;
+#[cfg(test)]
+mod wire_window;
 // The SOCKS5 client half of Tor routing (MYND-650 task 3) — host-only for the same reason
 // `rustls_transport` is: raw TCP, which a browser tab does not have. A web client wanting Tor
 // uses Tor Browser (task 12), not an in-page tunnel.
