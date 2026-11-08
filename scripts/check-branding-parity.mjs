@@ -58,7 +58,7 @@ const APP_SHEET_REL = "client-core/src/tokens.css";
  *
  * Resolved from the repo root (the guard's own location), so the same path
  * works from the ordinary checkout and from a worktree under
- * `.opencode/worktrees/<name>`. Each `MYNE_*_DIR` override exists so the
+ * `.worktrees/<name>`. Each `MYNE_*_DIR` override exists so the
  * companion-ABSENT branch — the branch CI and a fresh clone take — stays
  * exercisable on a machine that HAS the companion; `tests/scripts/brandingParity.test.ts`
  * uses them.

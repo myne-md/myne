@@ -14,8 +14,8 @@
 # `myne-desktop` refused with `run_probe` taking 2 arguments and `ProbeProgress`
 # unresolved, while `core/src/plugins/agent/probe.rs` in this tree declared 3 and
 # defined the struct. rustc's own note pointed at line 164, and line 164 of
-# `.opencode/worktrees/554-manual-test-debt/core/src/plugins/agent/probe.rs` is
-# exactly that function. Worktrees live under `.opencode/worktrees/` by
+# `.worktrees/554-manual-test-debt/core/src/plugins/agent/probe.rs` is
+# exactly that function. Worktrees live under `.worktrees/` by
 # convention, so they are inside the bind mount and this is the normal case, not
 # an exotic one.
 #

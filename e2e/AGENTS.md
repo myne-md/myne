@@ -65,7 +65,7 @@
   form, back when the cargo target volume was shared, so the stale bundle could be
   a **different worktree's** frontend. It happened on myne-md/myne#520: `pnpm build` emitted a correct `dist/`, the
   build reported success, and the app under test loaded
-  `main-CoKDUqv9.js` out of `.opencode/worktrees/554-…/dist`, whose host still
+  `main-CoKDUqv9.js` out of `.worktrees/554-…/dist`, whose host still
   dispatched the pre-fix event, so a correct fix's own scenario failed and read
   as "the fix does not work". The three `e2e-*.sh` build scripts now
   `touch src-tauri/src/lib.rs` before `pnpm tauri build`; **`e2e-one.sh` does
@@ -79,7 +79,7 @@
   bind-mounted at the same in-container path, `/work`, so two checkouts of this
   repo are indistinguishable to cargo: same package, same version, same absolute
   source path. One shared volume therefore lets a build here reuse an rlib
-  compiled from ANOTHER tree, and worktrees live under `.opencode/worktrees/` by
+  compiled from ANOTHER tree, and worktrees live under `.worktrees/` by
   convention, so they sit inside the mount and this is the normal case rather
   than an exotic one. `scripts/lib/e2e-docker.sh` keys the volume on `pwd` and is
   sourced by every script that runs this repo in the container (eight of them as

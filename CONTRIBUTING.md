@@ -12,7 +12,7 @@ that outlives the diff.
 
 **Work in a git worktree, not in your checkout of the default branch.** `AGENTS.md` explains why
 (the branch in a shared checkout belongs to whoever is in the directory) and where one goes
-(`.opencode/worktrees/<name>`, branched from `origin/develop`).
+(`.worktrees/<name>`, branched from `origin/develop`).
 
 **Large, contested or unclear work gets a design pass first**: an issue, then a stress-test
 interview, then a PRD and a task list, then implementation. Work that touches cryptography, the

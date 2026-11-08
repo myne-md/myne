@@ -213,7 +213,7 @@ function inRoot(rel, root) {
 }
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/;
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", ".worktrees"]);
 
 // Import/require/dynamic-import of a `@tauri-apps/*` specifier. Anchored on
 // the quote so a prose mention in a comment ("routed via the seam's dialog

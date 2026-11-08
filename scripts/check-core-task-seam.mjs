@@ -157,7 +157,7 @@ const CLOCK_ALLOWED = new Map([
   ["core/src/plugins/sync/rustls_transport.rs", "gated out of wasm32 entirely (mod.rs); host-only TLS"],
 ]);
 
-const SKIP_DIRS = new Set(["target"]);
+const SKIP_DIRS = new Set(["target", ".worktrees"]);
 
 /**
  * Modules already gated out of the wasm build are exempt — a
