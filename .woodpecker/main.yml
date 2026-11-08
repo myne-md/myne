@@ -1572,8 +1572,8 @@ steps:
       CARGO_HOME: /cache/cargo
     commands:
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
-      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
-      - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard --no-fail-fast
+      - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-save-file -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
+      - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard -p tauri-plugin-save-file --no-fail-fast
 
   # ─── Web container check (the deploy half of this chain is gone) ────────────
   # `web-docker-build`, `web-docker-deploy` and `web-smoke` lived here. The last

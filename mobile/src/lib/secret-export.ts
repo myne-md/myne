@@ -61,8 +61,10 @@ export async function copySecretToClipboard(
 
 /**
  * Save a secret (recovery phrase / account number) to a `.txt` file in the app's
- * Documents directory, then present the native share sheet (MYND-475) so the
- * user can pick a destination ("Save to Files" elsewhere, AirDrop, etc.). Uses
+ * Documents directory, then present the platform destination chooser (MYND-475)
+ * so the user can pick where it goes: iOS's share sheet ("Save to Files",
+ * AirDrop, …) or Android's Storage Access Framework picker (myne-md/myne#505).
+ * Uses
  * the `myne-core` `secret_export` plugin (the Rust-side write) because the
  * mobile backend has no fs / save-dialog plugin. The plaintext secret is written
  * by the user's explicit intent (threat-model TB3 egress exception).
@@ -70,14 +72,15 @@ export async function copySecretToClipboard(
  * **Where that directory actually is, per platform** (this used to read
  * "reachable via the iOS Files app", which is not true of either platform as
  * shipped): on **iOS** the app declares no `UIFileSharingEnabled`, so `Documents`
- * is NOT browsable in the Files app and the share sheet is the only way the user
- * reaches the file. On **Android** the directory is
+ * is NOT browsable in the Files app. On **Android** the directory is
  * `Android/data/<pkg>/files/Documents`, which the system Files app and
  * DocumentsUI have refused to navigate into since Android 11 (API 30) while
- * `minSdk` here is 24, and the share sheet is a documented no-op
- * (`share_file.rs`). So on a current Android the write is the delivery and the
- * user has no supported way to reach what was delivered: myne-md/myne#505 is the
- * follow-up, and myne-md/myne#504 is the iOS label that claims otherwise.
+ * `minSdk` here is 24. Neither platform can open the directory, so the platform
+ * chooser is the user's ONLY route to the file on both: iOS's share sheet, and
+ * since myne-md/myne#505 Android's Storage Access Framework picker, where the
+ * user picks the destination and the bytes are written there. Before #505 the
+ * Android arm was a documented no-op, so the write was the delivery and nothing
+ * delivered.
  *
  * The file is **excluded from the platform's automatic cloud backup** on both
  * platforms (myne-md/myne#491) — a saved recovery phrase alone reconstructs the
@@ -87,78 +90,49 @@ export async function copySecretToClipboard(
  * Resolves to a {@link SecretSaveOutcome} on success, or `null` on failure (the
  * caller shows a message). `filename` should end in `.txt`.
  *
- * **The outcome names the DELIVERY, not a path, and the two platforms have
- * different ones** (myne-md/myne#504). This used to answer `"Documents/<file>"`
- * on both, and on iOS that is a location the user cannot open: the app declares
- * no `UIFileSharingEnabled` and no `LSSupportsOpeningDocumentsInPlace` in either
- * `Info.ios.plist` or the generated plist, so its Documents directory is not in
- * the Files app at all. The share sheet is the only route to the file there, and
- * a user who dismissed it was left holding a success message naming a folder
- * that does not exist for them, for the one file the app produces that is never
- * re-displayable (`recovery-flow.md` §2.4).
+ * **The outcome names the DELIVERY, not a path** (myne-md/myne#504, and #505 for
+ * the Android half). This used to answer `"Documents/<file>"` on Android, naming
+ * a folder no app on that phone can open; on iOS the same answer named a folder
+ * missing from the Files app. A success may claim only what the client observed
+ * (`recovery-flow.md` §2.2), and what it observed is that it wrote the file and
+ * offered the chooser.
  *
  * Adding `UIFileSharingEnabled` is deliberately NOT the fix: it would make the
  * claim true by making a plaintext recovery phrase browsable to anyone holding
  * the unlocked phone.
- *
- * Android keeps the path, because there the share sheet is the documented no-op
- * (`share_file.rs`) and the write IS the delivery. Note that `share_file.rs` and
- * this file's own header disagree about whether that directory is reachable from
- * the system Files app on a current Android; that question is myne-md/myne#505's
- * and is not answered here, so this says only where the file went and promises
- * nothing about which app can browse to it.
- *
- * The `"shared"` sentence names no operating system, and used to name iOS. It is
- * also no longer where a failed probe lands: that has its own arm now, because
- * the sentence tells the user to use the share sheet and Android's is a
- * documented no-op, so on an Android phone whose probe failed the app pointed at
- * an affordance that never appears and offered "tap Save again" to bring it
- * back.
  */
 export type SecretSaveOutcome =
-  /** Written, and the path is meaningful to the user. */
-  | { readonly kind: "path"; readonly label: string }
-  /** Written inside the app, where only the share sheet can reach it. */
+  /** Written inside the app, and offered to the platform chooser. */
   | { readonly kind: "shared" }
   /**
    * Written, and nothing else is known.
    *
-   * The platform probe is an IPC read and it can fail. The two arms above are
-   * both CLAIMS about a file holding a plaintext recovery phrase, on the one
-   * screen `recovery-flow.md` §2.4 says is never re-displayable, and §2.2 in
-   * this same spec now says a success may claim only what the client observed.
-   * Routing an unknown platform into `"shared"` was the smaller claim of the
-   * two and still not an observed one: on an Android device whose probe failed
-   * it told the user to use a share sheet that `share_file.rs` documents as a
-   * no-op there, and to tap Save again to bring back a sheet that never
-   * appeared. The write is the only thing this arm witnessed, so it is the only
-   * thing it says.
+   * The platform probe is an IPC read and it can fail. Both real arms are CLAIMS
+   * about a file holding a plaintext recovery phrase, on the one screen
+   * `recovery-flow.md` §2.4 says is never re-displayable, and §2.2 of the same
+   * spec says a success may claim only what the client observed. A failed probe
+   * observed the write and nothing else, so that is all this arm says.
    */
   | { readonly kind: "written" };
 
 /**
  * Which {@link SecretSaveOutcome} the platform's delivery calls for.
  *
- * A named predicate rather than a `platform === "android"` compare at the point
- * of use, following `canHoldSecretOnClipboard` in `clipboardTransport.ts`: the
- * fact being branched on is a property of the delivery, and a bare platform
- * string at the call site invites the next caller to re-derive it from a
- * different premise.
+ * A named predicate rather than a platform compare at the point of use,
+ * following `canHoldSecretOnClipboard` in `clipboardTransport.ts`: the fact being
+ * branched on is a property of the delivery, and a bare platform string at the
+ * call site invites the next caller to re-derive it from a different premise.
  *
- * It returns the outcome's own `kind` rather than a second three-value
- * vocabulary, because a private `"path" | "share-sheet" | "unknown"` mapped 1:1
- * onto the public one and the only thing between them was an if-chain at the
- * caller: two names for each of three facts.
- *
- * `"written"` is its own answer rather than folded into either real one, because
- * both real ones are CLAIMS and a failed probe has established neither. The
- * failure mode of an IPC read is silence, so folding it in is how a claim gets
- * made about a device nobody asked.
+ * **Both known platforms now answer `"shared"`**, which is why the Android arm
+ * returns that rather than `"path"`: since myne-md/myne#505 Android presents the
+ * Storage Access Framework picker, so no platform's delivery can be described as
+ * a path the user can open. `"written"` stays its own answer for a probe that
+ * failed, because both real arms are claims and a failure has established
+ * neither.
  */
 async function savedFileDelivery(): Promise<SecretSaveOutcome["kind"]> {
   const platform = await devicePlatform().catch(() => null);
-  if (platform === null) return "written";
-  return platform === "android" ? "path" : "shared";
+  return platform === null ? "written" : "shared";
 }
 
 /**
@@ -172,19 +146,17 @@ async function savedFileDelivery(): Promise<SecretSaveOutcome["kind"]> {
  * stopped making, which is exactly the drift `savedFileDelivery` above was
  * factored out to prevent.
  *
- * A `switch` over the union rather than a ternary chain: a fourth `kind` becomes
+ * A `switch` over the union rather than a ternary chain: a third `kind` becomes
  * a compile error here instead of falling into whichever arm happens to be last.
  * The sentences differ in exactly what they CLAIM, which is the point of the
- * union: one names a folder, one names the share sheet as the route, and one
- * names neither because the probe that would have decided between them failed.
+ * union: one names the chooser as the route and one names neither, because the
+ * probe that would have established the first failed.
  */
 export function secretSaveMessage(
   outcome: SecretSaveOutcome | null,
 ): { key: string; params?: Record<string, string> } {
   if (outcome === null) return { key: "createVault.saveFileError" };
   switch (outcome.kind) {
-    case "path":
-      return { key: "createVault.savedToFile", params: { label: outcome.label } };
     case "shared":
       return { key: "createVault.savedToShareSheet" };
     case "written":
@@ -197,16 +169,15 @@ export async function saveSecretToDocuments(
   contents: string,
 ): Promise<SecretSaveOutcome | null> {
   try {
-    const { path, dir, name } = await exportPath(filename);
+    const { path } = await exportPath(filename);
     await invoke("plugin:secret-export|save_secret_text", { path, contents });
-    // Offer the native destination chooser on top of the guaranteed Documents
-    // write; additive, so a share cancel still leaves the file saved.
+    // Offer the platform destination chooser on top of the guaranteed Documents
+    // write; additive, so dismissing it still leaves the file saved.
     await shareFile(path);
     // The platform read comes AFTER the write, so a probe failure cannot cost
-    // the save. It can only cost the app the right to say where the file went,
+    // the save. It can only cost the app the right to say a chooser was offered,
     // which is what the third arm is.
-    const kind = await savedFileDelivery();
-    return kind === "path" ? { kind, label: `${dir}/${name}` } : { kind };
+    return { kind: await savedFileDelivery() };
   } catch (e) {
     logErrorKind(e, "secret-save-failed");
     return null;
