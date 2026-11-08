@@ -34,7 +34,9 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GUARD = "scripts/check-private-path-refs.mjs";
 const RECORD = join(ROOT, "scripts", "private-path-refs.json");
-const PROBE_REL = "myne-agents/docs/__private_path_probe.md";
+// A scanned root, because `docs/` is no longer one: the documentation tree moved into the private
+// companion, and this guard now scans the two published trees only.
+const PROBE_REL = "src/__private_path_probe.md";
 
 function run(args: string[]): { code: number; out: string } {
   try {
