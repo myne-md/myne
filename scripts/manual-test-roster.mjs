@@ -3122,8 +3122,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On an Android device (device-matrix row 8.8): run each export. Confirm the file is written, a toast names the location, and there is no crash and no silent no-op. Then open the system Files app and try to navigate to Android/data/<pkg>/files/Documents: confirm you cannot (API 30+ refuses), and record whether the toast's wording is honest about that.",
-        whyNotAutomated: "Android has no share sheet in this build and the destination is a directory the system Files app refuses to enter; both facts are only observable on a device with a real Files app.",
+        see: "On an Android device (device-matrix row 8.8): run each export (recovery phrase, identity phrase, Export to Markdown, an attachment). Confirm the system save dialog opens for each, that picking a destination writes a file you can open from the Files app or the provider's app, and that dismissing it leaves the app's own copy intact. Export to Markdown must arrive as one .zip that unzips to the note tree, because a document picker saves a document and not a folder.",
+        whyNotAutomated: "The Storage Access Framework dialog, the provider that receives the bytes and the system Files app's refusal to enter Android/data/<pkg>/files/Documents are all device facts; no CI lane in this repo runs an Android device, and the picker's effect is exactly what cannot be observed from inside the process.",
         clients: ["android"],
         estimateMin: 8,
         tier: "standard",
