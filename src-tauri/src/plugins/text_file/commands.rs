@@ -119,18 +119,67 @@ pub struct ImportedText {
     pub content: String,
 }
 
+/// The stores this plugin refuses to touch.
+///
+/// The same list `diagnostics` guards, and for the same reason: a destination
+/// inside one of them is a vault component, not an exported calendar.
+fn guarded_roots<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+) -> Vec<Result<std::path::PathBuf, ()>> {
+    crate::plugins::diagnostics::commands::GuardedStore::ALL
+        .iter()
+        .map(|store| store.resolve(app))
+        .collect()
+}
+
+/// The one file kind this plugin exchanges.
+///
+/// A general text writer with a page-supplied destination is a capability no other
+/// command in this tree grants: a compromised WebView could write
+/// `~/.config/autostart/*.desktop` or a shell rc file, and read `~/.ssh/id_ed25519`.
+/// The calendar is the whole reason the plugin exists, so the extension IS the
+/// bound, and it is enforced here rather than promised in a comment.
+pub(crate) const TEXT_FILE_EXTENSION: &str = "ics";
+
+/// Whether `path` names a file this plugin is allowed to touch.
+///
+/// Checked case-insensitively on the extension alone: a path is a path, and the
+/// case of its suffix is the user's file manager rather than a security property.
+fn has_the_one_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .is_some_and(|ext| ext.eq_ignore_ascii_case(TEXT_FILE_EXTENSION))
+}
+
+/// Reject a destination that is not a calendar, or that resolves inside a store
+/// this app owns.
+///
+/// `containment_refused` is the shared predicate for the second half, and it is
+/// reused rather than reimplemented: `format/src/dest_guard.rs` names the failure
+/// (a page that skipped the dialog replacing `vault.meta`) and the four commands
+/// that must re-validate. `secret_export` and `diagnostics` are the two precedent.
+fn validate_text_file_destination(
+    destination: &Path,
+    guarded_roots: &[Result<std::path::PathBuf, ()>],
+) -> Result<(), TextFileError> {
+    if !has_the_one_extension(destination) {
+        return Err(TextFileError::InvalidDestination);
+    }
+    myne_core::paths::containment_refused(destination, guarded_roots)
+        .map_err(|_| TextFileError::InvalidDestination)
+}
+
 /// Testable sync core: bound the content, validate the destination, write durably.
 pub(crate) fn write_text_to(
     target_path: &Path,
     content: &[u8],
     overwrite: bool,
+    guarded_roots: &[Result<std::path::PathBuf, ()>],
 ) -> Result<(), TextFileError> {
     if content.len() as u64 > TEXT_FILE_MAX_BYTES {
         return Err(TextFileError::TooLarge);
     }
-    if !crate::paths::parent_dir_ok(target_path) {
-        return Err(TextFileError::InvalidDestination);
-    }
+    validate_text_file_destination(target_path, guarded_roots)?;
     crate::atomic_write::atomic_write_unclobbered(target_path, content, overwrite).map_err(|e| {
         match e.kind() {
             std::io::ErrorKind::AlreadyExists => TextFileError::TargetAlreadyExists,
@@ -141,8 +190,16 @@ pub(crate) fn write_text_to(
     })
 }
 
-/// Testable sync core: capped read, then strict UTF-8.
-pub(crate) fn read_text_from(target_path: &Path) -> Result<ImportedText, TextFileError> {
+/// Testable sync core: capped read, same destination bounds, then strict UTF-8.
+pub(crate) fn read_text_from(
+    target_path: &Path,
+    guarded_roots: &[Result<std::path::PathBuf, ()>],
+) -> Result<ImportedText, TextFileError> {
+    if !has_the_one_extension(target_path) {
+        return Err(TextFileError::InvalidDestination);
+    }
+    myne_core::paths::containment_refused(target_path, guarded_roots)
+        .map_err(|_| TextFileError::InvalidDestination)?;
     let file = std::fs::File::open(target_path).map_err(|e| TextFileError::Io {
         io_error_kind: from_io_error_kind(e.kind()),
     })?;
@@ -168,17 +225,20 @@ pub(crate) fn read_text_from(target_path: &Path) -> Result<ImportedText, TextFil
 /// Write `content` to `target_path`, which the caller obtained from the OS save
 /// dialog. `overwrite` carries that dialog's own "Replace" consent.
 #[tauri::command]
-pub async fn export_text_file(
+pub async fn export_text_file<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
     content: String,
     target_path: String,
     overwrite: bool,
 ) -> Result<(), TextFileError> {
     let target = std::path::PathBuf::from(target_path);
+    let roots = guarded_roots(&app);
     let bytes = content.into_bytes();
     let len = bytes.len();
-    let result = tokio::task::spawn_blocking(move || write_text_to(&target, &bytes, overwrite))
-        .await
-        .map_err(|_| TextFileError::JoinFailure)?;
+    let result =
+        tokio::task::spawn_blocking(move || write_text_to(&target, &bytes, overwrite, &roots))
+            .await
+            .map_err(|_| TextFileError::JoinFailure)?;
     match &result {
         Ok(()) => tracing::info!(event = "text_file_exported", bytes = len),
         Err(e) => tracing::error!(
@@ -192,9 +252,13 @@ pub async fn export_text_file(
 /// Read `target_path`, which the caller obtained from the OS open dialog, as
 /// UTF-8 text under [`TEXT_FILE_MAX_BYTES`].
 #[tauri::command]
-pub async fn import_text_file(target_path: String) -> Result<ImportedText, TextFileError> {
+pub async fn import_text_file<R: tauri::Runtime>(
+    app: tauri::AppHandle<R>,
+    target_path: String,
+) -> Result<ImportedText, TextFileError> {
     let target = std::path::PathBuf::from(target_path);
-    let result = tokio::task::spawn_blocking(move || read_text_from(&target))
+    let roots = guarded_roots(&app);
+    let result = tokio::task::spawn_blocking(move || read_text_from(&target, &roots))
         .await
         .map_err(|_| TextFileError::JoinFailure)?;
     match &result {
@@ -211,6 +275,10 @@ pub async fn import_text_file(target_path: String) -> Result<ImportedText, TextF
 mod tests {
     use super::*;
 
+    /// No guarded store, which is what a temp directory is: these cases prove the
+    /// extension and size bounds, and the store refusal has its own case below.
+    const UNGUARDED: &[Result<std::path::PathBuf, ()>] = &[];
+
     fn tmp(name: &str) -> std::path::PathBuf {
         let dir =
             std::env::temp_dir().join(format!("myne-text-file-{name}-{}", std::process::id()));
@@ -223,8 +291,8 @@ mod tests {
     fn writes_then_reads_the_same_bytes() {
         let path = tmp("roundtrip");
         let text = "BEGIN:VCALENDAR\nEND:VCALENDAR\n";
-        write_text_to(&path, text.as_bytes(), false).expect("write");
-        let read = read_text_from(&path).expect("read");
+        write_text_to(&path, text.as_bytes(), false, UNGUARDED).expect("write");
+        let read = read_text_from(&path, UNGUARDED).expect("read");
         assert_eq!(read.content, text);
         assert_eq!(read.name, "calendar.ics");
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
@@ -233,8 +301,8 @@ mod tests {
     #[test]
     fn refuses_a_second_write_without_the_consent() {
         let path = tmp("noclobber");
-        write_text_to(&path, b"one", false).expect("first write");
-        let err = write_text_to(&path, b"two", false).expect_err("must refuse");
+        write_text_to(&path, b"one", false, UNGUARDED).expect("first write");
+        let err = write_text_to(&path, b"two", false, UNGUARDED).expect_err("must refuse");
         assert!(matches!(err, TextFileError::TargetAlreadyExists));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
@@ -243,7 +311,7 @@ mod tests {
     fn refuses_content_a_reader_would_reject() {
         let path = tmp("toolarge");
         let bytes = vec![b'x'; TEXT_FILE_MAX_BYTES as usize + 1];
-        let err = write_text_to(&path, &bytes, false).expect_err("must refuse");
+        let err = write_text_to(&path, &bytes, false, UNGUARDED).expect_err("must refuse");
         assert!(matches!(err, TextFileError::TooLarge));
         assert!(!path.exists(), "a refused write must leave nothing behind");
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
@@ -253,7 +321,7 @@ mod tests {
     fn reading_detects_an_oversized_file_instead_of_truncating_it() {
         let path = tmp("readtoolarge");
         std::fs::write(&path, vec![b'x'; TEXT_FILE_MAX_BYTES as usize + 1]).expect("seed");
-        let err = read_text_from(&path).expect_err("must refuse");
+        let err = read_text_from(&path, UNGUARDED).expect_err("must refuse");
         assert!(matches!(err, TextFileError::TooLarge));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
@@ -262,14 +330,57 @@ mod tests {
     fn reading_refuses_bytes_that_are_not_utf8() {
         let path = tmp("notutf8");
         std::fs::write(&path, [0xff, 0xfe, 0x00]).expect("seed");
-        let err = read_text_from(&path).expect_err("must refuse");
+        let err = read_text_from(&path, UNGUARDED).expect_err("must refuse");
         assert!(matches!(err, TextFileError::NotUtf8));
         std::fs::remove_dir_all(path.parent().unwrap()).ok();
     }
 
     #[test]
+    fn refuses_any_file_that_is_not_a_calendar() {
+        // The extension IS the bound: without it this command is a general text
+        // writer at a page-supplied path, which nothing else in this tree grants.
+        let dir = std::env::temp_dir().join(format!("myne-text-file-ext-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let script = dir.join("authorized_keys");
+        let err =
+            write_text_to(&script, b"ssh-ed25519 AAAA", false, UNGUARDED).expect_err("refuse");
+        assert!(matches!(err, TextFileError::InvalidDestination));
+        assert!(
+            !script.exists(),
+            "a refused write must leave nothing behind"
+        );
+        let err = read_text_from(&script, UNGUARDED).expect_err("refuse");
+        assert!(matches!(err, TextFileError::InvalidDestination));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn refuses_a_destination_inside_a_store_this_app_owns() {
+        // A page that skipped the save dialog must not be able to rename over
+        // `vault.meta`; `containment_refused` is the shared predicate for that, and
+        // this pins that the plugin actually calls it.
+        let dir = std::env::temp_dir().join(format!("myne-text-file-guard-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).expect("temp dir");
+        let target = dir.join("vault.ics");
+        let guarded = vec![Ok(dir.clone())];
+        for err in [
+            write_text_to(&target, b"BEGIN:VCALENDAR", true, &guarded).expect_err("refuse"),
+            read_text_from(&target, &guarded)
+                .err()
+                .unwrap_or(TextFileError::JoinFailure),
+        ] {
+            assert!(matches!(err, TextFileError::InvalidDestination));
+        }
+        // And the same path is allowed once the store is not guarded, so the case
+        // above measures the predicate rather than an unrelated refusal.
+        assert!(write_text_to(&target, b"BEGIN:VCALENDAR", false, UNGUARDED).is_ok());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
     fn refuses_a_destination_with_no_directory() {
-        let err = write_text_to(Path::new("calendar.ics"), b"x", true).expect_err("must refuse");
+        let err = write_text_to(Path::new("calendar.ics"), b"x", true, UNGUARDED)
+            .expect_err("must refuse");
         assert!(matches!(err, TextFileError::InvalidDestination));
     }
 }
