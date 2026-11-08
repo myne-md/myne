@@ -2,7 +2,7 @@
 // biometric). Drives headless Chromium against the dev server with mock IPC —
 // NOT an end-to-end suite (no device, no Rust, no real Face ID; the OS
 // biometric sheet is system UI a WebView test can never reach — see
-// docs/dev/mobile-e2e-options.md §6.3). What this tier CAN pin down is the
+// myne-agents/docs/dev/mobile-e2e-options.md §6.3). What this tier CAN pin down is the
 // flow logic around the prompt: the auto-prompt on unlock entry, the
 // cancel → retry surface, the password fallback, and the settings toggle
 // round-trip.

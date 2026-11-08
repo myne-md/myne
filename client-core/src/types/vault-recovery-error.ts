@@ -46,7 +46,7 @@ export type VaultRecoveryError =
    * AEAD-tag failure on the recovery wrap-key. **By design this
    * single tag does NOT distinguish** "wrong phrase" from "tampered
    * recovery section of vault.meta", see
-   * `docs/spec/recovery-flow.md` § 3.4:
+   * `myne-agents/docs/spec/recovery-flow.md` § 3.4:
    *
    * > Tag-verification failure means either the phrase was entered
    * > wrong or the `vault.meta` was tampered. The client MUST NOT

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 //
-// Automatic apply, and the three bounds `docs/threat-model.md` rests on
+// Automatic apply, and the three bounds `myne-agents/docs/threat-model.md` rests on
 // (myne-md/myne#551).
 //
 // This mode is a change to a normative guarantee: SYNC-17 says the AI never
@@ -19,7 +19,7 @@
 // The first is the load-bearing one: the frontend split is presentation, and
 // the host re-derives the same question from the note as it will actually be.
 // Sending `"individual"` would hand it forty edits under a label that permits
-// removals, which is the shape `docs/decisions/ai/0515` contrasts with a
+// removals, which is the shape `myne-agents/docs/decisions/ai/0515` contrasts with a
 // frontend filter.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

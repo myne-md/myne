@@ -11,7 +11,7 @@ import Foundation
 ///
 /// Like every other watch surface here, it holds **NO vault key and runs NO
 /// crypto** — the watch is outside the plaintext trust boundary (spec
-/// §9.18, main-repo `docs/decisions.md` 2026-07-12). It records, then hands each
+/// §9.18, main-repo `myne-agents/docs/decisions.md` 2026-07-12). It records, then hands each
 /// chunk to [`MeetingTransfer`], which ships it to the paired iPhone over
 /// WatchConnectivity. The phone seals each chunk on arrival under the
 /// device-local wrap key (`WCMeetingReceiver` → `plugin:captures|seal_meeting_chunk`),

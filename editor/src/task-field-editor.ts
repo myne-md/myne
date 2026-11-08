@@ -13,7 +13,7 @@
 //     `<input type="date">` / `<input type="time">`, whose visible format is the
 //     WebView's region setting and ignored the `date_format` / `time_format`
 //     prefs (myne-md/myne#614; the reversal and what changed since the earlier
-//     measurement are recorded in `docs/decisions/editor/0586-*`);
+//     measurement are recorded in `myne-agents/docs/decisions/editor/0586-*`);
 //   - for the repeat field, the shared recurrence model
 //     (`@myne/dialect/recurrence`): the rule is **assembled from controls and
 //     serialized to canonical English**, never typed. That is `markdown-dialect.md`

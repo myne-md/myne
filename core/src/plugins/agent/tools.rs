@@ -10,7 +10,7 @@
 //! **The fifth is the calendar** (myne-md/myne#1037, grill Q15): a window read,
 //! bounded by the host so "the whole calendar in one call" is not expressible, and
 //! clamped by the same exclusion set as every other tool. Its argument is in
-//! `docs/decisions/ai/` and its risk row in `docs/threat-model.md` §7.
+//! `myne-agents/docs/decisions/ai/` and its risk row in `myne-agents/docs/threat-model.md` §7.
 //!
 //! **The fourth was such a change, and this line was not updated with it.** The
 //! header said "three" for as long as `search_vault` had existed, which is the
@@ -1179,7 +1179,7 @@ mod tests {
 //
 // **The fifth tool, and the reason the ceiling moved.** This module's header says
 // the count is a security decision, so a fifth tool is a change to that decision
-// rather than an addition, and `docs/decisions/ai/` carries the argument (the
+// rather than an addition, and `myne-agents/docs/decisions/ai/` carries the argument (the
 // calendar's own grill, Q15, myne-md/myne#1037). The shape that argument buys is
 // this: a read the model may ASK for, bounded so that "the whole calendar in one
 // call" is not expressible, and clamped by the SAME exclusion set every other

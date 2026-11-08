@@ -1,10 +1,10 @@
 // Pandoc-style definition lists (`Term \n : Definition`) for the Myne markdown
 // dialect.
 //
-// Spec: docs/spec/markdown-dialect.md §3 (recognized block syntax) + §8
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3 (recognized block syntax) + §8
 // (informative parser config). The GFM grammar does NOT parse definition lists,
 // so there is no AST node to decorate without this custom `MarkdownConfig`.
-// MYND-152; scope reversal recorded in docs/decisions.md 2026-05-30.
+// MYND-152; scope reversal recorded in myne-agents/docs/decisions.md 2026-05-30.
 //
 // PINNED SUBSET (what this parser recognizes — the dialect, not just the code):
 //   - A definition list is a TERM line (an ordinary paragraph-style first line,

@@ -11,7 +11,7 @@
 # every `DeviceLocal` field whatever the client claims; on the detached-window
 # arm the bound is the client's own window-role check rather than this ACL, and
 # moving that check host-side is owed. `decisions/clients/0677` records that
-# qualification, and `docs/threat-model.md` §7 states it in the same terms. The
+# qualification, and `myne-agents/docs/threat-model.md` §7 states it in the same terms. The
 # `default` bundle was reserved
 # main-window-only anticipating multi-window; myne#677 (epic #173, sync-ledger
 # SYNC-12) resolves that reservation: a detached (pop-out) note window is granted

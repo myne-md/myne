@@ -97,9 +97,9 @@ their notes. If you front this origin with your own proxy or CDN, **the
 obligation moves to you** — the container cannot scrub a log it does not write.
 
 Normative obligations, the rebuild-and-verify procedure and the AGPL §13
-source offer are in [`docs/self-host-web.md`](../docs/self-host-web.md) —
+source offer are in [`myne-agents/docs/self-host-web.md`](../myne-agents/docs/self-host-web.md) —
 this file stays a contributor's map of the target, not an operator runbook
-(`docs/AGENTS.md`, operator-doc placement).
+(`myne-agents/docs/AGENTS.md`, operator-doc placement).
 
 ## State
 
@@ -137,6 +137,6 @@ deleted the `scripts/check-web-no-phrase.mjs` artefact grep that enforced it).
 What remains absent is the B2B member plane, quick-unlock and backup
 import/export — a runtime capability refusal rather than a build-time
 substitution. Sync is required: there is no offline-first first run.
-[`docs/threat-model.md`](../docs/threat-model.md) A15 / TB11 states what the
+[`myne-agents/docs/threat-model.md`](../myne-agents/docs/threat-model.md) A15 / TB11 states what the
 served-code delivery channel costs relative to a signed desktop build, and A18
 records that no rule now tells a user which phrase prompt is legitimate.

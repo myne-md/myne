@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! `NC05` next-major CRDT note-type blob codec (`docs/spec/protocol.md` § 10.7,
+//! `NC05` next-major CRDT note-type blob codec (`myne-agents/docs/spec/protocol.md` § 10.7,
 //! automerge-sync-migration epic, myne-md/myne#418 task 2).
 //!
 //! A CRDT note is stored under the **same § 9.2 three-level envelope layout** as

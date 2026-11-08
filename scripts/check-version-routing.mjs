@@ -251,7 +251,7 @@ const ALLOWED = new Map([
   // ── legitimately v0.1: REBUILDABLE, NEVER-SYNCED CACHES ───────────────────
   // EMPTY. The last entry here was `local_inference/hydrate.rs#kek`, the KEK
   // for the `vault.embeddings` cache. The AI-embeddings family was retired
-  // (`docs/decisions/ai/0703-*`) and the module went with it, so no root-only
+  // (`myne-agents/docs/decisions/ai/0703-*`) and the module went with it, so no root-only
   // cache derivation is left in the tree. The SHARED singleton KEKs that used
   // to sit in this section (prefs, search, workspace, indices, graph, themes,
   // dictionary, attachments catalog, attachment-text) moved to

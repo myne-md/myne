@@ -19,8 +19,8 @@
 //   - **no green check, anywhere**. A completed row is expressed by a filled
 //     box and struck-through text, never a tick glyph;
 //   - **completion is the one ruled exception to state-never-by-fill** in this
-//     panel: the box and the strike are ACCENT (`docs/design/README.md`
-//     "Task completion", `docs/decisions/ui/0587`). Everywhere else — the date
+//     panel: the box and the strike are ACCENT (`myne-agents/docs/design/README.md`
+//     "Task completion", `myne-agents/docs/decisions/ui/0587`). Everywhere else — the date
 //     chip's overdue ink, the editor's inline affordances — state stays text,
 //     never a pill;
 //   - the row is quiet: this is a list of work, not a scoreboard.

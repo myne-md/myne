@@ -45,7 +45,7 @@ use tauri::{Manager, Runtime};
 /// **Total by requirement rather than by convenience**, and on this client the
 /// requirement is sharper than on desktop: a run dies with the foreground here,
 /// so this is not only the lock path but the ordinary way a run ends
-/// (`docs/decisions/ai/…`, myne-md/myne#456). A run holds a note-id set derived
+/// (`myne-agents/docs/decisions/ai/…`, myne-md/myne#456). A run holds a note-id set derived
 /// from decrypted plaintext, a transcript containing note bodies, and a proposal
 /// built out of both; none of it may outlive the unlocked session.
 ///

@@ -263,7 +263,7 @@ pub fn install() {
 ///
 /// `SharedArrayBuffer` requires **cross-origin isolation**, and this client
 /// already requires it: `web/csp.ts` sends COOP `same-origin` + COEP, and
-/// `docs/self-host-web.md` lists dropping either as a misconfiguration. So this
+/// `myne-agents/docs/self-host-web.md` lists dropping either as a misconfiguration. So this
 /// adds no deployment constraint — but it does mean a page served WITHOUT those
 /// headers cannot back off, which is why the absence is a hard failure below
 /// rather than a silent fallback to not waiting: a backoff that does not wait is
@@ -280,7 +280,7 @@ fn block_via_atomics_wait(duration: std::time::Duration) {
         .and_then(|v| v.dyn_into::<js_sys::Function>().ok())
         .expect(
             "SharedArrayBuffer is unavailable — the page is not cross-origin isolated. \
-             COOP `same-origin` + COEP are required (web/csp.ts, docs/self-host-web.md).",
+             COOP `same-origin` + COEP are required (web/csp.ts, myne-agents/docs/self-host-web.md).",
         );
     let buffer =
         js_sys::Reflect::construct(&sab_ctor, &js_sys::Array::of1(&JsValue::from_f64(4.0)))

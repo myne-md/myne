@@ -40,7 +40,7 @@ export const KEY = {
    * the finding does not generalise to users, because a real WebKitGTK window
    * does activate a focused button on Enter. What fails is the driver's
    * synthesis of it, so "Enter activates this control" stays a claim for the
-   * manual keyboard pass (`docs/dev/accessibility-checklist.md` section 1)
+   * manual keyboard pass (`myne-agents/docs/dev/accessibility-checklist.md` section 1)
    * rather than one this suite can make.
    */
   ENTER: String.fromCharCode(0xe007),

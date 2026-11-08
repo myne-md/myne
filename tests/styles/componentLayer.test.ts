@@ -170,7 +170,7 @@ function walk(dir: string, out: string[]): void {
   }
 }
 
-describe("the zero state's wash (docs/decisions/ui/0633)", () => {
+describe("the zero state's wash (myne-agents/docs/decisions/ui/0633)", () => {
   it("takes its colour from the accent, so every palette tints it with its own", () => {
     // A literal here would be the one colour in the zero state no theme reaches.
     expect(ruleBody(SHEET, ".myne-empty {")).toContain("--myne-empty-wash: var(--accent)");

@@ -6,7 +6,7 @@
 //! consumed by `ui-vault-delete`) extended the IPC to also accept
 //! `Slot::Empty` when `vault.meta` exists on disk (lost-credentials
 //! cul-de-sac escape from the Unlock + Recovery phrase-entry surfaces).
-//! See `docs/decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
+//! See `myne-agents/docs/decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
 //! extended to accept Slot::Empty + vault.meta-exists" for the
 //! full rationale.
 //!
@@ -100,7 +100,7 @@ use tauri::{AppHandle, Runtime, State};
 /// # Frontend contract
 ///
 /// **Caller MAY pre-[`crate::plugins::vault_unlock::commands::lock`]
-/// (`vault_lock` IPC).** As of MYND-108-bis (`docs/decisions.md`
+/// (`vault_lock` IPC).** As of MYND-108-bis (`myne-agents/docs/decisions.md`
 /// 2026-05-26 entry "MYND-108-bis vault_delete extended to accept
 /// Slot::Empty + vault.meta-exists"), the IPC also accepts the
 /// `Slot::Empty` arm when `vault.meta` exists on disk — so pre-locking
@@ -114,7 +114,7 @@ use tauri::{AppHandle, Runtime, State};
 /// The canonical specification of the broader contract is the PRD at
 /// `myne-agents/features/backend-vault-delete/prd.md` §"Implementation
 /// Decisions → Frontend contract surface" (initial shape); the
-/// MYND-108-bis extension is canonical in `docs/decisions.md`
+/// MYND-108-bis extension is canonical in `myne-agents/docs/decisions.md`
 /// 2026-05-26 entry "MYND-108-bis vault_delete extended to accept
 /// Slot::Empty + vault.meta-exists".
 ///
@@ -133,10 +133,10 @@ use tauri::{AppHandle, Runtime, State};
 ///
 /// - `myne-agents/features/backend-vault-delete/prd.md` — PRD
 ///   (canonical specification of all behavior on this command)
-/// - `docs/decisions.md` 2026-05-26 entries (a)-(d) —
+/// - `myne-agents/docs/decisions.md` 2026-05-26 entries (a)-(d) —
 ///   cryptographic-erase claim, Slot precondition matrix + R3,
 ///   partial-fail posture, VaultArtifactsPresent rename
-/// - `docs/threat-model.md` A5 (lost or stolen device — locked,
+/// - `myne-agents/docs/threat-model.md` A5 (lost or stolen device — locked,
 ///   Strong) — the load-bearing at-rest guarantee that the
 ///   "geri getirilemez" UX claim reaffirms post-unlink
 pub async fn vault_delete_from_host(
@@ -289,7 +289,7 @@ async fn read_account_number_hash(
 /// one durable member, and it goes last for that reason.
 ///
 /// **And it is why the per-vault keychain secrets belong here too**
-/// (myne-md/myne#761, `docs/decisions/security/0709`). `forget_label` destroys
+/// (myne-md/myne#761, `myne-agents/docs/decisions/security/0709`). `forget_label` destroys
 /// the sealed-label wrap key; `erase_for_vault` destroys the item the owner
 /// quick-unlock **and** member-vault biometric wrap keys share
 /// (`plugins::quick_unlock::device_secret`), which nothing removed until this
@@ -616,7 +616,7 @@ pub(crate) async fn vault_delete_with_dir(
 /// `VaultNotFound` when nothing is on disk to delete (unchanged from
 /// MYND-105's rejection semantics — no silent no-op success).
 ///
-/// See `docs/decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
+/// See `myne-agents/docs/decisions.md` 2026-05-26 entry "MYND-108-bis vault_delete
 /// extended to accept Slot::Empty + vault.meta-exists" for the
 /// rationale that the racing `vault_lock`'s `Drop` already zeroized
 /// the keys, so the race branch falling through to this dispatcher
@@ -1988,7 +1988,7 @@ mod tests {
     // live at `md.myne.quickunlock` under `hex(account_number_hash):vault_id`,
     // and until this change nothing removed them: the recursive unlink takes the
     // `MYQ1` blob and the member-unlock store, and leaves the wrap key that
-    // opens neither. `docs/decisions/security/0709` is the class rule.
+    // opens neither. `myne-agents/docs/decisions/security/0709` is the class rule.
 
     /// A `<app_data_dir>/vaults/<id>/` whose `vault.meta` is REAL and parses, so
     /// the teardown can derive the keychain account component. `seeded_vault`

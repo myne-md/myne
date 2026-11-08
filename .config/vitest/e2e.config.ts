@@ -9,7 +9,7 @@
 // at production parameters (the VR-1 recovery-drill scenario, SYNC-9).
 //
 // Run via `pnpm test:e2e` (locally inside the container — see
-// docs/dev/e2e.md — or in the Woodpecker E2E step).
+// myne-agents/docs/dev/e2e.md — or in the Woodpecker E2E step).
 
 import { cpus } from "node:os";
 
@@ -23,7 +23,7 @@ import { defineConfig } from "vitest/config";
  * finishes in 137 s.
  *
  * **Measured (2026-10-17, this 16-core box, the 7 slowest files, 37 scenarios),
- * against this pipeline's own criterion** — `docs/dev/e2e.md`: "the reading that
+ * against this pipeline's own criterion** — `myne-agents/docs/dev/e2e.md`: "the reading that
  * would justify raising this is a run at N+1 whose SUMMED FILE TIME is unchanged
  * from N":
  *

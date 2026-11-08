@@ -104,17 +104,17 @@ describe("runTool: a tool that fails on STDOUT only", () => {
 describe("formatDiagnostic", () => {
   it("carries both streams, the argv, the exit and the cwd", () => {
     const text = formatDiagnostic({
-      argv: ["git", "show", "HEAD:docs/x.md"],
+      argv: ["git", "show", "HEAD:myne-agents/docs/x.md"],
       status: 128,
       stdout: "",
-      stderr: "fatal: path 'docs/x.md' does not exist",
+      stderr: "fatal: path 'myne-agents/docs/x.md' does not exist",
       cwd: "/repo",
       reason: "the record has a first commit",
     });
     // Both streams unconditionally: pnpm/tsc report on stdout, git on stderr.
     expect(text).toContain('stdout: ""');
-    expect(text).toContain("fatal: path 'docs/x.md' does not exist");
-    expect(text).toContain("git show HEAD:docs/x.md");
+    expect(text).toContain("fatal: path 'myne-agents/docs/x.md' does not exist");
+    expect(text).toContain("git show HEAD:myne-agents/docs/x.md");
     expect(text).toContain("exit: 128");
     expect(text).toContain("cwd: /repo");
     expect(text).toContain("tolerated as an empty result");

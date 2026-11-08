@@ -302,7 +302,7 @@ describe("environment gate — the refusal it produces", () => {
   // one at launch. A test is a specification, so that assertion would have
   // pushed the next author back to the false wording. It pins persistence and
   // the published hash instead, which is what actually distinguishes an
-  // installed app from a re-delivered page (docs/decisions/security/0534).
+  // installed app from a re-delivered page (myne-agents/docs/decisions/security/0534).
   //
   // It asserts over BOTH copies of the sentence, and the second one is the
   // reason this loop exists at all. `UnsupportedEnvironment.tsx` renders

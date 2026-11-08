@@ -656,7 +656,7 @@ const V = {
   "src/hooks/usePrefs.ts": ["ported", "The shared prefs hook."],
   "src/hooks/useDiagnostics.ts": [
     "adapted",
-    "The hook reads the device-local log switch and the one crash record through `plugin:diagnostics`. It runs as written, but the whole `diagnostics` plugin is `Unsupported` on web (the web build installs no `tracing` subscriber at all, `docs/decisions/ops/0366`), so the `diagnosticLog` capability is absent and the effect short-circuits to off and no record. The About rows that render it are omitted rather than greyed; a failed read is deliberately indistinguishable from off, because off is the state in which nothing is written.",
+    "The hook reads the device-local log switch and the one crash record through `plugin:diagnostics`. It runs as written, but the whole `diagnostics` plugin is `Unsupported` on web (the web build installs no `tracing` subscriber at all, `myne-agents/docs/decisions/ops/0366`), so the `diagnosticLog` capability is absent and the effect short-circuits to off and no record. The About rows that render it are omitted rather than greyed; a failed read is deliberately indistinguishable from off, because off is the state in which nothing is written.",
   ],
   "src/hooks/useReminderScheduler.ts": [
     "adapted",

@@ -2,7 +2,7 @@
 
 > Per-**release** manual protocol for the sync flows the desktop `tauri-driver` E2E harness
 > cannot reach (no iOS/Android WebDriver). This is the compensating coverage named in the
-> `docs/decisions.md` 2026-07-07 "Mobile-sync device-level UI E2E exemption (SYNC-44)" entry.
+> `myne-agents/docs/decisions.md` 2026-07-07 "Mobile-sync device-level UI E2E exemption (SYNC-44)" entry.
 > Sync scenario rows (§3) remain **iOS-first** (SYNC-46 shipped iOS-only v1); the **Android
 > tablet section (§6) supersedes the former "Android rows are out of scope" line** — Android
 > enablement (MYND-465) landed with the tablet-adaptive layout work, and §6 is its per-release
@@ -289,7 +289,7 @@ tests and a device.
 > **Not run as of 2026-08-15, on either platform.** Recorded here rather than implied by the
 > table's existence: nothing schedules this checklist, no CI step names it and no release
 > runbook references it, so it verifies nothing until somebody runs it and writes the result
-> (device model and OS build) below. `docs/threat-model.md` says the same thing in the
+> (device model and OS build) below. `myne-agents/docs/threat-model.md` says the same thing in the
 > normative voice: the mobile allowlist's DEVICE behaviour is not verified. The matching
 > logic and the config strings are unit-tested and CI-run; that the host hook fires on a
 > device at all is not.

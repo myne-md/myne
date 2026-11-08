@@ -4,7 +4,7 @@
 // credentials + the vault.meta bytes so the unlock/recovery suites can
 // exercise a REAL created-by-the-app vault without re-paying creation.
 // Lives under the gitignored `e2e/artifacts/` (per-run throwaway
-// credentials — same caveat as failure artifacts, docs/dev/e2e.md).
+// credentials — same caveat as failure artifacts, myne-agents/docs/dev/e2e.md).
 //
 // Consumers must stay runnable standalone: `loadRealisticFixture()`
 // returns null when VC-1 hasn't run in this checkout, and callers fall

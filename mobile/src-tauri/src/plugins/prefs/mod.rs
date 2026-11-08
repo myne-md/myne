@@ -221,7 +221,7 @@ mod acl_registration_guard {
     ///
     /// The MOBILE twin of `src-tauri/src/plugins/prefs/mod.rs`'s guard of the
     /// same name, mirrored here by myne-md/myne#609. Until then only the desktop
-    /// side had it, while `docs/dev/twin-inventory.md` recorded in its own words
+    /// side had it, while `myne-agents/docs/dev/twin-inventory.md` recorded in its own words
     /// that the two capability grants were "NOT measured, and deliberately not
     /// claimed", while this file's own comments assert the lockstep obligation
     /// three times without anything checking it. It reads all three sources out

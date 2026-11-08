@@ -36,7 +36,7 @@ export type Inline =
        * directly: `null` means the author wrote none, so the filename remains
        * the accessible name, while `""` means they deliberately wrote an empty
        * one, which marks the media decorative and is NOT the same thing
-       * (`docs/spec/wikilink.md` §5.1). Mobile parsed the alias and then kept
+       * (`myne-agents/docs/spec/wikilink.md` §5.1). Mobile parsed the alias and then kept
        * only `label`, so an authored alt was not the accessible name on a phone
        * and an authored empty alt announced the filename instead of being
        * skipped.

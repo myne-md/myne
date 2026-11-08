@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! Vault head — Phase 2 fork-consistency primitive (`docs/spec/sync-protocol.md` §3–§5).
+//! Vault head — Phase 2 fork-consistency primitive (`myne-agents/docs/spec/sync-protocol.md` §3–§5).
 //!
 //! The vault head is a small, server-relayed, per-push record that lets the
 //! devices of a single user detect a malicious server's attempts to **roll

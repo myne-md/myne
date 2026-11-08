@@ -5,7 +5,7 @@
 // (`src/lib/load-bearing-copy.ts` re-exports them) and the mobile client
 // (`mobile/src/…`), so the literals are byte-identical across clients by
 // construction — cross-client paraphrase is impossible. E2E asserts them by
-// FULL-literal equality; changing any is a `docs/decisions.md` event, never a
+// FULL-literal equality; changing any is a `myne-agents/docs/decisions.md` event, never a
 // copy edit. Never i18n these (see `src/AGENTS.md` "Do NOT i18n load-bearing copy").
 //
 // **What "by construction" covers, stated because it was overclaimed.** This
@@ -74,7 +74,7 @@ export const ENROLL_NON_DISTINGUISHING_BANNER =
  *
  *  Selected by the `phraseRecovery` capability rather than by a platform name,
  *  so a future client with the same shape inherits the right one. Changing
- *  either literal is a `docs/decisions.md` event, never a copy edit — and
+ *  either literal is a `myne-agents/docs/decisions.md` event, never a copy edit — and
  *  changing one without the other is how the two drift into disagreeing about
  *  what failed. */
 export const ENROLL_NON_DISTINGUISHING_BANNER_NO_PHRASE =
@@ -170,7 +170,7 @@ export const MEMBER_VAULT_REMOVAL_DISCLOSURE =
 //
 // The published text this used to defer to (https://myne.md/terms) is no longer
 // linked from the dialog and no longer governs anything: it is the beta terms of
-// a service Myne closed (`docs/decisions/sync/0696`), so the clauses can no
+// a service Myne closed (`myne-agents/docs/decisions/sync/0696`), so the clauses can no
 // longer be a summary of it. They stand on their own.
 //
 // Load-bearing for the same reason the consent copy above is: each clause is a
@@ -190,7 +190,7 @@ export const MEMBER_VAULT_REMOVAL_DISCLOSURE =
  *  `core/src/plugins/sync/legal_consent.rs`.
  *
  *  **v2, 2026-10-16:** three clauses were reworded when Myne stopped offering a
- *  sync service (`docs/decisions/sync/0696`). The old text described Myne as the
+ *  sync service (`myne-agents/docs/decisions/sync/0696`). The old text described Myne as the
  *  provider ("Myne's sync is a free beta", the end-of-beta guarantee, the
  *  moderation reality); the new text describes what sync is on whatever server
  *  the reader names, which is the only thing left for the dialog to be about.
@@ -218,7 +218,7 @@ export const BETA_TERMS_WHAT_HAPPENS_NEXT =
  *  was the moderation reality of Myne's own service, and it is now about
  *  whoever runs the server the reader named. Same bound as the old one: it
  *  claims only the metadata the protocol exposes and the policy-level actions
- *  an operator can take (`docs/threat-model.md` §7, `self-host-policy.md` §7). */
+ *  an operator can take (`myne-agents/docs/threat-model.md` §7, `self-host-policy.md` §7). */
 export const BETA_TERMS_WHAT_WE_CAN_SEE =
   "Whoever runs that server can refuse to serve you, keep a copy of something you deleted until their own retention window passes, and see that an account synced, when, and roughly how much. None of that lets them read a note, because to them a note is ciphertext.";
 
@@ -267,7 +267,7 @@ export function providerLabelOf(wire: string | null | undefined): string | undef
  * Moved here from `src/lib/load-bearing-copy.ts` so the mobile consent screen
  * shows the same sentences as the desktop one, by construction rather than by
  * discipline. Deliberately outside i18n: the exact wording is what
- * `docs/threat-model.md` bounds.
+ * `myne-agents/docs/threat-model.md` bounds.
  */
 
 /** WHAT leaves. Names the content, not a euphemism for it.
@@ -508,7 +508,7 @@ export const AI_TRANSCRIPT_HONESTY_NOTE =
  * The eighteen literals below were DECLARED in both
  * `src/lib/load-bearing-copy.ts` and `mobile/src/lib/load-bearing-copy.ts`,
  * byte-identical by hand, while this package's header claimed the class was
- * "byte-identical across clients by construction" and `docs/dev/twin-inventory.md`
+ * "byte-identical across clients by construction" and `myne-agents/docs/dev/twin-inventory.md`
  * recorded the pair as "RESOLVED … both sides now re-export the shared family".
  * Measured: 23 exported consts on desktop, 19 on mobile, 18 in both, and none of
  * the 18 appeared here. The claim was true of the sync/enroll family and false of
@@ -516,7 +516,7 @@ export const AI_TRANSCRIPT_HONESTY_NOTE =
  *
  * It was latent rather than broken: the two copies were byte-identical on the day
  * it was found, so nothing was misrendering. What was missing is the MECHANISM —
- * a `docs/decisions.md` event had to be a copy edit in two files, and the only
+ * a `myne-agents/docs/decisions.md` event had to be a copy edit in two files, and the only
  * guard over the pair (`check-twin-drift-ratchet.mjs`) fires on a pair that
  * STARTS differing, not on one that was already recorded as differing for an
  * unrelated reason. `scripts/check-copy-membership.mjs` is the missing mechanism
@@ -537,7 +537,7 @@ export const RECOVERY_NON_DISTINGUISHING_BANNER =
   "Phrase or vault file is invalid. Please try again.";
 
 // The normative "honest about cost" sentence (PRODUCT.md principle 3 /
-// docs/design/README.md "Lost both secrets") — the irreversible
+// myne-agents/docs/design/README.md "Lost both secrets") — the irreversible
 // consequence of losing both credentials, stated plainly. Rendered
 // verbatim by PasswordStep's helper copy AND embedded in the first-run
 // safety briefing's recovery-phrase "Why?" (MYND-114); the briefing

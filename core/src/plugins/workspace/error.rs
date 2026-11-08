@@ -8,7 +8,7 @@
 //!
 //! `workspace_read` returns `Ok(None)` (→ default single empty pane) on
 //! absent / AEAD-fail / unsupported-format / parse-fail per
-//! `docs/spec/protocol.md` § 9.7.4 — those do NOT surface as errors. Only
+//! `myne-agents/docs/spec/protocol.md` § 9.7.4 — those do NOT surface as errors. Only
 //! a Slot precondition violation or an unrecoverable `vault.meta` IO/parse
 //! failure becomes a read error. `workspace_write` surfaces real failures
 //! so the frontend knows the descriptor did not commit.

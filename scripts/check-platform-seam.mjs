@@ -84,7 +84,7 @@ const GUARDED = [
       join("src", "platform"),
       `the web client compiles the same tree with a web implementation` +
         `\nbehind that boundary, so a direct import breaks it rather than degrading` +
-        `\nit (docs/decisions.md, phase3-web-client).`,
+        `\nit (myne-agents/docs/decisions.md, phase3-web-client).`,
     ),
   },
   { root: "editor", seam: null, advice: SHARED_PACKAGE_ADVICE("editor") },

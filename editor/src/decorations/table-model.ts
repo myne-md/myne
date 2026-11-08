@@ -10,7 +10,7 @@
 // `| --- |`). It never re-pads to content width, so a one-cell edit produces the
 // smallest predictable rewrite. Decision: grill 2026-06-13 (Q2/B) — supersedes
 // MYND-139's "surgical, no-reformat / byte-stable round-trip" for the editable
-// case (see docs/decisions.md).
+// case (see myne-agents/docs/decisions.md).
 
 /** Per-column horizontal alignment; `null` = default (renders left). */
 export type ColumnAlign = "left" | "center" | "right" | null;

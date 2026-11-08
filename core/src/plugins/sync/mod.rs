@@ -12,7 +12,7 @@
 //!   `sync_set_endpoint`.
 //! - [`transport`] — blind-relay [`transport::SyncTransport`] seam (SYNC-3). Real impl is
 //!   [`rustls_transport`]: rustls verifying the certificate chain and server name against bundled
-//!   public roots, plus the keying-material exporter (R3-gated; see `docs/dependency-policy.md`).
+//!   public roots, plus the keying-material exporter (R3-gated; see `myne-agents/docs/dependency-policy.md`).
 //!   Engine builds against the trait; [`transport::FakeTransport`] backs unit tests.
 //!
 //! ## Capability ACL (deny-by-default, SYNC-15)

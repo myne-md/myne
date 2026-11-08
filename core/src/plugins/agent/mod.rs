@@ -42,9 +42,9 @@
 //! would require rewriting every note that links to the renamed one, and those
 //! notes are not in scope, so rename and the scope model are mutually exclusive.
 //!
-//! Spec: `docs/threat-model.md` §7 (the prompt-injection bullet this feature
-//! amends, and the restated SYNC-17), `docs/decisions/ai/0461` (the provider
-//! posture this inherits unchanged) and `docs/decisions/ai/0462` (the request
+//! Spec: `myne-agents/docs/threat-model.md` §7 (the prompt-injection bullet this feature
+//! amends, and the restated SYNC-17), `myne-agents/docs/decisions/ai/0461` (the provider
+//! posture this inherits unchanged) and `myne-agents/docs/decisions/ai/0462` (the request
 //! class and the described-backend registry).
 //!
 //! See: `src-tauri/AGENTS.md` "Secret-handling logging discipline".

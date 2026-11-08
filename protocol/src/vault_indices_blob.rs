@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.indices` 34-byte-header encrypted structured-metadata codec —
-//! see `docs/spec/protocol.md` § 9.8 (MYND-271; design MYND-31).
+//! see `myne-agents/docs/spec/protocol.md` § 9.8 (MYND-271; design MYND-31).
 //!
 //! `vault.indices` is a vault-level singleton artifact holding the
 //! **structured-metadata index**: the wikilink forward/reverse (backlink)

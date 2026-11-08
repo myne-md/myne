@@ -142,7 +142,7 @@ pub async fn sleep(duration: std::time::Duration) {
 // `Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)`. That needs
 // `SharedArrayBuffer`, which needs cross-origin isolation — already a hard
 // requirement of the web client (`web/csp.ts` sets COOP `same-origin` + COEP;
-// `docs/self-host-web.md` lists dropping either as a misconfiguration), so this
+// `myne-agents/docs/self-host-web.md` lists dropping either as a misconfiguration), so this
 // adds no new deployment constraint.
 //
 /// Block the current thread for `duration`.

@@ -3,7 +3,7 @@
 //
 // Fails the build on any transitive npm license outside the allowlist below,
 // which MIRRORS deny.toml's `[licenses].allow` set (the Rust gate;
-// docs/dependency-policy.md) plus a few npm-ecosystem-permissive additions and
+// myne-agents/docs/dependency-policy.md) plus a few npm-ecosystem-permissive additions and
 // per-package exceptions, each documented inline. Closes the standing gap that
 // cargo-deny machine-checks CARGO licenses only — the npm half of the tree was
 // entirely ungated. Runs in CI (.woodpecker/main.yml `npm-licenses`) after install.

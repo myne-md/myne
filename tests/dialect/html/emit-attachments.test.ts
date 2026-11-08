@@ -223,7 +223,7 @@ describe("an image carrying layout segments stays an image", () => {
     expect(excludedAttachments).toEqual([]);
   });
 
-  // myne-md/myne#518. `docs/spec/wikilink.md` §5.1 is normative: "An authored
+  // myne-md/myne#518. `myne-agents/docs/spec/wikilink.md` §5.1 is normative: "An authored
   // alt replaces the filename on the rendered media and on the embed's
   // accessible name. An authored EMPTY alt marks the media decorative." HTML is
   // the one output format where both are native and free, and it emitted the

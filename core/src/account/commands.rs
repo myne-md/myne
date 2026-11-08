@@ -15,7 +15,7 @@
 //! they are gone. A device therefore has at most one account on every path, and
 //! the record is what the disk-scan rebuilds, and nothing here needs to write it.
 //!
-//! There is no rename: an account has no name (`docs/decisions/ui/0728`), and the
+//! There is no rename: an account has no name (`myne-agents/docs/decisions/ui/0728`), and the
 //! heading a client draws for a group comes from that group's own vault names.
 //! The account number a user shows on this surface is the person identity's,
 //! derived from the phrase, not a property of this record.
@@ -234,7 +234,7 @@ mod tests {
     }
 
     /// The grouping is the only secret this file holds, so that is what the
-    /// sealing claim is asserted on. Until `docs/decisions/ui/0728` the record
+    /// sealing claim is asserted on. Until `myne-agents/docs/decisions/ui/0728` the record
     /// also carried an account label and this test named it; a check whose
     /// subject has been deleted passes forever, so the assertion moved to the
     /// values a write still produces: the account id and the member vault ids.

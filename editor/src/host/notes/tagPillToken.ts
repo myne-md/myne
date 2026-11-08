@@ -1,7 +1,7 @@
 // Shared tag-pill visual token (tag-system TS-5). The ONE source of the tag
 // chip's look, so the tag-browser surface (#2, React inline styles) and the
 // editor inline-`#tag` decoration (#3, CodeMirror theme) render a tag
-// identically. Values are design tokens (`docs/design/colors_and_type.css`),
+// identically. Values are design tokens (`myne-agents/docs/design/colors_and_type.css`),
 // never raw hex. Two variants: quiet (default, in the tree/prose) and selected
 // (accent, when the tag is an active filter / hovered click target).
 

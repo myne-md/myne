@@ -162,7 +162,7 @@ function appendDroppedSegmentMarker(
   const mark = document.createElement("span");
   mark.className = "cm-attachment-embed-warning";
   mark.setAttribute("data-testid", `${testidPrefix}.unreadable`);
-  // A Lucide glyph, not a unicode character: `docs/design/README.md`
+  // A Lucide glyph, not a unicode character: `myne-agents/docs/design/README.md`
   // Iconography forbids unicode symbols as icons, and Status already uses
   // `circle-alert` (the toast one directory over draws the same one).
   mark.appendChild(makeAttachmentIcon("circle-alert"));

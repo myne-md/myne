@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Per-note `.myn` blob encoder/decoder (`MY01` magic) per
-//! `docs/spec/protocol.md` § 6 (per-note encryption flow) and § 9.2
+//! `myne-agents/docs/spec/protocol.md` § 6 (per-note encryption flow) and § 9.2
 //! (per-note blob binary format).
 //!
 //! The third level of Myne's note-key wrapping (`spec/protocol.md`

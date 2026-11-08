@@ -21,7 +21,7 @@
 //     is what makes check 2 gate-able at all.
 //   - a locale whose catalog carries a key English no longer has must not be
 //     placeholder-checked against nothing. Fourteen of the shipped catalogs
-//     carry 26 to 29 such orphans (`docs/decisions/storage/0411`), so treating
+//     carry 26 to 29 such orphans (`myne-agents/docs/decisions/storage/0411`), so treating
 //     `undefined` as an empty placeholder set would fail the guard on every
 //     run against the real tree.
 //   - EVERY group in a locale losing the SAME category must still fail. That is

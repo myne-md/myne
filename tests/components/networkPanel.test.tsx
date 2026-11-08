@@ -6,7 +6,7 @@
 // Three things are worth a test here, and none of them is "does the switch
 // flip".
 //
-// 1. **The copy's BOUNDS.** `docs/threat-model.md` is normative and Tor mode is
+// 1. **The copy's BOUNDS.** `myne-agents/docs/threat-model.md` is normative and Tor mode is
 //    an opt-in client-side reduction of the AS14/A2 source-IP exposure and
 //    nothing more. Copy that called it anonymity would exceed the model on the
 //    one screen a user reads before trusting it, so the forbidden vocabulary is

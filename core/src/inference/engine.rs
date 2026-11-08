@@ -2268,7 +2268,7 @@ mod agent_script_tests {
     /// the stub having asked `list_scope`, which a pre-answered scope means it
     /// never does), every test in this module still passed, and `ag5` was the
     /// only thing that noticed — after a container build and nine specs. The
-    /// expansion is the injection-reachable path `docs/decisions/ai/0518` puts a
+    /// expansion is the injection-reachable path `myne-agents/docs/decisions/ai/0518` puts a
     /// user gate in front of, so "unreachable" is the one way it must not fail.
     #[test]
     fn a_task_naming_other_folders_requests_scope_before_proposing() {

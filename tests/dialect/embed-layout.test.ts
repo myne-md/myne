@@ -421,7 +421,7 @@ describe("embedAccessibleName", () => {
   });
 
   it("reports an authored EMPTY alt as decorative, and names nothing", () => {
-    // `docs/spec/wikilink.md` §5.1's second clause. The name is `""` rather
+    // `myne-agents/docs/spec/wikilink.md` §5.1's second clause. The name is `""` rather
     // than the filename precisely so a caller that cannot hide the media from
     // the accessibility tree still does not read the filename out loud.
     expect(embedAccessibleName(layout(""), "cat.png")).toEqual({

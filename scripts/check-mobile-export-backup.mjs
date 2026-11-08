@@ -993,8 +993,8 @@ if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import
     console.error(
       "\n  Why this is a gate: a saved recovery phrase alone reconstructs the vault, so a copy\n" +
         "  of it in iCloud or Google Drive is a complete break of the zero-knowledge posture,\n" +
-        "  reached without any adversary doing anything. See docs/decisions/security/0506-* and\n" +
-        "  docs/decisions/security/0595-*.",
+        "  reached without any adversary doing anything. See myne-agents/docs/decisions/security/0506-* and\n" +
+        "  myne-agents/docs/decisions/security/0595-*.",
     );
     process.exit(1);
   }

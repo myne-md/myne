@@ -10,7 +10,7 @@
 //! check is what carries security patches, so the safe direction is on. This is
 //! the opposite of a privacy-preserving default only in appearance; what leaves
 //! the device is a version and a platform to a no-log origin, recorded in
-//! `docs/threat-model.md`, and the user turns it off here if that is their
+//! `myne-agents/docs/threat-model.md`, and the user turns it off here if that is their
 //! choice.
 
 use serde::{Deserialize, Serialize};

@@ -780,7 +780,7 @@ pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
 /// the time this runs, those bytes are already in the page. That residual is the
 /// browser's and closing it needs the async-transport refactor this trait
 /// deliberately does not have, so it is recorded in
-/// `docs/dev/audit-nv-verdicts.md` rather than papered over here.
+/// `myne-agents/docs/dev/audit-nv-verdicts.md` rather than papered over here.
 pub(crate) struct CappedTransport {
     inner: Box<dyn SyncTransport>,
     max: u64,

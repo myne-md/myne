@@ -12,8 +12,8 @@
 // icon rather than displacing something with links. It now runs while it has
 // energy, cools by alpha decay, and stops on its own once it has settled, and an
 // interaction re-heats it. That is the "bounded heat" posture recorded in
-// `docs/decisions/ui/0600`; the idle stop is the half that keeps it affordable,
-// and `docs/decisions/sync/0601` records why nothing about the result crosses a
+// `myne-agents/docs/decisions/ui/0600`; the idle stop is the half that keeps it affordable,
+// and `myne-agents/docs/decisions/sync/0601` records why nothing about the result crosses a
 // device boundary, which is what makes the loss of cross-engine bit-identity
 // acceptable.
 //
@@ -107,7 +107,7 @@ export interface LayoutRequest {
   nodes: ReadonlyArray<{ id: string; radius?: number }>;
   /** Directed edges among `nodes`. The model's `weight` is deliberately NOT an
    *  input: it is a render-time signal (how many occurrences collapsed into the
-   *  pair), and `docs/decisions/sync/0601` records the decision to leave it out
+   *  pair), and `myne-agents/docs/decisions/sync/0601` records the decision to leave it out
    *  of both the physics and the edge thickness. */
   edges: ReadonlyArray<{ source: string; target: string }>;
   /** Previous positions (warm start): a node present here keeps its place;

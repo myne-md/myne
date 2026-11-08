@@ -6,7 +6,7 @@
 // collision, not the primary key, and the note's actual `folder:` frontmatter
 // wins over a stale link segment. This collapses the earlier dual mode
 // (title-only via index vs. path-form via exact path) into one model. See
-// `docs/spec/wikilink.md` §5.3 + decisions.md 2026-05-29 (C2 refine).
+// `myne-agents/docs/spec/wikilink.md` §5.3 + decisions.md 2026-05-29 (C2 refine).
 
 import {
   filenameToTitle,

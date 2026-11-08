@@ -64,7 +64,7 @@ describe("CenteredCard inside App's shortened column", () => {
     // A `mask-image` clips the whole rendered box. On the card that means the
     // `--bg-2` fill, the `--line-1` hairline and the `--radius-2` corners fade
     // to transparent the moment anything overflows, which is the chrome
-    // `docs/design/README.md` defines a card by. The fade belongs on the
+    // `myne-agents/docs/design/README.md` defines a card by. The fade belongs on the
     // content, one level in.
     const { card, scroller } = levels();
     expect(card.className).not.toContain("myne-scroll-fade");

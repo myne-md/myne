@@ -43,7 +43,7 @@
 //! # Sources
 //!
 //! Nothing here is invented. Each `Unsupported` entry cites either
-//! `docs/decisions.md` 2026-07-26 "Web capability set", the `Absent on web` list
+//! `myne-agents/docs/decisions.md` 2026-07-26 "Web capability set", the `Absent on web` list
 //! in task 27, a `cannot-exist-in-browser` verdict from
 //! `core-wasm-assessment.md`, or a decision another roster in this repo has
 //! already taken and recorded (myne#411's `vault-label` cites
@@ -609,10 +609,10 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // bug-report surface. `Unsupported` rather than `Pending`, the same call
     // `plain-file` makes one line up: the bound issue's own scope sentence
     // keeps only "copying the same block to the clipboard", and
-    // `docs/decisions/ops/0690` records the same boundary, and no port could
+    // `myne-agents/docs/decisions/ops/0690` records the same boundary, and no port could
     // make the logging half meaningful,
     // because the web build installs NO subscriber and compiles every event
-    // below `warn` out of the bundle (`docs/decisions/ops/0366`). There is no
+    // below `warn` out of the bundle (`myne-agents/docs/decisions/ops/0366`). There is no
     // log for it to write, no folder to reveal and no platform log directory
     // to resolve. All of its commands share this class.
     ("diagnostics", Class::Unsupported),
@@ -839,7 +839,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
     // host: the conflict it repaired is now repaired by the sync cycle's own
     // boundary, which is core behaviour rather than a command a page could reach.
     // **The device-admission ceremony's five commands are GONE from this table,
-    // not reclassified** (myne-md/myne#956, `docs/decisions/protocol/0764`). The
+    // not reclassified** (myne-md/myne#956, `myne-agents/docs/decisions/protocol/0764`). The
     // surface was withdrawn on both clients, so the shared tree names none of
     // `sync_device_admission_{start,confirm,preview,accept,cancel}` any more, and a
     // classification whose command nothing mentions is a decision with no subject
@@ -915,7 +915,7 @@ const PER_COMMAND: &[(&str, Class)] = &[
         Class::Unsupported,
     ),
     // Task 27 "Absent on web: screen-capture protection". `set_content_protected`
-    // is a Tauri window API (`docs/dependency-policy.md` load-bearing API
+    // is a Tauri window API (`myne-agents/docs/dependency-policy.md` load-bearing API
     // watchlist) with no browser counterpart — a page cannot ask the compositor
     // to exclude it from a capture.
     //

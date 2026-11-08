@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.chats` 34-byte-header encrypted AI conversations catalog codec
-//! (myne-md/myne#675; `docs/spec/protocol.md` § 9.23).
+//! (myne-md/myne#675; `myne-agents/docs/spec/protocol.md` § 9.23).
 //!
 //! The catalog singleton holds the conversation roster (one entry per
 //! persisted conversation: id, title, created/updated timestamps, causal

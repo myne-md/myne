@@ -3,7 +3,7 @@
 // The gate itself (myne-md/myne#728, task 17).
 //
 // `PRODUCT.md` has committed Myne to WCAG 2.2 AA since before this pass;
-// `docs/decisions/ui/0263` gated 2.1. The tag set is the whole of that
+// `myne-agents/docs/decisions/ui/0263` gated 2.1. The tag set is the whole of that
 // difference, and it is one line, which is exactly why it needs a test: a
 // merge that drops `wcag22aa` reverts the bar with nothing else changing and
 // every other accessibility test in this tree still green.

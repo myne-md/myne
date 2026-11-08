@@ -5,8 +5,8 @@
 // It belongs to both and to neither, which is why it is a crate-level module
 // rather than a `pub` in `plugins::local_inference::audio`. `parse_wav` refuses
 // anything outside this window, and `CpalSource::start` refuses to record
-// outside it, so the invariant `docs/threat-model.md` and
-// `docs/decisions/ai/0542` state as a construction -- no clip a Myne client
+// outside it, so the invariant `myne-agents/docs/threat-model.md` and
+// `myne-agents/docs/decisions/ai/0542` state as a construction -- no clip a Myne client
 // records is refused by a Myne decoder -- is held by two sites reading ONE pair
 // of constants rather than by two copies that agree today.
 //
@@ -33,7 +33,7 @@
 // The refusal stays, for three reasons in order of weight.
 //
 // It is the only thing that makes the invariant a construction. `0542` and
-// `docs/threat-model.md` § 7 both state "no clip a Myne client records is
+// `myne-agents/docs/threat-model.md` § 7 both state "no clip a Myne client records is
 // refused by a Myne decoder" as something the code holds rather than something
 // the format guarantees. The LENGTH clamp in `capture.rs` holds one half of it;
 // this refusal holds the other. Record outside the window and the sentence is

@@ -71,7 +71,7 @@ fi
 # not close it (it swaps the legacy hash suffix for the same StableCrateId as a
 # disambiguator), and no stable-toolchain flag removes the `rustc -vV` input.
 # The published hash is therefore defined against a reference build environment
-# rather than against every host: `docs/web-bundle-hashes.md`.
+# rather than against every host: `myne-agents/docs/web-bundle-hashes.md`.
 if [ "${1:-}" = "--verify" ]; then
   echo "== reproducibility check: two cold builds, separate target dirs =="
 

@@ -1,4 +1,4 @@
-// Spec: docs/spec/markdown-dialect.md §3.6 (line-1-anchored detection,
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6 (line-1-anchored detection,
 // YAML 1.2 body) and §3.6.1 (Myne-managed canonical fields).
 
 import { load as parseYaml, YAMLException } from "js-yaml";

@@ -2,7 +2,7 @@
 // check-ignored-tests.mjs — an `#[ignore]` that carries a reason is a DEFERRED
 // CLAIM, and a deferred claim owes a tracking issue and a roster entry.
 //
-// WHY THIS EXISTS. `docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`
+// WHY THIS EXISTS. `myne-agents/docs/decisions/security/0614-unfixed-security-findings-ship-as-ignored-invariant-tests.md`
 // records the convention: when a verification pass establishes a security defect whose fix is
 // not available in the same change, the test asserts the INVARIANT and carries
 // `#[ignore = "unfixed: … see <issue>"]`. `cargo test` stays green, and

@@ -11,7 +11,7 @@
 # variables, so one nightly pipeline runs both suites IN SEQUENCE (`e2e-ai`
 # depends on `e2e`) rather than racing them for the same cores.
 #
-# myne-md/myne#579. Decision: `docs/decisions/ops/0529`, "Both E2E lanes leave
+# myne-md/myne#579. Decision: `myne-agents/docs/decisions/ops/0529`, "Both E2E lanes leave
 # the per-push pipeline for a manual, pre-release workflow", which supersedes
 # the merge-gate clause of `ops/0181` while leaving every other policy that
 # entry ratified (Linux-only tauri-driver, zero test hooks, weak-KDF fixtures,
@@ -25,7 +25,7 @@
 #   RUN_E2E = true
 #
 # The release runbook (`myne-ops/runbooks/release-checklist.md`, phase 0) is
-# where that trigger is owed, and `docs/dev/e2e.md` carries the procedure.
+# where that trigger is owed, and `myne-agents/docs/dev/e2e.md` carries the procedure.
 #
 # ─── Why the RUN_E2E variable, and not a bare `event: manual` ────────────────
 # On this repo the manual event already means something else: `main.yml` is a
@@ -34,7 +34,7 @@
 # `WOODPECKER_MAX_WORKFLOWS=2` it would park a long suite in front of a pipeline
 # nobody asked to wait for. (The `app.myne.md` deploy this comment used to name
 # here left CI with `web-docker-build` in myne-md/myne#584: publishing is by hand
-# now, `docs/decisions/ops/0680`.) An unset RUN_E2E evaluates to the empty string, so
+# now, `myne-agents/docs/decisions/ops/0680`.) An unset RUN_E2E evaluates to the empty string, so
 # the default is "do not run" and `main.yml` carries the matching negation.
 #
 # ─── Why this workflow builds its own binaries ───────────────────────────────
@@ -215,7 +215,7 @@ steps:
   # cost is recorded as debt on myne-md/myne#579: roughly the web suite's own
   # run time again, on the critical path.
   #
-  # CHROMIUM ONLY, and the matrix in `docs/dev/e2e.md` also lists Firefox. That
+  # CHROMIUM ONLY, and the matrix in `myne-agents/docs/dev/e2e.md` also lists Firefox. That
   # seat needs geckodriver, which Debian does not package, so it would be a
   # downloaded release archive, and the rule this repo follows for those is a
   # pinned version WITH its sha256. Browser and driver are installed as a PAIR
@@ -338,7 +338,7 @@ steps:
   # ─── Desktop E2E suite (real binary via tauri-driver) ────────
   # Drives the production binary `e2e-compile` just built in a real WebKitGTK
   # window under xvfb. Scenario authoring rules: `e2e/CLAUDE.md`; procedure:
-  # `docs/dev/e2e.md`. The whole container body is
+  # `myne-agents/docs/dev/e2e.md`. The whole container body is
   # `scripts/ci-e2e-lane.sh`. Read its header for why it is a script and not
   # inline YAML, and for the shard and cache decisions it carries.
   #

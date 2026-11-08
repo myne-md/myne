@@ -519,21 +519,21 @@ describe("check-prefs-parity, the tree as it stands", () => {
 
   it("FAILS when the generated projection is missing or stale", () => {
     // The `--check` staleness arm, and the ONE arm of this guard that had no
-    // rejection case while every other arm did. `docs/dev/settings-parity.md` is
+    // rejection case while every other arm did. `myne-agents/docs/dev/settings-parity.md` is
     // GENERATED, so a hand edit to it is a docs-only commit, and CI runs this
     // step UNFILTERED for exactly that reason: the arm has to be shown to fire,
     // not assumed to.
     withTempProjection(null, (path) => {
       const missing = run(["--check"], undefined, path);
       expect(missing.code).toBe(1);
-      expect(missing.out).toContain("docs/dev/settings-parity.md");
+      expect(missing.out).toContain("myne-agents/docs/dev/settings-parity.md");
       expect(missing.out).toContain("does not exist");
     });
 
     withTempProjection("hand edited\n", (path) => {
       const stale = run(["--check"], undefined, path);
       expect(stale.code).toBe(1);
-      expect(stale.out).toContain("docs/dev/settings-parity.md");
+      expect(stale.out).toContain("myne-agents/docs/dev/settings-parity.md");
       expect(stale.out).toContain("stale");
     });
 
@@ -613,7 +613,7 @@ function withTempRecord(contents: string | null, body: (path: string) => void): 
 /**
  * Run `body` with the guard pointed at a scratch PROJECTION file.
  *
- * The staleness arm's whole subject is the committed `docs/dev/settings-parity.md`,
+ * The staleness arm's whole subject is the committed `myne-agents/docs/dev/settings-parity.md`,
  * so exercising it against the real file means doctoring it and restoring it,
  * which leaves the tree wrong when the run is interrupted. The override exists
  * for the same reason `MYNE_PREFS_PARITY_RECORD` does; `null` means "no file at

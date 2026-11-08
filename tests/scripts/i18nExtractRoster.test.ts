@@ -6,7 +6,7 @@
 // the config listed six, so `client-core/src`, `ornaments/src` and `stories/src`
 // were never scanned. The cost is silent in both directions and neither is an
 // error: a `t()` key added to an unscanned tree is invisible to the documented
-// add-a-string procedure (`docs/dev/i18n.md`), and a stale path in a glob matches
+// add-a-string procedure (`myne-agents/docs/dev/i18n.md`), and a stale path in a glob matches
 // nothing rather than failing.
 //
 // The config now imports the roster, which is the construction. This test is

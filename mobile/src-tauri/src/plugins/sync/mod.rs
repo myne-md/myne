@@ -38,7 +38,7 @@
 //! debt — no "-PLUS" / "verified cert-trust" claim may be made until R3 lands.
 //!
 //! What the endpoint UX may and may not say is decided by
-//! `docs/decisions/sync/0620`: the client verifies against bundled Mozilla
+//! `myne-agents/docs/decisions/sync/0620`: the client verifies against bundled Mozilla
 //! public roots, so the honest phrasing is "the certificate chain and server
 //! name were checked" and NOT "verified" (the R3 clause above), and there is no
 //! pin to describe at all. The copy lives in `locales/en/common.json` under
