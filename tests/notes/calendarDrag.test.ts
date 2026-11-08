@@ -21,7 +21,7 @@
 // every later drag in that session then fails for a reason nothing displayed. This
 // file has one test whose only job is that a refusal is not swallowed.
 
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   EventWriteRefused,
   applyEventMove,
@@ -101,13 +101,13 @@ describe("planDrag", () => {
 
 describe("planResize", () => {
   it("changes only the end", () => {
-    const next = planResize(span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" }), 1);
+    const next = planResize(span({ start: "2026-11-05 09:00", end: "2026-11-05 10:00" }), 1)!;
     expect(next.start).toBe("2026-11-05 09:00");
     expect(next.end).toBe("2026-11-06 10:00");
   });
 
   it("gives a point event an end rather than refusing the gesture", () => {
-    const next = planResize(span({ start: "2026-11-05 09:00" }), 1);
+    const next = planResize(span({ start: "2026-11-05 09:00" }), 1)!;
     expect(next.end).toBe("2026-11-06 09:00");
   });
 

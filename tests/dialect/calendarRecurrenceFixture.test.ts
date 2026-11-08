@@ -13,9 +13,7 @@
 // fixture produced by the code it checks agrees with that code by construction,
 // which is the vacuous-test shape `AGENTS.md` names.
 
-import * as fs from "node:fs";
-import * as path from "node:path";
-import { fileURLToPath } from "node:url";
+import recurrenceFixture from "../../core/tests/fixtures/calendar/recurrence_projection.json";
 import { describe, expect, it } from "vitest";
 import {
   compareCivilDates,
@@ -32,11 +30,6 @@ type Case = {
   until: string;
   occurrences: string[] | null;
 };
-
-const FIXTURE = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../../core/tests/fixtures/calendar/recurrence_projection.json",
-);
 
 /** The guard the Rust walk also carries, so neither side can spin on a bad rule. */
 const MAX_OCCURRENCES = 10_000;
@@ -58,7 +51,7 @@ function project(ruleText: string, start: string, until: string): string[] | nul
 }
 
 describe("the calendar recurrence fixture", () => {
-  const fixture = JSON.parse(fs.readFileSync(FIXTURE, "utf8")) as { cases: Case[] };
+  const fixture = recurrenceFixture as { cases: Case[] };
 
   it("has cases to run", () => {
     expect(fixture.cases.length).toBeGreaterThan(10);
