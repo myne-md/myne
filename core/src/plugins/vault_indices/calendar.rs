@@ -547,6 +547,15 @@ pub struct CalendarRow {
     /// it is on the row: see `ParsedEvent::uid`.
     #[serde(default)]
     pub uid: Option<String>,
+    /// The dates this series does not occur on, in canonical `YYYY-MM-DD`.
+    ///
+    /// On the row because the `.ics` export is the one consumer that cannot recompute
+    /// them: `EXDATE` is the file's own spelling of a cancellation, and without the
+    /// list an export asserts occurrences the user cancelled (`decisions/storage/0795`).
+    /// Empty for a one-off, and `default` so a pre-feature reader of this answer still
+    /// parses it.
+    #[serde(default)]
+    pub skip: Vec<String>,
 }
 
 /// The whole answer.
@@ -867,6 +876,14 @@ pub fn range(
                 remind: event.remind.clone(),
                 repeat_unrecognized: event.repeat_unrecognized,
                 uid: event.uid.clone(),
+                skip: event
+                    .skip
+                    .iter()
+                    .map(|day| {
+                        let (y, m, d) = civil_from_days(*day);
+                        format!("{y:04}-{m:02}-{d:02}")
+                    })
+                    .collect(),
             });
         }
     }

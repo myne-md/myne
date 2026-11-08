@@ -257,6 +257,14 @@ export interface CalendarRow {
    * ask "do I already hold this one" (myne-md/myne#1037).
    */
   readonly uid: string | null;
+  /**
+   * The dates this series does not occur on, in canonical `YYYY-MM-DD`.
+   *
+   * Optional because the host added it after the field shipped, and a row from an
+   * older host is still a row: an absent list means "no cancellations known", which is
+   * the same reading a one-off has.
+   */
+  readonly skip?: readonly string[];
 }
 
 /** Why a note that claims to be an event cannot be shown as one (§3.10.4). */

@@ -93,6 +93,9 @@ function rowsToIcsEvents(rows: readonly CalendarRow[]): IcsEvent[] {
     .filter((row) => row.occurrenceOf === null)
     .map((row) => ({
       uid: row.uid ?? row.noteId,
+      // `EXDATE`, so a backup of a calendar does not assert the weeks the user
+      // cancelled. A one-off has no rule and therefore no cancellations to write.
+      skip: row.occurrenceOf === null ? (row.skip ?? []) : [],
       title: row.title ?? "",
       start: row.start,
       end: row.end,

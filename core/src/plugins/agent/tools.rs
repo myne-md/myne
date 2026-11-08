@@ -499,6 +499,7 @@ mod tests {
             remind: None,
             repeat_unrecognized: false,
             uid: None,
+            skip: Vec::new(),
         }
     }
 

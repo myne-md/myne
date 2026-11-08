@@ -40,6 +40,15 @@ export type IcsEvent = {
   /** A relative lead: `30m`, `2h`, `1d`. */
   readonly remind: string | null;
   readonly calendar: string | null;
+  /**
+   * The dates this series does not occur on, as `YYYY-MM-DD`.
+   *
+   * `EXDATE` is the file's own spelling of a cancellation and Myne stores the same
+   * fact as `skip:` on the series note (`decisions/storage/0795`), so the exchange is
+   * a rename rather than a translation. Without it an export asserted occurrences the
+   * user had cancelled, which is the one thing a backup must not do.
+   */
+  readonly skip: readonly string[];
 };
 
 /**
@@ -432,6 +441,15 @@ export function importEvents(text: string, options: { readonly zone: string }): 
       trigger = prop.value;
       continue;
     }
+    if (prop.name === "EXDATE") {
+      // Repeatable, and a `Map` can only hold one. Collected on a second map that
+      // only this reader looks at, so the property map keeps its first-wins rule for
+      // every other field.
+      const seen = current.get("EXDATE");
+      const merged = seen === undefined ? prop.value : `${seen.value},${prop.value}`;
+      current.set("EXDATE", { name: "EXDATE", value: merged } as Property);
+      continue;
+    }
     if (!current.has(prop.name)) current.set(prop.name, prop);
   }
 
@@ -493,6 +511,19 @@ function buildEvent(
     repeat = rule.rule;
   }
 
+  // `EXDATE` may appear once per date, or once with a comma list, and both spellings
+  // are produced by real calendars. The prefix is stripped because these values are
+  // parsed from a line whose name was already consumed, and a date-only or
+  // date-time value both name the same day here.
+  const skip: string[] = [];
+  for (const piece of (properties.get("EXDATE")?.value ?? "").split(",")) {
+    // A date-only or a date-time value names the same DAY here, which is the
+    // granularity `skip:` stores. RFC 5545's DATE form is COMPACT (`20261110`), and a
+    // dashed value is accepted too because hand-written files carry them.
+    const date = icsDateToCanonical(piece.trim());
+    if (date !== null && !skip.includes(date)) skip.push(date);
+  }
+
   const lead = trigger === null ? null : leadFromTrigger(trigger);
   if (trigger !== null && lead === null) warnings.add("property-ignored");
 
@@ -507,10 +538,23 @@ function buildEvent(
       ? unescapeText(properties.get("DESCRIPTION")?.value ?? "")
       : null,
     remind: lead,
+    skip,
     calendar: properties.has("CATEGORIES")
       ? (unescapeText(properties.get("CATEGORIES")?.value ?? "").split(",")[0] ?? "").trim()
       : null,
   };
+}
+
+/**
+ * The `YYYY-MM-DD` a `DTSTART`/`EXDATE` value names, from either the compact RFC 5545
+ * form or a dashed one this codec's own writer used before it was corrected.
+ */
+function icsDateToCanonical(value: string): string | null {
+  const compact = /^(\d{4})(\d{2})(\d{2})(?:T|$)/.exec(value);
+  if (compact !== null) return `${compact[1]}-${compact[2]}-${compact[3]}`;
+  const dashed = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (dashed !== null) return `${dashed[1]}-${dashed[2]}-${dashed[3]}`;
+  return null;
 }
 
 /** `YYYY-MM-DD` minus one day, without a date library. */
@@ -629,6 +673,12 @@ export function exportEvents(events: readonly IcsEvent[]): string {
     if (event.repeat !== null) {
       const rule = ruleToIcs(event.repeat);
       if (rule !== null) lines.push(`RRULE:${rule}`);
+      // `EXDATE` belongs beside the rule it narrows, and only a series can carry one:
+      // a non-recurring event with a cancellation is a note that simply does not
+      // exist, so an empty or orphaned list is dropped rather than written.
+      if (rule !== null && (event.skip ?? []).length > 0) {
+        lines.push(`EXDATE:${[...(event.skip ?? [])].sort().map((date) => date.split("-").join("")).join(",")}`);
+      }
     }
     if (event.description !== null) lines.push(`DESCRIPTION:${escapeText(event.description)}`);
     if (event.calendar !== null) lines.push(`CATEGORIES:${escapeText(event.calendar)}`);
