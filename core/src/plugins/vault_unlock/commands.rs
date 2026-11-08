@@ -1224,20 +1224,6 @@ async fn unlock_with_credential(
     io: &dyn VaultIo,
     host: &dyn HostCtx,
 ) -> Result<(), VaultUnlockError> {
-    // Both arms already hold `Zeroizing`, so every early-return path
-    // (VaultAlreadyUnlocked, UnlockInProgress, IO failure, parse failure) drops
-    // the wrapper and zeroes the bytes.
-    //
-    // Which credential opened the vault decides whether the `NTV7` to `NTV8`
-    // upgrade may run at the tail (myne-md/myne#938 review): the phrase is the door
-    // of a user who has lost the password, so it must never be the unlock that
-    // removes it. Read here, before the derivation match consumes `credential`.
-    let upgrade_authority = if matches!(&credential, UnlockCredential::Password(_)) {
-        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordProven
-    } else {
-        crate::plugins::vault_migrate::ntv8::UpgradeAuthority::PasswordNotProven
-    };
-
     // Host clock, not `Instant::now()`: the latter PANICS on
     // `wasm32-unknown-unknown` (std falls to its `unsupported` time backend).
     // Monotonic rather than wall-clock because this measures an elapsed
@@ -1655,34 +1641,6 @@ async fn unlock_with_credential(
         duration_ms = (now_ms.saturating_sub(started_ms) / 10) * 10,
         "vault unlocked successfully"
     );
-
-    // myne-md/myne#938, `protocol.md` §10.4.3: an `NTV7` vault drops the person
-    // wrap of `root_key` on the unlock that opens it, silently and atomically.
-    //
-    // HERE rather than in the command wrapper, because this is the one tail every
-    // unlocking credential shares: the password path and the identity-phrase path
-    // both land on it, and so does every client (the wrapper is `tauri-ipc`-gated
-    // and the web client never calls it). A failure is swallowed by
-    // `upgrade_on_unlock`: the vault is open either way and the next unlock
-    // retries, so no unlock can fail because a rewrite could not land.
-    //
-    // The credential decides whether it runs at all. The person wrap is the only
-    // door for a user who opened this vault with their phrase because they no
-    // longer know the password, so truncating it on THAT unlock would destroy the
-    // credential they just used. `PasswordNotProven` leaves the frame alone and the
-    // next password unlock performs the upgrade.
-    //
-    // The identity session installed above is deliberately NOT touched: this
-    // rewrite removes a credential from the file, and the person session is what
-    // lets the user keep syncing without typing the phrase again.
-    crate::plugins::vault_migrate::ntv8::upgrade_on_unlock(
-        io,
-        vault_path,
-        state,
-        vault_id,
-        upgrade_authority,
-    )
-    .await;
 
     Ok(())
 }
@@ -3680,11 +3638,9 @@ mod tests {
     /// phrase broke" instead of "the phrase is no longer a vault credential on
     /// this generation".
     ///
-    /// This unlock also UPGRADES the vault (myne-md/myne#938, `protocol.md`
-    /// §10.4.3), so the assertion below is on the in-memory frame this test built
-    /// rather than on the file: the file is `NTV8` by the time this returns, which
-    /// is what [`the_first_unlock_drops_the_person_wrap_and_keeps_the_session`]
-    /// pins.
+    /// The unlock no longer upgrades the frame: the `NTV7` -> `NTV8` in-place
+    /// truncation went with the version-migration surface, so the file is
+    /// whatever this test built and nothing rewrites it underneath the assertion.
     #[test]
     fn the_identity_phrase_still_opens_an_ntv7_vault_and_keeps_its_person_wrap() {
         rt().block_on(async {
@@ -3717,12 +3673,10 @@ mod tests {
             assert_eq!(*derived.root_key, root_key);
 
             // And the frame on disk is STILL `NTV7`, because this unlock did not
-            // prove the password. The upgrade truncates the person wrap, which is the
-            // only door for a user who opened the vault with their phrase because
-            // they forgot their password: running it here would destroy the very
-            // credential that just worked, in the same act. The password path does
-            // perform it, and that is asserted in `vault_migrate::ntv8` and in
-            // `unlock_with_credential`'s own password case (myne-md/myne#938 review).
+            // prove the password. The in-place rewrite that used to run here was
+            // removed with the version-migration surface; what remains holding this
+            // is the rule that an act must never destroy the credential that just
+            // worked, and a phrase unlock proves no password.
             let after = std::fs::read(scratch.path()).expect("read the frame");
             assert_eq!(
                 &after[..4],
@@ -4158,77 +4112,6 @@ mod tests {
         });
     }
 
-    /// The first unlock of an `NTV7` vault drops the person wrap, moves the CAS
-    /// anchor to the bytes it wrote, and keeps everything the session needs
-    /// (myne-md/myne#938, `protocol.md` §10.4.3).
-    ///
-    /// Three separate things are asserted because three separate things can be
-    /// got wrong here, and each of them fails silently:
-    ///
-    /// 1. **The file.** A generation claim with nothing behind it would be the
-    ///    worst shape: the frame must be the `NTV7` one truncated, carrying the
-    ///    same group tail and no person wrap.
-    /// 2. **The anchor.** The unlock captured the hash of the bytes it READ, so a
-    ///    rewrite that does not move `vault_meta_bytes_hash` makes the next
-    ///    `change_password` fail `VaultMetaChangedExternally`, a user whose
-    ///    password change reports tampering because the app upgraded its own file.
-    /// 3. **The session.** The upgrade removes a credential from disk; it must not
-    ///    touch the group tier or the person session, or the user loses sync
-    ///    (the exact symptom myne-md/myne#938 was filed for) by upgrading.
-    #[test]
-    fn the_first_unlock_drops_the_person_wrap_and_keeps_the_session() {
-        rt().block_on(async {
-            let (meta_bytes, root_key, _pair) = seed_person_vault_ntv7("person-born-pw");
-            let scratch = scratch_vault();
-            scratch.write_meta(&meta_bytes);
-            let before = std::fs::read(scratch.path()).expect("read NTV7");
-
-            let state = VaultRuntimeState::default();
-            unlock_with_path(
-                "person-born-pw".to_string(),
-                None,
-                scratch.path(),
-                &state,
-                &crate::vault_io::StdVaultIo,
-                &crate::host::NoopHost,
-            )
-            .await
-            .expect("the password opens the NTV7 vault");
-
-            // 1. The file is the truncated frame, and it is a real frame.
-            let after = std::fs::read(scratch.path()).expect("read NTV8");
-            assert_eq!(&after[..4], b"NTV8", "the unlock must upgrade the frame");
-            assert_eq!(
-                after.len() + protocol::PERSON_WRAP_LEN,
-                before.len(),
-                "the person wrap is gone and nothing else moved"
-            );
-            assert_eq!(&after[6..], &before[6..after.len()]);
-            assert!(protocol::has_b2b_tail(&after));
-
-            // 2. The anchor follows the bytes on disk, not the bytes read.
-            let unlocked = state.take(test_vault_id()).await.unwrap_unlocked();
-            assert_eq!(
-                unlocked.vault_meta_bytes_hash,
-                crate::vault_meta_hash::vault_meta_sha256(after.as_slice()),
-                "the CAS anchor must move with the upgrade or change-password reports tampering"
-            );
-            // 3. The session is intact: same root key (nothing was re-derived),
-            //    and still group-tier (every shared singleton is sealed under it).
-            assert_eq!(
-                unlocked.owner_root_key().expect("root key").as_slice(),
-                root_key.as_slice()
-            );
-            assert!(
-                matches!(
-                    unlocked.shared_singleton_key(),
-                    crate::plugins::vault_unlock::state::SharedSingletonKey::Group(_)
-                ),
-                "the upgrade must not drop the group tier"
-            );
-        });
-    }
-
     /// `Slot::Unlocked.vault_meta_bytes_hash` must equal SHA-256 of the on-disk
     /// vault.meta bytes after a successful unlock — the CAS anchor for
     /// `vault_change_password`'s in-place rewrite. See `decisions.md`
@@ -4322,6 +4205,7 @@ mod tests {
                     ai_provider_model: None,
                     meeting_ai_prompt: None,
                     bar_items_order: Vec::new(),
+                    calendar_settings: Default::default(),
                     cli_enabled: false,
                     cli_excluded_folders: Vec::new(),
                     cli_rate_limit_disabled: None,
@@ -4505,6 +4389,7 @@ mod tests {
                 ai_provider_model: None,
                 meeting_ai_prompt: None,
                 bar_items_order: Vec::new(),
+                calendar_settings: Default::default(),
                 cli_enabled: false,
                 cli_excluded_folders: Vec::new(),
                 cli_rate_limit_disabled: None,

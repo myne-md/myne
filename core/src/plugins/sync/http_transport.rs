@@ -25,12 +25,12 @@
 //! a security rule, and both clients must be answering the same one. Only the
 //! transports it selects differ.
 
+use super::transport::{CappedTransport, SyncTransport, TransportError};
 #[cfg(not(target_arch = "wasm32"))]
 use super::transport::{
     HttpMethod, SseOpenError, SseStream, TransportResponse, TransportResponseExt,
     MAX_SYNC_RESPONSE_BYTES,
 };
-use super::transport::{SyncTransport, TransportError};
 #[cfg(not(target_arch = "wasm32"))]
 use crate::http::codec::{build_http_request_ext, keepalive_roundtrip, read_response_head};
 #[cfg(not(target_arch = "wasm32"))]
@@ -290,13 +290,11 @@ pub fn set_browser_transport(factory: BrowserTransportFactory) {
 /// working trust material.
 pub fn build_transport(endpoint_url: &str) -> Result<Box<dyn SyncTransport>, TransportError> {
     let (scheme, host, port) = parse_endpoint(endpoint_url).ok_or(TransportError::BadRequest)?;
-    match scheme.as_str() {
+    let transport: Box<dyn SyncTransport> = match scheme.as_str() {
         // wasm32 has no rustls arm (see `mod.rs`); the browser transport is
         // installed by the Worker host, not built here.
         #[cfg(not(target_arch = "wasm32"))]
-        "https" => Ok(Box::new(super::rustls_transport::RustlsTransport::new(
-            host, port,
-        ))),
+        "https" => Box::new(super::rustls_transport::RustlsTransport::new(host, port)),
         // The browser answers for `https` through the factory it installed. TLS,
         // certificate verification and the trust store are the browser's, which
         // is also why no pin crosses this boundary: a page cannot pin a
@@ -304,9 +302,9 @@ pub fn build_transport(endpoint_url: &str) -> Result<Box<dyn SyncTransport>, Tra
         // rather than deferred (A4 is ⚠️ Best-effort on web by decision, not by
         // omission).
         #[cfg(target_arch = "wasm32")]
-        "https" => browser_transport(BrowserScheme::Https, &host, port),
+        "https" => browser_transport(BrowserScheme::Https, &host, port)?,
         #[cfg(not(target_arch = "wasm32"))]
-        "http" if is_loopback(&host) => Ok(Box::new(HttpTransport::new(host, port))),
+        "http" if is_loopback(&host) => Box::new(HttpTransport::new(host, port)),
         // Same endpoints, different transport. The browser cannot open the raw
         // socket `HttpTransport` is, but it can fetch a loopback origin — so the
         // loopback-dev/harness case is served by the browser transport rather
@@ -315,9 +313,16 @@ pub fn build_transport(endpoint_url: &str) -> Result<Box<dyn SyncTransport>, Tra
         // untouched: `is_loopback` gates this arm exactly as it gates the native
         // one, and it is the guard, not the transport, that enforces it.
         #[cfg(target_arch = "wasm32")]
-        "http" if is_loopback(&host) => browser_transport(BrowserScheme::LoopbackHttp, &host, port),
-        _ => Err(TransportError::BadRequest), // non-loopback http = A4 downgrade
-    }
+        "http" if is_loopback(&host) => {
+            browser_transport(BrowserScheme::LoopbackHttp, &host, port)?
+        }
+        _ => return Err(TransportError::BadRequest), // non-loopback http = A4 downgrade
+    };
+    // The response ceiling is the SEAM's contract, applied once here rather than
+    // remembered by each implementation (myne-md/myne#758, NV12). The browser is
+    // why: it cannot bound its read, so without this it handed an unbounded body
+    // to callers that assume one.
+    Ok(Box::new(CappedTransport::new(transport)))
 }
 
 /// Resolve the installed browser factory, or report a startup failure.

@@ -2,7 +2,7 @@ import { useEffect, useReducer, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { strengthLevel } from "../../lib/password-strength";
 import { MIN_PASSWORD_LEN, passwordLength } from "@myne/client-core/password-policy";
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import {
   Screen,
   ScreenScroll,
@@ -30,6 +30,7 @@ import { ioBanner } from "../../lib/io-banner";
 import { readText } from "../../lib/clipboardTransport";
 import type { IoFailureKind, RecoverSubStep } from "../../lib/stage";
 import type { RecoverFlowProps } from "./types";
+import { FieldLabel } from "@myne/field-label";
 
 /**
  * Recover — wired counterpart of `src/screens/recover/index.tsx`
@@ -58,24 +59,6 @@ const inputReset: CSSProperties = {
  *  runs, drops empties, caps at 24 (paste-to-grid helper). */
 function splitWords(text: string): string[] {
   return text.trim().toLowerCase().split(/\s+/).filter(Boolean).slice(0, WORD_COUNT);
-}
-
-// Small uppercase field label (12px / 600 / 0.06em) — mirrors the static.
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
-      {children}
-    </div>
-  );
 }
 
 // Account-number field (RC-01) — mono input, accent border on focus,

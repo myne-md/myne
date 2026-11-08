@@ -19,6 +19,7 @@ import {
   BlockingOverlay,
 } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { FieldLabel } from "@myne/field-label";
 
 const PHRASE = [
   "ribbon", "kernel", "voyage", "marble", "harvest", "cobalt",
@@ -189,24 +190,6 @@ function SafetyBriefing() {
         <Button disabled>Continue</Button>
       </FooterBar>
     </Screen>
-  );
-}
-
-// Small uppercase field label.
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
-      {children}
-    </div>
   );
 }
 

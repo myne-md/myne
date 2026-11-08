@@ -744,7 +744,264 @@ mod default_binding_tests {
 /// bound, not an HTTP one: the shared codec takes its cap from the caller
 /// precisely so an AI response is never silently held to a number chosen for
 /// batch blob fetches (ai-ollama-local task 1).
+///
+/// [`CappedTransport`] applies it to every transport, which is what makes it a
+/// property of the seam rather than of the two implementations that happened to
+/// pass it into the codec.
 pub(crate) const MAX_SYNC_RESPONSE_BYTES: u64 = 64 * 1024 * 1024;
+
+/// Enforces [`MAX_SYNC_RESPONSE_BYTES`] on the response of ANY transport
+/// (myne-md/myne#758, audit lead NV12).
+///
+/// # Why a decorator, and not a line in each implementation
+///
+/// The native transports refuse an oversized body **while reading**: they pass
+/// the cap into `crate::http`'s codec, which stops at the ceiling instead of
+/// buffering past it. The browser cannot: a synchronous XHR has buffered the
+/// whole response by the time `send()` returns, so there is no read loop to
+/// interrupt. It therefore applied no ceiling at all, while every caller above
+/// the seam assumed one ([`super::orchestrator`] pairs its fetch window with
+/// this number).
+///
+/// A line in the browser transport would close today's hole and leave the class
+/// open, because the contract lives in the trait and the trait said nothing
+/// about a cap: the next implementation would be written against the same
+/// silence. The wrapper is applied at
+/// [`super::http_transport::build_transport`], the one place a transport is
+/// created, so the cap becomes the SEAM's. That also makes it testable on the
+/// host against a double, which a `wasm32`-only transport is not.
+///
+/// # What it promises, and what it cannot
+///
+/// It promises the CONTRACT: no sync caller ever sees a body over the cap, and
+/// an over-cap body is refused in the same shape the native read loop refuses
+/// one (`Network`, which is what `HttpReadError::TooLarge` maps to there).
+/// It cannot promise the MEMORY bound on a client that had to buffer first: by
+/// the time this runs, those bytes are already in the page. That residual is the
+/// browser's and closing it needs the async-transport refactor this trait
+/// deliberately does not have, so it is recorded in
+/// `docs/dev/audit-nv-verdicts.md` rather than papered over here.
+pub(crate) struct CappedTransport {
+    inner: Box<dyn SyncTransport>,
+    max: u64,
+}
+
+impl CappedTransport {
+    pub(crate) fn new(inner: Box<dyn SyncTransport>) -> Self {
+        Self {
+            inner,
+            max: MAX_SYNC_RESPONSE_BYTES,
+        }
+    }
+
+    /// Tests inject a small ceiling, so the boundary case is exercised without
+    /// allocating 64 MiB.
+    #[cfg(test)]
+    fn with_max(inner: Box<dyn SyncTransport>, max: u64) -> Self {
+        Self { inner, max }
+    }
+
+    /// The rule, in one place: over the ceiling is a refusal.
+    fn check(&self, body: &[u8]) -> Result<(), TransportError> {
+        if body.len() as u64 > self.max {
+            return Err(TransportError::Network);
+        }
+        Ok(())
+    }
+}
+
+impl SyncTransport for CappedTransport {
+    fn request(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponse, TransportError> {
+        let r = self.inner.request(method, path, body, token)?;
+        self.check(&r.body)?;
+        Ok(r)
+    }
+
+    fn request_ext(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        extra_headers: &[(&str, &str)],
+        body: &[u8],
+        token: Option<&str>,
+    ) -> Result<TransportResponseExt, TransportError> {
+        let r = self
+            .inner
+            .request_ext(method, path, extra_headers, body, token)?;
+        self.check(&r.body)?;
+        Ok(r)
+    }
+
+    fn open_sse(
+        &self,
+        path: &str,
+        token: &str,
+        read_timeout: std::time::Duration,
+    ) -> Result<SseStream, SseOpenError> {
+        // Untouched: a stream is not a bounded body, and forwarding it here is
+        // what keeps the wrapper invisible to the poke channel.
+        self.inner.open_sse(path, token, read_timeout)
+    }
+
+    fn request_bound_to_exporter(
+        &self,
+        method: HttpMethod,
+        path: &str,
+        token: Option<&str>,
+        label: &[u8],
+        out_len: usize,
+        build_body: &dyn Fn(&[u8]) -> Vec<u8>,
+    ) -> Result<TransportResponse, TransportError> {
+        // Forwarded with EVERY argument, and the `build_body` closure in
+        // particular: inheriting the trait default here would rebuild the body
+        // against an empty exporter and quietly downgrade the SCRAM channel
+        // binding to the unbound shape.
+        let r = self
+            .inner
+            .request_bound_to_exporter(method, path, token, label, out_len, build_body)?;
+        self.check(&r.body)?;
+        Ok(r)
+    }
+}
+
+#[cfg(test)]
+mod capped_tests {
+    use super::*;
+    use std::sync::Arc;
+
+    /// A transport that answers every request with one fixed body, and records
+    /// which method the caller actually reached. It is the double the cap is
+    /// proved against, with no socket and no 64 MiB allocation.
+    struct FixedBody {
+        body: Vec<u8>,
+        exporter_calls: Arc<std::sync::atomic::AtomicU32>,
+    }
+
+    impl FixedBody {
+        fn double(len: usize) -> (Box<dyn SyncTransport>, Arc<std::sync::atomic::AtomicU32>) {
+            let calls = Arc::new(std::sync::atomic::AtomicU32::new(0));
+            (
+                Box::new(Self {
+                    body: vec![0u8; len],
+                    exporter_calls: calls.clone(),
+                }),
+                calls,
+            )
+        }
+    }
+
+    impl SyncTransport for FixedBody {
+        fn request(
+            &self,
+            _: HttpMethod,
+            _: &str,
+            _: &[u8],
+            _: Option<&str>,
+        ) -> Result<TransportResponse, TransportError> {
+            Ok(TransportResponse {
+                status: 200,
+                body: self.body.clone(),
+            })
+        }
+
+        fn request_ext(
+            &self,
+            _: HttpMethod,
+            _: &str,
+            _: &[(&str, &str)],
+            _: &[u8],
+            _: Option<&str>,
+        ) -> Result<TransportResponseExt, TransportError> {
+            Ok(TransportResponseExt {
+                status: 200,
+                body: self.body.clone(),
+                headers: Vec::new(),
+            })
+        }
+
+        fn request_bound_to_exporter(
+            &self,
+            _: HttpMethod,
+            _: &str,
+            _: Option<&str>,
+            _: &[u8],
+            _: usize,
+            _: &dyn Fn(&[u8]) -> Vec<u8>,
+        ) -> Result<TransportResponse, TransportError> {
+            self.exporter_calls
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            Ok(TransportResponse {
+                status: 200,
+                body: self.body.clone(),
+            })
+        }
+    }
+
+    /// The defect this wrapper exists for: a transport that applies no ceiling
+    /// of its own cannot hand an over-cap body to a sync caller.
+    #[test]
+    fn an_over_cap_body_is_refused_on_both_request_paths() {
+        let (inner, _) = FixedBody::double(9);
+        let t = CappedTransport::with_max(inner, 8);
+
+        assert!(matches!(
+            t.request(HttpMethod::Get, "/sync/pull", b"", None),
+            Err(TransportError::Network)
+        ));
+        assert!(matches!(
+            t.request_ext(HttpMethod::Get, "/sync/blob?id=x", &[], b"", None),
+            Err(TransportError::Network)
+        ));
+        assert!(matches!(
+            t.request_bound_to_exporter(
+                HttpMethod::Post,
+                "/auth/devices",
+                None,
+                b"lbl",
+                0,
+                &|_| { Vec::new() }
+            ),
+            Err(TransportError::Network)
+        ));
+    }
+
+    /// The boundary is the CAP, not CAP − 1: a body exactly at the ceiling is a
+    /// legal response, and refusing it would break every legitimate maximum-size
+    /// batch fetch.
+    #[test]
+    fn a_body_exactly_at_the_cap_passes() {
+        let (inner, _) = FixedBody::double(8);
+        let t = CappedTransport::with_max(inner, 8);
+        let r = t
+            .request(HttpMethod::Get, "/sync/pull", b"", None)
+            .expect("a body at the ceiling is within the contract");
+        assert_eq!(r.body.len(), 8);
+    }
+
+    /// The wrapper must not silently degrade the exporter-bound path: inheriting
+    /// the trait default would rebuild the body against an EMPTY exporter, which
+    /// is the unbound SCRAM shape, and nothing above the seam would notice.
+    #[test]
+    fn the_exporter_bound_request_reaches_the_inner_transport() {
+        let (inner, calls) = FixedBody::double(4);
+        let t = CappedTransport::with_max(inner, 64);
+        t.request_bound_to_exporter(HttpMethod::Post, "/auth/devices", None, b"lbl", 32, &|_| {
+            b"body".to_vec()
+        })
+        .expect("an in-cap exporter-bound response passes through");
+        assert_eq!(
+            calls.load(std::sync::atomic::Ordering::SeqCst),
+            1,
+            "the inner transport must compute the exporter, not the default"
+        );
+    }
+}
 
 #[cfg(test)]
 mod namespaced_tests {

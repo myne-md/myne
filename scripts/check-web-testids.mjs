@@ -92,13 +92,6 @@ const RENDERS_NOTHING = new Set([
   join("web", "src", "components", "PairingDialog.tsx"),
   join("web", "src", "components", "settings", "ConnectedExtensions.tsx"),
   join("web", "src", "components", "backup", "BackupExportModal.tsx"),
-  // `ReadyLocalArtefacts` is gone rather than exempt: myne-md/myne#960 deleted the
-  // two local-disk controls and the substitution edge with them, so there is no
-  // module left to render null. An exemption for a file nobody can open reads as a
-  // decision about a file that is gone.
-  // Whole-vault migration is desktop-only, so its phrase credential is absent
-  // from the browser bundle rather than merely unreachable.
-  join("web", "src", "components", "settings", "MigrateVaultForm.tsx"),
   join("web", "src", "main.tsx"), // the entry point; mounts, renders no markup of its own
 ]);
 

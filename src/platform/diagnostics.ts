@@ -12,6 +12,8 @@
 
 import type { IoFailureKind } from "@myne/client-core/types/vault-unlock-error";
 
+import type { VaultUsage } from "../lib/diagnostics-gather";
+
 import { invoke } from "./core";
 
 /**
@@ -105,6 +107,39 @@ export async function revealLogsFolder(): Promise<void> {
 /** What a saved report would contain, before anything is written. */
 export async function reportManifest(): Promise<ReportManifest> {
   return await invoke<ReportManifest>("plugin:diagnostics|report_manifest");
+}
+
+/**
+ * The SHA-256 of the running executable, `sha256:`-prefixed (myne-md/myne#991).
+ *
+ * This is the desktop's only build-identity digest, because a bundle cannot
+ * contain the hash of its own bytes and this client has no served `version.json`
+ * to fetch one from. The VALUE covers the executable, not the installer a user
+ * downloaded: a `.dmg`, `.deb`, `AppImage` or `.msi` hashes differently from the
+ * program inside it, so nobody should match this against a published
+ * `SHA256SUMS`. What it answers is "same build as that other paste" and "did
+ * this binary change under an unchanged version string", which is what the
+ * surrounding `version` and `commit` lines are read for.
+ */
+export async function buildDigest(): Promise<string> {
+  return await invoke<string>("plugin:diagnostics|build_digest");
+}
+
+
+/**
+ * Measure the active vault directory (myne-md/myne#991).
+ *
+ * The block cannot take this reading in the page: `navigator.storage.estimate()`
+ * measures the WebView's own origin store, and a desktop vault is a directory of
+ * `.myn` files outside it. A pure read, so it works while the vault is locked:
+ * the fail-closed screen builds the same block.
+ *
+ * `null` when the directory cannot be read at all, which the block prints as no
+ * line rather than as `0 entries`: an empty vault and an unreadable one are two
+ * different readings, and the second must not be reported as the first.
+ */
+export async function measureVaultUsage(): Promise<VaultUsage | null> {
+  return await invoke<VaultUsage | null>("plugin:diagnostics|vault_usage");
 }
 
 /**

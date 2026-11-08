@@ -6,6 +6,8 @@
 
 import { useRef, useState, type ReactNode } from "react";
 import { Button } from "@app/components/primitives/Button";
+import { ColorSwatchPicker } from "@app/components/primitives/ColorSwatchPicker";
+import { GROUP_COLOR_PALETTE } from "@app/notes/graphColorGroups";
 import { IconButton } from "@app/components/primitives/IconButton";
 import { Input } from "@app/components/primitives/Input";
 import { Textarea } from "@app/components/primitives/Textarea";
@@ -18,6 +20,7 @@ import { CredentialField } from "@app/components/primitives/CredentialField";
 import { EmptyState } from "@app/components/primitives/EmptyState";
 import { Skeleton } from "@app/components/primitives/Skeleton";
 import { AnchoredPanel } from "@app/components/primitives/AnchoredPanel";
+import { FieldLabel, SectionLabel } from "@app/components/primitives/FieldLabel";
 import type { StoryDescriptor } from "../types";
 import { action } from "../actions";
 
@@ -104,6 +107,24 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
         <Button variant="secondary" icon="plus">
           With icon
         </Button>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/colorswatchpicker/variants",
+    group: "primitives",
+    surface: "ColorSwatchPicker",
+    state: "variants",
+    description:
+      "A row of colour swatches, one selected. The paint is a var(--group-*) token rather than a hex value, so a theme switch repaints it; the selection ring sits on the dot rather than on the larger hit box, and each swatch is announced by its colour name with aria-pressed for the chosen one.",
+    tags: ["primitives", "colour", "swatch", "tokens", "picker", "accessibility"],
+    render: () => (
+      <Row>
+        <ColorSwatchPicker
+          palette={GROUP_COLOR_PALETTE}
+          value="group-teal"
+          onChange={action("onChange")}
+        />
       </Row>
     ),
   },
@@ -434,6 +455,29 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
       <Row>
         <div style={{ width: 280 }}>
           <Skeleton lines={3} />
+        </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/labels/field-and-section",
+    group: "primitives",
+    surface: "FieldLabel",
+    state: "default",
+    description:
+      "The two label treatments a form or a settings panel needs, both on the canon's `.t-eyebrow` ramp: a caption over ONE control, and a heading over a GROUP. They were defined nineteen times across the mobile screens before myne-md/myne#995, each copy differing in prop order or in one margin, which is why no scan could group them and why this story renders both side by side. Look for the caption to sit directly on the field's top edge and the heading to carry the card's own inset, which is the `padded` prop rather than a second style.",
+    tags: ["primitives", "label", "field-label", "section-label", "eyebrow", "caption", "form"],
+    render: () => (
+      <Row>
+        <div style={{ display: "flex", flexDirection: "column", width: 320 }}>
+          <SectionLabel>Vault security</SectionLabel>
+          <FieldLabel>Your identity phrase, 24 words</FieldLabel>
+          <Input placeholder="Twenty-four words" />
+          <FieldLabel mt={16}>Recovery password</FieldLabel>
+          <Input placeholder="At least twelve characters" />
+          <SectionLabel tone="danger">Danger zone</SectionLabel>
+          <FieldLabel>Type the vault name to confirm</FieldLabel>
+          <Input placeholder="My vault" />
         </div>
       </Row>
     ),

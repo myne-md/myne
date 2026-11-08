@@ -33,6 +33,7 @@ const INPUTS = {
   crossOriginIsolated: true,
   storageUsedMb: 12,
   storageQuotaMb: 10240,
+  storageEntries: 418,
 };
 
 describe("diagnostic block", () => {
@@ -80,6 +81,7 @@ describe("diagnostic block", () => {
       bundleHash: null,
       storageUsedMb: null,
       storageQuotaMb: null,
+      storageEntries: null,
       engine: null,
     };
     const text = buildDiagnostics({ ...INPUTS, ...unreadable });

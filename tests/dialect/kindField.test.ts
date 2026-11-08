@@ -165,8 +165,12 @@ describe("TASK_KIND_VALUE (MYND-613)", () => {
     expect(TASK_KIND_VALUE).toBe("task");
   });
 
-  it("CANONICAL_KIND_VALUES is exactly the two canonical values", () => {
-    expect([...CANONICAL_KIND_VALUES]).toEqual(["drawing", "task"]);
+  it("CANONICAL_KIND_VALUES is exactly the canonical values", () => {
+    // Widened to three by the calendar (myne-md/myne#1037, §3.10): `event` is a
+    // note class, not a fourth kind of marker, so this list stays the ONE place
+    // that says how many classes exist. A new value added to the enum without a
+    // row here fails this test on purpose.
+    expect([...CANONICAL_KIND_VALUES]).toEqual(["drawing", "task", "event"]);
   });
 });
 

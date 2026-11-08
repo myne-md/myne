@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! IPC surface of the `diagnostics` plugin (myne-md/myne#860).
 //!
-//! Desktop-only. Every command resolves `app_config_dir` and delegates to a
-//! pure `*_in` helper in `flag.rs` that takes its path directly, so the tests
-//! need no Tauri runtime (`src-tauri/AGENTS.md` plugin pattern).
-//!
-//! SEVEN commands ship in total: the switch pair, the crash record pair, the
-//! reveal action, the manifest and the report writer.
+//! Desktop-only. Every command resolves its path host-side and delegates to a
+//! pure helper: `flag.rs` for the device-local switch, `report.rs` for the
+//! bundle, `super::measures` for the two block readings. The command bodies stay
+//! thin so the tests need no Tauri runtime (`src-tauri/AGENTS.md` plugin
+//! pattern).
 //!
 //! Prose carries no count and no tense here on purpose: this doc said "two
 //! commands today" for as long as it took four more to land, which is the drift
@@ -17,10 +16,13 @@
 //! covered, which is stated here rather than implied by a green tick.
 
 use super::flag::{self, DiagnosticLogFlagError};
+use super::measures;
 use super::report::{self, ReportManifest};
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::logging::crash::{self, CrashState};
 use crate::logging::sink::LogSink;
+use crate::plugins::vault_unlock::state::VaultRuntimeState;
+use myne_core::vault_sweep::Footprint;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -29,8 +31,9 @@ use tauri_plugin_opener::OpenerExt;
 
 /// The plugin's one error surface.
 ///
-/// One closed arm today, because the switch has exactly one way to fail: a
-/// filesystem error on the flag file or on resolving its directory. It is a
+/// One closed arm today, because every command here fails exactly one way: a
+/// filesystem error on the flag file, on resolving its directory, on the
+/// executable it hashes or on the vault directory it measures. It is a
 /// separate type from [`DiagnosticLogFlagError`] so the command signatures stay
 /// uniform across the commands later tasks add, without the flag module having
 /// to grow arms that are not its business.
@@ -252,6 +255,114 @@ pub async fn save_report<R: Runtime>(
     Ok(())
 }
 
+/// The digest of the running build artefact (myne-md/myne#991).
+///
+/// The page cannot supply this: a bundle cannot contain the hash of its own
+/// bytes, and the desktop client has no served bundle to fetch one from, so
+/// `src/platform/build-info.ts` answers `null` there by construction. Hashing the
+/// running executable is the reading that exists.
+///
+/// **What this value does not match.** An installer artefact (`.dmg`, `.deb`,
+/// `AppImage`, `.msi`) hashes differently from the executable inside it, so this
+/// digest is not the published one. It answers "same build as that other
+/// report" and "did this binary change under an unchanged version string", which
+/// is what the block is read for; the installer's own identity is the `version`
+/// and `commit` lines beside it.
+///
+/// Cached for the life of the process. The read is a 64 KiB-at-a-time pass over
+/// a file of tens of megabytes, the value cannot change while this executable is
+/// the one running, and the panel is opened more than once: without the cache a
+/// second visit to Settings pays the whole cost again. A failure is cached too,
+/// so a build whose executable cannot be read does not re-read it on every mount.
+///
+/// The cache is observable, which is the only reason it is testable: the tests
+/// count hashing passes rather than calling twice and comparing two equal
+/// strings, an assertion two uncached reads satisfy just as well.
+#[tauri::command]
+pub async fn build_digest() -> Result<String, DiagnosticLogError> {
+    // CPU/IO-bound over the whole bundle, so off the async worker (the
+    // attachments pattern). `crate::plugins::attachments::blocking_reads` states
+    // the rule for reads that must be synchronous by construction; this one must
+    // not be, so it belongs on a blocking worker rather than in the command.
+    tokio::task::spawn_blocking(cached_digest)
+        .await
+        .map_err(|_| DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })?
+        .ok_or(DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })
+}
+
+/// How many times this process has streamed the executable through SHA-256.
+///
+/// Test-only observation of the cache below. It exists because "cached" is
+/// otherwise indistinguishable from "recomputed" by any assertion a test can
+/// write: two hashes of an unchanged file are equal either way.
+#[cfg(test)]
+static DIGEST_PASSES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// [`build_digest`]'s body: one process-wide hash, and the one trace line.
+fn cached_digest() -> Option<String> {
+    use std::sync::OnceLock;
+    // `None` means "already failed", which is what stops a second attempt: the
+    // reason is in the log line written when the first one ran.
+    static CACHED: OnceLock<Option<String>> = OnceLock::new();
+    CACHED
+        .get_or_init(|| {
+            #[cfg(test)]
+            DIGEST_PASSES.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            std::env::current_exe()
+                .and_then(|exe| measures::digest_of_file(&exe))
+                .inspect_err(|e| {
+                    // The closed reduction, not `ErrorKind`: every other
+                    // `io_error_kind` field in this crate is `IoFailureKind`, and
+                    // one log file must not mean two vocabularies by it.
+                    tracing::warn!(
+                        event = "build_digest_failed",
+                        io_error_kind = ?from_io_error_kind(e.kind())
+                    );
+                })
+                .ok()
+        })
+        .clone()
+}
+
+/// The active vault's on-disk footprint (myne-md/myne#991).
+///
+/// `navigator.storage.estimate()` answers about the WebView's own origin store,
+/// which on desktop holds none of the vault: the notes live under
+/// `<app_data_dir>/vaults/<id>/` as `.myn` files. So the page's own figure is a
+/// true statement about the wrong thing, which is worse in a pasted block than no
+/// line at all.
+///
+/// `None` when the directory cannot be read, and that is not the same reading as
+/// an empty vault: the block omits a line it could not take, and would otherwise
+/// print `0 entries`, which is the one value a maintainer uses to rule storage
+/// out of an investigation.
+///
+/// **A pure read, so it takes no auth permit**, and it resolves the ACTIVE vault
+/// rather than the transitional sole-vault disk heuristic: that heuristic returns
+/// the legacy `vault/` path as soon as a second vault exists, which would report
+/// the size of a directory holding nothing. `active_vault_root_io` falls back to
+/// the same heuristic while nothing is unlocked, so the fail-closed screen, which
+/// builds this block too, still resolves.
+#[tauri::command]
+pub async fn vault_usage<R: Runtime>(
+    app: AppHandle<R>,
+    vault_state: State<'_, VaultRuntimeState>,
+) -> Result<Option<Footprint>, DiagnosticLogError> {
+    let dir = crate::paths::active_vault_root_io(&app, vault_state.active_vault_id().await)
+        .map_err(|_| DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })?;
+    tokio::task::spawn_blocking(move || myne_core::vault_sweep::footprint(&dir))
+        .await
+        .map_err(|_| DiagnosticLogError::Io {
+            io_error_kind: IoFailureKind::Other,
+        })
+}
+
 /// The host-resolved stores a report may never be written into.
 ///
 /// **A named roster rather than an inline vector**, because the list is what
@@ -268,7 +379,7 @@ pub async fn save_report<R: Runtime>(
 /// [`GuardedStore::ALL`] is the hand-written roster a test can hold, which a type
 /// cannot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum GuardedStore {
+pub(crate) enum GuardedStore {
     AppData,
     Log,
     Config,
@@ -276,11 +387,15 @@ enum GuardedStore {
 
 impl GuardedStore {
     /// The roster, and the order the refusal walks it in.
-    const ALL: [GuardedStore; 3] = [Self::AppData, Self::Log, Self::Config];
+    ///
+    /// Public within the crate because `text_file` guards the same three stores:
+    /// a second list would be a second opinion about which paths a page must not
+    /// write, and the two would drift the first time one gained a store.
+    pub(crate) const ALL: [GuardedStore; 3] = [Self::AppData, Self::Log, Self::Config];
 
     /// The directory, or `Err` when the host cannot resolve it. An unresolved
     /// store is a refusal at the caller, never a skipped comparison.
-    fn resolve<R: Runtime>(self, app: &AppHandle<R>) -> Result<PathBuf, ()> {
+    pub(crate) fn resolve<R: Runtime>(self, app: &AppHandle<R>) -> Result<PathBuf, ()> {
         let resolved = match self {
             Self::AppData => app.path().app_data_dir(),
             Self::Log => app.path().app_log_dir(),
@@ -352,6 +467,35 @@ mod tests {
         assert!(!flag::read_flag(&path), "off before anything is written");
         flag::write_flag(&path, true).expect("set on");
         assert!(flag::read_flag(&path), "on after the setter");
+    }
+
+    #[test]
+    fn the_digest_command_body_reads_the_running_executable_and_caches_it() {
+        // The command wrapper needs a Tauri runtime, which a unit test has not got;
+        // its body does not, so the half worth pinning runs here: that hashing
+        // THIS process's executable resolves and answers a well-formed digest. Without it the only evidence that `current_exe()` works on a given
+        // platform is a user reporting a missing `bundleHash` line.
+        let before = DIGEST_PASSES.load(std::sync::atomic::Ordering::SeqCst);
+        let digest = cached_digest().expect("the test executable can be hashed");
+        assert!(
+            digest.starts_with(crate::plugins::diagnostics::measures::DIGEST_PREFIX),
+            "digest is not prefixed: {digest}"
+        );
+        assert_eq!(
+            digest.len(),
+            crate::plugins::diagnostics::measures::DIGEST_PREFIX.len() + 64
+        );
+        // Second call serves the cached value rather than re-hashing tens of
+        // megabytes. Counted, not compared: two uncached hashes of the same
+        // executable are equal, so an equality assertion passes with the cache
+        // removed and certifies a property nothing measured.
+        assert_eq!(cached_digest().expect("cached digest"), digest);
+        let after = DIGEST_PASSES.load(std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            after - before <= 1,
+            "the digest was re-hashed on {} extra call(s)",
+            after - before
+        );
     }
 
     #[test]

@@ -5,16 +5,6 @@
       "path": "core/src/inference/chatml.rs",
       "reason": "unfixed: the ChatML filter is family-scoped; see myne-md/myne#760",
       "issue": "760"
-    },
-    {
-      "path": "core/src/plugins/sync/state.rs",
-      "reason": "unfixed: unlocked read-modify-write loses a concurrent write; see myne-md/myne#964",
-      "issue": "964"
-    },
-    {
-      "path": "core/src/plugins/vault_migrate/mod.rs",
-      "reason": "unfixed: the abort unwinds one of the re-base's durable changes; see myne-md/myne#759",
-      "issue": "759"
     }
   ]
 }

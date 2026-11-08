@@ -122,7 +122,6 @@ const CAPABILITY_BACKING = {
   // migration — a web/OPFS container is provisioned current and never carries a
   // v0.1 layout to migrate, so the dispatcher refuses `vault-migrate` and the
   // `MigrateVaultForm` is gated behind this (absent-on-web) capability.
-  vaultMigration: ["vault-migrate"],
   // Deliberately empty, and for the reason `phraseEnrolment` states one screen
   // down: there is no refused command behind it. Empty, and it stays empty now
   // that the web person plane SHIPS (myne-md/myne#911 task 13): both
@@ -146,6 +145,12 @@ const CAPABILITY_BACKING = {
   backup: ["backup"],
   // A seam refusal (`dialog.save`), not an IPC command.
   nativeSaveAs: [],
+  // myne-md/myne#1037. The calendar's `.ics` exchange plugin is desktop-only at
+  // the COMMAND level: both commands take a PATH, and a page has no OS dialog to
+  // produce one. The web client is not left without the feature: it exports
+  // through `platform/download.ts` `deliverFile` (one user-initiated file, no IPC)
+  // and has no import until it grows an ingest of its own.
+  icsImport: ["text-file"],
   // `decisions.md` 2026-08-15 ships creation on web, so `vaultCreation` is no
   // longer absent and no longer appears in the descriptor's ABSENT set. The
   // entry stays here, empty, because this map is also read as documentation of

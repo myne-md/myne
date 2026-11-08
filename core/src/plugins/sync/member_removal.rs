@@ -1263,8 +1263,7 @@ pub async fn rotate_group_from_host(
 /// derived from the group key, so a rotation to a new epoch moves them. Each retired epoch's id
 /// that this device holds a baseline for is queued as an orphan tombstone (the
 /// next push flags it on the server so horizon-GC reclaims the stranded record)
-/// and its baseline dropped, the same shape as
-/// `vault_migrate::rebase_sync_plane_after_rekey` for a root re-key.
+/// and its baseline dropped.
 ///
 /// Content addresses (note UUIDs, attachment ids, conversation/entry ids) do
 /// NOT move: those baselines stay. A device that did not perform the rotation
@@ -1275,47 +1274,48 @@ async fn rebase_sync_plane_for_group_rotation(
     vault_root: &Path,
     old_group_key: &[u8; 32],
 ) {
-    use crate::plugins::sync::state::{read_sync_state, write_sync_state, OrphanTombstone};
-    let Ok(mut state) = read_sync_state(io, vault_root).await else {
-        // Present and unreadable: leave it alone, exactly as the root re-key
-        // does; a human has to look at it.
-        return;
-    };
-    if state.device_id_hex.is_none() {
-        return; // never enrolled: there is no sync plane to re-base
-    }
-    let mut changed = false;
-    for hex in group_rotation_reclaim_sync_ids(old_group_key) {
-        if let Some(baseline) = state.blobs.get(&hex) {
-            // Queue the tombstone BEFORE dropping the baseline: the removal
-            // takes the `base_version` the tombstone push CASes against. If the
-            // tombstone cannot be minted (RNG failure), leave the baseline so the
-            // next cycle can retry rather than dropping it un-tombstoned.
-            let mut nonce = [0u8; 24];
-            if getrandom::getrandom(&mut nonce).is_err() {
-                tracing::warn!(
-                    stage = "group_rotation",
-                    "could not mint a reclaim nonce; leaving the baseline for the next attempt"
-                );
-                continue;
+    use crate::plugins::sync::state::{update_sync_state, OrphanTombstone, Persist};
+    // Present and unreadable still resolves to "leave it alone, exactly as the root
+    // re-key does; a human has to look at it": the locked read fails and nothing is
+    // written. The rotation's own decision and the cycle's cursor both land because the
+    // read happens under the writer lock (myne-md/myne#964).
+    let outcome = update_sync_state(io, vault_root, |state| {
+        if state.device_id_hex.is_none() {
+            return (false, Persist::No); // never enrolled: no sync plane to re-base
+        }
+        let mut changed = false;
+        for hex in group_rotation_reclaim_sync_ids(old_group_key) {
+            if let Some(baseline) = state.blobs.get(&hex) {
+                // Queue the tombstone BEFORE dropping the baseline: the removal
+                // takes the `base_version` the tombstone push CASes against. If the
+                // tombstone cannot be minted (RNG failure), leave the baseline so the
+                // next cycle can retry rather than dropping it un-tombstoned.
+                let mut nonce = [0u8; 24];
+                if getrandom::getrandom(&mut nonce).is_err() {
+                    tracing::warn!(
+                        stage = "group_rotation",
+                        "could not mint a reclaim nonce; leaving the baseline for the next attempt"
+                    );
+                    continue;
+                }
+                state.pending_orphan_tombstones.push(OrphanTombstone {
+                    blob_id_hex: hex.clone(),
+                    base_version: baseline.version,
+                    content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
+                });
+                state.blobs.remove(&hex);
+                changed = true;
             }
-            state.pending_orphan_tombstones.push(OrphanTombstone {
-                blob_id_hex: hex.clone(),
-                base_version: baseline.version,
-                content_nonce_hex: crate::plugins::sync::to_hex(&nonce),
-            });
-            state.blobs.remove(&hex);
-            changed = true;
         }
-    }
-    if changed {
-        if let Err(e) = write_sync_state(io, vault_root, &state).await {
-            tracing::warn!(
-                stage = "group_rotation",
-                error = ?e,
-                "sync-plane rebase state write failed; the next cycle may strand the retired ids"
-            );
-        }
+        (changed, if changed { Persist::Yes } else { Persist::No })
+    })
+    .await;
+    if let Err(e) = outcome {
+        tracing::warn!(
+            stage = "group_rotation",
+            error = ?e,
+            "sync-plane rebase state write failed; the next cycle may strand the retired ids"
+        );
     }
 }
 

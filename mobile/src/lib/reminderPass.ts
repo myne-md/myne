@@ -30,10 +30,12 @@
 // payload that crosses the seam is `{ id, at }` and has nowhere to put one.
 
 import {
+  eventReminderId,
   reminderId,
-  runReminderPass,
-  targetReminders,
+  runReminderPassFor,
+  targetRemindersFor,
   REMINDER_HORIZON_DAYS,
+  type EventReminderSource,
   type PendingReminder,
   type ReminderClock,
   type ReminderNotifier,
@@ -95,6 +97,16 @@ export function boundedReminders(
 
 export type BoundedReminderPassOptions = {
   tasks: readonly VaultTask[];
+  /**
+   * The calendar's due reminders, when the caller has them.
+   *
+   * Optional rather than required so the existing call sites and tests keep their
+   * meaning: a caller that omits the source arms the tasks and nothing else, which is
+   * what this function did before the calendar existed.
+   */
+  events?: readonly EventReminderSource[];
+  /** The wall-clock hour an all-day event's lead counts back from. */
+  dayAnchor?: string;
   notifier: ReminderNotifier;
   clock: ReminderClock;
   horizonDays?: number;
@@ -119,13 +131,31 @@ export type BoundedReminderPassOptions = {
 export async function runBoundedReminderPass(
   options: BoundedReminderPassOptions,
 ): Promise<ReminderPassResult> {
-  const { tasks, notifier, clock, horizonDays = REMINDER_HORIZON_DAYS, max } = options;
+  const {
+    tasks,
+    events = [],
+    dayAnchor,
+    notifier,
+    clock,
+    horizonDays = REMINDER_HORIZON_DAYS,
+    max,
+  } = options;
 
+  // The bound is applied to the TARGET of both sources, then each source is narrowed
+  // to the ids that survived. Doing it the other way round (bound the tasks, then add
+  // the events) would let the events exceed the platform ceiling, which is the one
+  // thing the bound exists to prevent: the strictest platform drops what it cannot
+  // hold, silently.
+  const sources = { tasks, events, dayAnchor };
   const kept = new Set(
-    boundedReminders(targetReminders(tasks, clock(), horizonDays), max).map((r) => r.id),
+    boundedReminders(targetRemindersFor(sources, clock(), horizonDays), max).map((r) => r.id),
   );
-  return runReminderPass(
-    tasks.filter((task) => kept.has(reminderId(task))),
+  return runReminderPassFor(
+    {
+      tasks: tasks.filter((task) => kept.has(reminderId(task))),
+      events: events.filter((event) => kept.has(eventReminderId(event))),
+      dayAnchor,
+    },
     notifier,
     clock,
     horizonDays,

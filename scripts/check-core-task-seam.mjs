@@ -25,6 +25,7 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { isExtractedTestModule } from "./lib/test-module-files.mjs";
 
 const ROOT = "core/src";
 const SEAM = join("core", "src", "task.rs");
@@ -125,12 +126,11 @@ const CLOCK_ALLOWED = new Map([
   // `HostCtx::now_unix_millis()` at each call site, so no std clock is read here.
   // `std::thread::sleep` sites, all inside the sync engine. Two of these files
   // are already listed above for the clocks; the rest join for the sleep alone.
-  // Every remaining occurrence in this file is inside `#[cfg(test)] mod tests`:
-  // the three PRODUCTION retry-backoff sleeps moved onto `task::block_sleep`
-  // (task 84). It stays listed because this guard greps the file rather than
-  // parsing its cfg attributes — a *new* production call here would be invisible
-  // to it, which is the one thing this entry costs and is worth writing down.
-  ["core/src/plugins/sync/orchestrator.rs", "test-only after task 84 moved the backoff onto `task::block_sleep`"],
+  // `orchestrator.rs` used to be listed here for test-only occurrences, at the
+  // honest cost that a NEW production call inside it would have been invisible.
+  // That cost is gone: its test module now lives in `orchestrator_tests.rs`, which
+  // this guard skips wholesale (`isExtractedTestModule`), so the production file is
+  // held to the ban with no entry of its own.
   // NOT reachable on wasm32: `mod.rs` gates `poke_listener` behind
   // `tauri-ipc`+non-wasm and `rustls_transport` behind non-wasm. Listed anyway
   // so the ban still applies to them — a file that is gated out today can be
@@ -227,6 +227,7 @@ function walk(dir, out = []) {
 const argv = process.argv.slice(2);
 const files = (argv.length ? argv.filter((f) => f.endsWith(".rs")) : walk(ROOT)).filter((f) => {
   const rel = relative(process.cwd(), f);
+  if (isExtractedTestModule(rel)) return false;
   return rel === ROOT || rel.startsWith(ROOT + sep) || rel.startsWith(ROOT + "/");
 });
 

@@ -81,6 +81,13 @@ declare module "*/wasm/pkg/myne_web_wasm.js" {
   export function sync_awareness_deliver(payload: string): void;
 
   /**
+   * One tick of the `Slot::Recovering` deadline; resolves to whether the recovery
+   * session was expired and dropped (myne-md/myne#758). The Worker drives it from
+   * an interval because it has no Rust timer, for the same split `sync_tick` makes.
+   */
+  export function vault_recovering_ttl_tick(): Promise<boolean>;
+
+  /**
    * `true` iff two 32-byte CSPRNG draws succeeded and differed. Called once at
    * startup: a `custom`-backend registration that links but throws at runtime
    * would otherwise first surface as a failed *write*, after the user has

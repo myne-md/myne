@@ -42,6 +42,7 @@ import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge"
 // be one function.
 import { recoveryKitText } from "@myne/recovery-kit";
 import type { CreateVaultFlowProps } from "./types";
+import { FieldLabel } from "@myne/field-label";
 
 // Browser-dev placeholders (no Tauri host → no IPC). Let the multi-step flow
 // stay fully navigable under `pnpm dev`; the real backend runs `pnpm tauri dev`.
@@ -509,24 +510,6 @@ function WhyDisclosure({ open, children }: { open: boolean; children: ReactNode 
       }}
     >
       <div style={{ minHeight: 0, minWidth: 0, overflow: "hidden" }}>{children}</div>
-    </div>
-  );
-}
-
-// Small uppercase field label (mirrors the static FieldLabel).
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
-      {children}
     </div>
   );
 }

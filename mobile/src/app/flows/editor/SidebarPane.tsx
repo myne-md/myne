@@ -73,6 +73,7 @@ export function SidebarPane({
   onTasks,
   onNoteTasks,
   onGraph,
+  onCalendar,
   onFiles,
   onTemplates,
   onChat,
@@ -94,6 +95,10 @@ export function SidebarPane({
    *  that cannot do anything. */
   onNoteTasks?: () => void;
   onGraph: () => void;
+  /** The calendar destination (myne-md/myne#1037): a nav row here rather than a
+   *  bottom-bar column, because the bar is at its column budget by design
+   *  (`TabBar.tsx`) and the vocabulary is deliberately wider than the bar. */
+  onCalendar: () => void;
   onFiles: () => void;
   onTemplates: () => void;
   /** Omitted when `ai_enabled` is off (myne-md/myne#457). Optional for the same
@@ -182,6 +187,13 @@ export function SidebarPane({
           active={tab === "graph"}
           onClick={onGraph}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4" {...gi} /><circle cx="18" cy="14" r="2.4" {...gi} /><circle cx="13" cy="6" r="2.4" {...gi} /><path d="M8.3 15.6l3-7M8.4 16.2l7-1.6" {...gi} /></svg>}
+        />
+        <NavItem
+          testid="sidebar.nav-calendar"
+          label={t("calendar.title")}
+          active={tab === "calendar"}
+          onClick={onCalendar}
+          icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5" {...gi} /><path d="M3.5 9.5h17M8 3v4M16 3v4" {...gi} /></svg>}
         />
         <NavItem
           testid="sidebar.nav-files"

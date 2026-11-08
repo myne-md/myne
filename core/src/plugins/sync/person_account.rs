@@ -1108,39 +1108,46 @@ pub async fn adopt_person_device_identity_best_effort(
     let Some(device_id) = super::devices::hex16(auth.device_id_hex.trim()) else {
         return false;
     };
-    let Ok(mut st) = super::state::read_sync_state(io, vault_dir).await else {
-        return false;
-    };
-    let mut dirty = false;
-    if st.device_id_hex.is_none() {
-        st.device_id_hex = Some(crate::account::person_identity::hex_lower(&device_id));
-        dirty = true;
-    }
-    // The code is rebuilt from the halves rather than stored as a blob, so a
-    // person key transition refreshes it instead of pinning the retired key.
-    if let (Some(person_id), Some(public)) = (
-        super::devices::hex16(auth.person_id_hex.trim()),
-        protocol::person_key::PersonPublicHalf::from_parts_hex(
-            &auth.kem_ek_hex,
-            &auth.ed_pk_hex,
-            &auth.mldsa_vk_hex,
-        )
-        .ok(),
-    ) {
-        let code = super::invite::encode_person_identity_code(&person_id, &public);
-        if st.own_identity_code.as_deref() != Some(code.as_str()) {
-            st.own_identity_code = Some(code);
+    // One locked mutation rather than a read plus a whole-record write: a sync cycle
+    // holding its own copy of this record would otherwise lose the cursor to this
+    // seam (myne-md/myne#964).
+    let written = super::state::update_sync_state(io, vault_dir, |st| {
+        let mut dirty = false;
+        if st.device_id_hex.is_none() {
+            st.device_id_hex = Some(crate::account::person_identity::hex_lower(&device_id));
             dirty = true;
         }
-    }
-    if dirty
-        && super::state::write_sync_state(io, vault_dir, &st)
-            .await
-            .is_err()
-    {
-        return false;
-    }
-    true
+        // The code is rebuilt from the halves rather than stored as a blob, so a
+        // person key transition refreshes it instead of pinning the retired key.
+        if let (Some(person_id), Some(public)) = (
+            super::devices::hex16(auth.person_id_hex.trim()),
+            protocol::person_key::PersonPublicHalf::from_parts_hex(
+                &auth.kem_ek_hex,
+                &auth.ed_pk_hex,
+                &auth.mldsa_vk_hex,
+            )
+            .ok(),
+        ) {
+            let code = super::invite::encode_person_identity_code(&person_id, &public);
+            if st.own_identity_code.as_deref() != Some(code.as_str()) {
+                st.own_identity_code = Some(code);
+                dirty = true;
+            }
+        }
+        (
+            (),
+            if dirty {
+                super::state::Persist::Yes
+            } else {
+                super::state::Persist::No
+            },
+        )
+    })
+    .await;
+    // `true` means the adoption completed, including the case where both fields were
+    // already right and nothing needed writing, which is the idempotent path the callers
+    // and the test below both rely on.
+    written.is_ok()
 }
 
 /// Finish a pending device's enrolment once an existing device approved it
@@ -1763,7 +1770,7 @@ pub async fn ensure_owner_member_token(
         &host.app_data_dir().map_err(|_| SyncDeviceError::Internal)?,
         state.active_vault_id().await,
     );
-    let mut sync_state = super::state::read_sync_state(io, &root)
+    let sync_state = super::state::read_sync_state(io, &root)
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
     if let (Some(tok), Some(pid)) = (
@@ -1813,11 +1820,17 @@ pub async fn ensure_owner_member_token(
     })
     .await
     .map_err(|_| SyncDeviceError::Internal)??;
-    sync_state.owner_member_token_hex = Some(issued.clone());
-    sync_state.owner_member_person_id_hex = Some(owner_person_id_hex.to_string());
-    super::state::write_sync_state(io, &root, &sync_state)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
+    // Written through the locked mutation, not from the snapshot taken before the
+    // handshake: this call is on the wire for a whole round trip while a cycle keeps
+    // writing its cursor, and re-serialising that snapshot would take it back
+    // (myne-md/myne#964).
+    super::state::update_sync_state(io, &root, |sync_state| {
+        sync_state.owner_member_token_hex = Some(issued.clone());
+        sync_state.owner_member_person_id_hex = Some(owner_person_id_hex.to_string());
+        ((), super::state::Persist::Yes)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?;
     Ok(issued)
 }
 
@@ -2296,17 +2309,16 @@ async fn materialize_member_vault(
 
     use sha2::Digest as _;
     let meta_hash: [u8; 32] = sha2::Sha256::digest(meta_bytes).into();
-    let mut st = super::state::read_sync_state(io, &vault_dir)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
-    st.account_hash_hex = Some(account_hash_hex.to_string());
-    st.owner_identity_code = Some(owner_code.to_string());
-    st.device_id_hex = Some(crate::account::person_identity::hex_lower(
-        &super::enroll::generate_device_id(),
-    ));
-    super::state::write_sync_state(io, &vault_dir, &st)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
+    super::state::update_sync_state(io, &vault_dir, |st| {
+        st.account_hash_hex = Some(account_hash_hex.to_string());
+        st.owner_identity_code = Some(owner_code.to_string());
+        st.device_id_hex = Some(crate::account::person_identity::hex_lower(
+            &super::enroll::generate_device_id(),
+        ));
+        ((), super::state::Persist::Yes)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?;
     super::token_store::default_store()
         .store(io, &vault_dir, &token)
         .await
@@ -2940,14 +2952,12 @@ async fn pin_owner_device_attestation(
         );
         return;
     }
-    let Ok(mut st) = super::state::read_sync_state(io, vault_dir).await else {
-        return;
-    };
-    st.owner_device = Some(attestation);
-    if super::state::write_sync_state(io, vault_dir, &st)
-        .await
-        .is_err()
-    {
+    let pinned = super::state::update_sync_state(io, vault_dir, |st| {
+        st.owner_device = Some(attestation.clone());
+        ((), super::state::Persist::Yes)
+    })
+    .await;
+    if pinned.is_err() {
         // Best effort: without the pin this member falls back to the person-key class,
         // which a device-signed roster will refuse, so the failure is logged rather than
         // swallowed silently.
@@ -4413,13 +4423,15 @@ pub async fn member_adopt_rotation_from_host(
         )
         .await
         .map_err(|_| SyncDeviceError::Internal)?;
-        let mut next = sync_state;
         use sha2::Digest as _;
         let hash: [u8; 32] = sha2::Sha256::digest(&server_bytes).into();
-        next.meta_baseline_hex = Some(crate::plugins::sync::to_hex(&hash));
-        crate::plugins::sync::state::write_sync_state(io, &root, &next)
-            .await
-            .map_err(|_| SyncDeviceError::Internal)?;
+        let baseline = Some(crate::plugins::sync::to_hex(&hash));
+        crate::plugins::sync::state::update_sync_state(io, &root, |state| {
+            state.meta_baseline_hex = baseline.clone();
+            ((), crate::plugins::sync::state::Persist::Yes)
+        })
+        .await
+        .map_err(|_| SyncDeviceError::Internal)?;
         let _ = crate::plugins::sync::state::clear_vault_meta_dirty(io, &root).await;
     }
 

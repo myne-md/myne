@@ -846,7 +846,6 @@ export function SettingsModal({
     sync: (
       <SyncPanel
         vaultId={vaultId}
-        onMigrated={() => onForceRelock?.({ kind: "Exists" })}
         onDialogOpenChange={setChildDialogOpen}
       />
     ),

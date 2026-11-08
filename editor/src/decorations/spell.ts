@@ -97,9 +97,7 @@ function cursorInside(state: EditorState, from: number, to: number): boolean {
   return false;
 }
 
-/** Carries fresh misspelled ranges from the async IPC result into the field.
- *  Exported for the test that pins the out-of-range clamp below: a caller
- *  outside this module cannot otherwise put a stale range into the field. */
+/** Fresh ranges from the async IPC result. */
 export const setSpellErrors = StateEffect.define<SpellRange[]>();
 
 /** Forces an immediate re-scan (after add-to-dictionary / ignore, which change
@@ -107,9 +105,9 @@ export const setSpellErrors = StateEffect.define<SpellRange[]>();
 const triggerSpellRescan = StateEffect.define<null>();
 
 /** Client-side "ignore this session" set (SYNC-13): folded words suppressed for
- * the lifetime of this editor session only — never persisted (the vault-wide
- * ignore set is the persisted path, via `ignoreWordInVault`). Folded with the
- * shared `foldSegment` (NFC + lowercase) — the same case-fold the engine's
+ * this editor session only — never persisted (the vault-wide set is the persisted
+ * path, via `ignoreWordInVault`), folded with the shared `foldSegment` — the same
+ * case-fold the engine's
  * `default_lower` mirrors; good enough for the RAM-only session set. */
 const sessionIgnored = new Set<string>();
 
@@ -189,15 +187,7 @@ export const spellField = StateField.define<SpellFieldValue>({
   update(value, tr) {
     for (const e of tr.effects) {
       if (e.is(setSpellErrors)) {
-        // **Clamp on the way IN.** The scan is asynchronous: it is dispatched from
-        // a completed IPC round trip against the document the scan STARTED on, and
-        // the document can have shrunk before the result lands (a note whose body
-        // is replaced on switch, a remote edit applied under the caret). Ranges
-        // past the end are then out of range for the NEXT changeset, and
-        // `ChangeSet.mapPos` throws `RangeError` — which escaped as a render
-        // crash and put the whole app on the fail-closed card. Measured
-        // 2026-11-03, from `data-render-error`: `RangeError@mapPos`, both
-        // scenarios of `editor-persistent-view`, at boot.
+        // Clamp (2026-11-03): a range past the end throws out of the NEXT mapPos.
         const limit = tr.state.doc.length;
         const clamped = e.value
           .map((r) => ({
@@ -210,13 +200,7 @@ export const spellField = StateField.define<SpellFieldValue>({
       }
     }
     if (tr.docChanged) {
-      // Map the ranges through the edit + rebuild; the debounced re-scan will
-      // refresh shortly, but mapping keeps marks aligned in the meantime.
-      //
-      // Clamped against the START state as well, because a range can also predate
-      // this transaction (an older revision's value surviving a reconfiguration):
-      // `mapPos` refuses a position its own start document does not have, and a
-      // thrown `RangeError` here is a crash rather than a mis-drawn squiggle.
+      // Map through the edit + rebuild; the re-scan refreshes shortly.
       const startLimit = tr.startState.doc.length;
       const mapped = value.ranges
         .map((r) => ({

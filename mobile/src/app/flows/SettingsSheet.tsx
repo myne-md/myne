@@ -107,6 +107,7 @@ import type { VaultId } from "../../lib/stage";
 import { useMemberVault } from "../../hooks/useMemberVault";
 import { MEMBER_VAULT_REMOVAL_DISCLOSURE } from "../../lib/load-bearing-copy";
 import { tappable } from "../a11y/tappable";
+import { FieldLabel, SectionLabel } from "@myne/field-label";
 
 /**
  * Settings sheet — the wired counterpart to the static workspace `11 · Settings`
@@ -217,24 +218,6 @@ const MEMBER_REMOVE_DISCLOSURE_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
-function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /** The Appearance/Editor panel card — a labelled block that owns its own padding,
  *  as opposed to `Group`, which is the flush-edged container for `Row` lists. */
 const CARD_STYLE: CSSProperties = {
@@ -316,24 +299,6 @@ const ICON_BTN_STYLE: CSSProperties = {
   background: "transparent",
   color: "var(--fg-2)",
 };
-
-function FieldLabel({ children, mt }: { children: ReactNode; mt: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        marginBottom: 8,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 /** Real text/password input styled to the design Field geometry. */
 function SheetInput({
@@ -1660,9 +1625,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) {
         const dest = await defaultExportDestination();
         const summary = await vaultExportMarkdown(dest.path);
-        setToast(t("settings.data.exported", { count: summary.notes, label: dest.label }));
-        // Offer the native destination chooser for the exported folder (MYND-475);
-        // additive on top of the guaranteed Documents write above.
+        // The sentence names no folder, deliberately: the export lands in a
+        // directory no file manager on either platform will open, so naming it
+        // was a claim the user could not act on (myne-md/myne#504, #505). What
+        // the app did is the count; where the copy goes is the chooser's answer.
+        setToast(t("settings.data.exportedChoose", { count: summary.notes }));
+        // Offer the platform destination chooser for the exported folder
+        // (MYND-475, and the Android half is myne-md/myne#505, where a directory
+        // is zipped because a document picker saves one file); additive on
+        // top of the guaranteed Documents write above.
         await shareFile(dest.path);
       } else {
         setToast(t("settings.data.exportNeedsApp"));

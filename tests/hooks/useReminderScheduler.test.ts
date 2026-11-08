@@ -179,6 +179,8 @@ describe("the catch-up pass", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
       horizonDays: null,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
     });
     await act(async () => {
@@ -196,6 +198,8 @@ describe("the catch-up pass", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
       horizonDays: null,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
     });
     await act(async () => {
@@ -213,6 +217,8 @@ describe("the catch-up pass", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: null,
       horizonDays: null,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
       onPass,
     });
@@ -234,6 +240,8 @@ describe("the catch-up pass", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
       horizonDays: null,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
       onPass,
     });
@@ -266,6 +274,8 @@ describe("it never throws", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
       horizonDays: null,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
       onPass,
     });
@@ -290,6 +300,8 @@ describe("it never throws", () => {
         // defaulted parameter, which is the shape that excuses every call site
         // from the check in advance, and making it required is what named these.
         horizonDays: 7,
+        events: [],
+        dayAnchor: "09:00",
       });
       await act(async () => {
         await Promise.resolve();
@@ -335,6 +347,8 @@ describe("the default clock is stable across renders (myne#318)", () => {
       // defaulted parameter, which is the shape that excuses every call site
       // from the check in advance, and making it required is what named these.
       horizonDays: 7,
+      events: [],
+      dayAnchor: "09:00",
     }));
     const afterMount = n.calls.listed;
     expect(afterMount).toBeGreaterThan(0);
@@ -358,6 +372,8 @@ describe("the default clock is stable across renders (myne#318)", () => {
       // defaulted parameter, which is the shape that excuses every call site
       // from the check in advance, and making it required is what named these.
       horizonDays: 7,
+      events: [],
+      dayAnchor: "09:00",
     }));
     const afterMount = n.calls.listed;
     tasks = [task({ remind: "2026-07-28 11:00" })];
@@ -389,6 +405,10 @@ describe("the horizon reaches the pass (myne#508)", () => {
       tasks: [task({ remind: "2026-07-30 09:00" })],
       notifier: impl,
       horizonDays,
+      // No event notes in this fixture: the horizon's effect on TASK reminders is
+      // what this case measures, and the event source has its own suite.
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
     });
     await act(async () => {
@@ -420,6 +440,8 @@ describe("the horizon reaches the pass (myne#508)", () => {
       tasks,
       notifier: impl,
       horizonDays: days,
+      events: [],
+      dayAnchor: "09:00",
       clock: () => NOW,
     }));
     await act(async () => {

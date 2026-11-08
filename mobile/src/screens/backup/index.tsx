@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, ScreenScroll, Title, Button } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { SectionLabel } from "@myne/field-label";
 
 // Shared bits ─────────────────────────────────────────────────────────────────
 
@@ -58,25 +59,6 @@ function NavBar({
         {label}
       </button>
       {right}
-    </div>
-  );
-}
-
-/** Uppercase tracked section label (12px / 600 / 0.06em). */
-function SectionLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-        ...style,
-      }}
-    >
-      {children}
     </div>
   );
 }

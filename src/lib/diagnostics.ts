@@ -63,6 +63,13 @@ export const DIAGNOSTIC_FIELDS = [
   "crossOriginIsolated",
   "storageUsedMb",
   "storageQuotaMb",
+  // How many entries the vault directory holds (myne-md/myne#991). Desktop-only,
+  // because only a client whose vault is a DIRECTORY can say what it holds: the
+  // browser's figure is the origin store's own estimate, which has no entries to
+  // count. `12 000 entries` and `3 entries` are the same size and two different
+  // vaults, which is the question a maintainer asks when a report says storage
+  // grew.
+  "storageEntries",
 ] as const;
 
 export type DiagnosticField = (typeof DIAGNOSTIC_FIELDS)[number];
@@ -98,6 +105,9 @@ export interface DiagnosticInputs {
    *  which omits the line rather than printing a placeholder. */
   readonly storageUsedMb: number | null;
   readonly storageQuotaMb: number | null;
+  /** Entries under a filesystem vault's directory, or `null` where the client has
+   *  no such measure (a browser store has no directory to count). */
+  readonly storageEntries: number | null;
 }
 
 /**
@@ -143,6 +153,8 @@ export function diagnosticRecord(inputs: DiagnosticInputs): Partial<Record<Diagn
     crossOriginIsolated: String(inputs.crossOriginIsolated),
     storageUsedMb: inputs.storageUsedMb === null ? null : String(inputs.storageUsedMb),
     storageQuotaMb: inputs.storageQuotaMb === null ? null : String(inputs.storageQuotaMb),
+    storageEntries:
+      inputs.storageEntries === null ? null : String(inputs.storageEntries),
   };
   const record: Partial<Record<DiagnosticField, string>> = {};
   for (const field of DIAGNOSTIC_FIELDS) {

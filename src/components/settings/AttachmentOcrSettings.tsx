@@ -13,13 +13,13 @@
 //
 // Default state is ON, not off: starting from `false` and correcting after the
 // disk read would flash the wrong answer for effectively every vault.
-
 import { useEffect, useState } from "react";
 import { listen } from "../../platform/event";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { HELPER_STYLE } from "./panel-styles";
 import { Switch } from "../primitives/Switch";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import {
   OCR_BACKLOG_PROGRESS_EVENT,
   prefsRead,
@@ -29,27 +29,17 @@ import {
 
 export function AttachmentOcrSettings() {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.attachment_ocr_enabled,
+    write: setAttachmentOcrEnabled,
+    initial: true,
+    errorMessage: t("settings.attachmentOcr.errorSaveSetting"),
+  });
   // Attachments still queued. `0` hides the line — the indicator exists to
   // explain a busy fan, so it must disappear the moment there is nothing to
   // explain.
   const [remaining, setRemaining] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        setEnabled(p.attachment_ocr_enabled);
-      })
-      .catch(() => {
-        /* locked / no vault — leave the default ON */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   useEffect(() => {
     // The worker emits at start, after every attachment, and once at the end
@@ -62,17 +52,6 @@ export function AttachmentOcrSettings() {
     };
   }, []);
 
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await setAttachmentOcrEnabled(next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback — never leave the UI asserting an unsaved value
-      setError(t("settings.attachmentOcr.errorSaveSetting"));
-    }
-  }
 
   return (
     <SettingRow
@@ -82,7 +61,7 @@ export function AttachmentOcrSettings() {
       control={(helperId) => (
         <Switch
           checked={enabled}
-          onChange={(next) => void toggle(next)}
+          onChange={(next) => void setEnabled(next)}
           ariaLabel={t("settings.attachmentOcr.label")}
           ariaDescribedBy={helperId}
           testId="settings.attachment-ocr"

@@ -218,6 +218,15 @@ fi
 # never do is run SILENTLY beside one while pretending the number it produced is
 # clean, so a lock it could not take says so on stdout.
 E2E_LOCK="${E2E_LOCK:-/cache/myne-e2e.lock}"
+
+# The compiler wrapper this lane passes into the container is provisioned and
+# hash-verified first (myne-md/myne#758, audit lead NV02); `/cache/tools/bin/sccache`
+# had no line anywhere in this repository that put it there. Guarded on the mount
+# because that is the only place the binary comes from: outside CI there is none
+# to verify, and a developer running this by hand is not the defect.
+if [ -d /cache ]; then
+  bash "$(dirname "$0")/ci-pinned-tools.sh" sccache cargo-nextest
+fi
 E2E_LOCK_WAIT="${MYNE_E2E_LOCK_WAIT:-1800}"
 if command -v flock >/dev/null 2>&1 && [ -w "$(dirname "$E2E_LOCK")" ]; then
   echo "ci-e2e-lane: acquiring ${E2E_LOCK} (wait up to ${E2E_LOCK_WAIT}s)"
@@ -244,7 +253,7 @@ INNER="$INNER MYNE_E2E_SERVER=\"${MYNE_E2E_SERVER}\""
 # developer running this script by hand keeps their own value.
 INNER="$INNER MYNE_E2E_TIMEOUT_SCALE=\"${MYNE_E2E_TIMEOUT_SCALE:-1}\""
 INNER="$INNER MYNE_E2E_LANE=\"${LANE}\""
-INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache'
+INNER="$INNER"' RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/tools/bin/sccache'
 INNER="$INNER"' SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0'
 # fd soft limit -> hard cap (EMFILE guard): the Tauri app plus parallel cargo
 # codegen open enough fds to hit the runner's low default.

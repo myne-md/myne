@@ -161,6 +161,8 @@ export type CommandContext = {
   onShowIsolatedGraph: () => void;
   /** Open (or reveal) the vault-wide task list (MYND-616). */
   onShowTasks: () => void;
+  /** Open the calendar tab (myne-md/myne#1037). */
+  onShowCalendar: () => void;
   /** Open the tag browser (modal carve-out: tree + multi-select filter) (MYND-46). */
   onShowTags: () => void;
   /** Reveal the Saved Views surface — the sidebar "Views" section (MYND-274). */

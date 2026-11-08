@@ -11,13 +11,13 @@
 // languages (TR deferred, SYNC-12); the picker lists exactly the manifest, so
 // adding a bundled language surfaces here with no edit.
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
 import { SearchableSelect } from "../primitives/SearchableSelect";
 import type { SelectOption } from "../primitives/Select";
 import { ERROR_STYLE } from "./panel-styles";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import {
   prefsRead,
   setSpellEnabled,
@@ -72,63 +72,37 @@ const LANG_OPTIONS: readonly SelectOption<string>[] = [...BUNDLED_SPELL_LANGUAGE
 
 export function SpellSettings() {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(true);
-  const [active, setActive] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        // null ≡ unset → host default-ON (SYNC-15).
-        setEnabled(p.spell_enabled ?? true);
-        setActive(
-          p.spell_languages.length > 0
-            ? p.spell_languages
-            : defaultActiveLanguages(),
-        );
-      })
-      .catch(() => {
-        /* locked / no vault — leave defaults */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggleEnabled(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
+  const { value: enabled, set: setEnabled, error: enabledError } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.spell_enabled ?? true,
+    write: async (next) => {
       await setSpellEnabled(next);
       setSpellConfig(next, active); // live-update the open editor
       // Free all loaded dictionaries when turning off; on → they lazy-reload.
       void setActiveSpellLanguages(next ? active : []);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback
-      setError(t("settings.spell.errorSaveSetting"));
-    }
-  }
-
-  async function setLanguages(next: string[]) {
-    const prev = active;
-    setActive(next); // optimistic
-    try {
-      // `prev` is this component's own previous value, so the delta is what
+    },
+    initial: true,
+    errorMessage: t("settings.spell.errorSaveSetting"),
+  });
+  const { value: active, set: setActive, error: languagesError } = usePrefValue({
+    read: prefsRead,
+    select: (p) =>
+      p.spell_languages.length > 0
+        ? p.spell_languages
+        : defaultActiveLanguages(),
+    write: async (next) => {
+      // `active` is this component's own previous value, so the delta is what
       // the user just did rather than a claim about the whole stored set.
-      await mutateSpellLanguages(mutationFrom(prev, next));
+      await mutateSpellLanguages(mutationFrom(active, next));
       setSpellConfig(enabled, next); // live-update the open editor
       // Drop the dicts of just-removed languages; added ones lazy-load on the
       // next scan. Only when enabled (disabled → already freed in toggleEnabled).
       if (enabled) void setActiveSpellLanguages(next);
-      setError(null);
-    } catch {
-      setActive(prev); // rollback
-      setError(t("settings.spell.errorSaveLanguages"));
-    }
-  }
+    },
+    initial: [],
+    errorMessage: t("settings.spell.errorSaveLanguages"),
+  });
+  const error = enabledError ?? languagesError;
 
   return (
     <>
@@ -138,7 +112,7 @@ export function SpellSettings() {
         control={(helperId) => (
           <Switch
             checked={enabled}
-            onChange={() => void toggleEnabled(!enabled)}
+            onChange={() => void setEnabled(!enabled)}
             ariaLabel={t("settings.spell.label")}
             ariaDescribedBy={helperId}
             testId="settings.spell-check"
@@ -155,7 +129,7 @@ export function SpellSettings() {
             multiple
             options={LANG_OPTIONS}
             selected={active}
-            onChange={(next) => void setLanguages(next)}
+            onChange={(next) => void setActive(next)}
             disabled={!enabled}
             aria-label={t("settings.spell.languagesAriaLabel")}
             testId="settings.spell-language-select"

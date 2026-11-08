@@ -221,13 +221,13 @@ describe("check-twin-inventory", () => {
     // `core/src/plugins/agent/history.rs` arrived from develop while the agent
     // command surface had already moved into `myne-core` here, so the pair the
     // sweep sees is new to the merged tree rather than to either branch.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     // Then 104 to 105: myne-md/myne#177 rostered `src/notes/dailyNote.ts`
     // against `mobile/src/lib/daily.ts`, the period resolver hand-mirrored at
     // two different paths. The curated half again, and again the half that was
     // green and blind: six doc comments across the two files claimed they
     // mirrored each other exactly and nothing measured it.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then 109 to 110 when the two met at a merge: neither branch could see
     // the other's pair, and both are real.
@@ -237,7 +237,7 @@ describe("check-twin-inventory", () => {
     // and the second is where the review found mobile issuing one prefs write
     // per note in a folder rename while desktop batched: an unrostered pair is
     // how that stayed green.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
     //
     // Then to 112 when the two met at a merge: neither branch could see the
     // other's pairs, and all of them are real.
@@ -327,7 +327,7 @@ describe("check-twin-inventory", () => {
     // same change moved is the VOCABULARY (`Capability` and the keyed
     // `CAPABILITY_KEYS` record) into `@myne/client-core`, which is what let the
     // phone answer the closed list at all.
-    expect(full.out).toContain("133 twin(s) discovered");
+    expect(full.out).toContain("134 twin(s) discovered");
   });
 
   it("keeps both counterparts when one desktop file has two", () => {
@@ -539,7 +539,7 @@ describe("check-twin-inventory", () => {
     // same read a missing file does. The drift ratchet locks the convergence in,
     // which is what keeps the pair from re-appearing on the desktop side without
     // somebody deciding to bring the surface back.
-    expect(ROSTER.length).toBe(133);
+    expect(ROSTER.length).toBe(134);
   });
 
   it("keeps `screen` narrow", () => {

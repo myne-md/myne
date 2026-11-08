@@ -94,6 +94,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::set_daily_folder,
             commands::set_daily_template,
             commands::set_periodic_note_setting,
+            commands::set_calendar_setting,
             // myne-md/myne#699 left ribbon.
             commands::set_ribbon_items,
             commands::set_ribbon_visible,
