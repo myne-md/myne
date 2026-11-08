@@ -143,7 +143,7 @@
     "core/src/plugins/sync/cycle.rs": 920,
     "core/src/plugins/sync/device_actor.rs": 147,
     "core/src/plugins/sync/device_admission.rs": 141,
-    "core/src/plugins/sync/device_identity.rs": 535,
+    "core/src/plugins/sync/device_identity.rs": 537,
     "core/src/plugins/sync/device_key_pin.rs": 180,
     "core/src/plugins/sync/devices.rs": 527,
     "core/src/plugins/sync/dictionary_payload.rs": 206,

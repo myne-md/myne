@@ -1130,6 +1130,9 @@ mod tests {
     /// that had destroyed the key. `None` must stay `None`: it is neither permission nor refusal,
     /// and `has_separate_file_keychain` answers `false` (no delete) without caching it so the next
     /// call asks again.
+    // Apple-only: `classify_probe_answer` and the `ERR_SEC_*` statuses it reads exist
+    // only in the Apple `imp` (the second address is the pre-split keychain item).
+    #[cfg(any(target_os = "macos", target_os = "ios"))]
     #[test]
     fn only_a_missing_legacy_item_proves_two_keychains() {
         assert_eq!(
