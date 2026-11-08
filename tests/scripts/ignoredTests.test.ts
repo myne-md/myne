@@ -98,8 +98,10 @@ describe("check-ignored-tests", () => {
     const issues = r.ignored.map((e: { issue: string | null }) => e.issue).sort();
     // Written out in full rather than counted: a deferral nobody reviewed is exactly a new
     // issue number appearing here, and adding one is supposed to make somebody read this.
-    // #759 left with the v0.1 generation cut, which deleted the code its #[ignore] guarded.
-    expect(issues).toEqual(["760", "964"]);
+    // #759 left with the v0.1 generation cut, which deleted the code its #[ignore] guarded,
+    // and #964 left with the locked writer that landed beside it: the deferral was the
+    // unlocked read-modify-write, and there is no longer one to defer.
+    expect(issues).toEqual(["760"]);
   });
 
   it("rule 1: a deferral that names no issue fails", () => {
