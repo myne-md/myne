@@ -29,7 +29,7 @@ import { compareCivilDates, formatCivilDate, parseCivilDate, type CivilDate } fr
 import { isLegalSegment } from "./folderPath";
 import { NEWLINE } from "./lezer/frontmatter";
 import { parseRecurrenceRule, type ParsedRecurrence } from "./recurrence";
-import { EVENT_KIND_VALUE, extractFmScalar, readKindFromFmBody } from "./surgery";
+import { EVENT_KIND_VALUE, extractFmScalar, patchFrontmatterField, patchTitleField, readKindFromFmBody } from "./surgery";
 
 /** The frontmatter keys of the event vocabulary (§3.10). */
 export const EVENT_FIELD_KEYS = {
@@ -379,6 +379,53 @@ function residualsOf(raw: string | null, keep: (token: string) => boolean): stri
     if (!out.includes(trimmed)) out.push(trimmed);
   }
   return out;
+}
+
+/** What a brand-new event note says, before any client's folder handling. */
+export type NewEventNote = {
+  readonly title: string;
+  readonly start: EventInstant;
+  readonly end?: EventInstant | null;
+  readonly repeat?: string | null;
+  readonly remind?: string | null;
+  readonly calendar?: string | null;
+  readonly uid?: string | null;
+};
+
+/**
+ * The plaintext a brand-new event is created with.
+ *
+ * ONE builder, because it was two and the copies had already drifted: the phone wrote
+ * no `uid` and ordered `repeat` before `calendar` where the desktop did the reverse,
+ * so the comment in `mobile/src/lib/eventWrite.ts` claiming a phone-created note is
+ * byte-identical to a laptop-created one was false. The field SET and its ORDER are
+ * the contract here, and a second copy of a contract is a second contract.
+ *
+ * `folder` is the caller's: it arrives through the create command rather than as a
+ * frontmatter patch on this base, and the two clients pass it through the same
+ * `normalizeFolderPath`.
+ */
+export function eventNoteBytes(input: NewEventNote): Uint8Array {
+  const encoder = new TextEncoder();
+  let bytes = patchTitleField(encoder.encode(""), input.title);
+  bytes = patchFrontmatterField(bytes, "kind", EVENT_KIND_VALUE);
+  bytes = patchFrontmatterField(bytes, "start", formatEventInstant(input.start));
+  if (input.end !== undefined && input.end !== null) {
+    bytes = patchFrontmatterField(bytes, "end", formatEventInstant(input.end));
+  }
+  if (input.calendar !== undefined && input.calendar !== null && input.calendar !== "") {
+    bytes = patchFrontmatterField(bytes, "calendar", input.calendar);
+  }
+  if (input.repeat !== undefined && input.repeat !== null && input.repeat !== "") {
+    bytes = patchFrontmatterField(bytes, "repeat", input.repeat);
+  }
+  if (input.remind !== undefined && input.remind !== null && input.remind !== "") {
+    bytes = patchFrontmatterField(bytes, "remind", input.remind);
+  }
+  if (input.uid !== undefined && input.uid !== null && input.uid !== "") {
+    bytes = patchFrontmatterField(bytes, "uid", input.uid);
+  }
+  return bytes;
 }
 
 /** The hour an all-day event's relative reminder counts back from. */

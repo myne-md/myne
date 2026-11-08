@@ -13,12 +13,11 @@
 // and the emitted form is the one `@myne/dialect` reads (`formatEventInstant`, a
 // single space between date and time).
 
-import { formatEventInstant, type EventInstant } from "@myne/dialect/event";
+import { eventNoteBytes, type EventInstant } from "@myne/dialect/event";
 import { normalizeFolderPath } from "../dialect/folderPath";
-import { patchFrontmatterField, patchTitleField } from "../dialect/surgery";
+import { patchFrontmatterField } from "../dialect/surgery";
 import { noteCreate } from "./createNote";
 
-const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
 /**
@@ -57,25 +56,10 @@ export type NewEventInput = {
  * the bytes without an IPC round trip: the shape IS the contract here.
  */
 export function buildEventNoteBytes(input: NewEventInput): Uint8Array {
-  let bytes = patchTitleField(encoder.encode(""), input.title);
-  bytes = patchFrontmatterField(bytes, "kind", "event");
-  bytes = patchFrontmatterField(bytes, "start", formatEventInstant(input.start));
-  if (input.end !== undefined && input.end !== null) {
-    bytes = patchFrontmatterField(bytes, "end", formatEventInstant(input.end));
-  }
-  if (input.calendar !== undefined && input.calendar !== null && input.calendar !== "") {
-    bytes = patchFrontmatterField(bytes, "calendar", input.calendar);
-  }
-  if (input.repeat !== undefined && input.repeat !== null && input.repeat !== "") {
-    bytes = patchFrontmatterField(bytes, "repeat", input.repeat);
-  }
-  if (input.remind !== undefined && input.remind !== null && input.remind !== "") {
-    bytes = patchFrontmatterField(bytes, "remind", input.remind);
-  }
-  if (input.uid !== undefined && input.uid !== null && input.uid !== "") {
-    bytes = patchFrontmatterField(bytes, "uid", input.uid);
-  }
-  return bytes;
+  // The bytes come from the dialect now: this function and the phone's copy had
+  // drifted (no `uid` on the phone, and a different field order), so the claim that
+  // the two clients produce one note was false in one of them.
+  return eventNoteBytes(input);
 }
 
 /**

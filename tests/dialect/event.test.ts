@@ -20,6 +20,7 @@ import {
   formatEventInstant,
   parseEventInstant,
   parseReminderLead,
+  eventNoteBytes,
   parseOverrides,
   parseSkipDates,
   readEventFromFmBody,
@@ -337,5 +338,41 @@ describe("the writers keep what the reader cannot type", () => {
       time: "14:00",
     });
     expect(next).toBe("2026-11-17, 2026-11-05 14:00, 2026-11-10 14:00");
+  });
+});
+
+describe("eventNoteBytes: one builder for both clients", () => {
+  it("emits the field set in one order, so two clients cannot produce two notes", () => {
+    // Found by review: the desktop and the phone each had a builder, and they had
+    // already drifted (the phone wrote no `uid` and ordered `repeat` before
+    // `calendar`), which made "a phone note is byte-identical to a laptop note" false
+    // in the file that claimed it.
+    const bytes = eventNoteBytes({
+      title: "Standup",
+      start: { date: { year: 2026, month: 11, day: 5 }, time: "09:00" },
+      end: { date: { year: 2026, month: 11, day: 5 }, time: "09:30" },
+      repeat: "every tuesday",
+      remind: "10m",
+      calendar: "Work",
+      uid: "abc-123",
+    });
+    const text = new TextDecoder().decode(bytes);
+    const order = ["kind: event", "start: 2026-11-05 09:00", "end: 2026-11-05 09:30", "calendar: Work", "repeat: every tuesday", "remind: 10m", "uid: abc-123"];
+    const positions = order.map((line) => text.indexOf(line));
+    expect(positions.every((at) => at >= 0)).toBe(true);
+    expect([...positions].sort((a, b) => a - b)).toEqual(positions);
+  });
+
+  it("leaves out every absent field rather than writing an empty one", () => {
+    const text = new TextDecoder().decode(
+      eventNoteBytes({
+        title: "Dentist",
+        start: { date: { year: 2026, month: 11, day: 6 }, time: null },
+      }),
+    );
+    expect(text).toContain("kind: event");
+    for (const absent of ["end:", "calendar:", "repeat:", "remind:", "uid:"]) {
+      expect(text).not.toContain(absent);
+    }
   });
 });
