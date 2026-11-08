@@ -1191,7 +1191,10 @@ mod tests {
 /// model-visible half of a rule the host enforces. It is not a performance limit:
 /// a year is enough to answer "what am I doing next week" and too little to
 /// reconstruct a life.
-pub const CALENDAR_MAX_WINDOW_DAYS: i64 = 366;
+/// Re-exported rather than restated: the number the MODEL is told and the number the
+/// HOST enforces are one rule, and two constants with nothing tying them is how the
+/// prompt and the refusal drift apart (`MAX_EMBED_DIMENSION_PX` is the precedent).
+pub use super::super::vault_indices::calendar::MAX_WINDOW_DAYS as CALENDAR_MAX_WINDOW_DAYS;
 
 /// Why a calendar read could not answer.
 ///

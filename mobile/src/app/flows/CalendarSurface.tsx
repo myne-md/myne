@@ -35,6 +35,7 @@ import { EventWriteRefused } from "@myne/calendar-drag-write";
 import { skipOccurrence } from "@myne/calendar-skip";
 import { overrideOccurrence } from "@myne/calendar-override";
 import { noteRead, noteUpdate } from "../../lib/notes";
+import { formatLocalDate } from "../../lib/localDateTime";
 import { homeClockFor } from "@myne/home-zone";
 
 /**
@@ -50,14 +51,6 @@ function secondClock(start: string): string {
   if (home === null) return "";
   const day = home.dayOffset === 0 ? "" : home.dayOffset > 0 ? "+1" : "-1";
   return `  ·  ${home.time}${day}`;
-}
-
-/** Today, as the `YYYY-MM-DD` a cell and a composer both speak. */
-function todayDateString(): string {
-  const now = new Date();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${now.getFullYear()}-${month}-${day}`;
 }
 
 /** Today, as the civil date the calendar speaks. */
@@ -200,7 +193,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
           {...tappable}
           aria-label={t("calendar.composer.title")}
           data-testid="calendar.add"
-          onClick={() => setComposing(selected ?? todayDateString())}
+          onClick={() => setComposing(selected ?? formatLocalDate(new Date()))}
         >
           +
         </Button>

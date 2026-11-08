@@ -741,7 +741,7 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
 
 /// One legal calendar segment: non-empty, no separator, no control character,
 /// bounded like a folder segment (`§3.10.1`).
-fn is_legal_calendar_name(name: &str) -> bool {
+pub(crate) fn is_legal_calendar_name(name: &str) -> bool {
     !name.is_empty()
         && name.len() <= 255
         && name == name.trim()

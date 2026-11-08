@@ -4673,11 +4673,11 @@ fn is_wall_clock_hm(value: &str) -> bool {
 /// Whether `name` is one legal calendar segment: non-empty, no separator, no
 /// control character, bounded like a folder segment.
 fn is_legal_calendar_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 255
-        && name == name.trim()
-        && !name.contains('/')
-        && !name.chars().any(|c| c.is_control())
+    // One definition, in the calendar vocabulary that decides which values a READER
+    // accepts. A second copy here decided which keys the setter WRITES, so a tightened
+    // rule would land on one side of a write/read pair and the picker would store a
+    // value the pane then refuses to render.
+    crate::plugins::vault_indices::calendar::is_legal_calendar_name(name)
 }
 
 /// Whether `value` is a design-token NAME (`moss`, `slate-2`), never a colour
