@@ -54,7 +54,6 @@ import { join } from "node:path";
 import { harnessSupported, type AppSession } from "./support/session";
 import { startSyncServer, syncServerSupported } from "./support/sync-server";
 import {
-  migrateFleetToV02,
   noteBlobCount,
   noteBlobMagics,
   setupTwoSyncedDevices,
@@ -152,15 +151,10 @@ describeCanary("live co-editing convergence (collab-verification)", () => {
   it("concurrent NC05 edits merge byte-equal, with no keep-both and no fabricated frontmatter", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
         const idHex = noteId.replace(/-/g, "");
-        // The migration route (the `crdt-remove-wins` template) rather than a
-        // born-v0.2 fleet: it exercises the adoption path and still leaves both
-        // devices holding the same NC05 corpus. Asserted, not assumed, every
-        // claim below is about NC05 merge semantics.
-        await migrateFleetToV02(devices);
         expect(noteBlobMagics(a.appDataDir)).toEqual([CRDT_MAGIC]);
         expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
 
@@ -254,10 +248,9 @@ describeCanary("live co-editing convergence (collab-verification)", () => {
   it("does not echo its own frame as a second participant, and never doubles a local edit", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
-        await migrateFleetToV02(devices);
         expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
 
         const body = await readBody(a.session, noteId);
@@ -370,10 +363,9 @@ describeCanary("live co-editing convergence (collab-verification)", () => {
   it("converges through the durable plane after the live stream is dropped, with no loss", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
-        await migrateFleetToV02(devices);
         expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
 
         // Drop the live CHANNEL on BOTH devices by dropping the live session, which
@@ -414,10 +406,9 @@ describeCanary("live co-editing convergence (collab-verification)", () => {
   it("leaves no awareness artefact on disk after a live co-editing session", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
-        await migrateFleetToV02(devices);
 
         // A live co-editing session: A edits, B pulls.
         await writeBody(a.session, noteId, `# Live\n\n${A_MARKER}\n`);

@@ -20,7 +20,6 @@ import {
   adoptedHeadFingerprint,
   joinAccountDevice,
   launchDevice,
-  migrateFleetToV02,
   noteBlobCount,
   noteBlobMagics,
   setupTwoSyncedDevices,
@@ -340,11 +339,10 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   // keep-both copy, no Conflicts row), and the pulling device shows the calm
   // "updated from another device" hint (`sync.remote-merge-hint`).
   //
-  // Live since myne-md/myne#447. This scenario is what found that defect — the
-  // peer could not join the generation a migration creates, so `migrateFleetToV02`
-  // never got past its adoption step — and it is what proves the fix: B only
-  // reaches the assertions below by staging the server's `NTV5` meta, opening it
-  // with its own password, and promoting it.
+  // Live since myne-md/myne#447, which found that the peer could not join the
+  // generation a migration created; the fleet is born v0.2 now (the migration
+  // surface itself was removed with myne-md/myne#945's generation cut), so the
+  // adoption the fix added is what the born-v0.2 join exercises end to end.
   //
   // The assertions are COUNT-based on purpose (#446): the previous version
   // asserted `toContain("A")` + `toContain("B")`, which #428's doubling bug
@@ -357,8 +355,6 @@ describeCanary("two-device sync canary (MYND-428)", () => {
       // exercises the v0.2 arm of device ENROLMENT — the enrol path derives both
       // credential wrap keys under the vault's generation, and deriving them
       // under v0.1 against a v0.2 meta reports a correct password as wrong.
-      // `crdt-remove-wins` below keeps the migrated route, so both ways of
-      // reaching a CRDT fleet stay covered.
       const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
@@ -456,12 +452,24 @@ describeCanary("two-device sync canary (MYND-428)", () => {
   it("crdt-remove-wins: a deletion beats a concurrent edit, with no fabricated timestamp", async () => {
     const srv = await startSyncServer();
     try {
-      const devices = await setupTwoSyncedDevices(srv);
+      // Born v0.2, like every vault the product creates: the explicit migration
+      // that used to reach a CRDT fleet was removed with the generation cut, so a
+      // v0.1 seed here would leave an `MY01` note and make every claim below
+      // vacuous — which is exactly how it failed first.
+      const devices = await setupTwoSyncedDevices(srv, { generation: "v0.2" });
       const { a, b, noteId, teardown } = devices;
       try {
         const idHex = noteId.replace(/-/g, "");
-        await migrateFleetToV02(devices);
         expect(noteBlobMagics(b.appDataDir)).toEqual([CRDT_MAGIC]);
+
+        // Both panes hold the note, so both LIVE sessions go first: a live session
+        // is the note's single durable writer (`SYNC-33`) and `note_update` refuses
+        // with `LiveSessionOpen` while one is open — the refusal this scenario hit
+        // as soon as it stopped arriving through a migration, which dropped the
+        // sessions on its own. `crdt-merge` above takes the same step.
+        for (const session of [a.session, b.session]) {
+          await pageSeatInvoke(session, "plugin:live|live_session_close", { noteId }, 15_000);
+        }
 
         // A tombstones through the real path (the `tombstoneNote` dialect
         // surgery + the queued flag), B edits the same note concurrently.

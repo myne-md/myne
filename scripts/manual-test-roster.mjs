@@ -5605,7 +5605,6 @@ export const ROSTER = Object.freeze([
       "e2e/state-machine.e2e.ts",
       "e2e/prefs.e2e.ts",
       "e2e/keyboard-nav-working.e2e.ts",
-      "e2e/vault-format-upgrade.e2e.ts",
       "e2e-web/vault-delete.e2e.ts",
     ],
     manual: [
@@ -6792,7 +6791,6 @@ export const ROSTER = Object.freeze([
     ],
     clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
     automatedBy: [
-      "e2e/vault-migrate.e2e.ts",
       "e2e/state-machine.e2e.ts",
       "e2e/crdt-history.e2e.ts",
     ],

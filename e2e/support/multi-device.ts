@@ -306,11 +306,10 @@ interface SetupOptions {
    * copies, take-theirs, the `snapshots/` store. Those need a pre-flip vault to
    * have a subject at all.
    *
-   * Pass `"v0.2"` for a fleet that is v0.2 FROM BIRTH — which is a different
-   * thing from a migrated fleet (`migrateFleetToV02`) and worth covering
-   * separately: enrolment derives the credential wrap keys under the vault's
-   * generation, so a birth-v0.2 fleet is the only shape that exercises the v0.2
-   * arm of the enrol path.
+   * Pass `"v0.2"` for a fleet that is v0.2 FROM BIRTH: enrolment derives the
+   * credential wrap keys under the vault's generation, so a birth-v0.2 fleet is
+   * the only shape that exercises the v0.2 arm of the enrol path. This is also
+   * the only v0.2 shape left — the explicit migration surface was removed.
    */
   generation?: "v0.1" | "v0.2";
   /** MYND-548: type these into the two enrollment forms' "Name this device"
@@ -470,75 +469,6 @@ export async function setupTwoSyncedDevices(
   }
 }
 
-/**
- * Move a synced two-device fleet from v0.1 to v0.2 (§10.4.1, myne-md/myne#446).
- *
- * **Exactly one device migrates.** `vault_migrate` mints a FRESH random
- * `root_key`, so running it on both devices gives them different vault keys and
- * forks the fleet irrecoverably — neither can decrypt the other's blobs and
- * there is no merge that recovers it. (The skipped NC05 scenario this helper
- * un-blocks carried a note saying the harness should "migrate both devices";
- * that setup would have been the hazard, not the fix.)
- *
- * The other device adopts the new generation instead, which is the production
- * path #429 specifies:
- *
- *  1. **A migrates.** The re-key drops A's unlocked slot — it held v0.1 keys
- *     that open none of the new `NC05` blobs — so A routes back to Unlock and
- *     re-unlocks under the same password (the NTV5 meta rewraps it).
- *  2. **A syncs.** Its pull cannot open the head it wrote under the OLD root, so
- *     the one-shot re-base flag lets it adopt that head's id unverified, author
- *     a fresh head under the new root, and push it — along with the NTV5 meta
- *     and the whole re-keyed corpus.
- *  3. **B syncs.** Its pull hits the same unopenable head with NO re-base flag,
- *     asks the one question that separates a migration from an attack (is the
- *     server's `vault.meta` a newer generation?), and on `true` locks the vault
- *     rather than crying forgery. `sync_now` reports a failed cycle here — that
- *     is the SUCCESS path for this step, not an error to retry.
- *  4. **B re-unlocks**, re-deriving the v0.2 root from the meta the meta phase
- *     adopted, then pulls the re-keyed corpus.
- *
- * After this returns, both devices hold the same `NC05` notes under the same
- * generation, and the note ids are unchanged (the migration re-encodes bodies;
- * it does not re-issue identities).
- */
-export async function migrateFleetToV02(devices: TwoSyncedDevices): Promise<void> {
-  const { a, b, password, phrase } = devices;
-
-  // (1) A migrates. Real IPC, real production KDF path — no test hook.
-  await ipcOk(a.session, "plugin:vault-migrate|vault_migrate", { password, phrase }, 300_000);
-  await a.session.refresh();
-  await unlockToEditor(a.session, password);
-  // The TOLERANT variant on purpose: this is a re-unlock of a populated vault,
-  // and the fresh-vault importer offer does not re-appear on a second mount —
-  // the hard `dismissImporterOffer` waits 10 s for an overlay that will never
-  // exist and fails the scenario in the setup step.
-  await dismissImporterOfferIfPresent(a.session);
-
-  // (2) A publishes the new generation. Two cycles: the first lands the re-based
-  //     head + the replaced verifier, the second the re-keyed corpus behind it.
-  await ipcOk(a.session, "plugin:sync|sync_now", {});
-  await new Promise((r) => setTimeout(r, 1500));
-  await ipcOk(a.session, "plugin:sync|sync_now", {});
-
-  // (3) B meets the new generation and locks. The cycle FAILS by design, so this
-  //     goes through the page seat rather than `ipcOk` — the command answers
-  //     with a status, and treating a non-`Idle` status as a harness error here
-  //     would be asserting the opposite of the specified behaviour.
-  await pageSeatInvoke(b.session, "plugin:sync|sync_now", {}, 60_000);
-  await b.session.byTestId("sync.vault-rekeyed", { timeoutMs: 30_000 });
-
-  // (4) B re-unlocks under the adopted NTV5 meta and pulls the re-keyed corpus.
-  await b.session.refresh();
-  await unlockToEditor(b.session, password);
-  await dismissImporterOfferIfPresent(b.session);
-  for (let i = 0; i < 12; i++) {
-    await ipcOk(b.session, "plugin:sync|sync_now", {});
-    await new Promise((r) => setTimeout(r, 1500));
-    if (noteBlobMagics(b.appDataDir).every((m) => m === "NC05")) return;
-  }
-  throw new Error("setup: the re-keyed NC05 corpus never replicated to B");
-}
 
 /** Count `.myn` note blobs across every vault under a device's app-data dir. */
 export function noteBlobCount(appDataDir: string): number {
