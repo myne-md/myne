@@ -167,10 +167,14 @@ steps:
         # "destination path already exists". Clone aside, move in, and let the loser find the
         # directory already there.
         if [ ! -d myne-agents/docs ]; then
-          rm -rf .myne-agents-clone
-          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-agents.git" .myne-agents-clone
-          mv -n .myne-agents-clone myne-agents 2>/dev/null || true
-          rm -rf .myne-agents-clone
+          # A UNIQUE staging directory per step. A fixed name was the race after all: two steps
+          # reaching here at once shared `.myne-agents-clone`, and the second one's `rm -rf` and
+          # clone removed the pack files the first was still writing ("could not open
+          # .../tmp_pack_XD6ZG8 for reading"). `mktemp -d` cannot collide.
+          stage=$(mktemp -d)
+          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/myne-md/myne-agents.git" "$stage/repo"
+          mv -n "$stage/repo" myne-agents 2>/dev/null || true
+          rm -rf "$stage"
         fi
       - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - /cache/tools/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
