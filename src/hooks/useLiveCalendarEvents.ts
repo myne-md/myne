@@ -47,9 +47,13 @@ export function useLiveCalendarEvents(horizonDays: number | null): readonly Even
       })
       .catch(() => {
         if (cancelled) return;
-        // Locked, or the index is not ready: no events this pass, and the next
-        // nonce or tick retries by construction.
-        setEvents([]);
+        // Locked, or the index is not ready.
+        //
+        // The list is LEFT ALONE rather than cleared. The reminder pass reconciles the
+        // OS against what this hook reports, so an empty list is not "nothing to
+        // report", it is "cancel every event reminder", and a transient read failure
+        // would then withdraw reminders that were correctly registered. The next nonce
+        // or tick retries by construction, which is what makes staying inert safe.
       });
     return () => {
       cancelled = true;

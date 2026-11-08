@@ -116,11 +116,7 @@ vi.mock("../../src/lib/tasks", async (importActual) => {
   };
 });
 
-import {
-  eventSourcesFrom,
-  resetPermissionAsk,
-  useMobileReminderPass,
-} from "../../src/lib/useMobileReminderPass";
+import { resetPermissionAsk, useMobileReminderPass } from "../../src/lib/useMobileReminderPass";
 
 beforeEach(() => {
   resetPermissionAsk();
@@ -156,12 +152,13 @@ describe("useMobileReminderPass", () => {
     expect(permission.requested).toBe(1);
   });
 
-  it("keeps only the events that carry a lead", () => {
-    const sources = eventSourcesFrom([
-      { noteId: "a", start: "2026-11-10 09:15", allDay: false, occurrenceDate: null, remind: "10m" },
-      { noteId: "b", start: "2026-11-10 09:15", allDay: false, occurrenceDate: null, remind: null },
-      { noteId: "c", start: "2026-11-10 09:15", allDay: false, occurrenceDate: null, remind: "" },
-    ]);
-    expect(sources).toHaveLength(1);
+  it("hands the pass only the events that carry a lead", async () => {
+    // Through the pass rather than through the mapper: the mapper is internal, and
+    // what matters is the list the scheduler actually receives.
+    renderHook(() => useMobileReminderPass());
+    await waitFor(() => expect(calls).toHaveLength(1));
+    const options = calls[0] as { events: { remind: string | null }[] };
+    expect(options.events).toHaveLength(1);
+    expect(options.events[0]?.remind).toBe("10m");
   });
 });

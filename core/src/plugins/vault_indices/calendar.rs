@@ -742,9 +742,18 @@ fn read_event(record: &NoteRecord) -> Option<Result<ParsedEvent, UnreadableReaso
 /// One legal calendar segment: non-empty, no separator, no control character,
 /// bounded like a folder segment (`§3.10.1`).
 pub(crate) fn is_legal_calendar_name(name: &str) -> bool {
+    // The DIALECT's grammar, not a looser neighbour of it: `isLegalSegment`
+    // (`dialect/src/folderPath.ts`) also refuses `.`, `..`, a trailing dot, the
+    // segment delimiters and a byte length over `NAME_MAX`. A host that accepted more
+    // made one note two notes - rendered by the pane as an ordinary row, and refused
+    // by every writer as `start-missing`, so the calendar showed an event nobody could
+    // drag, cancel or retime and blamed a missing field.
     !name.is_empty()
         && name.len() <= 255
         && name == name.trim()
+        && name != "."
+        && name != ".."
+        && !name.ends_with('.')
         && !name.contains('/')
         && !name.chars().any(|c| c.is_control())
 }
@@ -1391,6 +1400,61 @@ mod tests {
     }
 
     #[test]
+    fn a_calendar_name_the_dialect_refuses_is_refused_here_too() {
+        // The two readers must agree about one persisted value. Before this, the host
+        // served `calendar: Work.` as an ordinary row while the dialect called the same
+        // note `calendar-unreadable`, so the pane showed an event the writers refused.
+        let state = state_with(&[
+            (
+                "dot",
+                &[
+                    ("kind", "event"),
+                    ("start", "2026-11-05"),
+                    ("calendar", "Work."),
+                ],
+            ),
+            (
+                "dots",
+                &[
+                    ("kind", "event"),
+                    ("start", "2026-11-05"),
+                    ("calendar", ".."),
+                ],
+            ),
+            (
+                "fine",
+                &[
+                    ("kind", "event"),
+                    ("start", "2026-11-05"),
+                    ("calendar", "Work"),
+                ],
+            ),
+        ]);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        assert_eq!(
+            answer.rows.len(),
+            1,
+            "only the legal name is a row: {:?}",
+            answer.rows
+        );
+        assert_eq!(answer.rows[0].calendar.as_deref(), Some("Work"));
+        let reasons: Vec<&str> = answer
+            .unreadable
+            .iter()
+            .map(|entry| match entry.reason {
+                UnreadableReason::CalendarUnreadable => "calendar-unreadable",
+                _ => "other",
+            })
+            .collect();
+        assert_eq!(reasons, vec!["calendar-unreadable", "calendar-unreadable"]);
+    }
+
+    #[test]
     fn a_trashed_event_is_absent_from_the_answer() {
         // Found by review: a note outside the working set is absent from every read,
         // and `search_vault` was corrected for exactly this leak. The pane, the phone
@@ -1638,6 +1702,14 @@ mod tests {
         let raw = include_str!("../../../tests/fixtures/calendar/recurrence_projection.json");
         let fixture: Fixture = serde_json::from_str(raw).expect("fixture parses");
 
+        // A loop over a roster passes trivially when the roster is empty, and this
+        // fixture is the only thing holding the two implementations of the §3.8.7
+        // grammar together. Its TS twin pins the same floor.
+        assert!(
+            fixture.cases.len() > 10,
+            "the shared recurrence fixture must stay populated: {} case(s)",
+            fixture.cases.len()
+        );
         for case in &fixture.cases {
             let Some(expected) = &case.occurrences else {
                 assert!(
