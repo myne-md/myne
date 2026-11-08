@@ -372,6 +372,7 @@ fn canned(status: http::StatusCode) -> http::Response<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_support::seed_real_vault_meta as seed_vault_meta;
     use crate::test_support::ScopedTempDir;
     use protocol::{
         derive_subkey, encode_attachment_blob, encode_attachments_catalog, AttachmentMeta,
@@ -392,29 +393,6 @@ mod tests {
                 Zeroizing::new([SEED_ROOT; 32]),
             ),
         }
-    }
-
-    fn seed_vault_meta(dir: &Path) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [SEED_ACCOUNT_HASH; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .unwrap();
     }
 
     /// Seed a blob + catalog entry the way `attachment_import` would, and
@@ -488,7 +466,7 @@ mod tests {
     #[test]
     fn serves_png_with_resniffed_type() {
         let tmp = ScopedTempDir::new("scheme-png").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let id = seed_attachment(tmp.path(), PNG_BYTES, "image/png");
 
         let resp = build_response(tmp.path(), &keys(), &id);
@@ -512,7 +490,7 @@ mod tests {
         // the blob must be ENCODED under the same (lying) hint for decode
         // to succeed — we seed it as "application/pdf" but with PNG bytes.
         let tmp = ScopedTempDir::new("scheme-resniff").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let id = seed_attachment(tmp.path(), PNG_BYTES, "application/pdf");
 
         let resp = build_response(tmp.path(), &keys(), &id);
@@ -529,7 +507,7 @@ mod tests {
         // Bytes that don't sniff to anything allowlisted → served as
         // octet-stream (non-scriptable), never text/html.
         let tmp = ScopedTempDir::new("scheme-octet").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let mystery = b"\x00\x01\x02 not a known format \x03\x04";
         let id = seed_attachment(tmp.path(), mystery, "application/octet-stream");
 
@@ -546,7 +524,7 @@ mod tests {
     #[test]
     fn malformed_id_is_forbidden() {
         let tmp = ScopedTempDir::new("scheme-badid").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let resp = build_response(tmp.path(), &keys(), "not-hex");
         assert_eq!(resp.status(), http::StatusCode::FORBIDDEN);
         assert!(resp.body().is_empty());
@@ -555,7 +533,7 @@ mod tests {
     #[test]
     fn absent_blob_is_not_found() {
         let tmp = ScopedTempDir::new("scheme-absent").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         // Valid-shape id that was never stored (no catalog entry, no blob).
         let id = "ab".repeat(32);
         let resp = build_response(tmp.path(), &keys(), &id);
@@ -565,7 +543,7 @@ mod tests {
     #[test]
     fn wrong_items_key_decode_fail_is_forbidden_not_distinguishing() {
         let tmp = ScopedTempDir::new("scheme-wrongkey").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let id = seed_attachment(tmp.path(), PNG_BYTES, "image/png");
         // Serve with a WRONG items_key → decode fails → 403 (non-
         // distinguishing from tamper / cross-vault).
@@ -578,7 +556,7 @@ mod tests {
     #[test]
     fn tampered_blob_is_forbidden() {
         let tmp = ScopedTempDir::new("scheme-tamper").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let id = seed_attachment(tmp.path(), PNG_BYTES, "image/png");
         // Flip a ciphertext byte in the stored blob.
         let blob_path = tmp.path().join("attachments").join(&id);
@@ -608,7 +586,7 @@ mod tests {
     #[test]
     fn reads_text_attachment_roundtrip() {
         let tmp = ScopedTempDir::new("scheme-text").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let body = "line one\nsecond line\n";
         let id = seed_attachment(tmp.path(), body.as_bytes(), "text/plain");
 
@@ -624,7 +602,7 @@ mod tests {
     #[test]
     fn read_text_absent_id_is_not_found() {
         let tmp = ScopedTempDir::new("scheme-text-missing").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         // Syntactically valid (64 hex chars) but never seeded → catalog miss.
         let absent = "ab".repeat(32);
         assert!(matches!(
@@ -636,7 +614,7 @@ mod tests {
     #[test]
     fn read_text_malformed_id_is_denied() {
         let tmp = ScopedTempDir::new("scheme-text-bad").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         assert!(matches!(
             read_attachment_text(tmp.path(), &keys(), "not-hex!!"),
             ReadTextOutcome::Denied
@@ -646,7 +624,7 @@ mod tests {
     #[test]
     fn read_text_tampered_blob_is_denied() {
         let tmp = ScopedTempDir::new("scheme-text-tamper").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let id = seed_attachment(tmp.path(), b"hello world", "text/plain");
         let blob_path = tmp.path().join("attachments").join(&id);
         let mut blob = std::fs::read(&blob_path).unwrap();
@@ -662,7 +640,7 @@ mod tests {
     #[test]
     fn read_text_truncates_at_cap() {
         let tmp = ScopedTempDir::new("scheme-text-cap").unwrap();
-        seed_vault_meta(tmp.path());
+        seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let big = "a".repeat(ATTACHMENT_TEXT_PREVIEW_CAP + 100);
         let id = seed_attachment(tmp.path(), big.as_bytes(), "text/plain");
         match read_attachment_text(tmp.path(), &keys(), &id) {

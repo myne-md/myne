@@ -32,8 +32,6 @@
 // through the `vault.prefs` setters. Deliberately NOT the `usePrefs` hook —
 // the Settings panels are rendered in tests without that provider, and reaching
 // for it here took the whole Appearance panel down rather than just this block.
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   BAR_ITEMS,
@@ -44,47 +42,28 @@ import { ControlBlock } from "./ControlBlock";
 import { CUSTOMIZE_LIST_STYLE, CustomizeRow, useDragReorder } from "./CustomizeList";
 import { Switch } from "../primitives/Switch";
 import { prefsRead, setBarItemsOrder, setHiddenBarItems } from "../../lib/prefs";
+import { usePrefValue } from "@myne/client-core/pref-value";
 
 export function BarCustomizeSettings() {
   const { t } = useTranslation();
-  const [hidden, setHidden] = useState<readonly string[]>([]);
+  const { value: hidden, set: setHidden } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.hidden_bar_items ?? [],
+    write: (next) => setHiddenBarItems([...next]),
+    initial: [],
+  });
   // The bar's DISPLAY order, which is the order this list must show. Rendering
   // `BAR_ITEMS` instead would be rendering menu order — a different sequence of
   // the same nine ids — so a reordered bar and its own settings list would
   // disagree about where an item is, on the one surface that exists to move it.
-  const [order, setOrder] = useState<string[]>([...RIGHT_CLUSTER_DEFAULT_ORDER]);
+  const { value: order, set: setOrder } = usePrefValue({
+    read: prefsRead,
+    select: (p) => resolveBarOrder(p.bar_items_order ?? []),
+    write: setBarItemsOrder,
+    initial: [...RIGHT_CLUSTER_DEFAULT_ORDER],
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        // `?? []` is not defensive noise: a partially-mocked `prefsRead` (and a
-        // vault written before this key existed) yields `undefined` here, and an
-        // undefined `hidden` throws on `.includes` during the NEXT render — past
-        // the `.catch` below, which only sees the promise. That took the whole
-        // Appearance panel blank rather than this one block.
-        setHidden(p.hidden_bar_items ?? []);
-        setOrder(resolveBarOrder(p.bar_items_order ?? []));
-      })
-      .catch(() => {
-        /* locked / no vault: leave every item shown, in default order */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  function persistOrder(next: string[]) {
-    const prev = order;
-    setOrder(next);
-    // Optimistic, then persist — the bar reads the same pref through the
-    // cross-surface prefs nonce, so a failed write converges on the next read
-    // rather than leaving the two surfaces disagreeing.
-    void setBarItemsOrder(next).catch(() => setOrder(prev));
-  }
-
-  const reorder = useDragReorder(order, persistOrder);
+  const reorder = useDragReorder(order, (next) => void setOrder(next));
   const byId = new Map(BAR_ITEMS.map((i) => [i.id, i]));
 
   return (
@@ -125,10 +104,7 @@ export function BarCustomizeSettings() {
                       const updated = next
                         ? hidden.filter((x) => x !== id)
                         : [...hidden, id];
-                      setHidden(updated);
-                      void setHiddenBarItems([...updated]).catch(() => {
-                        setHidden(hidden);
-                      });
+                      void setHidden(updated);
                     }}
                   />
                 }

@@ -1,0 +1,1094 @@
+{
+  "clones": {
+    "verdicts": [
+      {
+        "id": "protocol/src/agent_memory_catalog_blob.rs + protocol/src/agent_personality_blob.rs",
+        "lines": 41,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/agent_memory_catalog_blob.rs + protocol/src/agent_personality_blob.rs + protocol/src/chats_catalog_blob.rs #1",
+        "lines": 91,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/agent_memory_catalog_blob.rs + protocol/src/agent_personality_blob.rs + protocol/src/chats_catalog_blob.rs #2",
+        "lines": 39,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/agent_memory_entry_blob.rs + protocol/src/attachment_text_blob.rs",
+        "lines": 16,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/agent_memory_entry_blob.rs + protocol/src/chats_blob.rs",
+        "lines": 12,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/agent_personality_blob.rs + protocol/src/chats_catalog_blob.rs",
+        "lines": 33,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_blob.rs #1",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_blob.rs #2",
+        "lines": 11,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_blob.rs #3",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_text_blob.rs + protocol/src/chats_blob.rs + protocol/src/dictionary_blob.rs",
+        "lines": 30,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_text_blob.rs + protocol/src/chats_catalog_blob.rs + protocol/src/themes_blob.rs",
+        "lines": 31,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/attachment_text_blob.rs + protocol/src/search_blob.rs",
+        "lines": 33,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/capture_blob.rs + protocol/src/dictionary_blob.rs + protocol/src/graph_layout_blob.rs + protocol/src/search_blob.rs + protocol/src/themes_blob.rs + protocol/src/vault_indices_blob.rs + protocol/src/workspace_blob.rs",
+        "lines": 86,
+        "copies": 7,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/capture_blob.rs + protocol/src/quick_unlock_blob.rs",
+        "lines": 111,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/capture_blob.rs + protocol/src/share_import_blob.rs",
+        "lines": 289,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/capture_blob.rs + protocol/src/share_import_blob.rs + protocol/src/vault_label_blob.rs",
+        "lines": 52,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/chats_blob.rs + protocol/src/chats_catalog_blob.rs",
+        "lines": 58,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #1",
+        "lines": 227,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #2",
+        "lines": 91,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #3",
+        "lines": 17,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #4",
+        "lines": 57,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #5",
+        "lines": 38,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs #6",
+        "lines": 37,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/graph_layout_blob.rs + protocol/src/search_blob.rs + protocol/src/themes_blob.rs + protocol/src/vault_indices_blob.rs + protocol/src/workspace_blob.rs",
+        "lines": 140,
+        "copies": 6,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/graph_layout_blob.rs + protocol/src/search_blob.rs + protocol/src/vault_indices_blob.rs + protocol/src/workspace_blob.rs",
+        "lines": 114,
+        "copies": 5,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/graph_layout_blob.rs + protocol/src/workspace_blob.rs",
+        "lines": 168,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/quick_unlock_blob.rs",
+        "lines": 60,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/search_blob.rs + protocol/src/themes_blob.rs + protocol/src/vault_indices_blob.rs",
+        "lines": 164,
+        "copies": 4,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/dictionary_blob.rs + protocol/src/themes_blob.rs",
+        "lines": 87,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/person_profile_blob.rs",
+        "lines": 37,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/search_blob.rs",
+        "lines": 134,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/themes_blob.rs + protocol/src/workspace_blob.rs",
+        "lines": 287,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/vault_indices_blob.rs",
+        "lines": 34,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/vault_indices_blob.rs + protocol/src/workspace_blob.rs #1",
+        "lines": 81,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/graph_layout_blob.rs + protocol/src/vault_indices_blob.rs + protocol/src/workspace_blob.rs #2",
+        "lines": 30,
+        "copies": 3,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/search_blob.rs + protocol/src/themes_blob.rs",
+        "lines": 69,
+        "copies": 2,
+        "verdict": "justified",
+        "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #1",
+        "lines": 63,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #2",
+        "lines": 61,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #3",
+        "lines": 90,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #4",
+        "lines": 12,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #5",
+        "lines": 12,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #6",
+        "lines": 70,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #7",
+        "lines": 64,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #8",
+        "lines": 57,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #9",
+        "lines": 61,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #10",
+        "lines": 69,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #11",
+        "lines": 47,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #12",
+        "lines": 47,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #13",
+        "lines": 81,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #14",
+        "lines": 81,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #15",
+        "lines": 54,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #16",
+        "lines": 52,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #17",
+        "lines": 54,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #18",
+        "lines": 54,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #19",
+        "lines": 53,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #20",
+        "lines": 80,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #21",
+        "lines": 34,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #22",
+        "lines": 36,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #23",
+        "lines": 79,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #24",
+        "lines": 78,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #25",
+        "lines": 75,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #26",
+        "lines": 76,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #27",
+        "lines": 58,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #28",
+        "lines": 93,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #29",
+        "lines": 39,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #30",
+        "lines": 31,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #31",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #32",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #33",
+        "lines": 62,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #34",
+        "lines": 37,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #35",
+        "lines": 34,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #36",
+        "lines": 35,
+        "copies": 7,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #1",
+        "lines": 67,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #2",
+        "lines": 22,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #3",
+        "lines": 56,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #4",
+        "lines": 40,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #5",
+        "lines": 58,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #6",
+        "lines": 88,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #7",
+        "lines": 24,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #8",
+        "lines": 26,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #9",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #10",
+        "lines": 31,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #11",
+        "lines": 64,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #12",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #13",
+        "lines": 40,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #14",
+        "lines": 15,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #15",
+        "lines": 21,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #16",
+        "lines": 23,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #17",
+        "lines": 18,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #18",
+        "lines": 35,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #19",
+        "lines": 33,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/attachments_catalog.rs + protocol/src/prefs_tests.rs #1",
+        "lines": 51,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/attachments_catalog.rs + protocol/src/prefs_tests.rs #2",
+        "lines": 70,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs + core/src/plugins/vault_unlock/commands.rs",
+        "lines": 55,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #1",
+        "lines": 50,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #2",
+        "lines": 35,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #1",
+        "lines": 39,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #2",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #3",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #4",
+        "lines": 48,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs + core/src/plugins/vault_unlock/commands.rs",
+        "lines": 45,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
+        "lines": 39,
+        "copies": 13,
+        "verdict": "consolidate",
+        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
+      },
+      {
+        "id": "protocol/src/prefs.rs",
+        "lines": 11,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
+      }
+    ],
+    "baseline": [
+      "cli/src/backend/ipc.rs",
+      "cli/src/logging_discipline.rs + src-tauri/src/cli_bridge/logging_discipline.rs",
+      "cli/src/windows_pipe.rs + src-tauri/src/win_pipe.rs",
+      "client-core/src/accept-invite.ts + client-core/src/join-member-vault.ts",
+      "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
+      "client-core/src/capabilities.ts + mobile/src/components/Icon.tsx",
+      "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
+      "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + mobile/src/lib/attachments.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
+      "client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts",
+      "client-core/src/types/note-set-field-error.ts + src/types/note-export-error.ts",
+      "client-core/src/types/note-set-field-error.ts + src/types/vault-export-error.ts",
+      "client-core/src/types/vault-recovery-error.ts + client-core/src/types/vault-unlock-error.ts",
+      "core/src/hooks.rs + core/src/plugins/quick_unlock/commands.rs + core/src/plugins/snapshots/commands.rs + src-tauri/src/plugins/notes/desktop_commands.rs",
+      "core/src/hooks.rs + src-tauri/src/plugins/prefs/mod.rs",
+      "core/src/inference/engine.rs",
+      "core/src/inference/model_download.rs + core/src/inference/provider_transport.rs",
+      "core/src/plugins/agent/run_loop.rs #1",
+      "core/src/plugins/agent/run_loop.rs #2",
+      "core/src/plugins/agent/run_loop.rs #3",
+      "core/src/plugins/agent/run_loop.rs #4",
+      "core/src/plugins/attachments/commands.rs",
+      "core/src/plugins/attachments/commands.rs + core/src/plugins/graph_layout/commands.rs + core/src/plugins/prefs/commands.rs + core/src/plugins/workspace/commands.rs + src-tauri/src/backup_container.rs + src-tauri/src/plugins/notes/desktop_commands.rs",
+      "core/src/plugins/attachments/error.rs",
+      "core/src/plugins/attachments/error.rs + core/src/plugins/chats/error.rs + core/src/plugins/sync/config.rs",
+      "core/src/plugins/attachments/error.rs + core/src/plugins/notes/error.rs #1",
+      "core/src/plugins/attachments/error.rs + core/src/plugins/notes/error.rs #2",
+      "core/src/plugins/captures/commands.rs",
+      "core/src/plugins/captures/commands.rs + core/src/plugins/share_import/commands.rs",
+      "core/src/plugins/captures/device_key.rs + core/src/plugins/share_import/device_key.rs",
+      "core/src/plugins/captures/queue.rs + core/src/plugins/share_import/queue.rs",
+      "core/src/plugins/chats/commands.rs + core/src/plugins/memory/commands.rs",
+      "core/src/plugins/chats/error.rs + core/src/plugins/memory/error.rs",
+      "core/src/plugins/device_binding/commands.rs + core/src/plugins/member_names/commands.rs",
+      "core/src/plugins/device_binding/store.rs",
+      "core/src/plugins/device_binding/store.rs + core/src/plugins/member_names/store.rs #1",
+      "core/src/plugins/device_binding/store.rs + core/src/plugins/member_names/store.rs #2",
+      "core/src/plugins/device_binding/store.rs + protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs",
+      "core/src/plugins/device_binding/sync.rs + core/src/plugins/member_names/sync.rs #1",
+      "core/src/plugins/device_binding/sync.rs + core/src/plugins/member_names/sync.rs #2",
+      "core/src/plugins/graph_layout/commands.rs + core/src/plugins/workspace/commands.rs #1",
+      "core/src/plugins/graph_layout/commands.rs + core/src/plugins/workspace/commands.rs #2",
+      "core/src/plugins/graph_layout/error.rs + core/src/plugins/workspace/error.rs",
+      "core/src/plugins/live/apply_remote.rs",
+      "core/src/plugins/live/apply_remote_test.rs",
+      "core/src/plugins/live/awareness.rs",
+      "core/src/plugins/live/session_test.rs #1",
+      "core/src/plugins/live/session_test.rs #2",
+      "core/src/plugins/live/session_test.rs #3",
+      "core/src/plugins/live/session_test.rs #4",
+      "core/src/plugins/live/session_test.rs #5",
+      "core/src/plugins/mcp/anchor_test.rs",
+      "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #1",
+      "core/src/plugins/mcp/anchor_test.rs + core/src/plugins/mcp/intent_test.rs #2",
+      "core/src/plugins/memory/commands.rs",
+      "core/src/plugins/memory/commands.rs + core/src/plugins/sync/prefs_classification.rs",
+      "core/src/plugins/notes/commands.rs",
+      "core/src/plugins/notes/commands.rs + src-tauri/src/plugins/notes/desktop_commands.rs",
+      "core/src/plugins/notes/commands.rs + src-tauri/src/plugins/pdf_export/commands.rs",
+      "core/src/plugins/notes/error.rs",
+      "core/src/plugins/notes/error.rs + core/src/plugins/vault_change_password/error.rs",
+      "core/src/plugins/notes/error.rs + core/src/plugins/vault_change_password/error.rs + core/src/plugins/vault_recover/error.rs",
+      "core/src/plugins/notes/error.rs + core/src/plugins/vault_unlock/error.rs #1",
+      "core/src/plugins/notes/error.rs + core/src/plugins/vault_unlock/error.rs #2",
+      "core/src/plugins/prefs/commands.rs #1",
+      "core/src/plugins/prefs/commands.rs #10",
+      "core/src/plugins/prefs/commands.rs #11",
+      "core/src/plugins/prefs/commands.rs #12",
+      "core/src/plugins/prefs/commands.rs #13",
+      "core/src/plugins/prefs/commands.rs #14",
+      "core/src/plugins/prefs/commands.rs #15",
+      "core/src/plugins/prefs/commands.rs #16",
+      "core/src/plugins/prefs/commands.rs #17",
+      "core/src/plugins/prefs/commands.rs #18",
+      "core/src/plugins/prefs/commands.rs #19",
+      "core/src/plugins/prefs/commands.rs #2",
+      "core/src/plugins/prefs/commands.rs #3",
+      "core/src/plugins/prefs/commands.rs #4",
+      "core/src/plugins/prefs/commands.rs #5",
+      "core/src/plugins/prefs/commands.rs #6",
+      "core/src/plugins/prefs/commands.rs #7",
+      "core/src/plugins/prefs/commands.rs #8",
+      "core/src/plugins/prefs/commands.rs #9",
+      "core/src/plugins/quick_unlock/apple.rs + core/src/plugins/quick_unlock/device_secret.rs",
+      "core/src/plugins/snapshots/commands.rs #1",
+      "core/src/plugins/snapshots/commands.rs #2",
+      "core/src/plugins/snapshots/error.rs + src-tauri/src/plugins/backup/error.rs + src-tauri/src/plugins/pdf_export/commands.rs",
+      "core/src/plugins/sync/awareness_listener.rs + core/src/plugins/sync/poke_listener.rs",
+      "core/src/plugins/sync/conflict.rs",
+      "core/src/plugins/sync/http_transport.rs + core/src/plugins/sync/rustls_transport.rs + core/src/plugins/sync/transport.rs",
+      "core/src/plugins/sync/legal_consent.rs + core/src/plugins/sync/tor_config.rs + core/src/screen_capture_override.rs + core/src/vault_label/commands.rs + core/src/vault_label/hide_flag.rs + src-tauri/src/plugins/sync/tor.rs",
+      "core/src/plugins/sync/member_removal.rs #1",
+      "core/src/plugins/sync/member_removal.rs #2",
+      "core/src/plugins/sync/orchestrator.rs #1",
+      "core/src/plugins/sync/orchestrator.rs #2",
+      "core/src/plugins/sync/orchestrator.rs #3",
+      "core/src/plugins/sync/orchestrator.rs #4",
+      "core/src/plugins/sync/orchestrator.rs #5",
+      "core/src/plugins/sync/person_account.rs #1",
+      "core/src/plugins/sync/person_account.rs #2",
+      "core/src/plugins/sync/person_ai_sync.rs",
+      "core/src/plugins/sync/sim.rs #1",
+      "core/src/plugins/sync/sim.rs #2",
+      "core/src/plugins/sync/sim.rs #3",
+      "core/src/plugins/sync/sim.rs #4",
+      "core/src/plugins/sync/sim.rs #5",
+      "core/src/plugins/vault_change_password/error.rs + core/src/plugins/vault_recover/error.rs",
+      "core/src/plugins/vault_creation/commands.rs",
+      "core/src/plugins/vault_delete/commands.rs #1",
+      "core/src/plugins/vault_delete/commands.rs #2",
+      "core/src/plugins/vault_delete/commands.rs #3",
+      "core/src/plugins/vault_indices/state.rs #1",
+      "core/src/plugins/vault_indices/state.rs #2",
+      "core/src/plugins/vault_recover/commands.rs + core/src/plugins/vault_unlock/commands.rs #1",
+      "core/src/plugins/vault_recover/commands.rs + core/src/plugins/vault_unlock/commands.rs #2",
+      "core/src/plugins/vault_unlock/commands.rs #1",
+      "core/src/plugins/vault_unlock/commands.rs #2",
+      "core/src/plugins/vault_unlock/commands.rs #3",
+      "dialect/src/diff.ts",
+      "dialect/src/surgery.ts #1",
+      "dialect/src/surgery.ts #2",
+      "dialect/src/surgery.ts #3",
+      "dialect/src/surgery.ts #4",
+      "dialect/src/surgery.ts #5",
+      "editor/src/CMEditor.tsx + src/components/SettingsModal.tsx",
+      "editor/src/attachments/icons.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts",
+      "editor/src/attachments/meetingBar.ts + editor/src/attachments/recordingBar.ts #1",
+      "editor/src/attachments/meetingBar.ts + editor/src/attachments/recordingBar.ts #2",
+      "editor/src/attachments/renamePrompt.ts + src/lib/promptForText.ts",
+      "editor/src/attachments/widgets.ts #1",
+      "editor/src/attachments/widgets.ts #2",
+      "editor/src/attachments/widgets.ts #3",
+      "editor/src/decorations/autolink.ts + editor/src/decorations/colored-highlight.ts",
+      "editor/src/decorations/autolink.ts + editor/src/decorations/emphasis.ts + editor/src/decorations/inline-code.ts + editor/src/decorations/inline-typography.ts + editor/src/decorations/link.ts + editor/src/decorations/reference-link.ts",
+      "editor/src/decorations/colored-highlight.ts + editor/src/decorations/emphasis.ts + editor/src/decorations/inline-code.ts + editor/src/decorations/inline-typography.ts + editor/src/decorations/link.ts",
+      "editor/src/decorations/embedded-html.ts + editor/src/decorations/emoji.ts + editor/src/decorations/math.ts",
+      "editor/src/decorations/embedded-html.ts + editor/src/decorations/math.ts",
+      "editor/src/decorations/embedded-html.ts + editor/src/decorations/mermaid.ts",
+      "editor/src/decorations/emoji.ts + editor/src/decorations/math.ts #1",
+      "editor/src/decorations/emoji.ts + editor/src/decorations/math.ts #2",
+      "editor/src/decorations/task-chip.ts",
+      "editor/src/host/notes/blockAnchors.ts + editor/src/host/notes/vaultHeadings.ts",
+      "editor/src/slash/icons.ts",
+      "editor/src/slash/plugin.ts + editor/src/template-tokens/plugin.ts",
+      "editor/src/slash/plugin.ts + editor/src/template-tokens/plugin.ts + editor/src/wikilink/picker.ts #1",
+      "editor/src/slash/plugin.ts + editor/src/template-tokens/plugin.ts + editor/src/wikilink/picker.ts #2",
+      "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #1",
+      "editor/src/slash/plugin.ts + editor/src/wikilink/picker.ts #2",
+      "mcp/src/tool_list.rs",
+      "mobile/src/app/flows/AiHistorySheet.tsx + mobile/src/app/flows/MemorySheet.tsx",
+      "mobile/src/app/flows/AttachmentsSheet.tsx",
+      "mobile/src/app/flows/CreateVaultFlow.tsx + mobile/src/app/flows/IdentityFlow.tsx",
+      "mobile/src/app/flows/CreateVaultFlow.tsx + src/screens/vault-creation/BriefingStep.tsx",
+      "mobile/src/app/flows/IdentityFlow.tsx",
+      "mobile/src/app/flows/MemorySheet.tsx",
+      "mobile/src/app/flows/SettingsSheet.tsx",
+      "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/app/flows/editor/sheets/ReorderRow.tsx",
+      "mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/SyncSettingsPanels.tsx",
+      "mobile/src/app/flows/UnlockFlow.tsx + mobile/src/screens/unlock/index.tsx",
+      "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
+      "mobile/src/app/flows/editor/sheets/FilterSheet.tsx + mobile/src/app/flows/editor/sheets/ViewsSheet.tsx",
+      "mobile/src/app/flows/editor/sheets/FolderActionsSheet.tsx + mobile/src/app/flows/editor/sheets/NoteRowActionsSheet.tsx",
+      "mobile/src/app/flows/editor/sheets/SortSheet.tsx + mobile/src/app/flows/editor/sheets/TagBrowserSheet.tsx",
+      "mobile/src/components/FolderGlyph.tsx + src/notes/components/FolderGlyph.tsx",
+      "mobile/src/components/SyncSettingsPanels.tsx + src/components/sync/DeviceManagementPanel.tsx",
+      "mobile/src/components/SyncSettingsPanels.tsx + src/components/sync/MemberRosterPanel.tsx",
+      "mobile/src/device/AndroidFrame.tsx + mobile/src/device/IOSFrame.tsx",
+      "mobile/src/hooks/useHeadFingerprintCompare.ts + src/hooks/useHeadFingerprintCompare.ts",
+      "mobile/src/ipad/editor.tsx",
+      "mobile/src/lib/account.ts + src/lib/account.ts",
+      "mobile/src/lib/archivedFolders.ts + src/notes/archivedFolders.ts",
+      "mobile/src/lib/chatHistory.ts + src/notes/ai/chatPersist.ts #1",
+      "mobile/src/lib/chatHistory.ts + src/notes/ai/chatPersist.ts #2",
+      "mobile/src/lib/chats.ts + src/lib/chats.ts + src/lib/themes.ts",
+      "mobile/src/lib/customTheme.ts + src/lib/theme.ts",
+      "mobile/src/lib/daily.ts + src/notes/dailyNote.ts #1",
+      "mobile/src/lib/daily.ts + src/notes/dailyNote.ts #2",
+      "mobile/src/lib/device-name.ts + src/lib/device-name.ts",
+      "mobile/src/lib/formatBarItems.ts + src/notes/toolbarItems.ts #1",
+      "mobile/src/lib/formatBarItems.ts + src/notes/toolbarItems.ts #2",
+      "mobile/src/lib/live.ts + src/lib/live.ts",
+      "mobile/src/lib/liveNote.ts + src/notes/liveNote.ts",
+      "mobile/src/lib/memory.ts + src/lib/memory.ts",
+      "mobile/src/lib/outlineTree.ts + src/notes/outlineTree.ts",
+      "mobile/src/lib/password-generator.ts + src/lib/password-generator.ts",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #1",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #10",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #11",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #12",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #13",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #14",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #15",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #16",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #17",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #2",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #3",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #4",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #5",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #6",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #7",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #8",
+      "mobile/src/lib/prefs.ts + src/lib/prefs.ts #9",
+      "mobile/src/lib/prefsNonce.ts + src/notes/prefsNonce.ts",
+      "mobile/src/lib/quick-unlock.ts + src/lib/quick-unlock.ts",
+      "mobile/src/lib/seed.ts",
+      "mobile/src/lib/stage.ts + src/lib/stage.ts #1",
+      "mobile/src/lib/stage.ts + src/lib/stage.ts #2",
+      "mobile/src/lib/stage.ts + src/lib/stage.ts #3",
+      "mobile/src/lib/stage.ts + src/lib/stage.ts #4",
+      "mobile/src/lib/stage.ts + src/lib/stage.ts #5",
+      "mobile/src/lib/sync.ts + src/hooks/useDevices.ts #1",
+      "mobile/src/lib/sync.ts + src/hooks/useDevices.ts #2",
+      "mobile/src/lib/sync.ts + src/hooks/useEnroll.ts",
+      "mobile/src/lib/vault-creation-logging.ts + src/lib/vault-creation-logging.ts",
+      "mobile/src/lib/vault-label.ts + src/lib/vault-label.ts",
+      "mobile/src/lib/vault-list.ts + src/lib/vault-list.ts",
+      "mobile/src/platform/plainFile.ts + src/platform/plainFile.ts + web/src/platform/plainFile.ts",
+      "mobile/src/platform/window.ts + src/platform/window.ts",
+      "mobile/src/screens/agent/index.tsx + mobile/src/screens/backup/index.tsx + mobile/src/screens/members/index.tsx + mobile/src/screens/organize/index.tsx",
+      "mobile/src/screens/agent/index.tsx + mobile/src/screens/members/index.tsx + mobile/src/screens/portable/index.tsx",
+      "mobile/src/screens/agent/index.tsx + mobile/src/screens/portable/index.tsx",
+      "mobile/src/screens/agent/index.tsx + mobile/src/screens/system/index.tsx",
+      "mobile/src/screens/conflict/index.tsx + mobile/src/screens/multivault/index.tsx + mobile/src/screens/settings/index.tsx + mobile/src/screens/sync/index.tsx",
+      "mobile/src/screens/notes/index.tsx + mobile/src/screens/system/index.tsx",
+      "mobile/src/screens/onboarding/index.tsx + mobile/src/screens/sync/index.tsx",
+      "mobile/src/screens/organize/index.tsx + mobile/src/screens/settings/index.tsx + mobile/src/screens/system/index.tsx",
+      "mobile/src/screens/organize/index.tsx + mobile/src/screens/system/index.tsx",
+      "mobile/src/screens/settings/index.tsx + mobile/src/screens/unlock/index.tsx",
+      "mobile/src/screens/unlock/index.tsx",
+      "protocol/src/aead.rs #1",
+      "protocol/src/aead.rs #10",
+      "protocol/src/aead.rs #2",
+      "protocol/src/aead.rs #3",
+      "protocol/src/aead.rs #4",
+      "protocol/src/aead.rs #5",
+      "protocol/src/aead.rs #6",
+      "protocol/src/aead.rs #7",
+      "protocol/src/aead.rs #8",
+      "protocol/src/aead.rs #9",
+      "protocol/src/attachment_blob.rs + protocol/src/blob.rs #1",
+      "protocol/src/attachment_blob.rs + protocol/src/blob.rs #2",
+      "protocol/src/attachment_blob.rs + protocol/src/blob.rs #3",
+      "protocol/src/attachments_catalog.rs + protocol/src/canonical_json.rs",
+      "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #1",
+      "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #2",
+      "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs #1",
+      "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs #2",
+      "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs + protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs",
+      "protocol/src/color_group.rs + protocol/src/paired_extension.rs",
+      "protocol/src/color_group.rs + protocol/src/saved_view.rs",
+      "protocol/src/device_key.rs + protocol/src/person_key.rs",
+      "protocol/src/kdf.rs #1",
+      "protocol/src/kdf.rs #2",
+      "protocol/src/paired_extension.rs + protocol/src/saved_view.rs",
+      "protocol/src/subkey.rs",
+      "protocol/src/vault_head.rs #1",
+      "protocol/src/vault_head.rs #2",
+      "protocol/src/vault_meta.rs + protocol/src/vault_meta_v0_2.rs",
+      "protocol/src/vault_meta_ntv7.rs + protocol/src/vault_meta_ntv8.rs + protocol/src/vault_meta_v0_2.rs",
+      "protocol/src/vault_meta_v0_2.rs",
+      "src-tauri/src/cli_bridge/dispatch.rs #1",
+      "src-tauri/src/cli_bridge/dispatch.rs #2",
+      "src-tauri/src/cli_bridge/dispatch.rs #3",
+      "src-tauri/src/cli_bridge/dispatch.rs #4",
+      "src-tauri/src/cli_bridge/rate_limit.rs + src-tauri/src/clipper/rate_limit.rs #1",
+      "src-tauri/src/cli_bridge/rate_limit.rs + src-tauri/src/clipper/rate_limit.rs #2",
+      "src-tauri/src/clipper/ingest.rs",
+      "src-tauri/src/plugins/agent/mod.rs + src-tauri/src/plugins/prefs/mod.rs",
+      "src-tauri/src/plugins/agent/mod.rs + src-tauri/src/plugins/screen_capture/acl_parity.rs",
+      "src-tauri/src/plugins/agent/mod.rs + src-tauri/src/plugins/screen_capture/acl_parity.rs + src-tauri/src/plugins/vault_recover/acl_parity.rs",
+      "src-tauri/src/plugins/local_inference/engine_candle.rs",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #1",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #2",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #3",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #4",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #5",
+      "src-tauri/src/plugins/notes/desktop_commands.rs #6",
+      "src-tauri/src/plugins/notes/search_sync.rs #1",
+      "src-tauri/src/plugins/notes/search_sync.rs #2",
+      "src-tauri/src/plugins/screen_capture/acl_parity.rs + src-tauri/src/plugins/vault_recover/acl_parity.rs",
+      "src/commands/actions.ts #1",
+      "src/commands/actions.ts #2",
+      "src/commands/actions.ts #3",
+      "src/commands/actions.ts #4",
+      "src/commands/actions.ts #5",
+      "src/components/CommandPalette.tsx + src/components/QuickPicker.tsx",
+      "src/components/PasswordChangeForm.tsx + src/components/PasswordCreateForm.tsx",
+      "src/components/VaultSwitcher.tsx + src/notes/components/NoteActionsMenu.tsx",
+      "src/components/export/ExportEgressNotice.tsx + src/components/export/NotePdfExportNotice.tsx",
+      "src/components/primitives/ScrollArea.tsx + src/hooks/useScrollEdges.ts",
+      "src/components/primitives/SearchableSelect.tsx + src/components/primitives/Select.tsx #1",
+      "src/components/primitives/SearchableSelect.tsx + src/components/primitives/Select.tsx #2",
+      "src/components/primitives/Segmented.tsx + src/notes/agent/reviewCardLayout.ts",
+      "src/components/settings/AiPanel.tsx",
+      "src/components/settings/TypographySettings.tsx",
+      "src/components/settings/search/settingsSearchIndex.ts #1",
+      "src/components/settings/search/settingsSearchIndex.ts #2",
+      "src/dialect/clip.ts + src/dialect/html/emitNoteHtml.ts",
+      "src/dialect/clip.ts + src/dialect/text/emitNoteText.ts",
+      "src/dialect/clip/math.ts + src/dialect/html/emitNoteHtml.ts",
+      "src/dialect/html/emitNoteHtml.ts + src/dialect/text/emitNoteText.ts #1",
+      "src/dialect/html/emitNoteHtml.ts + src/dialect/text/emitNoteText.ts #2",
+      "src/hooks/useScrollEdges.ts + src/notes/components/TabStrip.tsx",
+      "src/lib/attachments.ts + src/types/note-export-error.ts",
+      "src/lib/vault-creation-errors.ts #1",
+      "src/lib/vault-creation-errors.ts #2",
+      "src/lib/vault-creation-errors.ts #3",
+      "src/notes/archiveNote.ts + src/notes/trashNote.ts",
+      "src/notes/components/BacklinksTab.tsx",
+      "src/notes/components/ContextMenu.tsx + src/notes/components/DecorationPopover.tsx",
+      "src/notes/components/useFolderManagement.ts",
+      "src/notes/exportFlow.ts",
+      "src/notes/import/sources/html.ts + src/notes/import/sources/notion.ts",
+      "src/notes/sidebarState.tsx",
+      "src/notes/workspaceState.ts",
+      "src/platform/diagnostics.ts + web/src/platform/diagnostics.ts",
+      "src/screens/IdentityHome.tsx",
+      "src/screens/VaultPicker.tsx + src/screens/vault-recover/RecoverySelectStep.tsx",
+      "web/src/worker/sync-loop.ts"
+    ]
+  },
+  "repeats": {
+    "verdicts": [],
+    "baseline": [
+      "Clause",
+      "Group",
+      "GroupLabel",
+      "Header",
+      "Meta",
+      "NavHeader",
+      "Note",
+      "Row",
+      "RowChevron",
+      "TabBar",
+      "VaultRow",
+      "Wordmark",
+      "assertNever",
+      "childText",
+      "clamp",
+      "commitDelete",
+      "commitRename",
+      "displayName",
+      "errorKind",
+      "formatBytes",
+      "isMarkName",
+      "labelFor",
+      "pad2",
+      "persist",
+      "renderBlockChildren",
+      "renderBlockNode",
+      "renderDefinitionList",
+      "renderFencedCode",
+      "renderHeading",
+      "renderImage",
+      "renderIndentedCode",
+      "renderInline",
+      "renderInlineMath",
+      "renderInlineNode",
+      "renderItem",
+      "renderLink",
+      "renderList",
+      "renderListItem",
+      "renderTable",
+      "rowStyle",
+      "setCell",
+      "subscribe"
+    ]
+  }
+}

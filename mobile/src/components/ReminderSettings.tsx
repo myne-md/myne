@@ -42,6 +42,7 @@ import {
   type ReminderExactness,
 } from "../lib/reminders";
 import { Segmented, Switch } from "./inputs";
+import { SectionLabel } from "@myne/field-label";
 
 const rowLabel: CSSProperties = { fontSize: 16, color: "var(--fg-1)" };
 const rowValue: CSSProperties = { fontSize: 15, color: "var(--fg-3)" };
@@ -52,23 +53,6 @@ const helper: CSSProperties = {
   margin: "6px 4px 0",
 };
 
-function SectionLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        marginTop: 18,
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 function Group({ children }: { children: ReactNode }) {
   return (

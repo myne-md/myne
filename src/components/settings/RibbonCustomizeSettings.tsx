@@ -4,7 +4,6 @@
 // dropdown (command-palette style: search field over the eligible commands that
 // are not pinned yet). The list below shows only the PINNED commands,
 // reorderable by drag, each with an × to remove. No checkboxes, no arrows.
-
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { COMMAND_ACTIONS } from "../../commands";
@@ -17,6 +16,7 @@ import { ERROR_STYLE } from "./panel-styles";
 import { HOVER_TRANSITION } from "../primitives/hoverSurface";
 import { interactiveSurface } from "../primitives/interactiveSurface";
 import { prefsRead, setRibbonItems, setRibbonVisible } from "../../lib/prefs";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { resolveRibbonItems, ribbonEligibleIds } from "../../notes/ribbonItems";
 import { CUSTOMIZE_LIST_STYLE, CustomizeRow, useDragReorder } from "./CustomizeList";
 import { EmptyState } from "../primitives/EmptyState";
@@ -87,10 +87,22 @@ export function RibbonCustomizeSettings() {
   const eligible = useMemo(() => ribbonEligibleIds(), []);
   const byId = useMemo(() => new Map(COMMAND_ACTIONS.map((a) => [a.id, a])), []);
 
-  const [order, setOrder] = useState<string[]>([]);
+  const { value: order, set: setOrder, error: orderError } = usePrefValue({
+    read: prefsRead,
+    select: (p) => resolveRibbonItems(p.ribbon_items, eligible),
+    write: setRibbonItems,
+    initial: [],
+    errorMessage: t("settings.ribbonCustomize.errorSave"),
+  });
+  const { value: visible, set: setVisible, error: visibleError } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.ribbon_visible,
+    write: setRibbonVisible,
+    initial: true,
+    errorMessage: t("settings.ribbonCustomize.errorSave"),
+  });
+  const error = orderError ?? visibleError;
   const [orderLoaded, setOrderLoaded] = useState(false);
-  const [visible, setVisible] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -98,10 +110,8 @@ export function RibbonCustomizeSettings() {
   useEffect(() => {
     let cancelled = false;
     void prefsRead()
-      .then((p) => {
+      .then(() => {
         if (cancelled) return;
-        setOrder(resolveRibbonItems(p.ribbon_items, eligible));
-        setVisible(p.ribbon_visible);
         setOrderLoaded(true);
       })
       .catch(() => {
@@ -168,14 +178,7 @@ export function RibbonCustomizeSettings() {
   }, [pickerOpen]);
 
   function persistOrder(next: string[]) {
-    const prev = order;
-    setOrder(next);
-    void setRibbonItems(next)
-      .then(() => setError(null))
-      .catch(() => {
-        setOrder(prev);
-        setError(t("settings.ribbonCustomize.errorSave"));
-      });
+    void setOrder(next);
   }
   function add(id: string) {
     persistOrder([...order, id]);
@@ -187,13 +190,7 @@ export function RibbonCustomizeSettings() {
   }
 
   function persistVisible(next: boolean) {
-    setVisible(next);
-    void setRibbonVisible(next)
-      .then(() => setError(null))
-      .catch(() => {
-        setVisible(!next);
-        setError(t("settings.ribbonCustomize.errorSave"));
-      });
+    void setVisible(next);
   }
 
   const reorder = useDragReorder(order, persistOrder);

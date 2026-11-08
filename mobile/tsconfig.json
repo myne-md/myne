@@ -60,6 +60,7 @@
       "@myne/agent-store": ["../src/notes/agent/agentStore.ts"],
       "@myne/agent-run-core": ["../src/lib/agent-run-core.ts"],
       "@myne/run-cost-line": ["../src/notes/agent/components/RunCostLine.tsx"],
+      "@myne/field-label": ["../src/components/primitives/FieldLabel.tsx"],
       "@myne/undo-last-run": ["../src/notes/agent/useUndoLastRun.ts"],
       "@myne/engine-error": ["../src/lib/engine-error.ts"],
       "@myne/decorations": ["../src/notes/decorations.ts"],
