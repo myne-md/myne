@@ -35,6 +35,11 @@ pub use myne_core::export_naming;
 mod device_key;
 #[cfg(windows)]
 mod device_key_dpapi;
+// One streamed SHA-256 over a file (myne-md/myne#991), shared by the model
+// store's weights fingerprint and the diagnostic block's build digest. Here
+// rather than inside either caller so the loop and its non-regular-file guard
+// exist once.
+mod file_digest;
 mod hooks;
 // myne-md/myne#860: the diagnostic log's runtime. Installed in `Builder::setup`
 // because the file layer needs an `AppHandle` to resolve the platform log
