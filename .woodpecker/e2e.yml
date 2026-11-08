@@ -182,11 +182,12 @@ steps:
     when: *always
     environment:
       CARGO_HOME: /cache/cargo
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - bash scripts/wasm-repro-check.sh
 
   # ─── Web E2E lane (the built bundle in a real browser) ───────
@@ -318,12 +319,13 @@ steps:
       # steps below run unprivileged and use `/cache/*/ci` instead; mixing the
       # two is the cross-UID trap that cost pipeline #167 (root fills the cache
       # 0750, the `ci` user then cannot read it).
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # Raise the open-file soft limit to the hard cap: the Tauri CLI + parallel
       # cargo codegen open enough fds to hit the runner's low default, which
       # surfaces as a `tauri build` panic (EMFILE → core dump, exit 134).
@@ -331,7 +333,7 @@ steps:
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm tauri build --no-bundle -c '{"build":{"beforeBuildCommand":"pnpm sidecar:release && (test -d dist || pnpm build)"}}' -- --features voice-capture-stub,local-inference-stub
       # Cache hit-rate visibility. Never fails the step.
-      - /cache/bin/sccache --show-stats || true
+      - /cache/tools/bin/sccache --show-stats || true
 
   # ─── Desktop E2E suite (real binary via tauri-driver) ────────
   # Drives the production binary `e2e-compile` just built in a real WebKitGTK

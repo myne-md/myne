@@ -19,6 +19,11 @@ pub mod error;
 /// reuses its derivation steps; its COMMANDS are registered under the desktop
 /// `importer:` namespace, not this one.
 pub mod import_source;
+/// The `Slot::Recovering` deadline, and the tick every client runs to enforce it
+/// (myne-md/myne#758, audit lead NV09). Shared rather than desktop-only because
+/// the state it bounds is populated from this crate and reachable on all three
+/// clients.
+pub mod recovering_ttl;
 pub mod state;
 // Mid-session storage health (phase3-web-client task 22). A sibling of the boot
 // probe in `commands`, not an extension of it: the same three on-disk states mean

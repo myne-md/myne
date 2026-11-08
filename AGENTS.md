@@ -452,6 +452,8 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-e2e-menu-testids.mjs` | E2E may not reach for a testid that renders only inside the sidebar's open `+` menu, it… | `pre-commit` + CI `pnpm-build` |
 | `check-e2e-toolchain.mjs` | `e2e/Dockerfile`'s Rust version matches `rust-toolchain.toml`'s `channel`, and the image… | `pre-commit` + CI `pnpm-build` |
 | `check-playwright-image.mjs` | the CI Playwright image tag names the version `pnpm-lock.yaml` resolves for… | `pre-commit` + CI `pnpm-build` |
+| `check-pinned-ci-tools.mjs` | every `/cache/tools/bin/<tool>` a workflow or `scripts/ci-e2e-lane.sh` executes is provisioned at a pinned, hash-verified version by `scripts/ci-pinned-tools.sh` first: a new unpinned tool, a step that executes without provisioning, a pin whose version/URL/digests drifted apart, and a pin nothing references each fail, and a reach back to the read-only `/cache/bin` mount is refused by name | `pre-commit` + CI `pnpm-build` |
+| `check-arch-pkgbuild.mjs` | the two Arch recipes and `flake.nix` state one release version, and the from-source recipe pins a `#commit=` rather than a movable tag; `sha256sums=('SKIP')` is refused on anything that is not a commit-pinned git source | `pre-commit` + CI `pnpm-build` |
 | `check-ci-image.mjs` | the prebuilt CI base image (`ghcr.io/myne-md/myne-ci`, myne-md/myne#585) against the… | `pre-commit` + CI `pnpm-build` |
 | `check-e2e-floor.mjs` | two ratchets over one report, and they hold each other up | CI `e2e-floor` |
 | `check-twin-inventory.mjs` | every desktop/mobile twin module carries a verdict (`decision` / `screen` / `absent` /… | `pre-commit` + CI `twin-inventory` |

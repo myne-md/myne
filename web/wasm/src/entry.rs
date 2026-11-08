@@ -272,3 +272,28 @@ pub async fn sync_poke_target() -> Option<String> {
 pub fn sync_awareness_deliver(payload: String) {
     crate::awareness::deliver(payload.into_bytes());
 }
+
+/// One tick of the `Slot::Recovering` deadline (myne-md/myne#758, audit lead
+/// NV09). Returns whether the recovery session was expired and dropped.
+///
+/// # Why JS drives this one
+///
+/// Every other client calls the same `myne_core::…::recovering_ttl::bail_if_expired`
+/// from a Rust timer: desktop inside its idle-lock tick, mobile from the interval
+/// `spawn_recovering_ttl_timer` opens (`tauri::async_runtime`). The Worker has no
+/// Rust timer: no threads to sleep on, exactly as `sync_loop` records. Its tick
+/// is therefore a browser `setInterval` calling this export. Without it the browser was
+/// the client with no deadline at all: `recover_with_phrase` populates the slot
+/// here too, and nothing expired it.
+#[wasm_bindgen]
+pub async fn vault_recovering_ttl_tick() -> bool {
+    use myne_core::host::HostCtx;
+
+    let now_ms = HostCtx::monotonic_millis(&crate::host::WebHost);
+    myne_core::plugins::vault_unlock::recovering_ttl::bail_if_expired(
+        crate::session::state(),
+        now_ms,
+        crate::session::hooks(),
+    )
+    .await
+}

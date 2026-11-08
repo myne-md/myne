@@ -124,12 +124,13 @@ steps:
     # cargo fingerprints. (sccache passes clippy-driver through, but the dep rustc
     # compiles it caches are what cargo-test then reuses.)
     environment:
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - rustup component add clippy
       - cargo clippy -p protocol --all-targets -- -D warnings
 
@@ -143,13 +144,14 @@ steps:
     # as cargo-clippy above (shared workspace target/). Argon2id KATs dominate the
     # runtime and stay uncached; only the compile portion caches (~20-40s).
     environment:
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
-      - /cache/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
+      - /cache/tools/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
 
   # ─── Rust supply-chain audit ─────────────────────────────────
   # `git` is required by cargo-deny to fetch the rustsec advisory-db.
@@ -203,12 +205,13 @@ steps:
     image: rust:1.96.0-slim
     when: *code-paths
     environment:
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # No `rustup target add` here on purpose: `rust-toolchain.toml` pins
       # `targets = ["wasm32-unknown-unknown"]`, so the target is present from the
       # toolchain install. A gate that installs its own target is a gate that
@@ -355,12 +358,13 @@ steps:
       - name: stories-build
         optional: true
     environment:
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - apt-get update && apt-get install -y --no-install-recommends nodejs
       - bash scripts/wasm-repro-check.sh
 
@@ -599,6 +603,16 @@ steps:
       # `browserType.launch`. It took the whole mobile-flow-logic lane down,
       # 179 tests, and looked like a broken suite rather than a missing binary.
       - node scripts/check-playwright-image.mjs
+      # Pinned CI tools (myne#758, audit NV02): sccache and cargo-nextest are
+      # provisioned at a pinned, hash-verified version by
+      # `scripts/ci-pinned-tools.sh` before any step executes them. Fourteen
+      # invocations used to run whatever the host mount held, and no compiler can
+      # see that.
+      - node scripts/check-pinned-ci-tools.mjs
+      # Arch packaging vs the release (myne#758, audit NV11): both recipes and
+      # `flake.nix` state one version, and the from-source recipe pins a commit
+      # rather than a movable tag with an unverifiable SKIP.
+      - node scripts/check-arch-pkgbuild.mjs
       # Frontend lock teardown (myne#529): the WebView half of the Rust-side
       # `check-lock-teardown.mjs`. A vault-leaving path that skips one clear
       # leaves a module-scope store resident into the next vault's session.
@@ -977,12 +991,23 @@ steps:
       # is content-addressed + concurrency-safe (MAX_WORKFLOWS=2 stays); the signed
       # release build is a SEPARATE pipeline and never uses this cache. To disable:
       # remove the agent volume line + these five vars.
-      RUSTC_WRAPPER: /cache/bin/sccache
+      #
+      # The BINARIES are not the mount's (myne#758, audit NV02): `/cache/tools/bin/sccache`
+      # and `/cache/tools/bin/cargo-nextest` are provisioned at pinned versions whose
+      # digests this repository checks, by the first command of each step below
+      # (`scripts/ci-pinned-tools.sh`, held in place by
+      # `scripts/check-pinned-ci-tools.mjs`). The mount supplies the CACHE, never
+      # the tool. Note the path: `/cache/bin` is a READ-ONLY mount, which the first
+      # pipeline to run the provisioner reported (`install: cannot create regular
+      # file ...: Read-only file system`), so the tools live on the writable half of
+      # the volume and the digest check is what makes them trustworthy.
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # Raise the open-file soft limit to the hard cap before the build: the
       # Tauri CLI + parallel cargo codegen open enough fds to hit the runner's
       # low default soft limit, which surfaces as a `tauri build` panic
@@ -1143,7 +1168,7 @@ steps:
       - cargo clippy -p myne-desktop --all-targets --no-default-features -- -D warnings
       - echo "[t] clippy-no-default $(date +%s)"
       # Cache hit-rate visibility (H1) — never fails the step.
-      - /cache/bin/sccache --show-stats || true
+      - /cache/tools/bin/sccache --show-stats || true
       - echo "[t] end $(date +%s)"
 
   # ─── Backend host tests (src-tauri / myne-desktop) ───────────
@@ -1162,6 +1187,7 @@ steps:
     environment:
       CI: "true"
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # 67 s, the same set `tauri-compile` installs one stage earlier, and sharing
       # the downloads between them does NOT work — see that step for the two
       # stacked causes and for why a prebuilt image rather than a cache is the
@@ -1175,7 +1201,7 @@ steps:
       # tauri-compile) inside the unprivileged shell where the build actually runs.
       # RUSTFLAGS=mold (Q6) folded into the su env; `{ test -d dist || pnpm build; }`
       # reuses the dist/ from tauri-compile instead of rebuilding it (Q3).
-      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast'
+      - su ci -c 'export HOME=/home/ci CARGO_HOME=/cache/cargo/ci RUSTUP_HOME=/usr/local/rustup PATH=/usr/local/cargo/bin:/usr/local/bin:$PATH RUSTFLAGS="-C link-arg=-fuse-ld=mold" RUSTC_WRAPPER=/cache/tools/bin/sccache SCCACHE_DIR=/cache/sccache/ci SCCACHE_CACHE_SIZE=20G CARGO_INCREMENTAL=0 ; ulimit -n $(ulimit -Hn) 2>/dev/null || true ; pnpm install --frozen-lockfile --store-dir /cache/cargo/ci/pnpm-store && { test -d dist || pnpm build; } && /cache/tools/bin/cargo-nextest nextest run --profile ci -p myne-desktop -p myne-core -p myne-format -p myne-decrypt --no-fail-fast'
 
   # ─── Sync simulation harness (multi-device, real myne-server) ─
   # Runs the Phase-1 sync harness `src-tauri/src/plugins/sync/sim.rs` against a
@@ -1565,12 +1591,13 @@ steps:
       - name: web-build
         optional: true
     environment:
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - ulimit -n $(ulimit -Hn) 2>/dev/null || true
       - cargo clippy -p myne-mobile -p tauri-plugin-screen-guard -p tauri-plugin-device-key -p tauri-plugin-share-intent -p tauri-plugin-save-file -p tauri-plugin-qr-scan -p tauri-plugin-reminders -p tauri-plugin-sensitive-clipboard --all-targets -- -D warnings
       - cargo test -p myne-mobile -p tauri-plugin-sensitive-clipboard -p tauri-plugin-save-file --no-fail-fast
@@ -1674,7 +1701,7 @@ steps:
       # mold linker for the myne-core sync test binary link (CI-only, Q6).
       RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
       # Persistent compile cache (H1) — see tauri-compile's comment.
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
@@ -1694,6 +1721,7 @@ steps:
       MYNE_SERVER_TOKEN:
         from_secret: myne_server_token
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # `$$` is NOT a typo and NOT decoration. Woodpecker pre-processes dollar-brace
       # in commands and substitutes its OWN variables; a name it does not know
       # becomes the empty string BEFORE the shell ever sees the line. Written
@@ -1746,7 +1774,7 @@ steps:
       # everywhere by never executing, and they are the only behavioural proof
       # that a v0.2 vault syncs its attachments at all, which is the #425 shape the
       # comment above describes, one filter over.
-      - "/cache/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim) + test(plugins::sync::orchestrator)' --no-fail-fast"
+      - "/cache/tools/bin/cargo-nextest nextest run --profile ci -p myne-core -E 'test(plugins::sync::sim) + test(plugins::sync::orchestrator)' --no-fail-fast"
 
   # ─── Cross-impl vector verification, both lanes ─────────────────────────────
   # `protocol/tests/vectors.rs` reads the companion fixtures and asserts
@@ -1826,7 +1854,7 @@ steps:
       # crates one step over. `RUSTFLAGS` stays unset here on purpose: it changes
       # the cache key, and the same-key hits worth having are `cargo-test`'s
       # `-p protocol` run a few minutes earlier in this pipeline.
-      RUSTC_WRAPPER: /cache/bin/sccache
+      RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
@@ -1834,6 +1862,7 @@ steps:
       VECTORS_TOKEN:
         from_secret: vectors_token
     commands:
+      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - |
         if [ -z "$VECTORS_TOKEN" ]; then
           echo "vectors_token not provided (pull_request or fork) -> skipping cross-impl vectors";
@@ -1864,7 +1893,7 @@ steps:
       # Same attribution line as `tauri-compile`: a hit rate of 100 % with
       # `Compilations 0` means the remaining minutes are the chromium install and
       # graph walks, and this is where that becomes visible instead of assumed.
-      - /cache/bin/sccache --show-stats || true
+      - /cache/tools/bin/sccache --show-stats || true
 
   # Failure notification via Pushover. The token + group come ONLY from CI
   # secrets, never committed (public repo). A missing secret (e.g. a fork PR)
