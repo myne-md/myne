@@ -272,8 +272,12 @@ export function tasksItem(): WorkspaceItem {
   return { kind: "tasks", id: TASKS_TAB_ID };
 }
 
+/** The calendar tab item, narrowed to its own variant: `CalendarPane` takes the item it
+ *  renders, so the narrowing belongs to the builder rather than to every call site. */
+export type CalendarWorkspaceItem = Extract<WorkspaceItem, { kind: "calendar" }>;
+
 /** The calendar tab item (singleton - see [`CALENDAR_TAB_ID`]). */
-export function calendarItem(view?: CalendarView): WorkspaceItem {
+export function calendarItem(view?: CalendarView): CalendarWorkspaceItem {
   const persisted = view === undefined ? undefined : calendarViewToPersisted(view);
   return persisted === undefined
     ? { kind: "calendar", id: CALENDAR_TAB_ID }

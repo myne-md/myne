@@ -42,6 +42,8 @@ function row(start: string, end: string | null = null, extra: Partial<CalendarRo
     conflicts: false,
     repeat: null,
     repeatUnrecognized: false,
+    remind: null,
+    uid: null,
     ...extra,
   };
 }

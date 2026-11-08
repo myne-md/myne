@@ -14030,7 +14030,10 @@ mod tests {
         let account_hash_a: [u8; PREFS_BLOB_ACCOUNT_HASH_LEN] = [0x33; PREFS_BLOB_ACCOUNT_HASH_LEN];
         let prefs_key_a = derive_subkey(&root_a, SubkeyRole::PrefsKey);
 
-        let nonce_cs: [u8; AEAD_NONCE_LEN] = [0xE0; AEAD_NONCE_LEN];
+        // `0xE4` is a free byte: `0xE0`-`0xE3` are already spent on the meeting-ai and
+        // set-entry-clock cases, and a shared (root_key, account_number_hash, nonce)
+        // seals two plaintexts under one keystream.
+        let nonce_cs: [u8; AEAD_NONCE_LEN] = [0xE4; AEAD_NONCE_LEN];
         let mut settings = BTreeMap::new();
         settings.insert(String::from("day_reminder_anchor"), String::from("08:30"));
         settings.insert(String::from("colours.work"), String::from("moss"));

@@ -42,6 +42,8 @@ function row(over: Partial<CalendarRow> = {}): CalendarRow {
     conflicts: false,
     repeat: "every monday",
     repeatUnrecognized: false,
+    remind: null,
+    uid: null,
     ...over,
   };
 }

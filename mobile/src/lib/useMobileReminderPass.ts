@@ -127,7 +127,13 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       const { start, end } = windowFor(now, horizonDays);
       let rows: readonly CalendarRow[] = [];
       try {
-        rows = (await vaultIndicesCalendarRange(start, end, true)).rows;
+        const answer = await vaultIndicesCalendarRange(start, end, true);
+        // An answer that carries no `rows` array is a host that did not answer the
+        // question, and it is NOT an empty window: an empty list is what cancels
+        // every registered event reminder, which is the failure the catch below
+        // exists to prevent. So it takes the same path as a refused read.
+        if (!Array.isArray(answer?.rows)) throw new Error("calendar range answered without rows");
+        rows = answer.rows;
       } catch {
         // A failed read means the EVENT half of this pass is SKIPPED, not empty. The
         // pass is reconciling, so an empty list cancels every registered event
