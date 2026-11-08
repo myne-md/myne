@@ -54,7 +54,6 @@ import { DeviceJoinQrDialog } from "@app/components/sync/DeviceJoinQrDialog";
 import { InvitesDialog } from "@app/components/sync/InvitesDialog";
 import { PersonIdentityUnlock } from "@app/components/sync/PersonIdentityUnlock";
 import { PersonPhraseUnlock } from "@app/components/PersonPhraseUnlock";
-import { VaultFormatUpgrade } from "@app/components/settings/VaultFormatUpgrade";
 import { EndpointConfig } from "@app/components/sync/EndpointConfig";
 import { EnrollDeviceForm } from "@app/components/sync/EnrollDeviceForm";
 import { PhraseEntryGrid } from "@app/components/PhraseEntryGrid";
@@ -2680,30 +2679,5 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
         onCancel={action("onCancel")}
       />
     ),
-  },
-  {
-    id: "components/vaultformatupgrade/default",
-    group: "components",
-    surface: "VaultFormatUpgrade",
-    state: "default",
-    description:
-      "The explicit upgrade of an existing vault to one-phrase recovery, as the Settings row offers it: one CTA, and the confirmation appears only after a press. The fixture answers the person-wrap probe with false, which is the only state in which the row renders anything at all.",
-    tags: [
-      "components",
-      "settings",
-      "vault",
-      "format",
-      "migration",
-      "one-phrase",
-      "irreversible",
-    ],
-    fixture: {
-      description:
-        "a vault that has not been upgraded yet, so the row offers the upgrade",
-      handlers: {
-        "plugin:vault-unlock|vault_is_person_wrapped": () => false,
-      },
-    },
-    render: () => <VaultFormatUpgrade />,
   },
 ];

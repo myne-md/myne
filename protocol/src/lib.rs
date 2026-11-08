@@ -89,7 +89,6 @@ pub mod saved_view;
 pub mod scram;
 pub mod search_blob;
 pub mod share_import_blob;
-pub mod singleton_migrate;
 pub mod subkey;
 pub mod template;
 pub mod themes_blob;
@@ -325,7 +324,6 @@ pub use search_blob::{
     SEARCH_BLOB_HEADER_LEN, SEARCH_BLOB_INDEX_FORMAT_V1, SEARCH_BLOB_MAGIC,
     SEARCH_BLOB_PROTOCOL_VERSION,
 };
-pub use singleton_migrate::{reseal_kek_envelope_v0_2, reseal_kek_envelope_v0_2_with_formats};
 pub use subkey::{
     derive_group_subkey_v0_2, derive_owner_subkey_v0_2, derive_subkey, derive_subkey_v0_2,
     derive_subkey_versioned, GroupKey, GroupRole, OwnerKey, OwnerRole, SubkeyRole,
