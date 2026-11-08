@@ -167,10 +167,14 @@ steps:
         # "destination path already exists". Clone aside, move in, and let the loser find the
         # directory already there.
         if [ ! -d agent-tooling/docs ]; then
-          rm -rf .agent-tooling-clone
-          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/example-org/agent-tooling.git" .agent-tooling-clone
-          mv -n .agent-tooling-clone agent-tooling 2>/dev/null || true
-          rm -rf .agent-tooling-clone
+          # A UNIQUE staging directory per step. A fixed name was the race after all: two steps
+          # reaching here at once shared `.agent-tooling-clone`, and the second one's `rm -rf` and
+          # clone removed the pack files the first was still writing ("could not open
+          # .../tmp_pack_XD6ZG8 for reading"). `mktemp -d` cannot collide.
+          stage=$(mktemp -d)
+          git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/example-org/agent-tooling.git" "$stage/repo"
+          mv -n "$stage/repo" agent-tooling 2>/dev/null || true
+          rm -rf "$stage"
         fi
       - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - /cache/tools/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
