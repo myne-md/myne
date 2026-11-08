@@ -5161,6 +5161,7 @@ dependencies = [
  "tauri-plugin-opener",
  "tauri-plugin-qr-scan",
  "tauri-plugin-reminders",
+ "tauri-plugin-save-file",
  "tauri-plugin-screen-guard",
  "tauri-plugin-sensitive-clipboard",
  "tauri-plugin-share-intent",
@@ -8820,6 +8821,15 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "tauri-plugin-save-file"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "tauri",
+ "tauri-plugin",
 ]
 
 [[package]]
