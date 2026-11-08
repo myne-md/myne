@@ -215,8 +215,9 @@ Two device-only surfaces with no automated coverage (the same posture as `pdf_ex
 hard-crashes on first camera access from the WKWebView file picker. **MYND-475** adds the native
 share sheet (`share_file.rs`, `UIActivityViewController`) on top of the guaranteed Documents write,
 so every row must confirm BOTH that the file lands (no regression) AND that the destination chooser
-appears. iOS-first: Android share is a documented no-op (file stays in Documents + a toast names
-the location) — its rows confirm the non-silent fallback, not a SAF picker.
+appears. Android's half of the same surface landed last (myne-md/myne#505, the Storage Access
+Framework picker in `tauri-plugin-save-file`), so its rows now check a real picker rather than the
+fallback that used to be all it had.
 
 Rows **8.9 / 8.10** (myne-md/myne#491) belong here for a different reason: they check where the
 exported file is allowed to come to rest. Every export above puts plaintext in `Documents`, and both
@@ -229,12 +230,13 @@ platform honoured them.
 |---|---|---|
 | 8.1 | **iOS "Take Photo" attach (MYND-474)** — Files/attach → file picker → Take Photo, grant camera | camera opens, photo captures, lands as an encrypted image attachment; **no crash** (the pre-fix `NSInvalidArgumentException`) |
 | 8.2 | **iOS camera permission prompt copy** — first camera use | the `NSCameraUsageDescription` string shows, honest + telemetry-free |
-| 8.3 | **iOS Export Markdown (MYND-475)** — Settings → Export to Markdown | success toast names `Documents/…`; share sheet opens on the export folder; "Save to Files" writes it to the chosen location |
+| 8.3 | **iOS Export Markdown (MYND-475)** — Settings → Export to Markdown | the toast names the note COUNT and asks you to choose where to save a copy (it no longer names `Documents/…`, which is a folder the Files app cannot open); share sheet opens on the export folder; "Save to Files" writes it to the chosen location |
 | 8.4 | **iOS Export PDF** — note → Export as PDF | the note renders to a legible A4 `.pdf` and the **share sheet** opens on it directly (NOT the print dialog); Save to Files writes it; multi-page notes paginate |
 | 8.5 | **iOS Download recovery phrase** — vault creation → save recovery phrase | share sheet opens on the `.txt`; Save to Files writes the correct plaintext; the Documents copy also exists |
 | 8.6 | **iOS Export attachment** — attachment → export | share sheet opens on the file with its correct extension; Save to Files writes the decrypted bytes |
 | 8.7 | **iOS share cancel is non-silent** — open any export share sheet, cancel it | the file is still saved in Documents (the success toast already fired); no silent no-op |
-| 8.8 | **Android export fallback (no SAF yet)** — run each export flow | file writes to Documents; a toast names the location; no crash, no silent no-op (SAF picker deferred, see `share_file.rs` module docs) |
+| 8.8 | **Android save picker (myne-md/myne#505)**: run each export flow: recovery phrase `.txt`, identity phrase `.txt`, Export to Markdown, an attachment export | each one opens the system save dialog AFTER the write; picking a destination writes a readable file there (open it with the Files app or the provider's own app); dismissing it leaves the file in Documents and loses nothing; **Export to Markdown arrives as one `.zip`** whose contents unzip to the note tree (a document picker cannot save a folder). The note PDF has no Android renderer yet, so that flow still reports itself unsupported; that is not this row's failure |
+| 8.8a | **Android picker is not a silent no-op when it fails (same issue)**: run an export, then pick a destination that refuses the write (a read-only provider, or revoke access mid-write) | the copy is reported failed in the diagnostic log as `share_file_failed` with a reason CLASS only, no path and no filename; the app does not crash and the Documents copy is intact |
 | 8.9 | **iOS export directory is excluded from iCloud Backup (myne-md/myne#491)** — launch the app once (simulator is enough), then on the host: `ls -l@ ~/Library/Developer/CoreSimulator/Devices/<device-id>/data/Containers/Data/Application/<app-id>/Documents` | the directory carries the `com.apple.metadata:com_apple_backup_excludeItem` xattr. **This row is the only proof the iOS half works** — the Rust compiles and `scripts/check-mobile-export-backup.mjs` passes whether or not Foundation honoured the call, and a saved recovery phrase in an iCloud backup reconstructs the vault. Absent xattr ⇒ `backup_exclude.rs` shipped inert; do not report the issue fixed |
 | 8.10 | **Android export directory is excluded from Auto Backup + device transfer (same issue)** — the manifest half is **done** (2026-08-15: `./gradlew :app:processUniversalDebugMainManifest` + `:app:processUniversalDebugResources`; merged `<application>` carries both attributes, the merger's blame report attributes both to `[:myne-widgets]`, aapt2 link resolves both resources, and no `android:allowBackup` appears anywhere, so Auto Backup defaults on and these are the operative control). `scripts/check-mobile-export-backup.mjs` re-checks the merged manifest whenever a build has left one behind. **What is still owed is the device half**: `adb shell bmgr backupnow md.myne.mobile`, then confirm the export directory is not in the transported set | the export directory is absent from the transported set. Manifest agreement is NOT this row's answer: it says Android was told, not that Android obeyed |
 
