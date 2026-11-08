@@ -12,8 +12,8 @@
 // above the seam: the surgery, the instant formatter, the field vocabulary, so a
 // note created on a phone is byte-identical to one created on a laptop.
 
-import { formatEventInstant, type EventInstant } from "../dialect/event";
-import { patchFrontmatterField, patchTitleField } from "../dialect/surgery";
+import { eventNoteBytes, type EventInstant } from "../dialect/event";
+import { patchFrontmatterField } from "@myne/dialect/surgery";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { noteCreate } from "./notes";
 
@@ -43,22 +43,19 @@ export type NewMobileEvent = {
  * exported builder with one test importer is an export nothing ships.
  */
 function buildEventNote(input: NewMobileEvent): string {
-  let bytes = patchTitleField(encoder.encode(""), input.title);
-  bytes = patchFrontmatterField(bytes, "kind", "event");
-  bytes = patchFrontmatterField(bytes, "start", formatEventInstant(input.start));
-  if (input.end !== undefined && input.end !== null) {
-    bytes = patchFrontmatterField(bytes, "end", formatEventInstant(input.end));
-  }
-  if (input.repeat !== undefined && input.repeat !== null && input.repeat !== "") {
-    bytes = patchFrontmatterField(bytes, "repeat", input.repeat);
-  }
-  if (input.remind !== undefined && input.remind !== null && input.remind !== "") {
-    bytes = patchFrontmatterField(bytes, "remind", input.remind);
-  }
-  if (input.calendar !== undefined && input.calendar !== null && input.calendar !== "") {
-    bytes = patchFrontmatterField(bytes, "calendar", input.calendar);
-  }
-  return decoder.decode(bytes);
+  // The dialect's builder, not a copy of it: a second emitter is how the phone came to
+  // write no `uid` and to order `repeat` before `calendar` while the desktop did the
+  // reverse, which made the "byte-identical" claim in this file's header false.
+  return decoder.decode(
+    eventNoteBytes({
+      title: input.title,
+      start: input.start,
+      end: input.end,
+      repeat: input.repeat,
+      remind: input.remind,
+      calendar: input.calendar,
+    }),
+  );
 }
 
 /** Create the note and return its id. */
