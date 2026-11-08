@@ -66,7 +66,10 @@ const WATCHED = [
 ];
 
 /** Every tree that may contain an importer (production or test). */
-const IMPORTER_TREES = ["src", "web/src", "mobile/src", "editor/src", "dialect/src", "copy/src", "tests", "e2e", "e2e-web", "mobile/tests"];
+// `client-core/src` is here so a module reached only through its own package barrel
+// (`import { x } from "@myne/client-core"`) counts as wired: without it, every leaf
+// that the barrel re-exports read as dead, and the exemption list grew to compensate.
+const IMPORTER_TREES = ["src", "web/src", "mobile/src", "editor/src", "dialect/src", "copy/src", "client-core/src", "tests", "e2e", "e2e-web", "mobile/tests"];
 
 /** A file is a TEST importer when it lives here or is named like one. */
 function isTestFile(rel) {
@@ -92,7 +95,6 @@ const EXEMPT = new Map([
   // deliberately hands the WebView opaque handles so bytes stay in Rust
   // (`editor/src/host.ts` `PickedFile`). Adding that seam member is the remaining
   // task on myne-md/myne#1037, and this entry is the reminder rather than a licence.
-  ["client-core/src/ics.ts", "the .ics import and export commands are its consumer; both wait on the bounded text-read seam member for a picked file (myne-md/myne#1037)"],
   ["web/src/main.tsx", "the web entry point — the bundler's input, imported by nothing"],
   ["src/main.tsx", "the desktop entry point, same reason"],
   ["web/src/platform/capabilities.ts", "platform-seam twin: its importer is the desktop file it is substituted FOR at build time"],

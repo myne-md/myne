@@ -504,8 +504,8 @@ const V = {
     "The calendar's two settings ride the same `calendar_settings` prefs map on every client, and the web client reads prefs through the same seam, so the panel is the same panel. Its colour values are design-token names and its anchor is a 48-choice list, so nothing here needs a host.",
   ],
   "src/lib/calendarIcs.ts": [
-    "excluded",
-    "The `.ics` codec itself is pure and would ship, but its two callers are the desktop import dialog and the export delivery path, and the web client has neither: import needs a path-taking dialog the browser cannot open, and export leaves through `platform/download.ts` rather than through this module's callers. Excluded as a whole unit rather than half-ported, because a codec that ships with no way to reach it is dead weight in a bundle with a budget (`check-web-bundle-budget.mjs`).",
+    "adapted",
+    "It SHIPS: the pane imports it statically and the export arm runs on web through `platform/download.ts` `deliverFile`. What the web client cannot do is the IMPORT half, and that is a capability rather than a substitution: `icsImport` is in the web descriptor's absent set, so `has(\"icsImport\")` is false and the import affordance never renders. An earlier verdict here said `excluded` with no absence marker, which the guard's own header records twice as the wrong shape: a module that ships and is unreachable is not an excluded module, and the marker is what makes the claim checkable.",
   ],
   "src/lib/homeZone.ts": [
     "ported",

@@ -34,6 +34,28 @@ import { TASK_WRITE_EVENT, useVaultTasks } from "./tasks";
 /** How long the app may sit open before the schedule is rebuilt once more. */
 const TICK_MINUTES = 15;
 
+/**
+ * Whether this app run has already asked for the notification permission.
+ *
+ * Module scope, not a ref: the editor remounts on every lock and unlock, and a
+ * per-mount flag asks again each time, which is the shape that turns a prompt into
+ * noise the user dismisses without reading. The comment said "once per app run" while
+ * the code did once per mount, and the test that was supposed to catch it asserted a
+ * range wide enough to admit both (`toBeLessThanOrEqual(2)`).
+ */
+let askedForPermission = false;
+
+/**
+ * Forget that the permission was asked, for a test that mounts the hook more than
+ * once in one process.
+ *
+ * Exported rather than reached through `vi.resetModules`, which would re-import the
+ * notifier and the scheduler too and make the test's mocks a second thing under test.
+ */
+export function resetPermissionAsk(): void {
+  askedForPermission = false;
+}
+
 /** `YYYY-MM-DD`, the device's own day. */
 function todayString(now: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -72,8 +94,7 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
   const horizonDays = prefs.reminder_horizon_days ?? 7;
   const { tasks } = useVaultTasks();
   const [result, setResult] = useState<{ scheduled: number; cancelled: number; failed: number } | null>(null);
-  /** Set once per app run: the permission prompt is a question, not a habit. */
-  const askedRef = useRef(false);
+
   // The task list is a NEW array on every render, so it cannot be an effect
   // dependency: doing that re-ran the whole pass (two IPC reads and up to sixty-four
   // registrations) on every keystroke-driven render of the editor. The effect keys on
@@ -93,8 +114,8 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       // put something in the notification list. A refusal leaves the pass running and
       // simply achieves nothing, which is the same outcome as scheduling into a denied
       // permission, minus the lie.
-      if (!askedRef.current) {
-        askedRef.current = true;
+      if (!askedForPermission) {
+        askedForPermission = true;
         try {
           const api = createReminderPermissionApi();
           const status = await api.status();
