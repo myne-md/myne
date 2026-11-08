@@ -1,0 +1,36 @@
+# In-repo Tauri mobile plugin: the Android OUTBOUND "save this export somewhere
+# the user can reach" bridge (myne-md/myne#505). The INBOUND half, a file the
+# user shares INTO Myne, is `tauri-plugin-share-intent`; desktop and mobile share
+# nothing here but the phrase "share sheet". Do not conflate the two directions.
+#
+# Rust-only WebView surface: zero WebView-facing commands, so no permission file,
+# no capability grant and no `InlinedPlugin` entry in the app's build.rs. It has
+# the same shape as `tauri-plugin-screen-guard` and `tauri-plugin-share-intent`. The
+# Kotlin `saveFile` @Command is reached ONLY from `src-tauri/src/share_file.rs`
+# through `run_mobile_plugin` (the `tauri-plugin-deep-link` precedent).
+#
+# Why a plugin rather than `ndk-context` from Rust: reaching the Activity for a
+# Storage Access Framework intent needs `startActivityForResult` AND the result
+# callback, which raw JNI cannot express without re-implementing Tauri's plugin
+# lifecycle. Kotlin lives in `android/` because `src-tauri/gen` is gitignored and
+# a fresh `tauri android init` must not be able to clobber it; the app build wires
+# the module in automatically through the `cargo:android_library_path` metadata
+# that `tauri_plugin::Builder` emits.
+[package]
+name = "tauri-plugin-save-file"
+version = "0.1.0"
+description = "Myne mobile: Android Storage Access Framework save picker for exports (Rust-only WebView surface)"
+authors = ["Myne"]
+edition = "2021"
+license = "AGPL-3.0"
+# Mandatory for tauri-plugin build scripts (build fails without it) and must
+# equal the crate name exactly.
+links = "tauri-plugin-save-file"
+
+[build-dependencies]
+# Already in the shared lock (pulled by tauri-plugin-deep-link), so no new crates.
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }

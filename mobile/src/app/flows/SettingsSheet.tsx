@@ -1625,9 +1625,15 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       if (HAS_TAURI) {
         const dest = await defaultExportDestination();
         const summary = await vaultExportMarkdown(dest.path);
-        setToast(t("settings.data.exported", { count: summary.notes, label: dest.label }));
-        // Offer the native destination chooser for the exported folder (MYND-475);
-        // additive on top of the guaranteed Documents write above.
+        // The sentence names no folder, deliberately: the export lands in a
+        // directory no file manager on either platform will open, so naming it
+        // was a claim the user could not act on (myne-md/myne#504, #505). What
+        // the app did is the count; where the copy goes is the chooser's answer.
+        setToast(t("settings.data.exportedChoose", { count: summary.notes }));
+        // Offer the platform destination chooser for the exported folder
+        // (MYND-475, and the Android half is myne-md/myne#505, where a directory
+        // is zipped because a document picker saves one file); additive on
+        // top of the guaranteed Documents write above.
         await shareFile(dest.path);
       } else {
         setToast(t("settings.data.exportNeedsApp"));
