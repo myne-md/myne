@@ -105,6 +105,9 @@ export async function importIcsIntoVault(): Promise<IcsImportOutcome> {
       repeat: event.repeat,
       remind: event.remind,
       uid: event.uid,
+      // `EXDATE` in, `skip:` out: the file's spelling of a cancellation is the note's
+      // spelling of the same fact, so a round trip keeps it.
+      skip: event.skip,
       folder: null,
     });
     created += 1;

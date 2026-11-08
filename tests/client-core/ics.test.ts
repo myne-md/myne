@@ -213,6 +213,7 @@ describe("exporting", () => {
       description: null,
       remind: null,
       calendar: "Work",
+      skip: [],
     },
     {
       uid: "def-456",
@@ -224,6 +225,7 @@ describe("exporting", () => {
       description: null,
       remind: null,
       calendar: null,
+      skip: [],
     },
   ];
 
@@ -232,6 +234,55 @@ describe("exporting", () => {
     const back = importEvents(text, { zone: "UTC" });
     if (back.kind !== "ok") throw new Error(`refused: ${back.kind}`);
     expect(back.events).toEqual(sample);
+  });
+
+  it("writes a cancellation as EXDATE and reads it back as the same list", () => {
+    // Found by review: `skip:` had no `.ics` arm in either direction, so an export of a
+    // series asserted the weeks the user had cancelled, which is the one thing a
+    // backup must not do.
+    const series: IcsEvent[] = [
+      {
+        uid: "standup",
+        title: "Standup",
+        start: "2026-11-03 09:15",
+        end: "2026-11-03 09:45",
+        allDay: false,
+        repeat: "every tuesday",
+        description: null,
+        remind: "10m",
+        calendar: null,
+        skip: ["2026-11-10", "2026-11-17"],
+      },
+    ];
+    const text = exportEvents(series);
+    expect(text).toContain("EXDATE:20261110,20261117");
+    const back = importEvents(text, { zone: "UTC" });
+    if (back.kind !== "ok") throw new Error(`refused: ${back.kind}`);
+    expect(back.events[0]?.skip).toEqual(["2026-11-10", "2026-11-17"]);
+    // And a one-off carries none: a cancellation on an event with no rule describes a
+    // note that simply does not exist.
+    const oneOff = exportEvents([{ ...series[0]!, repeat: null, skip: ["2026-11-10"] }]);
+    expect(oneOff).not.toContain("EXDATE");
+  });
+
+  it("accepts a repeated EXDATE line as well as one comma list", () => {
+    const text = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "BEGIN:VEVENT",
+      "UID:x",
+      "SUMMARY:Standup",
+      "DTSTART:20261103T091500Z",
+      "RRULE:FREQ=WEEKLY;BYDAY=TU",
+      "EXDATE:20261110T091500Z",
+      "EXDATE:20261117T091500Z",
+      "END:VEVENT",
+      "END:VCALENDAR",
+      "",
+    ].join("\r\n");
+    const back = importEvents(text, { zone: "UTC" });
+    if (back.kind !== "ok") throw new Error(`refused: ${back.kind}`);
+    expect(back.events[0]?.skip).toEqual(["2026-11-10", "2026-11-17"]);
   });
 
   it("writes CRLF line endings and folds a long line", () => {

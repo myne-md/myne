@@ -13,7 +13,8 @@
 // and the emitted form is the one `@myne/dialect` reads (`formatEventInstant`, a
 // single space between date and time).
 
-import { eventNoteBytes, type EventInstant } from "@myne/dialect/event";
+import { appendSkipDate, eventNoteBytes, type EventInstant } from "@myne/dialect/event";
+import { parseCivilDate } from "@myne/dialect/civilDate";
 import { normalizeFolderPath } from "../dialect/folderPath";
 import { patchFrontmatterField } from "../dialect/surgery";
 import { noteCreate } from "./createNote";
@@ -48,6 +49,14 @@ export type NewEventInput = {
    * match instead of duplicate (myne-md/myne#1037).
    */
   readonly uid?: string | null;
+  /**
+   * The dates this series does not occur on, from an `EXDATE` an import read.
+   *
+   * Written through the same `skip:` field the pane writes (`0795`), so a calendar
+   * exported from Myne and imported back keeps its cancellations instead of
+   * resurrecting every week the user removed.
+   */
+  readonly skip?: readonly string[];
   readonly folder?: string | null;
 };
 
@@ -59,7 +68,19 @@ export function buildEventNoteBytes(input: NewEventInput): Uint8Array {
   // The bytes come from the dialect now: this function and the phone's copy had
   // drifted (no `uid` on the phone, and a different field order), so the claim that
   // the two clients produce one note was false in one of them.
-  return eventNoteBytes(input);
+  let bytes = eventNoteBytes(input);
+  if (input.skip !== undefined && input.skip.length > 0) {
+    // Sorted and de-duplicated by the dialect's own speller, so the bytes are a
+    // function of the set rather than of the file's order.
+    let skip: string | null = null;
+    for (const date of input.skip) {
+      const parsed = parseCivilDate(date);
+      if (parsed === null) continue;
+      skip = appendSkipDate(skip, parsed) ?? skip;
+    }
+    if (skip !== null) bytes = patchFrontmatterField(bytes, "skip", skip);
+  }
+  return bytes;
 }
 
 /**
