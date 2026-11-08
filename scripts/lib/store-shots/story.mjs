@@ -37,15 +37,18 @@ export const STORY = [
   // is sent anywhere until you do") is true of exactly this frame.
   { id: "agent", screens: { phone: "AG-02", tablet: null } },
   { id: "collab", screens: { phone: "MB-03", tablet: null } },
-  // THE PORTABILITY FRAME IS RETIRED FROM THE SET, and the reason is a claim the
-  // phone cannot keep. `PT-01`/`PT-02` remain board screens for desktop parity,
-  // but on Android the export lands in `Android/data/<pkg>/files/Documents`,
+  // THE PORTABILITY FRAME IS RETIRED FROM THE SET, and the reason was a claim the
+  // phone could not keep. `PT-01`/`PT-02` remain board screens for desktop parity,
+  // but on Android the export landed in `Android/data/<pkg>/files/Documents`,
   // which the system Files app refuses to open since API 30, and the share sheet
-  // is not implemented (`mobile/src/lib/export.ts`, myne-md/myne#505). A frame
-  // captioned "a folder you can open in any editor" promises the one thing the
-  // app cannot do on the store it publishes to. It returns when #505 lands, and
-  // the tablet/phone slot counts in `slots.mjs` are checked against this array,
-  // so re-adding it cannot be a silent edit.
+  // was not implemented, so a frame captioned "a folder you can open in any
+  // editor" promised the one thing the app could not do on the store it publishes
+  // to. **myne-md/myne#505 removed that blocker** (the system save picker, and a
+  // directory export arrives as a `.zip`), so restoring the frame is now a design
+  // decision about what the caption should say for a zip rather than a blocked
+  // one: the frame cannot show "a folder" on Android as shipped. Re-adding it
+  // needs new phone/tablet renders, and the slot counts in `slots.mjs` are checked
+  // against this array so the edit cannot be silent.
   { id: "find", screens: { phone: "09", tablet: "SC-02" } },
   { id: "privacy", screens: { phone: "ST-01", tablet: null } },
   { id: "server", screens: { phone: "SY-01", tablet: null } },

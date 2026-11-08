@@ -4344,6 +4344,8 @@
     "data": {
       "exported_one": "Exported {{count}} note → {{label}}",
       "exported_other": "Exported {{count}} notes → {{label}}",
+      "exportedChoose_one": "Exported {{count}} note. Choose where to save a copy.",
+      "exportedChoose_other": "Exported {{count}} notes. Choose where to save a copy.",
       "exportNeedsApp": "Export needs the app (not the browser preview).",
       "exportFailed": "Couldn't export the vault.",
       "exportToMarkdown": "Export to Markdown",
@@ -5963,7 +5965,7 @@
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
-    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. It is a plain text file, so if you use the share sheet to put a copy somewhere you can reach, choose somewhere only you can read rather than a cloud drive. Tap Save again if you closed the sheet.",
+    "savedToShareSheet": "Saved inside Myne, where no file browser can open it. It is a plain text file, so if the system asked you where to put a copy and you chose a place, choose somewhere only you can read rather than a cloud drive. Tap Save again to bring the offer back.",
     "savedFileWritten": "Saved inside Myne. It is a plain text file, so keep any copy you make somewhere only you can read. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
