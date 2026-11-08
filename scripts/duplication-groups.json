@@ -269,7 +269,7 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #3",
-        "lines": 90,
+        "lines": 91,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -318,7 +318,7 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #10",
-        "lines": 69,
+        "lines": 70,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -339,14 +339,14 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #13",
-        "lines": 81,
+        "lines": 54,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #14",
-        "lines": 81,
+        "lines": 52,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -354,34 +354,34 @@
       {
         "id": "protocol/src/prefs_tests.rs #15",
         "lines": 54,
-        "copies": 2,
+        "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #16",
-        "lines": 52,
-        "copies": 2,
+        "lines": 54,
+        "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #17",
-        "lines": 54,
-        "copies": 3,
+        "lines": 53,
+        "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #18",
-        "lines": 54,
-        "copies": 3,
+        "lines": 82,
+        "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #19",
-        "lines": 53,
+        "lines": 82,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -444,7 +444,7 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #28",
-        "lines": 93,
+        "lines": 94,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -458,14 +458,14 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #30",
-        "lines": 31,
+        "lines": 32,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #31",
-        "lines": 32,
+        "lines": 33,
         "copies": 2,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -486,21 +486,21 @@
       },
       {
         "id": "protocol/src/prefs_tests.rs #34",
-        "lines": 37,
+        "lines": 38,
         "copies": 4,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #35",
-        "lines": 34,
+        "lines": 35,
         "copies": 3,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
       },
       {
         "id": "protocol/src/prefs_tests.rs #36",
-        "lines": 35,
+        "lines": 36,
         "copies": 7,
         "verdict": "consolidate",
         "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
@@ -710,7 +710,7 @@
       },
       {
         "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
-        "lines": 39,
+        "lines": 40,
         "copies": 13,
         "verdict": "consolidate",
         "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
@@ -721,6 +721,20 @@
         "copies": 2,
         "verdict": "consolidate",
         "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
+      },
+      {
+        "id": "src/commands/actions.ts #6",
+        "lines": 38,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
+      },
+      {
+        "id": "mobile/src/lib/eventWrite.ts + src/notes/createEvent.ts",
+        "lines": 10,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "First measured over the merged tree: myne-md/myne#1047's calendar landed with the run it was reviewed in. Recorded as owed work rather than judged permanent, which is the refactor's question to answer."
       }
     ],
     "baseline": [
@@ -1045,7 +1059,20 @@
     ]
   },
   "repeats": {
-    "verdicts": [],
+    "verdicts": [
+      {
+        "name": "key",
+        "sites": 4,
+        "verdict": "consolidate",
+        "reason": "The same small local name on surfaces that share nothing else. One owner is a refactor rather than a rename that saves a line, so this is recorded as owed work."
+      },
+      {
+        "name": "name",
+        "sites": 3,
+        "verdict": "consolidate",
+        "reason": "The same small local name on surfaces that share nothing else. One owner is a refactor rather than a rename that saves a line, so this is recorded as owed work."
+      }
+    ],
     "baseline": [
       "Clause",
       "Group",

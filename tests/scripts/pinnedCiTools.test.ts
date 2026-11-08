@@ -36,7 +36,11 @@ const PINS = [
 
 const PROVISION_LINE = "      - bash scripts/ci-pinned-tools.sh sccache cargo-nextest\n";
 
-function workflow(stepBody) {
+/** One fixture file: the path the guard keys on, its whole text, and whether it is the
+ *  shell lane script rather than a workflow file. */
+type FixtureFile = { rel: string; text: string; isLaneScript?: boolean };
+
+function workflow(stepBody: string): string {
   return [
     "steps:",
     "  build:",
@@ -49,7 +53,7 @@ function workflow(stepBody) {
   ].join("\n");
 }
 
-function run({ provisionerText = PINS, files }) {
+function run({ provisionerText = PINS, files }: { provisionerText?: string; files: FixtureFile[] }): string[] {
   return audit({ provisionerText, files }).failures;
 }
 
