@@ -50,14 +50,17 @@ type ImportedText = { readonly name: string; readonly content: string };
 /**
  * How wide the export's window is, in wall-clock dates.
  *
- * The pane's own reads are unbounded by design (`vaultIndicesCalendarRange`'s
- * `bounded` flag is the model's clamp, not the user's), and an export is "my
- * calendar", so the window is deliberately wider than any life: a note dated 1974
- * and one dated 2099 both belong in it. It is a range rather than "everything"
- * because the host read is a range read.
+ * 1990-2100, not "everything": an export is "my calendar", and a note dated 1974 or
+ * 2099 still belongs in it, but the host expands every series into one row per
+ * occurrence before the caller collapses them back to one row per series. A
+ * three-century window is therefore a request for tens of thousands of rows the
+ * exporter throws away, and the read is the expensive half.
+ *
+ * A date outside the window is REFUSED rather than filtered here, so the user learns
+ * the bound instead of exporting a file that silently omits their 1974 event.
  */
-const EXPORT_WINDOW_START = "1900-01-01";
-const EXPORT_WINDOW_END = "2200-12-31";
+const EXPORT_WINDOW_START = "1990-01-01";
+const EXPORT_WINDOW_END = "2100-12-31";
 
 /**
  * Whether this host can IMPORT an `.ics` file.

@@ -785,6 +785,13 @@ pub fn range(
 
     let snapshot = indices.snapshot();
     for (note_id, record) in snapshot.iter() {
+        // A note outside the WORKING SET is absent from every read, and the calendar
+        // is a read: `search_vault` was corrected for exactly this in an earlier
+        // round, and the pane, the phone and the agent tool all come through here, so
+        // one trashed event would otherwise reach all three.
+        if !record.live {
+            continue;
+        }
         let Some(parsed) = read_event(record) else {
             continue;
         };
@@ -865,15 +872,20 @@ pub fn range(
             .then_with(|| a.note_id.cmp(&b.note_id))
     });
 
+    if let Some(max) = bound.max_rows {
+        // Truncate BEFORE the conflict pass. It is quadratic on purpose (a second
+        // implementation of "overlap" would save nothing a person can measure), so it
+        // may only run on the rows somebody will actually see: the export path used
+        // to hand it a 300-year window of expanded series, which is tens of thousands
+        // of rows and about a billion comparisons on the command's thread.
+        answer.rows.truncate(max);
+    }
     mark_conflicts(&mut answer.rows);
     // Deterministic for the same reason the rows are: the unreadable group is a
     // list a person reads, and BTreeMap iteration order is not a promise anybody
     // should have to know.
     answer.unreadable.sort_by(|a, b| a.note_id.cmp(&b.note_id));
 
-    if let Some(max) = bound.max_rows {
-        answer.rows.truncate(max);
-    }
     answer
 }
 
@@ -1375,6 +1387,30 @@ mod tests {
                 .iter()
                 .all(|row| row.occurrence_of.as_deref() == Some("standup")),
             "the surviving rows still name the series, so it is skippable again"
+        );
+    }
+
+    #[test]
+    fn a_trashed_event_is_absent_from_the_answer() {
+        // Found by review: a note outside the working set is absent from every read,
+        // and `search_vault` was corrected for exactly this leak. The pane, the phone
+        // and the agent tool all come through `range`, so one trashed event used to
+        // reach all three - including the model.
+        let (id, mut record) =
+            event_note("gone", &[("kind", "event"), ("start", "2026-11-05 09:00")]);
+        record.live = false;
+        let state = VaultIndicesState::default();
+        state.apply(&id, record);
+        let answer = range(
+            &state,
+            instant("2026-11-01"),
+            instant("2026-11-30"),
+            Bound::unbounded(),
+        );
+        assert!(
+            answer.rows.is_empty(),
+            "a deleted event must not be on the calendar: {:?}",
+            answer.rows
         );
     }
 
