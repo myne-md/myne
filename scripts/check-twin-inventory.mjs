@@ -1479,7 +1479,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine error enum, 238 lines against 126. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
+      "The engine error enum, 191 lines against 126. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1848,8 +1848,7 @@ function emitProjection(roster, target = PROJECTION) {
  * The document says "Do not edit by hand" and the header calls it a projection,
  * and until this existed nothing enforced either: a hand edit to it is a
  * docs-only commit, which `pnpm-build`'s `code-paths` filter skips, so CI never
- * looked. `scripts/decisions-index.mjs --check` guards its generated index the
- * same way and for the same reason.
+ * looked.
  */
 function checkProjection(roster, target = PROJECTION) {
   const want = projectionBody(roster);

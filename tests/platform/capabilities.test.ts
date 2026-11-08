@@ -69,8 +69,7 @@ describe("capability descriptor", () => {
       "biometricQuickUnlock",
       "osIdleAutoLock",
       "screenCaptureProtection",
-      "vaultMigration",
-      // The person identity is session-only here (myne-md/myne#911 task 13): the
+          // The person identity is session-only here (myne-md/myne#911 task 13): the
       // sealed keypair and the device token live in the Worker's memory, so a
       // reload asks for the phrase again. `personVaultCredential` and
       // `personIdentity` are NOT in this list any more: the web person plane

@@ -1,20 +1,8 @@
 // The capability VOCABULARY: every product capability a client may answer for.
 //
-// Hoisted here from the desktop platform seam (myne-md/myne#849) because the
-// vocabulary is a CROSS-CLIENT decision and the ANSWERS are not. That split is
-// this package's entry criterion exactly: a module belongs here only if both
-// clients answer the same question AND it touches no host at all, which the
-// platform-seam guard enforces. Each client keeps its own answer set in its own
-// seam module; what it can no longer do is keep its own copy of this list.
-//
-// The failure the move closes is measured, not hypothetical: while the union
-// lived under `src/platform/`, the mobile client had no implementation of the
-// descriptor at all, so the closed list the desktop module documents ("adding a
-// capability forces every implementation of this module to answer for it") was
-// true of exactly one client.
-//
-// No imports. That is load-bearing: this file is compiled into all three clients
-// and read by none of their hosts.
+// Cross-client by construction (myne-md/myne#849): each client keeps its own
+// ANSWERS in its own seam module, and none of them keeps its own copy of this
+// list. No imports — compiled into all three clients, read by no host.
 
 export type Capability =
   /** Browser-extension web clipper (native-messaging host + pairing). */
@@ -33,58 +21,21 @@ export type Capability =
   | "screenCaptureProtection"
   /** The opt-in diagnostic log the user is invited to send on (myne-md/myne#860). */
   | "diagnosticLog"
-  /** Legacy single-vault → multi-vault migration. */
-  | "vaultMigration"
   /**
-   * The owner's identity phrase as a credential for opening a vault
-   * (myne-md/myne#911 task 10).
-   *
-   * The person-wrapped (`NTV7`) generation ships two credentials: the vault
-   * password, unchanged, and the identity phrase, which replaces the per-vault
-   * recovery phrase the explicit upgrade retires. This flag is what decides
-   * whether the unlock screen's escape hatch can offer that second credential.
-   *
-   * **Present on all three clients since task 13**, which is what turned the web
-   * person plane on: the commands dispatch there now, so the arm has something to
-   * call. It was absent on web for one task, and the reason is worth keeping
-   * rather than deleting: the arm is only offered where the command answers.
+   * The identity phrase opening a person-wrapped (`NTV7`/`NTV8`) vault, where it
+   * replaces the retired per-vault recovery phrase. Present on all three clients.
    */
   | "personVaultCredential"
   /**
-   * The person identity plane: creating an identity, registering it, unlocking
-   * it with the phrase, and joining an account from a scanned code
-   * (myne-md/myne#911 tasks 9 and 13).
-   *
-   * Split from `memberSharing` by task 13, and the split is the point even though
-   * NO client yet differs on it: both used to be one flag, which meant a client
-   * that shipped the identity could not have it without also shipping the member
-   * surface. They are different planes, the identity is the user's own keypair
-   * and token, while the member surface is invites, the roster, member names and
-   * the device-binding map, all of which need a group key and a SIGNED roster,
-   * and the split is what lets a client ship one without the other.
-   *
-   * **Present on all three clients since task 13**, which is what turned the web
-   * person plane on: `sync::person_account` is ungated for wasm32 (its member
-   * surface stays gated per function), the identity commands dispatch, and the
-   * two person files live in the Worker's memory rather than in OPFS.
+   * The person identity plane: create, register, unlock with the phrase, join
+   * from a scanned code. Split from `memberSharing` so a client can ship one
+   * without the other. Present on all three clients.
    */
   | "personIdentity"
   /**
-   * Whether this client keeps the person identity AT REST (myne-md/myne#911 task
-   * 13).
-   *
-   * A native client writes a phrase-derived sealed keypair and the device token
-   * to its app-config directory, so a reload finds the identity where it left it.
-   * A browser holds NEITHER on disk: the two files live in the Worker's memory
-   * for the session, because an origin's storage is readable by any script on
-   * that origin and a phrase-derived keypair at rest there is an offline cracking
-   * target that no password change rotates (threat-model A15/TB11, A18). The cost
-   * is that a reload asks for the 24 words again, so the caveat beside the phrase
-   * says so.
-   *
-   * A capability rather than a platform check at the call site, for the reason
-   * the descriptor exists: the phrase screens are shared code, and "does this
-   * client keep it" is a product fact, not a runtime probe.
+   * Whether this client keeps the person identity AT REST: a native client
+   * seals the keypair and device token to its app-config dir, a browser holds
+   * neither on disk and so re-asks for the phrase on reload (A15/TB11, A18).
    */
   | "personCredentialPersisted"
   /** Encrypted backup export and restore. */
@@ -96,369 +47,114 @@ export type Capability =
   /** Recovery by typing the 24-word phrase. */
   | "phraseRecovery"
   /**
-   * Clearing the OS clipboard after a secret was copied to it, gated on reading
-   * it back so unrelated content is never destroyed.
-   *
-   * The read-back is what makes the clear safe, and it is what a page cannot
-   * do: Firefox grants page content no clipboard read at all, and the other
-   * engines gate it behind a permission prompt plus document focus. So on web
-   * the Copy affordance ships and the 30 second auto-clear does not
-   * (`recovery-flow.md` §2.2 as amended 2026-08-15).
-   *
-   * A capability rather than a silent branch because the UI owes the user a
-   * sentence when it is absent: `recovery-flow.md` forbids presenting a control
-   * whose stated protection the client cannot perform.
+   * Clearing the OS clipboard after a secret was copied, gated on reading it
+   * back. Absent on web: no page clipboard read, so the affordance ships and
+   * the auto-clear does not (recovery-flow.md §2.2).
    */
   | "clipboardAutoClear"
   /**
-   * The 24-word phrase used as a DEVICE-ENROLMENT credential, the third phrase
-   * path and the one that is easy to miss because that screen is about adding a
-   * device rather than about the phrase.
-   *
-   * Split out of `phraseRecovery` by `decisions.md` 2026-08-15. One flag used to
-   * gate both, so lifting the served-code phrase ban would have shipped three
-   * phrase screens while the decision named two. They are separable on the
-   * merits: recovery is the one situation with no alternative credential, and
-   * enrolment already accepts account number plus master password. Every
-   * ROUTINE use of the phrase is what teaches a user that typing 24 words into a
-   * page is normal, which is the whole mechanism behind `threat-model.md` A18.
+   * The phrase as a DEVICE-ENROLMENT credential. Separable from
+   * `phraseRecovery` because routine phrase prompts in a page are the mechanism
+   * behind A18, and enrolment already accepts account number + password.
    */
   | "phraseEnrolment"
   /** Markdown-tree export to an OS directory. */
   | "vaultExport"
-  /** Spell-check: misspelling detection, suggestions and the dictionary ops
-   *  around them. Distinct from the `MYD1` personal dictionary itself, which is
-   *  vault content and is not a capability. */
+  /** Spell-check: detection, suggestions and the dictionary ops around them. */
   | "spellCheck"
-  /** Export a note to PDF. Distinct from `vaultExport` and from the note /
-   *  attachment downloads: it is the one export whose OUTPUT FORMAT, not its
-   *  destination, is the platform-specific part. */
+  /** Export a note to PDF — the one export whose FORMAT, not destination, is platform-specific. */
   | "pdfExport"
   /**
-   * Writing `vault.prefs` (myne-md/myne#850).
-   *
-   * **A capability rather than an assumption, because a build without it must not
-   * offer the agent's setting changes.** The intents the agent may use are
-   * resolved into a catalogue the client sends with the run, and a client that
-   * cannot write a preference must send an EMPTY one: the alternative is a change
-   * the user approves and then watches fail, which is the shape this capability
-   * exists to prevent.
-   *
-   * Every shipping client has it today, and both readings of that are true: it is
-   * present because desktop, mobile and web all write prefs through the same
-   * plugin, and its DECLARATION here is what makes a future build that does not
-   * an edit rather than an omission.
-   *
-   * **It does NOT cover the detached note window**, and that is why the agent's
-   * catalogue is gated twice. A detached window runs the same build as the main
-   * window and holds every one of these, so the second gate is window ROLE rather
-   * than a capability: see `offeredSettingIds`.
-   *
-   * **That gate is a consistency bound, not an enforcement, and this comment
-   * claimed the `prefs:allow-set-*` ACL until the 2026-10-13 review.** The agent's
-   * setting write is an in-process call into the prefs plugin rather than a
-   * `plugin:prefs|set-*` invocation, so no per-window grant is consulted and
-   * `detached-note.json` does grant `agent:default` to `note-*` windows. What the
-   * app guarantees is that its own UI offers nothing there; the host-side window
-   * check is owed and recorded in `docs/threat-model.md` §7.
+   * Writing `vault.prefs`. A build without it must send an EMPTY agent intent
+   * catalogue rather than a change the user approves and watches fail. Does not
+   * cover the detached window, which is gated by window ROLE (`offeredSettingIds`).
    */
   | "prefsWrite"
-  // ── capabilities web KEEPS, and keeps by decision rather than by default ──
-  //
-  // A descriptor listing only absences is an absence list wearing a capability
-  // list's name, and it cannot express "this was considered and kept". These
-  // two were, and both readings are load-bearing.
-  /**
-   * Changing the master password.
-   *
-   * **Present on web by decision** (`decisions.md` 2026-07-26): the master
-   * password is already typed into the page at every unlock, so allowing it to
-   * be changed there adds no exposure that unlocking did not already accept.
-   * Recorded as a capability so that removing it is a visible edit rather than
-   * a quiet omission.
-   */
+
+  // Kept on web by decision rather than by default, so that removing one is a
+  // visible edit instead of a quiet omission.
+
+  /** Changing the master password — already typed into the page at every unlock (2026-07-26). */
   | "changePassword"
   /**
-   * PIN-based quick-unlock.
-   *
-   * Distinct from `biometricQuickUnlock`, which is absent: the PIN path is
-   * "genuinely portable: Argon2id + three files under one vault root, no OS
-   * secret involved" (`core-wasm-assessment.md`). Collapsing the two into one
-   * capability would have made a portable feature look impossible.
+   * PIN quick-unlock. Distinct from `biometricQuickUnlock`, which web lacks: the
+   * PIN path is portable (Argon2id + three files, no OS secret).
    */
   | "pinQuickUnlock"
-  /**
-   * Scanning the vault directory for orphan artefacts and repairing them.
-   *
-   * **Absent on web by decision** (owner, 2026-07-27; MYND-574 task 72). The
-   * repair exists because a desktop vault directory is a place other software,
-   * a sync client, a backup tool, the user, can also write to, so it can hold
-   * artefacts this app did not put there. An OPFS container is written by this
-   * origin's client and nothing else, and the one damage mode it does have
-   * (browser eviction) is answered by re-sync rather than by repair (task 22).
-   * A repair affordance here would offer to fix a class of problem the storage
-   * cannot have.
-   */
+  /** Scanning the vault directory for orphan artefacts. Absent on web: an OPFS container holds nothing this app did not write (MYND-574 task 72). */
   | "vaultRepair"
   /**
-   * A vault can live on this client with **no sync server behind it**, so the
-   * local copy may be the only copy there is.
-   *
-   * Desktop and mobile are local-first: sync is optional, and a user who never
-   * enables it has exactly one copy of their notes. The web client is the other
-   * shape: `decisions.md` 2026-07-26 makes sync **required** there, because the
-   * OPFS container is a cache of a server-held vault rather than the vault
-   * itself.
-   *
-   * **Not an affordance, but a fact the copy has to know**, which is why it is here
-   * rather than inferred at a call site. `vault_delete` runs on both clients and
-   * removes the same bytes, but on a client where this is false, erasing the
-   * local store is a SIGN-OUT: the account and everything already synced are on
-   * the server, and signing in again brings them back. Telling that user their
-   * notes are "permanently deleted" and that "your recovery phrase will not
-   * restore the data" would be false in the direction that matters, namely someone
-   * trying to destroy their data would believe they had, while every note was
-   * still on the server. That is the same class of claim as
-   * `REMOVE_DEVICE_DISCLOSURE`'s "removal is not a remote wipe", and it is
-   * handled the same way: a load-bearing constant, selected by this flag.
+   * A vault can live on this client with NO sync server behind it, so erasing
+   * the local copy is not a remote wipe. Selects the load-bearing copy; never
+   * infer it at a call site.
    */
   | "localOnlyVault"
   /**
-   * A HOST-CONFINED directory read: naming a folder and having the platform
-   * walk and read it inside a root-validated seam the UI itself does not have.
-   *
-   * Desktop's `importer:` plugin is exactly that (`canonicalize` plus a
-   * component-wise within-root check), and it exists BECAUSE the WebView is
-   * denied `fs:allow-read-dir`, which is least privilege, TB6, SYNC-1.
-   *
-   * **Absent on web, and markdown import still ships.** That pairing is the
-   * whole reason this is named for the READ rather than for the import: a
-   * browser has no absolute path, no `canonicalize` and no host to confine to,
-   * so it gets the tree from the user's own directory pick instead, which is
-   * not a lesser version of the same mechanism, it is a different one that needs
-   * no confinement because a page is only ever handed what the user chose. A
-   * capability called `markdownImport` would have been a lie: the feature ships
-   * on both.
+   * A HOST-CONFINED directory read (desktop `importer:`), named for the read
+   * rather than the import: markdown import ships on web too, through the user's
+   * own directory pick.
    */
   | "hostDirectoryRead"
   /**
-   * Importing notes from ANOTHER LOCAL MYNE VAULT (myne-md/myne#464).
-   *
-   * Named for the second vault, not for the import, and the distinction is the
-   * same one `hostDirectoryRead` makes two entries down: markdown import ships
-   * on every client. What does not is the ability to hold a SECOND vault's keys
-   * while the first is unlocked, which is what this feature is.
-   *
-   * **Absent on web, on two independent grounds, and either alone is enough.**
-   * A browser origin holds exactly ONE container under a constant vault id
-   * (`phase3-web-client` task 85), so there is no second vault to import FROM
-   * and the source list would be permanently empty. And the `importer:` plugin
-   * is classified `Class::Unsupported` wholesale by the wasm dispatcher, so
-   * every command behind the flow refuses.
-   *
-   * A capability rather than an empty list, because an empty list is a dead
-   * affordance: the card would sit in the picker, the setup step would render,
-   * and the user would reach a credential field for a vault that cannot exist.
-   * `decisions.md` 2026-07-26 makes omission the normative answer to exactly
-   * that shape.
-   *
-   * It also carries a SECOND consequence that the runtime flag alone cannot
-   * deliver, so the module is substituted as well (`web/vite.config.ts`): the
-   * setup step accepts a 24-word recovery phrase, and `threat-model.md` A18 is
-   * about ROUTINE phrase prompts in a browser teaching a user that typing 24
-   * words into a page is normal. `decisions.md` 2026-08-15 bounds this client
-   * to asking for the phrase in exactly one situation, a recovery the user
-   * started themselves, and an import is not that situation. A hidden branch
-   * would leave the field in the artefact, one devtools breakpoint away, which
-   * is the reason `scripts/check-web-no-phrase.mjs` exists at all.
+   * Importing notes from ANOTHER local vault (myne-md/myne#464). Absent on web:
+   * one container per origin, and the `importer:` plugin is `Unsupported`
+   * wholesale there.
    */
   | "vaultImport"
   /**
-   * Searching the TEXT INSIDE attachments: a PDF's or DOCX's contents, not its
-   * filename.
-   *
-   * **Absent on web this release** (MYND-574 task 90). Three facts make it a
-   * decision rather than a port: the extractors live in `src-tauri/` so they do
-   * not arrive here; the `MYE1` cache is device-local and **never synced**
-   * (`protocol.md` §9.15), so a browser cannot inherit a desktop's extractions
-   * either; and `read_extracted` collapses every decode failure to a cache MISS
-   * whose contract is "the caller re-extracts", which on web would mean
-   * re-attempting an extraction that can never succeed, on every import.
-   *
-   * Named for the SEARCH, not the extraction, because that is what a user
-   * loses: attachments still import, still sync, still open, and their filenames
-   * are still searchable. Only their contents are not.
+   * Searching the TEXT inside attachments. Absent on web: the extractors live in
+   * `src-tauri/` and the `MYE1` cache is device-local, never synced (§9.15).
    */
   | "attachmentTextSearch"
   /**
-   * Performing the ingest-time image TRANSFORM: downscale + re-encode before
-   * an imported image is encrypted and stored.
-   *
-   * Named for the transform, not for the preference, and the distinction is the
-   * whole point. `attachment_compression_enabled` is ordinary shared vault
-   * content (`decisions.md` 2026-07-30): every client reads it, writes it and
-   * syncs it, and a web session flipping it changes what this user's desktop
-   * does. What a client without this capability declines is doing the decode.
-   *
-   * **Absent on web**, and for a containment reason rather than a capability
-   * one: `catch_unwind` needs unwinding and `wasm32-unknown-unknown` has none,
-   * so a hostile image that panicked the decoder would kill the vault Worker
-   * instead of falling back to storing the original, turning a successful
-   * import into a dead tab. `compress::is_supported_on_this_target` is the
-   * backend half of the same statement.
-   *
-   * Like `localOnlyVault`, this changes COPY rather than removing a control:
-   * the setting stays (it governs the user's other devices), but a helper line
-   * claiming it "applies on every device" is false in front of the one client
-   * that will not honour it.
+   * The ingest-time image transform (downscale + re-encode). Absent on web for
+   * containment: `catch_unwind` needs unwinding and wasm32 has none, so a
+   * hostile image would kill the vault Worker. Changes copy, not a control.
    */
   | "imageCompression"
   /**
-   * The `myne` terminal client reaching this vault over a local command socket
-   * (MYND-490).
-   *
-   * **Absent on web, and it cannot be otherwise.** The door is a Unix domain
-   * socket (or named pipe) that a shell command connects to, and the command is
-   * a binary shipped inside the desktop bundle. A page has neither: no socket to
-   * bind, no filesystem for a sidecar to sit on, and nothing on the machine that
-   * could reach the tab if it did.
-   *
-   * Named for the ACCESS, not for the binary, because that is what the Settings
-   * block governs: a door onto already-decrypted notes whose whole risk story
-   * (`threat-model.md` §7) is about which programs on the machine can walk
-   * through it. There is no browser-shaped version of that question.
+   * The `myne` CLI reaching this vault over a local command socket (MYND-490).
+   * Absent on web: no socket to bind and no filesystem for a sidecar.
    */
   | "cliAccess"
   /**
-   * An external MCP client reaching this vault through the `myne-mcp` sidecar
-   * (external-mcp-connection, myne-md/myne#923).
-   *
-   * **A second capability rather than a reuse of `cliAccess`, and the split is
-   * deliberate.** Both doors open onto the same notes and both ship in the same
-   * bundle, but they are different offers: `cliAccess` governs a terminal the
-   * user drives, and this governs a program that reads on its own and whose
-   * output a model writes. A client that shipped one without the other would be
-   * mis-described by a shared flag, and the Settings copy for each names a
-   * different consequence.
-   *
-   * **Absent on web and on mobile, and not as a port that is owed.** `myne-mcp`
-   * is a stdio binary staged as a desktop `externalBin` and installed on the
-   * user's PATH by the same shim the `myne` CLI uses; a page has no shell to
-   * install one from, and a phone has no PATH to put it on. The section is
-   * OMITTED where this is absent rather than greyed (`decisions.md` 2026-07-26),
-   * and the web dispatcher classifies the whole `mcp` plugin `Unsupported`, so
-   * the backend half says the same thing.
+   * An external MCP client through the `myne-mcp` sidecar (myne-md/myne#923).
+   * A second flag rather than a reuse of `cliAccess`: a program that reads on
+   * its own is a different offer from a terminal the user drives. Absent on web
+   * and mobile: no PATH to install a stdio binary onto.
    */
   | "externalMcp"
   /**
-   * Vault names on the LOCKED picker, and with them the device-local sealed
-   * `MYL1` store that makes showing one possible (myne-md/myne#411).
-   *
-   * **Absent on web.** The locked picker itself now SHIPS there
-   * (`check-web-screens.mjs` records `VaultPicker.tsx` as `ported` since
-   * myne-md/myne#911 task 13), so the obstacle is not the screen: the name is
-   * cached in the device-local sealed `MYL1` store, and that store's wrap key
-   * lives in an OS keychain. A page has no keychain, so there is no carrier for
-   * the cache and nothing for the display to read.
-   *
-   * Named for the NAMES rather than for the Privacy switch that hides them,
-   * because the switch is downstream: what a client without this capability
-   * lacks is the display and its cache, and the setting that governs them is
-   * omitted as a consequence. `decisions.md` 2026-08-15 records the erase
-   * semantics; none of that changes here, and none of it is what web is
-   * missing. `MYL1` and desktop behaviour are untouched.
+   * Vault names on the LOCKED picker, and the device-local sealed `MYL1` cache
+   * behind them (myne-md/myne#411). Absent on web: no OS keychain to wrap it.
    */
   | "lockedVaultNames"
   /**
    * Routing this client's own sync egress through a device-local Tor proxy
-   * (MYND-650).
-   *
-   * **Absent on web, and not as a port that is owed.** The desktop client does
-   * this by spawning a bundled Tor client as a subprocess and opening a SOCKS5
-   * tunnel to it over a loopback TCP socket; a page has neither a subprocess
-   * nor a raw socket, and `fetch` cannot be told to use a proxy. There is no
-   * in-page version of the mechanism: the browser-shaped answer is Tor
-   * Browser, which routes the whole page and does it better than an app ever
-   * could from inside one.
-   *
-   * Named for the ROUTING, not for the sidecar: what the Developer Options
-   * block governs is where this device's sync traffic goes, and the arti
-   * process is an implementation detail of the desktop answer to it.
+   * (MYND-650). Absent on web: no subprocess and no SOCKS5 socket.
    */
   | "torRouting"
   /**
-   * Grouping vaults under an account (the account/vault split, myne-md/myne#684).
-   *
-   * **Absent on web, and not as a port that is owed.** A browser can now hold
-   * two containers under one origin (myne-md/myne#911 task 13), so the obstacle
-   * is not the vault count: the account record is sealed with a wrap key kept in
-   * an OS keychain, and a page has none, so there is nowhere to keep the seal
-   * the grouping is read from. The picker renders the rows standalone instead of
-   * failing the list (`KeychainUnavailable`).
+   * Grouping vaults under an account (myne-md/myne#684). Absent on web: the
+   * account record's wrap key lives in an OS keychain.
    */
   | "accountGrouping"
   /** B2B member sharing: person identity, invite, roster, removal. */
   | "memberSharing"
-  /**
-   * Desktop pop-out: open a note in its own OS-level window (second monitor;
-   * myne-md/myne#173). Host-spawned `WebviewWindow`; web (single-tab OPFS) and
-   * mobile cannot spawn OS windows, so the affordance is absent there.
-   */
+  /** Desktop pop-out into its own OS window (myne-md/myne#173). Absent on web and mobile: neither spawns OS windows. */
   | "detachedWindows"
-  /**
-   * The sandboxed editor for the user's own on-disk markdown files
-   * (myne-md/myne#788).
-   *
-   * Desktop-only by the feature's own verdict: it needs an OS file ingress, a
-   * native open dialog and, at graduation, a file-type handler registration,
-   * none of which a browser page has. Absent rather than degraded: the
-   * surface is omitted, never rendered against commands that refuse.
-   */
+  /** The sandboxed editor for the user's own on-disk markdown (myne-md/myne#788). Desktop-only: needs an OS file ingress. */
   | "plainFile"
-  /**
-   * In-app desktop self-update (check for, and install, a signed update).
-   *
-   * Desktop-only by construction: `tauri-plugin-updater` has no browser target,
-   * and a served page cannot replace itself. Absent on web rather than degraded,
-   * so the About/banner affordances are omitted instead of shown against a
-   * command that refuses. See `src-tauri/src/update` and the `update` plugin.
-   */
+  /** In-app desktop self-update. Desktop-only: `tauri-plugin-updater` has no browser target. */
   | "selfUpdate"
-  // ── capabilities web keeps / drops for the live-collab epic ────────────────
-  /**
-   * A live co-editing SESSION: this client can open one for an open note, making
-   * it the single durable writer and letting a sync pull's peer revision land in
-   * the session rather than clobber in-flight typing (live-collab, `SYNC-31`).
-   * Present on all three clients: a browser can hold a vault and its socket like
-   * any other client.
-   */
+
+  // The live-collab epic's three flags (SYNC-31).
+
+  /** A live co-editing SESSION: this client can be the single durable writer. Present on all three. */
   | "liveCollabPeerPresence"
-  /**
-   * An awareness CURSOR consumer: this client renders peers' cursors, selections
-   * and live typing (`collab-presence-ui`).
-   *
-   * **Absent on web**, split from `liveCollabPeerPresence` on purpose. The
-   * awareness supervisor is a native SSE consumer (`AwarenessSignal` +
-   * `AppHandle`) and the web Worker-side consumer is not built, so the local
-   * presence report (`live_session_set_presence`) is refused there. Kept distinct
-   * so a web session still opens for its own devices' convergence while the
-   * cursor affordance is omitted rather than rendered against a command that
-   * refuses.
-   */
+  /** Rendering peers' cursors, selections and live typing. Absent on web: the awareness supervisor is a native SSE consumer. */
   | "liveCollabAwarenessCursors"
-  /**
-   * Multi-user (B2B) live collaboration: different PEOPLE sharing a vault over
-   * the group substrate, co-editing one note live (live-collab, `SYNC-31`).
-   *
-   * **Absent on web**, split from `liveCollabPeerPresence` on purpose. A browser
-   * origin cannot hold a person identity, the person keypair is a device-local
-   * sealed file outside browser storage and the panel's recovery-phrase prompt is
-   * substituted out of the served bundle, so multi-user is absent for exactly
-   * the reasons `memberSharing` is, and one undivided `liveCollab` flag would
-   * have implied multi-user worked in the browser. Absent rather than disabled:
-   * the multi-user affordance is omitted, never rendered against commands that
-   * refuse.
-   */
+  /** B2B live collaboration between different PEOPLE. Absent on web: no person identity there, the same reason as `memberSharing`. */
   | "liveCollabMultiUser";
 
 export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze({
@@ -470,7 +166,6 @@ export const CAPABILITY_KEYS: Readonly<Record<Capability, true>> = Object.freeze
   osIdleAutoLock: true,
   screenCaptureProtection: true,
   diagnosticLog: true,
-  vaultMigration: true,
   personVaultCredential: true,
   personIdentity: true,
   personCredentialPersisted: true,

@@ -122,7 +122,6 @@ const CAPABILITY_BACKING = {
   // migration — a web/OPFS container is provisioned current and never carries a
   // v0.1 layout to migrate, so the dispatcher refuses `vault-migrate` and the
   // `MigrateVaultForm` is gated behind this (absent-on-web) capability.
-  vaultMigration: ["vault-migrate"],
   // Deliberately empty, and for the reason `phraseEnrolment` states one screen
   // down: there is no refused command behind it. Empty, and it stays empty now
   // that the web person plane SHIPS (myne-md/myne#911 task 13): both
