@@ -240,6 +240,14 @@ export default defineConfig(async () => ({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The two label treatments a form or a settings panel needs — the small
+      // uppercase caption over a control and the heading over a group (myne-md/myne#995).
+      // Shared rather than re-declared: the caption existed ELEVEN times under
+      // `mobile/src` and the heading eight, each copy differing in prop order or in
+      // one margin, which is why no scan could group them. `mobile/src` reaching
+      // `src/` needs an alias per module, and that missing alias is the honest
+      // reason the copies existed at all.
+      { find: /^@myne\/field-label$/, replacement: sib("../src/components/primitives/FieldLabel.tsx") },
       // The run indicator, shared for the reason the cost line is: it is a
       // NAMED motion-canon exemption (`design-notes/ai/0635`), and every one
       // of the conditions that exemption rests on — bounded by the run, paused

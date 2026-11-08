@@ -14,43 +14,21 @@
 // Default state is OFF, so seeding local state with `false` matches the
 // preference default and never flashes the wrong answer before the disk read.
 
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SettingRow } from "./SettingRow";
 import { Switch } from "../primitives/Switch";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { prefsRead, setFolderNotesEnabled } from "../../lib/prefs";
 
 export function FolderNotesSettings() {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        setEnabled(p.folder_notes_enabled);
-      })
-      .catch(() => {
-        /* locked / no vault: leave the default OFF */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await setFolderNotesEnabled(next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback: never leave the UI asserting an unsaved value
-      setError(t("settings.folderNotes.errorSaveSetting"));
-    }
-  }
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.folder_notes_enabled,
+    write: setFolderNotesEnabled,
+    initial: false,
+    errorMessage: t("settings.folderNotes.errorSaveSetting"),
+  });
 
   return (
     <SettingRow
@@ -66,7 +44,7 @@ export function FolderNotesSettings() {
       control={(helperId, explanationId) => (
         <Switch
           checked={enabled}
-          onChange={(next) => void toggle(next)}
+          onChange={(next) => void setEnabled(next)}
           ariaLabel={t("settings.folderNotes.label")}
           ariaDescribedBy={
             explanationId === undefined

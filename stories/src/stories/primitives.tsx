@@ -18,6 +18,7 @@ import { CredentialField } from "@app/components/primitives/CredentialField";
 import { EmptyState } from "@app/components/primitives/EmptyState";
 import { Skeleton } from "@app/components/primitives/Skeleton";
 import { AnchoredPanel } from "@app/components/primitives/AnchoredPanel";
+import { FieldLabel, SectionLabel } from "@app/components/primitives/FieldLabel";
 import type { StoryDescriptor } from "../types";
 import { action } from "../actions";
 
@@ -434,6 +435,29 @@ export const PRIMITIVE_STORIES: StoryDescriptor[] = [
       <Row>
         <div style={{ width: 280 }}>
           <Skeleton lines={3} />
+        </div>
+      </Row>
+    ),
+  },
+  {
+    id: "primitives/labels/field-and-section",
+    group: "primitives",
+    surface: "FieldLabel",
+    state: "default",
+    description:
+      "The two label treatments a form or a settings panel needs, both on the canon's `.t-eyebrow` ramp: a caption over ONE control, and a heading over a GROUP. They were defined nineteen times across the mobile screens before myne-md/myne#995, each copy differing in prop order or in one margin, which is why no scan could group them and why this story renders both side by side. Look for the caption to sit directly on the field's top edge and the heading to carry the card's own inset, which is the `padded` prop rather than a second style.",
+    tags: ["primitives", "label", "field-label", "section-label", "eyebrow", "caption", "form"],
+    render: () => (
+      <Row>
+        <div style={{ display: "flex", flexDirection: "column", width: 320 }}>
+          <SectionLabel>Vault security</SectionLabel>
+          <FieldLabel>Your identity phrase, 24 words</FieldLabel>
+          <Input placeholder="Twenty-four words" />
+          <FieldLabel mt={16}>Recovery password</FieldLabel>
+          <Input placeholder="At least twelve characters" />
+          <SectionLabel tone="danger">Danger zone</SectionLabel>
+          <FieldLabel>Type the vault name to confirm</FieldLabel>
+          <Input placeholder="My vault" />
         </div>
       </Row>
     ),

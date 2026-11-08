@@ -107,6 +107,7 @@ import type { VaultId } from "../../lib/stage";
 import { useMemberVault } from "../../hooks/useMemberVault";
 import { MEMBER_VAULT_REMOVAL_DISCLOSURE } from "../../lib/load-bearing-copy";
 import { tappable } from "../a11y/tappable";
+import { FieldLabel, SectionLabel } from "@myne/field-label";
 
 /**
  * Settings sheet — the wired counterpart to the static workspace `11 · Settings`
@@ -217,24 +218,6 @@ const MEMBER_REMOVE_DISCLOSURE_STYLE: CSSProperties = {
   color: "var(--fg-2)",
 };
 
-function SectionLabel({ children, mt = 18 }: { children: ReactNode; mt?: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /** The Appearance/Editor panel card — a labelled block that owns its own padding,
  *  as opposed to `Group`, which is the flush-edged container for `Row` lists. */
 const CARD_STYLE: CSSProperties = {
@@ -316,24 +299,6 @@ const ICON_BTN_STYLE: CSSProperties = {
   background: "transparent",
   color: "var(--fg-2)",
 };
-
-function FieldLabel({ children, mt }: { children: ReactNode; mt: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        marginBottom: 8,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 /** Real text/password input styled to the design Field geometry. */
 function SheetInput({

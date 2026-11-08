@@ -19,12 +19,33 @@ const setTheme = vi.fn();
 const setCustomTheme = vi.fn();
 const setShowNoteTimestamps = vi.fn();
 const applyTheme = vi.fn();
+// The ribbon subsection mounts inside this panel and now hands these setters to
+// `usePrefValue` as VALUES at render time (myne-md/myne#995), where it used to call
+// them from inside a handler. Vitest's mocked module throws on ACCESS to a key the
+// factory never defined, so a setter the panel imports but never exercises still has
+// to exist here — the mock has to mirror the module it stands in for, not the subset
+// one test happens to touch.
+const setRibbonItems = vi.fn();
+const setRibbonVisible = vi.fn();
+const setBarItemsOrder = vi.fn();
+const setHiddenBarItems = vi.fn();
 
 vi.mock("../../src/lib/prefs", async (importOriginal) => ({
+  // The REAL module first, then the overrides. A panel mounted by this one referenced
+  // its setters as VALUES at render time (`usePrefValue` takes the writer as an
+  // option, myne-md/myne#995) rather than calling them from inside a handler, and a
+  // mocked module throws on ACCESS to a key the factory never defined — so a partial
+  // mock turns "the panel imports a setter this test does not exercise" into a red
+  // test. Spreading keeps the mock mirroring the module it stands in for.
+  ...(await importOriginal<typeof import("../../src/lib/prefs")>()),
   prefsRead: (...a: unknown[]) => prefsRead(...a),
   setTheme: (...a: unknown[]) => setTheme(...a),
   setCustomTheme: (...a: unknown[]) => setCustomTheme(...a),
   setShowNoteTimestamps: (...a: unknown[]) => setShowNoteTimestamps(...a),
+  setRibbonItems: (...a: unknown[]) => setRibbonItems(...a),
+  setRibbonVisible: (...a: unknown[]) => setRibbonVisible(...a),
+  setBarItemsOrder: (...a: unknown[]) => setBarItemsOrder(...a),
+  setHiddenBarItems: (...a: unknown[]) => setHiddenBarItems(...a),
   // The REAL derivation, not a copy of it. It is what decides whether a
   // stale view can claim a deletion (myne-md/myne#613), so a stub here would
   // test the stub, and a hand-copy would be one more place for the real one

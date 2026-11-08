@@ -8,6 +8,7 @@ import {
   BlockingOverlay,
 } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { SectionLabel } from "@myne/field-label";
 
 // Shared bits ─────────────────────────────────────────────────────────────────
 
@@ -96,24 +97,6 @@ function ToastCard({ children, style }: { children: ReactNode; style?: CSSProper
         borderRadius: 10,
         padding: "13px 15px",
         boxShadow: "var(--shadow-3)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Uppercase tracked section label (SYS-07 — 12px / 0.08em / line-3). */
-function SectionLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
         ...style,
       }}
     >
