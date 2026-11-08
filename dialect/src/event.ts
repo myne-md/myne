@@ -321,11 +321,20 @@ export function setOverride(raw: string | null, instant: EventInstant): string {
   const kept = parseOverrides(raw).filter(
     (seen) => compareCivilDates(seen.date, instant.date) !== 0,
   );
-  return [...kept, instant]
+  const next = [...kept, instant]
     .sort((left, right) => compareCivilDates(left.date, right.date))
-    .slice(0, MAX_OVERRIDES)
-    .map(formatEventInstant)
-    .join(", ");
+    .map(formatEventInstant);
+  // Same rule as `appendSkipDate`: an entry the reader could not type is kept as the
+  // user wrote it, ahead of the normalised ones, rather than deleted by a writer that
+  // never saw the user.
+  // The predicate is `parseOverrides`' own, not "does it parse at all": a bare date
+  // parses as an all-day instant and is still REFUSED as an override (it changes no
+  // clock), so it belongs in the residuals rather than being silently dropped.
+  const residuals = residualsOf(raw, (token) => {
+    const parsed = parseEventInstant(token);
+    return parsed !== null && parsed.time !== null;
+  });
+  return [...residuals, ...next].join(", ");
 }
 
 /** `override:` without the entry for `date`, or `null` when there was none. */
@@ -349,11 +358,45 @@ export function clearOverride(raw: string | null, date: CivilDate): string | nul
 export function appendSkipDate(raw: string | null, date: CivilDate): string | null {
   const dates = parseSkipDates(raw);
   if (dates.some((seen) => compareCivilDates(seen, date) === 0)) return null;
-  const next = [...dates, date]
-    .sort(compareCivilDates)
-    .slice(0, MAX_SKIP_DATES)
-    .map(formatCivilDate);
-  return next.join(", ");
+  // Anything the reader could not type is kept VERBATIM, ahead of the normalised
+  // entries. Dumping the parsed set back out deletes a user's own typo, and
+  // `2026-11-5` is a typo a person means rather than one they want removed, so
+  // cancelling one occurrence would silently resurrect another week. §3.10.1 says
+  // such an entry is dropped by the READER and left in the file; this is the writer
+  // honouring the same sentence.
+  const next = [...dates, date].sort(compareCivilDates).map(formatCivilDate);
+  const residuals = residualsOf(raw, (token) => parseCivilDate(token) !== null);
+  return [...residuals, ...next].join(", ");
+}
+
+/** The tokens of `raw` that `keep` rejects, in file order, deduplicated. */
+function residualsOf(raw: string | null, keep: (token: string) => boolean): string[] {
+  if (raw === null) return [];
+  const out: string[] = [];
+  for (const token of raw.split(",")) {
+    const trimmed = token.trim();
+    if (trimmed === "" || keep(trimmed)) continue;
+    if (!out.includes(trimmed)) out.push(trimmed);
+  }
+  return out;
+}
+
+/** The hour an all-day event's relative reminder counts back from. */
+export const DEFAULT_DAY_ANCHOR = "09:00";
+
+/**
+ * The day anchor a settings map names, or {@link DEFAULT_DAY_ANCHOR}.
+ *
+ * The one resolver, shared by every client, because `calendar_settings` is a SHARED
+ * pref: its value reaches a device through the per-key merge, so a client that
+ * trusted the writer's validation would be trusting a value its own setter never
+ * produced. Read-side and total: a value that is not `HH:MM` becomes the default
+ * rather than an `Invalid Date` downstream, which is how an all-day reminder used to
+ * vanish silently on one client and not the other.
+ */
+export function resolveDayAnchor(raw: string | undefined | null): string {
+  if (typeof raw !== "string") return DEFAULT_DAY_ANCHOR;
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(raw) ? raw : DEFAULT_DAY_ANCHOR;
 }
 
 export function readEventFromFmBody(fmBody: string, options?: EventReadOptions): EventRead {

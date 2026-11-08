@@ -9,6 +9,7 @@
 //   Disk-then-native ordering is load-bearing for UI / disk
 //   consistency per MYND-160 grill Q5.2.
 
+import { DEFAULT_DAY_ANCHOR, resolveDayAnchor } from "@myne/dialect/event";
 import { invoke } from "../platform/core";
 import { bumpPrefsNonce, getPrefsNonce } from "../notes/prefsNonce";
 
@@ -1682,7 +1683,7 @@ export async function setPeriodicNoteSetting(
 }
 
 /** The default anchor for an all-day event's relative reminder (myne-md/myne#1037). */
-export const CALENDAR_DEFAULT_DAY_ANCHOR = "09:00";
+export const CALENDAR_DEFAULT_DAY_ANCHOR = DEFAULT_DAY_ANCHOR;
 
 /** The calendar settings this build writes. */
 export const CALENDAR_ANCHOR_SETTING = "day_reminder_anchor";
@@ -1712,10 +1713,11 @@ export async function setCalendarSetting(setting: string, value: string | null):
 
 /** The all-day reminder anchor, falling back to the canonical default. */
 export function resolveCalendarDayAnchor(settings: Readonly<Record<string, string>>): string {
-  const raw = settings[CALENDAR_ANCHOR_SETTING];
-  return raw === undefined || !/^([01]\d|2[0-3]):[0-5]\d$/.test(raw)
-    ? CALENDAR_DEFAULT_DAY_ANCHOR
-    : raw;
+  // The rule lives in the dialect now (`resolveDayAnchor`), because the phone reads
+  // the same SHARED pref and had no resolver at all: it fed the raw value to the
+  // scheduler, where a value that is not `HH:MM` produced `Invalid Date` and silently
+  // dropped every all-day reminder on that client.
+  return resolveDayAnchor(settings[CALENDAR_ANCHOR_SETTING]);
 }
 
 /**

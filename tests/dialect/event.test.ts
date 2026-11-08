@@ -317,3 +317,25 @@ describe("override: one occurrence retimed", () => {
     expect(clearOverride(null, { year: 2026, month: 11, day: 10 })).toBeNull();
   });
 });
+
+describe("the writers keep what the reader cannot type", () => {
+  it("leaves an unparseable skip entry in the file instead of deleting it", () => {
+    // Found by review: the reader is told to drop such an entry and LEAVE IT, and the
+    // writer shipped beside it dumped the parsed set back out, so cancelling one
+    // occurrence deleted a different cancellation and resurrected that week.
+    const next = appendSkipDate("2026-11-12, 2026-11-5, TBD", { year: 2026, month: 11, day: 5 });
+    expect(next).toBe("2026-11-5, TBD, 2026-11-05, 2026-11-12");
+  });
+
+  it("treats an already-cancelled date as a no-op, so the writer writes nothing", () => {
+    expect(appendSkipDate("2026-11-05", { year: 2026, month: 11, day: 5 })).toBeNull();
+  });
+
+  it("keeps a bare-date override entry when a real one is set", () => {
+    const next = setOverride("2026-11-17, 2026-11-10 14:00", {
+      date: { year: 2026, month: 11, day: 5 },
+      time: "14:00",
+    });
+    expect(next).toBe("2026-11-17, 2026-11-05 14:00, 2026-11-10 14:00");
+  });
+});

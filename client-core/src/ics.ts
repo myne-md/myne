@@ -361,10 +361,16 @@ function joinWords(words: readonly string[]): string {
 
 /** A lead from a `TRIGGER`, or `null` when the shape is not one Myne writes. */
 function leadFromTrigger(value: string): string | null {
-  const match = /^-P(?:T(?:(\d+)H)?(?:(\d+)M)?)$/.exec(value.trim().toUpperCase());
+  // The `D` arm is not optional: `exportEvents` writes a day-granular lead as
+  // `-P<n>D`, so without it Myne's own `remind: 1d` left as a duration and came back
+  // as `null` with a generic "property ignored" warning. The round trip has to hold
+  // for every unit the grammar admits, which is what this arm is for.
+  const match = /^-P(?:(\d+)D|T(?:(\d+)H)?(?:(\d+)M)?)$/.exec(value.trim().toUpperCase());
   if (match === null) return null;
-  const hours = Number(match[1] ?? "0");
-  const minutes = Number(match[2] ?? "0");
+  const days = Number(match[1] ?? "0");
+  const hours = Number(match[2] ?? "0");
+  const minutes = Number(match[3] ?? "0");
+  if (days > 0) return `${days}d`;
   const total = hours * 60 + minutes;
   if (total <= 0) return null;
   if (total % 1440 === 0) return `${total / 1440}d`;

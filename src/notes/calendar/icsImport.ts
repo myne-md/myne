@@ -70,7 +70,11 @@ export async function importIcsIntoVault(): Promise<IcsImportOutcome> {
       false,
     );
     for (const row of existing.rows) {
-      if (row.uid !== null) held.add(row.uid);
+      // The exporter writes `uid ?? noteId` (a hand-authored event has no `uid:`),
+      // so the matcher has to answer the same pair. Reading only `uid` made every
+      // hand-authored event fail to match its own export, and a restore from that
+      // export then created a second note for each one.
+      held.add(row.uid ?? row.noteId);
     }
   } catch {
     // Deliberately silent, with the consequence stated in the outcome: the import
