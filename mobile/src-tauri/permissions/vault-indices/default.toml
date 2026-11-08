@@ -28,6 +28,7 @@ permissions = [
   "allow-vault-indices-persist",
   "allow-vault-indices-hydrate",
   "allow-vault-indices-tasks",
+  "allow-vault-indices-calendar-range",
   "allow-vault-indices-headings",
   "allow-vault-indices-block-anchors",
 ]
@@ -106,3 +107,8 @@ commands.allow = ["vault_indices_headings"]
 identifier = "allow-vault-indices-block-anchors"
 description = "Allow invoking vault-indices:vault_indices_block_anchors (Slot::Unlocked-gated whole-vault dump of imported ^block-id anchors, {noteId, noteTitle, noteFolder, blockId, preview} per anchor, for the [[^^ enumerate-only block-deep-link picker, MYND-382; defensive anchor-ceiling). Enumerate-only: surfaces markers that already exist (import), never mints one. Trash-blind like every query here, so the caller joins against the resident note-set (`joinVaultBlockAnchors`); an unjoined row deep-links into a trashed note. Returns vault-wide block-anchor metadata (AS3/AS4-Sensitive) → main-window-only, the same invariant as every other setter here."
 commands.allow = ["vault_indices_block_anchors"]
+
+[[permission]]
+identifier = "allow-vault-indices-calendar-range"
+description = "Allow invoking vault-indices:vault_indices_calendar_range, the calendar's windowed read (myne-md/myne#1037). Slot::Unlocked-gated. The window is parsed from the same wall-clock shape the event fields carry (markdown-dialect.md §3.10.2), so no offset or zone can enter a query, and the caller-supplied `bounded` flag decides whether the host applies its 366-day / 500-row ceiling: the user's own pane asks unbounded, the agent tool asks bounded, so 'the whole calendar in one call' is unreachable from a model. Returns event metadata (titles, times, calendar names) that the vault's own pane already shows. Granted to the main window and to the detached `note-*` window, which reads the same in-RAM index (SYNC-12)."
+commands.allow = ["vault_indices_calendar_range"]

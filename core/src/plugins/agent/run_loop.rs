@@ -1163,9 +1163,16 @@ async fn drive_inner(
                 AgentAction::CalendarRange { from, to } => {
                     let fresh = asked.insert(format!("calendar_range:{from}:{to}"));
                     productive |= fresh;
-                    let (prose, payload) =
-                        calendar_range(&from, &to, deps.calendar, deps.records, deps.exclusions)
-                            .await?;
+                    let (prose, payload) = calendar_range(
+                        runs,
+                        run_id,
+                        &from,
+                        &to,
+                        deps.calendar,
+                        deps.records,
+                        deps.exclusions,
+                    )
+                    .await?;
                     tracing::debug!(
                         target: "myne_core::agent",
                         event = "tool",

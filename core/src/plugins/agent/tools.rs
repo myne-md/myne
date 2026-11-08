@@ -502,6 +502,14 @@ mod tests {
         }
     }
 
+    /// A run whose approved scope is exactly `ids`, so a test can say what the tool
+    /// is allowed to see rather than relying on an absent filter.
+    fn scoped(ids: &[&str]) -> AgentRunState {
+        let runs = AgentRunState::default();
+        runs.start("r".into(), ids.iter().map(|id| id.to_string()).collect());
+        runs
+    }
+
     #[test]
     fn calendar_range_renders_one_line_per_row_and_names_the_window() {
         block(async {
@@ -510,6 +518,8 @@ mod tests {
                 row("b", "Dentist", "2026-11-06 14:30"),
             ]));
             let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
                 "2026-11-01",
                 "2026-11-30",
                 Some(&reader),
@@ -540,6 +550,8 @@ mod tests {
             let mut recs = records(&[("a", "Standup"), ("b", "Dentist")]);
             recs.get_mut("b").unwrap().folder = Some("Private".to_string());
             let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
                 "2026-11-01",
                 "2026-11-30",
                 Some(&reader),
@@ -556,12 +568,43 @@ mod tests {
     }
 
     #[test]
+    fn calendar_range_never_answers_a_note_outside_the_approved_scope() {
+        // Found by review: the tool filtered folders and not the run's scope, so a run
+        // approved for one note could read every event title in the vault. The other
+        // read tools all consult the scope (`read_note` refuses `OutOfScope`), and the
+        // threat model says in writing that this one does too.
+        block(async {
+            let reader = StubCalendar(Ok(vec![
+                row("a", "Standup", "2026-11-05 09:00"),
+                row("b", "Boarding pass", "2026-11-06 14:30"),
+            ]));
+            let (prose, payload) = calendar_range(
+                &scoped(&["a"]),
+                "r",
+                "2026-11-01",
+                "2026-11-30",
+                Some(&reader),
+                &records(&[("a", "Standup"), ("b", "Boarding pass")]),
+                &no_exclusions(),
+            )
+            .await
+            .unwrap();
+            let body = payload.unwrap_or_default();
+            assert!(body.contains("Standup"), "{body}");
+            assert!(!body.contains("Boarding pass"), "{body}");
+            assert!(prose.contains("1"), "{prose}");
+        });
+    }
+
+    #[test]
     fn calendar_range_states_the_bound_when_the_window_is_too_wide() {
         block(async {
             // The message has to carry the number: "too wide" alone tells a model to
             // guess, and a model that guesses twice has spent the run.
             let reader = StubCalendar(Err(CalendarRefusal::WindowTooWide { max_days: 366 }));
             let (prose, payload) = calendar_range(
+                &scoped(&[]),
+                "r",
                 "2020-01-01",
                 "2026-12-31",
                 Some(&reader),
@@ -579,6 +622,8 @@ mod tests {
     fn calendar_range_says_unavailable_instead_of_ending_the_run() {
         block(async {
             let (prose, payload) = calendar_range(
+                &scoped(&["a", "b"]),
+                "r",
                 "2026-11-01",
                 "2026-11-30",
                 None,
@@ -1214,6 +1259,8 @@ impl CalendarReader for NoCalendar {
 /// * **A refusal states the bound.** "Too wide" without the number tells a model to
 ///   guess, and a model that guesses twice has spent the run.
 pub async fn calendar_range(
+    runs: &AgentRunState,
+    run_id: &str,
     from: &str,
     to: &str,
     reader: Option<&dyn CalendarReader>,
@@ -1248,12 +1295,23 @@ pub async fn calendar_range(
         Err(CalendarRefusal::Unavailable) => return Ok(calendar_unavailable()),
     };
 
+    // The SCOPE comes first, and it is resolved before anything is filtered:
+    // `search_scope`'s comment above states the reason, and this tool was the one
+    // read path that skipped it. Without it a run approved for one note could read
+    // every event title, time and calendar name in the vault, which is the widening
+    // the threat model says this tool does not perform.
+    let scope = runs.scope(run_id)?;
     let excluded = excluded_now(exclusions).await?;
-    let kept: Vec<&CalendarRow> = rows
+    let in_scope: Vec<&CalendarRow> = rows
         .iter()
+        .filter(|row| scope.contains(&row.note_id))
+        .collect();
+    let out_of_scope = rows.len() - in_scope.len();
+    let kept: Vec<&CalendarRow> = in_scope
+        .into_iter()
         .filter(|row| !record_excluded(records, &row.note_id, &excluded))
         .collect();
-    let dropped = rows.len() - kept.len();
+    let dropped = out_of_scope + (rows.len() - out_of_scope - kept.len());
 
     let mut prose = format!(
         "calendar_range found {} entr(y/ies) between {from} and {to}, in start order. \
