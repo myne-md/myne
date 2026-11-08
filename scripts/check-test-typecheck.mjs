@@ -44,7 +44,7 @@
 //
 // RUN IT FROM A TOP-LEVEL CHECKOUT, NOT FROM A WORKTREE, and the reason is
 // measured rather than tidiness. TypeScript resolves module specifiers by
-// walking UP the directory chain, so a checkout at `.opencode/worktrees/<name>/`
+// walking UP the directory chain, so a checkout at `.worktrees/<name>/`
 // finds `.opencode/node_modules/@types/node`, a dependency of the agent
 // tooling, not of this project, and `@types/node` is the one package whose
 // PRESENCE changes these counts. With it visible, the three `Buffer` shape

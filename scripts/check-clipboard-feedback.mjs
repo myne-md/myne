@@ -69,7 +69,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const SCANNED = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs"]);
 
 /** Directories never worth walking. */
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", "gen", "pkg"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", "gen", "pkg", ".worktrees"]);
 
 /**
  * The ONE file allowed to name the raw API.

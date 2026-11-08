@@ -211,13 +211,13 @@ until it has the answer. On `n` the work proceeds in the current checkout, and t
 that it is untracked and not isolated.
 
 A worktree for this repo is created only with `git worktree add`, into
-`.opencode/worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**:
-`git worktree add .opencode/worktrees/<name> -b <branch> origin/develop`.
+`.worktrees/<name>`, and never anywhere else. It branches from **`origin/develop`**:
+`git worktree add .worktrees/<name> -b <branch> origin/develop`.
 Branching from the current local HEAD instead carries whatever the working checkout happens to be
 sitting on into the new branch, which is how a feature branch picks up an unrelated half-finished
 change and a PR arrives with a diff nobody can explain. The session scratchpad under `/private/tmp` is
 specifically wrong for one: it is per session and gets cleaned, so the worktree outlives the
-directory `git worktree list` still points at, and `.opencode/worktrees/` stops being the roster of
+directory `git worktree list` still points at, and `.worktrees/` stops being the roster of
 what is in flight. Name it after the issue (`410-note-covers`) so the worktree, the branch and the
 session read the same.
 
@@ -239,11 +239,11 @@ it is not a session-size judgment and it is not a reason to refuse the work. Ful
 `agent-tooling/reference/worktrees.md`.
 
 **A second trap, and it is not about the worktree's own session: a sibling checkout sits inside the
-tree every guard walks.** `.opencode/worktrees/<name>/` is a full copy of this repository, so a guard
+tree every guard walks.** `.worktrees/<name>/` is a full copy of this repository, so a guard
 that enumerates files from the repo root sees a second `core/src`, a second `src/`, and that
 session's half-finished work. The failure is asymmetric and reads as a product defect: a Rust change
 here fails `check-hex-helpers.mjs` naming a file in somebody else's worktree, and the red says
-nothing about the tree it ran in. A guard whose walk root is the repo root must skip `.opencode` in
+nothing about the tree it ran in. A guard whose walk root is the repo root must skip `.worktrees` in
 its skip list, and one that instead narrows by path (`check-core-task-seam.mjs` walks `core/src`, not
 `.`) needs nothing. Audited 2026-10-19 after the second occurrence: `check-hex-helpers.mjs` carries
 the fix and its `SKIP_DIRS` comment is the worked example, and the injection proof is two-directional
@@ -258,7 +258,7 @@ from this repository on 2026-11-03, together with `opencode.json`, `.opencode/pl
 
 - **`AGENTS.md` is the single source of repository rules.** Subdirectory `AGENTS.md` files add their domain guidance when work enters that directory.
 - **The agent tooling is clone-local, not tracked.** `workspace/link-skills.sh` symlinks every skill in the private `agent-tooling` companion into `.pi/skills/`, and `.pi/.gitignore` excludes them. A fresh clone therefore has no slash commands and no subagents until `./workspace/setup.sh` has cloned `agent-tooling` and `link-skills.sh` has run. **Two files are authored here and stay tracked**: `.pi/conventions/diverge/SKILL.md` (the convention the plugin injects, with `.pi/skills/diverge` a symlink to it) and `.pi/agents/subworker.md`, which has no source in `agent-tooling` and no second copy anywhere, so gitignoring it would delete the agent rather than de-publish somebody else's file.
-- **`.opencode/` survives as a PATH, not as a product.** It holds the worktree root `.opencode/worktrees/<n>-<slug>` and the `pnpm start` sync store, because the pi plugin's guard refuses a worktree anywhere else and eight scripts, a dozen documents and every runbook name that path. Renaming it is a change to the plugin and the guard, not a tidy-up, and it buys nothing.
+- **`.opencode/` survives as a PATH, not as a product, and it no longer holds the worktrees.** What is left under it is the `pnpm start` dev instance set and its sync store, plus the stale directories a clone from before the cut still regenerates. Worktrees moved to `.worktrees/<n>-<slug>` when the pi plugin's guard was tightened to refuse any other path: a worktree is machine state that a guard has to be able to name, and `.opencode/` was a directory with two unrelated reasons to exist. `scripts/dev-menu.mjs`, the e2e scripts and the runbooks that name `.opencode/` are all talking about the dev store, not about worktrees.
 - **No MCP servers are configured by this repository.** pi registers Woodpecker's through its own package (`myne-mcp.ts`) when a token is present.
 
 ## pi harness
@@ -284,7 +284,7 @@ pi is a second front-end over the same rules, not a second rulebook. Everything 
 - **The footer carries what the owner would otherwise open another window for.** Alongside the model and the branch it already showed, `myne-hud.ts` now prints the pull request for the current branch (`gh pr view --head`, cached, refreshed with the usage tick because the footer renders synchronously) and the context percentage, so the stage of the lane and the fill of the window are both visible without a command.
 - **The sidebar shows the diff without the IDE.** `myne-sidebar.ts` records the working tree - `git status --porcelain`, per-file status, and `git diff --unified=2 HEAD` capped at 400 lines and 32 KB with the truncation stated - and `scripts/sidebar.mjs` prints it below the box with `+`/`-` coloured, refreshing only when the state file changes so the pane keeps its scrollback and the diff stays readable by scrolling.
 - **Delegation has a budget, because two failures are invisible while they happen.** `myne-budget.ts` names at session start any agent file pinned to a model that is not a `*-free` id (on OpenCode Go everything else bills the subscription), and it caps subagent calls per session: `MYNE_MAX_DELEGATIONS`, default 30, one warning at 80%, then a refusal that states the count, the cap and the override. It is a count rather than a cost estimate on purpose, because a dispatch loop and a busy session look identical from the outside; `/budget` reports the count, the cap and any billed pin. `MYNE_ALLOW_PAID_SUBAGENTS=1` silences the model warning for a deliberate expensive run.
-- **The hooks mirror is a hook, not the enforcement.** `myne-guards.ts` refuses a `git push` to a protected branch and a worktree outside `.opencode/worktrees/`, so the model gets the refusal in a second instead of at push time; lefthook remains the thing that actually blocks. `MYNE_ALLOW_PROTECTED_PUSH=0` keeps the guard on, `1` turns it off, and the local `myne.allowProtectedPush` git config is honoured the same way by both.
+- **The hooks mirror is a hook, not the enforcement.** `myne-guards.ts` refuses a `git push` to a protected branch and a worktree outside `.worktrees/`, so the model gets the refusal in a second instead of at push time; lefthook remains the thing that actually blocks. `MYNE_ALLOW_PROTECTED_PUSH=0` keeps the guard on, `1` turns it off, and the local `myne.allowProtectedPush` git config is honoured the same way by both.
 - **`.pi/` is cwd-based.** pi reads project settings from the working directory only, so a nested companion repo (`myne-server`, `myne-web`, ...) does not inherit this harness - measured, not assumed: run inside `myne-server`, no conventions and no project skills load. Start pi at this repository's root.
 - **The plugin is tested without a model.** `cd myne-pi-plugin && npm test` runs `node:test` against a stub host: the protected-push guard with both hatches, the worktree path, the memory append and injection, the convention injection and its idempotence, and the compaction threshold and repost delta. Thirteen cases in about a second, no network, no key. That suite is also what caught the conventions extension resolving its resource root two levels up from its own file, which as an installed package points at an unrelated checkout.
 

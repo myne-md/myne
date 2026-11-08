@@ -356,7 +356,7 @@ export function debtTotal() {
 
 export { ALLOWED, CLASSES, DEBT };
 
-const SKIP_DIRS = new Set(["target"]);
+const SKIP_DIRS = new Set(["target", ".worktrees"]);
 
 function walk(dir, out = []) {
   let entries;

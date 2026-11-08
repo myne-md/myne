@@ -202,7 +202,7 @@ const ALLOWLIST = new Map([
   // ["mobile/zeroize_spell", "reason the empty body is correct despite a holder"],
 ]);
 
-const SKIP_DIRS = new Set(["target", "gen", "node_modules", ".git"]);
+const SKIP_DIRS = new Set(["target", "gen", "node_modules", ".git", ".worktrees"]);
 
 function walk(dir, out = []) {
   let entries;

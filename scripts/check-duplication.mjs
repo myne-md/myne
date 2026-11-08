@@ -140,8 +140,7 @@ const SKIP_DIRS = new Set([
   "gen",
   "vendor",
   ".git",
-  "__generated__",
-]);
+  "__generated__", ".worktrees"]);
 
 // Ten lines is the seed length: a copy shorter than that is a coincidence.
 //

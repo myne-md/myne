@@ -201,7 +201,7 @@ const TREE_PAIRS = [
 /** The unit is the pair, so every set and every sort keys on both paths. */
 const pairKey = (t) => `${t.a}::${t.b}`;
 
-const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "gen"]);
+const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "gen", ".worktrees"]);
 
 /**
  * Twins the path sweep cannot see, because their two sides sit at different
