@@ -167,6 +167,9 @@ steps:
         # "destination path already exists". Clone aside, move in, and let the loser find the
         # directory already there.
         if [ ! -d myne-agents/docs ]; then
+          # Anything already at `myne-agents` without a `docs/` is a leftover, and `mv -n` would
+          # nest the clone INSIDE it instead of replacing it.
+          rm -rf myne-agents
           # A UNIQUE staging directory per step. A fixed name was the race after all: two steps
           # reaching here at once shared `.myne-agents-clone`, and the second one's `rm -rf` and
           # clone removed the pack files the first was still writing ("could not open
