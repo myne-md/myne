@@ -347,13 +347,13 @@ fn rate_limit_backoff<T>(mut f: impl FnMut() -> Result<T, PullError>) -> Result<
 /// Upper bound on the blobs ONE `POST /sync/blobs` asks for (myne-md/myne#240).
 /// Mirrors [`PUSH_CHUNK_MAX_BLOBS`] — the server's per-request work scales with
 /// the id COUNT, and the batch's rate-limit cost is derived from it too.
-const FETCH_WINDOW_MAX_BLOBS: usize = 256;
+pub(super) const FETCH_WINDOW_MAX_BLOBS: usize = 256;
 
 /// Upper bound on the ciphertext ONE batch window asks for, in bytes measured
 /// before base64. Twin of [`PUSH_CHUNK_MAX_BYTES`], and the same 8 MiB, so the
 /// encoded response (~4/3 of this plus per-entry framing, ≈11 MiB) stays far
 /// under `transport::MAX_SYNC_RESPONSE_BYTES` (the cap sync passes into `crate::http`).
-const FETCH_WINDOW_MAX_BYTES: usize = 8 * 1024 * 1024;
+pub(super) const FETCH_WINDOW_MAX_BYTES: usize = 8 * 1024 * 1024;
 
 /// How many of `queue` the next batch request should ask for, bounded by BOTH
 /// [`FETCH_WINDOW_MAX_BLOBS`] and [`FETCH_WINDOW_MAX_BYTES`] — the window closes
