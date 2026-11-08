@@ -17,7 +17,7 @@
 // moment an English string is authored would block every copy edit, which is
 // the wrong trade and is exactly why `check-i18n.mjs` declines it too. Instead
 // it PUBLISHES coverage into a generated document and gates THAT, the way
-// `check-twin-inventory.mjs` and `decisions-index.mjs` do. Adding an English
+// `check-twin-inventory.mjs` does. Adding an English
 // key therefore costs one `--emit`, and shows the author every locale row going
 // down, in the diff, in the commit that caused it.
 //

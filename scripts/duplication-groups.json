@@ -252,6 +252,475 @@
         "copies": 2,
         "verdict": "justified",
         "reason": "Per-family sealed envelope: the magic, the AAD role string, the plaintext cap and the error type are the crypto discipline, and a macro over them would hide the AAD at the call site (protocol.md §5.2). Recorded as permanent by myne#995 with the protocol owner's reasoning; NOT a refactor ticket."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #1",
+        "lines": 63,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #2",
+        "lines": 61,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #3",
+        "lines": 90,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #4",
+        "lines": 12,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #5",
+        "lines": 12,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #6",
+        "lines": 70,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #7",
+        "lines": 64,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #8",
+        "lines": 57,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #9",
+        "lines": 61,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #10",
+        "lines": 69,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #11",
+        "lines": 47,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #12",
+        "lines": 47,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #13",
+        "lines": 81,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #14",
+        "lines": 81,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #15",
+        "lines": 54,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #16",
+        "lines": 52,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #17",
+        "lines": 54,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #18",
+        "lines": 54,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #19",
+        "lines": 53,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #20",
+        "lines": 80,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #21",
+        "lines": 34,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #22",
+        "lines": 36,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #23",
+        "lines": 79,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #24",
+        "lines": 78,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #25",
+        "lines": 75,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #26",
+        "lines": 76,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #27",
+        "lines": 58,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #28",
+        "lines": 93,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #29",
+        "lines": 39,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #30",
+        "lines": 31,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #31",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #32",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #33",
+        "lines": 62,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #34",
+        "lines": 37,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #35",
+        "lines": 34,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs_tests.rs #36",
+        "lines": 35,
+        "copies": 7,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #1",
+        "lines": 67,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #2",
+        "lines": 22,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #3",
+        "lines": 56,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #4",
+        "lines": 40,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #5",
+        "lines": 58,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #6",
+        "lines": 88,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #7",
+        "lines": 24,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #8",
+        "lines": 26,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #9",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #10",
+        "lines": 31,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #11",
+        "lines": 64,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #12",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #13",
+        "lines": 40,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #14",
+        "lines": 15,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #15",
+        "lines": 21,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #16",
+        "lines": 23,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #17",
+        "lines": 18,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #18",
+        "lines": 35,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs #19",
+        "lines": 33,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/attachments_catalog.rs + protocol/src/prefs_tests.rs #1",
+        "lines": 51,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/attachments_catalog.rs + protocol/src/prefs_tests.rs #2",
+        "lines": 70,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs + core/src/plugins/vault_unlock/commands.rs",
+        "lines": 55,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #1",
+        "lines": 50,
+        "copies": 5,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "protocol/src/prefs.rs + protocol/src/prefs_tests.rs #2",
+        "lines": 35,
+        "copies": 3,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #1",
+        "lines": 39,
+        "copies": 4,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #2",
+        "lines": 30,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #3",
+        "lines": 32,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/prefs/commands_tests.rs #4",
+        "lines": 48,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "core/src/plugins/sync/orchestrator_tests.rs + core/src/plugins/vault_unlock/commands.rs",
+        "lines": 45,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "Moved verbatim by the test-module split that landed as myne#1048, and the roster's ids are path-derived, so the same copies arrive under new ids. Owed work (`consolidate`), not deemed permanent."
+      },
+      {
+        "id": "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts",
+        "lines": 39,
+        "copies": 13,
+        "verdict": "consolidate",
+        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
+      },
+      {
+        "id": "protocol/src/prefs.rs",
+        "lines": 11,
+        "copies": 2,
+        "verdict": "consolidate",
+        "reason": "First measured over the tree the cut left (myne#1048). Recorded as owed work rather than judged permanent: whether this copy is permanent is the refactor's question to answer, not this roster's."
       }
     ],
     "baseline": [
@@ -259,7 +728,6 @@
       "cli/src/logging_discipline.rs + src-tauri/src/cli_bridge/logging_discipline.rs",
       "cli/src/windows_pipe.rs + src-tauri/src/win_pipe.rs",
       "client-core/src/accept-invite.ts + client-core/src/join-member-vault.ts",
-      "client-core/src/capabilities.ts + core/src/plugins/agent/edit.rs + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/IdentityFlow.tsx + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/lib/vault-format-upgrade.ts",
       "client-core/src/capabilities.ts + editor/src/slash/icons.ts + editor/src/toolbar/icons.ts + mobile/src/app/flows/SettingsSheet.tsx + mobile/src/components/Icon.tsx + mobile/src/lib/memory.ts + src/components/SettingsModal.tsx + src/components/settings/settingsTopics.ts + src/lib/agent-protocol.ts + src/lib/engine-error.ts + src/lib/memory.ts + src/platform/history.ts + src/screens/vault-creation/reducer.ts",
       "client-core/src/capabilities.ts + mobile/src/components/Icon.tsx",
       "client-core/src/types/live-session-error.ts + client-core/src/types/note-set-field-error.ts + client-core/src/types/vault-change-password-error.ts + src/types/note-export-error.ts + src/types/vault-export-error.ts",
@@ -331,10 +799,6 @@
       "core/src/plugins/prefs/commands.rs #18",
       "core/src/plugins/prefs/commands.rs #19",
       "core/src/plugins/prefs/commands.rs #2",
-      "core/src/plugins/prefs/commands.rs #20",
-      "core/src/plugins/prefs/commands.rs #21",
-      "core/src/plugins/prefs/commands.rs #22",
-      "core/src/plugins/prefs/commands.rs #23",
       "core/src/plugins/prefs/commands.rs #3",
       "core/src/plugins/prefs/commands.rs #4",
       "core/src/plugins/prefs/commands.rs #5",
@@ -342,9 +806,7 @@
       "core/src/plugins/prefs/commands.rs #7",
       "core/src/plugins/prefs/commands.rs #8",
       "core/src/plugins/prefs/commands.rs #9",
-      "core/src/plugins/prefs/commands.rs + core/src/plugins/vault_unlock/commands.rs",
       "core/src/plugins/quick_unlock/apple.rs + core/src/plugins/quick_unlock/device_secret.rs",
-      "core/src/plugins/quick_unlock/commands.rs + core/src/plugins/vault_migrate/ntv8.rs",
       "core/src/plugins/snapshots/commands.rs #1",
       "core/src/plugins/snapshots/commands.rs #2",
       "core/src/plugins/snapshots/error.rs + src-tauri/src/plugins/backup/error.rs + src-tauri/src/plugins/pdf_export/commands.rs",
@@ -355,30 +817,10 @@
       "core/src/plugins/sync/member_removal.rs #1",
       "core/src/plugins/sync/member_removal.rs #2",
       "core/src/plugins/sync/orchestrator.rs #1",
-      "core/src/plugins/sync/orchestrator.rs #10",
-      "core/src/plugins/sync/orchestrator.rs #11",
-      "core/src/plugins/sync/orchestrator.rs #12",
-      "core/src/plugins/sync/orchestrator.rs #13",
-      "core/src/plugins/sync/orchestrator.rs #14",
-      "core/src/plugins/sync/orchestrator.rs #15",
-      "core/src/plugins/sync/orchestrator.rs #16",
-      "core/src/plugins/sync/orchestrator.rs #17",
-      "core/src/plugins/sync/orchestrator.rs #18",
-      "core/src/plugins/sync/orchestrator.rs #19",
       "core/src/plugins/sync/orchestrator.rs #2",
-      "core/src/plugins/sync/orchestrator.rs #20",
-      "core/src/plugins/sync/orchestrator.rs #21",
-      "core/src/plugins/sync/orchestrator.rs #22",
-      "core/src/plugins/sync/orchestrator.rs #23",
-      "core/src/plugins/sync/orchestrator.rs #24",
       "core/src/plugins/sync/orchestrator.rs #3",
       "core/src/plugins/sync/orchestrator.rs #4",
       "core/src/plugins/sync/orchestrator.rs #5",
-      "core/src/plugins/sync/orchestrator.rs #6",
-      "core/src/plugins/sync/orchestrator.rs #7",
-      "core/src/plugins/sync/orchestrator.rs #8",
-      "core/src/plugins/sync/orchestrator.rs #9",
-      "core/src/plugins/sync/orchestrator.rs + core/src/plugins/vault_unlock/commands.rs",
       "core/src/plugins/sync/person_account.rs #1",
       "core/src/plugins/sync/person_account.rs #2",
       "core/src/plugins/sync/person_ai_sync.rs",
@@ -394,8 +836,6 @@
       "core/src/plugins/vault_delete/commands.rs #3",
       "core/src/plugins/vault_indices/state.rs #1",
       "core/src/plugins/vault_indices/state.rs #2",
-      "core/src/plugins/vault_migrate/b2b.rs + core/src/plugins/vault_migrate/ntv7.rs",
-      "core/src/plugins/vault_migrate/mod.rs",
       "core/src/plugins/vault_recover/commands.rs + core/src/plugins/vault_unlock/commands.rs #1",
       "core/src/plugins/vault_recover/commands.rs + core/src/plugins/vault_unlock/commands.rs #2",
       "core/src/plugins/vault_unlock/commands.rs #1",
@@ -528,8 +968,6 @@
       "protocol/src/attachments_catalog.rs + protocol/src/canonical_json.rs",
       "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #1",
       "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #2",
-      "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #3",
-      "protocol/src/attachments_catalog.rs + protocol/src/prefs.rs #4",
       "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs #1",
       "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs #2",
       "protocol/src/blob.rs + protocol/src/crdt_note_blob.rs + protocol/src/device_binding_blob.rs + protocol/src/member_names_blob.rs",
@@ -539,45 +977,6 @@
       "protocol/src/kdf.rs #1",
       "protocol/src/kdf.rs #2",
       "protocol/src/paired_extension.rs + protocol/src/saved_view.rs",
-      "protocol/src/prefs.rs #1",
-      "protocol/src/prefs.rs #10",
-      "protocol/src/prefs.rs #11",
-      "protocol/src/prefs.rs #12",
-      "protocol/src/prefs.rs #13",
-      "protocol/src/prefs.rs #14",
-      "protocol/src/prefs.rs #15",
-      "protocol/src/prefs.rs #16",
-      "protocol/src/prefs.rs #17",
-      "protocol/src/prefs.rs #18",
-      "protocol/src/prefs.rs #19",
-      "protocol/src/prefs.rs #2",
-      "protocol/src/prefs.rs #20",
-      "protocol/src/prefs.rs #21",
-      "protocol/src/prefs.rs #22",
-      "protocol/src/prefs.rs #23",
-      "protocol/src/prefs.rs #24",
-      "protocol/src/prefs.rs #25",
-      "protocol/src/prefs.rs #26",
-      "protocol/src/prefs.rs #27",
-      "protocol/src/prefs.rs #28",
-      "protocol/src/prefs.rs #29",
-      "protocol/src/prefs.rs #3",
-      "protocol/src/prefs.rs #30",
-      "protocol/src/prefs.rs #31",
-      "protocol/src/prefs.rs #32",
-      "protocol/src/prefs.rs #33",
-      "protocol/src/prefs.rs #34",
-      "protocol/src/prefs.rs #35",
-      "protocol/src/prefs.rs #36",
-      "protocol/src/prefs.rs #37",
-      "protocol/src/prefs.rs #38",
-      "protocol/src/prefs.rs #39",
-      "protocol/src/prefs.rs #4",
-      "protocol/src/prefs.rs #5",
-      "protocol/src/prefs.rs #6",
-      "protocol/src/prefs.rs #7",
-      "protocol/src/prefs.rs #8",
-      "protocol/src/prefs.rs #9",
       "protocol/src/subkey.rs",
       "protocol/src/vault_head.rs #1",
       "protocol/src/vault_head.rs #2",
@@ -621,7 +1020,6 @@
       "src/components/settings/TypographySettings.tsx",
       "src/components/settings/search/settingsSearchIndex.ts #1",
       "src/components/settings/search/settingsSearchIndex.ts #2",
-      "src/components/settings/search/settingsSearchIndex.ts #3",
       "src/dialect/clip.ts + src/dialect/html/emitNoteHtml.ts",
       "src/dialect/clip.ts + src/dialect/text/emitNoteText.ts",
       "src/dialect/clip/math.ts + src/dialect/html/emitNoteHtml.ts",
