@@ -381,7 +381,7 @@ myne/
 ├── mobile/              ← Phase 3 iOS + Android client (decisions.md 2026-08-13), moved in-repo from the myne-mobile companion, which was then deleted. Its OWN React tree under mobile/src, source-consuming ~25 @myne/* aliases into src/, editor/, dialect/, ornaments/ and locales/ — which is exactly why a repo boundary here was never real. pnpm workspace MEMBER (it keeps its package.json: it is a second Tauri app with its own tauri.conf.json and CLI invocations, unlike web/). Dev server :1422 — desktop holds :1420, web :1421
 │   ├── src/platform/    ← mobile's own platform seam (myne#492): the ONLY place under mobile/src allowed to import @tauri-apps/*
 │   ├── src/formfactor/  ← the iOS-vs-Android and phone-vs-tablet PRESENTATION split, renamed out of src/platform/ so <tree>/platform/ means the host seam in all three clients
-│   └── src-tauri/       ← the mobile Tauri crate + its in-repo plugins (screen-guard, share-intent, qr-scan, reminders, sensitive-clipboard, device-key); the crate and every plugin are root-workspace members under the ONE Cargo.lock
+│   └── src-tauri/       ← the mobile Tauri crate + its in-repo plugins (screen-guard, share-intent, save-file, qr-scan, reminders, sensitive-clipboard, device-key); the crate and every plugin are root-workspace members under the ONE Cargo.lock
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
