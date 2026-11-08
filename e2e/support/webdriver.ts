@@ -63,12 +63,18 @@ interface WireValue {
  */
 const WIRE_TIMEOUT_MS = 60_000;
 
+/** How long to wait for `POST /element/<id>/value` before typing page-side. Short
+ *  on purpose: the same session answers `execute` in milliseconds while the
+ *  keystroke command wedges, so waiting the full minute buys nothing. */
+const SEND_KEYS_TIMEOUT_MS = 12_000;
+
 async function wire<T>(
   baseUrl: string,
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
   attempt = 0,
+  timeoutMs = WIRE_TIMEOUT_MS,
 ): Promise<T> {
   let res: Response;
   try {
@@ -77,7 +83,7 @@ async function wire<T>(
       headers: { "content-type": "application/json; charset=utf-8" },
       // W3C requires a JSON body on every POST, even parameter-less ones.
       body: method === "POST" ? JSON.stringify(body ?? {}) : undefined,
-      signal: AbortSignal.timeout(WIRE_TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
   } catch (e) {
     const name = (e as Error)?.name ?? "";
@@ -107,11 +113,18 @@ async function wire<T>(
       // passes alone in 40-124 s. One retry keeps a transient stall from consuming
       // the whole scenario; a genuinely dead page still fails immediately, with
       // the sentence below naming which of the two it was.
-      if (pageSays.startsWith("answers execute") && attempt < 1) {
-        return await wire(baseUrl, method, path, body, attempt + 1);
+      // **Three attempts, with a pause, because the block can be long.** A page
+      // that answers now may be inside a production-KDF round on the next call — the
+      // member scenarios are the only ones that create an identity at m=256 MiB, and
+      // measured 2026-11-08 the wedge hops between `element/value` and `execute/sync`
+      // within one scenario. Pausing gives the app's main thread time to finish
+      // rather than hammering a blocked WebView.
+      if (pageSays.startsWith("answers execute") && attempt < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 5_000));
+        return await wire(baseUrl, method, path, body, attempt + 1, timeoutMs);
       }
       throw new Error(
-        `the driver at ${baseUrl} did not answer ${method} ${path} within ${WIRE_TIMEOUT_MS} ms ` +
+        `the driver at ${baseUrl} did not answer ${method} ${path} within ${timeoutMs} ms ` +
           `(attempt ${attempt + 1}); the page ${pageSays}`,
       );
     }
@@ -504,8 +517,39 @@ export class Element {
   }
 
   /** Types text into the element (W3C "element send keys"). */
-  sendKeys(text: string): Promise<void> {
-    return this.session.send("POST", this.path("/value"), { text });
+  /**
+   * Type into this element through the driver, and fall back to the page when the
+   * driver will not answer.
+   *
+   * `POST /element/<id>/value` (W3C Element Send Keys) hangs for its whole budget
+   * on this WebKitGTK build for SOME inputs while the page itself is perfectly
+   * alive — measured 2026-11-08, twice in a row at 60 s each, on the member
+   * scenarios' invite/identity fields, with `execute` answering normally on the
+   * same session. The short bound and the page-side fallback are what turn that
+   * from a scenario-killer into a keystroke.
+   *
+   * The fallback is not a shortcut around React: it uses the native value setter
+   * and dispatches `input` + `change`, which is what a controlled input listens
+   * for — the same technique `replaceText` documents (W3C `clear` sets the value
+   * outside the keystroke path and React's tracker then ignores it).
+   */
+  async sendKeys(text: string): Promise<void> {
+    try {
+      await this.session.send("POST", this.path("/value"), { text }, SEND_KEYS_TIMEOUT_MS);
+      return;
+    } catch (e) {
+      if (!(e instanceof Error) || !/did not answer/.test(e.message)) throw e;
+    }
+    await this.session.execute<void>(
+      "var el = arguments[0], text = arguments[1];" +
+        "el.focus();" +
+        "var proto = Object.getPrototypeOf(el);" +
+        "var desc = Object.getOwnPropertyDescriptor(proto, 'value');" +
+        "if (desc && desc.set) desc.set.call(el, text); else el.value = text;" +
+        "el.dispatchEvent(new Event('input', { bubbles: true }));" +
+        "el.dispatchEvent(new Event('change', { bubbles: true }));",
+      [{ [ELEMENT_KEY]: this.elementId }, text],
+    );
   }
 
   clear(): Promise<void> {
@@ -843,8 +887,13 @@ export class Session {
     readonly sessionId: string,
   ) {}
 
-  send<T>(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<T> {
-    return wire<T>(this.baseUrl, method, `/session/${this.sessionId}${path}`, body);
+  send<T>(
+    method: "GET" | "POST" | "DELETE",
+    path: string,
+    body?: unknown,
+    timeoutMs?: number,
+  ): Promise<T> {
+    return wire<T>(this.baseUrl, method, `/session/${this.sessionId}${path}`, body, 0, timeoutMs);
   }
 
   /** Convenience: find by `data-testid` (the SYNC-8 selector idiom). */
