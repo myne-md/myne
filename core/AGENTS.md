@@ -152,6 +152,22 @@ The seeders use the native transport's public-CA and hostname verifier, exactly 
 ## Feature flags
 
 - **`default = ["tauri-ipc"]`** — compiles the `#[tauri::command]` wrappers and the `TauriHost` adapter. A wasm build never enables it (the `tauri` dep is target-gated out of the wasm arm anyway); `web/wasm` takes the crate with `default-features = false`.
+- **A test module may live in its own file**, and when it does it is named
+  `<owner>_tests.rs` and wired with `#[path]`, because a 10 000-line `mod tests`
+  at the end of a 19 000-line file is a file a reader cannot reach the production
+  half of:
+  ```
+  #[cfg(test)]
+  #[path = "orchestrator_tests.rs"]
+  mod tests;
+  ```
+  The suffix is load-bearing in the other direction too: `scripts/lib/test-module-files.mjs`
+  is what the production ratchets (io seam, task seam, version routing, crypto
+  registries) use to skip such a file, since each of them walks one file at a time
+  and cannot see a declaration that lives in a different file. `sync/no_bypass.rs`
+  resolves the declaration instead of trusting the name, because it scans one
+  directory and can afford to.
+
 - **`test-support`**, gates `test_support` (`ScopedTempDir`, `block_on`, seeded vault fixtures) and `double_buffer_fixtures` so clients can pull them as a dev-dependency while production builds never compile them. Both fixture emitters declare it as `required-features`. It also gates the handful of accessors that exist only for a client's tests, of which `inference::state`'s `snapshot_cell` is the current example: `#[cfg(test)]` is per-crate, so an accessor that a client test reaches has to widen to `any(test, feature = "test-support")` or it silently disappears the moment its module moves into this crate.
 - **`remote-ai`**, the inference seam and the remote-provider arm (`src/inference/`). **Default off, and that is the property rather than a convention**: the `webpki-roots` trust data is shared with native sync and is no longer evidence that AI code compiled. See the `src/inference/` section above for the feature chain and workspace-unification caveat.
 - **`local-inference-stub`** (the E2E build variant, moved here with `inference/engine.rs` because that file is where it is read. Implies `remote-ai`. With it off, `stub_fault()` has no environment read at all, so `MYNE_E2E_AI_FAULT` on a shipped binary does nothing. It is declared here rather than left to the desktop crate for a reason worth keeping: without the declaration, cargo's check-cfg reduces every `#[cfg(feature = "local-inference-stub")]` in the moved file to the `not(...)` arm, which is the safe arm and therefore silent) the desktop stub build would keep compiling while quietly losing its fault injection.

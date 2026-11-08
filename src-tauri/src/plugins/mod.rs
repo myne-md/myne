@@ -84,7 +84,6 @@ pub mod account;
 pub mod vault_delete;
 pub mod vault_indices;
 pub mod vault_label;
-pub mod vault_migrate;
 pub mod vault_recover;
 pub mod vault_repair;
 pub mod vault_unlock;

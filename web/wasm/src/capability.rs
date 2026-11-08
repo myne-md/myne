@@ -550,15 +550,6 @@ const PLUGIN_DEFAULT: &[(&str, Class)] = &[
     // this row, which is the same posture `vault-change-password` and
     // `vault-delete` already take.
     ("vault-creation", Class::Pending),
-    // The whole-vault v0.1 → v0.2 migration (#420) is a DESKTOP flow: it re-keys
-    // and re-encrypts the entire vault at rest and requires the 24-word recovery
-    // phrase, which is never typed into served code (the same reason
-    // `vault-migrate` stays absent on web; `decisions.md` 2026-07-26). A browser
-    // client joins an already-current account over sync; it does not migrate one.
-    // Do not read the old parenthetical here: `vault-creation` and
-    // `vault-recover` are DISPATCHED now (`decisions.md` 2026-08-15 and
-    // 2026-10-22), and this row is about the migration alone.
-    ("vault-migrate", Class::Unsupported),
     // Markdown tree export to an OS path chosen through a native Save-As
     // dialog. `core-wasm-assessment.md`: `cannot-exist-in-browser` — "The
     // command's contract IS the desktop filesystem". Task 48's browser
