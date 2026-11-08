@@ -881,11 +881,19 @@ export function MemberRosterPanel({
               disabled={inviting}
               onClick={async () => {
                 const vaultLabel = prefs.label ?? t("sync.memberRoster.untitledVault");
-                try {
-                  await startB2bMigration(vaultLabel);
-                } catch {
-                  setActionError(t("sync.memberRoster.shareFailed"));
-                  return;
+                // Only a vault with NO group tier needs the migration: it is what
+                // mints the tier and seals the shared singletons under it. A
+                // person-born vault is born with epoch 1 and a one-row owner
+                // roster, so `shared` is already true and the command would refuse
+                // the frame it is handed (`InvalidVaultMeta`, since the migration
+                // only accepts an `NTV5` meta) - the failure this gate removes.
+                if (!shared) {
+                  try {
+                    await startB2bMigration(vaultLabel);
+                  } catch {
+                    setActionError(t("sync.memberRoster.shareFailed"));
+                    return;
+                  }
                 }
                 reload();
                 setShareConfirmOpen(false);

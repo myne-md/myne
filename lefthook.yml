@@ -393,9 +393,7 @@ pre-commit:
       # `twin-inventory` step rather than inside `pnpm-build`, because a hand
       # edit to the projection is a docs-only commit and the `code-paths` filter
       # would skip it, leaving this bypassable hook as the only gate.
-      # `bundle-record` is unfiltered for the identical reason, and
-      # `decisions-index` guards its generated index the same way two hooks
-      # below.
+      # `bundle-record` is unfiltered for the identical reason.
       glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
@@ -1011,11 +1009,14 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n-duplicates.mjs --check
 
-    decisions-index:
-      # design-notes.md is generated over design-notes/**. Without this, the first person to
-      # add a decision hand-edits the index, and the next regeneration silently discards it.
-      # Deliberately NOT scoped to code paths: a docs-only commit is exactly when a decision lands.
-      run: node scripts/decisions-index.mjs --check
+    comment-density:
+      # AGENTS.md rule 3 ("a comment earns its lines or it goes") had no guard and
+      # was the one rule that decayed: 199,438 comment lines across the shared
+      # trees, worst files 75-84% comments. A file may lose comments, never gain
+      # them; `--record` re-baselines with the growth in the diff.
+      # Deliberately NOT code-path filtered: any tree can grow a docblock.
+      glob: "*.{rs,ts,tsx,json}"
+      run: node scripts/check-comment-density.mjs
 
     beta-terms-version:
       # The beta-terms clauses and BETA_TERMS_VERSION must move together
