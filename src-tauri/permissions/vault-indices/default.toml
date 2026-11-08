@@ -31,6 +31,7 @@ permissions = [
   "allow-vault-indices-all-edges",
   "allow-vault-indices-block-anchors",
   "allow-vault-indices-tasks",
+  "allow-vault-indices-calendar-range",
   "allow-vault-indices-headings",
   "allow-vault-indices-orphans",
   "allow-vault-indices-backlink-candidates",
@@ -122,3 +123,8 @@ commands.allow = ["vault_indices_persist"]
 identifier = "allow-vault-indices-hydrate"
 description = "Allow invoking vault-indices:vault_indices_hydrate (Slot::Unlocked-gated load of the vault.indices / MYI1 blob as the unlock fast path — populates the store with unchanged-note records, drops deleted, and returns the stale note ids for TS to re-apply, §9.8.4 Build-B reconcile; absent/undecodable/stale → full rebuild). Returns vault-wide stale-id list (AS3/AS4-Sensitive) → main-window-only, same invariant as the prefs setters."
 commands.allow = ["vault_indices_hydrate"]
+
+[[permission]]
+identifier = "allow-vault-indices-calendar-range"
+description = "Allow invoking vault-indices:vault_indices_calendar_range, the calendar's windowed read (myne-md/myne#1037). Slot::Unlocked-gated. The window is parsed from the same wall-clock shape the event fields carry (markdown-dialect.md §3.10.2), so no offset or zone can enter a query, and the caller-supplied `bounded` flag decides whether the host applies its 366-day / 500-row ceiling: the user's own pane asks unbounded, the agent tool asks bounded, so 'the whole calendar in one call' is unreachable from a model. Returns event metadata (titles, times, calendar names) that the vault's own pane already shows. Granted to the main window and to the detached `note-*` window, which reads the same in-RAM index (SYNC-12)."
+commands.allow = ["vault_indices_calendar_range"]

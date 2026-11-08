@@ -89,10 +89,14 @@ impl EventInstant {
     /// reader does: a non-existent date and an offset-bearing timestamp both fail.
     pub fn parse(value: &str) -> Option<Self> {
         let trimmed = value.trim();
-        if trimmed.len() < 10 {
-            return None;
-        }
-        let (y, m, d) = parse_date(&trimmed[..10])?;
+        // `get(..10)` rather than `&trimmed[..10]`: a byte slice at a fixed index
+        // panics when that index falls inside a multi-byte character, and this
+        // string is CALLER-SUPPLIED on one path (the IPC window) and FILE-SUPPLIED
+        // on the other (`start:` on any `kind: event` note), so one hand-typed
+        // `start: 123456789ü` took the range read down for the whole vault. On
+        // wasm32 that panic is a trap, which is the Worker the web client runs in.
+        let head = trimmed.get(..10)?;
+        let (y, m, d) = parse_date(head)?;
         let rest = &trimmed[10..];
         let days = days_from_civil(y, m, d);
         if rest.is_empty() {
@@ -1372,6 +1376,17 @@ mod tests {
                 .all(|row| row.occurrence_of.as_deref() == Some("standup")),
             "the surviving rows still name the series, so it is skippable again"
         );
+    }
+
+    #[test]
+    fn a_start_whose_tenth_byte_is_inside_a_character_is_refused_not_fatal() {
+        // Found by review. `&trimmed[..10]` panics when index 10 lands inside a
+        // multi-byte character, and the string is FILE-SUPPLIED on this path: one
+        // hand-typed `start: 123456789ü` took the range read down for the whole vault
+        // (and on wasm32 a panic is a trap in the Worker the web client runs in).
+        assert!(EventInstant::parse("123456789ü").is_none());
+        assert!(EventInstant::parse("2026-11-0ü 09:00").is_none());
+        assert!(EventInstant::parse("2026-11-05").is_some());
     }
 
     #[test]
