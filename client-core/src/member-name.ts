@@ -15,7 +15,7 @@
 // instance of that class on the accept path; this is the same shape one command over.
 //
 // Two clients ask it today, and the surfaces differ per
-// `docs/decisions/clients/0488` while the QUESTION does not: desktop's
+// `myne-agents/docs/decisions/clients/0488` while the QUESTION does not: desktop's
 // `MemberRosterPanel` row editor and `MemberNameGate`, and the phone's onboarding
 // name step (myne-md/myne#851 task 15).
 //

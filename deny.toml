@@ -1,7 +1,7 @@
 # cargo-deny configuration — Myne workspace
 # Run via: cargo deny check
-# Policy doc: docs/dependency-policy.md
-# Threat model: docs/threat-model.md §6, TB9
+# Policy doc: myne-agents/docs/dependency-policy.md
+# Threat model: myne-agents/docs/threat-model.md §6, TB9
 
 [graph]
 # Check all targets to catch platform-specific deps
@@ -156,7 +156,7 @@ ignore = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────
-# Licenses — allow-list per docs/dependency-policy.md
+# Licenses — allow-list per myne-agents/docs/dependency-policy.md
 # AGPL-3.0 workspace; permissive + weak-copyleft + GPL-compat allowed
 # ─────────────────────────────────────────────────────────────────────
 [licenses]
@@ -171,7 +171,7 @@ allow = [
     "CC0-1.0",
     # webpki-roots's Mozilla CA bundle is dual-stated MPL-2.0 / CDLA-Permissive-2.0,
     # and cargo-deny reads the CDLA half. The dependency itself was reviewed and
-    # accepted as a security decision — docs/dependency-policy.md "Remote AI
+    # accepted as a security decision — myne-agents/docs/dependency-policy.md "Remote AI
     # providers (myne#415)" records this exact license pair, decisions.md
     # 2026-08-09 "User-named AI providers", ledger SYNC-23. The prose said yes and
     # this list was never told, so `cargo-deny` has been red since e194df44 —

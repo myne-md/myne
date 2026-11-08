@@ -9,15 +9,15 @@ body:
         **Read this first — is your report a vulnerability or a hardening?**
 
         - **Undisclosed or exploitable vulnerability → STOP.** Anything that lets an attacker read plaintext, forge or bypass authentication, recover keys, break the reproducible-build / bundle chain, or otherwise defeat a guarantee the threat model claims **does not go in a public issue.** Email **security@myne.md** — coordinated disclosure per [SECURITY.md](https://github.com/myne-md/myne/blob/main/SECURITY.md).
-        - **This form is for the other case:** improving an **already-public accepted residual** (`docs/threat-model.md` §5 "NOT Protected Against" / §7 "Known Limitations"), reducing a documented metadata leak, or adding defense-in-depth. No new attack is being disclosed — the exposure is already written down.
+        - **This form is for the other case:** improving an **already-public accepted residual** (`myne-agents/docs/threat-model.md` §5 "NOT Protected Against" / §7 "Known Limitations"), reducing a documented metadata leak, or adding defense-in-depth. No new attack is being disclosed — the exposure is already written down.
 
-        If you are unsure which side of the line you are on, treat it as a vulnerability and email security@myne.md. Marketing and UX may never exceed the threat model — read [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) and [`docs/vision.md`](https://github.com/myne-md/myne/blob/main/docs/vision.md) before proposing.
+        If you are unsure which side of the line you are on, treat it as a vulnerability and email security@myne.md. Marketing and UX may never exceed the threat model — read it and the vision's anti-features, both summarised in the user guide's security pages, before proposing.
   - type: textarea
     id: residual
     attributes:
       label: Which residual or threat does this address?
       description: Reference the threat-model section and the adversary / asset / trust-boundary ids (e.g. "§7 blob-size leak; A4/A5 at rest; AS3").
-      placeholder: "e.g. docs/threat-model.md §7 'Blob size leaks information' — A4/A5/A7 at rest, future A13 sync observer."
+      placeholder: "e.g. myne-agents/docs/threat-model.md §7 'Blob size leaks information' — A4/A5/A7 at rest, future A13 sync observer."
     validations:
       required: true
   - type: textarea
@@ -62,5 +62,5 @@ body:
           required: true
         - label: This is NOT an undisclosed or exploitable vulnerability — it hardens an already-public/documented residual or adds defense-in-depth. (An undisclosed vulnerability goes privately to security@myne.md.)
           required: true
-        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
+        - label: This doesn't conflict with Myne's anti-features (myne-agents/docs/vision.md) or exceed the threat model (myne-agents/docs/threat-model.md).
           required: true

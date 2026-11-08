@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 
-//! B2B member display names: the `MYO5` vault singleton codec (`docs/spec/protocol.md`
+//! B2B member display names: the `MYO5` vault singleton codec (`myne-agents/docs/spec/protocol.md`
 //! §9.29, `decisions/protocol/0666`).
 //!
 //! One blob per shared vault holding a versioned, optionally tombstoned map of
@@ -73,7 +73,7 @@
 //! carries), so a member cannot name another member's row as theirs, and cannot
 //! alter a name, a version or a tombstone either.
 //!
-//! **What that is worth, stated plainly.** `docs/decisions/protocol/0660` records
+//! **What that is worth, stated plainly.** `myne-agents/docs/decisions/protocol/0660` records
 //! that a revision's actor is NOT a signature: anyone who can edit the document can
 //! set it. The signature here protects the NAME RECORD, not the authorship of a
 //! note, and the surfaces that render a name must not imply otherwise. What it buys

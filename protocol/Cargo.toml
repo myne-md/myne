@@ -55,7 +55,7 @@ tracing = { version = "0.1", default-features = false }
 # No independent audit exists for any Rust ML-KEM (README states it); the
 # compensating control is NIST KAT vectors + property tests (task 2) per the
 # same paragraph-6 posture that admits the rest of the stack. Ledger row:
-# docs/dependency-policy.md (this change).
+# myne-agents/docs/dependency-policy.md (this change).
 ml-kem = { version = "0.3.2", default-features = false, features = ["alloc", "zeroize"] }
 # ML-DSA (FIPS 204), the PQ signature half of the person-keypair hybrid
 # (Ed25519 + ML-DSA-65 per the roadmap commitment; myne-md/myne#698 task 2).

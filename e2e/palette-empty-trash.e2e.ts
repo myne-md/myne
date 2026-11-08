@@ -113,12 +113,12 @@ describeE2E("et1 palette empty-trash confirms with count; cancel keeps, confirm 
         // Enter rather than a click, and this is the only lane that can say
         // anything about it. myne-md/myne#628 made Enter perform the destructive
         // action, and this dialog is one of the two that perform the
-        // cryptographic erase of `docs/decisions/storage/0105`: no undo, and
+        // cryptographic erase of `myne-agents/docs/decisions/storage/0105`: no undo, and
         // nothing outside a `.myne-backup` gets the note back. Its jsdom tests
         // are not evidence for the shipping WebView, and myne-md/myne#683 is the
         // reason to believe that rather than assert it: the guard those tests
         // exercised was refusing the harness's press at 14 ms of dialog age,
-        // under load, with every jsdom-level check green. `docs/decisions/ui/
+        // under load, with every jsdom-level check green. `myne-agents/docs/decisions/ui/
         // 0685` records the measurement and what replaced the guard.
         //
         // It also exercises guard 4 end to end. The palette selects its row on an

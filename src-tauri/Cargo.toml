@@ -69,13 +69,13 @@ default = ["local-inference"]
 # enabling `remote-ai` at the dependency line would have put the remote-provider
 # arm into `--no-default-features` for the first time, silently, while every
 # gate stayed green. Chained here, dropping `local-inference` still drops the
-# whole AI path exactly as `docs/decisions/ai/0337` and `threat-model.md` say it
+# whole AI path exactly as `myne-agents/docs/decisions/ai/0337` and `threat-model.md` say it
 # does.
 local-inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers", "myne-core/remote-ai"]
 # E2E-only build variant: keeps `local-inference` but swaps the Candle engine for
 # the deterministic `StubEngine` at compile time, so the tauri-driver flow-suite
 # gets stable AI output without a model file in the repo. NEVER the shipped
-# bundle (the production build uses the real Candle engine). See `docs/dev/e2e.md`.
+# bundle (the production build uses the real Candle engine). See `myne-agents/docs/dev/e2e.md`.
 local-inference-stub = ["local-inference", "myne-core/local-inference-stub"]
 # E2E-only build variant for voice capture (myne#389 item D). Swaps the
 # microphone for a deterministic 440 Hz tone at COMPILE time, so the
@@ -86,7 +86,7 @@ local-inference-stub = ["local-inference", "myne-core/local-inference-stub"]
 # no runtime switch now: a build that cannot ship needs no escape hatch, and two
 # knobs would be two things to keep in sync. NEVER the shipped bundle; the
 # `Fixture` source and the synthetic generator do not exist without it. See
-# `docs/dev/e2e.md`.
+# `myne-agents/docs/dev/e2e.md`.
 voice-capture-stub = []
 
 [dependencies]
@@ -109,7 +109,7 @@ tauri = { version = "2", features = ["tray-icon"] }
 # network surface: no HTTP client in its tree (`serde`, `url`, `tauri-utils`,
 # and `windows-registry` on Windows only), and `deep-link:default` grants only
 # `allow-get-current`. Re-verified by the `no_egress` gate. A dependency is a
-# security decision — ledger row in `docs/dependency-policy.md`.
+# security decision — ledger row in `myne-agents/docs/dependency-policy.md`.
 tauri-plugin-deep-link = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-clipboard-manager = "2"
@@ -117,7 +117,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 # Desktop self-update (in-app). The ONE dependency that brings an HTTP client
 # (`reqwest` + `hyper`) into the shipped runtime closure, admitted deliberately
-# (docs/dependency-policy.md, decisions entry) so the client can fetch a signed
+# (myne-agents/docs/dependency-policy.md, decisions entry) so the client can fetch a signed
 # update manifest. The signature check is the plugin's and cannot be disabled;
 # the check is host-side, so no updater capability is granted to the WebView.
 # See `src-tauri/src/update/` and `src-tauri/src/no_egress.rs`.
@@ -217,7 +217,7 @@ spellbook = "=0.4.2"
 # and encode them on /sync/push. Transitive→direct promotion — `base64 0.22.1`
 # is already locked via the dependency tree, so this is zero Cargo.lock tree
 # expansion (the `windows-sys`/`objc2` precedent). Pure-Rust, no_std-capable,
-# MIT/Apache-2.0. Record in `docs/dependency-policy.md`.
+# MIT/Apache-2.0. Record in `myne-agents/docs/dependency-policy.md`.
 # base64 — desktop-side use is local_inference (engine_candle). The sync
 # transport's base64 use moved to `myne-core` with the sync extraction
 # (decisions.md 2026-07-07); this stays because local_inference still needs it.
@@ -243,7 +243,7 @@ base64 = "0.22"
 # compiled-in provider hosts rather than the open web, and it is chosen over
 # `rustls-platform-verifier` for identical behaviour on every machine, which is
 # what the reproducible-build commitment wants. That reasoning and its
-# `docs/dependency-policy.md` ledger row now live beside the dependency, in
+# `myne-agents/docs/dependency-policy.md` ledger row now live beside the dependency, in
 # `core/Cargo.toml`'s `remote-ai` feature.
 
 # PDF export per-page footer stamping (MYND-255 hotfix, owner-requested):
@@ -252,7 +252,7 @@ base64 = "0.22"
 # engines cannot draw margin-box page counters, CSS `@page` margin boxes
 # are Chromium-only, and a hand-rolled stamper would have to parse three
 # engine dialects (classic xref + xref/object streams) — see
-# `docs/dependency-policy.md` ledger ("PDF footer stamping") for the
+# `myne-agents/docs/dependency-policy.md` ledger ("PDF footer stamping") for the
 # measured transitive footprint. Not crypto, not telemetry; command-path
 # only (`plugins/pdf_export/footer.rs`), never on the boot path. Default
 # features (chrono/jiff/rayon/time — date-object + parallel-parse
@@ -287,7 +287,7 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 # so these two are the ONLY new crates this feature adds. Chosen over
 # `pdf-extract` (+61 transitive incl. a duplicate lopdf 0.36) and `docx-rs`
 # (+44 transitive) after the MYND-328 dependency spike — see
-# `docs/dependency-policy.md` ledger ("Attachment text extraction"). Both
+# `myne-agents/docs/dependency-policy.md` ledger ("Attachment text extraction"). Both
 # pure-Rust, command-path only (`plugins/attachments/extract.rs`), never on the
 # boot path. `zip` default features off (only `deflate` — the OOXML storage
 # method). zip MIT, quick-xml MIT.
@@ -303,7 +303,7 @@ quick-xml = "0.37"
 # on the boot path; v0.1 records WAV with no encoder dependency. NOTE: the
 # Linux build needs the ALSA dev headers (`libasound2-dev`) for cpal's
 # alsa-sys backend. A dependency is a security decision — record in
-# `docs/dependency-policy.md`. Apache-2.0/MIT.
+# `myne-agents/docs/dependency-policy.md`. Apache-2.0/MIT.
 cpal = "0.15"
 
 # Desktop-only: collapse the parallel-instance race source at process
@@ -371,7 +371,7 @@ windows = "0.62"
 # Wayland apps. No DISPLAY / no X server still lands on `None` →
 # `auto_lock` falls back to the window-level heartbeat (fail-secure). New
 # direct dependency per the user's "all three platforms now" decision
-# (grill/feature dependency call) — `docs/dependency-policy.md` bar applies.
+# (grill/feature dependency call) — `myne-agents/docs/dependency-policy.md` bar applies.
 [target.'cfg(target_os = "linux")'.dependencies]
 x11rb = { version = "0.13", features = ["screensaver"] }
 # PDF export print-to-file arm (MYND-255): WebKitPrintOperation +
@@ -445,7 +445,7 @@ candle-transformers = { version = "0.8", optional = true, default-features = fal
 # `Cargo.lock` only as an unreached transitive of `serde_with`/`tauri-utils`
 # (no workspace member's dependency graph actually resolves it — confirmed
 # via `cargo tree -p myne-desktop -i chrono`), so pulling it in would be new
-# supply-chain surface, not an already-trusted one (`docs/dependency-policy.md`
+# supply-chain surface, not an already-trusted one (`myne-agents/docs/dependency-policy.md`
 # — contrast the `dirs` precedent in `cli/Cargo.toml`, which WAS already
 # reachable). `time`'s local-offset API is unsound on multi-threaded Unix
 # (the documented `getenv` TZ race) and is explicitly disabled there by the
@@ -458,7 +458,7 @@ candle-transformers = { version = "0.8", optional = true, default-features = fal
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
-# Dev-dependencies — evaluated under the same `docs/dependency-policy.md`
+# Dev-dependencies — evaluated under the same `myne-agents/docs/dependency-policy.md`
 # bar as runtime dependencies. `tracing-test` (tokio-rs org, MIT) is the
 # project's first dev-dep; it captures `tracing` events per-test so the
 # notes plugin's tracing-level discipline (debug for orphan files, warn

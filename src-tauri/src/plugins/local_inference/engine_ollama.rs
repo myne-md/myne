@@ -4,7 +4,7 @@
 //!
 //! **No new crate.** The connection is a `std::net::TcpStream` framed by
 //! `myne_core::http::codec`, the first-party HTTP/1.1 codec promoted out of the
-//! sync plugin in task 1. `docs/dependency-policy.md` fast-rejects "adding an
+//! sync plugin in task 1. `myne-agents/docs/dependency-policy.md` fast-rejects "adding an
 //! HTTP client when one already exists in the tree", and an HTTP crate is the
 //! one thing that genuinely does trip the AI denylist gate.
 //!

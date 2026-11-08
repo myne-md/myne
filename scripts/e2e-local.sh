@@ -9,7 +9,7 @@
 # cargo registry live in named Docker volumes so (a) macOS-native
 # node_modules never leak into the Linux container and (b) re-runs are
 # incremental. tauri-driver itself cannot run on macOS — this container
-# IS the local Linux seat (docs/dev/e2e.md).
+# IS the local Linux seat (myne-agents/docs/dev/e2e.md).
 #
 # THREE ENVIRONMENT KNOBS, all of them opt-in and all of them the difference
 # between a run that verified something and a run that reported green having

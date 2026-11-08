@@ -94,7 +94,7 @@ describe("boot routing, per client", () => {
     // awaiting approval", read from disk as identity-present + token-absent, and
     // routed the web client's answer to a wait screen. On this client that pair
     // is ALSO what an approved device looks like one reload later, because its
-    // token is session-scoped (`docs/decisions/clients/0363`), so the routing
+    // token is session-scoped (`myne-agents/docs/decisions/clients/0363`), so the routing
     // could not tell the two apart, and it stranded the approved case on a
     // screen with no password field and no way to claim a token.
     //
@@ -122,7 +122,7 @@ describe("boot routing, per client", () => {
   // token and can pull nothing.
   //
   // **Its fix routed on a fact boot cannot establish**, which is what #535
-  // corrects. `docs/decisions/clients/0363` makes the web token session-scoped,
+  // corrects. `myne-agents/docs/decisions/clients/0363` makes the web token session-scoped,
   // so "identity present, token absent" is ALSO every reload of an approved
   // device. Routing that to a screen with no password field was a deadlock: the
   // only exit from pending is a token claim, the claim runs inside a sync cycle,

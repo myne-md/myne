@@ -32,7 +32,7 @@
 //! ## Verification status
 //!
 //! The iOS body compiles against `aarch64-apple-ios-sim` but is device-verified
-//! via `docs/dev/device-matrix.md` §8, not in this change. It follows the
+//! via `myne-agents/docs/dev/device-matrix.md` §8, not in this change. It follows the
 //! `ios_chrome.rs` raw-`msg_send!` idiom and is defensively null-guarded (each
 //! failed lookup early-returns to a no-op, never a panic).
 

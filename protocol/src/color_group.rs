@@ -2,7 +2,7 @@
 
 //! `ColorGroup` — an ordered rule pairing a filter with a color, applied to
 //! graph nodes at paint time (graph-connection-ux-polish, MYND-604 task 2).
-//! See `docs/spec/protocol.md` § 9.5.2.
+//! See `myne-agents/docs/spec/protocol.md` § 9.5.2.
 //!
 //! A color group is **authored content** (a user-named rule over the same
 //! `FilterNode` AST [`crate::saved_view::SavedView`] already persists),

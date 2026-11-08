@@ -86,7 +86,7 @@ serde_json = "1"
 # there is no second implementation to choose between. Already in the shared
 # `Cargo.lock` (pulled transitively), so this is a transitive→direct promotion
 # rather than a new admission — the `unicode-normalization` precedent in
-# `docs/dependency-policy.md`.
+# `myne-agents/docs/dependency-policy.md`.
 wasm-bindgen = "0.2"
 # `js_sys::Uint8Array` + the `crypto` global for the CSPRNG bridge (task 81).
 # Same family, same pin source, same transitive→direct promotion. Used ONLY

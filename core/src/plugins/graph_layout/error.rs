@@ -9,7 +9,7 @@
 //!
 //! `graph_layout_read` returns `Ok(None)` (→ frontend recomputes the layout)
 //! on absent / AEAD-fail / unsupported-format / parse-fail per
-//! `docs/spec/protocol.md` § 9.19.4 — those do NOT surface as errors (a
+//! `myne-agents/docs/spec/protocol.md` § 9.19.4 — those do NOT surface as errors (a
 //! rebuildable cache). Only a Slot precondition violation or an unrecoverable
 //! `vault.meta` IO/parse failure becomes a read error. `graph_layout_write`
 //! surfaces real failures so the frontend knows the layout did not persist.

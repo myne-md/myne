@@ -21,7 +21,7 @@ sentence such as "imported from Myne" is exactly what the Marks are for.
 
 ## Where the Marks appear in this repository
 
-- `public/myne-mark.svg`, `docs/design/assets/myne-mark.svg`, `docs/design/assets/myne-wordmark.svg`
+- `public/myne-mark.svg`, `myne-agents/docs/design/assets/myne-mark.svg`, `myne-agents/docs/design/assets/myne-wordmark.svg`
 - `.github/banner.png` / `.github/banner.gif`
 - `mobile/src-tauri/icons/` and `src-tauri/icons/` (the app icon in every shipped bundle)
 - the About panel, which renders the mark and the wordmark

@@ -1,4 +1,4 @@
-// Spec: docs/spec/markdown-dialect.md §3.1 (ATX canonical, Setext
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.1 (ATX canonical, Setext
 // recognized for round-trip but never emitted).
 
 import type { SyntaxNode, Tree } from "@lezer/common";

@@ -1,4 +1,4 @@
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (Myne-managed canonical
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (Myne-managed canonical
 // frontmatter fields); decisions.md 2026-05-09 (TS-owned surgery).
 
 import { load as parseYaml } from "js-yaml";
@@ -454,7 +454,7 @@ export function patchUpdatedField(bytes: Uint8Array, iso: string): Uint8Array {
 
 // === patchTitleField — Q7 (β mirror-existing) write target for FM `title:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (Myne-managed canonical
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (Myne-managed canonical
 // frontmatter fields — `title:` joins `updated:`); decisions.md 2026-05-15
 // "Note title write target".
 //
@@ -599,7 +599,7 @@ export function readFolderFromFmBody(fmBody: string): string | null {
 
 // === patchFirstH1Line — Q7 (β mirror-existing) write target for body `# H1` ===
 //
-// Spec: docs/decisions.md 2026-05-15 "Note title write target" — when the
+// Spec: myne-agents/docs/decisions.md 2026-05-15 "Note title write target" — when the
 // note's title is read from the body's first ATX-H1 line (no frontmatter
 // `title:` present), rename writes through this primitive. The H1 line is
 // user-authored body content; this is NOT a Myne-managed frontmatter field
@@ -670,7 +670,7 @@ export function patchFirstH1Line(
 
 // === patchFolderField — virtual-folder write target for FM `folder:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`folder:` joins `updated:` +
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`folder:` joins `updated:` +
 // `title:` as the 3rd Myne-managed canonical frontmatter field). Grill:
 // 2026-05-29-folder-hierarchy-sidebar Q5 (grammar/root convention) + Q7 (a2
 // create-timing, state-D delete, empty-block removal). Write trigger =
@@ -796,7 +796,7 @@ export function buildInitialPlaintext(folder: string | null): string {
 
 // === patchTrashedField — soft-trash write target for FM `trashed:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`trashed:` is the 4th Myne-managed
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`trashed:` is the 4th Myne-managed
 // canonical FM field). Write trigger = trash (`src/notes/trashNote.ts`) + restore
 // (state-D delete). MYND-133. Structurally identical to `patchFolderField`: the set
 // path is A/B/C value-surgery, plus state D (delete on restore) with empty-block
@@ -1065,7 +1065,7 @@ export function readConflictOfFromFmBody(fmBody: string): string | null {
 
 // === patchArchivedField — note-archive write target for FM `archived:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 8th Myne-managed
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`archived:` is the 8th Myne-managed
 // canonical FM field). Write trigger = archive (`src/notes/archiveNote.ts`) +
 // unarchive (state-D delete). note-archive / MYND-331. Structurally identical to
 // `patchTrashedField`: A/B/C value-surgery for the set path, plus state D (delete
@@ -1179,7 +1179,7 @@ export function patchArchivedField(
 
 // === patchDeletedField — sync deletion-tombstone write target for FM `deleted:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`deleted:` — the sync tombstone
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`deleted:` — the sync tombstone
 // marker, MYND-426). Value-strict RFC 3339 like `trashed:`/`archived:`: only a
 // parseable timestamp marks the note a deletion tombstone. Write trigger = the
 // under-sync deletion reroute (`src/notes/deleteNote.ts`) — NEVER body autosave.
@@ -1270,7 +1270,7 @@ export function patchDeletedField(bytes: Uint8Array, value: string | null): Uint
 
 // === patchTemplateField — note-template write target for FM `template:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`template:` is the 5th Myne-managed
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`template:` is the 5th Myne-managed
 // canonical FM field — the inverse-visibility twin of `trashed:`). Write trigger =
 // template create / convert actions (`src/notes/templates.ts`) only — never body
 // autosave. MYND-186. Structurally identical to `patchTrashedField`: the set path
@@ -1421,7 +1421,7 @@ function isCanonicalTemplateFlag(valuePortion: string): boolean {
 
 // === patchFolderIndexField — folder-note write target for FM `folder_index:` ===
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (`folder_index:` is the 6th
+// Spec: myne-agents/docs/spec/markdown-dialect.md §3.6.1 (`folder_index:` is the 6th
 // Myne-managed canonical FM field). Write trigger = folder-note designate /
 // undesignate actions (`src/notes/folderNote.ts`) only — never body autosave.
 // MYND-370. The note is the index of whichever folder its own `folder:` field

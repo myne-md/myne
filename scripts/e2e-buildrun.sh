@@ -31,7 +31,7 @@ IMAGE=myne-e2e
 # the binary keeps whatever bundle it embedded when it was last compiled. It was
 # found in its cross-tree form, back when the cargo target volume was shared:
 # this script rebuilt cleanly, `pnpm build` emitted a correct `dist/`, and the app
-# under test loaded `main-CoKDUqv9.js` from `.opencode/worktrees/554-…/dist`, whose
+# under test loaded `main-CoKDUqv9.js` from `.worktrees/554-…/dist`, whose
 # host still dispatched the pre-fix event. The scenario failed and read as "the
 # production fix does not work", which is the worst possible wrong answer from a
 # green build. `scripts/lib/e2e-docker.sh` now keys that volume per tree, so the

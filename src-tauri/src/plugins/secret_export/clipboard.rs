@@ -2,7 +2,7 @@
 //! Host-side clipboard auto-clear for the vault-creation secret handoff
 //! (myne#379).
 //!
-//! **Why this command exists at all.** `docs/spec/recovery-flow.md` §2.2 makes
+//! **Why this command exists at all.** `myne-agents/docs/spec/recovery-flow.md` §2.2 makes
 //! the 30 s clipboard auto-clear a MUST, *gated on a read precondition*: the
 //! clear must verify the clipboard still holds the phrase, so that unrelated
 //! contents the user copied since are never destroyed. That MUST is a

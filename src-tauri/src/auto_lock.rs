@@ -17,8 +17,8 @@
 //! always-on flag and the `[MIN, CEILING]` bounds are *code constants*. A
 //! disk-level attacker (A4) who replays, deletes, or tampers `vault.prefs`
 //! can therefore only make auto-lock **stricter** — never disable it or push
-//! it past the ceiling. See `docs/threat-model.md` §7 (two-class prefs
-//! taxonomy) and `docs/decisions.md` 2026-05-30 "Auto-lock on idle".
+//! it past the ceiling. See `myne-agents/docs/threat-model.md` §7 (two-class prefs
+//! taxonomy) and `myne-agents/docs/decisions.md` 2026-05-30 "Auto-lock on idle".
 //!
 //! The single entry point, [`effective_auto_lock_secs`], returns a plain
 //! `u32` (never an `Option`): there is **no disabled state**. Every possible

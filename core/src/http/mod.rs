@@ -3,7 +3,7 @@
 //!
 //! **Why it is here and not in `plugins::sync`.** The sync client owned the only
 //! HTTP codec, so a second caller — the local AI provider arm (#189) — would
-//! have had to duplicate it. `docs/dependency-policy.md` fast-rejects "adding an
+//! have had to duplicate it. `myne-agents/docs/dependency-policy.md` fast-rejects "adding an
 //! HTTP client when one already exists in the tree", and `plugins::sync::no_bypass`
 //! names duplication as the shape its ratchet exists to catch. Sharing is what
 //! makes reuse possible instead of adding a crate.

@@ -2,9 +2,9 @@
 //! The CLI terminal-access door: a local socket bound to the running,
 //! unlocked desktop (cli-thin-client task 3; MYND-490).
 //!
-//! `docs/decisions.md` "CLI terminal access is a default-off, unlock-gated
+//! `myne-agents/docs/decisions.md` "CLI terminal access is a default-off, unlock-gated
 //! local socket with a folder exclusion list (MYND-490)" and
-//! `docs/threat-model.md` §7 are the governing spec entries (task 1 of this
+//! `myne-agents/docs/threat-model.md` §7 are the governing spec entries (task 1 of this
 //! feature) — read them before changing anything here. In one line: the
 //! command socket exists ONLY while `cli_enabled` is true AND the vault is
 //! unlocked, created the instant both hold and torn down the instant either

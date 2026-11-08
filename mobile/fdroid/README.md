@@ -252,7 +252,7 @@ F-Droid's reproducibility flow wants a byte-identical APK. Cause 1 is a
 `RUSTFLAGS` line away. Cause 2 is a Tauri serialisation order, so until one of the
 two fixes lands, **F-Droid signs with its own key** and the migration warning
 ships: an uninstall, and an uninstall deletes the vault. That is the answer to the
-question `docs/decisions/ops/0698` left open.
+question `myne-agents/docs/decisions/ops/0698` left open.
 
 ## The NDK revision in the draft was a beta
 
@@ -453,9 +453,9 @@ Procedure:
    are paths embedded in the Rust binary, Gradle's archive ordering and
    timestamps, and generated build metadata. `--remap-path-prefix` and
    `SOURCE_DATE_EPOCH` are the first levers.
-4. Either way, write the result into `docs/decisions/` with the entry that lands
+4. Either way, write the result into `myne-agents/docs/decisions/` with the entry that lands
    this work. A negative result is a result: desktop builds are not reproducible
-   either (`docs/threat-model.md` section 6), while the wasm bundle is, and the
+   either (`myne-agents/docs/threat-model.md` section 6), while the wasm bundle is, and the
    difference is worth recording.
 
 ---
@@ -519,4 +519,4 @@ asking instead of two weeks being told during review.
   All three are separate pull requests against their own repositories; none of
   them is committed through the main one.
 - **No decision entry here.** The channel, the private-source blocker and the
-  reproducibility precondition are `docs/decisions/ops/0698`.
+  reproducibility precondition are `myne-agents/docs/decisions/ops/0698`.

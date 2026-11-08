@@ -151,7 +151,7 @@ describe("the mobile prefs chokepoint", () => {
     // Two names pinned rather than left to the count, because these two toggles
     // are the ones a user reads as a privacy promise, so a surface showing the
     // old value is worse here than a stale font size. Deliberately NOT cited to
-    // `docs/threat-model.md` §6: that section scopes screen-capture exclusion to
+    // `myne-agents/docs/threat-model.md` §6: that section scopes screen-capture exclusion to
     // Windows, macOS and Linux and describes no mobile platform, and its own text
     // records that one unqualified sentence made the item overclaim for a year.
     // What this assertion pins is narrower and true: the displayed state of these

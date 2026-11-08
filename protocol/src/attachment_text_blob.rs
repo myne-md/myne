@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `attachments-text/<attachment-id-hex>` 34-byte-header encrypted
-//! extracted-attachment-text codec (MYND-328; `docs/spec/protocol.md` § 9.15).
+//! extracted-attachment-text codec (MYND-328; `myne-agents/docs/spec/protocol.md` § 9.15).
 //!
 //! Each attachment whose text has been extracted gets a per-attachment cache
 //! blob holding the on-device-extracted text (PDF text-layer / Word `.docx` /

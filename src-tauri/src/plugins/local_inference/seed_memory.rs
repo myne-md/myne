@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 
-//! The reviewed vault seed (myne-md/myne#915, `docs/decisions/ai/` entry added
+//! The reviewed vault seed (myne-md/myne#915, `myne-agents/docs/decisions/ai/` entry added
 //! with it).
 //!
 //! **A dedicated job, not a mode of the agent run loop.** It shares the

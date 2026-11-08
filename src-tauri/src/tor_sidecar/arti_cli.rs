@@ -184,7 +184,7 @@ mod tests {
         // where a listener restriction would be expressed if arti offered one.
         // It does not (`ListenItem` has only IP variants, and `proxy` has no
         // SOCKS auth), so the door is unauthenticated loopback TCP and the
-        // residual is recorded in `docs/threat-model.md` §7 (myne#380). Do not
+        // residual is recorded in `myne-agents/docs/threat-model.md` §7 (myne#380). Do not
         // delete this assert while reaching for `socks_listen` — read that
         // entry first.
         assert!(!toml.contains("socks_listen"));

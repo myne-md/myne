@@ -29,7 +29,7 @@
 //! is moved into, not the by-value return slot the callee wrote; the `pbkdf2`
 //! and `hkdf` crates' own internal state is unreachable from here; and LLVM
 //! register/stack spills are outside any wrapper. That is the same posture the
-//! rest of the crate has, and `docs/threat-model.md` §7 defers forensic-grade
+//! rest of the crate has, and `myne-agents/docs/threat-model.md` §7 defers forensic-grade
 //! (freed-page / swap / hibernation) scrubbing outright.
 
 use alloc::string::String;

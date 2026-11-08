@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `memories/<memory-id-hex>` 34-byte-header encrypted agent-memory entry
-//! codec (myne-md/myne#697; `docs/spec/protocol.md` § 9.26).
+//! codec (myne-md/myne#697; `myne-agents/docs/spec/protocol.md` § 9.26).
 //!
 //! Each persisted agent-memory entry gets one file under
 //! `<vault-root>/memories/`, named by the lowercase-hex 16-byte entry UUIDv7,

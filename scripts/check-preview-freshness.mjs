@@ -112,7 +112,7 @@ const WATCHED = [
 
 /** Only the extensions that can change what the capture LOOKS like. */
 const SURFACE_EXT = /\.(ts|tsx|css)$/;
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", ".worktrees"]);
 
 /** Every watched file, repo-relative, sorted — the same set on every machine. */
 function surfaceFiles() {

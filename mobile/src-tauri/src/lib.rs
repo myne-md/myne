@@ -107,7 +107,7 @@ pub fn run() {
     // without this nothing is printed (the shared cores + `screen_guard` emit
     // `tracing` but no subscriber was wired; desktop `lib.rs` parity). On iOS
     // stdout lands in the `tauri ios dev` terminal; on Android it surfaces via
-    // `adb logcat -s RustStdoutStderr` (`docs/dev/device-matrix.md` §6.1).
+    // `adb logcat -s RustStdoutStderr` (`myne-agents/docs/dev/device-matrix.md` §6.1).
     // Honors the secret-handling logging discipline — bounded variant names /
     // stage tags only, never key material.
     let _ = tracing_subscriber::fmt()

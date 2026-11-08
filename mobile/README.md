@@ -19,7 +19,7 @@ repositories under [`myne-md`](https://github.com/myne-md), each with its own
 `AGENTS.md`.
 
 The protocol, threat model and on-disk format are defined once in
-[`docs/`](../docs) and shared by every client. Read those before touching
+[`myne-agents/docs/`](../docs) and shared by every client. Read those before touching
 anything cryptographic here.
 
 ## Status
@@ -60,7 +60,7 @@ embeddings have no mobile implementation yet, and the reminder pass has a
 `remindersReachTheOs()` gate so the settings screen cannot promise a delivery
 that is not running.
 
-Per-release device coverage is `docs/dev/device-matrix.md`, and it records
+Per-release device coverage is `myne-agents/docs/dev/device-matrix.md`, and it records
 honest-gap rows rather than papering over them.
 
 ## Layout
@@ -83,7 +83,7 @@ mobile/
 ├── ios-watch/            watchOS app + complications
 ├── ios-share/            Share Extension sources (not yet wired)
 ├── fdroid/               F-Droid packaging: recipe draft + procedure
-├── docs/dev/             device matrix, e2e options, per-feature checklists
+├── myne-agents/docs/dev/             device matrix, e2e options, per-feature checklists
 ├── scripts/              platform post-init, icon sync, the Tauri wrapper
 └── tests/                Vitest specs
 ```
@@ -142,5 +142,5 @@ vault.
 
 This client is **AGPL-3.0** (see [`LICENSE`](../LICENSE) and
 [`LICENSING.md`](../LICENSING.md), which also carries this bundle's third-party
-asset attributions). The specifications in [`docs/`](../docs) are CC-BY-4.0 so
+asset attributions). The specifications in [`myne-agents/docs/`](../docs) are CC-BY-4.0 so
 the protocol stays reusable by independent implementations.

@@ -153,12 +153,12 @@ mod generation_matrix {
     //! of the person-identity carrier and out of the head context before anybody noticed).
     //!
     //! The list of magics is READ FROM THE SPEC rather than copied here. A generation added to
-    //! `docs/spec/protocol.md` without a row below turns this red, which is the whole point: the
+    //! `myne-agents/docs/spec/protocol.md` without a row below turns this red, which is the whole point: the
     //! failure mode it replaces is a silent `_ =>` arm.
 
     use super::{carries_b2b_tail, is_person_born};
 
-    /// One row per magic `docs/spec/protocol.md` names, with what every consumer must answer.
+    /// One row per magic `myne-agents/docs/spec/protocol.md` names, with what every consumer must answer.
     ///
     /// `(magic, person_born, carries_tail)`. `person_born` is deliberate about the two older
     /// frames: `MYV1` and `NTV5` are single-user, and `NTV6` is a shared vault that is NOT
@@ -175,9 +175,9 @@ mod generation_matrix {
     fn spec_magics() -> Vec<String> {
         let spec = std::fs::read_to_string(concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../docs/spec/protocol.md"
+            "/../myne-agents/docs/spec/protocol.md"
         ))
-        .expect("docs/spec/protocol.md is part of the tree");
+        .expect("myne-agents/docs/spec/protocol.md is part of the tree");
         let mut out: Vec<String> = Vec::new();
         let bytes = spec.as_bytes();
         for (i, _) in spec.match_indices(['M', 'N']) {
@@ -215,7 +215,7 @@ mod generation_matrix {
             .collect();
         assert!(
             missing.is_empty(),
-            "docs/spec/protocol.md names {missing:?} and this matrix has no row for it. Answer for \
+            "myne-agents/docs/spec/protocol.md names {missing:?} and this matrix has no row for it. Answer for \
              it before adding it: which consumers branch on generation, and what does each answer? \
              See myne-md/myne#983 and myne-md/myne#984."
         );

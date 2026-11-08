@@ -310,7 +310,7 @@ fn is_direct_child(path: &Path, dir: &Path, name: &str) -> bool {
 /// creates and names a directory the platform already gives this app.
 ///
 /// **What it is NOT**, because the first draft of this doc claimed otherwise and
-/// the claim reached `docs/threat-model.md`: this is not the only way the WebView
+/// the claim reached `myne-agents/docs/threat-model.md`: this is not the only way the WebView
 /// can name a destination. The module header carries the enumeration, and it is
 /// the copy to keep current. It is not asserted to be exhaustive, and the
 /// sentence this replaced asserted exactly that over a list that was short by

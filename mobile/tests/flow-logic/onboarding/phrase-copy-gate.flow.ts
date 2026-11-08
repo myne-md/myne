@@ -9,7 +9,7 @@
 // `mobile/src/lib/clipboard.ts` is `false`, so the affordance renders nowhere at
 // all. It is held there because the two pasteboard options the whole design
 // rests on have been read in Apple's documentation and never observed on a
-// device (`docs/dev/clipboard-sensitivity-verification.md`).
+// device (`myne-agents/docs/dev/clipboard-sensitivity-verification.md`).
 //
 // So these tests assert what is true rather than what is intended. An earlier
 // version asserted "iOS offers Copy", was recorded as passing, and then failed

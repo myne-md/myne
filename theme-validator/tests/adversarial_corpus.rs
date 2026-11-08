@@ -12,7 +12,7 @@
 //! observation on this surface: the production WebView CSP carries
 //! `style-src 'self' 'unsafe-inline'`, so a value that reaches the DOM
 //! **executes**, and a successful injection is not something a reviewer sees.
-//! This scanner is the PRIMARY security control (`docs/threat-model.md`
+//! This scanner is the PRIMARY security control (`myne-agents/docs/threat-model.md`
 //! "Custom-theme CSS-value surface"), not CSP.
 //!
 //! # What an adversarial corpus adds over the module's own tests

@@ -84,7 +84,7 @@ const GUARDED = [
       join("src", "platform"),
       `the web client compiles the same tree with a web implementation` +
         `\nbehind that boundary, so a direct import breaks it rather than degrading` +
-        `\nit (docs/decisions.md, phase3-web-client).`,
+        `\nit (myne-agents/docs/decisions.md, phase3-web-client).`,
     ),
   },
   { root: "editor", seam: null, advice: SHARED_PACKAGE_ADVICE("editor") },
@@ -213,7 +213,7 @@ function inRoot(rel, root) {
 }
 
 const SOURCE_EXT = /\.(ts|tsx|js|jsx|mts|cts)$/;
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", ".worktrees"]);
 
 // Import/require/dynamic-import of a `@tauri-apps/*` specifier. Anchored on
 // the quote so a prose mention in a comment ("routed via the seam's dialog

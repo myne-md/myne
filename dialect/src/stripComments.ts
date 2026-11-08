@@ -13,7 +13,7 @@
 // Recognize-and-render-only: an UNTERMINATED `%%` is not a comment (no node),
 // so it is not stripped (§3.1 / §3.2 / §6 inert rule). The `.md` export is
 // byte-verbatim and never calls this (SYNC-2) — only lossy projections strip.
-// Spec: docs/spec/markdown-dialect.md §6.
+// Spec: myne-agents/docs/spec/markdown-dialect.md §6.
 
 import { parser } from "./lezer/parser";
 

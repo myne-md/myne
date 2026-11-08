@@ -33,9 +33,15 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { runTool } from "./lib/run-tool.mjs";
+import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
-const RECORD = "docs/web-bundle-hashes.md";
+const RECORD_REL = "myne-agents/docs/web-bundle-hashes.md";
+const RECORD = docsPath("web-bundle-hashes.md");
+if (!docsPresent()) {
+  console.log(`note: ${DOCS_ABSENT}`);
+  process.exit(0);
+}
 
 /** One row of the record table. */
 function parseRows(markdown) {
@@ -58,7 +64,7 @@ function readRecordAt(ref) {
   // `git` that could not run is visible rather than folded into "absent"
   // (myne#528). A spawn error, unlike exit 128 with "does not exist" on
   // stderr, is still FATAL below.
-  const r = runTool(["git", "show", `${ref}:${RECORD}`], {
+  const r = runTool(["git", "show", `${ref}:${RECORD_REL}`], {
     cwd: repoRoot,
     onToolFailure: "empty",
     reason: "the record has a first commit; before it there was nothing to preserve",

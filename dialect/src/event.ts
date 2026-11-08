@@ -1,6 +1,6 @@
 // The event vocabulary for calendar notes (myne-md/myne#1037).
 //
-// Spec: `docs/spec/markdown-dialect.md` §3.10 (the keys, their typing, all-day,
+// Spec: `myne-agents/docs/spec/markdown-dialect.md` §3.10 (the keys, their typing, all-day,
 // the relative `remind` grammar) plus §3.6.1 (`kind: event`), §3.8.3 (wall-clock
 // time, no offset, no IANA zone) and §3.8.7 (the CLOSED recurrence vocabulary,
 // which this file reuses and never redefines).

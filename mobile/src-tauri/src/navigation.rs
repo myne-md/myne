@@ -9,7 +9,7 @@
 //! mobile `tauri.conf.json` CSP now carries `form-action 'none'`; this module
 //! is the missing directive for the scripted case.
 //!
-//! Its precondition is a residual the main repo's `docs/threat-model.md` §7
+//! Its precondition is a residual the main repo's `myne-agents/docs/threat-model.md` §7
 //! already accepts — script running in the WebView after a DOMPurify bypass
 //! (embedded HTML, importer markup, mermaid). It contains nothing else about
 //! such a script: every vault command the ACL grants stays reachable. What it

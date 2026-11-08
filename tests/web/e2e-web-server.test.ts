@@ -5,7 +5,7 @@
 //  1. **It serves the PRODUCTION security headers.** A lane running against
 //     `vite preview` would prove the app works in an environment it is never
 //     deployed into, and would go green on exactly the misconfiguration
-//     `docs/self-host-web.md` calls fatal — without cross-origin isolation
+//     `myne-agents/docs/self-host-web.md` calls fatal — without cross-origin isolation
 //     `SharedArrayBuffer` is undefined and the sync backoff's blocking waiter
 //     (`core/src/task.rs`) cannot exist. The headers are asserted against
 //     `web/csp.ts::securityHeaders` itself, so a copy cannot drift looser.

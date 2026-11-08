@@ -10,7 +10,7 @@
 //   4. icon-source.svg matches its pinned hash — the ONLY pinned
 //      hash (the rendered variants regenerate via `pnpm tauri icon`;
 //      the master changes only deliberately). Re-pin at the
-//      brand-final mark replacement (docs/design/README.md).
+//      brand-final mark replacement (myne-agents/docs/design/README.md).
 //
 // OS-shell rendering (Dock, Start menu, launcher) is structurally
 // unreachable from any script — those checks live in the MYND-92

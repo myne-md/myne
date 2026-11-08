@@ -2,7 +2,7 @@
 
 //! Canonical `SavedView` schema + recursive filter AST — the single
 //! contract the Saved Views epic binds to (sub-feature #3,
-//! view-model-and-storage, MYND-273). See `docs/spec/protocol.md` § 9.5.2.
+//! view-model-and-storage, MYND-273). See `myne-agents/docs/spec/protocol.md` § 9.5.2.
 //!
 //! A saved view is **authored content** (a hand-built filter / sort /
 //! group projection over plain-markdown notes), persisted inside the
@@ -239,7 +239,7 @@ pub struct SavedView {
     pub image_aspect_ratio: Option<String>,
 
     /// Definition version: a non-negative integer, omitted when absent
-    /// (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
+    /// (`view-manifests`; `myne-agents/docs/spec/protocol.md` §9.5.2).
     ///
     /// The app maintains it, not the user: any local edit that changes the
     /// canonical bytes increments it. It exists so an imported manifest can be

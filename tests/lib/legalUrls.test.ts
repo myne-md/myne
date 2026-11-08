@@ -112,7 +112,7 @@ describe("LEGAL_LINKS: one list, every client", () => {
     // One entry, not four: terms, the DSA notice route and the law-enforcement
     // page described an offering Myne no longer makes, and all four of those
     // pages are now deleted from the site rather than merely unlinked
-    // (`docs/decisions/sync/0696`).
+    // (`myne-agents/docs/decisions/sync/0696`).
     expect(LEGAL_LINKS.map((l) => l.doc)).toEqual(["privacy"]);
   });
 

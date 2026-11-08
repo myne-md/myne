@@ -27,7 +27,7 @@
 //!   -- --ignored --nocapture --test-threads=1
 //! ```
 //!
-//! The printed numbers + the final engine decision land in `docs/decisions.md`
+//! The printed numbers + the final engine decision land in `myne-agents/docs/decisions.md`
 //! via Task 10. The corpus is SYNTHETIC (deterministic templates + a
 //! pseudo-vocabulary spread) — a reproducible proxy, not a real-note
 //! distribution; RAM/blob ratios are indicative, query/rebuild timing is

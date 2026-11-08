@@ -8,7 +8,7 @@
 //! ## The connection name
 //!
 //! The host resolves a scope by the name the client declares, so the name is the
-//! key to a grant rather than a credential (`docs/threat-model.md` TB15's
+//! key to a grant rather than a credential (`myne-agents/docs/threat-model.md` TB15's
 //! "a label, not a credential"). It comes from two places, in this order:
 //!
 //! 1. `MYNE_MCP_CONNECTION`, the env var the Settings snippet writes into the

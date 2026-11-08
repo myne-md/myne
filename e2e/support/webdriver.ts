@@ -4,7 +4,7 @@ import { appendFileSync } from "node:fs";
 // Hand-rolled instead of the `webdriver` npm package by deliberate
 // decision (e2e-harness grill Q2, 2026-06-10): the package carries the
 // whole @wdio family + undici + ws (50+ transitives — a
-// `docs/dependency-policy.md` red flag), while the protocol surface the
+// `myne-agents/docs/dependency-policy.md` red flag), while the protocol surface the
 // suites need is ~a dozen plain HTTP+JSON endpoints. Node ≥18's global
 // `fetch` covers transport; this module has ZERO runtime dependencies.
 //

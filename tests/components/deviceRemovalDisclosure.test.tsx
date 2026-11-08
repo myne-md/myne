@@ -12,7 +12,7 @@
 // stops the server syncing to that device, and it does not touch a device that
 // already holds the vault and the password. A user who reads "Remove" as "wipe
 // that laptop" is making a security decision on a false premise
-// (`docs/decisions.md` 2026-06-27, `server-protocol.md` §4).
+// (`myne-agents/docs/decisions.md` 2026-06-27, `server-protocol.md` §4).
 //
 // The panel is SHARED, so "identical wording on web and desktop" is true by
 // construction here — there is one implementation and both clients mount it.

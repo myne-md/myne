@@ -386,7 +386,7 @@ impl CpalSource {
             .map_err(|_| RecordError::CaptureFailed)?;
         let sample_rate = supported.sample_rate().0;
         // The clip LENGTH is bounded by `max_samples_for_rate`; the RATE was not
-        // bounded at all, and the invariant both `docs/threat-model.md` and
+        // bounded at all, and the invariant both `myne-agents/docs/threat-model.md` and
         // decision 0541 state as a construction ("no clip a Myne client records
         // is refused by a Myne decoder") holds only inside the decoder's window.
         // `parse_wav` refuses anything outside `MIN_SAMPLE_RATE_HZ..=MAX_SAMPLE_RATE_HZ`,

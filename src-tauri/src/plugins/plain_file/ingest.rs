@@ -15,7 +15,7 @@
 //! HTML5 `DataTransfer` that MYND-629's drag-import and the sidebar's
 //! HTML5 reorder both depend on, and on Windows wry additionally disables
 //! external drops outright (`SetAllowExternalDrop(false)`). The main window
-//! therefore keeps `dragDropEnabled: false` (`docs/decisions/storage/0151`;
+//! therefore keeps `dragDropEnabled: false` (`myne-agents/docs/decisions/storage/0151`;
 //! `src/notes/dropImport.ts`), and a drop cannot carry a filesystem path the
 //! WebView could hand back. Wiring drag means re-basing those two flows
 //! first; see the feature's tasks.md task 10.

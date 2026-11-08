@@ -127,7 +127,7 @@ FEATURE="local-inference"
 #   rustls / rustls-pki-types / rustls-webpki: TLS transport primitives.
 #   reqwest / hyper / hyper-util / socket2: the update check's HTTP client and
 #   its socket layer, reached only through tauri-plugin-updater
-#   (docs/dependency-policy.md, decisions entry).
+#   (myne-agents/docs/dependency-policy.md, decisions entry).
 ALLOWED_NETWORK_CRATES=$(cat <<'EOF'
 rustls
 rustls-pki-types
@@ -179,20 +179,38 @@ sentry-core
 EOF
 )
 
+TREE_ERR="$(mktemp)"
+
 echo "== AI no-network dependency check (shipped tree; AI is default-on) =="
 
 closure() {
   # crate names only, one per line, sorted-unique. `-e normal` excludes
   # build/dev deps; `--prefix none` drops the tree glyphs.
-  cargo tree -p "$PKG" --no-default-features "$@" -e normal --prefix none 2>/dev/null \
+  #
+  # stderr goes to a file rather than /dev/null. It was discarded, and in CI a `cargo tree` that
+  # could not reach the crates index then produced an EMPTY closure and no message at all: the
+  # step failed with the header as its last line, and the red named nothing. A gate whose failure
+  # is unreadable is a gate somebody re-runs until it goes green.
+  cargo tree -p "$PKG" --no-default-features "$@" -e normal --prefix none 2>"$TREE_ERR" \
     | sed -E 's/ v[0-9].*$//' \
     | sed -E 's/[[:space:]]+.*$//' \
     | grep -E '^[a-zA-Z0-9_-]+$' \
     | sort -u
 }
 
-off="$(closure)"                           # AI-free baseline (--no-default-features)
-on="$(closure --features "$FEATURE")"      # shipped tree (default == local-inference on)
+# `|| true`: this script runs under `set -e`, so a failing `cargo tree` used to abort the script
+# inside the assignment, before anything could say what had gone wrong. That is exactly how CI
+# went red with the header as its last line.
+off="$(closure)" || true                    # AI-free baseline (--no-default-features)
+on="$(closure --features "$FEATURE")" || true  # shipped tree (default == local-inference on)
+
+# An empty closure is not "no networked crates": it is `cargo tree` having failed, and every
+# check below would then pass over an empty list. Say which it was.
+if [ -z "$off" ] || [ -z "$on" ]; then
+  echo "FAIL: \`cargo tree\` produced nothing for the shipped closure, so nothing was checked."
+  sed -n '1,20p' "$TREE_ERR" | sed 's/^/  /'
+  exit 1
+fi
 
 violation=0
 

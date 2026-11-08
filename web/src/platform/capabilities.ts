@@ -170,7 +170,7 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   "selfUpdate",
   // The opt-in device-local diagnostic log (myne-md/myne#860): the web build
   // installs no `tracing` subscriber and compiles every event below `warn` out of
-  // the bundle (`docs/decisions/ops/0366`), so there is no log to write, no
+  // the bundle (`myne-agents/docs/decisions/ops/0366`), so there is no log to write, no
   // platform log directory to resolve and no folder to reveal. COPYING the
   // diagnostics block is present on web: that is the half a user needs where they
   // cannot open a devtools panel and read a failure back.

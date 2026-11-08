@@ -104,7 +104,7 @@ pub struct HideVaultNamesView {
 /// **`available: false` is not a licence to write the name in the clear.**
 /// Nothing anywhere reacts to it by falling back to plaintext; that combination
 /// would look identical on screen while voiding the erase guarantee and making
-/// the `docs/threat-model.md` § 7 paragraph false (`decisions.md` 2026-08-15).
+/// the `myne-agents/docs/threat-model.md` § 7 paragraph false (`decisions.md` 2026-08-15).
 /// The only thing this state changes is what the UI says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct KeychainStatusView {

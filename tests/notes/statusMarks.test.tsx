@@ -117,7 +117,7 @@ describe("save readout", () => {
     //
     // STATIC: `AUTOSAVE_IDLE_MS` is one second, so this is the state a whole
     // writing session is spent in, and a mark turning through all of it is the
-    // looping animation `docs/design/README.md` bans by name. Under the class
+    // looping animation `myne-agents/docs/design/README.md` bans by name. Under the class
     // grammar it is also the wrong sentence: outstanding, not in flight.
     const mark = readout({ status: "editing" }).querySelector<HTMLElement>('[data-status-mark]');
     expect(mark).not.toBeNull();
@@ -214,7 +214,7 @@ describe("unsynced marker", () => {
   });
 
   it("never turns, on either surface", () => {
-    // `docs/design/README.md` bans looping animation, and the sidebar draws one
+    // `myne-agents/docs/design/README.md` bans looping animation, and the sidebar draws one
     // of these per unsynced note. Motion stays where the work is bounded and
     // there is one of it: the save readout. The triangle's DIRECTION is what
     // carries "waiting to go out" without moving.

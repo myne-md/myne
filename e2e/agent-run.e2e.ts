@@ -29,7 +29,7 @@
 //
 // **All six were dead, and had been since the AI tab lost its modes**
 // (myne-md/myne#596). `openComposerInEditMode` clicked `ai.composer-mode-edit`
-// and then waited on `ai.composer-scope`; `docs/decisions/ai/0524` gave the tab
+// and then waited on `ai.composer-scope`; `myne-agents/docs/decisions/ai/0524` gave the tab
 // ONE mode and deleted the first control, and the second moved behind the
 // "change" disclosure so it never appears unprompted. Every scenario therefore
 // timed out at 45 s in the shared setup step, six for six, on every run, and
@@ -104,7 +104,7 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
  *  clicking chrome.
  *
  *  **It used to switch the composer into Edit mode, and there is no longer a
- *  mode to switch to.** `docs/decisions/ai/0524` gave the AI tab ONE mode: every
+ *  mode to switch to.** `myne-agents/docs/decisions/ai/0524` gave the AI tab ONE mode: every
  *  message goes to the agent, and `ai.composer-mode-edit` went with the change.
  *  This helper kept clicking it, so it timed out at 45 s and took all six
  *  scenarios in this file down with it, every run, invisibly. The suite is
@@ -594,9 +594,9 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         // **The scope caption is present from the start, and that is the
         // change.** This line used to assert the scope control was ABSENT,
         // because the tab opened in Ask mode and Ask granted no scope. With one
-        // mode (`docs/decisions/ai/0524`) every message is a run, so a scope is
+        // mode (`myne-agents/docs/decisions/ai/0524`) every message is a run, so a scope is
         // always resolved and always stated. Asserting its presence keeps the
-        // line doing work rather than deleting it: `docs/decisions/ai/0518`
+        // line doing work rather than deleting it: `myne-agents/docs/decisions/ai/0518`
         // point 1 requires a user-originated scope control on the composer,
         // and losing it routes every folder-scale run through the
         // model-originated expansion instead, which is the injection-reachable
@@ -620,7 +620,7 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         // **A question is a RUN now, so the first send opens the review screen
         // too, and this scenario has to get past it.** It used to wait on the
         // last turn's `data-streaming` going false, which was the right fact
-        // when Ask streamed a chat reply. `docs/decisions/ai/0524` made every
+        // when Ask streamed a chat reply. `myne-agents/docs/decisions/ai/0524` made every
         // message an agent run: the stub proposes for any task, an agent turn
         // renders `data-streaming="false"` from its first frame, and the wait
         // therefore passed instantly while a modal was opening over the
@@ -642,7 +642,7 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         // **Run an edit from the SAME input, with no mode to switch.** These
         // three lines used to click `ai.composer-mode-edit` and wait for the
         // scope control to appear with it, which was the coverage of
-        // myne-md/myne#533's one-composer change. `docs/decisions/ai/0524` then
+        // myne-md/myne#533's one-composer change. `myne-agents/docs/decisions/ai/0524` then
         // removed the modes outright, so what this scenario proves is narrower
         // and still worth proving: one input, no remount between a question and
         // an edit, and both landing in one transcript in order. The input count
@@ -668,7 +668,7 @@ aiDescribe("ag6 one composer, one transcript: a question then an edit", () => {
         const kinds = await Promise.all(turns.map((el) => el.attribute("data-kind")));
         // **Four agent turns, not two text ones and two agent ones.** The old
         // split described two modes: Ask produced a `text` exchange, Edit an
-        // `agent` one. With one mode (`docs/decisions/ai/0524`) both sends are
+        // `agent` one. With one mode (`myne-agents/docs/decisions/ai/0524`) both sends are
         // runs, and `data-kind` reports the FLOW rather than the bubble style,
         // so the task the user typed is an agent turn too, even though it
         // renders as an ordinary bubble. Asserting all four is what keeps this

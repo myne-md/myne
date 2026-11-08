@@ -6,7 +6,7 @@
 //! little-endian length prefix, the cap enforced BEFORE the body is
 //! allocated, and no panic on truncated/oversized/malformed input — as its
 //! own small, decoupled module: the CLI bridge is a same-user-only local
-//! IPC surface inside TB2 (`docs/threat-model.md` §7: "Everything stays
+//! IPC surface inside TB2 (`myne-agents/docs/threat-model.md` §7: "Everything stays
 //! inside TB2 — no new trust boundary"), not the clipper's external TB10
 //! ingress, so it earns its own cap and its own closed error type rather
 //! than sharing the clipper's `MAX_EXT_TO_HOST_FRAME` (a TB10-sized 64 MiB

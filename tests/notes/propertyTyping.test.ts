@@ -3,7 +3,7 @@
 // vectors in the `myne-test-vectors` companion — the FIRST TS-side vector
 // runner (the coercion is Build-B TS, so there is no Rust generator/runner for
 // this category). Plus unit coverage of `extractProperties` over raw
-// frontmatter. Spec: `docs/spec/markdown-dialect.md` §3.6.4.
+// frontmatter. Spec: `myne-agents/docs/spec/markdown-dialect.md` §3.6.4.
 
 import * as fs from "node:fs";
 import * as path from "node:path";

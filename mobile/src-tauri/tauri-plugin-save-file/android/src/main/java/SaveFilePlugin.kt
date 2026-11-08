@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //
 // ⚠️ DEVICE-VERIFY-PENDING. The effect of this Kotlin on a real handset is owed
-// to `docs/dev/device-matrix.md` §8 row 8.8, NOT to the change that adds it. The
+// to `myne-agents/docs/dev/device-matrix.md` §8 row 8.8, NOT to the change that adds it. The
 // module compiles against the generated gradle project; no CI lane in this repo
 // runs an Android device.
 //

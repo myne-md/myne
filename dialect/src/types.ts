@@ -1,4 +1,4 @@
-// Spec: docs/spec/markdown-dialect.md (D1 — GFM + footnote + wikilink +
+// Spec: myne-agents/docs/spec/markdown-dialect.md (D1 — GFM + footnote + wikilink +
 // frontmatter + inline-tag, see §3.5 / §3.6 / §3.7).
 
 /** Half-open byte range [start, end). */

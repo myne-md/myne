@@ -1,7 +1,7 @@
 // Lucide icon paths (https://lucide.dev, MIT). Inlined so the desktop app
 // works without a CDN — reproducible builds preclude runtime fetches.
 //
-// Source: docs/design/ui_kits/desktop/primitives.jsx
+// Source: myne-agents/docs/design/ui_kits/desktop/primitives.jsx
 // Stroke-based, 24x24 viewBox, 1.5px stroke (applied by the Icon component).
 
 export const ICON_PATHS = {
@@ -43,7 +43,7 @@ export const ICON_PATHS = {
   "circle-alert":
     '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
   // "This save failed" (myne-md/myne#603). The readout drew a literal `✕` in an
-  // 8px box, which `docs/design/README.md` bans by name under "No unicode
+  // 8px box, which `myne-agents/docs/design/README.md` bans by name under "No unicode
   // symbols as icons (e.g. ✓ ✗ →). Use Lucide's `check`, `x`, `arrow-right`".
   "circle-x":
     '<circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/>',

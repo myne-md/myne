@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Myne has hard commitments it won't walk back — no email recovery, no plaintext mode, no persistent per-IP logging, and UX/marketing may never exceed the threat model. Please skim [`docs/vision.md`](https://github.com/myne-md/myne/blob/main/docs/vision.md) (anti-features) and [`docs/threat-model.md`](https://github.com/myne-md/myne/blob/main/docs/threat-model.md) before proposing anything security-adjacent.
+        Myne has hard commitments it won't walk back — no email recovery, no plaintext mode, no persistent per-IP logging, and UX/marketing may never exceed the threat model. Please read the vision (its anti-features are hard commitments) and the threat model - the user guide's security pages summarise both - before proposing anything security-adjacent.
   - type: textarea
     id: problem
     attributes:
@@ -42,5 +42,5 @@ body:
       options:
         - label: I searched existing issues and this isn't a duplicate.
           required: true
-        - label: This doesn't conflict with Myne's anti-features (docs/vision.md) or exceed the threat model (docs/threat-model.md).
+        - label: This doesn't conflict with Myne's anti-features (myne-agents/docs/vision.md) or exceed the threat model (myne-agents/docs/threat-model.md).
           required: true

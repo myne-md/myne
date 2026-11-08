@@ -4,7 +4,7 @@
 //! arm turns into `cli.sock`.
 //!
 //! Why a pipe and not a socket: Windows has no filesystem socket, and its
-//! equivalent local rendezvous is `\\.\pipe\<name>`. `docs/threat-model.md`'s
+//! equivalent local rendezvous is `\\.\pipe\<name>`. `myne-agents/docs/threat-model.md`'s
 //! CLI-door entry already says so ("over a local Unix domain socket
 //! (macOS/Linux) or named pipe (Windows)"), so this arm closes a spec/code gap
 //! rather than inventing a transport.

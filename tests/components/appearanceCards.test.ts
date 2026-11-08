@@ -16,7 +16,7 @@
 // A string comparison against the token source catches it on every client at
 // once, without rendering anything.
 //
-// Deliberately reading `src/styles/tokens.css` and not `docs/design/
+// Deliberately reading `src/styles/tokens.css` and not `myne-agents/docs/design/
 // colors_and_type.css`: the design copy is a SUBSET (`src/AGENTS.md`) and
 // carries no `:root[data-theme="amoled"]` block at all, so a third of this
 // matrix would silently go unchecked — the third with the pure-black background,

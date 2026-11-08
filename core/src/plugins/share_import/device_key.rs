@@ -58,7 +58,7 @@ mod imp {
     /// allocation intact on every read — including the corrupt-length arm, which
     /// never reaches a `Zeroizing` copy at all.
     ///
-    /// **Honest limit** (`docs/threat-model.md` §7 defers forensic-grade
+    /// **Honest limit** (`myne-agents/docs/threat-model.md` §7 defers forensic-grade
     /// scrubbing): `security_framework` builds that `Vec` from a `CFData` it then
     /// releases without wiping, so a CoreFoundation-side residue survives this.
     /// Reaching it would mean dropping to `SecItemCopyMatching` directly.

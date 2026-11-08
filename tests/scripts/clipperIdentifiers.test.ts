@@ -142,7 +142,7 @@ function patchManifestRs(dir: string, from: string, to: string): void {
 //
 // **Both layouts, for the reason the guard now carries in its own comment.**
 // Companions are cloned NESTED at `<repo>/myne-clipper`
-// (`workspace/manifest.txt`); from a worktree under `.opencode/worktrees/<name>`
+// (`workspace/manifest.txt`); from a worktree under `.worktrees/<name>`
 // that same directory is three levels up. This file hardcoded only the second,
 // so it passed from a worktree and failed from the ordinary checkout with the
 // guard reporting NOT CHECKED — four cross-repo assertions that looked like a

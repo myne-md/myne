@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.personality` 34-byte-header encrypted agent-personality singleton
-//! codec (myne-md/myne#697; `docs/spec/protocol.md` § 9.27).
+//! codec (myne-md/myne#697; `myne-agents/docs/spec/protocol.md` § 9.27).
 //!
 //! `vault.personality` is a vault-level singleton artifact carrying the
 //! **agent-personality block**: the user's standing voice directives for the

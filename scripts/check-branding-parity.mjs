@@ -22,7 +22,7 @@
 //      app's #8a2a23 / #d99086 nor any recorded reason. `STATE_INK.locked` in
 //      `src/lib/icon-svg.ts` carried the same invented #b54034, its own comment
 //      saying it mirrors `./tokens.css` "where one exists". Both aligned in
-//      `docs/decisions/ui/0706` and both pinned here.
+//      `myne-agents/docs/decisions/ui/0706` and both pinned here.
 //
 //   B7 `myne-website/src/lib/themeBuilder/tokens.mjs` is the theme builder's
 //      authorable roster. It modelled 5 of the app's 13 `--highlight*` tokens,
@@ -58,7 +58,7 @@ const APP_SHEET_REL = "client-core/src/tokens.css";
  *
  * Resolved from the repo root (the guard's own location), so the same path
  * works from the ordinary checkout and from a worktree under
- * `.opencode/worktrees/<name>`. Each `MYNE_*_DIR` override exists so the
+ * `.worktrees/<name>`. Each `MYNE_*_DIR` override exists so the
  * companion-ABSENT branch — the branch CI and a fresh clone take — stays
  * exercisable on a machine that HAS the companion; `tests/scripts/brandingParity.test.ts`
  * uses them.

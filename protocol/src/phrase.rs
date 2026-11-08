@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! BIP-39 24-word recovery phrase — see `docs/spec/protocol.md` § 7.
+//! BIP-39 24-word recovery phrase — see `myne-agents/docs/spec/protocol.md` § 7.
 //!
 //! 256 bits of CSPRNG entropy + an 8-bit BIP-39 checksum encode to 24
 //! English BIP-39 words. Myne uses BIP-39 only as an *encoding* — the
@@ -50,7 +50,7 @@ pub const RECOVERY_PHRASE_WORD_COUNT: usize = 24;
 /// Number of CSPRNG entropy bytes consumed per phrase.
 pub const RECOVERY_PHRASE_ENTROPY_BYTES: usize = 32;
 
-/// 24-word BIP-39 English recovery phrase (`docs/spec/protocol.md` § 7).
+/// 24-word BIP-39 English recovery phrase (`myne-agents/docs/spec/protocol.md` § 7).
 ///
 /// Wraps `Zeroizing<[String; 24]>` so the inner word buffers are
 /// best-effort wiped on drop (the `zeroize` `alloc` feature provides

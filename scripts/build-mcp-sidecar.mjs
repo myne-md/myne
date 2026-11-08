@@ -7,7 +7,7 @@
 // Tauri `externalBin` rather than a separately distributed binary because the
 // trust story depends on it shipping inside the same bundle, the same
 // `Cargo.lock` and the same release; a binary that is separately distributed and
-// absent from the lockfile earns none of that (docs/threat-model.md TB12).
+// absent from the lockfile earns none of that (myne-agents/docs/threat-model.md TB12).
 //
 // It never opens the vault and never listens. Read `mcp/src/lib.rs` for what
 // this slice does and does not do.

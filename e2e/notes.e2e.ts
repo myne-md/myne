@@ -278,7 +278,7 @@ describeE2E("nc7 Enter confirms the folder-delete gate (#628)", () => {
   //
   // #628 makes Enter follow the focus RING: focus lands on the destructive
   // button, so the reflex press confirms, and a user who Tabs to Cancel gets an
-  // Enter that cancels. `docs/decisions/ui/0564` records it. Escape is asserted
+  // Enter that cancels. `myne-agents/docs/decisions/ui/0564` records it. Escape is asserted
   // first here, because a confirming Enter is only safe if the way out works.
   it("Escape cancels; Enter deletes the folder and its notes move to Trash", async () => {
     let password = "";
