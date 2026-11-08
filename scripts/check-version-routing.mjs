@@ -62,6 +62,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExtractedTestModule } from "./lib/test-module-files.mjs";
 
 // `mobile/src-tauri/src` joined on myne-md/myne#479, and its absence had cost
 // exactly what this guard exists to prevent. Mobile's local `workspace` plugin
@@ -269,12 +270,6 @@ const ALLOWED = new Map([
   ["core/src/plugins/sync/orchestrator.rs#kek", [2, "sync: `sync_id_for` (the reserved singleton sync-ids) + the ServerAuth secret for the #429 verifier replace"]],
 
   // ── legitimately v0.1: THE V0.1 SIDE, BY CONSTRUCTION ─────────────────────
-  ["core/src/plugins/vault_migrate/mod.rs#kek", [5, "the migration reads the OLD vault under the OLD keys (incl. the #441 fail-closed pre-flight, the #675 chats re-seal under the OLD chats/catalog KEKs, and the #697 memories re-seal under the OLD memory KEK). Lowered 6→5 by myne-md/myne#640, which factored the pre-flight and the real re-seal into ONE `reseal_kek_singleton` helper so the two cannot drift"]],
-  ["core/src/plugins/vault_migrate/mod.rs#meta", [1, "the migration parses the OLD `MYV1` meta"]],
-  ["core/src/plugins/vault_migrate/mod.rs#note", [1, "the migration decodes the OLD `MY01` notes"]],
-  ["core/src/plugins/vault_migrate/mod.rs#pwkdf", [2, "the migration verifies BOTH old credentials against the OLD salt domain"]],
-  ["core/src/plugins/vault_migrate/mod.rs#aadwrap", [2, "the migration opens the OLD wraps under the OLD AADs"]],
-  ["core/src/plugins/vault_migrate/mod.rs#items", [1, "the migration unwraps the OLD `itemsKey`"]],
   ["format/src/notes/decode.rs#note", [1, "IS the dispatcher's v0.1 arm"]],
   ["core/src/test_support.rs#metaw", [1, "test-support builds a v0.1 vault fixture on purpose (the migration's input)"]],
 
@@ -310,7 +305,6 @@ const ALLOWED = new Map([
   // an explicit generation branch. A grep cannot see the branch, so they are
   // recorded rather than rewritten; a bare-name match would report them as
   // offenders while missing nothing real.
-  ["core/src/plugins/vault_migrate/ntv7.rs#ntv6", [1, "the upgrade reads the OLD `NTV6` frame it is about to replace"]],
   ["core/src/plugins/vault_migrate/b2b.rs#ntv6", [1, "the NTV5→NTV6 migration validates the frame it just produced"]],
   ["core/src/plugins/sync/commands.rs#ntv6", [1, "the `AlreadyMigrated` arm reports the epoch of the NTV6 frame that vault already is"]],
   ["core/src/plugins/vault_change_password/commands.rs#ntv6", [1, "the `VaultMetaGeneration::B2b` arm of an explicit match (the `Person` arm sits beside it)"]],
@@ -394,6 +388,7 @@ const argv = process.argv.slice(2);
 const all = argv.length ? argv.filter((f) => f.endsWith(".rs")) : ROOTS.flatMap((r) => walk(r));
 const files = all.filter((f) => {
   const rel = relative(process.cwd(), f).split(sep).join("/");
+  if (isExtractedTestModule(rel)) return false;
   return ROOTS.some((r) => rel === r || rel.startsWith(r + "/"));
 });
 

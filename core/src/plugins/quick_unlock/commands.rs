@@ -648,15 +648,13 @@ pub async fn quick_unlock_with_dir<P: QuickUnlockProvider + Send + 'static>(
             // only fails safe (fewer future attempts) and recovers on next success.
             attempts.record_success();
 
-            // NO `NTV7` to `NTV8` upgrade on this path, deliberately (myne-md/myne#938
-            // review). The byte range could be dropped here: `root_key` is in hand
-            // and nothing is derived. But a PIN or a biometric proves a device-local
-            // secret, never the vault password, and the person wrap being removed is
-            // the only door left for a user who set quick unlock and then forgot
-            // their password. The upgrade therefore waits for a password unlock
-            // (`vault_migrate::ntv8::UpgradeAuthority::PasswordNotProven`), and a
-            // vault whose user only ever types a PIN stays on the person-wrapped
-            // frame, which costs nothing: it is defence in depth, not correctness.
+            // This path never rewrites `vault.meta`. A PIN or a biometric proves a
+            // device-local secret, never the vault password, so it must never be the
+            // act that removes a credential from the frame. The in-place `NTV7` to
+            // `NTV8` truncation that used to be the thing to keep out has been
+            // removed with the rest of the version-migration surface, but the rule
+            // outlives it: whoever reintroduces a frame rewrite must gate it on a
+            // password, not on a device-local proof.
             if let Err(_e) = persist_attempt_state(dir, &attempts) {
                 tracing::debug!(
                     stage = "persist_attempt_reset",
@@ -1667,13 +1665,11 @@ mod tests {
     /// A PIN unlock does NOT perform the `NTV7` to `NTV8` upgrade, and this is the
     /// test that holds that (myne-md/myne#938 review, `protocol.md` §10.4.3).
     ///
-    /// The upgrade drops the person wrap by TRUNCATION, and the person wrap is the
-    /// only door left for a user who opened the vault with their identity phrase
-    /// because they forgot the password. A six-digit PIN proves no password, so
-    /// running the step here would delete that door on the strength of a code, for
-    /// exactly the people least likely to notice. The upgrade waits for
-    /// `UpgradeAuthority::PasswordProven`; the password path performs it, and that
-    /// half is asserted in `vault_migrate::ntv8` and in `vault_unlock::commands`.
+    /// A PIN unlock leaves `vault.meta` byte-identical. The in-place frame rewrite
+    /// this used to guard was removed with the version-migration surface, so what it
+    /// holds now is the weaker claim that no device-local proof touches the frame —
+    /// worth keeping as the regression guard for anyone who reintroduces a rewrite
+    /// and forgets the gate.
     #[test]
     fn a_pin_unlock_leaves_the_person_wrap_alone() {
         rt().block_on(async {
@@ -1773,12 +1769,10 @@ mod tests {
             .await
             .expect("quick unlock on an NTV7 vault");
 
-            // The frame is UNTOUCHED, and that is the contract rather than a gap:
-            // the upgrade truncates the person wrap, and a PIN proves no password.
-            // Running it here would delete the only door left for a user who does
-            // not remember their password, on the strength of a six-digit code
-            // (myne-md/myne#938 review). The password path performs it, asserted in
-            // `vault_migrate::ntv8` and in `vault_unlock::commands`' password case.
+            // The frame is UNTOUCHED, and that is the contract rather than a gap: a
+            // PIN proves no password, so nothing on this path may rewrite
+            // `vault.meta`. The rewrite it guards against no longer exists; the rule
+            // does.
             let after = std::fs::read(dir.join("vault.meta")).expect("read meta");
             assert_eq!(
                 &after[..4],

@@ -1,16 +1,15 @@
 // Web seam — the capability descriptor (phase3-web-client task 27).
 //
-// The absences below are **normative**, not a backlog. Each cites the decision
-// or the platform fact that puts it here, because the difference matters: a
-// capability absent by decision must not quietly reappear when someone ports the
-// commands behind it.
+// The absences below are **normative**, not a backlog: each states the platform
+// fact or owner decision that puts it here, so a capability withheld by decision
+// does not quietly reappear when someone ports the commands behind it. Every one
+// is OMITTED from the surface rather than greyed out.
 //
 // Kept honest against the backend by `scripts/check-web-capabilities.mjs`, which
 // cross-checks this set against `web/wasm/src/capability.rs`'s `Unsupported`
-// classification. Two hand-maintained lists of "what web cannot do" would drift,
-// and the drift would be invisible: the UI would offer something the dispatcher
-// refuses, which is precisely the greyed-control failure this task exists to
-// prevent, arriving by a different route.
+// classification: two hand-maintained lists of "what web cannot do" would drift,
+// and the drift is invisible from either side — the UI would offer something the
+// dispatcher refuses.
 
 import { ALL_CAPABILITIES, type Capability } from "../../../src/platform/capabilities";
 
@@ -19,206 +18,141 @@ export type { Capability };
 
 /** Capabilities the web client does NOT have, each with its reason. */
 const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
-  // A page cannot be a native-messaging host; the extension talks to the
+  // A page cannot be a native-messaging host, so the extension talks to the
   // desktop app or to nothing.
   "clipper",
-  // Multi-GiB GGUF weights loaded from a bundled resource path onto a CPU
-  // thread pool. A Worker has one thread and no resource directory.
+  // Multi-GiB GGUF weights loaded from a bundled resource path onto a CPU thread
+  // pool; a Worker has one thread and no resource directory.
   "localAi",
   // WatchConnectivity has no browser counterpart, and there is no OS queue.
   "watchCapture",
   // No share sheet hands files to a page.
   "shareImport",
-  // Keychain/Keystore-backed. The PIN path is portable and is task 40 —
-  // deliberately NOT covered by this absence.
+  // Keychain/Keystore-backed. The PIN path is portable and is NOT covered here.
   "biometricQuickUnlock",
-  // The *pref* syncs and is honoured; OS idle DETECTION is what is missing.
+  // The pref syncs and is honoured; OS idle DETECTION is what is missing.
   "osIdleAutoLock",
-  // `set_content_protected` asks the compositor to exclude a window. A page
+  // `set_content_protected` asks the compositor to exclude a window, and a page
   // cannot ask that.
   "screenCaptureProtection",
-  // Legacy single-vault layout never existed in OPFS.
-  "vaultMigration",
-  // The person identity is SESSION-only on this client (myne-md/myne#911 task
-  // 13): the two person files (the sealed keypair and the device token) live in
-  // the Worker's memory, so a reload asks for the 24 words again. An origin's
-  // storage is readable by any script on that origin, and a phrase-derived
-  // keypair at rest there is an offline cracking target that no password change
-  // rotates. What this absence changes is COPY, not a control: the phrase step
-  // says the words are asked for again on reload.
-  //
-  // `personVaultCredential` and `personIdentity` are NOT here any more: the web
-  // person plane dispatches, so the unlock screen's identity-phrase arm and the
-  // identity row are offers the commands answer.
+  // The person identity is SESSION-only here (myne-md/myne#911 task 13): the
+  // sealed keypair and the device token live in the Worker's memory, because an
+  // origin's storage is readable by any script on that origin and a
+  // phrase-derived keypair at rest there is an offline cracking target no
+  // password change rotates. What this changes is COPY, not a control: the
+  // phrase step says the words are asked for again on reload.
   "personCredentialPersisted",
-  // Owner decision, 2026-07-27 (task 72). Repair scans a vault DIRECTORY for
-  // orphan artefacts — a thing that exists because a desktop directory is
+  // Owner decision 2026-07-27 (MYND-574 task 72): repair scans a vault DIRECTORY
+  // for orphan artefacts, a thing that exists because a desktop directory is
   // writable by other software. An OPFS container has exactly one writer, and
-  // its one real damage mode (eviction) is answered by re-sync (task 22), so
-  // this would offer to fix a class of problem the storage cannot have.
+  // its one damage mode (eviction) is answered by re-sync, so a repair offer
+  // would promise to fix a class of problem this storage cannot have.
   "vaultRepair",
-  // `decisions.md` 2026-07-26 makes sync REQUIRED here: the OPFS container is a
-  // cache of a server-held vault, never the only copy. This is not an affordance
-  // being withheld — it is the fact that makes `vault_delete`'s copy differ. On
-  // this client the command erases THIS BROWSER's copy and nothing else, so the
-  // UI calls it a sign-out and says plainly that the account and everything
-  // already synced stay on the server. Desktop's "cannot be undone, and your
-  // recovery phrase will not restore the data" would be false here in the
-  // dangerous direction: a user trying to destroy their notes would believe
-  // they had.
+  // Sync is REQUIRED here (`decisions.md` 2026-07-26): the OPFS container is a
+  // cache of a server-held vault, never the only copy. So `vault_delete` erases
+  // only this browser's copy, and the UI calls it a sign-out — desktop's
+  // "cannot be undone" wording would be false in the direction that matters,
+  // telling someone they had destroyed data that is still on the server.
   "localOnlyVault",
-  // The host-confined directory READ, not the import. Desktop's `importer:`
+  // The host-confined directory READ, not the import: desktop's `importer:`
   // plugin canonicalises and checks within-root because the WebView is denied
-  // `fs:allow-read-dir`; a browser has no path to canonicalise and no host to
-  // confine to. **Markdown import still ships here** (task 71) — the tree comes
-  // from the user's own directory pick, which needs no confinement because a
-  // page is only ever handed what the user chose.
+  // `fs:allow-read-dir`, and a browser has no path to canonicalise and no host
+  // to confine to. Markdown import still ships, from the user's own directory
+  // pick, which needs no confinement.
   "hostDirectoryRead",
-  // One container per origin under a constant vault id, so there is no
-  // second vault to import FROM, and `importer:` is `Class::Unsupported`
-  // wholesale. Substituted as well as gated, because the setup step takes a
+  // One container per origin under a constant vault id, so there is no second
+  // vault to import from and `importer:` is `Class::Unsupported` wholesale. The
+  // module is substituted as well as gated, because the setup step takes a
   // recovery phrase and A18 is about routine phrase prompts in a page.
   "vaultImport",
-  // Task 90. The extractors are `src-tauri/`-side, and `MYE1` is device-local
-  // and NEVER synced (`protocol.md` §9.15), so a browser can neither run an
-  // extraction nor inherit one. Absent rather than degraded: `read_extracted`
-  // reports a decode failure as a cache MISS meaning "re-extract", which here
-  // would be an unwinnable retry on every import. Attachments still import,
-  // sync, open and match by FILENAME — only their contents do not.
+  // Extractors are `src-tauri/`-side and `MYE1` is device-local and never synced
+  // (`protocol.md` §9.15), so a browser can neither run an extraction nor
+  // inherit one; `read_extracted` reports a decode failure as a cache miss
+  // meaning "re-extract", an unwinnable retry here. Attachments still import,
+  // sync, open and match by filename — only their contents are unsearchable.
   "attachmentTextSearch",
-  // `decisions.md` 2026-07-26: "Opening a backup file as an alternative entry
-  // path is not offered"; the code is desktop-side, so it would be net-new.
+  // `decisions.md` 2026-07-26: opening a backup file as an alternative entry
+  // path is not offered, and the code is desktop-side, so it would be net-new.
   "backup",
-  // No API grants a page an arbitrary write path. Task 48's download flow is a
+  // No API grants a page an arbitrary write path; the browser download flow is a
   // differently-shaped affordance, not this one.
   "nativeSaveAs",
   "icsImport",
-  // The sandboxed editor for the user's own on-disk files (myne-md/myne#788).
-  // A page has no OS file ingress, no native open dialog and no handler
-  // registration, and the surface exists to be independent of vault state in a
-  // way a browser session (vault-scoped, sync required) is not. The
-  // whole `plain-file` plugin is `Class::Unsupported` in `capability.rs`; this
-  // entry is the other half of that decision, so a menu or palette entry can
-  // never be offered against commands that refuse.
+  // The sandboxed editor for the user's own on-disk files (myne-md/myne#788): a
+  // page has no OS file ingress, no native open dialog and no handler
+  // registration, and the surface must work independent of vault state in a way
+  // a browser session (vault-scoped, sync required) never is. The whole
+  // `plain-file` plugin is `Class::Unsupported`; this entry is the other half of
+  // that decision.
   "plainFile",
-  // The calendar's `.ics` IMPORT needs a path-taking open dialog, which a page
-  // has none of. Export is not in this set: it leaves through the download seam,
-  // which is not an IPC command at all (myne-md/myne#1037).
-  "icsImport",
-  // `decisions.md` 2026-07-26: the 24-word recovery phrase is "never generated
-  // by, displayed by, or typed into served code". Creation generates and shows
-  // it; recovery types it. Both are normative removals, not scope cuts.
-  //
-  // **Rule 1 is reversed by `decisions.md` 2026-08-15**, and both halves have
-  // now left this set: `vaultCreation` (the flow registers the account with the
-  // sync server BEFORE the phrase is ever displayed, so a failure leaves no
-  // account and no words to write down) and `phraseRecovery` (a user who forgot
-  // their password can recover in the browser they have always used, instead of
-  // being sent to download a desktop client on the worst day of their Myne
-  // life). What did NOT leave is directly below.
-  // The 30 second clipboard auto-clear, NOT the Copy affordance, which ships.
+  // The 30-second clipboard auto-clear, not the Copy affordance, which ships.
   // The clear is gated on reading the clipboard back so unrelated content is
-  // never destroyed, and a page cannot read the clipboard: Firefox grants page
-  // content none at all, the rest gate it behind a prompt plus focus. A blind
-  // clear would be worse than none. The phrase step says so in words, because
-  // `recovery-flow.md` §2.2 forbids presenting a control whose stated
-  // protection this client cannot perform.
+  // never destroyed, and a page cannot read the clipboard (Firefox grants page
+  // content none; others prompt and require focus), so a blind clear would be
+  // worse than none. The phrase step says so in words, because
+  // `recovery-flow.md` §2.2 forbids presenting a control whose stated protection
+  // this client cannot perform.
   "clipboardAutoClear",
-  // The phrase as a device-enrolment credential, kept absent by a runtime flag
-  // and no longer by anything else. It was its own capability rather than a
-  // branch of `phraseRecovery` so the 2026-08-15 reversal could lift the phrase
-  // ban without shipping three phrase screens while the decision named two.
-  //
-  // The reason is not portability. `plugin:sync|sync_enroll` is dispatched here
-  // and the credential would work; what is refused is offering it. Enrolment is
-  // a ROUTINE action that already accepts account number plus master password,
-  // and a user who is not offered the phrase in a routine flow has one fewer
-  // place to be trained into typing 24 words into a page, which is the mechanism
-  // behind `threat-model.md` A18. What that buys is smaller than it was: the grid
-  // now SHIPS in the bundle (`decisions.md` 2026-10-18, entry 0704, which retired
-  // the build-time substitution and the `scripts/check-web-no-phrase.mjs` grep
-  // that asserted its absence), so this flag hides a rendered arm rather than
-  // keeping a module out of the artefact. A18 records the difference between
-  // those two and no longer claims the stronger one.
+  // The phrase as a device-enrolment credential: refused by OFFERING, not
+  // portability — `sync_enroll` dispatches and the credential would work.
+  // Enrolment already accepts account number plus master password, and not
+  // offering the phrase in a routine flow removes a place a user is trained into
+  // typing 24 words into a page, which is the mechanism behind A18. The grid now
+  // ships in the bundle (`decisions.md` 2026-10-18, entry 0704, which retired
+  // build-time substitution and `scripts/check-web-no-phrase.mjs`), so this flag
+  // hides a rendered arm rather than keeping a module out of the artefact.
   "phraseEnrolment",
-  // The command's contract IS the desktop filesystem (`core-wasm-assessment.md`:
-  // `cannot-exist-in-browser`).
+  // The command's contract IS the desktop filesystem
+  // (`core-wasm-assessment.md`: `cannot-exist-in-browser`).
   "vaultExport",
-  // Task 47. Not a portability limit — a BUNDLE-SIZE one, which is why it is a
-  // release decision rather than a permanent absence: dictionaries are bundled
+  // A BUNDLE-SIZE decision, not a portability limit: dictionaries are bundled
   // binary resources on desktop, and shipping even a couple would dominate a web
-  // bundle whose whole trust story is "small enough that someone might read the
-  // hashes". Shipping them later means fetching on demand from the app's OWN
-  // origin and caching — never a CDN, which the zero-third-party rule makes a
-  // design step rather than a link.
-  //
-  // The `MYD1` personal dictionary is NOT covered by this absence and must not
-  // be: it is vault content (`sync-protocol.md` §9 Class 1, set-union merge),
-  // so a web session leaves it alone and a desktop session keeps using it.
+  // bundle whose trust story is "small enough that someone might read the
+  // hashes". Shipping later means fetching on demand from the app's own origin
+  // — never a CDN, which the zero-third-party rule makes a design step. The
+  // `MYD1` personal dictionary is NOT covered: it is vault content
+  // (`sync-protocol.md` §9 Class 1), so a web session syncs it like any field.
   "spellCheck",
-  // Task 48. The one export whose obstacle is the OUTPUT, not the destination:
-  // it drives a hidden Tauri WebView window through `pdf-export`, prints it, and
-  // collects the result — a desktop render pipeline with no page-side
-  // counterpart that does not amount to shipping a PDF engine in the bundle.
-  //
-  // Note-as-markdown and attachment download are NOT covered by this absence:
-  // their obstacle was the destination, and the browser download flow answers
-  // that (see `platform/download.ts`).
+  // The transform, not the preference: it drives a hidden Tauri WebView through
+  // `pdf-export`, prints it and collects the result — a desktop render pipeline
+  // with no page-side counterpart short of shipping a PDF engine. Note-as-
+  // markdown and attachment download are NOT covered: their obstacle was the
+  // destination, answered by the browser download flow.
   "pdfExport",
-  // The TRANSFORM, not the preference. `catch_unwind` needs unwinding and
+  // The transform, not the preference: `catch_unwind` needs unwinding and
   // `wasm32-unknown-unknown` has none, so a hostile image that panicked the
-  // third-party decoder would kill the vault Worker rather than fall back to
-  // storing the original — a successful import turning into a dead tab.
-  // `compress::is_supported_on_this_target` refuses it in the backend for
-  // exactly that reason.
-  //
-  // `attachment_compression_enabled` is NOT covered by this absence and must not
-  // be: it is shared vault content (`decisions.md` 2026-07-30), so this client
-  // reads, writes and syncs it like any other field, and a user who turns it off
-  // here turns it off for their desktop. The absence changes the COPY around the
-  // control — a helper line promising "on every device" is false in front of the
-  // one client that will not honour it — not the control.
+  // third-party decoder would kill the vault Worker instead of falling back to
+  // storing the original. `attachment_compression_enabled` is NOT covered: it is
+  // shared vault content (`decisions.md` 2026-07-30), read, written and synced
+  // like any other field.
   "imageCompression",
-  // MYND-490 (cli-thin-client task 12). The `myne` terminal client connects to
-  // a local Unix socket / named pipe that the desktop process binds, and the
-  // binary itself ships inside the desktop bundle as a Tauri `externalBin`. A
+  // The `myne` CLI connects to a local Unix socket or named pipe the desktop
+  // binds, and the binary ships inside the desktop bundle as an `externalBin`; a
   // page can neither bind that socket nor be reached through one, and there is
-  // no filesystem here for a sidecar to be installed onto — so the Settings
-  // block is omitted rather than greyed. Absent by platform fact, not by
-  // decision: there is nothing to port.
+  // no filesystem here for a sidecar. Absent by platform fact. (MYND-490.)
   "cliAccess",
-  // external-mcp-connection (myne-md/myne#923). `myne-mcp` is a stdio binary
-  // staged as a desktop `externalBin` and installed on the user's PATH by the
-  // same shim the `myne` CLI uses: a page has no filesystem to put one on and
-  // nothing on the machine that could launch it. Absent by platform fact, so the
-  // Settings section is omitted rather than greyed, and the dispatcher refuses
-  // the whole `mcp` namespace.
+  // `myne-mcp` is a stdio binary staged as a desktop `externalBin` and installed
+  // on PATH by the same shim as the CLI; a page has no filesystem to put one on
+  // and nothing on the machine that could launch it. Absent by platform fact, so
+  // the Settings section is omitted and the dispatcher refuses the whole `mcp`
+  // namespace. (myne-md/myne#923.)
   "externalMcp",
-  // myne-md/myne#411. The picker is what a cached name exists to label, and it
-  // now SHIPS here (`check-web-screens.mjs` records `VaultPicker.tsx` as
-  // `ported` since myne-md/myne#911 task 13). What is still missing is the
-  // carrier: the `MYL1` store is sealed under an OS keychain `wrap_key`, which a
-  // page does not have. So the Privacy row is omitted rather than rendered
-  // against three commands that reject: the store it governs cannot exist here.
-  //
-  // The ENCRYPTION is not what is absent, and the distinction matters the same
-  // way it does for `spellCheck` and `MYD1`: `MYL1` is unchanged, and on
-  // desktop the row ships to everyone, ungated.
+  // The picker ships here (`check-web-screens.mjs` records `VaultPicker.tsx` as
+  // ported); what is missing is the CARRIER — the `MYL1` store is sealed under
+  // an OS keychain `wrap_key`, which a page does not have. So the Privacy row is
+  // omitted rather than rendered against commands that reject. The encryption is
+  // not absent: `MYL1` is unchanged. (myne-md/myne#411.)
   "lockedVaultNames",
-  // MYND-650 task 6. The desktop routes sync egress through a Tor client it
-  // spawns as a subprocess, reached over a loopback SOCKS5 socket. A page has
-  // neither half: no subprocess, no raw TCP, and no way to point `fetch` at a
-  // proxy. Absent by platform fact rather than by decision — there is nothing
-  // to port, and the browser already has a better answer than an in-page
-  // tunnel would be, which is Tor Browser (docs, task 12). The Developer
-  // Options block is omitted here rather than greyed.
+  // The desktop routes sync egress through a Tor client it spawns as a
+  // subprocess, reached over a loopback SOCKS5 socket; a page has neither half —
+  // no subprocess, no raw TCP, no way to point `fetch` at a proxy. Absent by
+  // platform fact, and the browser already has the better answer (Tor Browser).
+  // (MYND-650 task 6.)
   "torRouting",
-  // myne-md/myne#684: the account/vault split. A browser can hold two containers
-  // under one origin since myne-md/myne#911 task 13, so the obstacle is not the
-  // count: the account record is sealed with a wrap key kept in an OS keychain,
-  // and a page has none. The picker renders the rows standalone instead of
-  // failing the list, and the grouping UI is omitted rather than rendered
-  // against commands that reject.
+  // The account/vault split (myne-md/myne#684): a browser CAN hold two containers
+  // under one origin, so the obstacle is not the count — the account record is
+  // sealed with a wrap key kept in an OS keychain, which a page has none of. The
+  // picker renders rows standalone and the grouping UI is omitted.
   "accountGrouping",
   // The B2B member surface: the person identity's sealed file lives outside
   // browser storage, and the panel's recovery-phrase prompt stays out of served
@@ -226,44 +160,35 @@ const ABSENT: ReadonlySet<Capability> = new Set<Capability>([
   // `decisions.md` 2026-10-18, entry 0704). The phrase is not an enrolment
   // credential here.
   "memberSharing",
-  // myne#173. A pop-out is a second host-spawned OS window. A browser page has
-  // one tab context and cannot open an OS window a viewer would read as another
-  // window of the app; the single-tab OPFS lock is the whole model. Absent by
-  // platform fact. The pop-out affordance is omitted here rather than greyed.
+  // A pop-out is a second host-spawned OS window (myne#173); a browser page has
+  // one tab context and cannot open an OS window a viewer reads as another app
+  // window, and the single-tab OPFS lock is the whole model. Absent by platform
+  // fact.
   "detachedWindows",
-  // Desktop self-update. `tauri-plugin-updater` has no browser target, and a
-  // served page cannot replace itself. Absent by platform fact; the About and
-  // banner affordances are omitted here rather than greyed.
+  // Desktop self-update: `tauri-plugin-updater` has no browser target and a
+  // served page cannot replace itself. Absent by platform fact.
   "selfUpdate",
-  // myne-md/myne#860. The opt-in device-local diagnostic log. The web build
-  // installs NO `tracing` subscriber and compiles every event below `warn` out
-  // of the bundle (`docs/decisions/ops/0366`), so there is no log for it to
-  // write, no platform log directory to resolve and no folder to reveal. The
-  // logging half is omitted here rather than greyed; COPYING the diagnostics
-  // block is present on web, because that is the half the issue's scope
-  // sentence keeps and because the browser is where a user cannot open a
-  // devtools panel and read a failure back.
+  // The opt-in device-local diagnostic log (myne-md/myne#860): the web build
+  // installs no `tracing` subscriber and compiles every event below `warn` out of
+  // the bundle (`docs/decisions/ops/0366`), so there is no log to write, no
+  // platform log directory to resolve and no folder to reveal. COPYING the
+  // diagnostics block is present on web: that is the half a user needs where they
+  // cannot open a devtools panel and read a failure back.
   "diagnosticLog",
-  // Live-collab, `SYNC-31`. Multi-user co-editing needs the B2B member plane:
-  // the group substrate, the roster and the member removal rekey, held in a
-  // device-local sealed file outside browser storage whose panel prompt is
-  // refused in the served bundle. A browser can hold a person identity for the
-  // session (myne-md/myne#911 task 13, which made `personIdentity` present
-  // here), but it cannot hold the member half, so this is absent for the same
-  // reasons `memberSharing` is. Split from `liveCollabPeerPresence`, which stays
-  // PRESENT here, so the client is not second-class for its own devices while
-  // never implying multi-user works in a page. Omitted, not greyed.
-  //
-  // No command surface of its own: the transport exposes wasm exports, not an
-  // IPC command, and the person/membership commands it would depend on are
-  // already refused under `memberSharing` (hence the empty backing in the guard).
+  // Live-collab (SYNC-31): multi-user co-editing needs the B2B member plane —
+  // group substrate, roster and member-removal rekey — held in a device-local
+  // sealed file outside browser storage whose panel prompt is refused in the
+  // served bundle. A browser can hold a person identity for the session, but not
+  // the member half. Split from `liveCollabPeerPresence`, which stays PRESENT
+  // here, so a client is not second-class for its own devices while never
+  // implying multi-user works in a page.
   "liveCollabMultiUser",
-  // Live-collab, `collab-presence-ui`. The awareness CURSOR consumer is a native
-  // SSE supervisor (`AwarenessSignal` + `AppHandle`); the web Worker-side consumer
+  // Live-collab (`collab-presence-ui`): the awareness CURSOR consumer is a native
+  // SSE supervisor (`AwarenessSignal` + `AppHandle`), the web Worker-side consumer
   // is not built, and the local presence report (`live_session_set_presence`) is
-  // refused there. Split from `liveCollabPeerPresence`, which stays PRESENT here,
-  // so a web session still opens for this client's own devices' convergence while
-  // the cursor affordance is omitted. Omitted, not greyed.
+  // refused there. Split from `liveCollabPeerPresence`, which stays PRESENT, so a
+  // web session still opens for this client's own devices' convergence while the
+  // cursor affordance is omitted.
   "liveCollabAwarenessCursors",
 ]);
 

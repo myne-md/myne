@@ -1263,8 +1263,7 @@ pub async fn rotate_group_from_host(
 /// derived from the group key, so a rotation to a new epoch moves them. Each retired epoch's id
 /// that this device holds a baseline for is queued as an orphan tombstone (the
 /// next push flags it on the server so horizon-GC reclaims the stranded record)
-/// and its baseline dropped, the same shape as
-/// `vault_migrate::rebase_sync_plane_after_rekey` for a root re-key.
+/// and its baseline dropped.
 ///
 /// Content addresses (note UUIDs, attachment ids, conversation/entry ids) do
 /// NOT move: those baselines stay. A device that did not perform the rotation

@@ -147,10 +147,14 @@ describe("the wired guard", () => {
     const { code, out } = run([]);
     expect(out).toContain("private-path-refs: ok");
     expect(code).toBe(0);
-    // A floor, so a scan that silently stopped reading reports itself. The
-    // recorded set is in the hundreds and may only shrink.
+    // The floor is the roster's own size, not a number written here, so a scan that
+    // silently stopped reading still reports itself (it would say 0). The set may only
+    // shrink: it was 266 files until the decision log moved to the private companion,
+    // which is why a literal floor outlived its subject and had to be re-recorded twice.
+    const roster = JSON.parse(readFileSync(join(ROOT, "scripts/private-path-refs.json"), "utf8"));
+    const recorded = roster["living-document"].length + roster["append-only-record"].length;
     const n = Number(out.match(/ok \((\d+) recorded file/)?.[1] ?? "0");
-    expect(n).toBeGreaterThan(200);
+    expect(n).toBe(recorded);
   });
 
   it("scans three roots that all exist in this checkout", () => {
