@@ -108,8 +108,9 @@ export function attachmentRename(id: string, filename: string): Promise<void> {
 }
 
 /** Decrypt one attachment's bytes to a destination path, then (mobile, MYND-475)
- *  present the native share sheet so the user can pick where to save it. The
- *  Documents write always lands first, so the share is purely additive. */
+ *  present the platform destination chooser so the user can pick where it goes
+ *  (iOS share sheet, Android SAF picker since myne-md/myne#505). The Documents write
+ *  always lands first, so the chooser is purely additive. */
 export async function attachmentExport(id: string, destination: string, overwrite: boolean): Promise<void> {
   await invoke("plugin:attachments|attachment_export", { id, destination, overwrite });
   await shareFile(destination);
