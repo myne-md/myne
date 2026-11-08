@@ -6,7 +6,7 @@
 // tree points at a file nobody outside the org can open" and a one-line edit that
 // makes the failure go away. So it is driven end to end.
 //
-// It used to drive that end to end against a probe written into the REAL `docs/`
+// It used to drive that end to end against a probe written into the REAL `agent-tooling/docs/`
 // tree, deleted in a `finally`. That window was a race rather than a tidiness
 // problem: vitest runs files in parallel workers, so a sibling test asserting the
 // real tree is clean read the probe and failed on a pairing nobody chose. Measured
@@ -34,7 +34,9 @@ import {
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const GUARD = "scripts/check-private-path-refs.mjs";
 const RECORD = join(ROOT, "scripts", "private-path-refs.json");
-const PROBE_REL = "docs/__private_path_probe.md";
+// A scanned root, because `docs/` is no longer one: the documentation tree moved into the private
+// companion, and this guard now scans the two published trees only.
+const PROBE_REL = "src/__private_path_probe.md";
 
 function run(args: string[]): { code: number; out: string } {
   try {
@@ -119,8 +121,8 @@ describe("refsInText", () => {
 
 describe("classOf", () => {
   it("routes the append-only log to its own class", () => {
-    expect(classOf("design-notes/ui/0331-x.md")).toBe("append-only-record");
-    expect(classOf("docs/glossary.md")).toBe("living-document");
+    expect(classOf("agent-tooling/design-notes/ui/0331-x.md")).toBe("append-only-record");
+    expect(classOf("agent-tooling/docs/glossary.md")).toBe("living-document");
     expect(classOf("src/screens/Editor.tsx")).toBe("living-document");
   });
 });

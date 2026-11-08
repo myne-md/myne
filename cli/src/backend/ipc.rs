@@ -5,7 +5,7 @@
 //! key, never prompts for a password.
 //!
 //! Two transports, one protocol: a Unix domain socket on macOS and Linux, and a
-//! Windows named pipe, which is what `docs/threat-model.md`'s CLI-door entry
+//! Windows named pipe, which is what `agent-tooling/docs/threat-model.md`'s CLI-door entry
 //! already promises ("a local Unix domain socket (macOS/Linux) or named pipe
 //! (Windows)"). The framing, the wire types and every request below are shared;
 //! only `connect` and the name of the thing it connects to differ.

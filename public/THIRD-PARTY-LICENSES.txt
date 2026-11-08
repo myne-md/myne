@@ -24,7 +24,7 @@ whether or not a client imports it. `scripts/gen-third-party-licenses.mjs`
 carries the rule and names what it excluded when it runs.
 
 The per-dependency rationale (why a package is a dependency at all) lives in
-`docs/dependency-policy.md`; the project's own licensing map is `LICENSING.md`;
+`agent-tooling/docs/dependency-policy.md`; the project's own licensing map is `LICENSING.md`;
 the bundled non-npm assets are the fonts below plus the model weights and
 dictionaries those two files record.
 

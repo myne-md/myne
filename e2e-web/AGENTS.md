@@ -12,7 +12,7 @@ build substitutes. So a flow in the shared tree gets its one scenario from the
 desktop `e2e/` suite when one is written, and nothing here — and the premise that makes that
 legitimate is verified by the platform-seam contract tests
 (`tests/platform/seam-contract.ts`), one assertion suite run against every seam
-implementation in both CI lanes. `design-notes.md` 2026-07-26 "Web E2E policy".
+implementation in both CI lanes. `agent-tooling/design-notes.md` 2026-07-26 "Web E2E policy".
 
 What belongs here:
 
@@ -49,7 +49,7 @@ They apply here unchanged, and two of them bite differently in a browser:
 
 `vite preview` sends no CSP, no COOP and no COEP. A lane running against it would
 prove the app works in an environment it is never deployed into, and would go
-green on precisely the misconfiguration `docs/self-host-web.md` calls fatal:
+green on precisely the misconfiguration `agent-tooling/docs/self-host-web.md` calls fatal:
 without cross-origin isolation `SharedArrayBuffer` is undefined and the sync
 backoff's blocking waiter (`core/src/task.rs`) cannot exist.
 
@@ -70,8 +70,8 @@ gives each slot its own port band.
 of tauri-driver. Playwright was evaluated and rejected: its whole case was a
 WebKit seat for Safari-specific storage behaviour, and **Playwright's WebKit is a
 build of WebKit, not Safari** — the seat would imply coverage it does not
-provide. Full reasoning in `design-notes.md` 2026-07-27 and the ledger entry in
-`docs/dependency-policy.md`.
+provide. Full reasoning in `agent-tooling/design-notes.md` 2026-07-27 and the ledger entry in
+`agent-tooling/docs/dependency-policy.md`.
 
 `support/harness.ts`'s `SUPPORTED_BROWSERS` is the source of truth for what this
 lane can drive: `chrome`, `firefox`, `safari`. What CI *seats* is narrower.

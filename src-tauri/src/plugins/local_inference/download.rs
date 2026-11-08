@@ -146,7 +146,7 @@ pub const ARTIFACTS: &[Artifact] = &[Artifact {
 /// out of the production table so a shipped binary cannot name them.
 ///
 /// **One entry, for the auto-tag role.** It replaced `fixture-embedding` when
-/// the AI embedding index was retired (`design-notes/ai/0703-*`): the
+/// the AI embedding index was retired (`agent-tooling/design-notes/ai/0703-*`): the
 /// download path still needs a stub-only artefact to exercise install, digest
 /// verification, marker write and removal without a network, and the tag role
 /// is the surviving one with an otherwise identical flow. A fixture naming no

@@ -8,7 +8,7 @@
 // **What this tier cannot touch, and no harness can:** whether the operating
 // system actually fires a registration while Myne is closed, whether it survives
 // a reboot, and where a tap lands after unlock. Those are the manual per-platform
-// checklist in `docs/dev/reminders-device-checklist.md` — this spec deliberately
+// checklist in `agent-tooling/docs/dev/reminders-device-checklist.md` — this spec deliberately
 // asserts nothing about them rather than asserting something weaker and letting
 // the checklist look redundant.
 

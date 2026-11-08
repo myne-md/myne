@@ -58,7 +58,7 @@ import { join, relative } from "node:path";
  */
 const SHARED_ROOTS = ["src", "editor/src", "dialect/src", "copy"];
 const CAPABILITY_RS = join("web", "wasm", "src", "capability.rs");
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", "pkg"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", "pkg", ".worktrees"]);
 const SOURCE_EXT = /\.(ts|tsx|mts|cts|js|jsx)$/;
 
 function walk(dir, out = []) {

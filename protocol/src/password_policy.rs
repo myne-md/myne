@@ -5,7 +5,7 @@
 //! Single source of truth for the minimum number of Unicode characters a
 //! master password must contain before any Argon2id-bound auth plugin
 //! (`vault_creation`, `vault_recover`, `vault_change_password`) accepts
-//! it. Pinned by `design-notes.md` 2026-05-06 entry "Auth-pipeline
+//! it. Pinned by `agent-tooling/design-notes.md` 2026-05-06 entry "Auth-pipeline
 //! backend MIN_PASSWORD_LEN floor; project-wide retroactive".
 //!
 //! ## What this is and is not

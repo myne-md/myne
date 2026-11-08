@@ -20,7 +20,7 @@
 // would let the composer skip the check on a model nobody measured.
 //
 // This file deliberately does not test WHEN the probe fires. That rule
-// (`design-notes/ai/0518` point 2, TB13: the first Send, never a mount and
+// (`agent-tooling/design-notes/ai/0518` point 2, TB13: the first Send, never a mount and
 // never a control change) is unchanged and lives with the composer.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

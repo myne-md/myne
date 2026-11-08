@@ -44,7 +44,7 @@ import { dirname, join, normalize, sep } from "node:path";
 
 const PLAIN_ROOT = join("src", "plain");
 const SOURCE_EXT = /\.(ts|tsx)$/;
-const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git"]);
+const SKIP_DIRS = new Set(["node_modules", "dist", "target", ".git", ".worktrees"]);
 
 /**
  * A quoted import specifier after `from`, `import` or `require`. The leading

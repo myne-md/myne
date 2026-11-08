@@ -19,7 +19,7 @@
 //
 // The gate is also what the spec already required. An agent run drives a
 // generation model over note plaintext, so it IS the AI path, and
-// `design-notes/ai/0337` and `threat-model.md` both state that the
+// `agent-tooling/design-notes/ai/0337` and `threat-model.md` both state that the
 // `--no-default-features` build "never compiles the AI path". A build carrying
 // eight agent IPC commands that can never reach a backend would contradict that
 // while looking like it honoured it.
@@ -36,7 +36,7 @@ pub mod clipper_pairing;
 pub mod detached_window;
 // myne-md/myne#860: the opt-in device-local diagnostic log and the bug-report
 // surface's host side. Desktop-only: the web build installs no `tracing`
-// subscriber at all (`design-notes/ops/0366`), so both other clients carry
+// subscriber at all (`agent-tooling/design-notes/ops/0366`), so both other clients carry
 // `Unsupported` verdicts for the whole plugin.
 pub mod diagnostics;
 // B2B device-to-person bindings (`vault.device-bindings`, `MYU5`; protocol.md §9.30,

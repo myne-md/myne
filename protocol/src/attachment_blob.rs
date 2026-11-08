@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! Per-attachment `MYA1` blob encoder/decoder per
-//! `docs/spec/protocol.md` § 9.9 (attachment blob binary format), with
+//! `agent-tooling/docs/spec/protocol.md` § 9.9 (attachment blob binary format), with
 //! AAD construction per § 5.2 and the content-addressed attachment-id
 //! per § 9.9 "Attachment-id".
 //!

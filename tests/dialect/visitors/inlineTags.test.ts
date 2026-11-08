@@ -2,7 +2,7 @@
 //
 // 4 grammar fixtures (boundary, numeric-only, nested-slash, unicode)
 // plus 8 exclusion-zone fixtures (each expected to produce []).
-// Spec: docs/spec/markdown-dialect.md §3.7; grammar grounded in
+// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.7; grammar grounded in
 // agent-tooling/researches/2026-05-09-obsidian-inline-tag-behavior.md.
 
 import { describe, expect, it } from "vitest";

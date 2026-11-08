@@ -19,7 +19,7 @@
 # longer re-exporting `documentDir` / `join`, nothing under `mobile/src` and no
 # `@tauri-apps/*` package it imports calls `plugin:path|*`, so eight path
 # commands left the WebView's reach and one arrived. TB3 least privilege, and
-# `docs/threat-model.md` TB3 records the narrowing.
+# `agent-tooling/docs/threat-model.md` TB3 records the narrowing.
 #
 # Not slot-gated: the command reveals no vault content and touches no vault key.
 #

@@ -74,7 +74,7 @@ const COMPANION_SOURCES = [
 
 /** Files in THIS repository that might name an image. Scanned when they exist, never counted
  * as coverage: they carry the prose references, not the pins. */
-const REPO_SOURCES = [join(ROOT, "docs", "self-host-policy.md"), join(ROOT, "docs", "self-host-web.md")];
+const REPO_SOURCES = [join(ROOT, "agent-tooling", "docs", "self-host-policy.md"), join(ROOT, "agent-tooling", "docs", "self-host-web.md")];
 
 const SOURCES = [...COMPANION_SOURCES, ...REPO_SOURCES];
 

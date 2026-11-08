@@ -15,7 +15,7 @@
 //! So an anchored edit whose anchor spans the `folder:` line could move a note
 //! into an excluded folder, and no control saw it: the clamp had
 //! already run, and the removal roster carries five fields of which this is not
-//! one. `docs/threat-model.md` TB13 names `ai_excluded_folders` as the
+//! one. `agent-tooling/docs/threat-model.md` TB13 names `ai_excluded_folders` as the
 //! content-scoped control on a boundary that carries decrypted note plaintext
 //! off the device, and a control a write can relocate its way around is not one.
 //!

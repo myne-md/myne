@@ -3,7 +3,7 @@
 // the whole tag set against the core flow screens, including the two rules
 // jsdom cannot evaluate: `color-contrast` and, new with 2.2, `target-size`
 // (SC 2.5.8). A violation fails the screen. Contrast remediation goes to the
-// token source (`docs/design/colors_and_type.css`), never to a per-component
+// token source (`agent-tooling/docs/design/colors_and_type.css`), never to a per-component
 // override; target-size remediation goes to `--target-min` (task 11), never to
 // a per-control literal.
 //

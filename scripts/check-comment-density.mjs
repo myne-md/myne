@@ -76,7 +76,7 @@ const MIN_CODE_LINES = 50;
  */
 const NEW_FILE_MAX_RATIO = 0.5;
 
-const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "pkg", "coverage"]);
+const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "pkg", "coverage", ".worktrees"]);
 
 const EXT = new Set([".rs", ".ts", ".tsx"]);
 

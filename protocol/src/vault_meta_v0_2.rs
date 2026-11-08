@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! v0.2 `vault.meta` codecs: migration-only `NTV5` and B2B `NTV6`.
 //! `NTV5` carries the whole-vault-migration key hierarchy
-//! (`docs/spec/protocol.md` §10.4.1, automerge-sync-migration #420); `NTV6`
+//! (`agent-tooling/docs/spec/protocol.md` §10.4.1, automerge-sync-migration #420); `NTV6`
 //! adds the mandatory group-key package, epoch and signed roster envelope.
 //!
 //! Byte-identical **layout** to the v0.1 `MYV1` `vault.meta` (§9.3, 345 bytes):

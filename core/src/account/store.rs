@@ -8,7 +8,7 @@
 //! is the device-local counterpart of the sealed membership field inside each
 //! member vault's `vault.meta` (§9.3.1).
 //!
-//! An account has no name (`design-notes/ui/0728`): the heading a picker draws
+//! An account has no name (`agent-tooling/design-notes/ui/0728`): the heading a picker draws
 //! for a group is derived from the group's own vault names, so nothing in this
 //! record is user-authored text.
 //!
@@ -136,7 +136,7 @@ fn parse_record(bytes: &[u8]) -> Option<AccountRecord> {
             // spelling to accept (protocol::hex::decode_lower, R1.2).
             let account_id =
                 protocol::hex::decode_lower::<ACCOUNT_ID_LEN>(a.get("account_id")?.as_str()?)?;
-            // A record written before `design-notes/ui/0728` still carries a
+            // A record written before `agent-tooling/design-notes/ui/0728` still carries a
             // `label` member. It is not read and not required: an unknown key
             // parses fine, so an old file opens and the next write drops it.
             let vaults = a
@@ -764,7 +764,7 @@ mod tests {
         // and under which account id. Both are asserted against the values the
         // record actually holds rather than against a literal planted in the
         // fixture, so the check can fail for the reason it exists (the record
-        // carried user-authored text until `design-notes/ui/0728`, and this
+        // carried user-authored text until `agent-tooling/design-notes/ui/0728`, and this
         // test named that text instead: the shape outlived its subject).
         let id = hex(r.accounts[0].account_id);
         assert!(

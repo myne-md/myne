@@ -15,7 +15,7 @@
 // two Editor lock paths and NOT to `leaveActiveVault`, which is the switch. The
 // agent's proposal, whose anchors and replacements are text copied verbatim out
 // of note bodies, therefore survived a vault switch into the next vault, while
-// `design-notes/ai/0515` rested its "nothing survives a lock" claim on the
+// `agent-tooling/design-notes/ai/0515` rested its "nothing survives a lock" claim on the
 // opposite.
 //
 // WHAT IT CHECKS, and why it is keyed this way. Two hand-maintained rosters,
@@ -156,7 +156,7 @@ export const TEARDOWN_CALLS = [
     declaredIn: "src/notes/agent/agentStore.ts",
     holds: "the agent run's proposal: anchors and replacements copied verbatim out of note bodies",
     // Every leaving path. Note plaintext may not outlive the unlocked session,
-    // and `design-notes/ai/0515` rests its no-blob-family argument on that.
+    // and `agent-tooling/design-notes/ai/0515` rests its no-blob-family argument on that.
     // Asserted at the choke point, which covers every caller including future
     // ones. Also asserted on the switch, because that path is reached through
     // `leaveActiveVault` and a later refactor could stop routing it through
@@ -313,7 +313,7 @@ export const TEARDOWN_CALLS = [
     // and is a rendering fact rather than a guarantee. A refactor that keeps
     // the Editor mounted across a lock would carry one vault's conversation
     // into the next session, and nothing would say so.
-    // `design-notes/ai/0276` rests its "no new at-rest magic byte, KEK or
+    // `agent-tooling/design-notes/ai/0276` rests its "no new at-rest magic byte, KEK or
     // format" argument on this transcript being RAM-only and dropped on lock.
     appliesTo: ["desktop-lock", "desktop-switch"],
     skips: {
@@ -530,7 +530,7 @@ export const TEARDOWN_CALLS = [
     // Every leaving path. Its own comment used to argue it off this roster by
     // asserting the module unloads on lock, and that premise is false: a JS
     // module never unloads, the idle auto-lock path reloads the WebView but the
-    // manual Lock button and the vault switch do not. `docs/threat-model.md`
+    // manual Lock button and the vault switch do not. `agent-tooling/docs/threat-model.md`
     // AS7 classes this surface as AS1-class in-RAM plaintext whose exposure is
     // "not widened" beyond A6/A7/A10, and carrying it into a DIFFERENT vault's
     // session is wider than that.

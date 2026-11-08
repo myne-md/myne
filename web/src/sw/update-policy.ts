@@ -23,7 +23,7 @@
 //   1. its hash is **signed** by a release key this client carries; and
 //   2. its hash is **present in the append-only record** of released bundles.
 //      "Public" is the intent and not the state: that record is in a private
-//      repository today (docs/threat-model.md §5, design-notes/security/0534),
+//      repository today (agent-tooling/docs/threat-model.md §5, agent-tooling/design-notes/security/0534),
 //      which matters for the property below, since a record only a first party
 //      can read gives a third party nothing to compare against.
 //
@@ -46,7 +46,7 @@
 // gets for free by being an installed file.** This comment said "as strong as
 // desktop's TB7" until 2026-08-25, which reads as a signature comparison and is
 // not one in either direction: no desktop artifact carries a signature any OS
-// checks (docs/threat-model.md TB7, A9), so the two channels are alike in
+// checks (agent-tooling/docs/threat-model.md TB7, A9), so the two channels are alike in
 // persistence rather than in verification.
 
 /** A release public key this client trusts, as it appears in the bundle. */

@@ -6,7 +6,7 @@
 // The two properties that are NOT cosmetic:
 //
 //   1. **The figures are not on the line.** They are the compensating control
-//      `design-notes/ai/0515` names for the remote arm having no volume bound,
+//      `agent-tooling/design-notes/ai/0515` names for the remote arm having no volume bound,
 //      so they must be REACHABLE, a `<button>` with `aria-expanded`, not a
 //      hover affordance, and the test asserts the disclosure is a real button
 //      rather than that some div exists.
@@ -134,7 +134,7 @@ describe("AgentFootprint", () => {
   });
 
   it("shows the figures ON the line while the run works", async () => {
-    // **The running scope total is shown continuously** (design-notes/ai/0515,
+    // **The running scope total is shown continuously** (agent-tooling/design-notes/ai/0515,
     // and the threat-model bullet this phase edits): with no cap on scope growth
     // it is the only bound on accumulation, and the strip this replaced said in
     // as many words that it "does not belong behind a disclosure". Only the

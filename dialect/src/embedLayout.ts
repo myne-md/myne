@@ -377,7 +377,7 @@ export function embedWidthCss(layout: EmbedLayout): string | null {
 
 /**
  * The accessible name for an embed, and whether the author marked it
- * decorative. `docs/spec/wikilink.md` §5.1 is normative and has two clauses:
+ * decorative. `agent-tooling/docs/spec/wikilink.md` §5.1 is normative and has two clauses:
  *
  *  - an authored alt is THE accessible name, so it wins over the filename;
  *  - an authored EMPTY alt (`alt=`) means decorative, which is a different

@@ -2,7 +2,7 @@
 //! The agent's setting intents (myne-md/myne#850).
 //!
 //! The agent may change a **closed set of named settings**, not preferences in
-//! general. `design-notes/ai/0515` states the principle for note writes and it
+//! general. `agent-tooling/design-notes/ai/0515` states the principle for note writes and it
 //! carries over unchanged: the verb set is the permission. This module is where
 //! that set lives, where a value is validated, and where a field the agent may not
 //! write is refused.
@@ -324,7 +324,7 @@ pub enum SettingRefusal {
     /// exist.
     UnknownIntent,
     /// The field is one of the two egress-control sets, so writing it would let
-    /// the agent move the bound it runs under. `docs/threat-model.md` A17 rests
+    /// the agent move the bound it runs under. `agent-tooling/docs/threat-model.md` A17 rests
     /// its remote-provider mitigation on `ai_excluded_folders`.
     EgressControl,
     /// The field describes this device rather than the vault.

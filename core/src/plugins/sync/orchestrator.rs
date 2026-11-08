@@ -1876,8 +1876,8 @@ struct PrefsPhase {
 /// **Why these two and not "device-local fields".** `ai_provider_consent` is
 /// device-local, and a device that inherited a consent it never gave would begin
 /// sending this vault's note text to a named remote provider with nobody at that
-/// device having seen the consent screen. `docs/spec/sync-protocol.md` §10.2.1
-/// and `docs/threat-model.md` TB13 both name this seed path as one of the two
+/// device having seen the consent screen. `agent-tooling/docs/spec/sync-protocol.md` §10.2.1
+/// and `agent-tooling/docs/threat-model.md` TB13 both name this seed path as one of the two
 /// that had to close for the per-device claim to hold. `ai_enabled` goes with it
 /// because it is the other half of the same gate: inherited "AI is on", plus an
 /// inherited consent, plus the key (which still syncs), is a device fully
@@ -1972,7 +1972,7 @@ async fn sync_prefs_phase(
                 // has to ask for. A CONSENT is not a convenience. Inheriting it
                 // means a device begins sending note plaintext to a third party
                 // with nobody at that device having seen the screen that says
-                // so, which is exactly what `docs/threat-model.md` TB13 names
+                // so, which is exactly what `agent-tooling/docs/threat-model.md` TB13 names
                 // as the crossing condition.
                 //
                 // Reclassifying the field to `DeviceLocal` (entry 0559) was
@@ -3599,7 +3599,7 @@ fn parse_dictionary_payload(
 ///    (`SubkeyRole::PersonalDictKey`), like prefs/search/themes: the phase does
 ///    not ride the group tier for its KEK. Its sync id DOES route through
 ///    [`shared_sync_id`], so an `NTV6` member addresses the same blob under the
-///    group key; the decision entry (`design-notes/protocol/`) states the
+///    group key; the decision entry (`agent-tooling/design-notes/protocol/`) states the
 ///    member consequence (one shared vault dictionary).
 /// 2. **An EXISTING but unreadable local blob is a REFUSAL, not an empty
 ///    dictionary** (myne#255). The prefs phase answers a local decode failure
@@ -5491,7 +5491,7 @@ async fn sync_cycle_attempt(
     let bindings_id = device_bindings_sync_id(shared);
     // The chats / agent-memory / agent-personality catalogs are ROOT-derived, not
     // group-derived, and are therefore `None` on a member (which holds no
-    // `root_key`). `design-notes/protocol/0609` states it: those three families
+    // `root_key`). `agent-tooling/design-notes/protocol/0609` states it: those three families
     // are person-private (the `MYY5` plane, 0608) and "have no group role", which
     // is why `member_removal::group_rotation_reclaim_sync_ids` lists only the
     // catalog / prefs / themes ids it rotates. Routing them through

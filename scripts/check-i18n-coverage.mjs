@@ -9,7 +9,7 @@
 // meantime. The cost of that design is that translation coverage can fall for
 // weeks with every gate in the tree green. It did: myne-md/myne#589 found the
 // same 215 keys missing from all 31 catalogs, while `PRODUCT.md` said the
-// locale set was "all of them complete" and `docs/dev/i18n.md` said "All 31
+// locale set was "all of them complete" and `agent-tooling/docs/dev/i18n.md` said "All 31
 // non-English catalogs are at 100%". Nothing contradicted either sentence,
 // because nothing measured it.
 //
@@ -27,7 +27,7 @@
 //      `SUPPORTED_LANGUAGES` (`src/i18n/config.ts`) is what the picker offers,
 //      `locales/<code>/common.json` is what the bundler can load, and
 //      `i18next.config.js` is what `pnpm i18n:extract` writes new keys into.
-//      `docs/dev/i18n.md` documents adding a language as an edit to all three,
+//      `agent-tooling/docs/dev/i18n.md` documents adding a language as an edit to all three,
 //      by hand, and each omission fails silently in its own way: a picker entry
 //      with no catalog renders a fully English UI (the glob loads by PATH, so
 //      nothing throws); a catalog nobody offers is a chunk no user can reach;
@@ -77,11 +77,16 @@
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
 
 export const CONFIG_PATH = "src/i18n/config.ts";
 export const EXTRACTOR_PATH = "i18next.config.js";
 export const LOCALES_DIR = "locales";
-export const RECORD_PATH = "docs/dev/i18n-coverage.md";
+export const RECORD_PATH = docsPath("dev", "i18n-coverage.md");
+if (!docsPresent() && !process.argv.includes("--emit")) {
+  console.log(`note: ${DOCS_ABSENT}`);
+  process.exit(0);
+}
 export const NAMESPACE = "common.json";
 const SOURCE_LOCALE = "en";
 
@@ -275,7 +280,7 @@ export function analyse(io) {
     //
     // Deliberately NOT caught: a category BEYOND CLDR that some groups carry
     // and others do not. The six locales `id ja ko th vi zh` carry English's
-    // `one` where CLDR gives them only `other` (design-notes/storage/0411).
+    // `one` where CLDR gives them only `other` (agent-tooling/design-notes/storage/0411).
     // That is dead weight rather than a defect, because `Intl.PluralRules("ja")`
     // never returns `one`, so no user reaches the missing slot.
     const required = cldrCategories(code);
@@ -440,7 +445,7 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
     "# Translation coverage",
     "",
     "How much of the English source each shipped catalog actually answers, measured",
-    "rather than asserted. `PRODUCT.md` and `docs/dev/i18n.md` point here instead of",
+    "rather than asserted. `PRODUCT.md` and `agent-tooling/docs/dev/i18n.md` point here instead of",
     "carrying a figure of their own, because a number written into prose is a number",
     "that stops being true without anything reporting it (myne-md/myne#589).",
     "",
@@ -477,7 +482,7 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
     "mid-sentence. A category beyond CLDR is carried but never required, since no",
     "count can select it" +
       (beyondCldr.length
-        ? ` (${beyondCldr.join(" ")} carry English's \`one\` that way, the shipped convention recorded in \`design-notes/storage/0411\`).`
+        ? ` (${beyondCldr.join(" ")} carry English's \`one\` that way, the shipped convention recorded in \`agent-tooling/design-notes/storage/0411\`).`
         : "."),
     "",
   ].join("\n");
@@ -486,7 +491,9 @@ function renderRecord({ rows, enKeyCount, overall, complete, totalPossible }) {
 function diskIo(repo) {
   return {
     readFile: (rel) => {
-      const abs = join(repo, rel);
+      // `resolve`, not `join`: the record lives in the agent-tooling companion and reaches this
+      // function as an absolute path, which `join` would silently re-root inside the repo.
+      const abs = resolve(repo, rel);
       return existsSync(abs) ? readFileSync(abs, "utf8") : null;
     },
     exists: (rel) => existsSync(join(repo, rel)),
@@ -560,7 +567,7 @@ export function gate(io, argv = []) {
 if (process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url))) {
   const repo = join(dirname(fileURLToPath(import.meta.url)), "..");
   const { exitCode, emit, out, err } = gate(diskIo(repo), process.argv.slice(2));
-  if (emit !== null) writeFileSync(join(repo, RECORD_PATH), emit);
+  if (emit !== null) writeFileSync(resolve(repo, RECORD_PATH), emit);
   for (const line of out) console.log(line);
   for (const line of err) console.error(line);
   process.exit(exitCode);

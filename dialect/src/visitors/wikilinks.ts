@@ -1,4 +1,4 @@
-// Spec: docs/spec/wikilink.md §2, docs/spec/markdown-dialect.md §3.5.
+// Spec: agent-tooling/docs/spec/wikilink.md §2, agent-tooling/docs/spec/markdown-dialect.md §3.5.
 
 import type { SyntaxNode, Tree } from "@lezer/common";
 import { parser } from "../lezer/parser";

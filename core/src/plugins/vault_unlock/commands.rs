@@ -6486,7 +6486,7 @@ mod tests {
         // The forbidden fallback, asserted directly rather than assumed absent.
         // A plaintext write on either path would look identical on screen (the
         // row shows the name) while voiding the cryptographic-erase guarantee
-        // and making the `docs/threat-model.md` § 7 paragraph false. The walk
+        // and making the `agent-tooling/docs/threat-model.md` § 7 paragraph false. The walk
         // covers the whole scratch device rather than the one file we expected
         // to be wrong.
         rt().block_on(async {

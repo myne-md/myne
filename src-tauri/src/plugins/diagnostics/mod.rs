@@ -4,7 +4,7 @@
 //!
 //! Desktop-only by construction. The web build installs no `tracing`
 //! subscriber and compiles everything below `warn` out of the bundle
-//! (`design-notes/ops/0366`), so there is no log for it to write and no
+//! (`agent-tooling/design-notes/ops/0366`), so there is no log for it to write and no
 //! folder for it to reveal; both other clients carry `Unsupported` verdicts in
 //! `web/wasm/src/capability.rs`.
 //!

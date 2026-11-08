@@ -1,7 +1,7 @@
 # Mobile-sync test confidence — work-division map + honest gaps
 
 > Where each sync layer is actually tested, and where it is not. The companion to the
-> `design-notes.md` 2026-07-07 "device-level UI E2E exemption (SYNC-44)" entry: that entry grants
+> `agent-tooling/design-notes.md` 2026-07-07 "device-level UI E2E exemption (SYNC-44)" entry: that entry grants
 > the exemption, this doc shows the compensating coverage honestly, layer by layer. Mobile *test*
 > protocols live here, not in `operations` (SYNC-27).
 >

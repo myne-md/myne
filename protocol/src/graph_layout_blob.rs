@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.graph` 34-byte-header encrypted knowledge-graph-layout codec —
-//! see `docs/spec/protocol.md` § 9.19.
+//! see `agent-tooling/docs/spec/protocol.md` § 9.19.
 //!
 //! `vault.graph` is a vault-level singleton **rebuildable cache** holding the
 //! knowledge-graph view's laid-out node positions (id → x/y) plus a staleness

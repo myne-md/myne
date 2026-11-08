@@ -1,7 +1,7 @@
 // AI UX-surface flow suite (ai-ux-surface MYND-408 task 7). Drives the AI
 // settings panel + the right-sidebar AI Chat tab on the real tauri-driver
 // harness, against the **`local-inference-stub` build variant** — gated on
-// `MYNE_E2E_AI=1` (see `docs/dev/e2e.md`).
+// `MYNE_E2E_AI=1` (see `agent-tooling/docs/dev/e2e.md`).
 //
 // AI now ships in the DEFAULT build (decisions.md 2026-07-02), so the AI panel +
 // commands DO exist in the production bundle; the pure-UI surface (Labs group,
@@ -141,7 +141,7 @@ aiDescribe("aux1 AI settings surface + right-sidebar AI Chat tab (ai-ux-surface)
 });
 
 describeE2E("aux2 the excluded-folders picker writes the list the AI honors", () => {
-  // myne-md/myne#848. The list is the control `docs/threat-model.md` A17 rests its
+  // myne-md/myne#848. The list is the control `agent-tooling/docs/threat-model.md` A17 rests its
   // remote-provider mitigation on, and it gained a picker: the box stays the
   // authority (a pasted list still works, and an egress control must not require
   // a picker), while the common case stops being a hand-typed path that does not

@@ -24,7 +24,7 @@
  * - `"Recovering"`, A8d (`vault_recover_with_phrase`) succeeded
  *   and the user has not yet committed a new master password via
  *   `vault_complete_recovery` (A8f). Per
- *   `docs/spec/recovery-flow.md` § 4.1, the password-reset form is
+ *   `agent-tooling/docs/spec/recovery-flow.md` § 4.1, the password-reset form is
  *   non-dismissible from this state. Frontend routes to the
  *   password-reset form.
  * - `"Unlocked"`, vault is fully unlocked. Frontend routes to the
@@ -53,7 +53,7 @@
  * `Ok(())` from `vault_complete_recovery` as the success signal,
  * frontend (B4b) navigates directly to the editor route on success
  * without a defensive `vault_slot_kind` round-trip. Adding such a
- * round-trip would be paranoia per `design-notes.md` 2026-05-02
+ * round-trip would be paranoia per `agent-tooling/design-notes.md` 2026-05-02
  * (the IPC contract pins `Slot::Unlocked` as the success
  * postcondition).
  */

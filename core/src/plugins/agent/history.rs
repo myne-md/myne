@@ -15,7 +15,7 @@
 //!
 //! What does NOT travel: tool results, note bodies, anchors and replacements.
 //! Those live in the run store, which every vault-leaving path clears
-//! (`design-notes/ai/0518`), and re-sending a note body the model already has
+//! (`agent-tooling/design-notes/ai/0518`), and re-sending a note body the model already has
 //! in this run's own transcript would pay for it twice.
 //!
 //! ## The budget is a character count, not a turn count
@@ -125,7 +125,7 @@ pub const DEFAULT_HISTORY_BUDGET: usize = 3000;
 ///
 /// Four times the default and about 2.3x a measured request's own input. The
 /// bound exists because there is no per-run volume cap anywhere else: TB13 and
-/// `design-notes/ai/0515` both record that absence, and an unbounded setting
+/// `agent-tooling/design-notes/ai/0515` both record that absence, and an unbounded setting
 /// would make one run's off-device volume open-ended.
 pub const MAX_HISTORY_BUDGET: usize = 12_000;
 
@@ -134,7 +134,7 @@ pub const MAX_HISTORY_BUDGET: usize = 12_000;
 /// `None` (the user never touched the setting) is the default; a stored value
 /// is clamped again here even though the setter clamps at the write, because a
 /// setter-side clamp holds while every writer clamps and this holds whoever
-/// wrote the value (`design-notes/ai/0553` records the distinction against
+/// wrote the value (`agent-tooling/design-notes/ai/0553` records the distinction against
 /// `auto_lock_seconds`, which resolves on every read). Read at run start, not
 /// per iteration: the seed is built once and re-sent verbatim.
 pub fn history_budget(view: &protocol::PrefsView) -> usize {
@@ -147,7 +147,7 @@ pub fn history_budget(view: &protocol::PrefsView) -> usize {
 ///
 /// **This is the `SeedContext` half of myne-md/myne#648, and the name it carries
 /// here is what it is rather than what it was.** The 2026-08-16 merge dropped
-/// the seed's invalidation along with the seed: `design-notes/ai/0553`
+/// the seed's invalidation along with the seed: `agent-tooling/design-notes/ai/0553`
 /// records that changing `ai_excluded_folders` cuts the seed and changing the
 /// provider cuts it too, with a host-side half (a run paused for a scope
 /// approval is a user-length window in which either can move), and none of that
@@ -182,7 +182,7 @@ impl SeedControls {
     /// Pure so the rule is testable without a vault: the one question is
     /// whether either control moved, and a moved control drops the seed
     /// rather than filtering it, because a turn carries text and no note
-    /// provenance (`design-notes/ai/0553`).
+    /// provenance (`agent-tooling/design-notes/ai/0553`).
     pub fn survives(&self, live: &protocol::PrefsView) -> bool {
         *self == SeedControls::from_view(live)
     }
@@ -309,7 +309,7 @@ mod tests {
     #[test]
     fn a_stored_budget_above_the_ceiling_is_clamped_on_read() {
         // The setter clamps at the write; this holds whoever wrote the value
-        // (a blob predating the clamp, a hand-edited one). `design-notes/ai/0553`
+        // (a blob predating the clamp, a hand-edited one). `agent-tooling/design-notes/ai/0553`
         // records the distinction against `auto_lock_seconds`.
         assert_eq!(
             history_budget(&view_with(Some(999_999), vec![], None)),

@@ -71,16 +71,12 @@ coverage/
 # OpenCode configuration. Commands, agents, plugins and skills are shared.
 # Worktrees remain local machine state.
 # `.opencode/` is a PATH now, not a product (decision 0781): OpenCode left this
-# repository and only the worktree root and the dev sync store remain under it.
-# These patterns are the belt for a stale clone that still regenerates the old
-# directories, whose contents came from the private companion and must never be
-# committed here.
-/.opencode/worktrees/
-# The guards extension refuses a worktree anywhere but `.worktrees/<n>-<slug>`,
-# while AGENTS.md and the eight scripts and runbooks around it name
-# `.opencode/worktrees/`. The two have drifted, and only the second path was
-# ignored, so a real worktree read as untracked machine state here. Ignore both
-# until the guard and the prose agree.
+# repository, and what remains under it is the dev sync store and the stale
+# directories a clone from before that cut still regenerates, whose contents came
+# from the private companion and must never be committed here.
+#
+# Worktrees live at `.worktrees/<n>-<slug>` (`myne-guards.ts` refuses any other
+# path), so that is the directory to ignore.
 /.worktrees/
 /.opencode/goals/
 /.opencode/node_modules/

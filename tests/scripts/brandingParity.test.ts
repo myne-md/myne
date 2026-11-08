@@ -49,6 +49,10 @@ function tree(opts: { appSheet?: string | null } = {}): string {
   mkdirSync(join(dir, "client-core", "src"), { recursive: true });
   cpSync(join(REPO_ROOT, GUARD), join(dir, GUARD));
   cpSync(join(REPO_ROOT, TWIN), join(dir, TWIN));
+  // The twins read the documentation tree through one shared module, so the sandbox needs it:
+  // a guard copied without its imports fails to load, and every assertion below would read that
+  // resolution error instead of the guard's own answer.
+  cpSync(join(REPO_ROOT, "scripts", "lib"), join(dir, "scripts", "lib"), { recursive: true });
   if (opts.appSheet !== null) {
     writeFileSync(join(dir, APP_SHEET), opts.appSheet ?? (readFileSync(join(REPO_ROOT, APP_SHEET), "utf8") as string));
   }

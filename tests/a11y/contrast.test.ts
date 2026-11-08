@@ -1,11 +1,11 @@
 // Static WCAG AA contrast verification of the primary design tokens (MYND-93,
 // task 8). The E2E-axe tier (task 7) checks contrast on the live render; this is
 // the fast, deterministic guard at the token SOURCE — it parses the canonical
-// hex values from `docs/design/colors_and_type.css` and asserts every primary
+// hex values from `agent-tooling/docs/design/colors_and_type.css` and asserts every primary
 // text/control pair clears WCAG 2.1 AA (>=4.5:1) in BOTH light and dark.
 //
 // Per the MYND-93 decision, a contrast failure on a primary token is a design-
-// canon bug fixed at the token source — `docs/design/colors_and_type.css`, with
+// canon bug fixed at the token source — `agent-tooling/docs/design/colors_and_type.css`, with
 // `DESIGN.md`/`DESIGN.json` corrected in the same change — never a per-component
 // override. This test makes such a regression fail loudly.
 
@@ -14,7 +14,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const css = readFileSync(
-  fileURLToPath(new URL("../../docs/design/colors_and_type.css", import.meta.url)),
+  fileURLToPath(new URL("../../agent-tooling/docs/design/colors_and_type.css", import.meta.url)),
   "utf8",
 );
 

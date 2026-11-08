@@ -6,7 +6,7 @@
 // so there is no Rust generator). Each case hex-decodes a markdown source and
 // pins (a) whether a `%%…%%` comment is recognized and (b) the canonical
 // strip output (the byte ranges a lossy projection drops). Spec:
-// docs/spec/markdown-dialect.md §3.1 / §3.2 / §3.7.5 / §6.
+// agent-tooling/docs/spec/markdown-dialect.md §3.1 / §3.2 / §3.7.5 / §6.
 
 import * as fs from "node:fs";
 import * as path from "node:path";

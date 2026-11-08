@@ -62,7 +62,7 @@ the dependency is inverted with a trait, exactly as recommended:
 
 ## Device verification (owed before the gate is trusted)
 
-Verify on a **real Android device** (`docs/dev/device-matrix.md`), mirroring the Apple keychain
+Verify on a **real Android device** (`agent-tooling/docs/dev/device-matrix.md`), mirroring the Apple keychain
 checklist:
 
 - share a file into Myne while the vault is **locked** → a `MYF1` blob appears under `sealed/`, no

@@ -16,7 +16,7 @@
 //!
 //! Spec touchpoints:
 //!
-//! - `design-notes.md` 2026-05-15 "Note title write target" (the
+//! - `agent-tooling/design-notes.md` 2026-05-15 "Note title write target" (the
 //!   read-precedence chain whose source slices this function returns).
 //! - `agent-tooling/sessions/grill/2026-05-15-mynd-82-sidebar-autosave.md`
 //!   Q3 (hybrid byte-range design rationale).
@@ -37,7 +37,7 @@ pub struct TitleSlices<'a> {
 
 /// Locate the FM block boundary and the first H1 line.
 ///
-/// FM detection follows `docs/spec/markdown-dialect.md` §3.6
+/// FM detection follows `agent-tooling/docs/spec/markdown-dialect.md` §3.6
 /// "line-1-anchored detection": the source must begin with `"---\n"`,
 /// and the closer is the next line that consists exactly of `"---"`.
 /// An opener without a matching closer is treated as **no

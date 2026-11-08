@@ -3,8 +3,8 @@
 > Native SwiftUI watchOS app + complication + the iPhone-side WatchConnectivity
 > receiver. Committed here, **outside** the git-ignored `src-tauri/gen/apple/`
 > tree, so the sources survive `tauri ios init` (same discipline as
-> `ios-widgets/`). Spec: `docs/spec/protocol.md` §9.18. Scope decision:
-> main-repo `design-notes.md` 2026-07-12. Meeting lane: myne-md/myne#812.
+> `ios-widgets/`). Spec: `agent-tooling/docs/spec/protocol.md` §9.18. Scope decision:
+> main-repo `agent-tooling/design-notes.md` 2026-07-12. Meeting lane: myne-md/myne#812.
 
 ## What this is (and is not)
 

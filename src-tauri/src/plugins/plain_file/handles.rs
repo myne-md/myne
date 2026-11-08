@@ -16,7 +16,7 @@
 //! path exists"; it is that no such path becomes a handle without the host
 //! re-running the gate, the canonicalisation, the `.md`/`.markdown` check and
 //! the size cap (which `resolve_openable` below does). Every other command
-//! takes a handle and never a path. `docs/threat-model.md` §7 states the same
+//! takes a handle and never a path. `agent-tooling/docs/threat-model.md` §7 states the same
 //! invariant.
 //!
 //! **The base hash is the conflict guard.** A read returns the SHA-256 of the

@@ -497,7 +497,7 @@ const ALLOWED_DYNAMIC = new Map([
   // without asserting copy. No user input reaches it and it carries no account
   // value; the row exists on this screen at all because an unregistered identity
   // cannot list invitations, and a count-only row would have rendered nothing
-  // (`design-notes/protocol/0732`, `decisions/ui/0725`).
+  // (`agent-tooling/design-notes/protocol/0732`, `decisions/ui/0725`).
   [
     "data-invites",
     "Which arm of the invitations row is up: `count` / `not-enrolled` / `pending`.",

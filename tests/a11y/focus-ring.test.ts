@@ -18,7 +18,7 @@ const tokensCss = readFileSync(
   "utf8",
 );
 const colorsCss = readFileSync(
-  fileURLToPath(new URL("../../docs/design/colors_and_type.css", import.meta.url)),
+  fileURLToPath(new URL("../../agent-tooling/docs/design/colors_and_type.css", import.meta.url)),
   "utf8",
 );
 

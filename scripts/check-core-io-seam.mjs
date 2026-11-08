@@ -163,7 +163,7 @@ const ALLOWED = new Map([
   ["core/src/vault_sweep.rs", "task 72 (vault delete)"],
 ]);
 
-const SKIP_DIRS = new Set(["target"]);
+const SKIP_DIRS = new Set(["target", ".worktrees"]);
 
 // `std::fs::<op>(`, a bare `fs::<op>(` where the module is imported, and the two
 // handle constructors. Anchored on the call paren so a prose mention in a

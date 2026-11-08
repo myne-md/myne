@@ -477,7 +477,7 @@ pub struct NoteRecord {
     /// **A snapshot taken before this field existed does not load as a complete
     /// index.** The postcard blob is non-self-describing, so the read runs out of
     /// record: at end of input for a one-record snapshot, and inside the next
-    /// record's bytes for a many-record one. `docs/spec/protocol.md` §9.8.2 names
+    /// record's bytes for a many-record one. `agent-tooling/docs/spec/protocol.md` §9.8.2 names
     /// the residual that makes the second case worth pinning rather than
     /// assuming: `from_bytes` performs no trailing-byte check, so a read whose
     /// remaining bytes happen to satisfy the UTF-8 and discriminant checks could

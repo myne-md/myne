@@ -2,7 +2,7 @@
 // `%%…%%` inline + multi-line block, both terminated-only; an unterminated `%%`
 // is inert (no node, stays plain text). Structurally excluded from code /
 // inline-code / wikilink / math-leaf / frontmatter zones. Recognize-only —
-// never mutates bytes. Spec: docs/spec/markdown-dialect.md §3.1 / §3.2 / §3.7.5.
+// never mutates bytes. Spec: agent-tooling/docs/spec/markdown-dialect.md §3.1 / §3.2 / §3.7.5.
 
 import { describe, expect, it } from "vitest";
 import { parser } from "../../src/dialect/lezer/parser";

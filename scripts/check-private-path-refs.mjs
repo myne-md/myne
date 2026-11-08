@@ -4,11 +4,11 @@
 // ── THE FAILURE ──────────────────────────────────────────────────────────────
 //
 // `operations/`, `agent-tooling/` and `internal-service/` are companion repositories that
-// stay private. A path into one of them, written into a `docs/` page or a source
+// stay private. A path into one of them, written into a `agent-tooling/docs/` page or a source
 // header, is a reference a reader who does not have that repository cannot
 // follow, and the reader cannot tell the difference between "this is internal"
 // and "this moved and nobody updated it". The pointer also carries a promise the
-// publication does not keep: `docs/` is CC-BY-4.0 and meant to be reusable by
+// publication does not keep: `agent-tooling/docs/` is CC-BY-4.0 and meant to be reusable by
 // independent implementations, and a third of it currently cites design sessions
 // that are not published at all.
 //
@@ -19,9 +19,9 @@
 //
 // ── WHY A RATCHET, AND WHY THE REASONS ARE CLASSES ───────────────────────────
 //
-// The honest baseline is large: about two hundred and fifty files under `docs/`,
+// The honest baseline is large: about two hundred and fifty files under `agent-tooling/docs/`,
 // nearly all of them dated decision entries citing the grill session, PRD or RFC
-// they came from. `docs/AGENTS.md` makes that log append-only and says never to
+// they came from. `agent-tooling/docs/AGENTS.md` makes that log append-only and says never to
 // rewrite a past entry, and the two rules meet here: the pointer is the entry's
 // provenance, and the artefact it names is internal. So those are recorded, not
 // fixed, and the reason is a CLASS rather than a sentence per file, because two
@@ -46,7 +46,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const RECORD = join(ROOT, "scripts", "private-path-refs.json");
 
 /** The trees that get published. A root that is absent fails by name below. */
-export const SCANNED_ROOTS = ["docs", "src", "mobile/src"];
+export const SCANNED_ROOTS = ["src", "mobile/src"];
 
 /** Extensions whose bytes can carry a reader-facing path. */
 export const SCANNED_EXTENSIONS = new Set([
@@ -88,8 +88,8 @@ export function refsInText(text) {
 export const CLASSES = Object.freeze({
   "append-only-record": {
     reason:
-      "A file under design-notes/, the append-only log. The entry cites the grill session, PRD or RFC it " +
-      "came from, and docs/AGENTS.md forbids rewriting a past entry, so the pointer is that entry's " +
+      "A file under agent-tooling/design-notes/, the append-only log. The entry cites the grill session, PRD or RFC it " +
+      "came from, and agent-tooling/docs/AGENTS.md forbids rewriting a past entry, so the pointer is that entry's " +
       "provenance. The cited artefact is internal; the durable public record is the entry itself.",
     fix:
       "Nothing. This one is permanent by rule. If a NEW one appears, the entry should cite the decision " +
@@ -97,12 +97,12 @@ export const CLASSES = Object.freeze({
   },
   "living-document": {
     reason:
-      "Debt. A living file (docs/dev, docs/spec, a source header) that points at an internal artefact " +
+      "Debt. A living file (agent-tooling/docs/dev, agent-tooling/docs/spec, a source header) that points at an internal artefact " +
       "without being a historical record, so the pointer is supposed to be fixable: inline the substance, " +
       "or point at the public copy. Recorded so the set can only shrink.",
     fix:
       "Fix it: replace the path with the thing it was standing in for, or point at a published equivalent " +
-      "(a design-notes entry, the user guide on myne.md).",
+      "(a agent-tooling/design-notes entry, the user guide on myne.md).",
   },
 });
 
@@ -127,7 +127,7 @@ export function walkRoot(root, dir, readDir = readdirSync, read = (p) => readFil
         continue;
       }
       const ext = extname(name).toLowerCase();
-      // No extension is treated as prose: `docs/LICENSE` is a text file, and a
+      // No extension is treated as prose: `agent-tooling/docs/LICENSE` is a text file, and a
       // rule that skipped it would be a rule with a hole shaped like a licence.
       if (ext && ext in IGNORED_EXTENSIONS) continue;
       if (ext && !SCANNED_EXTENSIONS.has(ext)) {
@@ -170,7 +170,7 @@ export function scan(base = ROOT) {
 
 /** Group the hits into the classes, for the roster and for the report. */
 export function classOf(docPath) {
-  return docPath.startsWith("design-notes/") ? "append-only-record" : "living-document";
+  return docPath.startsWith("agent-tooling/design-notes/") ? "append-only-record" : "living-document";
 }
 
 function readRecord(path = RECORD) {
@@ -208,7 +208,7 @@ function main() {
   // three scanned roots are resolved from `<dir>` and the record is read and
   // written at `<dir>/private-path-refs.json`. It exists because a guard test
   // that needs a file the record does not list had to write it into the REAL
-  // `docs/` tree, and a sibling test file in a parallel worker then scanned that
+  // `agent-tooling/docs/` tree, and a sibling test file in a parallel worker then scanned that
   // tree mid-probe: vitest runs files in parallel workers, so `pnpm test` went red
   // on a pairing nobody chose, which is the failure `check-e2e-menu-testids.mjs`
   // records as myne-md/myne#242 and fixes the same way (`--scan <dir>`).

@@ -26,7 +26,7 @@ housekeeping one.
 | `locales/` (i18n catalogues) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `scripts/`, `tests/`, `e2e/`, `e2e-web/` (repo guards, specs, the E2E lanes) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
 | `packaging/` (Arch PKGBUILDs and the `.desktop` entry) | **AGPL-3.0** | [`LICENSE`](LICENSE) |
-| `docs/` (specifications, threat model) | **CC-BY-4.0** | [`docs/LICENSE`](docs/LICENSE) |
+| the specification tree (specifications, threat model, design canon) | **CC-BY-4.0** | not redistributed from this repository: it lives in the private `agent-tooling` companion, and CC-BY-4.0 is the licence it carries there |
 | `public/fonts/` (the two bundled webfonts) | **SIL OFL-1.1** | [`public/fonts/LICENSE.txt`](public/fonts/LICENSE.txt) |
 | `src-tauri/resources/dictionaries/**`, `src-tauri/resources/models/**` (bundled third-party data) | **per asset** | each dictionary's own `<lang>/license`; the models are listed under "Bundled third-party assets" below |
 
@@ -48,13 +48,16 @@ around it either. There is no SPDX header form for Markdown, JSON or CSS; a
 non-Rust file takes its licence from its subtree, which is what the table above
 is for.
 
-The specification subtree (`docs/`) is licensed under the **Creative Commons
-Attribution 4.0 International** license (CC-BY-4.0) so that independent
-implementations may reuse the protocol and on-disk format, provided Myne is
-credited.
+The specification tree is licensed under the **Creative Commons Attribution 4.0 International**
+license (CC-BY-4.0) so that independent implementations may reuse the protocol and on-disk format,
+provided Myne is credited. It is no longer published from this repository: the specifications, the
+threat model, the design canon and the decision log moved into the private `agent-tooling` companion,
+and every path in this repository that names one of them (`docs/spec/protocol.md`,
+`docs/threat-model.md`, `decisions/protocol/0763`) is an identifier rather than a path here. The
+licence still governs what those documents say; nothing in it depended on their being public.
 
 `web/` is AGPL-3.0 for a reason worth stating: the web client is served rather
-than installed, and the [threat model](docs/threat-model.md)'s only mitigation
+than installed, and the [threat model](agent-tooling/docs/threat-model.md)'s only mitigation
 for that (A15 / TB11) is that a user can build and serve their **own** bundle
 and stop being downstream of anyone else's. That is a licence promise as much as
 a technical one. Self-hostable "in practice and not just in principle" requires
@@ -70,7 +73,7 @@ licensed (each carries its own `LICENSE`):
 | Repo | License |
 |---|---|
 | `myne-server`, `myne-clipper` | AGPL-3.0 |
-| `myne-web` | AGPL-3.0: **archived**; the web client is the in-repo `web/` subtree above (`design-notes.md` 2026-07-26) |
+| `myne-web` | AGPL-3.0: **archived**; the web client is the in-repo `web/` subtree above (`agent-tooling/design-notes.md` 2026-07-26) |
 | `myne-test-vectors` | CC-BY-4.0 |
 | `myne-website` | MIT |
 | `myne-themes` | by subtree: CC-BY-4.0 (themes) / AGPL-3.0 (tooling) |
@@ -157,7 +160,7 @@ Because the modification is Myne's, **Apache-2.0 §4 attaches to it**, and is
 discharged the same way as before: the Apache-2.0 text ships beside the model as
 `MODEL-LICENSE`, attribution to the Qwen2.5 upstream is retained, and the
 modification is stated here, in the model's `README.md`, and in
-`design-notes.md`. (The previous wording described redistributing Qwen's
+`agent-tooling/design-notes.md`. (The previous wording described redistributing Qwen's
 unmodified first-party file, which stopped being true when the tensor was
 dropped.) Unlike transcription, this model has
 **no user-override picker**, so no third-party file can take its place and there
@@ -176,7 +179,7 @@ the tag and whisper weights even though nothing in its binary can load them. Thi
 pre-existing drift, not something the 2026-08-09 provider work introduced; the
 resource-gating mechanism that would make the original sentence true is owed by
 myne-md/myne#190.
-(`design-notes.md` 2026-07-31.)
+(`agent-tooling/design-notes.md` 2026-07-31.)
 
 ## Store listing graphics
 

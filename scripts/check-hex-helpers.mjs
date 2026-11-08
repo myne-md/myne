@@ -122,7 +122,7 @@ const SKIP_DIRS = new Set([
   // of the e2e fixture-gen crate. Scanning it would record debt in a checkout
   // this guard does not own.
   "internal-service",
-  // This repository puts its git worktrees under `.opencode/worktrees/<name>`
+  // This repository puts its git worktrees under `.worktrees/<name>`
   // (root AGENTS.md, "Worktrees"), so a SIBLING CHECKOUT sits inside the tree
   // this guard walks. Without this line, any Rust change in the main repo while
   // another session has a worktree open fails here, naming that session's
@@ -131,8 +131,7 @@ const SKIP_DIRS = new Set([
   // tree it was run in. Found by this guard firing on a sibling worktree during
   // Aşama 3's R1.2; `.opencode/` holds agent configuration and worktrees, never
   // source.
-  ".opencode",
-]);
+  ".opencode", ".worktrees"]);
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {

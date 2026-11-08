@@ -4,7 +4,7 @@
 //! A Unix domain socket on macOS/Linux, owner-only (0600) — the exact
 //! posture `clipper::relay`'s socket already uses for the same reason: local
 //! only (unreachable over the network), and readable/connectable only by
-//! processes running as the SAME OS user (`docs/threat-model.md` §7's
+//! processes running as the SAME OS user (`agent-tooling/docs/threat-model.md` §7's
 //! accepted residual is scoped to "the same user", not "anyone").
 //!
 //! **Windows named-pipe bind is a documented seam, not implemented here** —

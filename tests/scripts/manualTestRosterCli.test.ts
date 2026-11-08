@@ -20,13 +20,13 @@
 //
 // THE MUTATIONS GO INTO A SANDBOX, and that is a correctness fix rather than
 // tidiness. They used to land in the real tree (`src/screens/Zz*.tsx`,
-// `docs/dev/.manual-test-roster.probe`, the ratchet, the projection) and be
+// `agent-tooling/docs/dev/.manual-test-roster.probe`, the ratchet, the projection) and be
 // restored in a `finally`. Vitest runs files in parallel workers, so for as long
 // as a probe existed, a sibling test reading the real tree failed on a pairing
 // nobody chose. Measured by creating the probe by hand: `webScreens.test.ts` went
 // red with `expected 1 to be +0` (it copies the real `src/screens` and asks
 // whether every screen has a web verdict), and `privatePathRefs.test.ts` with
-// `docs/dev/.manual-test-roster.probe` named as an unclassified extension.
+// `agent-tooling/docs/dev/.manual-test-roster.probe` named as an unclassified extension.
 // `check-e2e-menu-testids.mjs` records the same failure as myne-md/myne#242 and
 // fixes it with a `--scan <dir>` seam; this file uses the three seams `main()`
 // now takes (`--scan`, `--ratchet`, `--projection`).
@@ -45,7 +45,7 @@ import { describe, expect, it } from "vitest";
 const ROOT = new URL("../../", import.meta.url).pathname;
 const SCRIPT = join(ROOT, "scripts/check-manual-test-roster.mjs");
 const RATCHET = join(ROOT, "scripts/manual-test-ratchet.json");
-const PROJECTION = join(ROOT, "docs/dev/manual-test-roster.md");
+const PROJECTION = join(ROOT, "agent-tooling/docs/dev/manual-test-roster.md");
 
 function run(args: string[] = []): { code: number; out: string } {
   try {

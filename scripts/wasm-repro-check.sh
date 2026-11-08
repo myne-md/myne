@@ -19,7 +19,7 @@
 # built on two host architectures emits a different wasm. Both builds here run on
 # one runner, so this gate is silent about it by construction. The published hash
 # is therefore defined against a reference build environment rather than against
-# every host; `docs/web-bundle-hashes.md` "Why the build host is part of the hash"
+# every host; `agent-tooling/docs/web-bundle-hashes.md` "Why the build host is part of the hash"
 # is the full reasoning, and `scripts/build-wasm.sh`'s header carries the same
 # note beside the local `--verify`.
 #

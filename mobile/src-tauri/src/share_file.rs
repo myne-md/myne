@@ -63,7 +63,7 @@
 //! ## Verification status
 //!
 //! The iOS body compiles against `aarch64-apple-ios-sim` but, like
-//! `pdf_export.rs`, is device-verified via `docs/dev/device-matrix.md`, not in
+//! `pdf_export.rs`, is device-verified via `agent-tooling/docs/dev/device-matrix.md`, not in
 //! this change. It follows the `ios_chrome.rs` / `pdf_export.rs` raw-`msg_send!`
 //! idiom and is defensively null-guarded — every failed lookup early-returns to a
 //! no-op, never a panic. The Android half is the same bar, one step further from

@@ -6,12 +6,12 @@
 //! vault. State (e.g. in-flight vault-creation sessions) lives in callers,
 //! not here — the crate is composed of pure functions and value types.
 //!
-//! The protocol specification lives at `docs/spec/protocol.md` (in the main
+//! The protocol specification lives at `agent-tooling/docs/spec/protocol.md` (in the main
 //! `myne` repository). Each `pub` function carries a doc comment naming its
 //! protocol section so reviewers can walk spec → code by following imports.
 //!
 //! Library choice (`hkdf`, `argon2`, `chacha20poly1305`, `sha2`, `zeroize`,
-//! `getrandom`, `bip39`) is recorded in `design-notes.md`
+//! `getrandom`, `bip39`) is recorded in `agent-tooling/design-notes.md`
 //! "2026-04-28 — Rust-side primitives: RustCrypto stack as primary".
 
 #![no_std]
@@ -30,7 +30,7 @@
 extern crate alloc;
 
 /// Per-note plaintext upper bound, inclusive (`16 MiB`). The per-note
-/// `.myn` blob's `ciphertext_len` field (`docs/spec/protocol.md` § 9.2,
+/// `.myn` blob's `ciphertext_len` field (`agent-tooling/docs/spec/protocol.md` § 9.2,
 /// 4-byte big-endian at offset 72+N) is capped at
 /// `MAX_PLAINTEXT_LEN + 32` — the trailing `+ 32` is the CTX commitment
 /// tag that follows the ciphertext.
@@ -45,8 +45,8 @@ extern crate alloc;
 /// before any AEAD verification could fire (the CTX commitment check
 /// is post-allocation by construction).
 ///
-/// Pinned by `design-notes.md` 2026-05-06 entry; spec amendment in
-/// `docs/spec/protocol.md` § 9.2 (SHOULD-tone). Larger payloads belong
+/// Pinned by `agent-tooling/design-notes.md` 2026-05-06 entry; spec amendment in
+/// `agent-tooling/docs/spec/protocol.md` § 9.2 (SHOULD-tone). Larger payloads belong
 /// to the Phase 1.5+ attachment subsystem (spec § 11).
 pub const MAX_PLAINTEXT_LEN: usize = 16 * 1024 * 1024;
 
@@ -108,7 +108,7 @@ pub mod vault_meta_ntv7;
 pub mod vault_meta_ntv8;
 pub mod vault_meta_v0_2;
 /// The `.myneview` view manifest: one `SavedView` read STRICTLY, for the import
-/// path only (`view-manifests`; `docs/spec/protocol.md` §9.5.2).
+/// path only (`view-manifests`; `agent-tooling/docs/spec/protocol.md` §9.5.2).
 pub mod view_manifest;
 pub mod workspace_blob;
 

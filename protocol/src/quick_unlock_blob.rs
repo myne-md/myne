@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.quickunlock` 50-byte-header encrypted quick-unlock credential codec
-//! (MYND-329; `docs/spec/protocol.md` § 9.14).
+//! (MYND-329; `agent-tooling/docs/spec/protocol.md` § 9.14).
 //!
 //! `vault.quickunlock` is a **device-local credential** holding a **third
 //! wrapped copy of `root_key`** — the realization of the § 3.1 forward-look
@@ -15,7 +15,7 @@
 //! Unlike every other § 9 blob, the wrap key is **NOT** a
 //! `DeriveSubkey(root_key, …)` subkey — that would be circular, since the blob
 //! *is* what protects `root_key`. The 32-byte `wrap_key` is supplied by an
-//! external [wrap-key provider](../../docs/spec/protocol.md) (macOS Keychain
+//! external [wrap-key provider](../../agent-tooling/docs/spec/protocol.md) (macOS Keychain
 //! biometric secret, or a PIN run through the vault's Argon2id parameters); the
 //! codec is **provider-agnostic** — it only ever sees a symmetric `wrap_key`.
 //!

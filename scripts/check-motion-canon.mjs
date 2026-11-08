@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Guard: the motion canon, mechanised (epic myne-md/myne#772; the normative
-// statement is `PRODUCT.md` principle 4 + `design-notes/ui/0632`).
+// statement is `PRODUCT.md` principle 4 + `agent-tooling/design-notes/ui/0632`).
 //
 // The failure this prevents: `0615` splits motion into a restrained default and
 // an opt-in expressive tier, and a split held by intention alone regresses to
@@ -184,7 +184,7 @@ const RAF_LOOP_ALLOWLIST = new Map([
   [
     "editor/src/host/notes/GraphCanvas.tsx",
     "The knowledge-graph force simulation. It runs while the layout is settling and stops " +
-      "itself when it does (design-notes/ui/0600) — a bounded computation being drawn, " +
+      "itself when it does (agent-tooling/design-notes/ui/0600) — a bounded computation being drawn, " +
       "not an animation being looped.",
   ],
 ]);
@@ -588,7 +588,7 @@ for (const root of present) {
               `${d[0]} exceeds the 300ms UI ceiling. If this is a large surface or a ` +
               "shared-element travel, use `var(--duration-slower)` (380ms) — it is a " +
               "token so that reaching for it is a visible act. Anything longer needs a " +
-              "reason in `design-notes/ui/`.",
+              "reason in `agent-tooling/design-notes/ui/`.",
             line: lineOf(src, m.index),
           });
         }
@@ -637,7 +637,7 @@ for (const root of present) {
           "If it reports work in flight, or stops itself when a bounded computation or a " +
           "gesture ends, add it to RAF_LOOP_ALLOWLIST with the reason — and make sure it " +
           "pauses on document.hidden and off-screen and does not loop under " +
-          "prefers-reduced-motion (design-notes/ui/0632).",
+          "prefers-reduced-motion (agent-tooling/design-notes/ui/0632).",
         line: lineOf(src, m.index),
       });
     }
@@ -835,7 +835,7 @@ if (findings.length > 0) {
     console.error(`      ${f.detail}\n`);
   }
   console.error(
-    "  Normative: PRODUCT.md principle 4 and design-notes/ui/0632.\n" +
+    "  Normative: PRODUCT.md principle 4 and agent-tooling/design-notes/ui/0632.\n" +
       "  These are not style preferences; each one is a defect a user can feel.\n",
   );
   process.exit(1);

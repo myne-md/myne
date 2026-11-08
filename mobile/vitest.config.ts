@@ -130,7 +130,7 @@ export default defineConfig({
       { find: /^@myne\/agent-store$/, replacement: sib("../src/notes/agent/agentStore.ts") },
       { find: /^@myne\/agent-run-core$/, replacement: sib("../src/lib/agent-run-core.ts") },
       // The three-figure cost line, shared rather than re-worded. Its own module
-      // comment is the reason: `design-notes/ai/0515` records this sentence as
+      // comment is the reason: `agent-tooling/design-notes/ai/0515` records this sentence as
       // the compensating control for the remote arm having no volume bound, and
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.

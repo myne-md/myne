@@ -8,7 +8,7 @@
 //! both in 9 pt base-14 Helvetica, muted gray. The footer carries
 //! **user content only** (the note's own title + page numbers) — it is
 //! explicitly NOT branding; the no-watermark posture
-//! (`design-notes.md` 2026-06-11 PDF-pipeline entry) is about
+//! (`agent-tooling/design-notes.md` 2026-06-11 PDF-pipeline entry) is about
 //! Myne-identifying marks, and none appear here (resource names are
 //! neutral `FtrN`).
 //!

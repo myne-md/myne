@@ -2,9 +2,9 @@
 // Every feature surface carries a pre-release manual-test verdict, and no verdict
 // outlives the files it describes.
 //
-// HAND-RUNNABLE ONLY since myne-md/myne#996 (`design-notes/process/0780`): it
+// HAND-RUNNABLE ONLY since myne-md/myne#996 (`agent-tooling/design-notes/process/0780`): it
 // left `pre-commit` and CI, so nothing fails a change for a missing or stale entry.
-// It still checks the roster and still regenerates `docs/dev/manual-test-roster.md`,
+// It still checks the roster and still regenerates `agent-tooling/docs/dev/manual-test-roster.md`,
 // and `/release` still generates the manual half from it. An entry is worth writing
 // for the release it gates, not for a commit.
 //
@@ -19,8 +19,8 @@
 // So macOS desktop, Windows desktop, Safari, iOS and
 // Android have ZERO automated UI coverage, and until this roster existed nothing
 // in the tree stated that. Seven manual procedure documents did exist
-// (`docs/dev/accessibility-checklist.md`, `docs/dev/tor-verification.md`,
-// `docs/dev/clipboard-sensitivity-verification.md`, `docs/dev/clipper-testing.md`,
+// (`agent-tooling/docs/dev/accessibility-checklist.md`, `agent-tooling/docs/dev/tor-verification.md`,
+// `agent-tooling/docs/dev/clipboard-sensitivity-verification.md`, `agent-tooling/docs/dev/clipper-testing.md`,
 // `mobile/docs/dev/device-matrix.md`, `mobile/docs/dev/reminders-device-checklist.md`,
 // `mobile/docs/dev/sync-test-confidence.md`) and only THREE were reachable from
 // the release flow at all. Measured rather than assumed, against every reference
@@ -82,6 +82,7 @@ import { fileURLToPath } from "node:url";
 
 import { presentSharedRoots } from "./lib/shared-roots.mjs";
 import { TS_FILES, walkFiles } from "./lib/surface-files.mjs";
+import { docsPath } from "./lib/docs-tree.mjs";
 
 // `fileURLToPath` rather than `new URL(...).pathname`, and the difference is not
 // cosmetic. `.pathname` keeps percent-encoding, so a checkout under a path with a
@@ -852,7 +853,7 @@ export function analyse(io) {
 // ---------------------------------------------------------------------------
 // The projection.
 //
-// `docs/dev/manual-test-roster.md` is generated from the roster and gated by
+// `agent-tooling/docs/dev/manual-test-roster.md` is generated from the roster and gated by
 // `--check`, the same arrangement `scripts/check-twin-inventory.mjs` uses. The
 // reason it is generated rather than written is that a hand-kept second copy of
 // a roster is the exact drift this whole file exists to stop.
@@ -910,7 +911,7 @@ no reason to open. An item you cannot run for want of hardware is recorded as un
 and acceptable answer.
 `;
 
-export const PROJECTION = join("docs", "dev", "manual-test-roster.md");
+export const PROJECTION = docsPath("dev", "manual-test-roster.md");
 
 export function projectionBody(roster, ratchet) {
   const c = counts(roster, ratchet);
@@ -1088,7 +1089,7 @@ async function main() {
   const ratchetOverride = flagValue(argv, "--ratchet");
   const projectionOverride = flagValue(argv, "--projection");
   const ratchetPath = ratchetOverride ?? RATCHET_PATH;
-  const projectionPath = projectionOverride ?? join(ROOT, PROJECTION);
+  const projectionPath = projectionOverride ?? resolve(ROOT, PROJECTION);
   // The canonical labels when nothing is overridden, so every message below reads
   // exactly as it did before these flags existed.
   const ratchetLabel = ratchetOverride ?? join("scripts", "manual-test-ratchet.json");

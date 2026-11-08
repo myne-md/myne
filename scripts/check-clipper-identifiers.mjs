@@ -61,7 +61,7 @@ const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
  *
  * Resolved from the repo root rather than from this script's own location, so
  * it is the same path whether this runs from the main checkout or from a
- * worktree under `.opencode/worktrees/`.
+ * worktree under `.worktrees/`.
  *
  * `MYNE_CLIPPER_DIR` overrides it, and exists for one reason: the
  * companion-ABSENT branch is the branch that runs in CI and in a fresh clone,
@@ -76,7 +76,7 @@ const read = (rel) => readFileSync(join(repoRoot, rel), "utf8");
  * **A single hardcoded `../../../` was worktree-only, and it degraded into the
  * exact silence the paragraph above warns about.** Companions are cloned
  * NESTED, at `<repo>/myne-clipper` (`workspace/manifest.txt`). From a worktree
- * under `.opencode/worktrees/<name>` that sits three levels up, which is the path
+ * under `.worktrees/<name>` that sits three levels up, which is the path
  * this used to hardcode, so the check verified the derivation from a worktree
  * and reported a shorter `ok` from the ordinary checkout, where it resolved
  * `<parent-of-repo>/../myne-clipper` and found nothing. Green either way, and

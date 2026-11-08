@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0
-//! The sealed label store (`MYL1`, `docs/spec/protocol.md` § 9.22): what lets
+//! The sealed label store (`MYL1`, `agent-tooling/docs/spec/protocol.md` § 9.22): what lets
 //! the LOCKED vault picker show a vault's real name.
 //!
 //! A vault's name lives in `vault.prefs`, sealed under a `root_key`-derived KEK,

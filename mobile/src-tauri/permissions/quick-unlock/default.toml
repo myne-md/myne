@@ -6,7 +6,7 @@
 # Mobile ships the PIN path AND the Apple biometric branch (iOS Face ID /
 # Touch ID via the shared `myne-core` Apple-Keychain provider; on Android the
 # biometric commands return HardwareUnavailable until a Keystore provider
-# lands). Threat-model trade-off: main repo `design-notes.md` 2026-07-12.
+# lands). Threat-model trade-off: main repo `agent-tooling/design-notes.md` 2026-07-12.
 
 "$schema" = "../../gen/schemas/mobile-schema.json"
 

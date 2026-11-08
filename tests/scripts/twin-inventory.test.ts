@@ -35,7 +35,7 @@ import {
 
 const ROOT = new URL("../../", import.meta.url).pathname;
 const SCRIPT = `${ROOT}scripts/check-twin-inventory.mjs`;
-const PROJECTION = `${ROOT}docs/dev/twin-inventory.md`;
+const PROJECTION = `${ROOT}agent-tooling/docs/dev/twin-inventory.md`;
 
 function run(args: string[] = []): { code: number; out: string } {
   try {
@@ -731,7 +731,7 @@ describe("check-twin-inventory", () => {
 
   // These four run against a THROWAWAY tree, like every other failure case in
   // this file and for the reason its header gives. An earlier version pointed
-  // them at the repository's tracked `docs/dev/twin-inventory.md`: one emitted
+  // them at the repository's tracked `agent-tooling/docs/dev/twin-inventory.md`: one emitted
   // into it twice with no restore at all, three restored in `finally`, which
   // narrows the window without closing it. Both halves of the guard now accept
   // an injected target under `--roots`, so there is no reason left to touch the

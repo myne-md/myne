@@ -548,7 +548,7 @@ describe("the horizon choices (myne#508)", () => {
   });
 
   it("stays inside `Segmented`'s option band, which is what keeps both pickers one shape", () => {
-    // `docs/design/README.md` ("Which picker"): `Segmented` is 2-4 options and
+    // `agent-tooling/docs/design/README.md` ("Which picker"): `Segmented` is 2-4 options and
     // `Select` takes over at 5. A fifth choice would push the desktop into a
     // dropdown while mobile kept a segmented control, so the count is a design
     // constraint rather than a preference.

@@ -1,7 +1,7 @@
 // @myne/dialect — shared markdown-dialect PARSER CORE public surface.
 // The desktop `src/dialect/index.ts` re-exports this (plus its desktop-only
 // clip/html/text export-renderers) so its ~90 importers stay unchanged; the
-// mobile client imports this package directly. Spec: docs/spec/markdown-dialect.md.
+// mobile client imports this package directly. Spec: agent-tooling/docs/spec/markdown-dialect.md.
 
 export * from "./folderPath";
 

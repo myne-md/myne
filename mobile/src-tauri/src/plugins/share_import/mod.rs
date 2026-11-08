@@ -12,7 +12,7 @@
 //! unavailable (Android Keystore provider is the SF1 open item), so the seal
 //! commands no-op cleanly.
 //!
-//! See: main repo `design-notes.md` (share-import; MYND-507).
+//! See: main repo `agent-tooling/design-notes.md` (share-import; MYND-507).
 
 // Re-exported so `crate::plugins::share_import::{commands, error}::…` paths resolve.
 #[allow(unused_imports)]

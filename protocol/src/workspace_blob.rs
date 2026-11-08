@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.workspace` 34-byte-header encrypted editor-workspace codec —
-//! see `docs/spec/protocol.md` § 9.7 (MYND-166).
+//! see `agent-tooling/docs/spec/protocol.md` § 9.7 (MYND-166).
 //!
 //! `vault.workspace` is a vault-level singleton artifact holding the
 //! editor's **workspace state**: the open-tab set per pane, the pane-split

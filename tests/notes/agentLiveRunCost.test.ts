@@ -2,7 +2,7 @@
 //
 // The run's cost is readable WHILE the run is working (myne-md/myne#456).
 //
-// `design-notes/ai/0515` rests the remote arm's lack of a volume bound on
+// `agent-tooling/design-notes/ai/0515` rests the remote arm's lack of a volume bound on
 // disclosure: "the residual is disclosed rather than capped: a finished run
 // reports the requests it made, the notes it read, and how much text left the
 // device". Rendering that only on a finished turn is what the entry said and it
