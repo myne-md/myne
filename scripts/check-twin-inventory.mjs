@@ -202,7 +202,11 @@ const TREE_PAIRS = [
 /** The unit is the pair, so every set and every sort keys on both paths. */
 const pairKey = (t) => `${t.a}::${t.b}`;
 
-const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "gen", ".worktrees"]);
+// `agent-tooling` is a nested clone of the documentation companion, sitting inside this tree
+// because that is where a developer's checkout has it. It is not this repository's code, and
+// walking it made this guard's answer depend on whether the companion happened to be present -
+// green locally, red in CI on the same commit. A nested repository is never part of the walk.
+const SKIP_DIRS = new Set(["node_modules", "target", "dist", ".git", "gen", ".worktrees", "agent-tooling"]);
 
 /**
  * Twins the path sweep cannot see, because their two sides sit at different
