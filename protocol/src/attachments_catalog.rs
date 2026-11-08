@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 //! `vault.attachments` 34-byte-header encrypted attachments-catalog
-//! codec (`MYC1` magic) — see `docs/spec/protocol.md` § 9.10.
+//! codec (`MYC1` magic) — see `agent-tooling/docs/spec/protocol.md` § 9.10.
 //!
 //! `vault.attachments` is a vault-level singleton artifact carrying the
 //! authoritative per-attachment metadata (the backing store for the

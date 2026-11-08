@@ -568,7 +568,7 @@ pub struct Document {
 /// the model does not have to agree with us: twenty thousand characters is
 /// roughly five thousand tokens, which is a readable report or a lecture
 /// handout and not a book. The budget exists because an unbounded document is an
-/// unbounded request, and the remote arm `design-notes/ai/0515` describes has
+/// unbounded request, and the remote arm `agent-tooling/design-notes/ai/0515` describes has
 /// no volume bound of its own.
 pub const MAX_DOCUMENT_CHARS: usize = 20_000;
 

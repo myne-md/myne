@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.agent-memory` 34-byte-header encrypted agent-memory catalog codec
-//! (myne-md/myne#697; `docs/spec/protocol.md` § 9.25).
+//! (myne-md/myne#697; `agent-tooling/docs/spec/protocol.md` § 9.25).
 //!
 //! The catalog singleton holds the memory roster (one entry per persisted
 //! memory: id, created/updated timestamps, causal `version`, deletion

@@ -5,7 +5,7 @@
 // instants the same pass registers, and what it refuses.
 //
 // The properties under test are the ones the threat model names (MYND-618,
-// `docs/threat-model.md` §7): a content-free payload, a short horizon, no new
+// `agent-tooling/docs/threat-model.md` §7): a content-free payload, a short horizon, no new
 // timer. The payload case is asserted against the object the notifier receives
 // rather than against the code that builds it, because "no title in the body" is a
 // claim about the bytes on the OS side.

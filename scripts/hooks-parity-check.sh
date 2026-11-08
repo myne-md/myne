@@ -62,7 +62,7 @@ echo "== EOF newline (tracked tree; hook exclusions) =="
 eof_fail=0
 while IFS= read -r f; do
   case "$f" in
-    docs/design/icons/*|docs/design/assets/*|docs/design/preview/*) continue ;;
+    agent-tooling/docs/design/icons/*|agent-tooling/docs/design/assets/*|agent-tooling/docs/design/preview/*) continue ;;
     src-tauri/icons/*|public/*.svg) continue ;;
     src-tauri/resources/dictionaries/*) continue ;;
     src-tauri/resources/models/*) continue ;;

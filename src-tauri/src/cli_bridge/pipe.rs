@@ -2,7 +2,7 @@
 //! The Windows command door: a **named-pipe server**, the counterpart of
 //! `socket.rs`'s Unix domain socket.
 //!
-//! `docs/threat-model.md`'s CLI-door entry has promised "a local Unix domain
+//! `agent-tooling/docs/threat-model.md`'s CLI-door entry has promised "a local Unix domain
 //! socket (macOS/Linux) or named pipe (Windows)" since MYND-490. This is the
 //! server half of that sentence; the client half is `cli/src/windows_pipe.rs`,
 //! and the machinery (DACL, close-once handle, instance loop, write watchdog) is

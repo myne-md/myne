@@ -11,7 +11,7 @@
 // the UI files, shoot again, `git stash pop`. The script only ever shoots the
 // current working tree.
 //
-// How each lane works (full reasoning: `docs/dev/ui-screenshots.md`):
+// How each lane works (full reasoning: `agent-tooling/docs/dev/ui-screenshots.md`):
 // - desktop: the story catalogue (`pnpm stories`, port 1423) mounts the real
 //   `AiChatTab` through its ONE fake-IPC host. The shot navigates to the
 //   `ai-panel/chat/default` story and screenshots the stage. This replaced a
@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const MOBILE_DIR = join(ROOT, "mobile");
 const STORIES_PORT = 1423;
-// Overridable, because `docs/dev/ui-screenshots.md` tells a caller to "point
+// Overridable, because `agent-tooling/docs/dev/ui-screenshots.md` tells a caller to "point
 // STORIES_STORY at it" and the constant was the only way to do that, which meant
 // editing this file to shoot any surface but the AI panel. The default is
 // unchanged, so the documented AI-panel invocation behaves exactly as before.

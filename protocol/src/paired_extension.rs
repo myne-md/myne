@@ -2,8 +2,8 @@
 
 //! Canonical `PairedExtension` record + its `vault.prefs`-embedded array codec
 //! — the on-disk projection of the browser-clipper pairing-token registry
-//! (`ext-foundation-handoff` task 7, MYND-443). See `docs/spec/protocol.md`
-//! § 9.5 and `design-notes.md` 2026-06-20 "Browser-clipper pairing-token
+//! (`ext-foundation-handoff` task 7, MYND-443). See `agent-tooling/docs/spec/protocol.md`
+//! § 9.5 and `agent-tooling/design-notes.md` 2026-06-20 "Browser-clipper pairing-token
 //! persistence: encrypted prefs-family blob".
 //!
 //! A paired extension record is **declarative state** (an issued or revoked

@@ -11,7 +11,7 @@
 // contract rather than the colour values, which come from tokens.
 //
 // What a green run does NOT prove is that the values are right; that is
-// `docs/design/README.md`'s job and the last test here is the one place a value is
+// `agent-tooling/docs/design/README.md`'s job and the last test here is the one place a value is
 // asserted, deliberately, so a silent edit to the neutral step fails.
 
 import { afterEach, describe, expect, it } from "vitest";

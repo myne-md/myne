@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `vault.dictionary` 34-byte-header encrypted personal-dictionary codec
-//! (MYND-266; `docs/spec/protocol.md` § 9.13).
+//! (MYND-266; `agent-tooling/docs/spec/protocol.md` § 9.13).
 //!
 //! `vault.dictionary` is a vault-level singleton artifact holding the user's
 //! personal spell-check dictionary — the added-words set plus a vault-wide

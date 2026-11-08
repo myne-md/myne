@@ -105,12 +105,13 @@
 import { readdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { DOCS_ABSENT, docsPath, docsPresent } from "./lib/docs-tree.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(HERE);
 
 export const RECORD_PATH = join(HERE, "duplication-groups.json");
-export const REPORT_PATH = join(ROOT, "docs", "dev", "duplication.md");
+export const REPORT_PATH = docsPath("dev", "duplication.md");
 
 // The roots myne#995 measured, so the guard answers the question that filed it.
 // `src-tauri/src`, `cli` and `mcp` join the two scanners' union: the issue's
@@ -957,14 +958,20 @@ if (isMain) {
     // The report is a committed projection of the same measurement, checked the
     // way `check-twin-inventory.mjs` checks its own: a stale report describes a
     // tree nobody has, and regenerating it is one command.
+    // The report lives in the private companion now, so a checkout without it cannot judge
+    // staleness. Say so rather than reporting a document nobody here can read as current.
     let reportStale = false;
+    if (!docsPresent()) {
+      console.log(`note: ${DOCS_ABSENT}`);
+    } else {
     try {
       const expected = renderReport({ ...actual, record }, actual).trim();
       reportStale = readFileSync(REPORT_PATH, "utf-8").trim() !== expected;
     } catch {
       reportStale = true;
     }
-    if (reportStale) failures.push("docs/dev/duplication.md is stale. Run `node scripts/check-duplication.mjs --emit`.");
+    }
+    if (reportStale) failures.push("agent-tooling/docs/dev/duplication.md is stale. Run `node scripts/check-duplication.mjs --emit`.");
     if (failures.length > 0) {
       console.log("duplication: FAILED");
       for (const failure of failures) console.log(`  - ${failure}`);

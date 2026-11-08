@@ -29,7 +29,7 @@
 //
 // What each holds is the user's own decrypted content: one is up to 24 file
 // previews, each capped at the host's 2 MiB read cap, and the other is the text
-// of completed voice-note transcriptions. `docs/threat-model.md` AS7 classes the
+// of completed voice-note transcriptions. `agent-tooling/docs/threat-model.md` AS7 classes the
 // transcript surface as AS1-class in-RAM plaintext whose exposure is "not
 // widened" beyond A6/A7/A10. Carrying it into a DIFFERENT vault's session is
 // wider than that, which is what makes this a correction rather than a polish.

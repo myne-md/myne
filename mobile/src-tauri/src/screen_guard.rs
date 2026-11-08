@@ -46,7 +46,7 @@
 //!    `objc2::exception::catch`, so a UIKit `NSException` degrades to a traced
 //!    no-op. Honest limit: a CoreAnimation *abort* (assertion → `abort()`)
 //!    during a later render commit is NOT catchable; startup timing is the
-//!    real mitigation and the device checklist (`docs/dev/device-matrix.md`
+//!    real mitigation and the device checklist (`agent-tooling/docs/dev/device-matrix.md`
 //!    §7) is the gate. If the soak row fails, revert [`ios::apply`]'s call in
 //!    [`apply`] to a no-op (one line) — do not ship a crashing guard.
 //! 3. **iOS-17 sublayer branch** — the secure container is

@@ -7,7 +7,7 @@
 // Reject clears the session. A wrong-render here would silently defeat the
 // out-of-band verification, so it is covered directly. (The cross-process
 // browser↔host leg is the deferred Linux-CI E2E layer; see
-// `docs/dev/clipper-testing.md` + `design-notes.md` 2026-06-21.)
+// `agent-tooling/docs/dev/clipper-testing.md` + `agent-tooling/design-notes.md` 2026-06-21.)
 //
 // The IPC-boundary wrappers are mocked at their lib boundary; the dialog's
 // poll → render → Accept/Reject state machine runs for real.

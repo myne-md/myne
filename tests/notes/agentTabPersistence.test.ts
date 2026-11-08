@@ -73,7 +73,7 @@ describe("the tab kind itself", () => {
 
 describe("omit-when-default", () => {
   // The `view` discriminator is gone: the tab was a Hub-or-Focus mode and is
-  // one screen now (`design-notes/ai/0637`), so what is persisted is WHICH
+  // one screen now (`agent-tooling/design-notes/ai/0637`), so what is persisted is WHICH
   // conversation is open rather than which of two views. The two keys are
   // independent, which the old shape could not express — it dropped both
   // unless a note was present, because "Focus with no note" was incoherent.

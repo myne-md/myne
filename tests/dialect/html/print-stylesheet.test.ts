@@ -171,7 +171,7 @@ describe("page geometry + pagination rules", () => {
 
 describe("design-token fidelity (light palette, embedded values)", () => {
   // Standalone document: the print CSS must EMBED the light token values
-  // (docs/design/colors_and_type.css :root). Spot-pin the load-bearing ones.
+  // (agent-tooling/docs/design/colors_and_type.css :root). Spot-pin the load-bearing ones.
   it.each([
     ["--fg-1", "#1a1a17"],
     ["--fg-2", "#3a3934"],

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0
 
-//! B2B member display names (`vault.member-names`, magic `MYO5`; `docs/spec/protocol.md`
+//! B2B member display names (`vault.member-names`, magic `MYO5`; `agent-tooling/docs/spec/protocol.md`
 //! §9.29, `decisions/protocol/0666`).
 //!
 //! The store in [`store`] is HOST-FREE on purpose: it takes the vault directory, the

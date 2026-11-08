@@ -6,7 +6,7 @@
 // tests/notes/documentStats.test.ts). The `.md` export is byte-verbatim
 // (SYNC-2) and never runs through these emitters — that contract is asserted
 // here at the projection boundary (the emitters are PURE over their input).
-// Spec: docs/spec/markdown-dialect.md §6.
+// Spec: agent-tooling/docs/spec/markdown-dialect.md §6.
 
 import { describe, expect, it } from "vitest";
 import { emitNoteHtml } from "../../../src/dialect/html/emitNoteHtml";

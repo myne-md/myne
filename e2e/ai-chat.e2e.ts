@@ -4,7 +4,7 @@
 // (the deterministic `StubEngine` — no model file in the repo; SYNC-5). The
 // audited production bundle never enables that feature, so this suite runs ONLY
 // when the AI-feature binary is under test — gated on `MYNE_E2E_AI=1`, which the
-// feature-flagged build sets (see `docs/dev/e2e.md`).
+// feature-flagged build sets (see `agent-tooling/docs/dev/e2e.md`).
 //
 //   ac1 — enable AI → open the AI Chat tab → send a message → a streamed
 //         assistant turn appears in the transcript → a follow-up appends another
@@ -53,7 +53,7 @@ const aiDescribe = process.env.MYNE_E2E_AI === "1" ? describeE2E : describe.skip
 
 /** Wait for the run's review screen and close it.
  *
- *  Every message is a run since `design-notes/ai/0524`, so a proposal takes
+ *  Every message is a run since `agent-tooling/design-notes/ai/0524`, so a proposal takes
  *  the screen after each send and the composer is unreachable until it goes.
  *  `ag6` in `agent-run.e2e.ts` does the same thing for the same reason. */
 async function dismissRunProposal(s: Session): Promise<void> {
@@ -110,7 +110,7 @@ aiDescribe("ac1 conversational AI chat → stream → follow-up → lock keeps",
         await (await s.byTestId("ai.composer-send")).click();
 
         // **A question is a RUN now, so the send opens the review screen over the
-        // composer.** `design-notes/ai/0524` removed the Ask/Edit split: every
+        // composer.** `agent-tooling/design-notes/ai/0524` removed the Ask/Edit split: every
         // message goes through the agent loop, the stub proposes for any task,
         // and the proposal takes the screen. This scenario is about the
         // transcript and the lock, not about reviewing a proposal (`ag1` and

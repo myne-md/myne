@@ -846,7 +846,7 @@ pub fn hex16(s: &str) -> Option<[u8; 16]> {
 /// cannot serve a member. A member vault's `sync-token` file holds the
 /// `(person, vault)` **membership token** written at accept/join
 /// (`person_account.rs`), and the server refuses that credential on the account
-/// routes: `docs/spec/server-protocol.md` §3.1 lists the routes a membership
+/// routes: `agent-tooling/docs/spec/server-protocol.md` §3.1 lists the routes a membership
 /// token is accepted on (`/sync/*`, `/account/status`) and `/auth/devices` is not
 /// among them, because the token is bound to a binding and **carries no device
 /// id**. The member's own account plane is authenticated instead by the

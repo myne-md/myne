@@ -5,7 +5,7 @@
 //! Closed, `serde`-tagged set, following the `vault_label` precedent. No
 //! `String` field reaches the frontend; OS and codec detail is reduced to coarse
 //! variants per the secret-handling logging discipline (`src-tauri/AGENTS.md`).
-//! Since `design-notes/ui/0728` the record carries no user-authored text at
+//! Since `agent-tooling/design-notes/ui/0728` the record carries no user-authored text at
 //! all, so there is nothing here a variant could leak beyond a vault id or the
 //! account id an IPC read already returns.
 //!

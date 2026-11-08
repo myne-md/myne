@@ -31,7 +31,7 @@
 // This one needs **no model and no stub**: the fixture supplies the answers,
 // and `local-inference` is in `default`, so any ordinary build carries the
 // commands. Gating it would have added a tenth permanently-skipped scenario
-// that looks like coverage. Recorded in `docs/dev/e2e.md`'s env-knob table.
+// that looks like coverage. Recorded in `agent-tooling/docs/dev/e2e.md`'s env-knob table.
 //
 // One interaction was checked before deciding: under `local-inference-stub`,
 // `resolve_backend` returns `StubEngine` unconditionally — but the runtime arm

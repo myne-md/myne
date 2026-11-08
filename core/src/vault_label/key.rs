@@ -261,7 +261,7 @@ mod imp {
             // wrong-length arm never reaches a copy at all, so wrapping at the
             // copy would leave that arm's allocation intact.
             //
-            // **Honest limit** (`docs/threat-model.md` §7 defers forensic-grade
+            // **Honest limit** (`agent-tooling/docs/threat-model.md` §7 defers forensic-grade
             // scrubbing): `security_framework` builds that `Vec` from a `CFData`
             // it then releases without wiping, so a CoreFoundation-side residue
             // survives this. Reaching it would mean dropping to

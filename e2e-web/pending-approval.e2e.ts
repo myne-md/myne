@@ -18,7 +18,7 @@
 // token and can pull nothing.
 //
 // MYND-635 therefore routed that disk state to the wait screen. **That state is
-// not evidence of anything on this client.** `design-notes/clients/0363` makes
+// not evidence of anything on this client.** `agent-tooling/design-notes/clients/0363` makes
 // the web sync token session-scoped: it lives in the Worker and is written
 // nowhere, so it dies with the tab, while `device_id` persists. An APPROVED
 // browser therefore presents identity-present + token-absent on every reload,

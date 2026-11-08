@@ -224,7 +224,7 @@ function tsFiles(dir: string): string[] {
 }
 
 describe("the screen-capture escape stays reachable behind an overlay", () => {
-  // Not an accessibility nicety: `docs/threat-model.md` section 6 requires
+  // Not an accessibility nicety: `agent-tooling/docs/threat-model.md` section 6 requires
   // the consented device-local override to be "reachable from a
   // keyboard-focusable control on every pre-unlock screen", and
   // `JoinDeviceModal` is a pre-unlock overlay. On Windows 10 19041+, the one

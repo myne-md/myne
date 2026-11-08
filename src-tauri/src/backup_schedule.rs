@@ -24,7 +24,7 @@
 //! Backups are ciphertext (the MYB1 container copies encrypted blobs), so a
 //! known location does not break confidentiality, and a plaintext path on disk
 //! is consistent with the already-out-of-scope A7 (local malware) posture. The
-//! `design-notes.md` entry (feature task 7) records this so it is not later
+//! `agent-tooling/design-notes.md` entry (feature task 7) records this so it is not later
 //! mistaken for a SYNC-3 violation.
 //!
 //! ## Field roles

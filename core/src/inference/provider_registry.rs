@@ -520,7 +520,7 @@ impl RemoteProvider {
         // cached prefix at roughly a tenth of the normal rate.
         //
         // Threat-model read, settled at the myne-md/myne#622 grill and recorded
-        // in `design-notes/ai/` rather than re-argued here: A17 puts the
+        // in `agent-tooling/design-notes/ai/` rather than re-argued here: A17 puts the
         // provider operator explicitly out of scope, and TB13 already states
         // that retention is unverifiable, so a cache marker crosses no boundary
         // the request does not already cross. What DOES change is the posture,
@@ -539,7 +539,7 @@ impl RemoteProvider {
         // excerpts, up to 6000 characters of decrypted plaintext, which is why
         // it is held under `Zeroizing`. Myne was therefore asking OpenRouter to
         // RETAIN the user's note text as a cache prefix, which is precisely the
-        // request `design-notes/ai/0555` argues it does not make.
+        // request `agent-tooling/design-notes/ai/0555` argues it does not make.
         //
         // The test that was supposed to bound this asserted a property about
         // turn ROLE ("no user or assistant turn carries a marker") and the
@@ -589,7 +589,7 @@ impl RemoteProvider {
             // Console translates each model to its native API family, so the
             // marker's meaning would depend on which family answered, and
             // asking to retain a span the provider may store anyway is the
-            // request `design-notes/ai/0555` argues Myne does not make.
+            // request `agent-tooling/design-notes/ai/0555` argues Myne does not make.
             Self::OpenCodeZen | Self::OpenCodeGo => {
                 if let Some(cap) = max_output_tokens {
                     obj.insert("max_tokens".into(), json!(cap));
@@ -861,7 +861,7 @@ impl RemoteEngine {
         // note-derived memory as an `UntrustedNote` span, so the agent arm
         // passes `false` explicitly below while keeping its ceiling. A marker
         // derived from the ceiling here would re-ask the provider to retain
-        // that memory: the exact request `design-notes/ai/0555` was
+        // that memory: the exact request `agent-tooling/design-notes/ai/0555` was
         // corrected to stop making.
         let body =
             provider.build_chat_body(&model, system, messages, max_output_tokens, cache_system);
@@ -994,7 +994,7 @@ impl Engine for RemoteEngine {
     ) -> Result<AgentReply, EngineError> {
         // Ceiling yes, cache marker no: the system turn carries note-derived
         // memory (myne-md/myne#697), so asking the provider to retain it as a
-        // cache prefix is the request `design-notes/ai/0555` forbids. The
+        // cache prefix is the request `agent-tooling/design-notes/ai/0555` forbids. The
         // cost is a full-price system turn on every iteration.
         self.post_and_parse(
             system,
@@ -1613,7 +1613,7 @@ mod tests {
     /// `rag::assemble_grounding_system` fills it with retrieved note excerpts,
     /// up to 6000 characters of decrypted plaintext. So Myne was asking
     /// OpenRouter to retain the user's note text as a cache prefix, which is the
-    /// one request `design-notes/ai/0555` argues it does not make.
+    /// one request `agent-tooling/design-notes/ai/0555` argues it does not make.
     ///
     /// The test that was meant to bound it asserted "no USER or ASSISTANT turn
     /// carries a marker" and passed on the defect, because the note content was
@@ -1720,7 +1720,7 @@ mod tests {
 
         // The ceiling rides on the agent arm, and the cache marker must NOT:
         // the system turn carries note-derived memory, so a marker would ask
-        // the provider to retain it (myne-md/myne#697, `design-notes/ai/0555`).
+        // the provider to retain it (myne-md/myne#697, `agent-tooling/design-notes/ai/0555`).
         // Read at the one place that passes both.
         let post = src
             .find("fn post_and_parse(")

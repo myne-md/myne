@@ -26,7 +26,7 @@
 //! it answered `None` for every body, the sync manifest scan came back empty,
 //! and no attachment was uploaded or accepted in either direction, with the
 //! catalog still syncing so other devices listed names and sizes over nothing.
-//! `design-notes/protocol/0567` carries the incident and the measurements.
+//! `agent-tooling/design-notes/protocol/0567` carries the incident and the measurements.
 //!
 //! A reader that answers `None` never errors: the caller reads it as "not this
 //! family, nothing to do". That is why the mistake is silent, and why the fix

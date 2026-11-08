@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `captures/<capture-id>` pending-capture blob codec (`MYK1`;
-//! `docs/spec/protocol.md` § 9.18).
+//! `agent-tooling/docs/spec/protocol.md` § 9.18).
 //!
 //! A **pending capture** is a short piece of dictated note text that arrives
 //! from the paired Apple Watch (via WatchConnectivity) while the phone's vault

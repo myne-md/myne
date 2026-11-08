@@ -20,7 +20,7 @@
 //! reaches is one the user is invited to send on. The location is a
 //! **compiled-in source path** (`core/src/...`), which cannot contain the user's
 //! directory layout, and it is what a maintainer can act on. Same reasoning, and
-//! the same shape, as `design-notes/ops/0366`'s panic hook for the web build.
+//! the same shape, as `agent-tooling/design-notes/ops/0366`'s panic hook for the web build.
 //!
 //! # Bounded, visible, and cleared when its purpose is served
 //!

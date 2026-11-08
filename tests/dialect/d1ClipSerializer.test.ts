@@ -9,7 +9,7 @@
 // canonical-D1 (SYNC-7), so the serializer re-authors recognized-on-parse
 // non-canonical forms (Setext→ATX, ref-link→inline, etc.) rather than preserving
 // them — the divergence-prone behavior these vectors guard.
-// Spec: docs/spec/markdown-dialect.md §5 (canonical emit forms) / §6 (round-trip).
+// Spec: agent-tooling/docs/spec/markdown-dialect.md §5 (canonical emit forms) / §6 (round-trip).
 
 import * as fs from "node:fs";
 import * as path from "node:path";

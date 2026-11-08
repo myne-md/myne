@@ -149,7 +149,7 @@ tokio = { version = "1", features = ["rt", "rt-multi-thread", "time", "sync", "m
 tracing = "0.1"
 # The actual log sink (desktop `lib.rs` parity). Without it every mobile
 # `tracing::*!` event is silently dropped — the device checklists
-# (`docs/dev/device-matrix.md` §7) read these events via the iOS dev console /
+# (`agent-tooling/docs/dev/device-matrix.md` §7) read these events via the iOS dev console /
 # `adb logcat -s RustStdoutStderr`. NOT a new audit surface: already in the
 # shared lock via the `tracing-test` dev-dependency.
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }

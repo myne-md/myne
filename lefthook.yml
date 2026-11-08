@@ -407,13 +407,13 @@ pre-commit:
       # out both the walk and the comment stripper.
       #
       # `--check` also holds the generated projection to the roster. Without it
-      # the "Do not edit by hand" banner on `docs/dev/twin-inventory.md` had no
+      # the "Do not edit by hand" banner on `agent-tooling/docs/dev/twin-inventory.md` had no
       # mechanism behind it. CI runs the same `--check` in its own UNFILTERED
       # `twin-inventory` step rather than inside `pnpm-build`, because a hand
       # edit to the projection is a docs-only commit and the `code-paths` filter
       # would skip it, leaving this bypassable hook as the only gate.
       # `bundle-record` is unfiltered for the identical reason.
-      glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
+      glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,agent-tooling/docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
     twin-drift-ratchet:
@@ -446,7 +446,7 @@ pre-commit:
       # client's wrapper list, because a denominator derived from a client is
       # blind to that client.
       #
-      # `--check` gates the GENERATED `docs/dev/settings-parity.md`, and CI runs
+      # `--check` gates the GENERATED `agent-tooling/docs/dev/settings-parity.md`, and CI runs
       # the same invocation in its own UNFILTERED step for the reason
       # `twin-inventory` above records: a hand edit to a generated projection is
       # a docs-only commit, which the `code-paths` filter would skip, leaving
@@ -459,7 +459,7 @@ pre-commit:
       # `check-ipc-binding-callers.mjs`, whose `CALLERS_FOR` walks `src`,
       # `web/src`, `editor/src`, `dialect/src` and `mobile/src`. It costs ~4.4 s,
       # measured, which is why it is globbed rather than run on every commit.
-      glob: "{src/**,web/src/**,editor/src/**,dialect/src/**,mobile/**,src-tauri/src/**,core/src/**,scripts/check-prefs-parity.mjs,scripts/check-ipc-binding-callers.mjs,scripts/prefs-parity.json,docs/dev/settings-parity.md}"
+      glob: "{src/**,web/src/**,editor/src/**,dialect/src/**,mobile/**,src-tauri/src/**,core/src/**,scripts/check-prefs-parity.mjs,scripts/check-ipc-binding-callers.mjs,scripts/prefs-parity.json,agent-tooling/docs/dev/settings-parity.md}"
       run: node scripts/check-prefs-parity.mjs --check
 
     duplication:
@@ -479,12 +479,12 @@ pre-commit:
       # prop order and in one margin, so no body comparison groups them at any
       # threshold.
       #
-      # `--check` also gates the generated docs/dev/duplication.md, which is why
+      # `--check` also gates the generated agent-tooling/docs/dev/duplication.md, which is why
       # CI runs its own UNFILTERED `duplication` step: a hand edit to that
       # projection is a docs-only commit this glob does not match. The record is
       # re-baselined DOWNWARD only — `--emit` refuses a group it has never seen,
       # because a re-baseline that comes back green licensed everything it found.
-      glob: "{src/**,core/src/**,protocol/src/**,editor/src/**,dialect/src/**,client-core/src/**,web/src/**,mobile/**,src-tauri/src/**,cli/src/**,mcp/src/**,scripts/check-duplication.mjs,scripts/duplication-groups.json,docs/dev/duplication.md}"
+      glob: "{src/**,core/src/**,protocol/src/**,editor/src/**,dialect/src/**,client-core/src/**,web/src/**,mobile/**,src-tauri/src/**,cli/src/**,mcp/src/**,scripts/check-duplication.mjs,scripts/duplication-groups.json,agent-tooling/docs/dev/duplication.md}"
       run: node scripts/check-duplication.mjs --check
 
     embed-layout-drift:
@@ -587,7 +587,7 @@ pre-commit:
       run: node scripts/check-tooltip-convention.mjs
 
     motion-canon:
-      # myne#772 / design-notes/ui/0632: the motion canon, mechanised. Four
+      # myne#772 / agent-tooling/design-notes/ui/0632: the motion canon, mechanised. Four
       # rules, none of which any compiler, lint or test in this tree reports —
       # a pulsing badge, an `ease-in` entrance, a 620ms hover and a `width`
       # transition on a per-frame loop all typecheck, render and pass. The
@@ -1017,7 +1017,7 @@ pre-commit:
       # check-embed-layout-drift records about the published vectors). A
       # threat-model row landing with no scenario-or-reason verdict fails the
       # commit, and so does a verdict whose row is gone. NOT globbed: the
-      # projection is a docs/** file, so a hand edit to it is a docs-only
+      # projection is a agent-tooling/docs/** file, so a hand edit to it is a docs-only
       # commit any code glob would skip, and the verdicts live in the script
       # itself.
       run: node scripts/check-adversary-coverage.mjs
@@ -1037,8 +1037,8 @@ pre-commit:
       # fall for weeks with every gate green (myne-md/myne#589: the same 215
       # keys missing from all 31 catalogs). Three hard checks (roster parity both
       # ways, no partial plural group, placeholder parity) plus a generated
-      # record, docs/dev/i18n-coverage.md, that --check compares.
-      # Deliberately NOT globbed: the record is a docs/** file, so a hand edit to
+      # record, agent-tooling/docs/dev/i18n-coverage.md, that --check compares.
+      # Deliberately NOT globbed: the record is a agent-tooling/docs/** file, so a hand edit to
       # it is a docs-only commit any code glob would skip. Regenerate with
       # `node scripts/check-i18n-coverage.mjs --emit`.
       run: node scripts/check-i18n-coverage.mjs --check
@@ -1125,7 +1125,7 @@ pre-commit:
         for f in {staged_files}; do
           [ -f "$f" ] || continue
           case "$f" in
-            docs/design/icons/*|docs/design/assets/*|docs/design/preview/*) continue ;;
+            agent-tooling/docs/design/icons/*|agent-tooling/docs/design/assets/*|agent-tooling/docs/design/preview/*) continue ;;
             src-tauri/icons/*|public/*.svg) continue ;;
             src-tauri/resources/dictionaries/*) continue ;;
             src-tauri/resources/models/*) continue ;;
@@ -1203,7 +1203,7 @@ pre-commit:
       #
       # Still a cheap last-line guard, not real secret scanning. gitleaks would
       # do this properly with a maintained ruleset; that is a dependency
-      # decision (see docs/dependency-policy.md), not a hook edit.
+      # decision (see agent-tooling/docs/dependency-policy.md), not a hook edit.
       run: |
         vendor='BEGIN [A-Z ]*PRIVATE KEY|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{20,}|xox[abprs]-[A-Za-z0-9-]{10,}|glpat-[A-Za-z0-9_-]{18,}|sk-[A-Za-z0-9]{20,}|plane_api_[A-Za-z0-9_-]{20,}'
         fail=0
@@ -1385,7 +1385,7 @@ pre-push:
       # MYND-74: the frozen Damm-32 quasigroup table is generated into two
       # sentinel-delimited regions — the DAMM32_TABLE const in
       # protocol/src/account_number.rs and the §4.2 block in
-      # docs/spec/account-number.md. Regenerate and compare; fail on drift so
+      # agent-tooling/docs/spec/account-number.md. Regenerate and compare; fail on drift so
       # the two representations can never diverge from the construction.
       #
       # Division of labor: the const's *values* are already locked to the
@@ -1399,7 +1399,7 @@ pre-push:
       # its generator live together in `account_number.rs`, and the spec block
       # is the file's §4.2 table. A push touching neither cannot change the
       # answer and does not pay the protocol test compile.
-      glob: "{protocol/src/account_number.rs,docs/spec/account-number.md}"
+      glob: "{protocol/src/account_number.rs,agent-tooling/docs/spec/account-number.md}"
       env:
         CARGO_TARGET_DIR: target/pre-push
       run: |
@@ -1413,8 +1413,8 @@ pre-push:
           echo "DRIFT: protocol/src/account_number.rs DAMM32_TABLE const differs from the generator."
           fail=1
         fi
-        if ! extract docs/spec/account-number.md | diff -u - /tmp/myne_damm32_table_spec.md; then
-          echo "DRIFT: docs/spec/account-number.md §4.2 table block differs from the generator."
+        if ! extract agent-tooling/docs/spec/account-number.md | diff -u - /tmp/myne_damm32_table_spec.md; then
+          echo "DRIFT: agent-tooling/docs/spec/account-number.md §4.2 table block differs from the generator."
           fail=1
         fi
         if [ "$fail" -ne 0 ]; then

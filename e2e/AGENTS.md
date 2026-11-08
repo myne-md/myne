@@ -11,12 +11,12 @@
 > behaviour is covered **once**, here, because it is the same `src/` tree —
 > a premise the platform-seam contract tests (`tests/platform/seam-contract.ts`)
 > verify rather than assume. Do not mirror a scenario across both lanes.
-> (`design-notes.md` 2026-07-26 "Web E2E policy"; procedure for both:
-> `docs/dev/e2e.md`.)
+> (`agent-tooling/design-notes.md` 2026-07-26 "Web E2E policy"; procedure for both:
+> `agent-tooling/docs/dev/e2e.md`.)
 
 > Subdirectory AGENTS.md. Loaded when pi works in this directory. Operating
 > manual (platform constraints, local container loop, env knobs, version pins):
-> `docs/dev/e2e.md`. Policy provenance: `design-notes.md` 2026-06-10 "E2E
+> `agent-tooling/docs/dev/e2e.md`. Policy provenance: `agent-tooling/design-notes.md` 2026-06-10 "E2E
 > harness" entry + `agent-tooling/epics/e2e-testing/sync-ledger.md`.
 
 ## Non-negotiable rules
@@ -149,7 +149,7 @@
   params from `vault.meta`; creation stays pinned, with no code branch). The VR-1
   recovery drill and the creation scenarios run PRODUCTION params on every run of
   the manual E2E workflow. Until myne-md/myne#579 that read "every pipeline",
-  which is the half of `design-notes/ops/0181` this change retired alongside
+  which is the half of `agent-tooling/design-notes/ops/0181` this change retired alongside
   the merge gate: the drill still runs at m=256 MiB, t=3, p=2, but no push runs
   it.
 
@@ -303,7 +303,7 @@
   `./scripts/e2e-buildrun.sh <spec>` (production-code changes, rebuilds first)
   is the gate, with `./scripts/e2e-batch.sh <spec>…` when several specs need
   it. `./scripts/e2e-local.sh` runs the whole suite and is the wrong tool for
-  proving one scenario. Invocations: `docs/dev/e2e.md`.
+  proving one scenario. Invocations: `agent-tooling/docs/dev/e2e.md`.
 - **From a `myne` WORKTREE, the harness needs the companion checked out beside
   it or it dies before the build.** Every scenario's sync side cross-compiles
   `myne-server` for linux, and a worktree carries no companions: the run fails at
@@ -317,7 +317,7 @@
   myne-md/myne#579.** It lives in `.woodpecker/e2e.yml`, a workflow that runs
   only on a manual trigger carrying `RUN_E2E=true`, and the release runbook owns
   that trigger. A green push pipeline says nothing about any scenario in this
-  directory. `docs/dev/e2e.md` "When CI runs these suites" has the procedure.
+  directory. `agent-tooling/docs/dev/e2e.md` "When CI runs these suites" has the procedure.
 - **`describeE2E.flaky` takes a scenario out of the counted set.** It is the
   quarantine marker (`support/scenario.ts`): the `e2e` step skips the flaky set,
   and the `e2e-quarantine` step (`MYNE_E2E_QUARANTINE=1`, `failure: ignore`)
@@ -507,7 +507,7 @@
   dialog in front of it was refusing the first press because its Enter guard was
   a 16 ms window that opened when React ran the arming EFFECT rather than when
   the dialog appeared, and this harness's own press sequence is 10 to 14 ms long
-  (myne-md/myne#683; the instrumented reading is in `design-notes/ui/0685`).
+  (myne-md/myne#683; the instrumented reading is in `agent-tooling/design-notes/ui/0685`).
   The retry worked because it was 8 s later, so every scenario using the helper
   went green and the defect reached users instead. The question to ask of a retry
   is which single press it is rescuing, and why that press failed; when the

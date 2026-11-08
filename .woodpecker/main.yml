@@ -1,6 +1,6 @@
 # Woodpecker CI — Myne main repo
 # Self-hosted Woodpecker via Forgejo mirror of GitHub.
-# Decision: design-notes.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
+# Decision: agent-tooling/design-notes.md "2026-05-01 — CI: self-hosted Woodpecker via Forgejo mirror"
 # Plan: tracked in GitHub Issues under the myne-md org
 #
 # Notes:
@@ -10,7 +10,7 @@
 #   it holds BOTH end-to-end suites, the desktop tauri-driver suite and the
 #   browser web lane. Nothing in it runs on a push or a pull request: it is
 #   manual-only, triggered before a release (myne-md/myne#579, and the decision
-#   entry `design-notes/ops/0529`). So a green
+#   entry `agent-tooling/design-notes/ops/0529`). So a green
 #   run of THIS file is not a claim that the E2E suites pass; the release
 #   runbook owns that claim.
 # - THREE lanes, one pipeline (MYND-574; the third landed 2026-08-13). The
@@ -107,7 +107,7 @@ steps:
     # hand-copy until myne-md/myne#458.
     when: &code-paths
       - path: &code-path-globs
-          exclude: ['docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
+          exclude: ['agent-tooling/docs/**', '*.md', '**/CLAUDE.md', '**/README.md']
     commands:
       - rustup component add rustfmt
       - cargo fmt --all -- --check
@@ -144,12 +144,20 @@ steps:
     # as cargo-clippy above (shared workspace target/). Argon2id KATs dominate the
     # runtime and stay uncached; only the compile portion caches (~20-40s).
     environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
       RUSTC_WRAPPER: /cache/tools/bin/sccache
       SCCACHE_DIR: /cache/sccache
       SCCACHE_CACHE_SIZE: "20G"
       CARGO_INCREMENTAL: "0"
       CARGO_HOME: /cache/cargo
     commands:
+      # The documentation tree lives in the private `agent-tooling` companion now, and this
+      # step reads it: the specification, the threat model and the generated projections
+      # under `agent-tooling/docs/`. Cloned into the workspace at the same path a developer's
+      # checkout has it, so `scripts/lib/docs-tree.mjs` resolves without an override. The
+      # anchor below is the one copy; a step that needs it aliases it.
+      - &clone-companion-docs git clone --quiet --depth 1 "https://x-access-token:$MYNE_SERVER_TOKEN@github.com/example-org/agent-tooling.git" agent-tooling
       - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       - /cache/tools/bin/cargo-nextest nextest run --profile ci -p protocol --no-fail-fast
 
@@ -399,14 +407,18 @@ steps:
   # record exists to make impossible to do quietly.
   bundle-record:
     image: node:25
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - git fetch origin develop --depth=50 || true
       - node scripts/check-bundle-record.mjs --append-only origin/develop
 
   # ─── Every desktop/mobile twin carries a verdict (#472) ──────────────────────
   # No `code-paths` filter, for exactly bundle-record's reason one step up: the
-  # guard's `--check` half compares the GENERATED docs/dev/twin-inventory.md
-  # against what --emit would write, so a docs/** file is one of its inputs. A
+  # guard's `--check` half compares the GENERATED agent-tooling/docs/dev/twin-inventory.md
+  # against what --emit would write, so a agent-tooling/docs/** file is one of its inputs. A
   # hand edit to that document is a docs-only commit, and under the filter CI
   # would never look, leaving only the --no-verify-bypassable pre-commit hook.
   #
@@ -422,7 +434,11 @@ steps:
   # had failed."
   twin-inventory:
     image: node:25
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - node scripts/check-twin-inventory.mjs --check
 
   # ─── F-Droid store metadata against the Android build it describes ───────────
@@ -447,7 +463,7 @@ steps:
   # ─── Every vault.prefs command says which client surfaces it (#880) ──────────
   # No `when:` filter, and it is the same reason bundle-record and twin-inventory
   # carry none: the `--check` half compares the GENERATED
-  # docs/dev/settings-parity.md against what `--emit` would write, so a docs/**
+  # agent-tooling/docs/dev/settings-parity.md against what `--emit` would write, so a agent-tooling/docs/**
   # file is one of its inputs. A hand edit to that document is a docs-only commit,
   # and under the filter CI would never look, leaving only the
   # --no-verify-bypassable pre-commit hook. Do NOT add `when: *code-paths` here as
@@ -459,13 +475,17 @@ steps:
   # seconds.
   prefs-parity:
     image: node:25
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - node scripts/check-prefs-parity.mjs --check
 
   # ─── Tree-level duplication has an owner (#995) ──────────────────────────────
   # No `when:` filter, for the reason bundle-record, twin-inventory and
   # prefs-parity all carry: the `--check` half compares the GENERATED
-  # docs/dev/duplication.md against what `--emit` would write, so a docs/** file
+  # agent-tooling/docs/dev/duplication.md against what `--emit` would write, so a agent-tooling/docs/** file
   # is one of its inputs and a hand edit to that projection is a docs-only commit
   # the `code-paths` filter would skip. Do NOT add `when: *code-paths` here as a
   # cleanup.
@@ -482,13 +502,17 @@ steps:
   # which is why it is a roster with two directions rather than a ceiling.
   duplication:
     image: node:25
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - node scripts/check-duplication.mjs --check
 
   # ─── Translation coverage is measured rather than asserted (#589) ────────────
   # No `code-paths` filter, for exactly the reason bundle-record and
   # twin-inventory carry none: the `--check` half compares the GENERATED
-  # docs/dev/i18n-coverage.md against what `--emit` would write, so a docs/**
+  # agent-tooling/docs/dev/i18n-coverage.md against what `--emit` would write, so a agent-tooling/docs/**
   # file is one of its inputs and a hand edit to it is a docs-only commit the
   # filter would skip.
   #
@@ -504,7 +528,11 @@ steps:
   # through to English mid-sentence), and interpolation-placeholder parity.
   i18n-coverage:
     image: node:25
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - node scripts/check-i18n-coverage.mjs --check
 
   # ─── A deferral must name an issue, and the roster must match the tree ──────
@@ -513,7 +541,7 @@ steps:
   # are a `#[ignore = "unfixed: … see myne-md/myne#N"]` reason that stops naming
   # an OPEN issue, and a roster that stops matching the tree. Both arrive with a
   # commit that touches only a decision entry, and `*code-paths` excludes
-  # `docs/**`, so inside `pnpm-build` this guard would be skipped by exactly the
+  # `agent-tooling/docs/**`, so inside `pnpm-build` this guard would be skipped by exactly the
   # commit class it exists for. Node builtins only: no `pnpm install`, which is
   # what lets it sit outside the serial desktop chain without lengthening it.
   ignored-tests:
@@ -524,7 +552,11 @@ steps:
   pnpm-build:
     image: node:25
     when: *code-paths
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       # platform-seam backstop (phase3-web-client tasks 2 + 76): the same guard the
@@ -719,7 +751,7 @@ steps:
       # and never shows on keyboard focus — plus a hard failure for an icon-only
       # control with no accessible name (WCAG 2.2 AA 4.1.2).
       - node scripts/check-tooltip-convention.mjs
-      # The motion canon (myne#772, design-notes/ui/0632): no `ease-in` on a
+      # The motion canon (myne#772, agent-tooling/design-notes/ui/0632): no `ease-in` on a
       # UI entrance, no `infinite` outside a named+reasoned allowlist, no raw
       # duration past the 300ms ceiling, no transition on a layout-triggering
       # property without a recorded reason. Every one of those is invisible to
@@ -737,7 +769,7 @@ steps:
       # Twin-drift RATCHET (myne#473): the recorded set of semantically-differing
       # desktop/mobile twin pairs may shrink, never grow. Distinct from the
       # `twin-inventory` step below, which is unfiltered because it gates a
-      # generated `docs/**` file: this one gates the TREE, produces no document,
+      # generated `agent-tooling/docs/**` file: this one gates the TREE, produces no document,
       # and cannot be changed by a docs-only commit, so it belongs here, under
       # the same `code-paths` filter as its neighbours.
       - node scripts/check-twin-drift-ratchet.mjs
@@ -868,7 +900,7 @@ steps:
       # evaluate exits 2 instead of reporting a finding it did not find.
       - node scripts/gen-third-party-licenses.mjs --check --store-dir /cache/cargo/pnpm-store
       # Private-path references in the published trees (audit T3.7). A path into
-      # `operations/`, `agent-tooling/` or `internal-service/` in `docs/`, `src/` or
+      # `operations/`, `agent-tooling/` or `internal-service/` in `agent-tooling/docs/`, `src/` or
       # `mobile/src/` is a dead end for a reader who does not have that
       # repository, and the reader cannot tell it apart from a stale link. The
       # recorded SET may shrink and never grow; `--record` refuses a grown set.
@@ -888,7 +920,11 @@ steps:
     # dirs (ERR_PNPM_ENOENT). The pnpm-install steps form one linear chain:
     # pnpm-build → vitest → tauri-compile → cargo-test-tauri.
     depends_on: [pnpm-build]
+    environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
     commands:
+      - *clone-companion-docs
       - npm install -g pnpm@11.8.0
       - pnpm install --frozen-lockfile --store-dir /cache/cargo/pnpm-store
       - pnpm test
@@ -1208,8 +1244,11 @@ steps:
     when: *code-paths
     depends_on: [tauri-compile]
     environment:
+      MYNE_SERVER_TOKEN:
+        from_secret: myne_server_token
       CI: "true"
     commands:
+      - *clone-companion-docs
       - bash scripts/ci-pinned-tools.sh sccache cargo-nextest
       # 67 s, the same set `tauri-compile` installs one stage earlier, and sharing
       # the downloads between them does NOT work — see that step for the two
@@ -1820,7 +1859,7 @@ steps:
   # The cost of leaving it closed was easy to misread as zero, and was not:
   # `cargo-test` runs the `vectors` target (it is `-p protocol`), every runner
   # prints `[skip]`, and the step reports green having asserted nothing. So the
-  # byte-level agreement `protocol/CLAUDE.md` and `docs/threat-model.md` §6 both
+  # byte-level agreement `protocol/CLAUDE.md` and `agent-tooling/docs/threat-model.md` §6 both
   # lean on was enforced on no machine (myne-md/myne#586).
   #
   # ─── github.com, not the Forgejo mirror ─────────────────────────────────────
@@ -2050,7 +2089,7 @@ steps:
       - name: prefs-parity
         optional: true
       # Unfiltered for the same reason, and listed for the same one: a stale
-      # docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody
+      # agent-tooling/docs/dev/i18n-coverage.md is a docs-only commit away, and a gate nobody
       # is paged for is a gate that stays red.
       - name: i18n-coverage
         optional: true
@@ -2058,7 +2097,7 @@ steps:
       # that stops naming an open issue is a decision-entry edit away, and a gate
       # nobody is paged for is a gate that stays red.
       # Unfiltered for the same reason, and listed for the same one: a stale
-      # docs/dev/duplication.md is a docs-only commit away, and a gate nobody is
+      # agent-tooling/docs/dev/duplication.md is a docs-only commit away, and a gate nobody is
       # paged for is a gate that stays red.
       - name: duplication
         optional: true

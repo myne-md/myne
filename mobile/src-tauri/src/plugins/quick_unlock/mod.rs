@@ -10,7 +10,7 @@
 //! with the desktop client): the PIN path, the OS-free `*_with_dir` cores, and
 //! the Apple-Keychain biometric provider + command branch (macOS Touch ID / iOS
 //! Face ID + Touch ID behind `kSecAccessControlBiometryCurrentSet`; the
-//! threat-model trade-off is analyzed in the main repo's `design-notes.md`
+//! threat-model trade-off is analyzed in the main repo's `agent-tooling/design-notes.md`
 //! 2026-07-12 entry). On Android the biometric commands return
 //! `HardwareUnavailable` until an Android Keystore provider lands (Android
 //! packaging itself is not initialized yet).

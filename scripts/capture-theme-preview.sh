@@ -2,7 +2,7 @@
 # Capture the theme-preview snapshot from the running desktop app (myne#394).
 # Sibling of scripts/capture-userguide.sh — same container plumbing, different
 # capture file. tauri-driver has no macOS support, so this container IS the
-# Linux seat (docs/dev/e2e.md).
+# Linux seat (agent-tooling/docs/dev/e2e.md).
 #
 #   ./scripts/capture-theme-preview.sh                # build app + capture
 #   ./scripts/capture-theme-preview.sh --skip-build   # reuse the built binary

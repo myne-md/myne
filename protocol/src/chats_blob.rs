@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 
 //! `chats/<conversation-id-hex>` 34-byte-header encrypted AI conversation
-//! codec (myne-md/myne#675; `docs/spec/protocol.md` § 9.24).
+//! codec (myne-md/myne#675; `agent-tooling/docs/spec/protocol.md` § 9.24).
 //!
 //! Each persisted AI conversation gets one file under `<vault-root>/chats/`,
 //! named by the lowercase-hex 16-byte conversation UUIDv7, holding the
@@ -652,7 +652,7 @@ mod tests {
     ///
     /// The turn-list plaintexts are the shipped writer's shape
     /// (`{"turns":[..],"title_derived_from":..}`: key order not significant,
-    /// writers emit `turns` first (see `docs/spec/protocol.md` §9.24.2); the
+    /// writers emit `turns` first (see `agent-tooling/docs/spec/protocol.md` §9.24.2); the
     /// codec treats them as opaque bytes and the runner pins the bytes.
     #[test]
     #[ignore]

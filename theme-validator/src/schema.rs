@@ -30,7 +30,7 @@ use crate::error::ThemeError;
 
 /// The minimal required-core CSS-variable tokens a custom theme MUST define
 /// (grill 2026-06-16, SYNC-1: minimal core). These are the **raw ramp** tokens
-/// from `docs/design/colors_and_type.css`; the semantic aliases resolve off
+/// from `agent-tooling/docs/design/colors_and_type.css`; the semantic aliases resolve off
 /// them automatically, so a theme that supplies these gets full coverage.
 ///
 /// The optional `--syntax-*` / `--label-*` / `--highlight-*` token families are

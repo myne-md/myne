@@ -15,7 +15,7 @@
 //      what the model actually emits — while the query types `şirket`. This is
 //      the index-side diacritic-folding path, and it is the reason the feature
 //      is usable in Turkish at all: no available on-device model reproduces
-//      those characters reliably (`design-notes.md` 2026-07-25).
+//      those characters reliably (`agent-tooling/design-notes.md` 2026-07-25).
 //
 // What is driven vs. asserted:
 //   - Import is page-seat IPC (`pageSeatInvoke`) because attachment import goes

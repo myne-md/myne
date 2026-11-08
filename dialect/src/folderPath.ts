@@ -1,7 +1,7 @@
 // Folder/title path-segment grammar + case-fold identity + .md-strip helpers.
 //
-// Spec: docs/spec/markdown-dialect.md §3.6.1 (segment grammar for the
-// Myne-managed `folder:` field); docs/spec/wikilink.md §2.1/§3.4/§10 (target
+// Spec: agent-tooling/docs/spec/markdown-dialect.md §3.6.1 (segment grammar for the
+// Myne-managed `folder:` field); agent-tooling/docs/spec/wikilink.md §2.1/§3.4/§10 (target
 // delimiters + forbidden `]]`); §3.7.8 tag case-fold+NFC identity (reused here).
 // Grill: agent-tooling/sessions/grill/2026-05-29-folder-hierarchy-sidebar.md Q5.
 //

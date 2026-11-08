@@ -27,7 +27,7 @@
 //!   -- --ignored --nocapture --test-threads=1
 //! ```
 //!
-//! The printed numbers + the final engine decision land in `design-notes.md`
+//! The printed numbers + the final engine decision land in `agent-tooling/design-notes.md`
 //! via Task 10. The corpus is SYNTHETIC (deterministic templates + a
 //! pseudo-vocabulary spread) — a reproducible proxy, not a real-note
 //! distribution; RAM/blob ratios are indicative, query/rebuild timing is

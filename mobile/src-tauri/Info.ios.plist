@@ -26,14 +26,14 @@
   through the App Store Connect API.
 
   NSFaceIDUsageDescription: required by the biometric quick-unlock provider
-  (MYND-329; main repo design-notes.md 2026-07-12) — without it iOS denies
+  (MYND-329; main repo agent-tooling/design-notes.md 2026-07-12) — without it iOS denies
   the Face ID evaluation behind the gated Keychain read
   (kSecAccessControlBiometryCurrentSet) and the feature silently fails. The
   string is honest: Face ID only gates the device-local re-unlock key; it never
   replaces the master password and nothing biometric leaves the device.
 
   NSMicrophoneUsageDescription: required for voice notes (mobile voice-notes
-  feature; main repo design-notes.md 2026-07-12). The WebView records audio
+  feature; main repo agent-tooling/design-notes.md 2026-07-12). The WebView records audio
   via getUserMedia and stores it as an encrypted audio/wav attachment in the
   vault; without this key iOS terminates the app on the first capture. The
   string is honest and telemetry-free: audio is recorded ONLY while the user is

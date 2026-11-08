@@ -62,7 +62,7 @@ export type VaultUnlockError =
    * AEAD-tag failure on the password wrap-key. **By design this
    * single tag does NOT distinguish** "wrong password" from
    * "tampered password section of vault.meta", see
-   * `docs/spec/protocol.md` § 7.3:
+   * `agent-tooling/docs/spec/protocol.md` § 7.3:
    *
    * > Tag-verification failure means either the phrase was entered
    * > wrong or the `vault.meta` was tampered. The client MUST NOT
@@ -147,7 +147,7 @@ export type VaultUnlockError =
    * has successfully recovered with their phrase but has not yet
    * committed a new master password via `vault_complete_recovery`.
    * `vault_unlock` is structurally rejected during this window per
-   * `docs/spec/recovery-flow.md` § 4.1's "non-dismissible mandatory
+   * `agent-tooling/docs/spec/recovery-flow.md` § 4.1's "non-dismissible mandatory
    * chained step" rule.
    *
    * **Not user-facing**: frontend routes the user to the password-

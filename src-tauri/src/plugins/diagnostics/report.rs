@@ -14,7 +14,7 @@
 //!
 //! # This is a plaintext egress, and it is the user's own act
 //!
-//! `docs/threat-model.md` TB3 already carries the exception: a user-initiated
+//! `agent-tooling/docs/threat-model.md` TB3 already carries the exception: a user-initiated
 //! export to a destination the user chose. The bundle is exactly that, so it
 //! goes through the OS save dialog and the unclobbered writer (a fixed
 //! `<target>.tmp` name is only safe INSIDE the vault), and the surface shows

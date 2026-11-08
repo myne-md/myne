@@ -4,7 +4,7 @@ import SwiftUI
 /// The single watch surface: dictate a note and send it to the phone. Tapping the
 /// field opens the system text input, whose **dictation (mic)** option provides
 /// the voice capture — so no `SFSpeechRecognizer` and no microphone / speech
-/// entitlement are needed (the OS owns the mic; main-repo `design-notes.md`
+/// entitlement are needed (the OS owns the mic; main-repo `agent-tooling/design-notes.md`
 /// 2026-07-12). There is deliberately NO reading or editing of existing notes and
 /// NO vault key on the watch — this view only produces text.
 struct CaptureView: View {

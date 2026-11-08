@@ -57,7 +57,7 @@ pub enum VaultDeleteError {
     VaultBusyAuth,
 
     /// **Unreachable from current code paths** as of MYND-108-bis
-    /// (`design-notes.md` 2026-05-26 entry "MYND-108-bis vault_delete
+    /// (`agent-tooling/design-notes.md` 2026-05-26 entry "MYND-108-bis vault_delete
     /// extended to accept Slot::Empty + vault.meta-exists"): the
     /// `Slot::Empty + vault.meta-exists` state that previously surfaced
     /// this variant is now the lost-credentials no-keys happy path

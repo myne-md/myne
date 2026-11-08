@@ -11,7 +11,7 @@
 //!
 //! The read cores (`themes_list` / `themes_read` / `themes_export`) collapse
 //! absent / AEAD-fail / parse-fail to the **empty theme store** per
-//! `docs/spec/protocol.md` § 9.21.4 — those conditions do NOT surface here. Only
+//! `agent-tooling/docs/spec/protocol.md` § 9.21.4 — those conditions do NOT surface here. Only
 //! Slot precondition violations, unrecoverable `vault.meta` IO, and a
 //! `themes_read`/`themes_export` on a name that is absent from the store
 //! (`NotFound`) become read errors. The write cores (`themes_import` /

@@ -162,7 +162,7 @@ mod tests {
     ///
     /// The module doc above claims a field joining `isLiveNote` fails here
     /// rather than silently becoming the sixth thing an approve-all can do, and
-    /// `design-notes/ai/0515` repeats that as the reason the roster is derived
+    /// `agent-tooling/design-notes/ai/0515` repeats that as the reason the roster is derived
     /// instead of hand-picked. The version that shipped did not check it: it
     /// asserted `markers("").len() == MARKER_LINES.len()` and then
     /// `MARKER_LINES.len() == 5`, and BOTH sides are fixed at five by their own

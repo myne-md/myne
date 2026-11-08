@@ -7,7 +7,7 @@
 # a per-PR review pass has to be cheap enough that somebody actually runs it.
 #
 # tauri-driver has no macOS support, so this container IS the Linux seat
-# (docs/dev/e2e.md) — and capturing on the developer's own machine would
+# (agent-tooling/docs/dev/e2e.md) — and capturing on the developer's own machine would
 # photograph their real vault, which is the other reason it is not an option.
 #
 #   ./scripts/capture-ui-pass.sh                # build app + capture

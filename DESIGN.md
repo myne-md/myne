@@ -2,7 +2,7 @@
 name: Myne
 description: Open-source, end-to-end-encrypted markdown notes. Paper and ink surface, one cool accent, monospace for cryptographic identifiers.
 canonicalSource: repo
-canonicalSourceNote: "The design canon lives in this repository at docs/design/. Tokens below are extracted from docs/design/colors_and_type.css, which is the CSS-variable source and therefore the binding value. When that file and the values below disagree, the CSS wins and these values get corrected."
+canonicalSourceNote: "The design canon lives in this repository at agent-tooling/docs/design/. Tokens below are extracted from agent-tooling/docs/design/colors_and_type.css, which is the CSS-variable source and therefore the binding value. When that file and the values below disagree, the CSS wins and these values get corrected."
 colors:
   iron-blue: "#2c4a7a"
   iron-blue-hover: "#233b62"
@@ -179,7 +179,7 @@ The system explicitly rejects the privacy-product visual canon. There is no lock
 - Inter Variable for UI sans, JetBrains Mono Variable for cryptographic identifiers (slashed zero on, `ss02 + zero + calt`).
 - 1px hairlines (`#e3e2dd`) for every divider; 2px borders are forbidden.
 - Flat at rest. Shadows live only on overlays (command palette, dropdowns, toasts, tooltips), never on the editor surface or on cards.
-- Two motion tiers (`design-notes/ui/0632`). **Restrained** is the default and covers hover/focus/press/disclosure/panel: 120/180/260ms, exponential ease-out only. **Expressive** is opt-in for rare moments (first arrival, shared-element travel, a held gesture): 80ms press feedback, a named 380ms ceiling-breaker, emphasized and spring curves, capped stagger. `prefers-reduced-motion` disables transitions globally in **both**. A keyboard-initiated or 100+/day action gets no motion in either tier, and there are no pulsing state indicators in either.
+- Two motion tiers (`agent-tooling/design-notes/ui/0632`). **Restrained** is the default and covers hover/focus/press/disclosure/panel: 120/180/260ms, exponential ease-out only. **Expressive** is opt-in for rare moments (first arrival, shared-element travel, a held gesture): 80ms press feedback, a named 380ms ceiling-breaker, emphasized and spring curves, capped stagger. `prefers-reduced-motion` disables transitions globally in **both**. A keyboard-initiated or 100+/day action gets no motion in either tier, and there are no pulsing state indicators in either.
 
 ## 2. Colors: The Paper-and-Ink Palette
 
@@ -191,7 +191,7 @@ A near-monochrome system. The warm-paper neutral ramp does almost all the work; 
 ### Neutral
 - **Warm Paper** (`#fbfbfa`): The page background of the entire product. Not pure white; tinted to read as paper rather than as a screen surface.
 - **Warm Paper Recessed** (`#f4f4f2`): Recessed surfaces (sidebars, cards, the chrome around the editor).
-- **Warm Paper Pressed** (`#ecebe7`): the **hover** surface, and the top rung of the neutral ramp. Press is NOT another rung: it deepens one step further by a theme-independent mix toward the ink, because a step measured in the hairline token lands twice as hard on the amoled palette (`docs/design/README.md` "Hover + press", `design-notes/ui/0683`). A control carrying only this fill therefore has a hover state and no press state.
+- **Warm Paper Pressed** (`#ecebe7`): the **hover** surface, and the top rung of the neutral ramp. Press is NOT another rung: it deepens one step further by a theme-independent mix toward the ink, because a step measured in the hairline token lands twice as hard on the amoled palette (`agent-tooling/docs/design/README.md` "Hover + press", `agent-tooling/design-notes/ui/0683`). A control carrying only this fill therefore has a hover state and no press state.
 - **Hairline** (`#e3e2dd`): The 1px hairline that separates every region. The system's most-used color after `--paper`.
 - **Divider** (`#c8c7c1`): Stronger dividers, default input borders.
 - **Control Disabled** (`#a3a29c`): Disabled controls and inactive icon strokes.
@@ -234,7 +234,7 @@ Both webfonts are self-hosted under `public/fonts/` (`InterVariable.woff2`, `Jet
 - **Label / Eyebrow** (semibold 600, 11px, line-height 1.5, letter-spacing 0.08em, uppercase, ink-tertiary): The only place the system uses uppercase. Eyebrow tags above primary blocks; nothing else gets all caps.
 - **Mono** (regular 400, 14px, line-height 1.4, `ss02 + zero + calt`): Code spans, fingerprints, file paths.
 - **Mono Large** (regular 400, 18px, line-height 1.4): Recovery-phrase word display.
-- **Account Number** (medium 500, 16px, line-height 1.4, letter-spacing 0.04em, `ss02 + zero + calt`): The signature treatment for `MY-XXXX-XXXX-XXXX-XXXX-XXXX` (27 characters — `MY-` plus five 4-char Crockford groups; `docs/spec/account-number.md` §2). Always non-breaking hyphens (U+2011), `user-select: all`. Truncates to `MY-XXXX-...-XXXX` only in the sidebar account chip.
+- **Account Number** (medium 500, 16px, line-height 1.4, letter-spacing 0.04em, `ss02 + zero + calt`): The signature treatment for `MY-XXXX-XXXX-XXXX-XXXX-XXXX` (27 characters — `MY-` plus five 4-char Crockford groups; `agent-tooling/docs/spec/account-number.md` §2). Always non-breaking hyphens (U+2011), `user-select: all`. Truncates to `MY-XXXX-...-XXXX` only in the sidebar account chip.
 
 ### Named Rules
 
@@ -268,7 +268,7 @@ Dark theme uses the same vocabulary with deeper alpha values (`rgba(0,0,0,0.4..0
 
 ## 5. Components
 
-Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/design/icons/` so the desktop client works offline and reproducible builds stay reproducible. 1.5px stroke at 24px canonical size, 16px in dense rows. `currentColor` always; icons inherit text color and are never colored independently.
+Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `agent-tooling/docs/design/icons/` so the desktop client works offline and reproducible builds stay reproducible. 1.5px stroke at 24px canonical size, 16px in dense rows. `currentColor` always; icons inherit text color and are never colored independently.
 
 ### Buttons
 
@@ -309,7 +309,7 @@ Lucide stroke icons throughout (`https://lucide.dev`), copied locally to `docs/d
 
 ### Account Number (signature component)
 
-The most distinctive visual element in the product. Renders as `MY-XXXX-XXXX-XXXX-XXXX-XXXX` in JetBrains Mono medium 16px with letter-spacing 0.04em — 27 characters, the `MY-` prefix plus five 4-char Crockford groups, the last of which ends in the Damm-32 check character (`docs/spec/account-number.md` §2). Size input fields and chips for the full 27; the truncated `-X` schematic that appears in older prose is illustrative shorthand, not the display form. Hyphens are non-breaking (U+2011) so the value never wraps mid-group. `user-select: all` so a single click selects the whole value. The slashed zero (`ss02 + zero` features) is mandatory because the value is hand-typed from another device. In the sidebar account chip, truncates to `MY-XXXX-...-XXXX` (first group + last group); everywhere else, full form.
+The most distinctive visual element in the product. Renders as `MY-XXXX-XXXX-XXXX-XXXX-XXXX` in JetBrains Mono medium 16px with letter-spacing 0.04em — 27 characters, the `MY-` prefix plus five 4-char Crockford groups, the last of which ends in the Damm-32 check character (`agent-tooling/docs/spec/account-number.md` §2). Size input fields and chips for the full 27; the truncated `-X` schematic that appears in older prose is illustrative shorthand, not the display form. Hyphens are non-breaking (U+2011) so the value never wraps mid-group. `user-select: all` so a single click selects the whole value. The slashed zero (`ss02 + zero` features) is mandatory because the value is hand-typed from another device. In the sidebar account chip, truncates to `MY-XXXX-...-XXXX` (first group + last group); everywhere else, full form.
 
 ### Recovery Phrase Word
 
@@ -322,7 +322,7 @@ Used only when an inline progressive disclosure is genuinely impossible. Backgro
 ## 6. Do's and Don'ts
 
 ### Do
-- **Do** treat `docs/design/` as the canonical design source, and bind every component to the CSS variables in `docs/design/colors_and_type.css` rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong — and update `docs/design/` in the same change when it is the canon that has fallen behind.
+- **Do** treat `agent-tooling/docs/design/` as the canonical design source, and bind every component to the CSS variables in `agent-tooling/docs/design/colors_and_type.css` rather than to a literal. When a shipped screen and the canon disagree, fix whichever side is actually wrong — and update `agent-tooling/docs/design/` in the same change when it is the canon that has fallen behind.
 - **Do** use OKLCH-style descriptive names in token discussions ("warm paper", "iron blue", "brick danger") rather than hex-code references in copy. The hex values are normative; the names are what humans use.
 - **Do** render every cryptographic identifier (account numbers, recovery-phrase words, key fingerprints, hash prefixes) in JetBrains Mono with `ss02` and `zero` features on.
 - **Do** use the standard 2px iron-blue ring with a 1px paper offset for `:focus-visible` on every interactive element. The ring is always visible; never removed.

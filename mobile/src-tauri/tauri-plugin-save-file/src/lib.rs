@@ -43,7 +43,7 @@
 //! ## Verification status
 //!
 //! The committed Kotlin compiles against the generated gradle project, and its
-//! effect is device-verified through `docs/dev/device-matrix.md` §8 row 8.8, not
+//! effect is device-verified through `agent-tooling/docs/dev/device-matrix.md` §8 row 8.8, not
 //! in this change, the same bar `pdf_export.rs`, `screen_guard.rs` and
 //! `ShareIntentPlugin.kt` are held to, because no CI lane in this repo runs an
 //! Android device.
