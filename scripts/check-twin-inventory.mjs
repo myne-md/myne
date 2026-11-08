@@ -1447,7 +1447,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Model resolution and integrity checking, 1373 lines against 716. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
+      "Model resolution and integrity checking, 1363 lines against 716. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
     a: "core/src/inference/engine.rs",

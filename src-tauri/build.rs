@@ -586,6 +586,11 @@ fn main() {
                 "reveal_logs_folder",
                 "report_manifest",
                 "save_report",
+                // The block's two host-side readings (myne-md/myne#991): the
+                // running executable's digest, and the active vault directory's
+                // entry count and size.
+                "build_digest",
+                "vault_usage",
             ]),
         )
         .plugin(

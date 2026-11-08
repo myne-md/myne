@@ -79,6 +79,12 @@ export interface SeamModules {
       total_bytes: number;
       crash_at_epoch_seconds: number | null;
     }>;
+    // The two host-side measures of the diagnostic block (myne-md/myne#991).
+    // On the contract rather than desktop-only because the browser arm carries a
+    // mirror of each: a mirror whose signature drifted is a build that cannot
+    // substitute the seam, and nothing else in the browser lane calls them.
+    buildDigest: () => Promise<string>;
+    measureVaultUsage: () => Promise<{ entries: number; bytes: number } | null>;
     saveReport: (block: string, destination: string) => Promise<void>;
   };
   window: { getCurrentWindow: () => { destroy: () => Promise<void> } };
@@ -308,6 +314,8 @@ export function runSeamContract(subject: SeamSubject): void {
         "crashRecordClear",
         "revealLogsFolder",
         "reportManifest",
+        "buildDigest",
+        "measureVaultUsage",
         "saveReport",
       ] as const;
       for (const name of names) {
