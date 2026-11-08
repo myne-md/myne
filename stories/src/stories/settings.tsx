@@ -54,10 +54,10 @@ import { SeedMemoryWizard } from "@app/components/settings/SeedMemoryWizard";
 import { SeedMemoryCard } from "@app/notes/components/SeedMemoryCard";
 import { McpGrantDialog } from "@app/components/settings/McpGrantDialog";
 import { McpSection } from "@app/components/settings/McpSection";
-import { MigrateVaultForm } from "@app/components/settings/MigrateVaultForm";
 import { NetworkPanel } from "@app/components/settings/NetworkPanel";
 import { NewNoteLocationSettings } from "@app/components/settings/NewNoteLocationSettings";
 import { PeriodicNotesSettings } from "@app/components/settings/PeriodicNotesSettings";
+import { CalendarSettings } from "@app/components/settings/CalendarSettings";
 import { PlainFileSettings } from "@app/components/settings/PlainFileSettings";
 import { PrivacyPanel } from "@app/components/settings/PrivacyPanel";
 import { QuickUnlockSettings } from "@app/components/settings/QuickUnlockSettings";
@@ -71,7 +71,6 @@ import {
   SettingsTopicPanel,
 } from "@app/components/settings/SettingsTabs";
 import { AI_PANEL_TOPICS } from "@app/components/settings/settingsTopics";
-import { SettleMigrationBlock } from "@app/components/settings/SettleMigrationBlock";
 import { SpellSettings } from "@app/components/settings/SpellSettings";
 import { StartupOpenSettings } from "@app/components/settings/StartupOpenSettings";
 import { StoragePanel } from "@app/components/settings/StoragePanel";
@@ -681,6 +680,36 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
+    id: "settings/calendarsettings/default",
+    group: "settings",
+    surface: "CalendarSettings",
+    state: "default",
+    description:
+      "Settings -> Editor -> Calendar: the all-day reminder anchor (chosen from the 48 half-hours, never typed) and the per-calendar colour map. Pick a colour and look for it landing on the swatch immediately, and for the empty state naming what fills the list rather than showing a bare row.",
+    tags: ["settings", "editor", "calendar", "colours", "reminders", "empty-state"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <CalendarSettings />
+      </Frame>
+    ),
+  },
+  {
+    id: "settings/calendarsettings/with-colours",
+    group: "settings",
+    surface: "CalendarSettings",
+    state: "with-colours",
+    description:
+      "The same block once two calendars carry colours: one row per name with the shared eight-token swatch picker and a remove control, and the add row underneath. Each swatch paints through var(--group-*), so this is the specimen that shows a theme switch repainting the calendar's colours with everything else.",
+    tags: ["settings", "editor", "calendar", "colours", "tokens", "theme"],
+    fixture: PREFS_FIXTURE,
+    render: () => (
+      <Frame>
+        <CalendarSettings />
+      </Frame>
+    ),
+  },
+  {
     id: "settings/attachmentcompressionsettings/default",
     group: "settings",
     surface: "AttachmentCompressionSettings",
@@ -1159,21 +1188,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "settings/migratevaultform/default",
-    group: "settings",
-    surface: "MigrateVaultForm",
-    state: "default",
-    description:
-      "The whole-vault v0.1 → v0.2 migration form, user-initiated rather than a forced refuse-and-prompt. The recovery phrase is required and verified backend-side, so a missing phrase writes nothing; the copy is honest rather than alarming, and the one-way re-key is the single caution.",
-    tags: ["settings", "migration", "v0.1", "v0.2", "recovery-phrase", "one-way", "upgrade"],
-    fixture: PREFS_FIXTURE,
-    render: () => (
-      <Frame>
-        <MigrateVaultForm onMigrated={action("onMigrated")} />
-      </Frame>
-    ),
-  },
-  {
     id: "settings/networkpanel/default",
     // A `role="switch"` whose value is unresolved: this story does not answer
     // the command that drives the toggle, so `checked` is not a boolean and
@@ -1501,25 +1515,6 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     ),
   },
   {
-    id: "settings/settlemigrationblock/default",
-    group: "settings",
-    surface: "SettleMigrationBlock",
-    state: "default",
-    description:
-      "Settings → Vault's block offering to settle a completed migration. It renders only when the backend reports an unsettled legacy snapshot, and the fake host reports none, so the stage shows the `unreachable` reason rather than the block: when it does render it is the door that finalises the migration.",
-    unreachable: {
-      what: "the block offering to settle a completed migration",
-      why: "it renders only when the backend reports an unsettled legacy snapshot, and the fake host reports none",
-    },
-    tags: ["settings", "migration", "settle", "v0.1", "unsettled", "snapshot", "vault"],
-    fixture: PREFS_FIXTURE,
-    render: () => (
-      <Frame>
-        <SettleMigrationBlock onSettled={action("onSettled")} />
-      </Frame>
-    ),
-  },
-  {
     id: "settings/spellsettings/default",
     group: "settings",
     surface: "SpellSettings",
@@ -1589,7 +1584,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     render: () => (
       <Frame>
         <SidebarStateProvider>
-          <SyncPanel onMigrated={action("onMigrated")} onDialogOpenChange={action("onDialogOpenChange")} />
+          <SyncPanel onDialogOpenChange={action("onDialogOpenChange")} />
         </SidebarStateProvider>
       </Frame>
     ),

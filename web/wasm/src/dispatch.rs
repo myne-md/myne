@@ -1580,6 +1580,37 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
         // `VaultIndicesState` — no host, no IO, no clock — so they port by being
         // dispatched. `persist` and `hydrate` are the two that touch storage and
         // take the seam.
+        "plugin:vault-indices|vault_indices_calendar_range" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                window_start: String,
+                window_end: String,
+                bounded: bool,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::vault_indices::commands::vault_indices_calendar_range_from_host(
+                crate::session::state(),
+                crate::session::indices(),
+                a.window_start,
+                a.window_end,
+                a.bounded,
+            )
+            .await
+            {
+                Ok(v) => Outcome::ok(&v),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
         "plugin:vault-indices|vault_indices_all_edges" => {
             use myne_core::plugins::vault_indices::commands::vault_indices_all_edges_from_host;
             match vault_indices_all_edges_from_host(
@@ -3908,6 +3939,37 @@ pub async fn dispatch(cmd: &str, args: serde_json::Value) -> Outcome {
                 crate::session::state(),
                 crate::session::hooks(),
                 a.period,
+                a.setting,
+                a.value,
+                vault_io(),
+            )
+            .await
+            {
+                Ok(()) => Outcome::ok(&serde_json::Value::Null),
+                Err(e) => Outcome::error(&e),
+            }
+        }
+
+        "plugin:prefs|set_calendar_setting" => {
+            #[derive(serde::Deserialize)]
+            #[serde(rename_all = "camelCase")]
+            struct Args {
+                setting: String,
+                value: Option<String>,
+            }
+            let a: Args = match serde_json::from_value(args) {
+                Ok(a) => a,
+                Err(e) => {
+                    return Outcome::BadArgs {
+                        command: cmd.to_string(),
+                        detail: e.to_string(),
+                    }
+                }
+            };
+            match myne_core::plugins::prefs::commands::set_calendar_setting_from_host(
+                host_ctx(),
+                crate::session::state(),
+                crate::session::hooks(),
                 a.setting,
                 a.value,
                 vault_io(),

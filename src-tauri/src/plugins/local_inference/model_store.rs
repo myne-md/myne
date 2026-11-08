@@ -32,11 +32,9 @@
 #![cfg_attr(not(test), allow(dead_code))]
 
 use std::fmt::Write as _;
-use std::io::Read as _;
 use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
-use sha2::{Digest, Sha256};
 
 use crate::io_failure_kind::{from_io_error_kind, IoFailureKind};
 use crate::paths::VAULTS_DIR_NAME;
@@ -265,19 +263,11 @@ fn file_stat(path: &Path) -> Result<(u64, i128), ModelStoreError> {
 /// file first (a FIFO/device would never terminate). Called at model-pick time
 /// (not on the unlock hot path) so a warm unlock never re-hashes.
 fn compute_file_sha256(path: &Path) -> Result<[u8; 32], ModelStoreError> {
-    // Guard against a FIFO/device masquerading as a model file (unbounded read).
-    let _ = file_stat(path)?;
-    let mut file = std::fs::File::open(path)?;
-    let mut hasher = Sha256::new();
-    let mut buf = [0u8; 64 * 1024];
-    loop {
-        let n = file.read(&mut buf)?;
-        if n == 0 {
-            break;
-        }
-        hasher.update(&buf[..n]);
-    }
-    Ok(hasher.finalize().into())
+    // The loop lives in `crate::file_digest`, shared with the diagnostics
+    // plugin's build digest (myne-md/myne#991): one implementation, one
+    // non-regular-file guard, so a FIFO/device masquerading as a model file
+    // cannot make either reader hang.
+    Ok(crate::file_digest::sha256_of_file(path)?)
 }
 
 /// Marker line format: `hex_hash\nlen\nmtime_nanos`. Line 1 is the hash (read by

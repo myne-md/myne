@@ -46,6 +46,7 @@ import {
   forceCloseTab as forceCloseTabOp,
   focusedLeaf,
   graphItem,
+  calendarItem,
   tasksItem,
   attachmentsItem,
   templatesItem,
@@ -64,6 +65,7 @@ import {
   setFocusedPane,
   setPinned as setPinnedOp,
   setItemViewMode as setItemViewModeOp,
+  setCalendarViewState as setCalendarViewStateOp,
   setTaskViewState as setTaskViewStateOp,
   setAgentViewState as setAgentViewStateOp,
   resolveTaskView,
@@ -88,6 +90,7 @@ import {
   type WorkspaceState,
 } from "./workspaceState";
 import type { TaskView } from "./taskView";
+import type { CalendarView } from "./workspaceState";
 import {
   clearRenameFlushHooks,
   registerRenameFlushHooks,
@@ -305,6 +308,8 @@ export type WorkspaceApi = {
   /** Open (or reveal) the vault-wide task list - a singleton tab, like the
    *  graph, so calling twice reveals rather than duplicating (MYND-616). */
   openTasks: () => void;
+  /** Open (or reveal) the calendar tab (myne-md/myne#1037). */
+  openCalendar: () => void;
   /** Open (or reveal) the attachment-library tab (myne-md/myne#773). */
   openAttachments: () => void;
   /** Open (or reveal) the template-library tab (myne-md/myne#779). */
@@ -312,6 +317,8 @@ export type WorkspaceApi = {
   /** Persist the task tab's view (filters + sort) WITH the tab.
    *  Session state, per tab, never a preference. */
   setTaskViewState: (paneId: PaneId, next: TaskView) => void;
+  /** Set a calendar tab's zoom (myne-md/myne#1037). Per-tab session state. */
+  setCalendarViewState: (paneId: PaneId, next: CalendarView) => void;
   /** The LAST task view, container-level, so closing and reopening the Tasks
    *  tab restores the filters (myne-md/myne#656 review). */
   taskView: TaskView;
@@ -697,6 +704,10 @@ export function WorkspaceProvider({
   );
   const openGraph = useCallback(() => openSingleton(graphItem()), [openSingleton]);
   const openTasks = useCallback(() => openSingleton(tasksItem()), [openSingleton]);
+  const openCalendar = useCallback(
+    () => openSingleton(calendarItem()),
+    [openSingleton],
+  );
   const openAttachments = useCallback(
     () => openSingleton(attachmentsItem()),
     [openSingleton],
@@ -705,6 +716,13 @@ export function WorkspaceProvider({
     () => openSingleton(templatesItem()),
     [openSingleton],
   );
+  const setCalendarViewState = useCallback(
+    (paneId: PaneId, next: CalendarView) => {
+      setState((s) => setCalendarViewStateOp(s, paneId, next));
+    },
+    [setState],
+  );
+
   const setTaskViewState = useCallback(
     (paneId: PaneId, next: TaskView) => {
       setState((s) => setTaskViewStateOp(s, paneId, next));
@@ -1057,6 +1075,7 @@ export function WorkspaceProvider({
       openView,
       openGraph,
       openTasks,
+      openCalendar,
       openAttachments,
       openTemplates,
       openAgent,
@@ -1064,6 +1083,7 @@ export function WorkspaceProvider({
       setAgentViewState,
       focusedNoteId,
       setTaskViewState,
+      setCalendarViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,
@@ -1120,9 +1140,11 @@ export function WorkspaceProvider({
       openView,
       openGraph,
       openTasks,
+      openCalendar,
       openAttachments,
       openTemplates,
       setTaskViewState,
+      setCalendarViewState,
       activateItemInPane,
       closeItemInPane,
       dropItemOnPane,

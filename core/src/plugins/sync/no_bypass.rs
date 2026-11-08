@@ -254,32 +254,52 @@ fn production_code(source: &str) -> String {
     out.join("\n")
 }
 
-/// Modules this directory's `mod.rs` declares under a `test` cfg — the
-/// simulation harness, and this guard itself. They are not shipped, so their
-/// sockets are not egress; and asking `mod.rs` beats a hardcoded list, which
-/// would go stale the first time somebody adds a test-only module.
+/// Modules under a `test` cfg - the simulation harness, this guard, and any module
+/// split out through `#[path]`. Not shipped, so their sockets are not egress.
 fn test_only_modules() -> Vec<String> {
-    let mod_rs = std::fs::read_to_string(sync_dir().join("mod.rs")).expect("read mod.rs");
     let mut out = Vec::new();
-    let mut gated = false;
-    for line in mod_rs.lines() {
-        let line = line.trim();
-        if line.starts_with("#[cfg(") {
-            // `#[cfg(test)]` and `#[cfg(all(test, …))]`, but NOT
-            // `#[cfg(feature = "test-support")]`.
-            gated = line.contains("test)") || line.contains("test,");
+    // Read every file: the `#[path]` declaration sits where the module is owned, not
+    // in `mod.rs`, and that file is exactly where a fixture's socket lives.
+    let mut sources =
+        vec![std::fs::read_to_string(sync_dir().join("mod.rs")).expect("read mod.rs")];
+    for entry in std::fs::read_dir(sync_dir()).expect("read sync dir") {
+        let path = entry.expect("dir entry").path();
+        if path.file_name().and_then(|n| n.to_str()) == Some("mod.rs") {
             continue;
         }
-        if let Some(rest) = line
-            .strip_prefix("mod ")
-            .or_else(|| line.strip_prefix("pub mod "))
-        {
-            if gated {
-                if let Some(name) = rest.strip_suffix(';') {
-                    out.push(format!("{name}.rs"));
-                }
+        if path.extension().and_then(|e| e.to_str()) == Some("rs") {
+            sources.push(std::fs::read_to_string(&path).expect("read source"));
+        }
+    }
+    for source in &sources {
+        let mut gated = false;
+        let mut path_attr: Option<String> = None;
+        for line in source.lines() {
+            let line = line.trim();
+            if line.starts_with("#[cfg(") {
+                // `#[cfg(test)]` and `#[cfg(all(test, …))]`, but NOT
+                // `#[cfg(feature = "test-support")]`.
+                gated = line.contains("test)") || line.contains("test,");
+                continue;
             }
-            gated = false;
+            if let Some(rest) = line.strip_prefix("#[path = \"") {
+                if gated {
+                    path_attr = rest.strip_suffix("\"]").map(str::to_string);
+                }
+                continue;
+            }
+            if let Some(rest) = line
+                .strip_prefix("mod ")
+                .or_else(|| line.strip_prefix("pub mod "))
+            {
+                if gated {
+                    if let Some(name) = rest.strip_suffix(';') {
+                        out.push(path_attr.take().unwrap_or_else(|| format!("{name}.rs")));
+                    }
+                }
+                gated = false;
+                path_attr = None;
+            }
         }
     }
     out

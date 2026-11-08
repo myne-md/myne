@@ -7,10 +7,9 @@
 // These configure the focus-mode BEHAVIOUR; entering focus mode itself is the
 // ⇧⌘F toggle (ephemeral, not a pref). The setters bump the prefs nonce so an open
 // editor re-reads and reconfigures its focus extensions live (no remount).
-
-import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { SettingRow } from "./SettingRow";
 import { ERROR_STYLE } from "./panel-styles";
 import {
@@ -21,50 +20,21 @@ import {
 
 export function FocusModeSettings() {
   const { t } = useTranslation();
-  const [typewriter, setTypewriter] = useState(true);
-  const [dim, setDim] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        // null ≡ unset → host default-ON.
-        setTypewriter(p.editor_focus_typewriter ?? true);
-        setDim(p.editor_focus_dim_inactive ?? true);
-      })
-      .catch(() => {
-        /* locked / no vault — leave defaults ON */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggleTypewriter(next: boolean) {
-    const prev = typewriter;
-    setTypewriter(next);
-    try {
-      await setEditorFocusTypewriter(next);
-      setError(null);
-    } catch {
-      setTypewriter(prev);
-      setError(t("settings.focusMode.saveError"));
-    }
-  }
-
-  async function toggleDim(next: boolean) {
-    const prev = dim;
-    setDim(next);
-    try {
-      await setEditorFocusDimInactive(next);
-      setError(null);
-    } catch {
-      setDim(prev);
-      setError(t("settings.focusMode.saveError"));
-    }
-  }
+  const { value: typewriter, set: setTypewriter, error: typewriterError } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.editor_focus_typewriter ?? true,
+    write: setEditorFocusTypewriter,
+    initial: true,
+    errorMessage: t("settings.focusMode.saveError"),
+  });
+  const { value: dim, set: setDim, error: dimError } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.editor_focus_dim_inactive ?? true,
+    write: setEditorFocusDimInactive,
+    initial: true,
+    errorMessage: t("settings.focusMode.saveError"),
+  });
+  const error = typewriterError ?? dimError;
 
   return (
     <>
@@ -74,7 +44,7 @@ export function FocusModeSettings() {
         control={(helperId) => (
           <Switch
             checked={typewriter}
-            onChange={() => toggleTypewriter(!typewriter)}
+            onChange={() => void setTypewriter(!typewriter)}
             ariaLabel={t("settings.focusMode.typewriterAria")}
             ariaDescribedBy={helperId}
             testId="settings.focus-typewriter"
@@ -87,7 +57,7 @@ export function FocusModeSettings() {
         control={(helperId) => (
           <Switch
             checked={dim}
-            onChange={() => toggleDim(!dim)}
+            onChange={() => void setDim(!dim)}
             ariaLabel={t("settings.focusMode.dimAria")}
             ariaDescribedBy={helperId}
             testId="settings.focus-dim"

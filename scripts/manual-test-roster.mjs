@@ -115,6 +115,55 @@
 /** @type {readonly Entry[]} */
 export const ROSTER = Object.freeze([
   {
+    id: "calendar.events",
+    title: "The calendar: events, tasks, and the two clocks",
+    paths: [
+      "src/notes/components/CalendarPane.tsx",
+      "src/notes/components/CalendarEventForm.tsx",
+      "src/notes/calendar/",
+      "src/lib/calendarIcs.ts",
+      "src/lib/homeZone.ts",
+      "src/hooks/useLiveCalendarEvents.ts",
+      "src/components/settings/CalendarSettings.tsx",
+      "core/src/plugins/vault_indices/calendar.rs",
+      "src-tauri/src/plugins/text_file/",
+      "mobile/src/app/flows/CalendarSurface.tsx",
+      "mobile/src/app/flows/EventComposerSheet.tsx",
+      "mobile/src/lib/eventWrite.ts",
+      "mobile/src/lib/useMobileReminderPass.ts",
+    ],
+    clients: ["desktop-macos", "desktop-linux", "desktop-windows", "ios", "android"],
+
+    manual: [
+      {
+        how: "On the desktop, with the browser's own zone set to something other than the vault's home zone, open the calendar and set Appearance > Home time zone to a zone at least three hours away. Confirm every timed event shows two clocks and that the SECOND one moves while the first stays exactly as the file says. Then close the app, reopen it, and confirm the file still reads `start: 2026-11-05 09:00` with no zone, no offset and no extra field in the frontmatter.",
+        see: "Two clocks on a timed event, one unchanged `start:` line in the file. A FAIL is any zone or offset written into a note, or a second clock that does not change when the setting does.",
+        whyNotAutomated: "The first half is a display rule covered by unit tests; the half that matters is the ONE thing a display feature must never do, which is reach the file. That is a claim about stored bytes on a machine whose zone a harness can fake but whose settings sheet it cannot drive, so the observation is a person reading a frontmatter block.",
+        clients: ["desktop-macos", "desktop-linux", "desktop-windows"],
+        estimateMin: 6,
+        tier: "standard",
+      },
+      {
+        how: "On a real iPhone or Android phone, tap a day, tap +, and create an event with a title, a time and a weekly repeat. Then tap the same day's row for the NEXT week, tap 'Start this one at', enter a different clock, and confirm that week shows the new time while the following week keeps the series' own. Then cancel one further week with 'Cancel this one' and confirm that week is empty while the week after still shows the event.",
+        see: "One retimed week, one cancelled week, every other week unchanged, and the series note in the vault carrying `override:` and `skip:` rather than two extra notes. A FAIL is a series that moved as a whole, or a cancelled week that came back after a sync.",
+        whyNotAutomated: "The gesture and the write are covered by tests, but the claim is about what the NEXT week shows after two writes to the same note, on a client the tauri-driver lane cannot hold: it runs one Linux container, and the phone is where the composer, the day list and the two sheets live.",
+        clients: ["ios", "android"],
+        estimateMin: 8,
+        tier: "core",
+      },
+      {
+        how: "On the phone, with reminders enabled and the notification permission granted, create an event starting in about twelve minutes with a `10m` reminder, lock the phone and wait. Then repeat with the app in the background rather than closed.",
+        see: "One notification, content-free, at the expected minute in both states. This is the check no harness can make: the permission, the background resume and the OS store behave differently on a device.",
+        whyNotAutomated: "Notification delivery is the platform's own scheduler. No in-process harness observes it, and a simulation would be testing the simulator: the failure this check exists for is a phone that holds no registration at all.",
+        clients: ["ios", "android"],
+        estimateMin: 10,
+        tier: "core",
+      },
+    ],
+    whyNotAutomated:
+      "The three claims here are a stored-bytes claim, a two-device-series claim and an OS-notification claim. The first is covered by unit tests, the second needs a phone driven by hand (the tauri-driver lane runs one Linux container and cannot hold a phone), and the third is the platform's own scheduling, which no in-process harness observes.",
+  },
+  {
     id: "ai.agent-mode",
     title: "Agent mode and its review card",
     paths: [
@@ -3073,8 +3122,8 @@ export const ROSTER = Object.freeze([
         tier: "standard",
       },
       {
-        see: "On an Android device (device-matrix row 8.8): run each export. Confirm the file is written, a toast names the location, and there is no crash and no silent no-op. Then open the system Files app and try to navigate to Android/data/<pkg>/files/Documents: confirm you cannot (API 30+ refuses), and record whether the toast's wording is honest about that.",
-        whyNotAutomated: "Android has no share sheet in this build and the destination is a directory the system Files app refuses to enter; both facts are only observable on a device with a real Files app.",
+        see: "On an Android device (device-matrix row 8.8): run each export (recovery phrase, identity phrase, Export to Markdown, an attachment). Confirm the system save dialog opens for each, that picking a destination writes a file you can open from the Files app or the provider's app, and that dismissing it leaves the app's own copy intact. Export to Markdown must arrive as one .zip that unzips to the note tree, because a document picker saves a document and not a folder.",
+        whyNotAutomated: "The Storage Access Framework dialog, the provider that receives the bytes and the system Files app's refusal to enter Android/data/<pkg>/files/Documents are all device facts; no CI lane in this repo runs an Android device, and the picker's effect is exactly what cannot be observed from inside the process.",
         clients: ["android"],
         estimateMin: 8,
         tier: "standard",
@@ -3393,7 +3442,6 @@ export const ROSTER = Object.freeze([
       "packaging/arch/myne.desktop",
       "src-tauri/src/cli_bridge/path_shim.rs",
       "src-tauri/src/clipper/manifest.rs",
-      "docs/decisions/clients/0050-vault-path-app-data-dir-vault-single-vault-per-os-user-in-ph.md",
     ],
     // android is here for the two distribution-integrity items only, not for the
     // installer chrome: stage-release.sh publishes the .apk to downloads.myne.md
@@ -5283,7 +5331,6 @@ export const ROSTER = Object.freeze([
       "src/hooks/usePrefs.ts",
       "src/lib/prefs.ts",
       "src-tauri/src/screen_capture.rs",
-      "docs/decisions/clients/0495-screen-capture-protection-macos-is-uncovered-and-linux-is-no.md",
     ],
     clients: ["desktop-linux"],
     automatedBy: [],
@@ -5306,7 +5353,6 @@ export const ROSTER = Object.freeze([
       "src/hooks/usePrefs.ts",
       "src/lib/prefs.ts",
       "src-tauri/src/screen_capture.rs",
-      "docs/decisions/clients/0495-screen-capture-protection-macos-is-uncovered-and-linux-is-no.md",
     ],
     clients: ["desktop-macos"],
     automatedBy: [],
@@ -5549,7 +5595,6 @@ export const ROSTER = Object.freeze([
     title: "Vault panel",
     paths: [
       "src/components/settings/VaultPanel.tsx",
-      "src/components/settings/VaultFormatUpgrade.tsx",
       "src/lib/vault-delete.ts",
       "src/lib/vault-format-upgrade.ts",
     ],
@@ -6736,15 +6781,9 @@ export const ROSTER = Object.freeze([
     id: "vault.migration-and-repair",
     title: "Vault migration, settle and repair",
     paths: [
-      "src/lib/vault-migrate.ts",
       "src/lib/vault-repair.ts",
       "src/components/RepairResidueBanner.tsx",
-       "src/components/settings/MigrateVaultForm.tsx",
-       "web/src/components/settings/MigrateVaultForm.tsx",
-
-      "src/components/settings/SettleMigrationBlock.tsx",
       "src/platform/capabilities.ts",
-      "src-tauri/src/plugins/vault_migrate/",
       "core/src/plugins/vault_migrate/",
       "src-tauri/src/vault_migration.rs",
       "src-tauri/src/plugins/vault_repair/",
@@ -7194,7 +7233,6 @@ export const ROSTER = Object.freeze([
       "web/src/components/sync/EndpointConfig.tsx",
       "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
-      "web/src/components/settings/MigrateVaultForm.tsx",
       "scripts/check-web-capabilities.mjs",
       "src/screens/WebNoAccount.tsx",
     ],
@@ -7237,7 +7275,6 @@ export const ROSTER = Object.freeze([
       "web/src/sw/update-policy.ts",
       "web/container/Caddyfile",
       "docs/web-bundle-hashes.md",
-      "docs/decisions/clients/0359-service-worker-update-policy-for-the-web-client-signed-updat.md",
     ],
     clients: ["web"],
     automatedBy: [
@@ -7435,8 +7472,6 @@ export const ROSTER = Object.freeze([
     id: "web.phrase.creation-and-recovery-in-a-page",
     title: "The 24-word phrase displayed in and typed into a browser, on every path",
     paths: [
-      "docs/decisions/protocol/0514-web-phrase-capability-split-creation-and-recovery-ship-enrol.md",
-      "docs/decisions/protocol/0704-the-recovery-phrase-is-no-longer-forbidden-in-served-code.md",
       "web/vite.config.ts",
       "src/components/PhraseEntryGrid.tsx",
       "e2e-web/create-account.e2e.ts",
@@ -7505,7 +7540,6 @@ export const ROSTER = Object.freeze([
     id: "web.storage.eviction-rebootstrap",
     title: "Browser eviction of the vault container, and re-bootstrap instead of loss",
     paths: [
-      "docs/decisions/clients/0358-on-the-web-client-tofu-re-bootstrap-is-routine-not-once-per.md",
       "src/screens/PendingApproval.tsx",
       "src/screens/StorageLost.tsx",
       "web/src/platform/app-exit.ts",

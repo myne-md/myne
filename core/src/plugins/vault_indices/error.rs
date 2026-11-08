@@ -33,6 +33,17 @@ pub enum VaultIndicesError {
     /// falls back to the RAM-only index + a full rebuild on next unlock.
     #[error("vault.meta unreadable for vault.indices persistence")]
     InvalidVaultMeta,
+    /// A calendar query window that does not parse as the event wall-clock
+    /// shape, or whose end precedes its start (myne-md/myne#1037). DENY-list
+    /// clean: the offending bytes are never echoed back.
+    #[error("calendar window is not a readable time range")]
+    CalendarWindowUnreadable,
+    /// A calendar range wider than the caller's bound allows
+    /// (myne-md/myne#1037). Carries the bound so the refusal can STATE it rather
+    /// than saying "too wide": a limit a caller cannot see is a limit it will hit
+    /// again. DENY-list clean (two integers, no content).
+    #[error("calendar window is wider than {max_days} days")]
+    CalendarWindowTooWide { max_days: i64 },
     /// An IO / encode failure while writing the `vault.indices` blob (Task 8).
     /// DENY-list clean (no path, no `io::Error::Display`). Best-effort: the
     /// in-RAM index is unaffected; the next unlock rebuilds the missing delta.

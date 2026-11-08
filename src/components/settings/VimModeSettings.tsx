@@ -11,11 +11,11 @@
 // Windows and Linux, Myne's application chords win over vim's `Ctrl-` grammar,
 // so a handful of vim chords are unavailable. Stating it here is what keeps a
 // missing `Ctrl-d` reading as a documented trade-off rather than a bug report.
-
-import { useEffect, useState, type CSSProperties } from "react";
+import { type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import { Switch } from "../primitives/Switch";
 import { SettingRow } from "./SettingRow";
+import { usePrefValue } from "@myne/client-core/pref-value";
 import { prefsRead, setEditorVimMode } from "../../lib/prefs";
 import { chordPolicyActive } from "../../editor/vim-chords";
 
@@ -28,36 +28,13 @@ const CAVEAT_STYLE: CSSProperties = {
 
 export function VimModeSettings() {
   const { t } = useTranslation();
-  const [enabled, setEnabled] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void prefsRead()
-      .then((p) => {
-        if (cancelled) return;
-        // null ≡ unset → host default-OFF (modal editing is opt-in).
-        setEnabled(p.editor_vim_mode ?? false);
-      })
-      .catch(() => {
-        /* locked / no vault — leave default OFF */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  async function toggle(next: boolean) {
-    const prev = enabled;
-    setEnabled(next); // optimistic
-    try {
-      await setEditorVimMode(next);
-      setError(null);
-    } catch {
-      setEnabled(prev); // rollback
-      setError(t("settings.vimMode.errorSaveSetting"));
-    }
-  }
+  const { value: enabled, set: setEnabled, error } = usePrefValue({
+    read: prefsRead,
+    select: (p) => p.editor_vim_mode ?? false,
+    write: setEditorVimMode,
+    initial: false,
+    errorMessage: t("settings.vimMode.errorSaveSetting"),
+  });
 
   return (
     <SettingRow
@@ -67,7 +44,7 @@ export function VimModeSettings() {
       control={(helperId) => (
         <Switch
           checked={enabled}
-          onChange={() => toggle(!enabled)}
+          onChange={() => void setEnabled(!enabled)}
           ariaLabel={t("settings.vimMode.label")}
           ariaDescribedBy={helperId}
           testId="settings.vim-mode"

@@ -534,6 +534,16 @@ const ROSTER = [
     reason: "Re-export shim, byte-identical.",
   },
   {
+    // myne-md/myne#1037 added this one: the event record's instant formatter, which
+    // the phone's composer needs and had nowhere to reach. Same shape as its eight
+    // siblings, so the same verdict, and the header line above now counts ten.
+    a: "src/dialect/event.ts",
+    b: "mobile/src/dialect/event.ts",
+    verdict: "delegated",
+    destination: "@myne/dialect",
+    reason: "Re-export shim, byte-identical.",
+  },
+  {
     a: "src/dialect/templateEngine.ts",
     b: "mobile/src/dialect/templateEngine.ts",
     verdict: "delegated",
@@ -1447,7 +1457,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "undecided",
     reason:
-      "Model resolution and integrity checking, 1373 lines against 716. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
+      "Model resolution and integrity checking, 1363 lines against 716. Needs only `sha2`, `serde` and `thiserror`, all already declared in `core/Cargo.toml`, so it extracts with no dependency movement.",
   },
   {
     a: "core/src/inference/engine.rs",
@@ -1479,7 +1489,7 @@ const ROSTER = [
     verdict: "decision",
     destination: "myne-core",
     reason:
-      "The engine error enum, 238 lines against 126. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
+      "The engine error enum, 191 lines against 126. Re-pointed by myne-md/myne#456, which moved the desktop side into `myne-core`, so the shared answer exists and mobile's is a stale subset of it rather than a peer mirror. Same drift class as the `src/types/*-error.ts` mirrors one layer up, with one difference that matters: `tests/lib/engineErrorTaxonomy.test.ts` reads `a` by an exact path and compares the TypeScript taxonomy against it, so THIS side cannot drift silently. Mobile's can, and does.",
   },
   {
     a: "src-tauri/src/plugins/local_inference/commands.rs",
@@ -1848,8 +1858,7 @@ function emitProjection(roster, target = PROJECTION) {
  * The document says "Do not edit by hand" and the header calls it a projection,
  * and until this existed nothing enforced either: a hand edit to it is a
  * docs-only commit, which `pnpm-build`'s `code-paths` filter skips, so CI never
- * looked. `scripts/decisions-index.mjs --check` guards its generated index the
- * same way and for the same reason.
+ * looked.
  */
 function checkProjection(roster, target = PROJECTION) {
   const want = projectionBody(roster);

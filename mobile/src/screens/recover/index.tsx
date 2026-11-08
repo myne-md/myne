@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import {
   Screen,
   ScreenScroll,
@@ -13,24 +12,7 @@ import {
   BlockingOverlay,
 } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
-
-// Small uppercase field label (12px / 600 / 0.06em).
-function FieldLabel({ children }: { children: ReactNode }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
+import { FieldLabel } from "@myne/field-label";
 
 // RC-01 · Account number ───────────────────────────────────────────────────────
 function AccountNumberEntry() {

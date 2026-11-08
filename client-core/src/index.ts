@@ -22,6 +22,22 @@
  */
 export type { IoFailureKind } from "./types/vault-unlock-error";
 
+/**
+ * The `.ics` codec (myne-md/myne#1037 task 10): one pure reader and writer of
+ * calendar interchange files, shared by desktop, web and mobile. It needs no host,
+ * which is the criterion this package states, and the device zone enters as a
+ * parameter rather than as a global read.
+ */
+export {
+  ICS_BYTE_CAP,
+  exportEvents,
+  importEvents,
+  type IcsEvent,
+  type IcsImport,
+  type IcsRefusal,
+  type IcsWarning,
+} from "./ics";
+
 /** The three-state unlock slot, mirroring `core/src/plugins/vault_unlock/state.rs`. */
 export type { SlotKind } from "./types/slot-kind";
 

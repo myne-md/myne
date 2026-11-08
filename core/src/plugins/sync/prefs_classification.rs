@@ -375,6 +375,21 @@ pub const CLASSIFICATION: &[(&str, PrefClass)] = &[
         "periodic_notes",
         PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
     ),
+    // myne-md/myne#1037: shared, and per-key for the same reason the decoration
+    // maps and `periodic_notes` are. A calendar's colour and the all-day reminder
+    // anchor are different settings, so a colour set on one device and an anchor
+    // set on another, in the same round, race on `calendar_settings/colours.work`
+    // and `calendar_settings/day_reminder_anchor` separately and both survive.
+    // **Shared** rather than device-local, and the line matters because the
+    // reminder neighbours are the other way round: `reminders_enabled` and
+    // `reminder_horizon_days` are per-MACHINE (whether this device may interrupt
+    // its user, and how much pending plaintext it hands its OS), while the anchor
+    // is when the calendar says an all-day reminder falls, which is a property of
+    // the schedule the user carries between their own devices.
+    (
+        "calendar_settings",
+        PrefClass::Shared(SharedDiscipline::PerKeyMapMerge),
+    ),
     ("reminder_horizon_days", PrefClass::DeviceLocal),
     ("reminders_enabled", PrefClass::DeviceLocal),
     // myne-md/myne#699. **DeviceLocal**, like every sibling layout pref
@@ -559,6 +574,7 @@ mod tests {
             new_note_location_folder: _,
             paired_extensions: _,
             periodic_notes: _,
+            calendar_settings: _,
             right_panel_active_tab: _,
             right_panel_hidden_tabs: _,
             right_panel_tab_order: _,
@@ -648,6 +664,7 @@ mod tests {
             "new_note_location_folder",
             "paired_extensions",
             "periodic_notes",
+            "calendar_settings",
             "reminder_horizon_days",
             "reminders_enabled",
             "ribbon_items",

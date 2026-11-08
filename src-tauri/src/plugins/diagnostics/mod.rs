@@ -13,6 +13,14 @@
 //! - `flag.rs`: the device-local `diagnostic-log.json` switch. Not a
 //!   `vault.prefs` field, because the sink is installed at process start,
 //!   before any vault is unlocked.
+//! - `report.rs`: the manifest of what a saved report would contain, and the
+//!   writer that puts that bundle at a destination the user chose.
+//! - `measures.rs`: the two readings the diagnostic BLOCK cannot take in the
+//!   page (myne-md/myne#991): the running executable's SHA-256, and the active
+//!   vault directory's entry count and size. Both are aggregate numbers. The
+//!   vault read returns no path, no per-file size, no name and no content, and
+//!   it works while the vault is locked, because the fail-closed screen builds
+//!   the same block.
 //!
 //! The file sink, the panic hook and the crash record live one level up in
 //! `crate::logging`, because they have to exist before this plugin can be
@@ -44,6 +52,7 @@
 
 pub mod commands;
 pub mod flag;
+pub mod measures;
 pub mod report;
 
 use tauri::{plugin::TauriPlugin, Runtime};
@@ -65,6 +74,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::reveal_logs_folder,
             commands::report_manifest,
             commands::save_report,
+            // The two host-side measures of the diagnostic block
+            // (myne-md/myne#991): the running artefact's digest and the vault
+            // directory's footprint. Registered here AND granted in
+            // `permissions/diagnostics/default.toml`; an ACL entry alone wires
+            // nothing.
+            commands::build_digest,
+            commands::vault_usage,
         ])
         .build()
 }

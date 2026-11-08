@@ -65,6 +65,7 @@ import { pickChallenge, phraseTypeBackMatches } from "../../lib/phraseChallenge"
 import { acceptInviteErrorKey } from "@myne/client-core/accept-invite";
 import { memberJoinVaultErrorKey } from "@myne/client-core/join-member-vault";
 import type { IdentityFlowProps, JoinLanding } from "./types";
+import { FieldLabel } from "@myne/field-label";
 
 type Step =
   | "gate"
@@ -163,29 +164,6 @@ const PHRASE_WORDS = 24;
  *  rather than UTF-16 units, the difference a passphrase with an emoji in it
  *  would otherwise hit. `RecoverFlow` and `MemberUnlockBlock` carry the same
  *  local mirror. */
-
-/** Small uppercase field label, the shape every wired flow uses (`JoinFlow`,
- *  `RecoverFlow`, `CreateVaultFlow` each keep a local copy). `id` exists so a
- *  phrase grid's `aria-labelledby` can point at a label that is actually in the
- *  document: it is a `<div>`, not a `<label>`, so nothing associates the two by
- *  structure. */
-function FieldLabel({ id, children }: { id?: string; children: ReactNode }) {
-  return (
-    <div
-      id={id}
-      style={{
-        fontSize: "var(--text-xs)",
-        fontWeight: "var(--weight-semibold)",
-        letterSpacing: "var(--tracking-caps)",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: "var(--space-2)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
 
 
 /** The canonical acknowledgement row (myne#728): a checkbox glyph inside a

@@ -45,6 +45,10 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   // The browser clipper is a desktop-side pairing host. No mobile plugin, no
   // pairing surface, and the extension talks to the desktop's socket by name.
   clipper: false,
+  // The calendar's `.ics` IMPORT needs a path-taking open dialog, and the phone's
+  // exchange is not built yet: the surface it needs is the calendar screen, and
+  // the share sheet is a write-only door. Export is not behind this gate.
+  icsImport: false,
   // On-device LLM: `plugins::local_inference` is registered and the AI chat,
   // review and transcript flows consume it.
   localAi: true,
@@ -69,7 +73,6 @@ const MOBILE_ANSWERS: Readonly<Record<Capability, boolean>> = Object.freeze({
   diagnosticLog: false,
   // The v0.1 to v0.2 on-disk migration. Mobile registers no `vault_migrate`
   // plugin, so a pre-v0.2 vault has no upgrade path on this client.
-  vaultMigration: false,
   // The owner's identity phrase as a vault credential (myne-md/myne#911 task 12).
   // This client has the person plane: it creates an identity, registers it and
   // opens a person-wrapped vault with the phrase.

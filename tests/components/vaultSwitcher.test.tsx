@@ -281,17 +281,10 @@ describe("VaultSwitcher — dropdown", () => {
   // an absence rather than deleted silently: a second way into a vault is
   // exactly what came back the last time this block was tidied, and the
   // invitations row above is the one door that installs a vault now.
+  // Absent, not disabled: a client that cannot hold a second vault container gets
+  // no callback from App.tsx, and must lose the ROW - not the switcher. (The
+  // duplicate that asserted this body separately is gone; its rationale moved here.)
   it("offers no join-device footer", async () => {
-    renderSwitcher(TWO);
-    await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
-    fireEvent.click(screen.getByTestId("switcher.chip"));
-    await screen.findByTestId("switcher.create-cta");
-    expect(screen.queryByTestId("switcher.join-cta")).toBeNull();
-  });
-
-  // Absent, not disabled: a client that cannot hold a second vault container
-  // gets no callback from App.tsx, and must lose the ROW — not the switcher.
-  it("omits the join row when no callback is wired, keeping create reachable", async () => {
     renderSwitcher(TWO);
     await waitFor(() => expect(screen.getByTestId("switcher.chip")).toBeTruthy());
     fireEvent.click(screen.getByTestId("switcher.chip"));

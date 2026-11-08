@@ -20,11 +20,18 @@
 //! `mobile/src-tauri/permissions/attachments/default.toml:39`) takes a
 //! caller-supplied path and reads whatever is at it. The sixth sits beside it
 //! and is also a read: `mobile/src/lib/share.ts` emits `share-file` with a path
-//! that `lib.rs` hands to `share_file::present`, which puts whatever file it is
-//! given into `UIActivityViewController`. Rounds 3 to 5 each asked for the fifth
-//! by name and the ordinal jumped from four to six until round 6; that jump was
-//! the tell, and it is the reason a list here is numbered rather than bulleted. `core:event:default` is granted,
-//! so the WebView can emit an arbitrary path to either. What this command IS: the
+//! that `lib.rs` hands to `share_file::present`, which offers whatever it is
+//! given to the platform's destination chooser (the iOS sheet, or the Android
+//! Storage Access Framework picker since myne-md/myne#505). Since #505 that
+//! function ALSO refuses a path outside the export directory, so this item is
+//! narrowed rather than merely moved: it can no longer carry
+//! `<app_config_dir>/person-auth.json` or a vault file to a chooser. Rounds 3 to 5
+//! each asked for the fifth by name and the ordinal jumped from four to six until
+//! round 6; that jump was the tell, and it is the reason a list here is numbered
+//! rather than bulleted. `core:event:default` is granted, so the WebView can still
+//! emit an arbitrary path to either of the two event-driven surfaces: the sixth
+//! item above, which now refuses anything outside the export directory, and
+//! `pdf_export::present`, which writes wherever the payload says. What this command IS: the
 //! only way to obtain an export directory that is guaranteed to exist and to be
 //! excluded from platform backup, and the only destination the four export flows
 //! compose. Containment stays with the writers, and

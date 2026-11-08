@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { Screen, ScreenScroll, FooterBar, Button, ACCOUNT_NUMBER_SPECIMEN } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
 import { SYNC_INTEGRITY_ALERT } from "../../lib/load-bearing-copy";
+import { FieldLabel, SectionLabel } from "@myne/field-label";
 
 // ── Shared local fragments ───────────────────────────────────────────────────
 
@@ -42,44 +43,6 @@ function NavHeader({ label }: { label: string }) {
         </svg>
         {label}
       </button>
-    </div>
-  );
-}
-
-/** Uppercase tracked section label (12px, 0.08em, line-3). */
-function SectionLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: "var(--line-3)",
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-/** Form field label (12px, 0.06em, fg-3). */
-function FieldLabel({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return (
-    <div
-      style={{
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-        marginBottom: 8,
-        ...style,
-      }}
-    >
-      {children}
     </div>
   );
 }

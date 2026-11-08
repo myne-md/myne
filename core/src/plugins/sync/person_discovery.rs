@@ -33,7 +33,7 @@
 use crate::host::HostCtx;
 use crate::plugins::sync::devices::SyncDeviceError;
 use crate::plugins::sync::http_transport::build_transport;
-use crate::plugins::sync::state::{read_sync_state, write_sync_state, SyncState};
+use crate::plugins::sync::state::{update_sync_state, Persist};
 use crate::plugins::sync::transport::HttpMethod;
 use crate::vault_id::VaultId;
 use crate::vault_io::{VaultIo, WriteOpts};
@@ -143,15 +143,18 @@ pub async fn list_person_vaults(
                     crate::paths::vault_dir_for_id_from_host_io(host, io, Some(existing)).await
                 {
                     if person_frame_namespace(io, &dir).await == Some(namespace) {
-                        if let Ok(cached) = read_sync_state(io, &dir).await {
-                            if cached.namespace_hex.is_none() {
-                                let repaired = SyncState {
-                                    namespace_hex: Some(protocol::hex::encode_lower(&namespace)),
-                                    ..cached
-                                };
-                                let _ = write_sync_state(io, &dir, &repaired).await;
+                        // The repairable case is the ABSENT one, and the test for it
+                        // runs inside the locked mutation: reading here and writing the
+                        // whole record back would take a live cycle's cursor with it
+                        // (myne-md/myne#964).
+                        let _ = update_sync_state(io, &dir, |state| {
+                            if state.namespace_hex.is_some() {
+                                return ((), Persist::No);
                             }
-                        }
+                            state.namespace_hex = Some(protocol::hex::encode_lower(&namespace));
+                            ((), Persist::Yes)
+                        })
+                        .await;
                     }
                 }
                 Some(existing)
@@ -301,13 +304,12 @@ async fn materialise_vault(
     // that need the namespace take it from the state when present and from the
     // frame when absent; `list_person_vaults` rewrites the record for a container
     // it matches, so the next listing repairs it.
-    let state = SyncState {
-        namespace_hex: Some(ns_hex),
-        ..read_sync_state(io, &dir).await.unwrap_or_default()
-    };
-    write_sync_state(io, &dir, &state)
-        .await
-        .map_err(|_| SyncDeviceError::Internal)?;
+    update_sync_state(io, &dir, |state| {
+        state.namespace_hex = Some(ns_hex);
+        ((), Persist::Yes)
+    })
+    .await
+    .map_err(|_| SyncDeviceError::Internal)?;
     Ok(vault_id)
 }
 

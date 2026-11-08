@@ -64,6 +64,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             // Shared with desktop through `myne-core`; mobile was missing only the
             // three registration sites.
             commands::vault_indices_tasks,
+            commands::vault_indices_calendar_range,
             // myne-md/myne#452: the two whole-vault picker dumps, missing here for
             // the same reason the task dump was. Both pickers already MOUNT on
             // mobile (`wikilinkPickerExtension` composes them unconditionally), so

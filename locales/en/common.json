@@ -842,6 +842,9 @@
       },
       "unfoldAll": {
         "label": "Unfold all"
+      },
+      "showCalendar": {
+        "label": "Open the calendar"
       }
     },
     "hotkeys": {
@@ -886,7 +889,8 @@
         "toggleSourceMode": "Toggle source mode",
         "toggleTaskList": "Toggle task list",
         "undo": "Undo",
-        "unfoldAll": "Unfold all"
+        "unfoldAll": "Unfold all",
+        "showCalendar": "Open the calendar"
       }
     },
     "rebind": {
@@ -2539,7 +2543,8 @@
         "attachments": "Attachments",
         "graph": "Graph",
         "tasks": "Tasks",
-        "today": "Today"
+        "today": "Today",
+        "calendar": "Calendar"
       },
       "placesLabel": "Go to",
       "recent": "Jump back in",
@@ -2553,7 +2558,8 @@
       "tasksTab": "Tasks",
       "agentTab": "Agent",
       "loading": "Loading…",
-      "untitledView": "Untitled view"
+      "untitledView": "Untitled view",
+      "calendarTab": "Calendar"
     },
     "relativeTime": {
       "daysAgo": "{{d}} days ago",
@@ -3384,7 +3390,10 @@
         "theme": "Theme and accent",
         "sidebar": "In the sidebar",
         "customisation": "Customisation"
-      }
+      },
+      "homeZoneLabel": "Home time zone",
+      "homeZoneHelper": "Shown beside an event's time, as a second clock. This device is in {zone}. Nothing here is written into your notes.",
+      "homeZoneUnknown": "That is not a time zone this device recognises, so no second clock is shown."
     },
     "archive": {
       "helper": "Let notes be moved to an Archive, kept out of the main list. Turning this off restores every archived note to its folder, un-archives every archived folder, and hides the archive controls. It applies to the whole vault, on every device.",
@@ -4331,11 +4340,12 @@
       "good": "Good",
       "strong": "Strong"
     },
-    "sync": {
-    },
+    "sync": {},
     "data": {
       "exported_one": "Exported {{count}} note → {{label}}",
       "exported_other": "Exported {{count}} notes → {{label}}",
+      "exportedChoose_one": "Exported {{count}} note. Choose where to save a copy.",
+      "exportedChoose_other": "Exported {{count}} notes. Choose where to save a copy.",
       "exportNeedsApp": "Export needs the app (not the browser preview).",
       "exportFailed": "Couldn't export the vault.",
       "exportToMarkdown": "Export to Markdown",
@@ -4360,7 +4370,8 @@
         "tasks": "Tasks"
       },
       "topics": {
-        "periodic": "Periodic notes"
+        "periodic": "Periodic notes",
+        "calendar": "Calendar"
       },
       "preview": {
         "heading": "The quick brown fox",
@@ -4496,6 +4507,18 @@
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
       "errorSave": "Couldn't save that setting."
+    },
+    "calendar": {
+      "anchorLabel": "All-day reminder time",
+      "anchorHelper": "What time of day an all-day event's reminder fires. A timed event counts back from its own start instead.",
+      "coloursLabel": "Calendar colours",
+      "coloursHelper": "Each calendar draws in the colour you pick. Colours come from the theme, so switching theme repaints the calendar too.",
+      "coloursEmpty": "No calendar has a colour yet. Add one below, or give an event a calendar name and it appears here.",
+      "newNameLabel": "New calendar name",
+      "newNamePlaceholder": "Work",
+      "addColour": "Add",
+      "remove": "Remove",
+      "saveFailed": "Could not save that setting. Your vault has not changed."
     }
   },
   "storageLost": {
@@ -5942,7 +5965,7 @@
     "phraseCopied": "Copied. It stays on this device, and the system drops it after 30 seconds.",
     "phraseCopyFailed": "Couldn't copy. Use \"Save to file\" instead.",
     "savedToFile": "Saved to {{label}}",
-    "savedToShareSheet": "Saved inside Myne, where the system file browser cannot reach it. It is a plain text file, so if you use the share sheet to put a copy somewhere you can reach, choose somewhere only you can read rather than a cloud drive. Tap Save again if you closed the sheet.",
+    "savedToShareSheet": "Saved inside Myne, where no file browser can open it. It is a plain text file, so if the system asked you where to put a copy and you chose a place, choose somewhere only you can read rather than a cloud drive. Tap Save again to bring the offer back.",
     "savedFileWritten": "Saved inside Myne. It is a plain text file, so keep any copy you make somewhere only you can read. This device did not report where the file can be reached from, so treat it as reachable only from inside the app until you have checked.",
     "saveFileError": "Couldn't save the file.",
     "stepLabel": "Create a vault · {{current}} of {{total}}",
@@ -6025,5 +6048,163 @@
     "verifyBody": "Check that this code is the same on both devices before you continue. If it isn't, stop: something is wrong with the connection, not with your password.",
     "verifyChanged": "The code changed while you were looking. Compare both screens again. If it keeps changing, stop and do not continue.",
     "verifyTitle": "Compare this code"
+  },
+  "calendar": {
+    "view": {
+      "label": "Calendar view",
+      "month": "Month",
+      "week": "Week",
+      "day": "Day",
+      "agenda": "Agenda"
+    },
+    "allDay": "All day",
+    "untitled": "Untitled event",
+    "locked": "Unlock the vault to see the calendar.",
+    "loadFailed": "The calendar could not be read. Your vault has not changed.",
+    "capture": {
+      "on": "Add an event on {{date}}",
+      "title": "Event title",
+      "placeholder": "What is happening"
+    },
+    "unreadable": {
+      "heading": "{{count}} event could not be read",
+      "heading_other": "{{count}} events could not be read",
+      "start-missing": "it has no start",
+      "start-unreadable": "its start is not a date this app can read",
+      "end-unreadable": "its end is not a date this app can read",
+      "end-before-start": "it ends before it starts",
+      "end-time-without-start-time": "it has an end time and no start time",
+      "calendar-unreadable": "its calendar name is not usable"
+    },
+    "agendaRange": "The next {{days}} days",
+    "prev": "Previous",
+    "next": "Next",
+    "today": "Today",
+    "more": "+{{count}} more",
+    "weekday": {
+      "monday": "Mon",
+      "tuesday": "Tue",
+      "wednesday": "Wed",
+      "thursday": "Thu",
+      "friday": "Fri",
+      "saturday": "Sat",
+      "sunday": "Sun"
+    },
+    "resize": "Resize {{title}}",
+    "refused": {
+      "value-changed": "That event changed on another device. The calendar shows where the note says it is.",
+      "start-missing": "That note no longer carries a start time, so it is not on the calendar.",
+      "base-mismatch": "The note changed while the calendar was writing. Nothing was overwritten."
+    },
+    "weekdayLong": {
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "sunday": "Sunday"
+    },
+    "form": {
+      "title": "New event",
+      "eventTitle": "Event title",
+      "when": "When",
+      "startDate": "Start date",
+      "startTime": "Start time, or all day",
+      "endDate": "End date, or leave empty for a single day",
+      "endTime": "End time",
+      "allDay": "All day",
+      "timed": "At a time",
+      "endBeforeStart": "The event cannot end before it starts. Change the end date.",
+      "repeat": "Repeats",
+      "repeatNever": "Never",
+      "repeatInterval": "Every",
+      "repeatWeekdays": "On a weekday",
+      "repeatDayOfMonth": "On a day of the month",
+      "repeatCount": "How many",
+      "repeatUnit": "Per how long",
+      "repeatWeekday": "Weekday",
+      "repeatDay": "Day of the month",
+      "repeatLastDay": "The last day",
+      "repeatOrdinal": "Which one",
+      "remind": "Remind me, at most {{days}} days before",
+      "remindNone": "No reminder",
+      "leadBeyondHorizon": "A reminder reaches at most {{days}} days ahead. Pick a shorter lead.",
+      "titleRequired": "Give the event a title.",
+      "save": "Save event",
+      "unit": {
+        "day": "Days",
+        "week": "Weeks",
+        "month": "Months",
+        "year": "Years"
+      },
+      "ordinal": {
+        "first": "First",
+        "second": "Second",
+        "third": "Third",
+        "fourth": "Fourth",
+        "last": "Last"
+      },
+      "lead": {
+        "10m": "10 minutes before",
+        "30m": "30 minutes before",
+        "1h": "1 hour before",
+        "2h": "2 hours before",
+        "1d": "1 day before",
+        "2d": "2 days before",
+        "7d": "1 week before",
+        "1m": "1 minute before"
+      }
+    },
+    "occurrenceOf": "One occurrence of a series, on {{date}}",
+    "occurrence": {
+      "thisIsOne": "This is one occurrence of a series, on {{date}}. To change it, edit the series or add a one-off on this day.",
+      "editSeries": "Edit the series",
+      "addOneOff": "Add a one-off on this day",
+      "skip": "Cancel this one",
+      "retime": "Start this one at",
+      "retimeHint": "Only this day changes. The rest of the series keeps its own time.",
+      "retimeSave": "Change the time"
+    },
+    "import": "Import an .ics file",
+    "export": "Export as .ics",
+    "imported": "Imported {{count}} events from {{filename}}",
+    "importRefused": {
+      "too-large": "That file is larger than Myne will read (1 MiB). Only a calendar file that size is a whole vault, not a schedule.",
+      "malformed-property": "That file is not an .ics calendar: a line is neither NAME:value nor NAME;param:value.",
+      "unreadable-start": "That file carries a start time Myne cannot read, so nothing was imported.",
+      "unknown-zone": "That file names a time zone this device does not know, so nothing was imported.",
+      "value-shape-mismatch": "That file marks an event as a date and also gives it a time, so nothing was imported.",
+      "unreadable-rule": "That file repeats on a rule Myne does not support, so nothing was imported.",
+      "missing-start": "That file has an event with no start time, and an event without a start is not a place on a calendar.",
+      "no-events": "That file has no events in it."
+    },
+    "exported": "Wrote {{count}} events to {{filename}}",
+    "exportFailed": "Could not write that .ics file.",
+    "exportEmpty": "There is nothing in the calendar to export yet.",
+    "importedSkipped": "Imported {{count}} events from {{filename}}, and left {{skipped}} that this vault already has",
+    "title": "Calendar",
+    "close": "Close the calendar",
+    "noEvents": "Nothing on this day",
+    "conflict": "overlaps another event",
+    "composer": {
+      "title": "New event",
+      "titleLabel": "What is it?",
+      "start": "Starts",
+      "end": "Ends (optional)",
+      "badTime": "A time is written like 09:00, 24-hour.",
+      "create": "Add to the calendar",
+      "cancel": "Cancel",
+      "createFailed": "The event could not be saved.",
+      "repeatNever": "Once",
+      "repeatDaily": "Daily",
+      "repeatWeekly": "Weekly",
+      "repeatMonthly": "Monthly",
+      "remindNone": "No reminder",
+      "calendarLabel": "Calendar (a name)"
+    },
+    "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
+    "taskRow": "A task due {date}",
+    "composeOn": "Add an event on {date}"
   }
 }

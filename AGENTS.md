@@ -374,14 +374,14 @@ Two jsdom facts worth knowing before designing a test around them, both measured
 
 ```
 myne/
-├── docs/                ← specs, threat model, glossary, decisions log (CC-BY-4.0)
+├── docs/                ← the PUBLIC contract: specs, threat model, glossary, design canon
 ├── src/                 ← React UI, shared by the desktop and web clients; src/editor is a re-export shim into @myne/editor, src/dialect shims @myne/dialect PLUS desktop-side dialect code never extracted (clip.ts, clip/, html/, text/)
 │   └── platform/        ← the platform seam: the ONLY place under src/ allowed to import @tauri-apps/*
 ├── web/                 ← Phase 3 desktop-browser client: same src/ tree, seam substituted at build time (pnpm web:dev / web:build)
 ├── mobile/              ← Phase 3 iOS + Android client (decisions.md 2026-08-13), moved in-repo from the myne-mobile companion, which was then deleted. Its OWN React tree under mobile/src, source-consuming ~25 @myne/* aliases into src/, editor/, dialect/, ornaments/ and locales/ — which is exactly why a repo boundary here was never real. pnpm workspace MEMBER (it keeps its package.json: it is a second Tauri app with its own tauri.conf.json and CLI invocations, unlike web/). Dev server :1422 — desktop holds :1420, web :1421
 │   ├── src/platform/    ← mobile's own platform seam (myne#492): the ONLY place under mobile/src allowed to import @tauri-apps/*
 │   ├── src/formfactor/  ← the iOS-vs-Android and phone-vs-tablet PRESENTATION split, renamed out of src/platform/ so <tree>/platform/ means the host seam in all three clients
-│   └── src-tauri/       ← the mobile Tauri crate + its in-repo plugins (screen-guard, share-intent, qr-scan, reminders, sensitive-clipboard, device-key); the crate and every plugin are root-workspace members under the ONE Cargo.lock
+│   └── src-tauri/       ← the mobile Tauri crate + its in-repo plugins (screen-guard, share-intent, save-file, qr-scan, reminders, sensitive-clipboard, device-key); the crate and every plugin are root-workspace members under the ONE Cargo.lock
 ├── src-tauri/           ← Tauri 2 + Rust desktop core
 │   └── capabilities/    ← Tauri capability ACLs (security-load-bearing)
 ├── dialect/             ← @myne/dialect: shared markdown-parser source pkg (source-consumed, no build), desktop+mobile WebView
@@ -452,6 +452,8 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-e2e-menu-testids.mjs` | E2E may not reach for a testid that renders only inside the sidebar's open `+` menu, it… | `pre-commit` + CI `pnpm-build` |
 | `check-e2e-toolchain.mjs` | `e2e/Dockerfile`'s Rust version matches `rust-toolchain.toml`'s `channel`, and the image… | `pre-commit` + CI `pnpm-build` |
 | `check-playwright-image.mjs` | the CI Playwright image tag names the version `pnpm-lock.yaml` resolves for… | `pre-commit` + CI `pnpm-build` |
+| `check-pinned-ci-tools.mjs` | every `/cache/tools/bin/<tool>` a workflow or `scripts/ci-e2e-lane.sh` executes is provisioned at a pinned, hash-verified version by `scripts/ci-pinned-tools.sh` first: a new unpinned tool, a step that executes without provisioning, a pin whose version/URL/digests drifted apart, and a pin nothing references each fail, and a reach back to the read-only `/cache/bin` mount is refused by name | `pre-commit` + CI `pnpm-build` |
+| `check-arch-pkgbuild.mjs` | the two Arch recipes and `flake.nix` state one release version, and the from-source recipe pins a `#commit=` rather than a movable tag; `sha256sums=('SKIP')` is refused on anything that is not a commit-pinned git source | `pre-commit` + CI `pnpm-build` |
 | `check-ci-image.mjs` | the prebuilt CI base image (`ghcr.io/myne-md/myne-ci`, myne-md/myne#585) against the… | `pre-commit` + CI `pnpm-build` |
 | `check-e2e-floor.mjs` | two ratchets over one report, and they hold each other up | CI `e2e-floor` |
 | `check-twin-inventory.mjs` | every desktop/mobile twin module carries a verdict (`decision` / `screen` / `absent` /… | `pre-commit` + CI `twin-inventory` |
@@ -459,6 +461,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-store-publishable.mjs` | a publishable store root may hold only frames whose surface a mobile user can reach (Apple 2.3.1, Play's equivalent), and every PNG in one is a frame the plan writes… | `pre-commit` + CI `pnpm-build` |
 | `check-store-frame-identifiers.mjs` | no store frame may carry an identifier that is not pinned; it scans the screens the story renders and `captions.en.json`, whose text is drawn onto the frame… | `pre-commit` + CI `pnpm-build` |
 | `check-store-set-freshness.mjs` | a committed store set that no longer matches its append-only record fails; a re-render comparison warns… | `pre-commit` + CI `pnpm-build` |
+| `check-duplication.mjs` | ratchet, over the TREE rather than the diff: renamed copies matched by a normalised skeleton, plus the cheapest signal — one unexported local name defined in three files (`FieldLabel` was 11) — with `scripts/duplication-groups.json` carrying a verdict per group (`consolidate`/`justified`+reason) and a baseline that `--emit` may only re-baseline DOWNWARD… | `pre-commit` + CI `duplication` |
 | `check-prefs-parity.mjs` | every Rust prefs command in `core/src/plugins/prefs/commands.rs` carries a per-client… | `pre-commit` + CI `prefs-parity` |
 | `check-twin-drift-ratchet.mjs` | ratchet: the recorded SET of twin pairs that differ SEMANTICALLY may shrink, never grow | `pre-commit` + CI `pnpm-build` |
 | `check-twin-drift.mjs` | warns (never fails) when a change touches one side of a twin module pair and not the… | `pre-commit` + CI `pnpm-build` |
@@ -481,6 +484,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-adversary-coverage.mjs` | the myne-range epic's anti-rot binding (myne-md/myne#553), in THIS repo so it cannot go… | `pre-commit` + CI `pnpm-build` |
 | `check-ornament-vocabulary.mjs` | the ornament vocabulary agrees across all THREE sources… | `pre-commit` + CI `pnpm-build` |
 | `check-token-parity.mjs` | the opposite question from `check-token-adoption.mjs` below, and the two together are the… | `pre-commit` + CI `pnpm-build` |
+| `check-comment-density.mjs` | ratchet: the recorded per-file comment count may shrink, never grow, so AGENTS.md rule 3 has a mechanism instead of an intention | `pre-commit` + CI `pnpm-build` |
 | `check-token-adoption.mjs` | ratchet: the per-file count of hardcoded visual values (colour literals, numeric… | `pre-commit` + CI `pnpm-build` |
 | `check-primitive-adoption.mjs` | ratchet: a raw `<button>`, `<input>`, `<select>` or `<textarea>` outside… | `pre-commit` + CI `pnpm-build` |
 | `check-hex-helpers.mjs` | ratchet, two halves. The ENCODER half: the lowercase-hex encoder and its predicate are… | `pre-commit` + CI `pnpm-build` |
@@ -491,7 +495,6 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-story-catalogue.mjs` | every story carries a `description` and at least one `tag` (search matches against them… | `pre-commit` + CI `pnpm-build` |
 | `check-foundations-coverage.mjs` | ratchet: every token in `client-core/src/tokens.css` is classified by a specimen group… | `pre-commit` + CI `pnpm-build` |
 | `tests/stories/a11yLevels.test.tsx` | the catalogue's accessibility GATE | `pnpm stories:test` / CI `vitest` |
-| `decisions-index.mjs` | `docs/decisions.md` is the generated index over `docs/decisions/`, and `--check` fails… | `pre-commit` |
 | `check-woodpecker-substitution.mjs` | no single-dollar brace-substitution token in ANY Woodpecker workflow file, comments… | `pre-commit` |
 | `check-woodpecker-split.mjs` | the ONE contract the two workflow files duplicate by design: the desktop release build's… | `pre-commit` + CI `pnpm-build` |
 | `scripts/lib/woodpecker-configs.mjs` (the roster behind both, plus `check-playwright-image.mjs`) | the one place that knows the CI config is `.woodpecker/`, imported rather than copied… | `pre-commit` |

@@ -23,7 +23,8 @@ export type WorkspaceTab =
   | "graph"
   | "files"
   | "templates"
-  | "chat";
+  | "chat"
+  | "calendar";
 
 /** Bottom tab bar. Notes/Search/Graph switch the list-view tab; Settings opens
  *  the sheet. Active tab is accent-tinted. Bottom padding clears the home

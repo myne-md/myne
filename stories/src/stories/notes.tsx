@@ -35,6 +35,8 @@ import { PanelEmptyState } from "@app/notes/components/PanelEmptyState";
 import { SaveStatus } from "@app/notes/components/SaveStatus";
 import { TabStrip } from "@app/notes/components/TabStrip";
 import { TrashPanel } from "@app/notes/components/TrashPanel";
+import { CalendarPane } from "@app/notes/components/CalendarPane";
+import { CalendarEventForm, emptyEventForm } from "@app/notes/components/CalendarEventForm";
 import { TreeRails } from "@app/notes/components/TreeRails";
 import { VirtualList } from "@app/notes/components/VirtualList";
 
@@ -47,6 +49,7 @@ import type { FolderNode } from "@app/notes/folderTree";
 import type { ResolverNote } from "@app/notes/resolveWikilink";
 import type { WikilinkEdge } from "@app/notes/graphModel";
 import {
+  calendarItem,
   tasksItem,
   type LeafPane,
   type WorkspaceNode,
@@ -317,6 +320,10 @@ function Box({
  * `by_tag` drive the tag browser. All three reuse the same three notes so the
  * stories stay consistent.
  */
+/** The day the calendar specimens are pinned to, so a recorded baseline is not a
+ *  picture of the machine's clock. */
+const NOVEMBER_5 = { year: 2026, month: 11, day: 5 };
+
 const NOTES_POPULATED_FIXTURE: Fixture = {
   description: "one unlocked vault with three notes and the index answers they need",
   handlers: {
@@ -380,6 +387,99 @@ const NOTES_POPULATED_FIXTURE: Fixture = {
     ],
   },
 };
+
+/**
+ * The calendar pane's fixture: notes in `Calendar/`, one travel span across three
+ * days and a weekly recurrence, all inside November 2026 so a specimen pinned to
+ * that month renders the same picture whenever it is recorded.
+ *
+ * The rows are what the HOST returns (`vault_indices_calendar_range`), including
+ * the flags the pane must not compute itself: `occurrenceOf` on a projected
+ * occurrence and `conflicts` on an overlap. A fixture that left those out would
+ * render a calendar whose hardest cases were never drawn.
+ */
+const CALENDAR_FIXTURE: Fixture = {
+  description: "November 2026 with a three-day trip, a weekly series and one unreadable event",
+  handlers: {
+    ...NOTES_POPULATED_FIXTURE.handlers,
+    "plugin:vault-indices|vault_indices_calendar_range": () => ({
+      rows: [
+        {
+          noteId: "n1",
+          title: "Send the recap",
+          folder: "Projects/",
+          calendar: "Work",
+          start: "2026-11-02 10:00",
+          end: "2026-11-02 11:00",
+          allDay: false,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: true,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+        {
+          noteId: "n2",
+          title: "Reading list",
+          folder: null,
+          calendar: "Personal",
+          start: "2026-11-02 10:30",
+          end: null,
+          allDay: false,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: true,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+        {
+          noteId: "n3",
+          title: "Standup",
+          folder: "Projects/",
+          calendar: "Work",
+          start: "2026-11-09 09:00",
+          end: null,
+          allDay: false,
+          occurrenceOf: "n3",
+          occurrenceDate: "2026-11-09",
+          conflicts: false,
+          repeat: "weekly",
+          repeatUnrecognized: false,
+        },
+        {
+          noteId: "n3",
+          title: "Standup",
+          folder: "Projects/",
+          calendar: "Work",
+          start: "2026-11-16 09:00",
+          end: null,
+          allDay: false,
+          occurrenceOf: "n3",
+          occurrenceDate: "2026-11-16",
+          conflicts: false,
+          repeat: "weekly",
+          repeatUnrecognized: false,
+        },
+        {
+          noteId: "n4",
+          title: "Away in Lisbon",
+          folder: "Calendar/",
+          calendar: "Personal",
+          start: "2026-11-05",
+          end: "2026-11-07",
+          allDay: true,
+          occurrenceOf: null,
+          occurrenceDate: null,
+          conflicts: false,
+          repeat: null,
+          repeatUnrecognized: false,
+        },
+      ],
+      unreadable: [{ noteId: "n7", title: "Old import", reason: "start-unreadable" }],
+    }),
+  },
+};
+
 
 export const NOTES_STORIES: StoryDescriptor[] = [
   {
@@ -1318,6 +1418,132 @@ export const NOTES_STORIES: StoryDescriptor[] = [
         <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
           <Box width={520} height={420}>
             <TasksPane paneId="pane-1" item={tasksItem()} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendareventform/empty",
+    group: "components",
+    surface: "CalendarEventForm",
+    state: "empty",
+    description:
+      "The event form as a cell click opens it: a title, a start date, and All day chosen, which is why no time control is drawn. Everything the file can carry is authorable here, and the recurrence control offers the closed vocabulary rather than a text field, so a rule Myne cannot read is not a rule a user can type.",
+    tags: ["notes", "calendar", "form", "event", "capture"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={560} height={560}>
+            <CalendarEventForm initial={emptyEventForm("2026-11-05")} onClose={action("onClose")} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendareventform/prefilled",
+    group: "components",
+    surface: "CalendarEventForm",
+    state: "prefilled",
+    description:
+      "The same form reopened on an existing event: a timed start with an end 90 minutes later, an every-two-weeks rule chosen from the builder, and a reminder lead whose control states the horizon it must stay inside. The values are what the note carries, so what a user sees here is a rendering of the record rather than a second copy of it.",
+    tags: ["notes", "calendar", "form", "event", "recurrence", "reminder"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={560} height={640}>
+            <CalendarEventForm
+              initial={{
+                title: "Standup",
+                startDate: "2026-11-05",
+                startTime: "09:00",
+                endDate: "2026-11-05",
+                endTime: "10:30",
+                calendar: "Work",
+                repeat: { kind: "interval", unit: "week", count: 2 },
+                remind: { raw: "30m", minutes: 30 },
+              }}
+              onClose={action("onClose")}
+            />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendarpane/month",
+    group: "components",
+    surface: "CalendarPane",
+    state: "month",
+    description:
+      "The month view of November 2026: whole weeks starting Monday, a three-day trip drawing in all three of its cells, an overlap tinted, and a recurring occurrence carrying its repeat glyph. Each calendar name draws in its own token colour, so a theme change repaints the grid with the rest of the app.",
+    tags: ["notes", "calendar", "pane", "month", "grid", "events", "recurrence"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={720} height={520}>
+            <CalendarPane paneId="pane-1" item={calendarItem("month")} initialAnchor={NOVEMBER_5} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendarpane/week",
+    group: "components",
+    surface: "CalendarPane",
+    state: "week",
+    description:
+      "The week view around 5 November 2026: seven columns, each listing its own times, so a week is readable at a glance rather than by scanning a grid for dots.",
+    tags: ["notes", "calendar", "pane", "week", "events"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={720} height={380}>
+            <CalendarPane paneId="pane-1" item={calendarItem("week")} initialAnchor={NOVEMBER_5} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendarpane/day",
+    group: "components",
+    surface: "CalendarPane",
+    state: "day",
+    description:
+      "The day view: one column, the day's events in the order the index returns them. An event with no time of its own shows as all day rather than at a made-up hour.",
+    tags: ["notes", "calendar", "pane", "day", "events"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={420} height={320}>
+            <CalendarPane paneId="pane-1" item={calendarItem("day")} initialAnchor={NOVEMBER_5} />
+          </Box>
+        </WorkspaceProvider>
+      </SidebarStateProvider>
+    ),
+  },
+  {
+    id: "notes/calendarpane/agenda",
+    group: "components",
+    surface: "CalendarPane",
+    state: "agenda",
+    description:
+      "The agenda of the next 30 days from 5 November 2026: one row per day, each offering capture on + (which opens an inline title field). A multi-day trip appears once, on the day it begins, because the agenda answers what starts on a day rather than what fills it. The unreadable group at the foot names a note that claims to be an event and does not parse, which is surfaced rather than dropped.",
+    tags: ["notes", "calendar", "pane", "agenda", "capture", "events"],
+    fixture: CALENDAR_FIXTURE,
+    render: () => (
+      <SidebarStateProvider initialState={SEEDED_SIDEBAR}>
+        <WorkspaceProvider initialState={seedWorkspace(EMPTY_LEAF, "pane-1")}>
+          <Box width={520} height={420}>
+            <CalendarPane paneId="pane-1" item={calendarItem("agenda")} initialAnchor={NOVEMBER_5} />
           </Box>
         </WorkspaceProvider>
       </SidebarStateProvider>

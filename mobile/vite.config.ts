@@ -33,6 +33,30 @@ export default defineConfig(async () => ({
       // one number, or the two clients disagree about when their own vault is
       // at risk. Like `@myne/i18n` below, this reaches into the desktop `src/`
       // tree rather than a top-level workspace package.
+      { find: "@myne/dialect-civil-date", replacement: sib("../dialect/src/civilDate.ts") },
+      { find: "@myne/vault-indices", replacement: sib("../src/notes/vaultIndices.ts") },
+      // The calendar's own grid math and labels (myne-md/myne#1037). Shared with
+      // the desktop pane and the agent tool's answers, so a cell and a row cannot
+      // disagree about which day a span falls on.
+      { find: "@myne/calendar-grid", replacement: sib("../src/notes/calendar/grid.ts") },
+      { find: "@myne/calendar-format", replacement: sib("../src/notes/calendar/format.ts") },
+      // The one reader of `skip:`, and the one writer of it (decisions/storage/0795).
+      // Aliased rather than reimplemented: the field's bytes are a function of its
+      // set, so two writers would be two orderings and every sync would see a
+      // conflict nobody made.
+      { find: "@myne/calendar-skip", replacement: sib("../src/notes/calendar/skipWrite.ts") },
+      // The refusal vocabulary the skip writer raises, re-exported rather than
+      // redefined: a surface that catches its own copy of an error class catches
+      // nothing the writer throws.
+      { find: "@myne/calendar-drag-write", replacement: sib("../src/notes/calendar/dragWrite.ts") },
+      // The retime writer (decisions/storage/0796), aliased for the reason the skip
+      // writer is: one speller of the field, so two clients cannot produce two
+      // orderings of one list.
+      { find: "@myne/calendar-override", replacement: sib("../src/notes/calendar/overrideWrite.ts") },
+      // The second clock's rule (decisions/storage/0797): one function decides what a
+      // stored wall clock reads as in the user's home zone, so the phone and the pane
+      // cannot disagree by an hour.
+      { find: "@myne/home-zone", replacement: sib("../src/lib/homeZone.ts") },
       { find: "@myne/sync-staleness", replacement: sib("../src/lib/sync-staleness.ts") },
       // The shared sync-status VOCABULARY (myne-md/myne#1027): the status union and the one
       // mapping from a status to a sentence. Aliased for the same reason as the staleness rule
@@ -240,6 +264,14 @@ export default defineConfig(async () => ({
       // "a control that is worded in two places is a control that is worded
       // differently in two places". Its only imports are React and i18next.
       { find: /^@myne\/run-cost-line$/, replacement: sib("../src/notes/agent/components/RunCostLine.tsx") },
+      // The two label treatments a form or a settings panel needs — the small
+      // uppercase caption over a control and the heading over a group (myne-md/myne#995).
+      // Shared rather than re-declared: the caption existed ELEVEN times under
+      // `mobile/src` and the heading eight, each copy differing in prop order or in
+      // one margin, which is why no scan could group them. `mobile/src` reaching
+      // `src/` needs an alias per module, and that missing alias is the honest
+      // reason the copies existed at all.
+      { find: /^@myne\/field-label$/, replacement: sib("../src/components/primitives/FieldLabel.tsx") },
       // The run indicator, shared for the reason the cost line is: it is a
       // NAMED motion-canon exemption (`docs/decisions/ai/0635`), and every one
       // of the conditions that exemption rests on — bounded by the run, paused

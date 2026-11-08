@@ -103,6 +103,7 @@ import {
   parseItemKey,
   type LeafPane,
   type SplitDirection,
+  type WorkspaceItem,
 } from "../workspaceState";
 import { tabKindSpec } from "../tabKinds";
 import { TAB_DRAG_MIME, readTabDrag } from "../tabDrag";
@@ -116,6 +117,7 @@ import { useViewResult } from "../views/useViewResult";
 import { ViewRenderHost } from "../views/viewRenderHost";
 import type { BoardCardActions } from "../views/boardView";
 import { Button } from "../../components/primitives/Button";
+import { CalendarPane } from "./CalendarPane";
 import { TasksPane } from "./TasksPane";
 import { AgentPane } from "../agent/AgentPane";
 import { useTaskQueryResults } from "../useTaskQueryResults";
@@ -388,6 +390,9 @@ export function PaneView({
   // A tasks-kind active tab renders the vault-wide task list (MYND-616) in place
   // of the note editor - the same first-class-tab pattern the graph established.
   const isTasks = leaf.activeTab?.kind === "tasks";
+  // The calendar (myne-md/myne#1037) is a first-class tab for the same reason the
+  // task list is: it is a surface you keep open beside a note, not a modal.
+  const isCalendar = leaf.activeTab?.kind === "calendar";
   const isAttachments = leaf.activeTab?.kind === "attachments";
   const isTemplates = leaf.activeTab?.kind === "templates";
   // An agent-kind active tab renders the agent hub (myne-md/myne#771) in place of
@@ -2253,6 +2258,21 @@ export function PaneView({
         fill: true,
         gutters: true,
         el: <TasksPane paneId={leaf.id} item={leaf.activeTab} />,
+      };
+    }
+    if (isCalendar && leaf.activeTab !== null) {
+      // The calendar fills its pane and takes gutters like the task list: it is a
+      // dense schedule, not prose, so the reading measure would leave a month grid
+      // narrower than the window it sits in.
+      return {
+        fill: true,
+        gutters: true,
+        el: (
+          <CalendarPane
+            paneId={leaf.id}
+            item={leaf.activeTab as Extract<WorkspaceItem, { kind: "calendar" }>}
+          />
+        ),
       };
     }
     if (isAgent && leaf.activeTab !== null) {

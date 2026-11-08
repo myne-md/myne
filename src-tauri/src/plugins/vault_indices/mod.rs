@@ -79,6 +79,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::vault_indices_all_edges,
             commands::vault_indices_block_anchors,
             commands::vault_indices_tasks,
+            commands::vault_indices_calendar_range,
             commands::vault_indices_headings,
             commands::vault_indices_orphans,
             commands::vault_indices_backlink_candidates,

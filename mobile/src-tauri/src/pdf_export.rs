@@ -13,18 +13,21 @@
 //! `UIPrintPageRenderer` + `UIMarkupTextPrintFormatter` lay the note HTML out to
 //! an A4 page grid, drawn into a PDF file via the `UIGraphics*PDF*` context (no
 //! print controller, no print/preview sheet). The finished file is handed to
-//! [`crate::share_file::present`] for the `UIActivityViewController` share sheet.
+//! [`crate::share_file::present_on_main_thread`] for the
+//! `UIActivityViewController` share sheet.
 //! Geometry crosses `msg_send!` + the C ABI via `objc2-core-foundation`'s
 //! `CGRect` (correct `Encode`), otherwise this stays on the `objc2` +
 //! raw-`msg_send!` idiom of `ios_chrome`/`screen_guard`.
 //!
 //! ## Android
 //!
-//! `PrintManager` + `WebView.createPrintDocumentAdapter` is the equivalent, but
-//! reaching the Activity from Rust needs `ndk-context` (absent from the mobile
-//! lockfile — adding it breaks offline builds). Deferred, same constraint as
-//! `share_file`'s Android half. Documented no-op for now (the file is not
-//! written; the frontend surfaces the unsupported state).
+//! Unimplemented, and the missing piece is the RENDERER rather than the delivery:
+//! Android's equivalent is `PrintManager` + `WebView.createPrintDocumentAdapter`
+//! reached from the committed Kotlin, and until that exists there is no `.pdf` to
+//! hand to the save picker (`share_file`'s Android half landed in myne-md/myne#505
+//! and this flow gets it for free on the day a renderer exists). The frontend
+//! surfaces the unsupported state, so this is a documented gap rather than a
+//! silent one.
 //!
 //! ## Verification status
 //!
@@ -58,7 +61,7 @@ pub fn present(title: &str, html: &str, path: &str) {
     let rendered = unsafe { ios::render_pdf(title, html, path) };
     if rendered {
         // Reuse the shared share-sheet bridge (also main-thread) for the result.
-        crate::share_file::present(path);
+        crate::share_file::present_on_main_thread(path);
     }
 }
 
@@ -68,7 +71,9 @@ pub fn present(_title: &str, _html: &str, _path: &str) {
     tracing::warn!(
         event = "pdf_export_unsupported",
         platform = "android",
-        "Android print export not yet wired (needs ndk-context / a Kotlin plugin)"
+        "Android print export not yet wired (there is no HTML-to-PDF renderer in \
+         this app yet; the save picker that would carry the result is already \
+         wired, see share_file.rs)"
     );
 }
 

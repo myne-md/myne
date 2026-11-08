@@ -297,6 +297,10 @@ export const FIELD_OVERRIDES = {
   // `set_view_approval` reads as the action and `view_approvals` as the map.
   set_view_approval: "view_approvals",
   set_periodic_note_setting: "periodic_notes",
+  // myne-md/myne#1037: one command writes the whole map, one entry per call, so
+  // the command name is singular while the field name is not (the
+  // set_periodic_note_setting precedent above).
+  set_calendar_setting: "calendar_settings",
   set_auto_lock_timeout: "auto_lock_seconds",
   set_device_name: "device_names",
   vault_set_label: "label",

@@ -21,11 +21,13 @@ import { useEffect, useRef } from "react";
 import {
   parseLocalInstant,
   resolveHorizonDays,
-  runReminderPass,
-  targetReminders,
+  runReminderPassFor,
+  targetRemindersFor,
+  type EventReminderSource,
   type PendingReminder,
   type ReminderNotifier,
   type ReminderPassResult,
+  type ReminderSources,
 } from "../lib/reminderSchedule";
 import type { VaultTask } from "../notes/taskIndex";
 
@@ -51,6 +53,8 @@ export function msUntilNextPass(
   tasks: readonly VaultTask[],
   now: Date,
   horizonDays?: number,
+  events: readonly EventReminderSource[] = [],
+  dayAnchor?: string,
 ): number {
   // `targetReminders` sorts by ID, not by instant, so `[0]` is the
   // lexicographically first reminder rather than the soonest. That sort exists
@@ -59,7 +63,9 @@ export function msUntilNextPass(
   // mobile twin needed an explicit comparator for the same reason
   // (`mobile/src/lib/reminderPass.ts`). Every existing test here passes a single
   // task, so the difference was unobservable.
-  const next = targetReminders(tasks, now, horizonDays).reduce<PendingReminder | undefined>(
+  const next = targetRemindersFor({ tasks, events, dayAnchor }, now, horizonDays).reduce<
+    PendingReminder | undefined
+  >(
     (soonest, r) => (soonest === undefined || r.at < soonest.at ? r : soonest),
     undefined,
   );
@@ -74,6 +80,16 @@ export type ReminderSchedulerOptions = {
   /** Off entirely when false — no pass, no timer, and no OS registration. */
   enabled: boolean;
   tasks: readonly VaultTask[];
+  /**
+   * Event notes carrying a reminder, from the calendar's own range read.
+   *
+   * Required for the same reason `horizonDays` is: an optional field is an opt-in
+   * wire, and omitting it would leave every event reminder unregistered with
+   * nothing failing. Deleting the line at the call site is the compile error.
+   */
+  events: readonly EventReminderSource[];
+  /** The wall-clock anchor an all-day event's reminder uses. */
+  dayAnchor: string;
   notifier: ReminderNotifier | null;
   /**
    * The user's registration horizon. `null` is the vault that never chose one.
@@ -107,7 +123,7 @@ export type ReminderSchedulerOptions = {
  * nothing.
  */
 export function useReminderScheduler(options: ReminderSchedulerOptions): void {
-  const { enabled, tasks, notifier, horizonDays, clock: clockOption, onPass } = options;
+  const { enabled, tasks, events, dayAnchor, notifier, horizonDays, clock: clockOption, onPass } = options;
   // Resolved to a number rather than left as `number | undefined` leaning on a
   // default parameter two modules away: both call sites below then read the
   // same value, and the dep array compares a primitive that changes only when
@@ -117,6 +133,12 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
   // being torn down and rebuilt on every keystroke-driven index change.
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
+  // The event list is held the same way, so a range read landing mid-timer does not
+  // rebuild the effect and drop a reminder due in the same minute.
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  const anchorRef = useRef(dayAnchor);
+  anchorRef.current = dayAnchor;
   const onPassRef = useRef(onPass);
   onPassRef.current = onPass;
   // myne#318 — the default clock USED to be a destructuring default,
@@ -154,7 +176,12 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
       if (cancelled) return;
       let result: ReminderPassResult;
       try {
-        result = await runReminderPass(tasksRef.current, notifier, clock, horizon);
+        const sources: ReminderSources = {
+          tasks: tasksRef.current,
+          events: eventsRef.current,
+          dayAnchor: anchorRef.current,
+        };
+        result = await runReminderPassFor(sources, notifier, clock, horizon);
       } catch {
         // `runReminderPass` is already total; this is belt-and-braces so a
         // future change there cannot turn an unlock into a crash.
@@ -171,7 +198,10 @@ export function useReminderScheduler(options: ReminderSchedulerOptions): void {
       // enough to change the answer is inside every horizon by construction.
       // Passing it anyway is what keeps this call correct if that ceiling ever
       // rises, and saying so here is better than a test that cannot fail.
-      timer = setTimeout(() => void pass(), msUntilNextPass(tasksRef.current, clock(), horizon));
+      timer = setTimeout(
+        () => void pass(),
+        msUntilNextPass(tasksRef.current, clock(), horizon, eventsRef.current, anchorRef.current),
+      );
     };
 
     // The catch-up pass, on mount — i.e. on unlock.

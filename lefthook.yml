@@ -248,6 +248,25 @@ pre-commit:
       # two-halves-pinned-by-hand shape as `e2e-toolchain` below.
       run: node scripts/check-playwright-image.mjs
 
+    pinned-ci-tools:
+      # myne#758 (audit NV02): every tool CI EXECUTES is provisioned at a pinned,
+      # hash-verified version first. Fourteen invocations ran sccache and
+      # cargo-nextest off a host mount that nothing in this repository put there,
+      # pinned or checksummed, while `cargo-deny` a few lines away downloaded a
+      # pinned prebuilt release and verified it. Three ways that comes back are
+      # invisible to every compiler: a new unpinned tool, a step that skips the
+      # provisioner, and a pin whose version and digests drift apart.
+      run: node scripts/check-pinned-ci-tools.mjs
+
+    arch-pkgbuild:
+      # myne#758 (audit NV11): the two Arch recipes and `flake.nix` state ONE
+      # release version, and the from-source recipe builds a commit rather than a
+      # tag. The from-source `pkgver` was a stable release behind while the other
+      # two had moved, and its `#tag=v$pkgver` + `sha256sums=('SKIP')` meant a
+      # force-pushed tag rebuilds different bytes under the same version. Both
+      # still build, so neither is visible to any compiler.
+      run: node scripts/check-arch-pkgbuild.mjs
+
     frontend-lock-teardown:
       # myne#529: the WebView half of `check-lock-teardown.mjs`, which held only
       # the Rust side. A module-scope store outlives every unmount, and neither
@@ -393,9 +412,7 @@ pre-commit:
       # `twin-inventory` step rather than inside `pnpm-build`, because a hand
       # edit to the projection is a docs-only commit and the `code-paths` filter
       # would skip it, leaving this bypassable hook as the only gate.
-      # `bundle-record` is unfiltered for the identical reason, and
-      # `decisions-index` guards its generated index the same way two hooks
-      # below.
+      # `bundle-record` is unfiltered for the identical reason.
       glob: "{src/**,src-tauri/src/**,mobile/**,scripts/check-twin-inventory.mjs,docs/dev/twin-inventory.md}"
       run: node scripts/check-twin-inventory.mjs --check
 
@@ -444,6 +461,31 @@ pre-commit:
       # measured, which is why it is globbed rather than run on every commit.
       glob: "{src/**,web/src/**,editor/src/**,dialect/src/**,mobile/**,src-tauri/src/**,core/src/**,scripts/check-prefs-parity.mjs,scripts/check-ipc-binding-callers.mjs,scripts/prefs-parity.json,docs/dev/settings-parity.md}"
       run: node scripts/check-prefs-parity.mjs --check
+
+    duplication:
+      # myne#995. A renamed copy is invisible to every other gate in this file:
+      # jscpd measured 1.85% literal duplication over the same roots and that is
+      # not the complaint, and the diff-scoped `least-code` review dimension
+      # (#984) cannot see the copies that already shipped. The eleven `FieldLabel`
+      # definitions under `mobile/src` each arrived through a review structurally
+      # unable to notice the other ten.
+      #
+      # Two signals, because one is not enough. The clone half compares a
+      # NORMALISED skeleton (comments stripped, strings, numbers and non-keyword
+      # identifiers placeholdered) so a renamed copy still matches. The repeat half
+      # is the cheaper one and catches what the clone half cannot: an unexported
+      # `function`/`const`/`class` defined under one name in three or more
+      # files, which is exactly the `FieldLabel` family — those copies differ in
+      # prop order and in one margin, so no body comparison groups them at any
+      # threshold.
+      #
+      # `--check` also gates the generated docs/dev/duplication.md, which is why
+      # CI runs its own UNFILTERED `duplication` step: a hand edit to that
+      # projection is a docs-only commit this glob does not match. The record is
+      # re-baselined DOWNWARD only — `--emit` refuses a group it has never seen,
+      # because a re-baseline that comes back green licensed everything it found.
+      glob: "{src/**,core/src/**,protocol/src/**,editor/src/**,dialect/src/**,client-core/src/**,web/src/**,mobile/**,src-tauri/src/**,cli/src/**,mcp/src/**,scripts/check-duplication.mjs,scripts/duplication-groups.json,docs/dev/duplication.md}"
+      run: node scripts/check-duplication.mjs --check
 
     embed-layout-drift:
       # myne#409: the form-C embed-layout grammar is written in TypeScript
@@ -1011,11 +1053,14 @@ pre-commit:
       glob: "*.{ts,tsx,json}"
       run: node scripts/check-i18n-duplicates.mjs --check
 
-    decisions-index:
-      # docs/decisions.md is generated over docs/decisions/**. Without this, the first person to
-      # add a decision hand-edits the index, and the next regeneration silently discards it.
-      # Deliberately NOT scoped to code paths: a docs-only commit is exactly when a decision lands.
-      run: node scripts/decisions-index.mjs --check
+    comment-density:
+      # AGENTS.md rule 3 ("a comment earns its lines or it goes") had no guard and
+      # was the one rule that decayed: 199,438 comment lines across the shared
+      # trees, worst files 75-84% comments. A file may lose comments, never gain
+      # them; `--record` re-baselines with the growth in the diff.
+      # Deliberately NOT code-path filtered: any tree can grow a docblock.
+      glob: "*.{rs,ts,tsx,json}"
+      run: node scripts/check-comment-density.mjs
 
     beta-terms-version:
       # The beta-terms clauses and BETA_TERMS_VERSION must move together

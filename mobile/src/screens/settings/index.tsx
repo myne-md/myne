@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import { Screen, ScreenScroll, Button, ACCOUNT_NUMBER_SPECIMEN } from "../../components";
 import type { ScreenDef } from "../../gallery/types";
+import { FieldLabel, SectionLabel } from "@myne/field-label";
 
 /**
  * Settings detail screens (prefix ST). iOS grouped-list settings pages built to
@@ -75,33 +76,6 @@ function PageTitle({
     >
       {children}
     </h1>
-  );
-}
-
-/** Uppercase tracked group header (e.g. "Encryption", "Auto-lock"). */
-function SectionLabel({
-  children,
-  mt = 18,
-  danger = false,
-}: {
-  children: ReactNode;
-  mt?: number;
-  danger?: boolean;
-}) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        padding: "0 4px 8px",
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.08em",
-        textTransform: "uppercase",
-        color: danger ? "var(--danger)" : "var(--line-3)",
-      }}
-    >
-      {children}
-    </div>
   );
 }
 
@@ -194,25 +168,6 @@ function Toggle({ on = false }: { on?: boolean }) {
   );
 }
 
-/** Uppercase field caption used on the change-password form. */
-function FieldLabel({ children, mt }: { children: ReactNode; mt: number }) {
-  return (
-    <div
-      style={{
-        marginTop: mt,
-        marginBottom: 8,
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: "0.06em",
-        textTransform: "uppercase",
-        color: "var(--fg-3)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
 /** Keyboard-shortcut chip. */
 function Kbd({ children }: { children: ReactNode }) {
   return (
@@ -273,7 +228,7 @@ function Account() {
             </span>
           </Row>
         </Group>
-        <SectionLabel danger>Danger zone</SectionLabel>
+        <SectionLabel tone="danger">Danger zone</SectionLabel>
         <button
           style={{
             width: "100%",

@@ -39,6 +39,9 @@ describe("the registry covers the union", () => {
       "attachments",
       "templates",
       "agent",
+      // myne-md/myne#1037: an event is a note and a vault has one schedule, so
+      // the calendar is a singleton tab beside the graph and the task list.
+      "calendar",
     ];
     expect([...TAB_KIND_TAGS].sort()).toEqual([...unionKinds].sort());
     for (const kind of unionKinds) {

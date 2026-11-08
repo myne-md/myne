@@ -41,7 +41,7 @@ pub fn fold(s: &str) -> String {
 /// Hinnant's `days_from_civil`). Integer arithmetic on purpose: this crate
 /// compiles for `wasm32` and a calendar crate here would be a dependency
 /// decision for one week number.
-fn days_from_civil(y: i32, m: u32, d: u32) -> i64 {
+pub(crate) fn days_from_civil(y: i32, m: u32, d: u32) -> i64 {
     let y = i64::from(if m <= 2 { y - 1 } else { y });
     let era = if y >= 0 { y } else { y - 399 } / 400;
     let yoe = y - era * 400; // [0, 399]
@@ -52,7 +52,7 @@ fn days_from_civil(y: i32, m: u32, d: u32) -> i64 {
 }
 
 /// The inverse of [`days_from_civil`], returning `(year, month, day)`.
-fn civil_from_days(z: i64) -> (i32, u32, u32) {
+pub(crate) fn civil_from_days(z: i64) -> (i32, u32, u32) {
     let z = z + 719468;
     let era = if z >= 0 { z } else { z - 146096 } / 146097;
     let doe = z - era * 146097; // [0, 146096]

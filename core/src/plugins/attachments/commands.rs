@@ -2808,10 +2808,15 @@ pub async fn hydrate_attachment_refs_core(
 #[cfg(test)]
 mod tests {
     use super::*;
+    // The v0.1 frame is the common case; a generation-specific seed spells out
+    // `crate::test_support::seed_vault_meta(.., SeededMeta::V02)` instead, so the
+    // frame a fixture writes is visible where it is written.
     use crate::plugins::vault_unlock::state::{
         fixture_unlocked_with_keys, test_vault_id, VaultRuntimeState,
     };
+    use crate::test_support::seed_real_vault_meta as seed_vault_meta;
     use crate::test_support::ScopedTempDir;
+    use crate::test_support::SeededMeta;
     use protocol::{derive_subkey, SubkeyRole, VAULT_META_ACCOUNT_HASH_LEN};
 
     fn rt() -> tokio::runtime::Runtime {
@@ -2831,31 +2836,6 @@ mod tests {
     const PNG_BYTES: &[u8] = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3, 4];
     const PDF_BYTES: &[u8] = b"%PDF-1.7\n1 0 obj\n<<>>\nendobj\n";
 
-    /// Seed a real 345-byte vault.meta whose account_number_hash is the
-    /// repeating seed byte; other fields are filler that parse-passes.
-    fn seed_vault_meta(dir: &Path, seed: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta(&meta),
-        )
-        .expect("seed vault.meta");
-    }
-
     async fn unlocked_state() -> VaultRuntimeState {
         let state = VaultRuntimeState::default();
         state
@@ -2872,32 +2852,6 @@ mod tests {
         seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH);
         let state = unlocked_state().await;
         (tmp, state)
-    }
-
-    /// The `NTV5` twin of [`seed_vault_meta`] — same filler fields, v0.2 framing.
-    /// Only the magic is load-bearing here: every generation-routed site under
-    /// test reads it back through `meta_version_of`.
-    fn seed_vault_meta_v0_2(dir: &Path, seed: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: None,
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta_v0_2(&meta),
-        )
-        .expect("seed NTV5 vault.meta");
     }
 
     /// **The predicate must answer TRUE for `NTV6`, and that is the half the
@@ -2944,45 +2898,16 @@ mod tests {
 
         // Control: the same fixture without the B2B frame is not withheld, or the
         // assertion above would pass for every vault.
-        seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
+        crate::test_support::seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH, SeededMeta::V02);
         assert_eq!(
             rt().block_on(vault_conversations_may_be_person_scoped(io(), tmp.path())),
             Some(false)
         );
     }
 
-    /// The same vault, carrying a MEMBERSHIP: the shape of a B2B vault whose base
-    /// carries the single-account field (review round seven).
-    fn seed_vault_meta_with_membership(dir: &Path, seed: u8) {
-        let meta = protocol::VaultMeta {
-            account_number_hash: [seed; VAULT_META_ACCOUNT_HASH_LEN],
-            kdf_params: protocol::DEFAULT_V0_1_KDF_PARAMS,
-            random_salt_password: [1u8; 16],
-            random_salt_recovery: [2u8; 16],
-            nonce_password_wrap: [3u8; 24],
-            enc_root_key_password: [4u8; 64],
-            nonce_recovery_wrap: [5u8; 24],
-            enc_root_key_recovery: [6u8; 64],
-            items_key_id: [7u8; 16],
-            items_key_nonce: [8u8; 24],
-            enc_items_key: [9u8; 64],
-            membership: Some(protocol::Membership {
-                nonce: [0x0A; 24],
-                enc: [0x0B; protocol::MEMBERSHIP_CIPHERTEXT_LEN],
-                roster: None,
-            }),
-            person_binding: None,
-        };
-        std::fs::write(
-            dir.join("vault.meta"),
-            protocol::serialize_vault_meta_v0_2(&meta),
-        )
-        .expect("seed membership-bearing vault.meta");
-    }
-
     async fn temp_vault_v0_2() -> (ScopedTempDir, VaultRuntimeState) {
         let tmp = ScopedTempDir::new("attach-it-v0-2").expect("scoped tempdir");
-        seed_vault_meta_v0_2(tmp.path(), SEED_ACCOUNT_HASH);
+        crate::test_support::seed_vault_meta(tmp.path(), SEED_ACCOUNT_HASH, SeededMeta::V02);
         let state = unlocked_state().await;
         (tmp, state)
     }
@@ -5074,7 +4999,11 @@ mod tests {
     fn a_shared_vault_refuses_the_sweep_for_every_scope() {
         rt().block_on(async {
             let tmp = ScopedTempDir::new("attach-shared").expect("scoped tempdir");
-            seed_vault_meta_with_membership(tmp.path(), SEED_ACCOUNT_HASH);
+            crate::test_support::seed_vault_meta(
+                tmp.path(),
+                SEED_ACCOUNT_HASH,
+                SeededMeta::V02WithMembership,
+            );
             let state = unlocked_state().await;
             let pasted = import_tagged_scoped(&tmp, &state, 41, AttachmentScope::Chat).await;
             let picked = import_tagged(&tmp, &state, 42).await;

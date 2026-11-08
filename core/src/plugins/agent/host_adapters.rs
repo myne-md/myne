@@ -32,7 +32,7 @@ use crate::plugins::agent::apply::{ApplyReader, BatchWrite, BatchWriter, Restore
 use crate::plugins::agent::error::AgentError;
 use crate::plugins::agent::memory::{MemoryStore, RememberAction, RememberOutcome};
 use crate::plugins::agent::prompt::ProposedNote;
-use crate::plugins::agent::tools::NoteReader;
+use crate::plugins::agent::tools::{CalendarReader, CalendarRefusal, NoteReader};
 use crate::plugins::memory::commands::{
     memory_list_from_host, memory_read_from_host, memory_write_from_host,
     personality_read_from_host, PersonalityView,
@@ -42,6 +42,7 @@ use crate::plugins::notes::commands::{
     note_create_from_host, note_read_from_host, note_write_batch_transactional_from_host,
     NoteBatchUpdate,
 };
+use crate::plugins::vault_indices::calendar::CalendarRow;
 use crate::plugins::vault_unlock::state::VaultRuntimeState;
 use crate::snapshot_store::{capture_snapshot_reporting_uuid, CaptureOutcome};
 use crate::vault_io::StdVaultIo;
@@ -57,6 +58,47 @@ impl<R: Runtime> NoteReadAdapter<'_, R> {
         note_read_from_host(&self.host, self.state, note_id.to_string(), &StdVaultIo)
             .await
             .map_err(|_| AgentError::ReadFailed)
+    }
+}
+
+/// The fifth tool's calendar, over the same host command the pane and the phone
+/// call (myne-md/myne#1037).
+///
+/// **It asks for a BOUNDED read.** That is not a preference: the 366-day refusal
+/// and the row cap live in `vault_indices::calendar::bound_for_window`, and asking
+/// unbounded here would put the whole calendar inside one model call, which is the
+/// shape the grill's Q15 exists to make unexpressible.
+pub struct HostCalendar<'a> {
+    pub runtime: &'a VaultRuntimeState,
+    pub indices: &'a crate::plugins::vault_indices::state::VaultIndicesState,
+}
+
+#[async_trait::async_trait]
+impl CalendarReader for HostCalendar<'_> {
+    async fn range(&self, from: &str, to: &str) -> Result<Vec<CalendarRow>, CalendarRefusal> {
+        match crate::plugins::vault_indices::commands::vault_indices_calendar_range_from_host(
+            self.runtime,
+            self.indices,
+            from.to_string(),
+            to.to_string(),
+            true,
+        )
+        .await
+        {
+            Ok(range) => Ok(range.rows),
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::CalendarWindowTooWide {
+                    max_days,
+                },
+            ) => Err(CalendarRefusal::WindowTooWide { max_days }),
+            Err(
+                crate::plugins::vault_indices::error::VaultIndicesError::CalendarWindowUnreadable,
+            ) => Err(CalendarRefusal::WindowUnreadable),
+            // Everything else is "this device cannot answer right now": a locked
+            // vault, an unreadable meta, an index that is not there. The model is
+            // told that rather than the run being ended.
+            Err(_) => Err(CalendarRefusal::Unavailable),
+        }
     }
 }
 
