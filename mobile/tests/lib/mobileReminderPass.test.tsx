@@ -116,9 +116,14 @@ vi.mock("../../src/lib/tasks", async (importActual) => {
   };
 });
 
-import { eventSourcesFrom, useMobileReminderPass } from "../../src/lib/useMobileReminderPass";
+import {
+  eventSourcesFrom,
+  resetPermissionAsk,
+  useMobileReminderPass,
+} from "../../src/lib/useMobileReminderPass";
 
 beforeEach(() => {
+  resetPermissionAsk();
   calls.length = 0;
   permission.status = "not-determined";
   permission.requested = 0;
@@ -145,7 +150,10 @@ describe("useMobileReminderPass", () => {
     const second = renderHook(() => useMobileReminderPass());
     await waitFor(() => expect(calls.length).toBeGreaterThan(1));
     second.unmount();
-    expect(permission.requested).toBeLessThanOrEqual(2);
+    // EXACTLY once: 0 is the defect this change exists to fix (a permission never
+    // requested, so a notification is registered and never delivered) and 2 is the
+    // opposite (a prompt a user meets on every unlock).
+    expect(permission.requested).toBe(1);
   });
 
   it("keeps only the events that carry a lead", () => {

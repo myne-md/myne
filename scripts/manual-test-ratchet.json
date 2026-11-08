@@ -1518,5 +1518,32 @@
     "gatedMinutes is NOT edited (3837): it is a floor that --record may only move",
     "downward, and the rule is that gating may not fall by more than total does. Both",
     "rose."
+  ],
+  "$comment32": [
+    "RESTORED ARGUMENT for the 12010 rung, which the previous edit lost.",
+    "",
+    "The raise 11985 -> 12010 was carried by the device self-naming item, and its argument",
+    "was written under a SECOND `$comment25` key. A JSON object cannot hold one key twice,",
+    "so every reader (and the edit that followed) saw only the later block: the ceiling stood",
+    "on a rung with no argument, which is exactly what the ratchet exists to prevent.",
+    "",
+    "The argument, restored verbatim from the merge base:",
+    "",
+    "  \"CEILING RAISED 11985 -> 12010 by the device self-naming item, and the argument is",
+    "  that the state it walks cannot be manufactured rather than that it was not worth",
+    "  automating. An approved device with no `device_names` entry is a HISTORY, not a",
+    "  configuration: the device id is minted by the server at enrollment and the name is",
+    "  written in that same act, so the nameless state arrives from an enrollment that",
+    "  predates names, a write that failed, or an approval that spanned a restart. A driver",
+    "  reaches it only by planting it, which is a fixture asserting itself, and the second",
+    "  half of the item has the same shape in TIME rather than in data: the pass condition",
+    "  is that nothing was written while the enrollment seed had not yet run. The gates",
+    "  themselves are covered where the state IS constructible",
+    "  (core::plugins::prefs::commands::tests::self_name_*, tests/client-core/deviceName.test.ts,",
+    "  and the two panels' component and flow tiers).\"",
+    "",
+    "Nothing is re-numbered and no ceiling moves here: this key only puts the missing",
+    "sentence back, under a unique name, so the chain 11889 -> ... -> 12010 -> 12064 can be",
+    "re-checked rung by rung."
   ]
 }
