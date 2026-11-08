@@ -35,7 +35,7 @@
       }
     },
     "core/src/plugins/sync/authority/mod.rs": {
-      "classify_key_load(crate::plugins::sync::device_identity::load(), site)": {
+      "let key = classify_key_load(crate::plugins::sync::device_identity::load(), site);": {
         "count": 1,
         "reason": "The resolver's own single read of the key at rest. If this line moves out of sync::authority the guard fires, which is the whole rule."
       },
