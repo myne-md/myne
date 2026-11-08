@@ -31,8 +31,6 @@
 // `SyncPanel` had NO test of any kind before this. The gate shipped, was wrong,
 // and nothing anywhere would have said so.
 
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 

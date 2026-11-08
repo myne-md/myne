@@ -95,11 +95,6 @@ export interface SyncPanelProps {
    */
   vaultId?: string | null;
   /**
-   * Routed to Unlock after a successful vault migration (#420). Migration re-keys
-   * the vault and drops the running slot, so the session must re-unlock; the
-   * Settings shell wires this to `onForceRelock({ kind: "Exists" })`.
-   */
-  /**
    * Raised while this panel has a modal dialog of its own up (the beta terms).
    * The Settings shell stands its global keys down while a child dialog owns
    * the surface — see the child-dialog gating note in `SettingsModal.tsx`.
