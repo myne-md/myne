@@ -2680,6 +2680,4 @@ export const COMPONENT_STORIES: StoryDescriptor[] = [
       />
     ),
   },
-    render: () => <VaultFormatUpgrade />,
-  },
 ];
