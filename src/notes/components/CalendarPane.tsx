@@ -714,19 +714,13 @@ export function CalendarPane({
             event.preventDefault();
             void dropOn(cell.date);
           }}
-          // A cell that opens the composer on click must answer a keyboard too, or
-          // the primary authoring gesture is mouse-only. `role="button"` with a real
-          // tab stop and Enter/Space is the smallest honest version; the day header's
-          // `+` stays as the labelled path.
-          role="button"
-          tabIndex={0}
-          aria-label={t("calendar.composeOn", { date: cell.date })}
-          onKeyDown={(event) => {
-            if (event.key !== "Enter" && event.key !== " ") return;
-            if (event.target !== event.currentTarget) return;
-            event.preventDefault();
-            setComposing(cell.date);
-          }}
+          // The cell is NOT a button. It holds buttons - one per event chip, plus the
+          // header's `+` - and a `role="button"` around them is the `nested-interactive`
+          // violation axe reports: a screen reader announces a button whose contents are
+          // buttons, and the focus order inside it stops making sense. The keyboard
+          // authoring path is the day header's `+`, which is a real labelled button; this
+          // click stays for the mouse, where an empty day is where a person reaches for a
+          // pen.
           onClick={(event) => {
             // Empty space in a day is where a person reaches for a pen, so a click
             // on the cell itself opens the composer for that day. `currentTarget`
