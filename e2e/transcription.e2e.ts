@@ -45,6 +45,7 @@ import {
   selectedNoteId,
   unlockToEditor,
   writeNoteBody,
+  countByTestId,
 } from "./support/flows";
 import { type Session, testIdSelector } from "./support/webdriver";
 
@@ -275,8 +276,11 @@ describeE2E("tr2 the Transcribe row follows its OWN switch, not the AI opt-in (M
         // would loop until timeout even on success.
         const read = await s.waitUntil(
           async () => {
-            const transcribe = (await s.byTestIdAll("attachment-audio.transcribe")).length;
-            const revealOpen = (await s.byTestIdAll("attachment-audio.reveal")).length > 0;
+            // Counted in the page: the driver cannot serialize element info for
+            // this card's rows (WebKitGTK answers `Could not parse element info`),
+            // and these claims are counts.
+            const transcribe = await countByTestId(s, "attachment-audio.transcribe");
+            const revealOpen = (await countByTestId(s, "attachment-audio.reveal")) > 0;
             if (!revealOpen) {
               // Menu not open (never opened, or a reflow closed it) — re-open.
               await (await s.byTestId("attachment-audio.menu-button")).click();
@@ -302,8 +306,8 @@ describeE2E("tr2 the Transcribe row follows its OWN switch, not the AI opt-in (M
 
         const after = await s.waitUntil(
           async () => {
-            const transcribe = (await s.byTestIdAll("attachment-audio.transcribe")).length;
-            const revealOpen = (await s.byTestIdAll("attachment-audio.reveal")).length > 0;
+            const transcribe = await countByTestId(s, "attachment-audio.transcribe");
+            const revealOpen = (await countByTestId(s, "attachment-audio.reveal")) > 0;
             if (!revealOpen) {
               await (await s.byTestId("attachment-audio.menu-button")).click();
               return null;

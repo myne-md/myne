@@ -1420,6 +1420,24 @@ export async function setAutoTagEnabled(session: Session, enabled: boolean): Pro
 /** Close the Settings modal via its × button and wait for the dialog
  *  to unmount (backdrop click is gated during child in-flight; the
  *  explicit button is the deterministic path). */
+/**
+ * How many elements carry `testId` right now, counted IN THE PAGE.
+ *
+ * A count claim — "the row is offered" / "the row is hidden" — needs the number,
+ * not a handle, and the driver's element-info serialization is a needless
+ * dependency for it: WebKitGTK answers `Could not parse element info` for some
+ * subtrees (measured 2026-11-07 on the audio attachment card, where every
+ * `POST /elements` for its menu rows failed while the DOM was perfectly
+ * readable). Use this where the answer IS the count; keep `byTestIdAll` where the
+ * elements are going to be clicked.
+ */
+export async function countByTestId(session: Session, testId: string): Promise<number> {
+  return session.execute<number>(
+    "return document.querySelectorAll(arguments[0]).length;",
+    [testIdSelector(testId)],
+  );
+}
+
 export async function closeSettings(session: Session): Promise<void> {
   await (await session.byTestId("settings.close")).click();
   await session.waitForGone(testIdSelector("settings.modal"));
