@@ -68,6 +68,7 @@ async function wire<T>(
   method: "GET" | "POST" | "DELETE",
   path: string,
   body?: unknown,
+  attempt = 0,
 ): Promise<T> {
   let res: Response;
   try {
@@ -81,8 +82,37 @@ async function wire<T>(
   } catch (e) {
     const name = (e as Error)?.name ?? "";
     if (name === "TimeoutError" || name === "AbortError") {
+      // **Ask the page, not the driver, before giving up.** Both answers point at
+      // different owners: a page that still runs `execute` means the DRIVER's
+      // element path wedged, while a page that answers nothing means the WebView is
+      // gone and the fault is the app's. Without this line the two were one
+      // message, and the session spent hours on the wrong side of it.
+      let pageSays = "did not answer either";
+      try {
+        const probe = await fetch(`${baseUrl}/execute/sync`, {
+          method: "POST",
+          headers: { "content-type": "application/json; charset=utf-8" },
+          body: JSON.stringify({ script: "return 1 + 1;", args: [] }),
+          signal: AbortSignal.timeout(10_000),
+        });
+        const body = (await probe.json()) as { value?: unknown };
+        pageSays = `answers execute (${String(body?.value)}) - the page is ALIVE, the driver's element path wedged`;
+      } catch {
+        pageSays = "answers nothing - the WebView is GONE";
+      }
+      // **A live page earns one retry.** A stall that leaves the page answering is
+      // the driver's scheduling, not the scenario's subject, and the same request
+      // answers on the next attempt — measured 2026-11-08: the four member
+      // scenarios wedge on `POST /element/...` only in a long full run, and each
+      // passes alone in 40-124 s. One retry keeps a transient stall from consuming
+      // the whole scenario; a genuinely dead page still fails immediately, with
+      // the sentence below naming which of the two it was.
+      if (pageSays.startsWith("answers execute") && attempt < 1) {
+        return await wire(baseUrl, method, path, body, attempt + 1);
+      }
       throw new Error(
-        `the driver at ${baseUrl} did not answer ${method} ${path} within ${WIRE_TIMEOUT_MS} ms`,
+        `the driver at ${baseUrl} did not answer ${method} ${path} within ${WIRE_TIMEOUT_MS} ms ` +
+          `(attempt ${attempt + 1}); the page ${pageSays}`,
       );
     }
     throw e;
