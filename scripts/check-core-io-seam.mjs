@@ -30,6 +30,7 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isExtractedTestModule } from "./lib/test-module-files.mjs";
 
 // Two roots now: `core/src` (the original subject) and `format/src` (the
 // on-disk-format crate extracted for the `myne-decrypt` CLI, myne-md/myne#166).
@@ -221,6 +222,7 @@ const files = (argv.length
   : ROOTS.flatMap((r) => walk(r))
 ).filter((f) => {
   const rel = relative(process.cwd(), f);
+  if (isExtractedTestModule(rel)) return false;
   return ROOTS.some((r) => rel === r || rel.startsWith(r + sep));
 });
 

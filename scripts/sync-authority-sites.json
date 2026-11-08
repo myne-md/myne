@@ -132,24 +132,6 @@
         "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
       }
     },
-    "core/src/plugins/vault_migrate/mod.rs": {
-      "crate::plugins::sync::device_actor::durable_device_id(host, io, &vault_root).await;": {
-        "count": 1,
-        "reason": "Attribution, not authority: the caller needs the id to stamp what this device wrote. `device_actor` owns that question (scripts/check-device-actor.mjs)."
-      }
-    },
-    "core/src/plugins/vault_migrate/ntv7.rs": {
-      ".clone_person_identity()": {
-        "count": 2,
-        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
-      }
-    },
-    "core/src/plugins/vault_migrate/ntv8.rs": {
-      "state.clone_person_identity().await.is_some(),": {
-        "count": 1,
-        "reason": "The caller needs the person KEYPAIR itself (to sign, derive or check that one is held); the resolver receives it as an input rather than answering it."
-      }
-    },
     "core/src/plugins/vault_unlock/commands.rs": {
       "crate::plugins::sync::device_actor::durable_device_id(host, io, vault_dir).await": {
         "count": 1,
