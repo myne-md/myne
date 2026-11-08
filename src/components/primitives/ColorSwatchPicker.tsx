@@ -22,6 +22,7 @@
 // "Olive, pressed" rather than as an unlabelled dot.
 
 import { type CSSProperties } from "react";
+import { colorGroupVar } from "../../notes/graphColorGroups";
 import { Tooltip } from "./Tooltip";
 
 export interface ColorSwatchPickerProps {
@@ -63,7 +64,10 @@ function paintStyle(key: string, selected: boolean): CSSProperties {
     width: "var(--space-3)",
     height: "var(--space-3)",
     borderRadius: "var(--radius-pill)",
-    background: `var(--${key}, var(--line-2))`,
+    // One expression, from the module that owns "a stored token name becomes a CSS
+    // value with a fallback": a second copy here had a different fallback token and no
+    // shape check, so a token a theme drops painted two colours in two places.
+    background: colorGroupVar(key),
     boxShadow: selected ? "0 0 0 2px var(--accent)" : "none",
   };
 }

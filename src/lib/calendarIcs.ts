@@ -30,7 +30,6 @@
 // about the note's bytes.
 
 import {
-  ICS_BYTE_CAP,
   exportEvents,
   importEvents,
   type IcsEvent,
@@ -193,7 +192,6 @@ export async function readIcsFile(): Promise<{
 }
 
 /** The read cap, so a caller can say what the bound is rather than "too large". */
-export const ICS_IMPORT_CAP_BYTES = ICS_BYTE_CAP;
 
 function toastSaved(filename: string, count: number): void {
   void import("../i18n").then(({ default: i18n }) => {

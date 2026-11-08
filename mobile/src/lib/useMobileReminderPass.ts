@@ -25,6 +25,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { CalendarRow } from "@myne/vault-indices";
 import { resolveDayAnchor } from "@myne/dialect/event";
+import { formatLocalDate } from "./localDateTime";
 import { REMINDER_MAX_PENDING, runBoundedReminderPass } from "./reminderPass";
 import { createReminderNotifier, createReminderPermissionApi, remindersReachTheOs } from "./reminders";
 import { vaultIndicesCalendarRange } from "./calendar";
@@ -56,20 +57,14 @@ export function resetPermissionAsk(): void {
   askedForPermission = false;
 }
 
-/** `YYYY-MM-DD`, the device's own day. */
-function todayString(now: Date): string {
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-}
-
 /** The window the pass needs: today, plus the horizon it schedules within. */
 function windowFor(now: Date, horizonDays: number): { start: string; end: string } {
   const end = new Date(now.getTime() + horizonDays * 86_400_000);
-  return { start: todayString(now), end: todayString(end) };
+  return { start: formatLocalDate(now), end: formatLocalDate(end) };
 }
 
 /** The reminders the calendar contributes, in the shape the pass consumes. */
-export function eventSourcesFrom(rows: readonly CalendarRow[]): { noteId: string; start: string; allDay: boolean; occurrenceDate: string | null; remind: string | null }[] {
+function eventSourcesFrom(rows: readonly CalendarRow[]): { noteId: string; start: string; allDay: boolean; occurrenceDate: string | null; remind: string | null }[] {
   return rows
     .filter((row) => row.remind !== null && row.remind !== "")
     .map((row) => ({
