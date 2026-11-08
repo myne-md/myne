@@ -1553,7 +1553,7 @@ export const SETTINGS_STORIES: StoryDescriptor[] = [
     render: () => (
       <Frame>
         <SidebarStateProvider>
-          <SyncPanel onMigrated={action("onMigrated")} onDialogOpenChange={action("onDialogOpenChange")} />
+          <SyncPanel onDialogOpenChange={action("onDialogOpenChange")} />
         </SidebarStateProvider>
       </Frame>
     ),

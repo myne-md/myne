@@ -211,7 +211,7 @@ export const SOURCE_MAP: Record<string, SourceReference> = {
   "SuspicionBanner": { file: "src/components/SuspicionBanner.tsx", line: 48 },
   "Switch": { file: "src/components/primitives/Switch.tsx", line: 37 },
   "SyncBanners": { file: "src/components/sync/SyncBanners.tsx", line: 60 },
-  "SyncPanel": { file: "src/components/settings/SyncPanel.tsx", line: 145 },
+  "SyncPanel": { file: "src/components/settings/SyncPanel.tsx", line: 140 },
   "SyncStatusIndicator": { file: "src/components/sync/SyncStatusIndicator.tsx", line: 76 },
   "SyncUsageBlock": { file: "src/components/sync/SyncUsageBlock.tsx", line: 66 },
   "TabStrip": { file: "src/notes/components/TabStrip.tsx", line: 251 },
