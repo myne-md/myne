@@ -217,13 +217,16 @@ const IDLE_POLL: Duration = Duration::from_secs(5);
 /// means autosave's debounce has already persisted).
 const LOCK_FLUSH_GRACE: Duration = Duration::from_millis(1500);
 
-/// Absolute TTL for the `Slot::Recovering` window (MYND-121 story 8) —
-/// measured from `recovered_at`, NOT activity-reset. A generous code
-/// constant aligned with the 10-minute vault-creation session TTL
-/// (`decisions.md` 2026-04-28; same rationale — bound the RAM-resident
-/// recovered `root_key` window). NOT user-tunable / NOT in `vault.prefs`
-/// → zero replay surface (the task-3 protective envelope is unneeded here).
-const RECOVERING_TTL: Duration = Duration::from_secs(600);
+/// Absolute TTL for the `Slot::Recovering` window. It is measured from
+/// `recovered_at`, NOT activity-reset, and NOT user-tunable (so there is no
+/// replay surface for it).
+///
+/// It moved to `myne-core` with the rest of the deadline (myne-md/myne#758,
+/// audit lead NV09) and is re-exported here because this crate's timer is still
+/// the DESKTOP driver: mobile and web had no driver at all, which is exactly
+/// what a constant living in one client's module made invisible.
+#[cfg(test)]
+use myne_core::plugins::vault_unlock::recovering_ttl::RECOVERING_TTL;
 
 /// Spawn the authoritative idle-lock timer for the process lifetime.
 /// FAIL-CLOSED: silence of the activity heartbeat lets the effective idle
@@ -432,32 +435,30 @@ async fn lock_unlocked_if_idle<R: Runtime>(app: &AppHandle<R>, state: &VaultRunt
 /// existing post-Argon2id slot-peek + `vault.meta` CAS in
 /// `vault_complete_recovery` (bail without disk write); the frontend resumes
 /// via its existing needs-active-session path on the next commit attempt.
+///
+/// The deadline, the drop and the screen-capture reset live in
+/// `myne_core::plugins::vault_unlock::recovering_ttl::bail_if_expired`
+/// (myne-md/myne#758): this crate supplies the TIMER, which is the only part
+/// that is desktop-specific.
 async fn bail_recovering_if_expired<R: Runtime>(app: &AppHandle<R>, state: &VaultRuntimeState) {
     // `recovered_at` is a host monotonic reading in millis rather than an
     // `Instant` (MYND-574 task 12); the age is the difference against a fresh
-    // reading from the same clock. `saturating_sub` so a backwards clock step
-    // reports age 0 — which DELAYS the bail rather than firing it early, the
-    // safe direction for a guard that zeroizes key material.
+    // reading from the same clock, and a backwards step DELAYS the bail rather
+    // than firing it early, the safe direction for a guard that zeroizes key
+    // material.
+    //
+    // The hook handle falls back to `NoopHooks` rather than returning early: the
+    // ZEROIZE is the part that protects the user, and an absent `Hooks` state
+    // must not be able to postpone it. `NoopHooks` applies no screen-capture
+    // reset, which is the only thing here that needs a real client hook.
+    let hooks = app
+        .try_state::<myne_core::hooks::Hooks>()
+        .map(|h| (*h).clone())
+        .unwrap_or_else(|| std::sync::Arc::new(myne_core::hooks::NoopHooks));
     let now_ms = myne_core::host::HostCtx::monotonic_millis(
         &myne_core::host::tauri_host::TauriHost::new(app.clone()),
     );
-    let bailed = state
-        .take_recovering_if_expired(RECOVERING_TTL, |recovered_at| {
-            Duration::from_millis(now_ms.saturating_sub(recovered_at))
-        })
-        .await;
-
-    if let Some(prior) = bailed {
-        debug_assert!(matches!(prior, Slot::Recovering { .. }));
-        tracing::info!(
-            event = "vault_locked",
-            from_slot_kind = "recovering",
-            reason = "recovering_ttl",
-            "auto-lock TTL expired the recovery session; root_key + items_key wipe on Drop"
-        );
-        drop(prior); // leg 1 — zeroize the recovered keys (leg-1-only: no notes)
-        crate::screen_capture::apply(app, true, "lock_reset");
-    }
+    myne_core::plugins::vault_unlock::recovering_ttl::bail_if_expired(state, now_ms, &hooks).await;
 }
 
 /// Side-effects of an idle-lock teardown, abstracted so the leg ORDER is

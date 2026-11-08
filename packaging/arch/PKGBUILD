@@ -1,6 +1,6 @@
 # Maintainer: Ömer Duran <me@omerduran.dev>
 pkgname=myne
-pkgver=0.11.3
+pkgver=0.11.4
 pkgrel=1
 pkgdesc="A calm place for your notes: clean, fast, end-to-end-encrypted markdown notes with [[wikilinks]], backlinks, a graph view and full-text search"
 arch=('x86_64')
@@ -20,9 +20,22 @@ options=('!lto')
 # budget.mjs` for what the binary package declares.
 #
 # ── Source ──────────────────────────────────────────────────────────────────
-# For AUR / distribution: public git URL + version tag.
-# NOTE: verify the <repo-url> and tag against your own remote (is the repo public?).
-source=("$pkgname::git+https://github.com/myne-md/myne.git#tag=v$pkgver")
+# For AUR / distribution: the public git URL, pinned to a COMMIT.
+#
+# A commit, not `#tag=v$pkgver`, and the difference is the whole point
+# (myne-md/myne#758, security-audit lead NV11). A tag can be moved: `git push
+# --force` an existing tag and this recipe silently builds different sources than
+# the ones that were reviewed, with nothing anywhere to notice. A commit id is
+# content-addressed, so the pin IS the integrity check. That is also why
+# `sha256sums=('SKIP')` is correct here rather than an omission: makepkg cannot
+# hash a git checkout, and Arch's VCS guidelines treat the ref as the integrity.
+# `scripts/check-arch-pkgbuild.mjs` holds both halves: a git source must carry a
+# 40-hex `#commit=`, and SKIP is refused for any source that is not one.
+#
+# Bump BOTH this and `myne-bin/PKGBUILD`'s `pkgver` together with `flake.nix`'s
+# two release URLs. The guard compares all three, because that is the drift this
+# lead found: this recipe was one stable release behind the other two.
+source=("$pkgname::git+https://github.com/myne-md/myne.git#commit=2a40fe4082cb991803483dd2156cecff4c0fc16f")
 sha256sums=('SKIP')
 
 prepare() {

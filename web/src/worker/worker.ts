@@ -33,6 +33,7 @@ import init, {
   sync_poke_target,
   sync_signal,
   sync_tick,
+  vault_recovering_ttl_tick,
 } from "../../wasm/pkg/myne_web_wasm.js";
 import { installOpfsBridge } from "./opfs";
 import { installSyncHttpBridge } from "./sync-transport";
@@ -61,6 +62,16 @@ function reply(message: WorkerResponse): void {
  */
 const pending: WorkerRequest[] = [];
 let started = false;
+
+/**
+ * Cadence of the `Slot::Recovering` deadline tick, matching `RECOVERING_TICK`
+ * in `myne-core` (myne-md/myne#758).
+ *
+ * The deadline itself is a timestamp comparison, so this only decides how
+ * promptly an already-expired recovery session is dropped; a coarser interval
+ * delays the drop, it never extends the deadline.
+ */
+const VAULT_RECOVERING_TTL_TICK_MS = 5_000;
 
 /**
  * Called BY the wasm panic hook (task 82) — see `entry.rs::install_panic_hook`.
@@ -262,6 +273,33 @@ async function start(): Promise<void> {
       // come through `sync_poke_target` above.
       awarenessFrame: sync_awareness_deliver,
     });
+
+    // The `Slot::Recovering` deadline (myne-md/myne#758, audit lead NV09).
+    //
+    // Every other client drives it from a Rust timer; the Worker has neither
+    // threads nor a Rust timer, so this interval is its driver. That is the same
+    // split `sync_loop` documents for the sync tick. It has to exist here rather than
+    // only on the recovery screen: `recover_with_phrase` populates the slot and
+    // the user can close that screen, and an expired session must still be
+    // dropped while a locked vault sits behind it.
+    //
+    // The cadence matches `RECOVERING_TICK` in `myne-core`; a slower interval
+    // only delays noticing a session that has already passed its deadline.
+    //
+    // The `.catch` is required by the promise type, not by a failure this code
+    // expects: `entry.rs` states that nothing there throws, and a Rust panic
+    // aborts the whole instance instead of rejecting. So a rejection here means
+    // the instance is gone, which the next `invoke` reports as `fatal`, and there
+    // is nothing this timer could add. Re-reporting it through the console would
+    // break the logging discipline at the top of this file.
+    //
+    // What the user can see is on the other side of the boundary, where the
+    // decision lives: a `bail_if_expired` that drops the session records a
+    // `vault_locked` event with `reason = "recovering_ttl"`, so the drop is never
+    // silent and this timer never has to describe it.
+    setInterval(() => {
+      void vault_recovering_ttl_tick().catch(() => {});
+    }, VAULT_RECOVERING_TTL_TICK_MS);
 
     // `build_info()` is parsed rather than forwarded raw so a malformed value
     // fails here, in the handshake, instead of somewhere downstream.
