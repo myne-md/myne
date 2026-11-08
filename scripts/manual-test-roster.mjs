@@ -3393,7 +3393,6 @@ export const ROSTER = Object.freeze([
       "packaging/arch/myne.desktop",
       "src-tauri/src/cli_bridge/path_shim.rs",
       "src-tauri/src/clipper/manifest.rs",
-      "docs/decisions/clients/0050-vault-path-app-data-dir-vault-single-vault-per-os-user-in-ph.md",
     ],
     // android is here for the two distribution-integrity items only, not for the
     // installer chrome: stage-release.sh publishes the .apk to downloads.myne.md
@@ -5283,7 +5282,6 @@ export const ROSTER = Object.freeze([
       "src/hooks/usePrefs.ts",
       "src/lib/prefs.ts",
       "src-tauri/src/screen_capture.rs",
-      "docs/decisions/clients/0495-screen-capture-protection-macos-is-uncovered-and-linux-is-no.md",
     ],
     clients: ["desktop-linux"],
     automatedBy: [],
@@ -5306,7 +5304,6 @@ export const ROSTER = Object.freeze([
       "src/hooks/usePrefs.ts",
       "src/lib/prefs.ts",
       "src-tauri/src/screen_capture.rs",
-      "docs/decisions/clients/0495-screen-capture-protection-macos-is-uncovered-and-linux-is-no.md",
     ],
     clients: ["desktop-macos"],
     automatedBy: [],
@@ -5549,7 +5546,6 @@ export const ROSTER = Object.freeze([
     title: "Vault panel",
     paths: [
       "src/components/settings/VaultPanel.tsx",
-      "src/components/settings/VaultFormatUpgrade.tsx",
       "src/lib/vault-delete.ts",
       "src/lib/vault-format-upgrade.ts",
     ],
@@ -6731,15 +6727,9 @@ export const ROSTER = Object.freeze([
     id: "vault.migration-and-repair",
     title: "Vault migration, settle and repair",
     paths: [
-      "src/lib/vault-migrate.ts",
       "src/lib/vault-repair.ts",
       "src/components/RepairResidueBanner.tsx",
-       "src/components/settings/MigrateVaultForm.tsx",
-       "web/src/components/settings/MigrateVaultForm.tsx",
-
-      "src/components/settings/SettleMigrationBlock.tsx",
       "src/platform/capabilities.ts",
-      "src-tauri/src/plugins/vault_migrate/",
       "core/src/plugins/vault_migrate/",
       "src-tauri/src/vault_migration.rs",
       "src-tauri/src/plugins/vault_repair/",
@@ -7189,7 +7179,6 @@ export const ROSTER = Object.freeze([
       "web/src/components/sync/EndpointConfig.tsx",
       "src/screens/VaultPicker.tsx",
       "web/src/screens/RestoreBackup.tsx",
-      "web/src/components/settings/MigrateVaultForm.tsx",
       "scripts/check-web-capabilities.mjs",
       "src/screens/WebNoAccount.tsx",
     ],
@@ -7232,7 +7221,6 @@ export const ROSTER = Object.freeze([
       "web/src/sw/update-policy.ts",
       "web/container/Caddyfile",
       "docs/web-bundle-hashes.md",
-      "docs/decisions/clients/0359-service-worker-update-policy-for-the-web-client-signed-updat.md",
     ],
     clients: ["web"],
     automatedBy: [
@@ -7430,8 +7418,6 @@ export const ROSTER = Object.freeze([
     id: "web.phrase.creation-and-recovery-in-a-page",
     title: "The 24-word phrase displayed in and typed into a browser, on every path",
     paths: [
-      "docs/decisions/protocol/0514-web-phrase-capability-split-creation-and-recovery-ship-enrol.md",
-      "docs/decisions/protocol/0704-the-recovery-phrase-is-no-longer-forbidden-in-served-code.md",
       "web/vite.config.ts",
       "src/components/PhraseEntryGrid.tsx",
       "e2e-web/create-account.e2e.ts",
@@ -7500,7 +7486,6 @@ export const ROSTER = Object.freeze([
     id: "web.storage.eviction-rebootstrap",
     title: "Browser eviction of the vault container, and re-bootstrap instead of loss",
     paths: [
-      "docs/decisions/clients/0358-on-the-web-client-tofu-re-bootstrap-is-routine-not-once-per.md",
       "src/screens/PendingApproval.tsx",
       "src/screens/StorageLost.tsx",
       "web/src/platform/app-exit.ts",

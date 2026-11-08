@@ -282,22 +282,6 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsIndexEntry[] = [
     keywordsKey: "settings.search.keywords.changePassword",
   },
   {
-    // The one-phrase upgrade (myne-md/myne#911). Gated on `vaultMigration`, the
-    // capability the row's control renders behind (`VaultPanel`): the upgrade
-    // needs a desktop vault directory and the person plane beside it. It was
-    // gated on `personVaultCredential`, which the browser HAS, so a web search
-    // would have scrolled to a section that client never draws.
-    id: "vault.format",
-    agentWritability: WRITABILITY_NONE,
-    capability: "vaultMigration",
-    panelId: "vault",
-    topic: "vault",
-    testid: "settings.vault.format-cta",
-    titleKey: "settings.vault.format.heading",
-    descriptionKey: "settings.vault.format.intro",
-    keywordsKey: "settings.search.keywords.vaultFormat",
-  },
-  {
     id: "vault.danger-zone",
     agentWritability: WRITABILITY_NONE,
     panelId: "vault",
