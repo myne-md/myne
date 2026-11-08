@@ -134,12 +134,11 @@ impl RecoveryPhrase {
 /// is invalid — please retry."). This is the single-pass cousin of
 /// [`RecoveryPhrase::join_normalized`], which canonicalizes a phrase
 /// Myne *generated* (already ASCII lowercase, no NFKD pass needed).
-// Return type is load-bearing: a bare `String` would leave the normalized phrase
-// un-zeroized. Asserted by coercion so it holds on every build, not only in tests.
-#[allow(dead_code)]
-fn assert_normalize_returns_a_zeroizing_string(s: &str) -> Zeroizing<String> {
-    normalize_user_phrase(s)
-}
+// The return type is load-bearing: a bare `String` leaves the phrase un-zeroized.
+// Anonymous `const`, so no dead-code lint can call it unused.
+const _: () = {
+    let _: fn(&str) -> Zeroizing<String> = normalize_user_phrase;
+};
 
 pub fn normalize_user_phrase(input: &str) -> Zeroizing<String> {
     // Pre-allocate against input byte length. NFKD can expand chars
