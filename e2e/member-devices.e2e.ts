@@ -141,7 +141,7 @@ if (!ready) {
   );
 }
 
-const describeCanary = ready ? describe : describe.skip;
+const describeCanary = ready ? describeE2E.flaky : describe.skip;
 
 /** What the second device's sidebar row will carry. Distinctive on purpose: the
  *  owner's seeded vault has notes of its own. */
@@ -325,6 +325,16 @@ async function publishPresence(
   );
 }
 
+// **QUARANTINED as a CONTENTION victim, with the measurement that says so.** In
+// a full run this scenario wedges on a WebDriver call (`element/value`, then
+// `execute/sync`, then the retries) while the same scenario passes alone: measured
+// 2026-11-08 on this Linux seat, `member-onboarding` 98-101 s standalone and three
+// wedged attempts of 60 s each in the suite, with the page-alive probe answering on
+// some attempts and not others. The steps themselves are not wrong; the WebView
+// stalls for minutes under the accumulated load of a long run, which is what
+// `describeE2E.flaky` exists for (see `e2e/support/scenario.ts`). The normal lane
+// SKIPS it and `MYNE_E2E_QUARANTINE=1` runs it, so it keeps being exercised
+// without reddening the suite until the stall itself is understood.
 describeCanary("MD-1 a member's second device (myne-md/myne#852)", () => {
   // Vault-count precondition: 1 seeded vault on the owner, 0 on each member device.
   it("joins the same vault from the phrase alone, and both devices' revisions and presence name the member", async () => {
