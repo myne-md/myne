@@ -6202,6 +6202,7 @@
       "calendarLabel": "Calendar (a name)"
     },
     "skipFailed": "That occurrence could not be cancelled. It is still in the calendar.",
-    "taskRow": "A task due {date}"
+    "taskRow": "A task due {date}",
+    "composeOn": "Add an event on {date}"
   }
 }

@@ -129,9 +129,13 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       try {
         rows = (await vaultIndicesCalendarRange(start, end, true)).rows;
       } catch {
-        // A locked or unreadable vault means no event reminders THIS pass; the task
-        // half still runs, because the two sources fail independently.
-        rows = [];
+        // A failed read means the EVENT half of this pass is SKIPPED, not empty. The
+        // pass is reconciling, so an empty list cancels every registered event
+        // reminder, and a vault that was momentarily locked would then withdraw
+        // reminders that were correct. The task half still runs, because the two
+        // sources fail independently.
+        if (!cancelled) setResult({ scheduled: 0, cancelled: 0, failed: 0 });
+        return;
       }
       if (cancelled) return;
 
