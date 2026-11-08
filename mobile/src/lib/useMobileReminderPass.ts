@@ -24,6 +24,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { CalendarRow } from "@myne/vault-indices";
+import { resolveDayAnchor } from "@myne/dialect/event";
 import { REMINDER_MAX_PENDING, runBoundedReminderPass } from "./reminderPass";
 import { createReminderNotifier, createReminderPermissionApi, remindersReachTheOs } from "./reminders";
 import { vaultIndicesCalendarRange } from "./calendar";
@@ -121,7 +122,11 @@ export function useMobileReminderPass(): { scheduled: number; cancelled: number;
       const outcome = await runBoundedReminderPass({
         tasks: tasksRef.current,
         events: eventSourcesFrom(rows),
-        dayAnchor: prefs.calendar_settings?.day_reminder_anchor,
+        // Through the shared resolver, not the raw value: `calendar_settings` is a
+        // SHARED pref, so a device can receive a value its own setter never validated,
+        // and `targetEventReminders` interpolates whatever it is given. A bad value
+        // used to produce `Invalid Date` and silently drop every all-day reminder.
+        dayAnchor: resolveDayAnchor(prefs.calendar_settings?.day_reminder_anchor),
         notifier,
         clock: () => new Date(),
         horizonDays,
