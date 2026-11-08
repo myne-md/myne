@@ -420,7 +420,6 @@ pub fn run() {
         .plugin(plugins::vault_recover::init())
         .plugin(plugins::vault_change_password::init())
         .plugin(plugins::vault_delete::init())
-        .plugin(plugins::vault_migrate::init())
         .plugin(plugins::vault_repair::init())
         .plugin(plugins::prefs::init())
         .plugin(plugins::themes::init())

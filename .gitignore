@@ -76,6 +76,12 @@ coverage/
 # directories, whose contents came from the private companion and must never be
 # committed here.
 /.opencode/worktrees/
+# The guards extension refuses a worktree anywhere but `.worktrees/<n>-<slug>`,
+# while AGENTS.md and the eight scripts and runbooks around it name
+# `.opencode/worktrees/`. The two have drifted, and only the second path was
+# ignored, so a real worktree read as untracked machine state here. Ignore both
+# until the guard and the prose agree.
+/.worktrees/
 /.opencode/goals/
 /.opencode/node_modules/
 /.opencode/skills/

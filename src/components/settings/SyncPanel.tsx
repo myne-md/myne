@@ -33,9 +33,6 @@ import { BuildingIndexState } from "../sync/BuildingIndexState";
 import { SyncUsageBlock } from "../sync/SyncUsageBlock";
 import { RecoveredNotes } from "../sync/RecoveredNotes";
 import { has as hasCapability } from "../../platform/capabilities";
-import { MigrateVaultForm } from "./MigrateVaultForm";
-import { SettleMigrationBlock } from "./SettleMigrationBlock";
-import { migrationSettleStatus } from "../../lib/vault-migrate";
 import {
   ConflictsView,
   type ConflictCompare,
@@ -98,12 +95,6 @@ export interface SyncPanelProps {
    */
   vaultId?: string | null;
   /**
-   * Routed to Unlock after a successful vault migration (#420). Migration re-keys
-   * the vault and drops the running slot, so the session must re-unlock; the
-   * Settings shell wires this to `onForceRelock({ kind: "Exists" })`.
-   */
-  onMigrated?: () => void;
-  /**
    * Raised while this panel has a modal dialog of its own up (the beta terms).
    * The Settings shell stands its global keys down while a child dialog owns
    * the surface — see the child-dialog gating note in `SettingsModal.tsx`.
@@ -146,7 +137,7 @@ const AUTHORITY_CAUSE_COPY: Partial<Record<AuthorityCause, string>> = {
   key_missing_while_bound: "sync.panel.status.authorityKeyMissing",
 };
 
-export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanelProps = {}) {
+export function SyncPanel({ vaultId, onDialogOpenChange }: SyncPanelProps = {}) {
   const { t } = useTranslation();
   const ctx = useSelectedNote();
   // `MY01`-only by construction (#422, ASM-6→B): keep-both conflict copies carry
@@ -393,35 +384,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
     plane === "owner" &&
     (devicesHook.devices ?? []).some((d) => d.is_current && d.approved && !d.retired);
 
-  // Cold-start "building search index…" state. Producer: the MYND-426 engine
-  // re-derives vault.search/vault.indices after a full-reconcile or a fresh
-  // device enroll and emits `sync://index-building` around that window. Dormant
-  // until the loop lands (R3); no-op outside Tauri (browser dev shim).
-  // Does this vault have anything to say about migration at all?
-  //
-  // `offerable` is "still v0.1, the upgrade can be offered"; `pending` is "a
-  // migration ran and its `legacy/` snapshot is unsettled". A vault created
-  // today is v0.2 from birth (`decisions.md` 2026-08-13) and has NEITHER, so
-  // the whole block — heading included — stays out of Settings rather than
-  // showing a permanently-inert control. `null` while the probe is in flight,
-  // which renders as absent: a row that appears a beat late is better than one
-  // that flashes and disappears.
-  const [migration, setMigration] = useState<{
-    offerable: boolean;
-    pending: boolean;
-  } | null>(null);
-  const probeMigration = useCallback(() => {
-    // Not on web: the dispatcher refuses the whole `vault-migrate` plugin there
-    // (a web client joins an already-current account and never migrates), so
-    // probing would be a call the backend answers with a refusal.
-    if (!hasCapability("vaultMigration")) return;
-    void migrationSettleStatus()
-      .then((s) => setMigration({ offerable: s.offerable, pending: s.pending }))
-      // A probe failure hides the block, exactly as it does on a vault that was
-      // never migrated. The unlock path owns any real meta failure.
-      .catch(() => setMigration(null));
-  }, []);
-  useEffect(probeMigration, [probeMigration]);
 
   const [buildingIndex, setBuildingIndex] = useState(false);
   useEffect(() => {
@@ -840,56 +802,6 @@ export function SyncPanel({ vaultId, onMigrated, onDialogOpenChange }: SyncPanel
       )}
       </SettingsSection>
 
-      {/* Whole-vault v0.1 → v0.2 migration (#420) - gated behind the
-          `vaultMigration` capability (present on desktop, absent on web: a web
-          client joins an already-current account and never migrates). The
-          dispatcher refuses `plugin:vault-migrate|vault_migrate` on web, so this
-          capability is what keeps the UI from offering a control the backend
-          rejects (check-web-capabilities.mjs).
-
-          **The gate is on the SECTION, not on the block inside it**, because the
-          section's heading and accent rule render unconditionally: a section
-          whose only child is this block drew a titled rule above nothing on a
-          v0.2 vault (nothing to offer, nothing pending) and on every web client. */}
-      {hasCapability("vaultMigration") && (migration?.offerable || migration?.pending) && (
-        <SettingsSection title={t("sync.panel.sections.server")}>
-        <div style={BLOCK_STYLE} data-setting-anchor="sync.migrate" data-setting-row="true">
-          <span style={SECTION_TITLE_STYLE}>{t("migrate.submit")}</span>
-          {/* The form only where there is something to migrate. On an
-              already-current vault it would ask for the 24-word recovery phrase
-              to perform a no-op that the backend refuses with `AlreadyMigrated`
-              - an offer the product cannot honour. */}
-          {migration?.offerable && (
-            <MigrateVaultForm
-              onMigrated={() => {
-                probeMigration();
-                onMigrated?.();
-              }}
-            />
-          )}
-          {/* §10.4.1 point 5 (myne-md/myne#430). Renders only while a `legacy/`
-              snapshot is staged, which is also why it sits BELOW the form: after
-              a migration the vault locks and the user re-unlocks, so this is the
-              surface they come back to, not one they see on the way out. */}
-          <SettleMigrationBlock
-            onSettled={(which) => {
-              probeMigration();
-              // ABORT only (myne-md/myne#461). `onMigrated` is the force-relock:
-              // it routes the shell to the Unlock screen, which is right after
-              // an abort, because that command restores the pre-migration root
-              // and the backend drops the slot with it. Confirm is not a re-key.
-              // It erases the staged `legacy/` snapshot and leaves the running
-              // slot untouched, so relocking on top of it showed a lock screen
-              // the backend never locked: the correct password then came back
-              // `VaultAlreadyUnlocked` forever and the only way out was
-              // restarting the app. Confirm re-probes and leaves the user where
-              // they are, which is what settling a migration should feel like.
-              if (which === "aborted") onMigrated?.();
-            }}
-          />
-        </div>
-        </SettingsSection>
-      )}
       </SettingsTopicPanel>
 
       {/* **Devices and members**: what is enrolled on this account, what may be
