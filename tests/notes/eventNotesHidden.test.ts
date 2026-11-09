@@ -69,6 +69,14 @@ describe("isLiveNote, an event is still IN the working set", () => {
     // The assertion is the predicate's, not this file's: `calendar.rs` refuses a
     // record whose `live` is false, and `vaultIndices` derives that flag from
     // this function.
-    expect(isLiveNote({ kind: "event", trashed: null })).toBe(true);
+    expect(
+      isLiveNote({
+        trashed: null,
+        deleted: null,
+        archived: null,
+        template: false,
+        conflict: false,
+      }),
+    ).toBe(true);
   });
 });

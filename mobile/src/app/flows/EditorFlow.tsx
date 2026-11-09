@@ -1416,11 +1416,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return m;
   }, [liveNotes, bodies]);
 
-  // The DELETE path's map: `folderOf` hides events, so a folder holding only them
-  // would read as empty and lose the confirmation the desktop twin shows.
+  // The DELETE path: `folderOf` hides events, so their folder would read as empty.
   const folderOfAll = useMemo(() => {
     const m = new Map<string, string | null>();
-    for (const n of resolverNotes) m.set(n.id, readNoteFolder(bodies.get(n.id) ?? ""));
+    for (const n of resolverNotes) m.set(n.noteUuid, readNoteFolder(bodies.get(n.noteUuid) ?? ""));
     return m;
   }, [resolverNotes, bodies]);
 
@@ -2849,7 +2848,10 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     }
   }
 
-  useAutosave(editorText, view === "editor" && editing !== null, persistOpenBuffer);
+  // The writer answers "did it land"; the cadence only needs to know it ran.
+  useAutosave(editorText, view === "editor" && editing !== null, () => {
+    void persistOpenBuffer();
+  });
 
   /** A list row's open: persist the open buffer first, and a failed write keeps the
    *  user where the text is rather than navigating away from it. */

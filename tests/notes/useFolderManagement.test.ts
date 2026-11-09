@@ -114,13 +114,24 @@ import type { UseSelectedNoteReturn } from "../../src/notes/sidebarState";
 // ---- fixtures -------------------------------------------------------------
 
 function rec(id: string, folder: string | null): TitleRecord {
+  // The full record, not the fields this file happens to read: a fixture missing
+  // half of TitleRecord type-checks nowhere and the folders plan reads more of it
+  // than the derivation used to (myne-md/myne#23's folder-delete union).
   return {
     noteUuid: id,
     title: id,
     folder,
     updatedAt: new Date(0),
     trashed: null,
+    deleted: null,
+    archived: null,
     template: false,
+    folderIndex: false,
+    conflict: false,
+    conflictOf: null,
+    hasSource: false,
+    kind: null,
+    done: null,
   };
 }
 

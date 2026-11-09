@@ -26,8 +26,20 @@ import { describe, expect, it } from "vitest";
 
 import { check, MIN_REASON_LEN, PLACEHOLDER, record } from "../../scripts/check-copy-budget.mjs";
 
+type Alias = { owner: string; reason: string };
+
 /** The smallest world the guard needs: a catalog, a record, and files -> keys. */
-function world({ catalog, aliases = {}, surfaces = {}, keys = {} }) {
+function world({
+  catalog,
+  aliases = {},
+  surfaces = {},
+  keys = {},
+}: {
+  catalog: Record<string, string>;
+  aliases?: Record<string, Alias>;
+  surfaces?: Record<string, number>;
+  keys?: Record<string, string[]>;
+}) {
   return {
     catalog: new Map(Object.entries(catalog)),
     record: { aliases, surfaces },
@@ -122,13 +134,16 @@ describe("check-copy-budget, the ownership ratchet", () => {
         keys: { "src/components/settings/A.tsx": ["common.cancel"] },
       }),
     );
-    expect(next.aliases["dialog.cancel"]).toEqual({ owner: "common.cancel", reason: PLACEHOLDER });
+    expect(next.aliases["dialog.cancel" as keyof typeof next.aliases]).toEqual({
+      owner: "common.cancel",
+      reason: PLACEHOLDER,
+    });
     const problems = check(
       world({
         catalog: { "common.cancel": "Cancel", "dialog.cancel": "Cancel" },
-        aliases: next.aliases,
+        aliases: next.aliases as Record<string, Alias>,
         keys: { "src/components/settings/A.tsx": ["common.cancel"] },
-        surfaces: next.surfaces,
+        surfaces: next.surfaces as Record<string, number>,
       }),
     );
     expect(problems.some((p) => p.includes("no usable reason"))).toBe(true);
