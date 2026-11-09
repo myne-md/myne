@@ -3184,7 +3184,7 @@
       "buildChannelLabel": "Build channel",
       "buildChannelStable": "Stable",
       "developerModeInline": "Shows the settings Myne keeps out of the way by default.",
-      "developerModeHelper": "Shows the advanced settings Myne keeps out of the way by default: the ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
+      "developerModeHelper": "The ones where you leave the path Myne vouches for, and the power-user tools most people never need. Turning it off only hides them again. Whatever you switched on stays on, and its own control is where you switch it off.",
       "developerModeLabel": "Developer mode",
       "diagnosticLogHelper": "Writes a plaintext log on this device, and only this device. It records what Myne is doing: never your note text, never a note title, never a file path. Myne caps its size and drops the oldest entries first, and turning this back off deletes the log. Nothing is ever sent anywhere; you decide what to share.",
       "diagnosticLogLabel": "Diagnostic logging",
@@ -3221,7 +3221,7 @@
       "licenseBody": "CC-BY-4.0 docs · AGPL-3.0 application code.",
       "licenseLabel": "License",
       "tagline": "Pre-alpha",
-      "threatModelHelper": "Open the public threat-model document in your browser.",
+      "threatModelHelper": "Open in your browser.",
       "threatModelLabel": "Threat model",
       "updateAutoCheckHelper": "Myne downloads a small signed file from myne.md to see whether a newer version exists, then tells you. It sends your current version and platform, and nothing else. You can still check by hand with the button above.",
       "updateAutoCheckLabel": "Check for updates automatically",
@@ -3233,7 +3233,7 @@
       "updateChecking": "Checking…",
       "updateFailed": "Couldn't check for updates. It will retry later.",
       "updateHelper": "Myne verifies every update against an offline release key before installing it. The check asks downloads.myne.md for the latest version, sending only your version and platform (and your IP, which that origin does not log); never your notes or account.",
-      "updateIdle": "Signed updates, fetched from downloads.myne.md when you check.",
+      "updateIdle": "Not checked yet.",
       "updateInstallButton": "Restart to update",
       "updateFlushFailed": "Could not save every open note, so Myne did not restart to update. Try again in a moment.",
       "updateLabel": "Updates",
@@ -3253,7 +3253,7 @@
         "grouping": "This account"
       },
       "vaultsLabel": "Vaults in this account",
-      "vaultsHelper": "The vaults this device groups together. Grouping is a per-device organisational choice, so it is not part of any vault's content and does not travel with it.",
+      "vaultsHelper": "The vaults this device groups together. Grouping is not part of any vault's content.",
       "vaultsHelperShort": "Grouping stays on this device and does not travel with a vault.",
       "vaultsCount_one": "{{count}} vault",
       "vaultsCount_other": "{{count}} vaults",
@@ -3422,7 +3422,7 @@
     "folderNotes": {
       "label": "Folder notes",
       "inline": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it.",
-      "helper": "Let a note act as its folder's index: it opens when you double-click the folder, and folder links like [[Projects/]] point to it. Off by default. Turning it off hides the buttons that create folder notes and shows any you already have as ordinary notes; it changes nothing on disk, so turning it back on restores them exactly.",
+      "helper": "Off by default. Turning it off hides the buttons that create folder notes and shows any you already have as ordinary notes; it changes nothing on disk, so turning it back on restores them exactly.",
       "errorSaveSetting": "Could not save this setting."
     },
     "autoBackup": {
@@ -3482,7 +3482,7 @@
       "label": "Terminal access",
       "helperOff": "Off. The `myne` command can't read or change anything in this vault.",
       "inlineOn": "Any program running under your account can read, search and create notes through it.",
-      "helperOn": "On while this vault is unlocked. Any program running under your account can read, search and create notes through it. Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
+      "helperOn": "On while this vault is unlocked. Myne can't tell your terminal apart from a script, and checks nothing beyond the door being open. It never asks for your password, closes the moment the vault locks, and can't delete notes.",
       "lastUsedNever": "Not used since this vault was unlocked.",
       "lastUsedJustNow": "Last used just now.",
       "lastUsedMinutesAgo": "Last used {{count}} min ago.",
@@ -3642,13 +3642,13 @@
     "focusMode": {
       "dimAria": "Dim inactive lines",
       "dimHelper": "In focus mode (⇧⌘F), dim every line except the one you're editing.",
-      "dimLabel": "Focus mode · dim inactive lines",
+      "dimLabel": "Dim inactive lines",
       "off": "Off",
       "on": "On",
       "saveError": "Could not save the focus-mode setting.",
       "typewriterAria": "Typewriter scroll",
       "typewriterHelper": "In focus mode (⇧⌘F), keep the active line vertically centered as you type.",
-      "typewriterLabel": "Focus mode · typewriter scroll"
+      "typewriterLabel": "Typewriter scroll"
     },
     "hotkeys": {
       "addBindingAria": "Add a shortcut for {{command}}",
@@ -3713,7 +3713,7 @@
       "searchEmpty": "No matching commands.",
       "searchPlaceholder": "Search commands…",
       "searchResultsLabel": "Matching commands",
-      "showHelper": "Show the left ribbon on this device.",
+      "showHelper": "This device only.",
       "showLabel": "Show left ribbon",
       "emptyTitle": "Nothing pinned yet"
     },
@@ -3759,7 +3759,7 @@
     "ai": {
       "autoTagHelper": "When you pause typing, a small model on your device reads the note and suggests tags at the top of it. Nothing is added until you accept a suggestion, unless you turn on the row below.",
       "historyBudgetInline": "How much of the recent conversation each request carries, in characters.",
-      "historyBudgetHelper": "How much of the recent conversation each request carries, in characters. Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
+      "historyBudgetHelper": "Leave empty for the default. A larger number lets the AI follow longer conversations and sends more of them: with a provider that is not on this device, that is more of your text leaving it, on every step of a run.",
       "historyBudgetLabel": "Conversation carried into each request",
       "historyBudgetMaxNotice": "The most you can enter is {{max}} characters; anything larger is reduced to that.",
       "historyBudgetDeviceLocal": "This one is per device: it bounds what this phone sends, so your other devices keep their own.",
@@ -3768,7 +3768,7 @@
       "meetingPromptReset": "Reset to default",
       "meetingPromptShared": "This one is shared: an edit here reaches your other devices, and a prompt edited on a computer arrives here.",
       "autoTagLabel": "Suggest tags automatically",
-      "autoTagUnavailable": "No tag model is installed yet. Download it once from Settings, AI, and the switch turns on by itself once it is installed.",
+      "autoTagUnavailable": "No tag model is installed yet. Turn the switch on in Settings, AI, once it is.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
         "cancel": "Cancel",
@@ -3863,7 +3863,7 @@
       "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
       "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
       "providerInline": "Your notes leave this device once a service is named.",
-      "providerChooseHelper": "A model can run on this device, or Myne can send a request to a service you name. Your notes leave this device when it does. \"On this device\" is the default and means no service is contacted at all.",
+      "providerChooseHelper": "A model can run on this device, or Myne can send a request to a service you name. \"On this device\" is the default and means no service is contacted at all.",
       "providerChooseLabel": "Choose provider",
       "providerHelper": "Instead of running a model here, Myne can send a request to a service you name. Your notes leave this device when it does. \"None\" is the default and means no service is contacted at all.",
       "providerKeyAdd": "paste your API key",
@@ -3871,7 +3871,7 @@
       "providerKeyLabel": "API key",
       "providerKeyNone": "No key is stored, so nothing can be sent yet.",
       "providerKeyRevoke": "Remove this key",
-      "providerKeyReplace": "paste a new key to replace the stored one",
+      "providerKeyReplace": "Replace key",
       "providerKeyStored": "A key is stored. Myne never shows it back to you. Paste a new one to replace it.",
       "providerActive": "Answering now: {{name}}",
       "providerLabel": "Remote provider",
@@ -3935,7 +3935,6 @@
         "snippetHelper": "Paste this into your AI tool's MCP configuration. The name must match the connection above, because that name is what the approval is keyed on.",
         "rootFolder": "Vault root",
         "addConnection": "Approve a connection",
-        "dialogTitleNew": "Approve a connection",
         "dialogTitle": "Approve {{name}} again",
         "nameLabel": "Connection name",
         "namePlaceholder": "claude-desktop",
@@ -4025,10 +4024,8 @@
       "loadFailed": "Couldn't load memories or voice preferences. Nothing was changed.",
       "retryLabel": "Try again",
       "seed": {
-        "rowTitle": "Teach Myne your vault",
         "rowHelper": "Build memory from your notes once, with a review of every line before it is saved.",
         "rowSeeded": "Created on {{date}} · {{count}} entries",
-        "start": "Teach Myne your vault",
         "rebuild": "Rebuild",
         "rebuildConfirm": "Replace the seed from {{date}} ({{count}} entries)?",
         "title": "Teach Myne your vault",
@@ -4117,7 +4114,7 @@
       "residualScope": "On desktop this covers your sync traffic and your remote AI provider requests. Mobile has no Tor routing yet, so its provider requests go direct. Nothing else on this device goes through Tor.",
       "residualsToggle": "What this doesn't hide",
       "torInline": "Hides your IP address and location from the sync server, and hides which server you sync with from your network and your internet provider.",
-      "torHelper": "Hides your IP address and location from the sync server, and hides which server you sync with (and, on desktop, which AI provider you reach) from your network and your internet provider. They can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
+      "torHelper": "On desktop this also hides which AI provider you reach. Anyone watching the network can still see this device connecting to Tor. It does not make you anonymous to Myne, and does not hide what you sync or when from the server.",
       "torLabel": "Route sync and desktop AI through Tor"
     },
     "prefs": {
@@ -4125,7 +4122,7 @@
       "saveError": "Couldn't save preference. Try again."
     },
     "reminders": {
-      "aria": "Show task reminders on this device",
+      "aria": "Task reminders on this device",
       "exactAllow": "Allow",
       "exactLabel": "Exact timing",
       "exactOn": "On",
@@ -4223,7 +4220,7 @@
       "setupButton": "Set up quick unlock"
     },
     "memberPassword": {
-      "reminder": "This shared vault has no password or PIN on this device yet, so it cannot be reopened here without a fresh invite from its owner.",
+      "reminder": "Set one so this device can open the vault again.",
       "reminderDismiss": "Not now",
       "title": "Shared vault unlock",
       "helperConfigured": "This shared vault opens with {{method}} stored on this device.",
@@ -4495,7 +4492,7 @@
       "time12": "12-hour",
       "zoneLabel": "Time zone",
       "zoneInline": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open.",
-      "zoneHelper": "Which zone decides what counts as today, and so which note your daily, weekly and monthly notes open. Leave empty to follow this device. The choice settles per device: no other device overwrites it, so an override can put this device on a different day from your others. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
+      "zoneHelper": "Leave empty to follow this device. The choice settles per device: no other device overwrites it, so an override can put this device on a different day from your others. Times you write in a note are never changed; 09:00 stays 09:00 everywhere.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne doesn't know that time zone. Use a name like Europe/Berlin.",
       "errorSave": "Couldn't save that setting."

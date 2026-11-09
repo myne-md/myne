@@ -3124,7 +3124,7 @@
       "buildLabel": "Yapı",
       "buildChannelLabel": "Yapı kanalı",
       "buildChannelStable": "Kararlı",
-      "developerModeHelper": "Myne’in varsayılan olarak yolunuzdan çektiği gelişmiş ayarları gösterir: Myne’in güvence verdiği yoldan ayrıldığınız ayarlar ve çoğu kişinin hiç ihtiyaç duymadığı ileri düzey araçlar. Bunu kapatmak onları yalnızca yeniden gizler. Açtığınız her şey açık kalır ve kapatacağınız yer o ayarın kendi denetimidir.",
+      "developerModeHelper": "Myne'in kefil olduğu yolun dışına çıktığınız ayarlar ve çoğu kişinin hiç ihtiyaç duymadığı ileri düzey araçlar. Kapatmak onları yalnızca yeniden gizler. Açtığınız şey açık kalır ve onu kapatacağınız yer kendi denetimidir.",
       "developerModeLabel": "Geliştirici modu",
       "legalLabel": "Yasal",
       "legalHelper": "Tarayıcınızda myne.md üzerinde açılır. Arayüz Almancaysa metin de Almanca olur.",
@@ -3132,7 +3132,7 @@
       "licenseBody": "CC-BY-4.0 belgeler · AGPL-3.0 uygulama kodu.",
       "licenseLabel": "Lisans",
       "tagline": "Pre-alpha",
-      "threatModelHelper": "Genel tehdit modeli belgesini tarayıcınızda açın.",
+      "threatModelHelper": "Tarayıcınızda aç.",
       "threatModelLabel": "Tehdit modeli",
       "version": "Sürüm",
       "dev": "Geliştirme",
@@ -3146,7 +3146,7 @@
       "updateChecking": "Kontrol ediliyor…",
       "updateFailed": "Güncellemeler kontrol edilemedi. Daha sonra yeniden denenecek.",
       "updateHelper": "Myne her güncellemeyi kurmadan önce çevrimdışı bir sürüm anahtarıyla doğrular. Kontrol, en son sürümü downloads.myne.md'den ister ve yalnızca sürümünüzü ve platformunuzu (ve o kaynağın günlüğe kaydetmediği IP'nizi) gönderir; notlarınızı ya da hesabınızı asla göndermez.",
-      "updateIdle": "İmzalı güncellemeler, kontrol ettiğinizde downloads.myne.md'den alınır.",
+      "updateIdle": "Henüz denetlenmedi.",
       "updateInstallButton": "Güncellemek için yeniden başlat",
       "updateLabel": "Güncellemeler",
       "updateUpToDate": "En son sürümdesiniz.",
@@ -3383,7 +3383,7 @@
     "cliAccess": {
       "label": "Terminal erişimi",
       "helperOff": "Kapalı. `myne` komutu bu kasadaki hiçbir şeyi okuyamaz veya değiştiremez.",
-      "helperOn": "Bu kasanın kilidi açıkken açıktır. Hesabınız altında çalışan herhangi bir program bunun üzerinden not okuyabilir, arayabilir ve oluşturabilir. Myne terminalinizi bir betikten ayırt edemez ve kapının açık olmasının ötesinde hiçbir şeyi denetlemez. Parolanızı asla istemez, kasa kilitlendiği anda kapanır ve not silemez.",
+      "helperOn": "Bu kasanın kilidi açıkken açıktır. Myne terminalinizi bir betikten ayırt edemez ve kapının açık olmasının ötesinde hiçbir şeyi denetlemez. Parolanızı asla istemez, kasa kilitlendiği anda kapanır ve not silemez.",
       "lastUsedNever": "Bu kasanın kilidi açıldığından beri kullanılmadı.",
       "lastUsedJustNow": "En son az önce kullanıldı.",
       "lastUsedMinutesAgo": "En son {{count}} dk önce kullanıldı.",
@@ -3543,13 +3543,13 @@
     "focusMode": {
       "dimAria": "Etkin olmayan satırları soluklaştır",
       "dimHelper": "Odak modunda (⇧⌘F), düzenlediğiniz satır dışındaki her satırı soluklaştırır.",
-      "dimLabel": "Odak modu · etkin olmayan satırları soluklaştır",
+      "dimLabel": "Etkin olmayan satırları soluklaştır",
       "off": "Kapalı",
       "on": "Açık",
       "saveError": "Odak modu ayarı kaydedilemedi.",
       "typewriterAria": "Daktilo kaydırması",
       "typewriterHelper": "Odak modunda (⇧⌘F), siz yazarken etkin satırı dikey olarak ortalanmış tutar.",
-      "typewriterLabel": "Odak modu · daktilo kaydırması"
+      "typewriterLabel": "Daktilo kaydırma"
     },
     "hotkeys": {
       "addBindingAria": "{{command}} için bir kısayol ekle",
@@ -3637,7 +3637,7 @@
     "ai": {
       "autoTagHelper": "Yazmayı duraklattığınızda, cihazınızdaki küçük bir model notu okur ve üstünde etiket önerir. Bir öneri kabul edene kadar hiçbir şey eklenmez, alttaki satırı açmadıkça.",
       "autoTagLabel": "Etiketleri otomatik öner",
-      "autoTagUnavailable": "Henüz etiket modeli kurulu değil. Ayarlar, Yapay Zeka bölümünden bir kez indirin; kurulduğunda anahtar kendiliğinden açılır.",
+      "autoTagUnavailable": "Henüz etiket modeli kurulu değil. Kurulduğunda Ayarlar, Yapay zeka bölümünden anahtarı açın.",
       "consent": {
         "accept": "Notlarımı {{provider}} sağlayıcısına gönder",
         "cancel": "İptal",
@@ -3701,7 +3701,7 @@
       "providerKeyLabel": "API anahtarı",
       "providerKeyNone": "Kayıtlı bir anahtar yok, bu yüzden henüz hiçbir şey gönderilemez.",
       "providerKeyRevoke": "Bu anahtarı kaldır",
-      "providerKeyReplace": "kayıtlı anahtarın yerine yeni bir anahtar yapıştırın",
+      "providerKeyReplace": "Anahtarı değiştir",
       "providerKeyStored": "Bir anahtar kayıtlı. Myne onu size asla geri göstermez. Değiştirmek için yenisini yapıştırın.",
       "providerActive": "Şu anda yanıtlayan: {{name}}",
       "providerLabel": "Uzak sağlayıcı",
@@ -3731,7 +3731,7 @@
       "mobileRevokeHelper": "Sağlayıcıyı, anahtarını ve bu telefonun onayını birlikte kaldırır; tam olarak hiç kurulmamış hâline döner. Diğer cihazlar, oradan da kaldırana kadar çalışmayı sürdürür.",
       "mobileApproveLabel": "Bu telefondan göndermeyi onayla",
       "mobileApproveHelper": "Sağlayıcı ve anahtarı başka bir cihazdan geldi. Neyin gönderileceğini okuyup burada onaylayana kadar bu telefondan hiçbir şey gönderilmez.",
-      "historyBudgetHelper": "Her isteğin son konuşmadan ne kadarını taşıyacağı, karakter olarak. Varsayılan için boş bırakın. Daha büyük bir sayı yapay zekanın daha uzun konuşmaları izlemesini sağlar ve bunun daha fazlasını gönderir: bu cihazda olmayan bir sağlayıcıda bu, bir çalıştırmanın her adımında metninizin daha fazlasının cihazdan çıkması demektir.",
+      "historyBudgetHelper": "Varsayılan için boş bırakın. Daha büyük bir sayı yapay zekanın daha uzun konuşmaları izlemesini sağlar ve bunun daha fazlasını gönderir: bu cihazda olmayan bir sağlayıcıda bu, bir çalıştırmanın her adımında metninizin daha fazlasının cihazdan çıkması demektir.",
       "historyBudgetLabel": "Her istekle gönderilen konuşma",
       "meetingPromptHelper": "Toplantı yapay zekası geçişinin bir metin dökümünü bölümlere dönüştürmek için kullandığı yönerge. Yerleşik varsayılan için boş bırakın. Varsayılan çıktı biçiminin yerini alır, yani onu ayarlarsanız istediğiniz bölümleri kendiniz istemelisiniz.",
       "meetingPromptLabel": "Toplantı özeti istemi",
@@ -3776,7 +3776,7 @@
       "catalogueColModel": "Model",
       "catalogueColState": "Durum",
       "providerInline": "Bir hizmet belirtildiğinde notlarınız bu cihazdan çıkar.",
-      "providerChooseHelper": "Bir model bu cihazda çalışabilir ya da Myne adını verdiğiniz bir hizmete istek gönderebilir. Bunu yaptığında notlarınız bu cihazdan çıkar. “Bu cihazda” varsayılandır ve hiçbir hizmetle iletişim kurulmaması anlamına gelir.",
+      "providerChooseHelper": "Bir model bu cihazda çalışabilir ya da Myne adını verdiğiniz bir hizmete istek gönderebilir. \"Bu cihazda\" varsayılandır ve hiçbir hizmetle iletişim kurulmaması anlamına gelir.",
       "providerChooseLabel": "Sağlayıcı seç",
       "providerKeySave": "Bu anahtarı kaydet",
       "providerOnDevice": "Bu cihazda",
@@ -3810,7 +3810,6 @@
         "snippetHelper": "Bunu yapay zeka aracınızın MCP yapılandırmasına yapıştırın. Ad, yukarıdaki bağlantıyla eşleşmeli, çünkü onay o ad üzerinde anahtarlanır.",
         "rootFolder": "Kasa kökü",
         "addConnection": "Bir bağlantı onayla",
-        "dialogTitleNew": "Bir bağlantı onayla",
         "dialogTitle": "{{name}} yeniden onaylansın mı",
         "nameLabel": "Bağlantı adı",
         "namePlaceholder": "claude-desktop",
@@ -3854,7 +3853,7 @@
       "residualPayment": "Barındırılan eşitleme için ödeme yapıyorsanız, ödeme ve hesabınız yine sizinle ilişkilendirilebilir. Tor, bağlantının nereden geldiğini değiştirir, faturalandırma izini değil.",
       "residualScope": "Masaüstünde bu, eşitleme trafiğinizi ve uzak yapay zeka sağlayıcısı isteklerinizi kapsar. Mobilde henüz Tor yönlendirmesi yok, bu yüzden sağlayıcı istekleri doğrudan gider. Bu cihazdaki başka hiçbir şey Tor üzerinden gitmez.",
       "residualsToggle": "Bunun gizlemedikleri",
-      "torHelper": "IP adresinizi ve konumunuzu eşitleme sunucusundan gizler; hangi sunucuyla eşitlediğinizi (ve masaüstünde hangi yapay zeka sağlayıcısına eriştiğinizi) ağınızdan ve internet sağlayıcınızdan gizler. Onlar yine de bu cihazın Tor’a bağlandığını görebilir. Sizi Myne’e karşı anonim yapmaz ve neyi ne zaman eşitlediğinizi sunucudan gizlemez.",
+      "torHelper": "Masaüstünde hangi yapay zeka sağlayıcısına eriştiğinizi de gizler. Ağınızı izleyen biri yine de bu cihazın Tor'a bağlandığını görebilir. Sizi Myne'e karşı anonim yapmaz ve neyi ne zaman eşitlediğinizi sunucudan gizlemez.",
       "torLabel": "Eşitlemeyi ve masaüstü yapay zekasını Tor üzerinden yönlendir",
       "torInline": "Eşitleme sunucusundan IP adresinizi ve konumunuzu gizler; ağınızdan ve internet sağlayıcınızdan hangi sunucuyla eşitlediğinizi gizler."
     },
@@ -3863,7 +3862,7 @@
       "folderListFull": "Bu klasör listesi dolu. Başka bir klasör eklemeden önce listeden bir klasör çıkarın."
     },
     "reminders": {
-      "aria": "Bu cihazda görev hatırlatıcılarını göster",
+      "aria": "Bu cihazda görev hatırlatıcıları",
       "exactAllow": "İzin ver",
       "exactLabel": "Tam zamanlama",
       "exactOn": "Açık",
@@ -4211,7 +4210,7 @@
       "time24": "24 saat",
       "time12": "12 saat",
       "zoneLabel": "Saat dilimi",
-      "zoneHelper": "Hangi günün bugün sayılacağına ve dolayısıyla günlük, haftalık ve aylık notlarınızın hangi notu açacağına karar veren saat dilimi. Bu cihazın saat dilimini kullanmak için boş bırakın. Seçim her cihazda ayrı yerleşir: başka hiçbir cihaz onun üzerine yazmaz, bu yüzden buradaki bir seçim bu cihazı diğerlerinden farklı bir güne koyabilir. Bir notta yazdığınız saatler asla değiştirilmez; 09:00 her yerde 09:00 kalır.",
+      "zoneHelper": "Bu cihazın saat dilimini kullanmak için boş bırakın. Seçim her cihazda ayrı yerleşir: başka hiçbir cihaz onun üzerine yazmaz, bu yüzden buradaki bir seçim bu cihazı diğerlerinden farklı bir güne koyabilir. Bir notta yazdığınız saatler asla değiştirilmez; 09:00 her yerde 09:00 kalır.",
       "zonePlaceholder": "Europe/Berlin",
       "zoneUnknown": "Myne bu saat dilimini tanımıyor. Europe/Berlin gibi bir ad kullanın.",
       "errorSave": "Bu ayar kaydedilemedi.",
@@ -4219,7 +4218,7 @@
     },
     "folderNotes": {
       "label": "Klasör notları",
-      "helper": "Bir notun klasörünün dizini gibi davranmasını sağlayın: çift tıkladığınızda açılır ve [[Projects/]] gibi klasör bağlantıları onu işaret eder. Varsayılan olarak kapalıdır. Kapatmak, klasör notu oluşturan düğmeleri gizler ve zaten olanları sıradan not olarak gösterir; diskte hiçbir şeyi değiştirmez, yeniden açmak hepsini aynen geri yükler.",
+      "helper": "Varsayılan olarak kapalıdır. Kapatmak, klasör notu oluşturan düğmeleri gizler ve zaten olanları sıradan not olarak gösterir; diskte hiçbir şeyi değiştirmez, yeniden açmak hepsini aynen geri yükler.",
       "errorSaveSetting": "Bu ayar kaydedilemedi.",
       "inline": "Bir notun klasörünün dizini gibi davranmasını sağlayın: klasöre çift tıkladığınızda açılır ve [[Projects/]] gibi klasör bağlantıları onu işaret eder."
     },
@@ -4234,7 +4233,7 @@
       "searchEmpty": "Eşleşen komut yok.",
       "searchPlaceholder": "Komut ara…",
       "searchResultsLabel": "Eşleşen komutlar",
-      "showHelper": "Bu cihazda sol şeridi göster.",
+      "showHelper": "Yalnızca bu cihazda.",
       "showLabel": "Sol şeridi göster",
       "emptyTitle": "Henüz sabitlenmiş bir şey yok"
     },
@@ -4269,10 +4268,8 @@
       "count": "{{used}} / {{cap}}",
       "atCap": "Liste dolu, bu yüzden yeni bir şey hatırlanamaz. Yer açmak için bir girdi silin.",
       "seed": {
-        "rowTitle": "Myne'e vault'ını öğret",
         "rowHelper": "Notlarından bir kez hafıza oluştur; kaydedilmeden önce her satırı gözden geçir.",
         "rowSeeded": "{{date}} tarihinde oluşturuldu · {{count}} kayıt",
-        "start": "Myne'e vault'ını öğret",
         "rebuild": "Yeniden oluştur",
         "rebuildConfirm": "{{date}} tarihli seed ({{count}} kayıt) değiştirilsin mi?",
         "title": "Myne'e vault'ını öğret",
@@ -4341,7 +4338,7 @@
     },
     "account": {
       "vaultsLabel": "Bu hesaptaki kasalar",
-      "vaultsHelper": "Bu cihazın birlikte grupladığı kasalar. Gruplama cihaz başına bir düzenleme seçimidir, bu yüzden hiçbir kasann içeriğinin parçası değildir ve onunla birlikte gitmez.",
+      "vaultsHelper": "Bu cihazın birlikte grupladığı kasalar. Gruplama hiçbir kasanın içeriğinin parçası değildir.",
       "vaultsHelperShort": "Gruplama bu cihazda kalır, kasayla birlikte taşınmaz.",
       "vaultsCount_one": "{{count}} kasa",
       "vaultsCount_other": "{{count}} kasa",
@@ -4374,7 +4371,7 @@
       "openFilesRemain": "Kaydedilmemiş değişiklikleri olan dosyalar hâlâ açık. Onları çözüme kavuşturun, sonra bunu tekrar kapatın."
     },
     "memberPassword": {
-      "reminder": "Bu cihazda henüz hızlı kilit açma yok, bu yüzden bu kasa her seferinde kurtarma ifadenizi ister.",
+      "reminder": "Bu cihazın kasayı yeniden açabilmesi için bir tane belirleyin.",
       "reminderDismiss": "Şimdi değil",
       "title": "Paylaşılan kasa kilidi açma",
       "helperConfigured": "Bu paylaşılan kasa, bu cihazda saklanan {{method}} ile açılır.",

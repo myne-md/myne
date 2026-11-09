@@ -251,7 +251,7 @@ export function McpGrantDialog({
       open={open}
       title={
         connection === null
-          ? t("settings.ai.externalAccess.dialogTitleNew")
+          ? t("settings.ai.externalAccess.addConnection")
           : t("settings.ai.externalAccess.dialogTitle", { name: connection.name })
       }
       onClose={onClose}

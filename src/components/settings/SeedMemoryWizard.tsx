@@ -769,7 +769,7 @@ export function SeedMemoryRow(props: {
       data-seeded={seeded ? "true" : "false"}
     >
       <p style={{ margin: 0, fontSize: "var(--text-sm)", color: "var(--fg-1)" }}>
-        {t("settings.memory.seed.rowTitle")}
+        {t("settings.memory.seed.title")}
       </p>
       <p style={HELPER}>
         {seeded
@@ -818,7 +818,7 @@ export function SeedMemoryRow(props: {
           >
             {seeded
               ? t("settings.memory.seed.rebuild")
-              : t("settings.memory.seed.start")}
+              : t("settings.memory.seed.title")}
           </Button>
         )}
       </div>
