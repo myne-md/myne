@@ -125,7 +125,6 @@
       "statusWaiting": "Waiting for your approval",
       "summaryShowAll": "Show the whole summary",
       "summaryShorten": "Shorten the summary",
-      "close": "Close",
       "scopeTotal_one": "{{count}} note in scope",
       "scopeTotal_other": "{{count}} notes in scope",
       "noChanges": "The agent proposed no changes.",
@@ -290,7 +289,6 @@
     "cleanUnused": {
       "cancel": "Cancel",
       "cleaning": "Cleaning…",
-      "close": "Close",
       "completeTitle": "Cleanup complete",
       "deleteCta": "Delete {{count}} unused",
       "deleteCta_one": "Delete {{count}} unused",
@@ -310,10 +308,8 @@
       "willBeReclaimed": "{{size}} will be reclaimed."
     },
     "coverPicker": {
-      "close": "Close",
       "dropHint": "Drop an image to use it as the cover.",
       "empty": "No images in this vault yet. Upload one or drag an image here.",
-      "loading": "Loading…",
       "removeCover": "Remove cover",
       "title": "Choose a cover image",
       "upload": "Upload"
@@ -327,8 +323,7 @@
       "notUsed": "Not used in any note.",
       "stillUsed_one": "It's still used in {{count}} note. Deleting it leaves a tombstone where it was embedded:",
       "stillUsed_other": "It's still used in {{count}} notes. Deleting it leaves a tombstone where it was embedded:",
-      "title": "Delete attachment",
-      "untitled": "Untitled"
+      "title": "Delete attachment"
     },
     "library": {
       "actionsAriaLabel": "Attachment actions",
@@ -363,9 +358,7 @@
       "importing": "Importing…",
       "listView": "List view",
       "menuDelete": "Delete",
-      "menuExport": "Export",
       "menuPreview": "Preview",
-      "menuRename": "Rename",
       "menuTranscribe": "Transcribe",
       "menuViewTranscription": "View transcription",
       "noUnusedNotice": "No unused attachments to clean.",
@@ -386,7 +379,6 @@
       "transcribeFailed": "Transcription failed. Please try again.",
       "transcribeNoModel": "Select a speech-to-text model in Settings → Developer → AI.",
       "transcribeStarted": "Transcribing…",
-      "transcriptCopy": "Copy",
       "transcriptCopied": "Transcript copied.",
       "transcriptCopyFailed": "Couldn't copy the transcript.",
       "transcriptEmpty": "No speech was found in this recording.",
@@ -416,8 +408,7 @@
       "play": "Play"
     },
     "usedInNotesPopover": {
-      "empty": "Not used in any note.",
-      "untitled": "Untitled"
+      "empty": "Not used in any note."
     },
     "needsApp": "Attachment cleanup needs the app.",
     "noUnused": "No unused attachments: every file is referenced.",
@@ -473,7 +464,6 @@
     },
     "export": {
       "cancel": "Cancel",
-      "close": "Close",
       "copying": "Copying {{done}} of {{total}}…",
       "phraseNotSubstitute": "A backup alone will not get you back in if you lose your password: the file holds your notes, not your password or your identity phrase.",
       "preparing": "Preparing…",
@@ -485,7 +475,6 @@
   "clipper": {
     "pairing": {
       "accept": "Accept",
-      "close": "Close",
       "codeAriaLabel": "Pairing code",
       "intro": "Confirm this code matches the one shown in the extension, then Accept to pair.",
       "reject": "Reject",
@@ -517,8 +506,7 @@
     },
     "searchPlaceholder": "Search notes or run a command. Try tag: · path: · task:",
     "sectionCommands": "Commands",
-    "sectionNotes": "Notes",
-    "untitledNote": "Untitled"
+    "sectionNotes": "Notes"
   },
   "commands": {
     "actions": {
@@ -921,7 +909,18 @@
     "back": "Back",
     "continue": "Continue",
     "phraseWordsProgress": "{{filled}} of {{total}} words",
-    "clear": "Clear"
+    "clear": "Clear",
+    "untitled": "Untitled",
+    "done": "Done",
+    "rename": "Rename",
+    "remove": "Remove",
+    "edit": "Edit",
+    "export": "Export",
+    "copy": "Copy",
+    "loading": "Loading…",
+    "tasks": "Tasks",
+    "priority": "Priority",
+    "today": "Today"
   },
   "deviceRevoked": {
     "cta": "Start over",
@@ -1034,7 +1033,6 @@
       },
       "lightbox": {
         "close": "Close preview",
-        "export": "Export",
         "exportAria": "Export attachment",
         "imagePreview": "Image preview",
         "pdfFallback": "PDF",
@@ -1046,16 +1044,13 @@
       "menu": {
         "actionsAria": "Attachment actions"
       },
-      "pdf": {
-        "loading": "Loading…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "Couldn't open the file picker."
       },
       "progress": {
         "encrypting": "Encrypting…",
-        "importing": "Importing…",
-        "loading": "Loading…"
+        "importing": "Importing…"
       },
       "recording": {
         "barAria": "Recording voice note",
@@ -1066,7 +1061,6 @@
       },
       "rename": {
         "cancel": "Cancel",
-        "confirm": "Rename",
         "title": "Rename attachment"
       },
       "summary": {
@@ -1107,9 +1101,6 @@
           "seek": "Seek"
         },
         "menu": {
-          "export": "Export",
-          "remove": "Remove",
-          "rename": "Rename",
           "reveal": "Reveal in library",
           "transcribe": "Transcribe",
           "customSize": "Custom size…",
@@ -1167,7 +1158,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Stopped. Nothing was added to the note.",
-        "close": "Close",
         "discard": "Discard",
         "failed": "The AI pass failed. The transcript is unchanged.",
         "generate": "Generate",
@@ -1211,7 +1201,6 @@
         "bug": "Bug",
         "caution": "Caution",
         "danger": "Danger",
-        "done": "Done",
         "error": "Error",
         "example": "Example",
         "failure": "Failure",
@@ -1239,8 +1228,7 @@
         "linksTo": "Links to {{count}}",
         "linksTo_one": "Links to {{count}}",
         "linksTo_other": "Links to {{count}}",
-        "outgoingEmpty": "This note doesn't link to anything yet.",
-        "untitled": "Untitled"
+        "outgoingEmpty": "This note doesn't link to anything yet."
       },
       "barItems": {
         "graph": "Graph",
@@ -1378,7 +1366,6 @@
           "historyDeleteTitle": "Delete conversation",
           "historyError": "Couldn't load conversations. Try again.",
           "historyProposalNewNote": "New note",
-          "historyRename": "Rename",
           "historyTitle": "Chat history",
           "historyRetry": "Try again",
           "viewDiff": "View changes",
@@ -1439,7 +1426,6 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Workspace name",
-        "renameConfirm": "Rename",
         "renameTitle": "Rename workspace",
         "saveAsTitle": "Save workspace as",
         "saveConfirm": "Save"
@@ -1456,7 +1442,6 @@
     "noteActions": {
       "buttonLabel": "Note actions",
       "convertFailed": "Couldn't change what this note is, so it is unchanged.",
-      "rename": "Rename",
       "move": "Move to folder…",
       "duplicate": "Duplicate",
       "openInNewWindow": "Open in new window",
@@ -1477,9 +1462,7 @@
       "defaultBadge": "code"
     },
     "drawingEmbed": {
-      "done": "Done",
       "edit": "Edit drawing {{name}}",
-      "editAction": "Edit",
       "empty": "Empty drawing: click to draw",
       "open": "Open",
       "rename": "Rename drawing"
@@ -1526,8 +1509,7 @@
       "managedField": "Myne writes this field",
       "propertiesLabel": "Properties",
       "removeListItemAriaLabel": "Remove {{item}}",
-      "titleAriaLabel": "Note title",
-      "titlePlaceholder": "Untitled"
+      "titleAriaLabel": "Note title"
     },
     "mermaid": {
       "rendering": "Rendering diagram…",
@@ -1541,11 +1523,9 @@
       "panLeft": "Pan left",
       "panRight": "Pan right",
       "edit": "Edit diagram source",
-      "editText": "Edit",
       "expand": "Expand diagram",
       "expandText": "Expand",
-      "expandClose": "Close expanded diagram",
-      "expandCloseText": "Close"
+      "expandClose": "Close expanded diagram"
     },
     "slash": {
       "aiContinue": "Continue writing (AI)",
@@ -1569,7 +1549,6 @@
       "link": "Link",
       "now": "Now",
       "numberedList": "Numbered list",
-      "priority": "Priority",
       "quote": "Quote",
       "repeat": "Repeat",
       "sheetTitle": "Insert",
@@ -1613,7 +1592,6 @@
       "dateGrid": "Choose a date",
       "dateNext": "Next month",
       "datePrev": "Previous month",
-      "today": "Today",
       "tomorrow": "Tomorrow",
       "invalidDue": "Myne can't read this date, so it isn't shown as a due date.",
       "invalidPriority": "Myne can't read this priority. Use highest, high, medium, low or lowest.",
@@ -1633,7 +1611,6 @@
       "title": {
         "due": "Due date",
         "repeat": "Repeat",
-        "priority": "Priority",
         "remind": "Reminder"
       },
       "invalidRemind": "Myne can't read this date, so it won't remind you."
@@ -1787,7 +1764,6 @@
       "clearSearch": "Clear search",
       "viewNoteCount_one": "{{count}} note in “{{name}}”",
       "viewNoteCount_other": "{{count}} notes in “{{name}}”",
-      "edit": "Edit",
       "trashEmpty": "Trash is empty",
       "archiveEmpty": "No archived notes",
       "noMatchingNotes": "No matching notes",
@@ -1832,8 +1808,7 @@
       "body": "Choose a note from the list, or start a new one."
     },
     "readingBar": {
-      "editNote": "Edit note",
-      "edit": "Edit"
+      "editNote": "Edit note"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} linked note",
@@ -1867,9 +1842,7 @@
       "emptyState": "No saved views yet. Create one to filter your notes by tag, folder, or text.",
       "editView": "Edit view"
     },
-    "sheet": {
-      "done": "Done"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Vaults"
     },
@@ -2004,7 +1977,6 @@
         "title": "Export vault as Markdown"
       },
       "summary": {
-        "done": "Done",
         "showInFolder": "Show in folder",
         "title": "Export complete"
       }
@@ -2042,7 +2014,6 @@
   "notes": {
     "archive": {
       "cancel": "Cancel",
-      "close": "Close",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
       "delete": "Delete",
@@ -2059,8 +2030,7 @@
       "folderDeleteWarning": "They move to Trash. Restore them anytime. Permanent deletion is a separate step.",
       "restore": "Restore",
       "restoreError": "Couldn't restore that note. Try again.",
-      "title": "Archive",
-      "untitled": "Untitled"
+      "title": "Archive"
     },
     "cardMenu": {
       "copyLink": "Copy link",
@@ -2091,7 +2061,6 @@
       "cancel": "Cancel",
       "delete": "Delete",
       "title": "Delete this note?",
-      "untitled": "Untitled",
       "warning": "This cannot be undone."
     },
     "example": {
@@ -2105,7 +2074,6 @@
         "body": "Myne writes plain Markdown and shows the result as you type.\n\n## The basics\nMake a word **bold** or *italic*, or drop in `inline code`.\n\n## A list\n- One item\n- Another item\n  - A nested one\n\n## A quote\n> Small notes, kept for years, beat big notes you never write.\n\n## A table\n| Shortcut | What it does |\n| --- | --- |\n| Cmd/Ctrl + B | Bold |\n| Cmd/Ctrl + K | Add a link |\n\n## Some code\n```\nconsole.log(\"hello from Myne\")\n```\n\nWhen you are ready, head back to [[{{index}}]].\n"
       },
       "tasks": {
-        "title": "Tasks",
         "body": "Any line that starts with `- [ ]` is a task. Myne collects every open task from across your notes into one Tasks view, so nothing gets lost between notes.\n\n- [ ] Read [[{{markdown}}]]\n- [ ] Add a task of your own\n- [ ] Try one with a due date 📅 2030-12-31\n- [x] Create your vault\n\nCheck a box here, then open the Tasks view in the sidebar to watch the list update.\n\nBack to [[{{index}}]].\n"
       },
       "links": {
@@ -2190,7 +2158,6 @@
         "rowLabel": "{{name}}, group {{index}} of {{total}}. Alt plus the up or down arrow reorders it.",
         "editFilterButton": "Edit filter…",
         "editFilterTitle": "Edit color-group filter",
-        "editRuleButton": "Edit",
         "emptyBody": "Color groups let you color graph nodes by tag or folder: work notes in one color, personal notes in another. Add your first rule.",
         "derivedMakeEditable": "Make these editable",
         "derivedMakeEditableFailed": "Those groups could not be saved. Try again.",
@@ -2225,7 +2192,6 @@
       "relayoutTitle": "Lay the graph out again from scratch",
       "settings": {
         "appearanceHeading": "Appearance",
-        "closeTitle": "Close",
         "forceCenter": "Center pull",
         "forceLinkDistance": "Link distance",
         "forceLinkStrength": "Link strength",
@@ -2268,11 +2234,8 @@
         "foldersNotKeptNote_one": "{{count}} will vanish when its last note leaves",
         "foldersNotKeptNote_other": "{{count}} will vanish when their last note leaves",
         "chooseFolder": "Choose folder…",
-        "close": "Close",
         "closeAriaLabel": "Close",
         "copied": "Copied",
-        "copy": "Copy",
-        "done": "Done",
         "errorBody": "The import couldn’t complete. Any notes already imported were kept and are safe to keep or delete.",
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Folder",
@@ -2495,7 +2458,6 @@
       "openToSide": "Open to the side",
       "removeFolderNote": "Remove folder note",
       "removeFromFavorites": "Remove from favorites",
-      "rename": "Rename",
       "renameFailed": "Couldn't save that name, so the note kept its old one.",
       "search": "Search",
       "selectionAnnouncement": "Selected {{title}}",
@@ -2511,7 +2473,6 @@
       "trashSingleError": "Couldn't move the note to Trash.",
       "treeLabel": "Notes and folders",
       "undo": "Undo",
-      "untitled": "Untitled",
       "vaultRoot": "Vault root",
       "viewSettingsTitle": "View settings"
     },
@@ -2523,9 +2484,7 @@
       "manageTemplates": "Manage templates",
       "emptyState": "You haven’t created any templates yet.",
       "listLabel": "Templates",
-      "loading": "Loading…",
       "nameLabel": "Name for the note (from “{{templateName}}”)",
-      "namePlaceholder": "Untitled",
       "nameStepTitle": "Name this note",
       "pickStepTitle": "New note from template",
       "untitledTemplate": "Untitled template"
@@ -2550,14 +2509,12 @@
       "recent": "Jump back in",
       "results": "Results",
       "searchAriaLabel": "Search notes and commands",
-      "searchPlaceholder": "Search notes and commands…",
-      "untitled": "Untitled"
+      "searchPlaceholder": "Search notes and commands…"
     },
     "pane": {
       "graphTab": "Graph",
       "tasksTab": "Tasks",
       "agentTab": "Agent",
-      "loading": "Loading…",
       "untitledView": "Untitled view",
       "calendarTab": "Calendar"
     },
@@ -2583,7 +2540,6 @@
       "taskBadgeTitle": "Task note",
       "unsyncedLabel": "Not yet on the server",
       "unsyncedTitle": "This note's latest changes are only on this device",
-      "untitled": "Untitled",
       "untitledDrawing": "Untitled drawing"
     },
     "savedView": {
@@ -2616,7 +2572,6 @@
       "changeCount_other": "{{count}} changes since this snapshot",
       "changeCountPrev_one": "{{count}} change from the previous snapshot",
       "changeCountPrev_other": "{{count}} changes from the previous snapshot",
-      "close": "Close",
       "compareAgainstLabel": "Compare against",
       "compareCurrent": "Current note",
       "comparePrevious": "Previous snapshot",
@@ -2634,15 +2589,13 @@
       "errorVaultLocked": "The vault is locked. Unlock it to view snapshots.",
       "justNow": "just now",
       "listLabel": "Snapshot list",
-      "loading": "Loading…",
       "noPrevious": "This is the earliest snapshot. There's nothing before it to compare against.",
       "restore": "Restore",
       "restoreCta": "Restore this snapshot",
       "restoredStatus": "Restored. The version you had is saved as a snapshot.",
       "selectPlaceholder": "Select a snapshot to preview what changed since then.",
       "title": "Snapshots",
-      "unknownAuthor": "Unknown device",
-      "untitled": "Untitled"
+      "unknownAuthor": "Unknown device"
     },
     "tabStrip": {
       "closeNewTab": "Close new tab",
@@ -2655,8 +2608,7 @@
       "pin": "Pin",
       "pinned": "Pinned",
       "pinnedTitle": "Pinned: unpin to close",
-      "unpin": "Unpin",
-      "untitled": "Untitled"
+      "unpin": "Unpin"
     },
     "tagBrowser": {
       "cancel": "Cancel",
@@ -2676,11 +2628,9 @@
       "saveAsView": "Save as view",
       "searchPlaceholder": "Search tags…",
       "title": "Tags",
-      "untitled": "Untitled",
       "viewNamePlaceholder": "View name"
     },
     "trash": {
-      "close": "Close",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
       "delete": "Delete",
@@ -2698,8 +2648,7 @@
       "purgeConfirmTitle": "Delete permanently?",
       "restore": "Restore",
       "restoreError": "Couldn't restore that note. Try again.",
-      "title": "Trash",
-      "untitled": "Untitled"
+      "title": "Trash"
     },
     "unlinkedMentions": {
       "empty": "No unlinked mentions.",
@@ -2708,8 +2657,7 @@
       "linkTooltip": "Link this mention to {{title}}",
       "refresh": "Mentions may have changed: refresh",
       "searching": "Searching…",
-      "thisNote": "this note",
-      "untitled": "Untitled"
+      "thisNote": "this note"
     },
     "unsettledSave": "An open note hasn't finished saving, so nothing was changed. Try again once it has.",
     "views": {
@@ -2771,8 +2719,7 @@
         "empty": "No notes match this view",
         "noValue": "No value",
         "setCover": "Set cover",
-        "setCoverImage": "Set cover image",
-        "untitled": "Untitled"
+        "setCoverImage": "Set cover image"
       },
       "empty": "No views yet. Save the current note list as a view.",
       "list": {
@@ -2790,7 +2737,6 @@
         "armRefusedHeading": "{{name}} was not imported",
         "armSameVersionDifferent": "The file says v{{version}}, the same version this vault has, but its contents differ. That is either a different author reusing the id or a file changed after it was signed off, so it is refused.",
         "armUpdate": "This replaces {{name}}: this vault has v{{stored}}, the file is v{{incoming}}.",
-        "close": "Close",
         "filterName": "View manifest",
         "idleBody": "A view file is one saved view somebody exported. Myne checks it first and shows you what it selects and reads before anything is stored.",
         "importAction": "Import view",
@@ -2816,7 +2762,6 @@
       "manager": {
         "approve": "Approve",
         "approvedState": "Approved on this device",
-        "close": "Close",
         "deleteFailed": "That view could not be deleted.",
         "deleteLabel": "Delete {{name}}",
         "emptyBody": "A view you save from the note list, or one somebody sends you, appears here.",
@@ -2833,7 +2778,6 @@
         "editFilter": "Edit filter…",
         "moveDown": "Move down",
         "moveUp": "Move up",
-        "rename": "Rename",
         "viewSettings": "View settings…"
       },
       "newView": "New view",
@@ -3147,7 +3091,6 @@
     },
     "damaged": {
       "body": "The backup file is damaged, so nothing was restored. If this is the only copy you have, salvage can restore the intact notes and list exactly what could not be read. The result is always labeled as a partial restore.",
-      "close": "Close",
       "salvage": "Salvage intact notes…"
     },
     "error": {
@@ -3266,7 +3209,6 @@
       "numberHelper": "Your identity's number, not a vault's. Derived from your identity phrase, so it cannot be lost and needs no saving. It is not a secret; use it for support or for a server operator handoff.",
       "numberUnavailable": "Could not read the account number on this device. Reopen Settings to try again.",
       "numberEmpty": "No identity on this device. Add or recover one in Sync to get an account number.",
-      "numberCopy": "Copy",
       "numberCopied": "Account number copied",
       "numberCopyFailed": "Couldn't copy the account number",
       "copyAccountNumber": "Copy account number",
@@ -3631,8 +3573,7 @@
         "optionSpecific": "Specific note",
         "saveError": "Could not save the startup setting.",
         "searchEmpty": "No notes found.",
-        "searchPlaceholder": "Search notes…",
-        "untitledNote": "Untitled"
+        "searchPlaceholder": "Search notes…"
       },
       "sections": {
         "notes": "Notes and folders",
@@ -3800,7 +3741,6 @@
       "excludedFoldersEmpty": "Nothing is excluded yet, so AI can read every folder in this vault.",
       "excludedFoldersAdd": "Add",
       "excludedFoldersAddLabel": "Folder to exclude from AI",
-      "excludedFoldersRemove": "Remove",
       "excludedFoldersRemoveLabel": "Stop excluding {{folder}} from AI",
       "excludedFoldersMonotoneNotice": "An exclusion added on any of your devices stays until you remove it everywhere: removals here do not travel, so a folder your other devices still exclude will come back on the next sync.",
       "endpointHelper": "If you already run a model runtime on this computer, point Myne at it instead of picking model files. Leave this empty to use the model files set in Models.",
@@ -3855,7 +3795,6 @@
       "downloadNotInstalled": "Not installed",
       "downloadReinstall": "Download",
       "downloadInstall": "Download",
-      "modelRemove": "Remove",
       "downloading": "Downloading…",
       "downloadingPercent": "Downloading… {{percent}}%",
       "downloadCancel": "Cancel",
@@ -4000,7 +3939,6 @@
       "helper": "Facts the AI learned from working with you. It writes them itself (at most one per run); you see and can correct every one. Entries sync to your other devices and stay encrypted.",
       "emptyTitle": "Nothing remembered yet",
       "empty": "Entries appear here when the assistant learns something during a run.",
-      "editLabel": "Edit",
       "deleteLabel": "Delete",
       "save": "Save",
       "cancel": "Cancel",
@@ -4030,7 +3968,6 @@
         "rebuildConfirm": "Replace the seed from {{date}} ({{count}} entries)?",
         "title": "Teach Myne your vault",
         "candidatesTitle": "Review what Myne learned",
-        "close": "Close",
         "loading": "Reading your vault…",
         "scopeIntro": "Myne reads the shape of your vault first: note titles, folders and tags. It asks for note text only if it needs it, and never for attachments.",
         "provider": "Provider: {{provider}}",
@@ -4227,7 +4164,6 @@
       "helperNotConfigured": "Set a password or PIN so this device can open the vault again. Without one, reopening it here needs a fresh invite from the owner.",
       "set": "Set",
       "change": "Change",
-      "remove": "Remove",
       "label": "Vault password",
       "methodPassword": "a password",
       "methodPin": "a PIN",
@@ -4349,7 +4285,6 @@
       "vaultName": "Vault name",
       "approveDevice": "Approve device"
     },
-    "done": "Done",
     "sectionOptions": "Options",
     "footerTagline": "myne · encrypted on this device · open source",
     "editor": {
@@ -4370,7 +4305,6 @@
         "bullet2": "How vexingly quick daft zebras jump",
         "dateTime": "Date and time",
         "toolbar": "Toolbar",
-        "task": "Tasks",
         "taskSampleOpen": "Send the quarterly report",
         "taskSampleDone": "Book the venue"
       },
@@ -4506,7 +4440,6 @@
       "newNameLabel": "New calendar name",
       "newNamePlaceholder": "Work",
       "addColour": "Add",
-      "remove": "Remove",
       "saveFailed": "Could not save that setting. Your vault has not changed."
     }
   },
@@ -4655,7 +4588,6 @@
       "approve": "Approve",
       "awaitingApproval_one": "{{count}} device awaiting approval",
       "awaitingApproval_other": "{{count}} devices awaiting approval",
-      "loading": "Loading…",
       "noDevices": "No other devices yet",
       "notEnrolled": "This device isn’t signed in yet. If you just added it, wait for approval from a device that is already on your account; otherwise sign it in with “Sign in this device”.",
       "platform": {
@@ -4669,9 +4601,7 @@
         "web": "Browser",
         "windows": "Windows PC"
       },
-      "remove": "Remove",
       "removedElsewhere": "This device was removed from your account on another device.",
-      "rename": "Rename",
       "renameFailed": "Couldn’t save that name. Try again.",
       "renameLabel": "Device name",
       "resetAndReAdd": "Reset and re-add this device",
@@ -4779,7 +4709,6 @@
         "helper": "One approval signs a device in to your account. It then sees every vault you own, and each vault still opens with its own password."
       },
       "recovered": {
-        "close": "Close",
         "decrypting": "Decrypting…",
         "deleteConfirmTitle": "Delete this recovered note?",
         "deleteConfirmWarning": "This permanently deletes the only copy kept on this device. This cannot be undone.",
@@ -4946,7 +4875,6 @@
       "nameErrorGeneric": "Could not save your name. Try again.",
       "nameInviteCta": "Set a name",
       "invite": "Invite member",
-      "remove": "Remove",
       "removeConfirm": "Remove {{name}}? Once the key rotation completes they lose access to future changes. This cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "removalLimits": "Removing a member would stop their access to future changes only. It cannot erase anything they already copied, and it does not recall content from their device or their AI provider.",
       "inviteReady": "Invite ready for {{fingerprint}}…",
@@ -5005,7 +4933,6 @@
       "due": "Due",
       "folder": "Folder",
       "note": "Note",
-      "priority": "Priority",
       "sort": "Sort",
       "status": "Status",
       "tag": "Tag"
@@ -5016,11 +4943,9 @@
       "folder": "Folder",
       "insert": "Insert",
       "noDueDate": "No due date",
-      "priority": "Priority",
       "sort": "Sort by",
       "sortDue": "Due date",
       "sortPath": "Note",
-      "sortPriority": "Priority",
       "status": "Status",
       "statusDone": "Completed",
       "statusTodo": "Not done",
@@ -5038,12 +4963,10 @@
       "later": "Later",
       "none": "No date",
       "overdue": "Overdue",
-      "today": "Today",
       "upcoming": "Upcoming"
     },
     "filter": {
       "overdue": "Overdue",
-      "today": "Today",
       "upcoming": "Upcoming"
     },
     "filters": {
@@ -5065,14 +4988,12 @@
       "later": "Later",
       "none": "No date",
       "overdue": "Overdue",
-      "today": "Today",
       "upcoming": "Upcoming"
     },
     "sort": {
       "due": "Due date",
       "dueDesc": "Due date, latest first",
-      "note": "Note",
-      "priority": "Priority"
+      "note": "Note"
     },
     "status": {
       "all": "All",
@@ -5083,8 +5004,7 @@
       "allFolders": "All folders",
       "allNotes": "All notes",
       "anyPriority": "Any priority",
-      "anyTag": "Any tag",
-      "untitled": "Untitled"
+      "anyTag": "Any tag"
     },
     "query": {
       "dropped_one": "{{count}} clause Myne could not read",
@@ -5108,8 +5028,7 @@
     "search": {
       "label": "Search tasks",
       "placeholder": "Search tasks…"
-    },
-    "title": "Tasks"
+    }
   },
   "templates": {
     "manager": {
@@ -5118,7 +5037,6 @@
       "emptyBody": "Create a template to reuse a note skeleton: a meeting note, a daily log, a reading note. Pick one when you make a new note.",
       "emptyTitle": "No templates yet",
       "listLabel": "Templates",
-      "loading": "Loading…",
       "newTemplate": "New template",
       "newTemplateName": "Untitled template",
       "nameLabel": "Template name",
@@ -5132,7 +5050,6 @@
     "newAction": "New",
     "emptyAfter": " to create a reusable note template, then start notes from it (and pick one as your daily-note template in Settings).",
     "use": "Use",
-    "edit": "Edit",
     "deleteConfirm": "Delete this template?",
     "convertToNote": "Convert to note"
   },
@@ -5141,7 +5058,6 @@
     "applying": "Applying…",
     "byAuthor": "This link says it's by {{author}}",
     "cancel": "Cancel",
-    "close": "Close",
     "collision": {
       "keepBoth": "Keep both and install as “{{name}}”",
       "question": "You already have a theme called “{{name}}”.",
@@ -5406,7 +5322,6 @@
       "continue": "I've saved this, confirm phrase",
       "copied": "The kit is on your clipboard. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the kit stays on it until you copy something else.",
-      "copy": "Copy",
       "copyFailed": "Couldn't copy. Use “Save recovery kit” instead.",
       "documentTitle": "Myne recovery kit",
       "downloadStarted": "Sent to your browser's downloads. Check the kit arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
@@ -5454,7 +5369,6 @@
       "clipboardNotCleared": "Your browser will not let Myne clear your clipboard afterwards, so those 24 words stay there until you copy something else. Paste them into your password manager, then copy anything.",
       "copied": "Copied. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the words stay on it until you copy something else.",
-      "copy": "Copy",
       "copyFailed": "Couldn't copy. Use \"Save as file\" instead.",
       "downloadStarted": "Sent to your browser's downloads. Check it arrived: your browser decides where the file goes, and Myne cannot see whether it did.",
       "extensionNotice": "Browser extensions with access to this site can read what is on this page. If you are not sure about every extension in this profile, use the desktop app or a clean browser profile for this step.",
@@ -5703,7 +5617,6 @@
     }
   },
   "identitySetup": {
-    "doneCta": "Done",
     "error": "Could not set up the identity. Try again.",
     "errorAlreadyHeld": "This device already holds an identity. Recover it with its recovery phrase, or forget it and create a new one.",
     "forgetCancel": "Keep it",

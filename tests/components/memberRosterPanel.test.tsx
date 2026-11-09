@@ -766,7 +766,7 @@ describe("MemberRosterPanel name invitation", () => {
       // The row still offers a rename: the ability to SET a name is not the same
       // as the standing ability to change one.
       expect(screen.getByTestId("member-roster.name-edit").textContent).toBe(
-        "sync.memberRoster.nameEdit",
+        "common.rename",
       );
     } finally {
       cleanup();

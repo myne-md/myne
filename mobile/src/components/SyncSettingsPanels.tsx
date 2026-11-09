@@ -1086,7 +1086,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
         </p>
       )}
       {devices === null ? (
-        error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("sync.devices.loading")}</p>
+        error ? null : <p style={{ ...HELP, marginTop: 4 }}>{t("common.loading")}</p>
       ) : approved.length === 0 ? (
         <p style={{ ...HELP, marginTop: 4 }}>{t("sync.settings.noDevices")}</p>
       ) : (
@@ -1195,7 +1195,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                   }}
                   data-testid="sync.rename-device"
                 >
-                  {t("sync.devices.rename")}
+                  {t("common.rename")}
                 </button>
               {d.is_current ? null : plane === "owner" ? (
                 <button
@@ -1214,7 +1214,7 @@ export function SyncDevicesPanel({ vaultId }: { vaultId?: VaultId }) {
                   }}
                   data-testid="sync.remove-device"
                 >
-                  {t("sync.devices.remove")}
+                  {t("common.remove")}
                 </button>
               ) : null}
               </div>

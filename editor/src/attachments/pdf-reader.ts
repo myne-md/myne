@@ -145,7 +145,7 @@ export function mountPdfScroller(
   // Show the "Loading…" chip immediately — the container stays laid out.
   const loading = document.createElement("div");
   loading.className = LOADING_CLASS;
-  loading.textContent = i18n.t("editor.attachment.pdf.loading");
+  loading.textContent = i18n.t("common.loading");
   container.replaceChildren(loading);
 
   void (async () => {

@@ -2268,7 +2268,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
             padding: 0,
           }}
         >
-          {t("settings.done")}
+          {t("common.done")}
         </button>
       </div>
 

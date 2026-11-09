@@ -266,7 +266,7 @@ export function BackupExportModal({
               onClick={handleDismiss}
               data-testid="backup-export.done"
             >
-              {t("backup.export.close")}
+              {t("common.close")}
             </Button>
           </div>
         </>
@@ -283,7 +283,7 @@ export function BackupExportModal({
           </div>
           <div style={FOOTER_STYLE}>
             <Button variant="secondary" onClick={onClose}>
-              {t("backup.export.close")}
+              {t("common.close")}
             </Button>
           </div>
         </>

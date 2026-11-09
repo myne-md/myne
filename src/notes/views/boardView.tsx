@@ -686,10 +686,10 @@ export function BoardView({
       for (const lane of rendered) {
         const row = lane.rows.find((r) => r.noteId === noteId);
         if (row !== undefined) {
-          return row.title ?? t("notes.views.cards.untitled");
+          return row.title ?? t("common.untitled");
         }
       }
-      return t("notes.views.cards.untitled");
+      return t("common.untitled");
     },
     [rendered, t],
   );
@@ -952,7 +952,7 @@ export function BoardView({
                               testId={VIEW_TESTID.boardSelectCard}
                               noteId={row.noteId}
                               label={t("notes.views.board.selectCard", {
-                                title: row.title ?? t("notes.views.cards.untitled"),
+                                title: row.title ?? t("common.untitled"),
                               })}
                               checked={selected.has(row.noteId)}
                               onToggle={() => toggleCard(row.noteId)}

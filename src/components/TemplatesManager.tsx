@@ -340,7 +340,7 @@ export function TemplatesManager({
       )}
 
       {templates === null ? (
-        <div style={LOADING_STYLE}>{t("templates.manager.loading")}</div>
+        <div style={LOADING_STYLE}>{t("common.loading")}</div>
       ) : templates.length === 0 ? (
         <div style={EMPTY_STYLE}>
           <Icon name="file-text" size={28} style={{ color: "var(--fg-3)" }} />

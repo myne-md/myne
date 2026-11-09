@@ -135,7 +135,7 @@ const CALLOUT_TYPES: Record<string, CalloutType> = {
   important: { color: "success", icon: "lightbulb", labelKey: "editor.callout.label.important" },
   success: { color: "success", icon: "check", labelKey: "editor.callout.label.success" },
   check: { color: "success", icon: "check", labelKey: "editor.callout.label.success" },
-  done: { color: "success", icon: "check", labelKey: "editor.callout.label.done" },
+  done: { color: "success", icon: "check", labelKey: "common.done" },
   question: { color: "warning", icon: "help", labelKey: "editor.callout.label.question" },
   faq: { color: "warning", icon: "help", labelKey: "editor.callout.label.faq" },
   warning: { color: "warning", icon: "warn", labelKey: "editor.callout.label.warning" },

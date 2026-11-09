@@ -125,7 +125,7 @@ export function MobileCardsView({
                 />
               )}
               <div style={TITLE_STYLE}>
-                {row.title || t("notes.views.cards.untitled")}
+                {row.title || t("common.untitled")}
               </div>
               {columns.map((col) =>
                 hasDisplayableValue(row.values[col]) ? (

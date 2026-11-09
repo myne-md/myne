@@ -477,7 +477,7 @@ function CatalogueRow(props: {
                 onClick={() => void remove()}
                 data-testid={`ai.remove-button-${props.artifact}`}
               >
-                {t("settings.ai.modelRemove")}
+                {t("common.remove")}
               </Button>
             )}
           </>

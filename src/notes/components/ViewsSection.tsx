@@ -390,7 +390,7 @@ export function ViewsSection({
         },
         {
           id: "rename",
-          label: t("notes.views.menu.rename"),
+          label: t("common.rename"),
           group: "edit",
           onSelect: () => setRenamingId(menu.id),
         },

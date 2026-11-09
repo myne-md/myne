@@ -706,7 +706,7 @@ function tabMenuItems(
 
 function tabLabel(title: string | null): { text: string; italic: boolean } {
   if (title === null || title.trim() === "") {
-    return { text: i18n.t("notes.tabStrip.untitled"), italic: true };
+    return { text: i18n.t("common.untitled"), italic: true };
   }
   return { text: title, italic: false };
 }

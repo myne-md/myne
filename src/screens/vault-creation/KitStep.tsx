@@ -288,7 +288,7 @@ export function KitStep({
           onClick={() => void handleCopy()}
           data-testid="create.kit-copy"
         >
-          {t("vaultCreation.kit.copy")}
+          {t("common.copy")}
         </Button>
       </div>
 

@@ -20,7 +20,7 @@ import { noteList, loadNoteBatch, type TitleRecord } from "../../notes";
 import i18n from "../../i18n";
 
 function noteName(rec: TitleRecord): string {
-  return rec.title?.trim() || i18n.t("settings.files.startup.untitledNote");
+  return rec.title?.trim() || i18n.t("common.untitled");
 }
 
 /** Enumerate the vault's live notes (excluding trashed / archived / templates),

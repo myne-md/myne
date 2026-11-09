@@ -2333,7 +2333,7 @@ function EditorChrome({
       const name = await promptForText({
         title: t("editor.chrome.workspacePrompt.renameTitle"),
         initialValue: active.name,
-        confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
+        confirmLabel: t("common.rename"),
         testIdPrefix: "workspace-prompt",
       });
       if (name !== null) renameWorkspace(active.id, name);
@@ -2349,7 +2349,7 @@ function EditorChrome({
         const name = await promptForText({
           title: t("editor.chrome.workspacePrompt.renameTitle"),
           initialValue: slot.name,
-          confirmLabel: t("editor.chrome.workspacePrompt.renameConfirm"),
+          confirmLabel: t("common.rename"),
           testIdPrefix: "workspace-prompt",
         });
         if (name !== null) renameWorkspace(id, name);
@@ -4376,7 +4376,7 @@ function CommandPaletteHost({
       kind: "action",
       action: "rename",
       icon: "pencil",
-      label: t("editor.noteActions.rename"),
+      label: t("common.rename"),
       onSelect: commandCtx.onRenameNote,
     },
     {

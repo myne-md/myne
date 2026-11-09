@@ -2862,7 +2862,7 @@ function PaneLoading() {
         fontFamily: "var(--font-sans)",
       }}
     >
-      {t("notes.pane.loading")}
+      {t("common.loading")}
     </div>
   );
 }

@@ -185,7 +185,7 @@ export function CalendarSurface({ onClose }: { onClose: () => void }) {
           ›
         </Button>
         <Button variant="ghost" full={false} {...tappable} data-testid="calendar.today" onClick={() => setAnchor(todayCivil())}>
-          {t("calendar.today")}
+          {t("common.today")}
         </Button>
         <Button
           variant="ghost"

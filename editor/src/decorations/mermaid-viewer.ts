@@ -377,14 +377,14 @@ export function buildMermaidViewer(opts: {
       chromeButton(
         "editor.mermaid.edit",
         i18n.t("editor.mermaid.edit"),
-        i18n.t("editor.mermaid.editText"),
+        i18n.t("common.edit"),
         "pencil",
         opts.onEdit,
       ),
       chromeButton(
         "editor.mermaid.expand-close",
         i18n.t("editor.mermaid.expandClose"),
-        i18n.t("editor.mermaid.expandCloseText"),
+        i18n.t("common.close"),
         "x",
         () => closeExpand(),
       ),
@@ -474,7 +474,7 @@ export function buildMermaidViewer(opts: {
     chromeButton(
       "editor.mermaid.edit",
       i18n.t("editor.mermaid.edit"),
-      i18n.t("editor.mermaid.editText"),
+      i18n.t("common.edit"),
       "pencil",
       opts.onEdit,
     ),

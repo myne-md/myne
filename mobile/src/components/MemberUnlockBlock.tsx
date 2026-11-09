@@ -189,7 +189,7 @@ export function MemberUnlockBlock() {
         )}
         {method && editing === null && (
           <Button disabled={busy} onClick={() => void run(() => clearMemberUnlock())} data-testid="settings.member-password-remove">
-            {t("settings.memberPassword.remove")}
+            {t("common.remove")}
           </Button>
         )}
       </div>

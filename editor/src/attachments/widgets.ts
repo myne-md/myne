@@ -584,19 +584,19 @@ function buildEmbedOverflowMenu(
       ...(canExportAttachment()
         ? [
             {
-              label: i18n.t("editor.attachment.widget.menu.export"),
+              label: i18n.t("common.export"),
               testid: `${testidPrefix}.export`,
               run: () => void exportAttachment(id, filename),
             },
           ]
         : []),
       {
-        label: i18n.t("editor.attachment.widget.menu.rename"),
+        label: i18n.t("common.rename"),
         testid: `${testidPrefix}.rename`,
         run: () => void renameFileCard(view, id, filename),
       },
       {
-        label: i18n.t("editor.attachment.widget.menu.remove"),
+        label: i18n.t("common.remove"),
         testid: `${testidPrefix}.remove`,
         run: () => removeFileCard(view, host, id),
       },
@@ -979,14 +979,14 @@ export class AttachmentFileCardWidget extends WidgetType {
         ...(canExportAttachment()
           ? [
               {
-                label: i18n.t("editor.attachment.widget.menu.export"),
+                label: i18n.t("common.export"),
                 testid: "attachment-card.export",
                 run: () => void exportAttachment(this.id, this.filename),
               },
             ]
           : []),
-        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-card.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-card.remove", run: () => removeFileCard(view, card, this.id) },
+        { label: i18n.t("common.rename"), testid: "attachment-card.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("common.remove"), testid: "attachment-card.remove", run: () => removeFileCard(view, card, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-card.reveal", run: () => revealFileCard(view, this.id) },
       ],
       { buttonTestId: "attachment-card.menu-button", menuTestId: "attachment-card.menu" },
@@ -1130,14 +1130,14 @@ export class AttachmentAudioWidget extends WidgetType {
         ...(canExportAttachment()
           ? [
               {
-                label: i18n.t("editor.attachment.widget.menu.export"),
+                label: i18n.t("common.export"),
                 testid: "attachment-audio.export",
                 run: () => void exportAttachment(this.id, this.filename),
               },
             ]
           : []),
-        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
+        { label: i18n.t("common.rename"), testid: "attachment-audio.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("common.remove"), testid: "attachment-audio.remove", run: () => removeFileCard(view, root, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-audio.reveal", run: () => revealFileCard(view, this.id) },
       ];
       // "Transcribe" (SYNC-V7) — only when the host backs speech-to-text (desktop;
@@ -1436,14 +1436,14 @@ export class AttachmentVideoWidget extends WidgetType {
         ...(canExportAttachment()
           ? [
               {
-                label: i18n.t("editor.attachment.widget.menu.export"),
+                label: i18n.t("common.export"),
                 testid: "attachment-video.export",
                 run: () => void exportAttachment(this.id, this.filename),
               },
             ]
           : []),
-        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-video.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-video.remove", run: () => removeFileCard(view, frame, this.id) },
+        { label: i18n.t("common.rename"), testid: "attachment-video.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("common.remove"), testid: "attachment-video.remove", run: () => removeFileCard(view, frame, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-video.reveal", run: () => revealFileCard(view, this.id) },
       ],
       { buttonTestId: "attachment-video.menu-button", menuTestId: "attachment-video.menu" },
@@ -1773,14 +1773,14 @@ export class AttachmentTextPreviewWidget extends WidgetType {
         ...(canExportAttachment()
           ? [
               {
-                label: i18n.t("editor.attachment.widget.menu.export"),
+                label: i18n.t("common.export"),
                 testid: "attachment-text-preview.export",
                 run: () => void exportAttachment(this.id, this.filename),
               },
             ]
           : []),
-        { label: i18n.t("editor.attachment.widget.menu.rename"), testid: "attachment-text-preview.rename", run: () => void renameFileCard(view, this.id, this.filename) },
-        { label: i18n.t("editor.attachment.widget.menu.remove"), testid: "attachment-text-preview.remove", run: () => removeFileCard(view, card, this.id) },
+        { label: i18n.t("common.rename"), testid: "attachment-text-preview.rename", run: () => void renameFileCard(view, this.id, this.filename) },
+        { label: i18n.t("common.remove"), testid: "attachment-text-preview.remove", run: () => removeFileCard(view, card, this.id) },
         { label: i18n.t("editor.attachment.widget.menu.reveal"), testid: "attachment-text-preview.reveal", run: () => revealFileCard(view, this.id) },
       ],
       { buttonTestId: "attachment-text-preview.menu-button", menuTestId: "attachment-text-preview.menu" },

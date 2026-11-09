@@ -439,7 +439,7 @@ export function SeedMemoryWizard(props: {
       title={title}
       width={720}
       testId="settings.memory.seed.wizard"
-      closeLabel={t("settings.memory.seed.close")}
+      closeLabel={t("common.close")}
       canDismiss={() => !generating && !applying}
     >
       {step === "scope" ? (

@@ -108,7 +108,6 @@
     "review": {
       "title": "Değişiklikleri gözden geçir",
       "statusWaiting": "Onayınız bekleniyor",
-      "close": "Kapat",
       "scopeTotal_one": "kapsamda {{count}} not",
       "scopeTotal_other": "kapsamda {{count}} not",
       "noChanges": "Ajan hiçbir değişiklik önermedi.",
@@ -297,7 +296,6 @@
     "cleanUnused": {
       "cancel": "İptal",
       "cleaning": "Temizleniyor…",
-      "close": "Kapat",
       "completeTitle": "Temizlik tamamlandı",
       "deleteCta": "{{count}} kullanılmayanı sil",
       "deleteCta_one": "{{count}} kullanılmayanı sil",
@@ -317,10 +315,8 @@
       "willBeReclaimed": "{{size}} geri kazanılacak."
     },
     "coverPicker": {
-      "close": "Kapat",
       "dropHint": "Kapak olarak kullanmak için bir görsel bırakın.",
       "empty": "Bu kasada henüz görsel yok. Bir görsel yükleyin veya buraya sürükleyin.",
-      "loading": "Yükleniyor…",
       "removeCover": "Kapağı kaldır",
       "title": "Kapak görseli seçin",
       "upload": "Yükle"
@@ -334,8 +330,7 @@
       "notUsed": "Hiçbir notta kullanılmıyor.",
       "stillUsed_one": "Hâlâ {{count}} notta kullanılıyor. Silmek, gömülü olduğu yerde bir kalıntı bırakır:",
       "stillUsed_other": "Hâlâ {{count}} notta kullanılıyor. Silmek, gömülü olduğu yerde bir kalıntı bırakır:",
-      "title": "Eki sil",
-      "untitled": "Başlıksız"
+      "title": "Eki sil"
     },
     "library": {
       "actionsAriaLabel": "Ek işlemleri",
@@ -366,9 +361,7 @@
       "importing": "İçe aktarılıyor…",
       "listView": "Liste görünümü",
       "menuDelete": "Sil",
-      "menuExport": "Dışa aktar",
       "menuPreview": "Önizle",
-      "menuRename": "Yeniden adlandır",
       "menuTranscribe": "Yazıya dök",
       "menuViewTranscription": "Metin dökümünü görüntüle",
       "noUnusedNotice": "Temizlenecek kullanılmayan ek yok.",
@@ -405,7 +398,6 @@
       "emptyFilteredBodyQuery": "Kitaplıkta eşleşen bir şey yok",
       "emptyLoadErrorBody": "Katalog kasanızla şifrelenmiştir, bu yüzden bu genellikle kayıp veri değil yarıda kalan bir okumadır. Tekrar deneyin; sorun sürerse notlarınız ve dosyaları etkilenmez.",
       "emptyRetry": "Yeniden dene",
-      "transcriptCopy": "Kopyala",
       "transcriptCopied": "Metin dökümü kopyalandı.",
       "transcriptCopyFailed": "Metin dökümü kopyalanamadı.",
       "transcriptEmpty": "Bu kayıtta konuşma bulunamadı.",
@@ -423,8 +415,7 @@
       "play": "Oynat"
     },
     "usedInNotesPopover": {
-      "empty": "Hiçbir notta kullanılmıyor.",
-      "untitled": "Başlıksız"
+      "empty": "Hiçbir notta kullanılmıyor."
     },
     "needsApp": "Ek temizliği için uygulama gerekir.",
     "noUnused": "Kullanılmayan ek yok: her dosya bir notta kullanılıyor.",
@@ -480,7 +471,6 @@
     },
     "export": {
       "cancel": "İptal",
-      "close": "Kapat",
       "copying": "{{total}} / {{done}} kopyalanıyor…",
       "preparing": "Hazırlanıyor…",
       "successToast": "Yedekleme doğrulandı ve kaydedildi.",
@@ -492,7 +482,6 @@
   "clipper": {
     "pairing": {
       "accept": "Kabul et",
-      "close": "Kapat",
       "codeAriaLabel": "Eşleştirme kodu",
       "intro": "Bu kodun uzantıda gösterilenle eşleştiğini doğrulayın, ardından eşleştirmek için Kabul et’e basın.",
       "reject": "Reddet",
@@ -521,7 +510,6 @@
     "searchPlaceholder": "Notlarda ara veya bir komut çalıştır. Deneyin: tag: · path: · task:",
     "sectionCommands": "Komutlar",
     "sectionNotes": "Notlar",
-    "untitledNote": "Başlıksız",
     "resultsLabel": "Komutlar ve notlar",
     "pin": "Sol şeride sabitle",
     "unpin": "Sol şeritten kaldır",
@@ -1018,7 +1006,6 @@
       },
       "lightbox": {
         "close": "Önizlemeyi kapat",
-        "export": "Dışa aktar",
         "exportAria": "Eki dışa aktar",
         "imagePreview": "Görsel önizlemesi",
         "pdfFallback": "PDF",
@@ -1030,16 +1017,13 @@
       "menu": {
         "actionsAria": "Ek işlemleri"
       },
-      "pdf": {
-        "loading": "Yükleniyor…"
-      },
+      "pdf": {},
       "picker": {
         "openFailed": "Dosya seçici açılamadı."
       },
       "progress": {
         "encrypting": "Şifreleniyor…",
-        "importing": "İçe aktarılıyor…",
-        "loading": "Yükleniyor…"
+        "importing": "İçe aktarılıyor…"
       },
       "recording": {
         "barAria": "Sesli not kaydediliyor",
@@ -1050,7 +1034,6 @@
       },
       "rename": {
         "cancel": "İptal",
-        "confirm": "Yeniden adlandır",
         "title": "Eki yeniden adlandır"
       },
       "summary": {
@@ -1091,9 +1074,6 @@
           "seek": "İlerle"
         },
         "menu": {
-          "export": "Dışa aktar",
-          "remove": "Kaldır",
-          "rename": "Yeniden adlandır",
           "reveal": "Kitaplıkta göster",
           "transcribe": "Yazıya dök",
           "customSize": "Özel boyut…",
@@ -1154,7 +1134,6 @@
         "bug": "Hata",
         "caution": "Uyarı",
         "danger": "Tehlike",
-        "done": "Tamamlandı",
         "error": "Hata",
         "example": "Örnek",
         "failure": "Başarısızlık",
@@ -1182,8 +1161,7 @@
         "linksTo": "{{count}} nota bağlanıyor",
         "linksTo_one": "{{count}} nota bağlanıyor",
         "linksTo_other": "{{count}} nota bağlanıyor",
-        "outgoingEmpty": "Bu not henüz hiçbir şeye bağlanmıyor.",
-        "untitled": "Başlıksız"
+        "outgoingEmpty": "Bu not henüz hiçbir şeye bağlanmıyor."
       },
       "barItems": {
         "graph": "Grafik",
@@ -1302,7 +1280,6 @@
           "historyDeleteBody": "Bu, konuşmayı bir sonraki bağlantıda cihazın tamamından siler. Geri alınamaz.",
           "historyError": "Konuşmalar yüklenemedi. Tekrar deneyin.",
           "historyProposalNewNote": "Yeni not",
-          "historyRename": "Yeniden adlandır",
           "historyTitle": "Sohbet geçmişi",
           "historyDeleteTitle": "Görüşmeyi sil",
           "persistWarning": "Kasaya kaydedilemedi. Mesajlarınız hâlâ burada ve yeniden denenecek.",
@@ -1377,7 +1354,6 @@
       },
       "workspacePrompt": {
         "namePlaceholder": "Çalışma alanı adı",
-        "renameConfirm": "Yeniden adlandır",
         "renameTitle": "Çalışma alanını yeniden adlandır",
         "saveAsTitle": "Çalışma alanını farklı kaydet",
         "saveConfirm": "Kaydet"
@@ -1409,7 +1385,6 @@
     "noteActions": {
       "buttonLabel": "Not işlemleri",
       "convertFailed": "Bu notun ne olduğu değiştirilemedi, bu yüzden değişmedi.",
-      "rename": "Yeniden adlandır",
       "move": "Klasöre taşı…",
       "duplicate": "Çoğalt",
       "convertToTemplate": "Şablona dönüştür",
@@ -1425,9 +1400,7 @@
       "defaultBadge": "kod"
     },
     "drawingEmbed": {
-      "done": "Bitti",
       "edit": "{{name}} çizimini düzenle",
-      "editAction": "Düzenle",
       "empty": "Boş çizim: çizmek için tıklayın",
       "open": "Aç",
       "rename": "Çizimi yeniden adlandır"
@@ -1474,7 +1447,6 @@
       "propertiesLabel": "Özellikler",
       "removeListItemAriaLabel": "{{item}} öğesini kaldır",
       "titleAriaLabel": "Not başlığı",
-      "titlePlaceholder": "Başlıksız",
       "managedField": "Bu alanı Myne yazar"
     },
     "mermaid": {
@@ -1489,11 +1461,9 @@
       "panLeft": "Sola kaydır",
       "panRight": "Sağa kaydır",
       "edit": "Diyagram kaynağını düzenle",
-      "editText": "Düzenle",
       "expand": "Diyagramı genişlet",
       "expandText": "Genişlet",
-      "expandClose": "Genişletilmiş diyagramı kapat",
-      "expandCloseText": "Kapat"
+      "expandClose": "Genişletilmiş diyagramı kapat"
     },
     "slash": {
       "aiContinue": "Yazmaya devam et (Yapay Zeka)",
@@ -1517,7 +1487,6 @@
       "link": "Bağlantı",
       "now": "Şimdi",
       "numberedList": "Numaralı liste",
-      "priority": "Öncelik",
       "quote": "Alıntı",
       "repeat": "Yineleme",
       "table": "Tablo",
@@ -1568,7 +1537,6 @@
       "title": {
         "due": "Son tarih",
         "repeat": "Yineleme",
-        "priority": "Öncelik",
         "remind": "Hatırlatıcı"
       },
       "invalidRemind": "Myne bu tarihi okuyamıyor, bu yüzden size hatırlatmayacak.",
@@ -1577,7 +1545,6 @@
       "dateGrid": "Tarih seç",
       "dateNext": "Gelecek ay",
       "datePrev": "Önceki ay",
-      "today": "Bugün",
       "tomorrow": "Yarın",
       "selectField": "Eklenecek bir alan seç",
       "noDate": "Tarih yok",
@@ -1730,7 +1697,6 @@
       "clearSearch": "Aramayı temizle",
       "viewNoteCount_one": "“{{name}}” içinde {{count}} not",
       "viewNoteCount_other": "“{{name}}” içinde {{count}} not",
-      "edit": "Düzenle",
       "trashEmpty": "Çöp Kutusu boş",
       "archiveEmpty": "Arşivlenmiş not yok",
       "noMatchingNotes": "Eşleşen not yok",
@@ -1775,8 +1741,7 @@
       "body": "Listeden bir not seçin ya da yeni bir tane başlatın."
     },
     "readingBar": {
-      "editNote": "Notu düzenle",
-      "edit": "Düzenle"
+      "editNote": "Notu düzenle"
     },
     "graphTab": {
       "linkedNotes_one": "{{count}} bağlı not",
@@ -1810,9 +1775,7 @@
       "emptyState": "Henüz kaydedilmiş görünüm yok. Notlarınızı etikete, klasöre veya metne göre filtrelemek için bir tane oluşturun.",
       "editView": "Görünümü düzenle"
     },
-    "sheet": {
-      "done": "Bitti"
-    },
+    "sheet": {},
     "vaultSwitcher": {
       "title": "Kasalar"
     },
@@ -1858,7 +1821,6 @@
     "meeting": {
       "ai": {
         "cancelled": "Durduruldu. Nota hiçbir şey eklenmedi.",
-        "close": "Kapat",
         "discard": "Vazgeç",
         "failed": "Yapay zeka geçişi başarısız oldu. Metin dökümü değişmedi.",
         "generate": "Oluştur",
@@ -2013,7 +1975,6 @@
         "title": "Kasayı Markdown olarak dışa aktar"
       },
       "summary": {
-        "done": "Tamam",
         "showInFolder": "Klasörde göster",
         "title": "Dışa aktarma tamamlandı"
       }
@@ -2051,7 +2012,6 @@
   "notes": {
     "archive": {
       "cancel": "İptal",
-      "close": "Kapat",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
       "delete": "Sil",
@@ -2068,8 +2028,7 @@
       "folderDeleteWarning": "Çöp Kutusu’na taşınırlar. İstediğiniz zaman geri yükleyebilirsiniz. Kalıcı silme ayrı bir adımdır.",
       "restore": "Geri yükle",
       "restoreError": "Bu not geri yüklenemedi. Tekrar deneyin.",
-      "title": "Arşiv",
-      "untitled": "Başlıksız"
+      "title": "Arşiv"
     },
     "cardMenu": {
       "copyLink": "Bağlantıyı kopyala",
@@ -2100,7 +2059,6 @@
       "cancel": "İptal",
       "delete": "Sil",
       "title": "Bu not silinsin mi?",
-      "untitled": "Başlıksız",
       "warning": "Bu işlem geri alınamaz."
     },
     "example": {
@@ -2114,7 +2072,6 @@
         "body": "Myne düz Markdown yazar ve sonucu siz yazarken gösterir.\n\n## Temeller\nBir sözcüğü **kalın** ya da *italik* yapın veya araya `satır içi kod` ekleyin.\n\n## Bir liste\n- Bir öğe\n- Başka bir öğe\n  - İç içe bir öğe\n\n## Bir alıntı\n> Yıllarca saklanan küçük notlar, hiç yazmadığınız büyük notları yener.\n\n## Bir tablo\n| Kısayol | Ne yapar |\n| --- | --- |\n| Cmd/Ctrl + B | Kalın |\n| Cmd/Ctrl + K | Bağlantı ekle |\n\n## Biraz kod\n```\nconsole.log(\"hello from Myne\")\n```\n\nHazır olduğunuzda [[{{index}}]] notuna dönün.\n"
       },
       "tasks": {
-        "title": "Görevler",
         "body": "`- [ ]` ile başlayan her satır bir görevdir. Myne, notlarınızın tamamındaki açık görevleri tek bir Görevler görünümünde toplar; böylece hiçbiri notlar arasında kaybolmaz.\n\n- [ ] [[{{markdown}}]] notunu okuyun\n- [ ] Kendi görevinizi ekleyin\n- [ ] Son tarihli bir tane deneyin 📅 2030-12-31\n- [x] Kasanızı oluşturun\n\nBuradaki bir kutuyu işaretleyin, sonra listenin güncellenmesini izlemek için kenar çubuğundaki Görevler görünümünü açın.\n\n[[{{index}}]] notuna dönün.\n"
       },
       "links": {
@@ -2205,7 +2162,6 @@
         "heading": "Renk grupları",
         "namePlaceholder": "Başlıksız kural",
         "rowLabel": "{{name}}, grup {{index}} / {{total}}. Alt plus yukarı veya aşağı ok ile yeniden sıralanır.",
-        "editRuleButton": "Düzenle",
         "derivedMakeEditable": "Bunları düzenlenebilir yap",
         "derivedMakeEditableFailed": "Bu gruplar kaydedilemedi. Yeniden deneyin.",
         "derivedNote_one": "Grafik etikete göre renklendirildi: etiketlerinizden türetilen {{count}} grup. Düzenlenebilir yapana kadar kaydedilmez.",
@@ -2226,7 +2182,6 @@
       "refreshTitle": "Kasa değişti: grafiği yeniden oluştur",
       "settings": {
         "appearanceHeading": "Görünüm",
-        "closeTitle": "Kapat",
         "forceCenter": "Merkez çekimi",
         "forceLinkDistance": "Bağlantı mesafesi",
         "forceLinkStrength": "Bağlantı gücü",
@@ -2266,11 +2221,8 @@
         "cancelledNotImported_other": "{{count}} içe aktarılmadı",
         "cancelling": "İptal ediliyor…",
         "chooseFolder": "Klasör seçin…",
-        "close": "Kapat",
         "closeAriaLabel": "Kapat",
         "copied": "Kopyalandı",
-        "copy": "Kopyala",
-        "done": "Tamam",
         "errorBody": "İçe aktarma tamamlanamadı. Daha önce içe aktarılan notlar korundu; bunları tutmak ya da silmek güvenlidir.",
         "flagDetail": "{{kind}} “{{segment}}” {{reason}}.",
         "flagKindFolder": "Klasör",
@@ -2490,7 +2442,6 @@
       "openToSide": "Yan tarafta aç",
       "removeFolderNote": "Klasör notunu kaldır",
       "removeFromFavorites": "Favorilerden çıkar",
-      "rename": "Yeniden adlandır",
       "setAsFolderNote": "Klasör notu olarak ayarla",
       "trash": "Çöp Kutusu",
       "trashBulkError": "Notlar Çöp Kutusu’na taşınamadı.",
@@ -2513,7 +2464,6 @@
       "moveFolderTo": "Klasörü şuraya taşı…",
       "treeLabel": "Notlar ve klasörler",
       "selectionAnnouncement": "{{title}} seçildi",
-      "untitled": "Adsız",
       "search": "Ara"
     },
     "newFromTemplate": {
@@ -2524,9 +2474,7 @@
       "manageTemplates": "Şablonları yönet",
       "emptyState": "Henüz hiç şablon oluşturmadınız.",
       "listLabel": "Şablonlar",
-      "loading": "Yükleniyor…",
       "nameLabel": "Not için ad (“{{templateName}}” şablonundan)",
-      "namePlaceholder": "Başlıksız",
       "nameStepTitle": "Bu nota ad verin",
       "pickStepTitle": "Şablondan yeni not",
       "untitledTemplate": "Başlıksız şablon"
@@ -2538,7 +2486,6 @@
       "recent": "Kaldığınız yerden devam edin",
       "searchAriaLabel": "Notlarda ve komutlarda ara",
       "searchPlaceholder": "Notlarda ve komutlarda ara…",
-      "untitled": "Başlıksız",
       "createFromTemplate": "Şablondan",
       "kindCommand": "Komut",
       "kindNote": "Not",
@@ -2556,7 +2503,6 @@
     "pane": {
       "graphTab": "Grafik",
       "tasksTab": "Görevler",
-      "loading": "Yükleniyor…",
       "untitledView": "Başlıksız görünüm",
       "agentTab": "Ajan"
     },
@@ -2582,7 +2528,6 @@
       "taskBadgeTitle": "Görev notu",
       "unsyncedLabel": "Henüz sunucuda değil",
       "unsyncedTitle": "Bu notun son değişiklikleri yalnızca bu cihazda",
-      "untitled": "Başlıksız",
       "untitledDrawing": "Adsız çizim"
     },
     "savedView": {
@@ -2615,7 +2560,6 @@
       "changeCount_other": "Bu anlık görüntüden bu yana {{count}} değişiklik",
       "changeCountPrev_one": "Önceki anlık görüntüye göre {{count}} değişiklik",
       "changeCountPrev_other": "Önceki anlık görüntüye göre {{count}} değişiklik",
-      "close": "Kapat",
       "compareAgainstLabel": "Şununla karşılaştır",
       "compareCurrent": "Geçerli not",
       "comparePrevious": "Önceki anlık görüntü",
@@ -2632,14 +2576,12 @@
       "errorVaultLocked": "Kasa kilitli. Anlık görüntüleri görüntülemek için kilidini açın.",
       "justNow": "az önce",
       "listLabel": "Anlık görüntü listesi",
-      "loading": "Yükleniyor…",
       "noPrevious": "Bu en eski anlık görüntü. Karşılaştırılacak daha öncesi yok.",
       "restore": "Geri yükle",
       "restoreCta": "Bu anlık görüntüyü geri yükle",
       "restoredStatus": "Geri yüklendi. Sahip olduğunuz sürüm bir anlık görüntü olarak kaydedildi.",
       "selectPlaceholder": "O zamandan beri neyin değiştiğini önizlemek için bir anlık görüntü seçin.",
       "title": "Anlık görüntüler",
-      "untitled": "Başlıksız",
       "deviceFallback": "Cihaz {{code}}",
       "unknownAuthor": "Bilinmeyen cihaz"
     },
@@ -2652,7 +2594,6 @@
       "pinned": "Sabitlendi",
       "pinnedTitle": "Sabitlendi: kapatmak için sabitlemeyi kaldırın",
       "unpin": "Sabitlemeyi kaldır",
-      "untitled": "Başlıksız",
       "closeTabMenuItem": "Sekmeyi kapat",
       "moveLeft": "Sola taşı",
       "moveRight": "Sağa taşı"
@@ -2675,11 +2616,9 @@
       "saveAsView": "Görünüm olarak kaydet",
       "searchPlaceholder": "Etiketlerde ara…",
       "title": "Etiketler",
-      "untitled": "Başlıksız",
       "viewNamePlaceholder": "Görünüm adı"
     },
     "trash": {
-      "close": "Kapat",
       "count_one": "{{count}} not",
       "count_other": "{{count}} not",
       "delete": "Sil",
@@ -2697,8 +2636,7 @@
       "purgeConfirmTitle": "Kalıcı olarak silinsin mi?",
       "restore": "Geri yükle",
       "restoreError": "Bu not geri yüklenemedi. Tekrar deneyin.",
-      "title": "Çöp Kutusu",
-      "untitled": "Başlıksız"
+      "title": "Çöp Kutusu"
     },
     "unlinkedMentions": {
       "empty": "Bağlantısız bahis yok.",
@@ -2707,8 +2645,7 @@
       "linkTooltip": "Bu bahsi {{title}} notuna bağla",
       "refresh": "Bahisler değişmiş olabilir: yenile",
       "searching": "Aranıyor…",
-      "thisNote": "bu not",
-      "untitled": "Başlıksız"
+      "thisNote": "bu not"
     },
     "unsettledSave": "Açık bir notun kaydedilmesi tamamlanmadı, bu yüzden hiçbir şey değiştirilmedi. Tamamlandığında tekrar deneyin.",
     "views": {
@@ -2770,8 +2707,7 @@
         "empty": "Bu görünümle eşleşen not yok",
         "noValue": "Değer yok",
         "setCover": "Kapak ayarla",
-        "setCoverImage": "Kapak görseli ayarla",
-        "untitled": "Başlıksız"
+        "setCoverImage": "Kapak görseli ayarla"
       },
       "empty": "Henüz görünüm yok. Geçerli not listesini bir görünüm olarak kaydedin.",
       "list": {
@@ -2789,7 +2725,6 @@
         "armRefusedHeading": "{{name}} içe aktarılmadı",
         "armSameVersionDifferent": "Dosya v{{version}} diyor, bu kasanın sahip olduğu sürümle aynı, ancak içeriği farklı. Bu ya kimliği yeniden kullanan farklı bir yazar ya da imzalandıktan sonra değiştirilen bir dosyadır, bu yüzden reddedilir.",
         "armUpdate": "Bu, {{name}} görünümünü değiştirir: bu kasa v{{stored}} sürümüne sahip, dosya v{{incoming}}.",
-        "close": "Kapat",
         "filterName": "Görünüm bildirimi",
         "idleBody": "Bir görünüm dosyası, birinin dışa aktardığı kaydedilmiş bir görünümdür. Myne önce onu denetler ve depolanmadan önce ne seçtiğini ve okuduğunu gösterir.",
         "importAction": "Görünümü içe aktar",
@@ -2815,7 +2750,6 @@
       "manager": {
         "approve": "Onayla",
         "approvedState": "Bu cihazda onaylandı",
-        "close": "Kapat",
         "deleteFailed": "O görünüm silinemedi.",
         "deleteLabel": "{{name}} sil",
         "emptyBody": "Not listesinden kaydettiğiniz bir görünüm ya da birinin size gönderdiği bir görünüm burada görünür.",
@@ -2832,7 +2766,6 @@
         "editFilter": "Filtreyi düzenle…",
         "moveDown": "Aşağı taşı",
         "moveUp": "Yukarı taşı",
-        "rename": "Yeniden adlandır",
         "viewSettings": "Görünüm ayarları…"
       },
       "newView": "Yeni görünüm",
@@ -3089,7 +3022,6 @@
     },
     "damaged": {
       "body": "Yedekleme dosyası hasarlı, bu yüzden hiçbir şey geri yüklenmedi. Elinizdeki tek kopya buysa, kurtarma işlemi sağlam notları geri yükleyebilir ve okunamayanların tam listesini gösterir. Sonuç her zaman kısmi geri yükleme olarak etiketlenir.",
-      "close": "Kapat",
       "salvage": "Sağlam notları kurtar…"
     },
     "error": {
@@ -3532,8 +3464,7 @@
         "optionSpecific": "Belirli bir not",
         "saveError": "Başlangıç ayarı kaydedilemedi.",
         "searchEmpty": "Not bulunamadı.",
-        "searchPlaceholder": "Notlarda ara…",
-        "untitledNote": "Başlıksız"
+        "searchPlaceholder": "Notlarda ara…"
       },
       "sections": {
         "notes": "Notlar ve klasörler",
@@ -3749,7 +3680,6 @@
       "downloadNotInstalled": "Kurulu değil",
       "downloadReinstall": "İndir",
       "downloadInstall": "İndir",
-      "modelRemove": "Kaldır",
       "downloading": "İndiriliyor…",
       "downloadingPercent": "İndiriliyor… %{{percent}}",
       "downloadCancel": "İptal",
@@ -3769,7 +3699,6 @@
       "excludedFoldersEmpty": "Henüz hiçbir şey hariç tutulmadı, bu yüzden yapay zeka bu kasadaki her klasörü okuyabilir.",
       "excludedFoldersAdd": "Ekle",
       "excludedFoldersAddLabel": "Yapay zekadan hariç tutulacak klasör",
-      "excludedFoldersRemove": "Kaldır",
       "excludedFoldersRemoveLabel": "{{folder}} klasörünü yapay zekadan hariç tutmayı bırak",
       "excludedFoldersMonotoneNotice": "Cihazlarınızdan herhangi birinde eklenen bir hariç tutma, siz onu her yerde kaldırana kadar kalır: buradaki kaldırmalar iletilmez, bu yüzden diğer cihazlarınızın hâlâ hariç tuttuğu bir klasör bir sonraki eşitlemede geri gelir.",
       "catalogueOpen": "Bir model indir",
@@ -4069,7 +3998,6 @@
       "vaultName": "Kasa adı",
       "approveDevice": "Cihazı onayla"
     },
-    "done": "Bitti",
     "sectionOptions": "Seçenekler",
     "footerTagline": "myne · bu cihazda şifreli · açık kaynak",
     "editor": {
@@ -4086,7 +4014,6 @@
         "bullet2": "Zıplayan zebralar şaşırtıcı biçimde çevik",
         "dateTime": "Tarih ve saat",
         "toolbar": "Araç çubuğu",
-        "task": "Görevler",
         "taskSampleOpen": "Üç aylık raporu gönder",
         "taskSampleDone": "Mekânı ayırt"
       },
@@ -4241,7 +4168,6 @@
       "heading": "Asistanın hatırladıkları",
       "helper": "Yapay zekânın sizinle çalışırken öğrentiği olgular. Kendisi yazar (çalıştırmada en fazla bir tane); her birini görür ve düzeltebilirsiniz. Girdiler diğer cihazlarınızla senkronize olur ve şifreli kalır.",
       "empty": "Asistan bir çalıştırma sırasında bir şey öğrendiğinde girdiler burada görünür.",
-      "editLabel": "Düzenle",
       "deleteLabel": "Sil",
       "save": "Kaydet",
       "cancel": "İptal",
@@ -4274,7 +4200,6 @@
         "rebuildConfirm": "{{date}} tarihli seed ({{count}} kayıt) değiştirilsin mi?",
         "title": "Myne'e vault'ını öğret",
         "candidatesTitle": "Myne'in öğrendiklerini gözden geçir",
-        "close": "Kapat",
         "loading": "Vault'ın okunuyor…",
         "scopeIntro": "Myne önce vault'ının şeklini okur: not başlıkları, klasörler ve etiketler. Not metnini yalnızca ihtiyaç duyarsa ister; ekleri hiç istemez.",
         "provider": "Sağlayıcı: {{provider}}",
@@ -4351,7 +4276,6 @@
       "numberHelper": "Kasanın değil, kimliğinizin numarası. Kimlik ifadenizden türetilir, bu yüzden kaybolmaz ve kaydedilmesi gerekmez. Gizli değildir; destek veya sunucu devri için kullanabilirsiniz.",
       "numberUnavailable": "Hesap numarası bu cihazda okunamadı. Tekrar denemek için Ayarlar'ı yeniden açın.",
       "numberEmpty": "Bu cihazda bir kimlik yok. Hesap numarası için Eşitleme bölümünden bir kimlik ekleyin veya kurtarın.",
-      "numberCopy": "Kopyala",
       "numberCopied": "Hesap numarası kopyalandı",
       "numberCopyFailed": "Hesap numarası kopyalanamadı",
       "copyAccountNumber": "Hesap numarasını kopyala",
@@ -4378,7 +4302,6 @@
       "helperNotConfigured": "Her seferinde kurtarma ifadenizi yeniden yazmamak için bir parola ya da PIN belirleyin.",
       "set": "Belirle",
       "change": "Değiştir",
-      "remove": "Kaldır",
       "label": "Kasa parolası",
       "methodPassword": "bir parola",
       "methodPin": "bir PIN",
@@ -4481,7 +4404,6 @@
       "approve": "Onayla",
       "awaitingApproval_one": "{{count}} cihaz onay bekliyor",
       "awaitingApproval_other": "{{count}} cihaz onay bekliyor",
-      "loading": "Yükleniyor…",
       "noDevices": "Henüz başka cihaz yok.",
       "notEnrolled": "Bu cihaz henüz kayıtlı değil. Az önce eklediyseniz, hesabınızda zaten bulunan bir cihazın onaylamasını bekleyin; aksi halde “Bu cihazda oturum aç” ile kaydedin.",
       "platform": {
@@ -4495,9 +4417,7 @@
         "web": "Tarayıcı",
         "windows": "Windows bilgisayar"
       },
-      "remove": "Kaldır",
       "removedElsewhere": "Bu cihaz, başka bir cihazdan hesabınızdan kaldırıldı.",
-      "rename": "Yeniden adlandır",
       "renameFailed": "Bu ad kaydedilemedi. Tekrar deneyin.",
       "renameLabel": "Cihaz adı",
       "resetAndReAdd": "Bu cihazı sıfırla ve yeniden ekle",
@@ -4638,7 +4558,6 @@
         "helper": "Bir onay bir cihazı hesabınıza imzalar. Ardından sahip olduğunuz her kasayı görür ve her kasa yine kendi parolasıyla açılır."
       },
       "recovered": {
-        "close": "Kapat",
         "decrypting": "Şifre çözülüyor…",
         "deleteConfirmTitle": "Bu kurtarılan not silinsin mi?",
         "deleteConfirmWarning": "Bu, bu cihazda tutulan tek kopyayı kalıcı olarak siler. Bu işlem geri alınamaz.",
@@ -4781,7 +4700,6 @@
       "ownerBadge": "Sahip",
       "memberBadge": "Üye",
       "invite": "Üye davet et",
-      "remove": "Kaldır",
       "removeConfirm": "{{name}} kaldırılsın mı? Anahtar döndürmesi tamamlandığında gelecekteki değişikliklere erişimi kaybeder. Bu, kopyaladıkları hiçbir şeyi silemez ve içeriklerini cihazlarından veya yapay zekâ sağlayıcılarından geri çağırmaz.",
       "removalLimits": "Bir üyeyi kaldırmak yalnızca gelecekteki değişikliklere erişimini durdurur. Kopyaladıkları hiçbir şeyi silemez ve içeriklerini cihazlarından veya yapay zekâ sağlayıcılarından geri çağırmaz.",
       "inviteReady": "{{fingerprint}} için davet hazır…",
@@ -4884,11 +4802,9 @@
       "folder": "Klasör",
       "insert": "Ekle",
       "noDueDate": "Son tarih yok",
-      "priority": "Öncelik",
       "sort": "Sıralama ölçütü",
       "sortDue": "Son tarih",
       "sortPath": "Not",
-      "sortPriority": "Öncelik",
       "status": "Durum",
       "statusDone": "Tamamlandı",
       "statusTodo": "Yapılmadı",
@@ -4903,7 +4819,6 @@
     },
     "filter": {
       "overdue": "Gecikmiş",
-      "today": "Bugün",
       "upcoming": "Yaklaşan"
     },
     "noteTitle": "Bu nottaki görevler",
@@ -4926,12 +4841,10 @@
       "untitled": "Başlıksız görev",
       "editFields": "Görev alanlarını düzenle"
     },
-    "title": "Görevler",
     "axis": {
       "due": "Bitiş",
       "folder": "Klasör",
       "note": "Not",
-      "priority": "Öncelik",
       "sort": "Sırala",
       "status": "Durum",
       "tag": "Etiket"
@@ -4941,7 +4854,6 @@
       "later": "Daha sonra",
       "none": "Tarih yok",
       "overdue": "Gecikmiş",
-      "today": "Bugün",
       "upcoming": "Yaklaşan"
     },
     "filters": {
@@ -4962,14 +4874,12 @@
       "later": "Daha sonra",
       "none": "Tarih yok",
       "overdue": "Gecikmiş",
-      "today": "Bugün",
       "upcoming": "Yaklaşan"
     },
     "sort": {
       "due": "Bitiş tarihi",
       "dueDesc": "Bitiş tarihi, en yeni önce",
-      "note": "Not",
-      "priority": "Öncelik"
+      "note": "Not"
     },
     "status": {
       "all": "Tümü",
@@ -4980,8 +4890,7 @@
       "allFolders": "Tüm klasörler",
       "allNotes": "Tüm notlar",
       "anyPriority": "Herhangi bir öncelik",
-      "anyTag": "Herhangi bir etiket",
-      "untitled": "Adsız"
+      "anyTag": "Herhangi bir etiket"
     },
     "search": {
       "label": "Görev ara",
@@ -4995,7 +4904,6 @@
       "emptyBody": "Bir not iskeletini yeniden kullanmak için bir şablon oluşturun: toplantı notu, günlük kayıt, okuma notu. Yeni bir not oluştururken birini seçin.",
       "emptyTitle": "Henüz şablon yok",
       "listLabel": "Şablonlar",
-      "loading": "Yükleniyor…",
       "newTemplate": "Yeni şablon",
       "newTemplateName": "Başlıksız şablon",
       "removeFromTemplates": "Şablonlardan çıkar",
@@ -5009,7 +4917,6 @@
     "newAction": "Yeni",
     "emptyAfter": " düğmesine dokunarak yeniden kullanılabilir bir not şablonu hazırlayın, sonra ondan notlar oluşturun (ve Ayarlar’da birini günlük not şablonunuz olarak seçin).",
     "use": "Kullan",
-    "edit": "Düzenle",
     "deleteConfirm": "Bu şablon silinsin mi?",
     "convertToNote": "Nota dönüştür"
   },
@@ -5018,7 +4925,6 @@
     "applying": "Uygulanıyor…",
     "byAuthor": "Bu bağlantı, temanın {{author}} tarafından yapıldığını söylüyor",
     "cancel": "İptal",
-    "close": "Kapat",
     "collision": {
       "keepBoth": "İkisini de tut ve “{{name}}” olarak kur",
       "question": "Zaten “{{name}}” adında bir temanız var.",
@@ -5299,7 +5205,6 @@
       "clipboardNotCleared": "Tarayıcınız Myne’in panonuzu sonradan temizlemesine izin vermez, bu yüzden o 24 sözcük siz başka bir şey kopyalayana kadar panoda kalır. Bunları parola yöneticinize yapıştırın, sonra herhangi bir şey kopyalayın.",
       "copied": "Kopyalandı. Uygulama çalışmayı sürdürdüğü sürece, siz başka bir yere geçseniz bile Myne bunu 30 saniye sonra panodan siler.",
       "copiedNoAutoClear": "Kopyalandı. Myne burada panonuzu temizleyemez, bu yüzden sözcükler siz başka bir şey kopyalayana kadar panoda kalır.",
-      "copy": "Kopyala",
       "extensionNotice": "Bu siteye erişimi olan tarayıcı uzantıları bu sayfadakileri okuyabilir. Bu profildeki her uzantıdan emin değilseniz bu adım için masaüstü uygulamasını ya da temiz bir tarayıcı profilini kullanın.",
       "copyFailed": "Kopyalanamadı. Bunun yerine “Dosya olarak kaydet”i kullanın.",
       "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne onun gidip gitmediğini göremez.",
@@ -5331,7 +5236,6 @@
       "continue": "Bunu kaydettim, ifadeyi onayla",
       "copied": "Kit panonuzda. Uygulama çalışmayı sürdürdüğü sürece, siz devam etseniz bile Myne onu 30 saniye içinde temizler.",
       "copiedNoAutoClear": "Kopyalandı. Myne burada panonuzu temizleyemez, bu yüzden kit siz başka bir şey kopyalayana kadar panoda kalır.",
-      "copy": "Kopyala",
       "copyFailed": "Kopyalanamadı. Bunun yerine “Kurtarma kitini kaydet”i kullanın.",
       "documentTitle": "Myne kurtarma kiti",
       "downloadStarted": "Tarayıcınızın indirilenlerine gönderildi. Kitin ulaştığını kontrol edin: dosyanın nereye gideceğine tarayıcınız karar verir ve Myne ulaşıp ulaşmadığını göremez.",
@@ -5708,7 +5612,6 @@
     "savedForNextLaunch": "Kaydedildi. Bu oturumda koruma hâlâ kapalı, çünkü oturum --disable-screen-capture-protection ile başlatıldı; Myne’i bu seçenek olmadan bir dahaki açışınızda koruma geri gelir."
   },
   "identitySetup": {
-    "doneCta": "Bitti",
     "error": "Kimlik kurulamadı. Tekrar deneyin.",
     "intro": "Bir kimlik, herhangi bir kasaya sahip olmadan önce insanların size davet göndermesini sağlar. Kasa oluşturmaz ve not saklamaz.",
     "pending": "Bu cihaz, hesaptaki başka bir cihazın onaylamasını bekliyor.",

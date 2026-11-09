@@ -26,7 +26,7 @@ export function progressLabel(kind: ProgressKind): string {
     case "encrypting":
       return i18n.t("editor.attachment.progress.encrypting");
     case "loading":
-      return i18n.t("editor.attachment.progress.loading");
+      return i18n.t("common.loading");
   }
 }
 

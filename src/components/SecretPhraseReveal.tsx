@@ -129,7 +129,7 @@ export function SecretPhraseReveal({
           onClick={() => void handleCopy()}
           data-testid={`${testIdPrefix}-copy`}
         >
-          {t("vaultCreation.phrase.copy")}
+          {t("common.copy")}
         </Button>
         <Button
           variant="ghost"

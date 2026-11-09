@@ -200,7 +200,7 @@ export function ViewsManager({ open, onClose }: ViewsManagerProps) {
       labelId="views-manager-title"
       onClose={onClose}
       width={520}
-      closeLabel={t("notes.views.manager.close")}
+      closeLabel={t("common.close")}
       testId="views-manager.modal"
       bodyBleed
     >

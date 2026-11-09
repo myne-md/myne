@@ -428,7 +428,7 @@ export function ColorGroupEditor({
                   onClick={() => setEditingFilterFor(rule.id)}
                   style={ROW_TEXT_BUTTON_STYLE}
                 >
-                  {t("notes.graph.colorGroups.editRuleButton")}
+                  {t("common.edit")}
                 </button>
                 <button
                   type="button"

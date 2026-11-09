@@ -499,7 +499,7 @@ export function VaultExportModal({
                 onClick={onClose}
                 data-testid="vault-export.done"
               >
-                {t("export.vault.summary.done")}
+                {t("common.done")}
               </Button>
             </div>
           </>

@@ -360,7 +360,7 @@ export function AiReviewFlow({
         </div>
         <div style={ACTIONS}>
           <Button variant="secondary" data-testid="ai.review-back" onClick={() => setOpenNote(null)}>
-            {t("agent.review.close")}
+            {t("common.close")}
           </Button>
         </div>
       </div>
@@ -468,7 +468,7 @@ export function AiReviewFlow({
           {t("agent.review.approveAll", { count: bulkApprovable.length })}
         </Button>
         <Button variant="secondary" data-testid="ai.review-close" onClick={onClose}>
-          {t("agent.review.close")}
+          {t("common.close")}
         </Button>
       </div>
     </div>

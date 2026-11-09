@@ -168,7 +168,7 @@ export function AiExcludedFoldersBlock({
                 onClick={() => commit(includeFolder(folders, folder))}
                 style={REMOVE_STYLE}
               >
-                {t("settings.ai.excludedFoldersRemove")}
+                {t("common.remove")}
               </button>
             </div>
           ))}

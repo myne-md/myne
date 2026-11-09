@@ -441,7 +441,7 @@ export function AiHistorySheet({
                     <>
                       <input
                         data-testid="ai.conversation-rename-input"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        aria-label={t("common.rename")}
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => {
@@ -454,14 +454,14 @@ export function AiHistorySheet({
                       <button
                         type="button"
                         data-testid="ai.conversation-rename-confirm"
-                        aria-label={t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        aria-label={t("common.rename")}
                         onClick={(e) => {
                           e.stopPropagation();
                           void commitRename(row.id);
                         }}
                         style={SMALL_BUTTON}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        {t("common.rename")}
                       </button>
                     </>
                   ) : deletingId === row.id ? (
@@ -611,7 +611,7 @@ export function AiHistorySheet({
                         }}
                         style={{ ...SMALL_BUTTON, textAlign: "left" }}
                       >
-                        {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                        {t("common.rename")}
                       </button>
                       <button
                         type="button"

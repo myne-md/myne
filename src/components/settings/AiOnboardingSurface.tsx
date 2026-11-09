@@ -273,7 +273,7 @@ export function AiOnboardingSurface({
           onClick={onClose}
           data-testid="aiOnboarding.done"
         >
-          {t("aiOnboarding.done")}
+          {t("common.done")}
         </Button>
       </div>
     </ModalShell>

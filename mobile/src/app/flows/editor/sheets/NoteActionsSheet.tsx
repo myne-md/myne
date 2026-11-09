@@ -67,7 +67,7 @@ export function NoteActionsSheet({
         <>
           <div style={{ padding: "0 18px 12px", fontSize: 13, color: "var(--fg-3)" }}>{stat}</div>
           {row(copied ? t("editor.noteMenu.copied") : t("editor.noteMenu.copyToClipboard"), onCopy)}
-          {row(t("tasks.title"), onTasks, { testId: "editor.note-menu-tasks" })}
+          {row(t("common.tasks"), onTasks, { testId: "editor.note-menu-tasks" })}
           {row(t("editor.noteMenu.versionHistory"), onHistory)}
           {row(t("export.pdf.title"), onExport)}
           {drawing && (

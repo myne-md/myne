@@ -366,7 +366,7 @@ export function IdentitySetupPanel({
                 disabled={doneDisabled}
                 data-testid={testId("close-cta")}
               >
-                {t("identitySetup.doneCta")}
+                {t("common.done")}
               </Button>
             )}
           </div>

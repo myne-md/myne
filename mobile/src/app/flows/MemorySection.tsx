@@ -158,7 +158,7 @@ function MemoryRow(props: {
       <li style={ROW} data-testid="settings.memory.row-editing">
         <textarea
           data-testid="settings.memory.edit-input"
-          aria-label={t("settings.memory.editLabel")}
+          aria-label={t("common.edit")}
           value={draft}
           disabled={busy}
           onChange={(e) => setDraft(e.target.value)}
@@ -240,7 +240,7 @@ function MemoryRow(props: {
               setEditing(true);
             }}
           >
-            {t("settings.memory.editLabel")}
+            {t("common.edit")}
           </Button>
           <Button
             variant="secondary"

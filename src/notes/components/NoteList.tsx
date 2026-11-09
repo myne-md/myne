@@ -2511,7 +2511,7 @@ function PopulatedList({
         id: "rename",
         group: "edit",
         icon: "pencil",
-        label: t("notes.list.rename"),
+        label: t("common.rename"),
         onSelect: () => ctx.startRename(menu.id),
       },
       {
@@ -2650,7 +2650,7 @@ function PopulatedList({
         id: "rename",
         group: "organize",
         icon: "pencil",
-        label: t("notes.list.rename"),
+        label: t("common.rename"),
         onSelect: () => fm.startRenameFolder(node),
       },
       {
@@ -3233,7 +3233,7 @@ function PopulatedList({
         {selectedTitle === null
           ? " "
           : t("notes.list.selectionAnnouncement", {
-              title: selectedTitle.trim() === "" ? t("notes.list.untitled") : selectedTitle,
+              title: selectedTitle.trim() === "" ? t("common.untitled") : selectedTitle,
             })}
       </div>
       {fm.caseMerge !== null && (
@@ -3249,7 +3249,7 @@ function PopulatedList({
               style={HEADER_BUTTON_STYLE}
               onClick={fm.cancelCaseMerge}
             >
-              {t("notes.list.rename")}
+              {t("common.rename")}
             </button>
             <button
               type="button"

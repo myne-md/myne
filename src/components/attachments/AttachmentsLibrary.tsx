@@ -1697,8 +1697,8 @@ function ItemMenu({
           },
         ]
       : []),
-    { id: "export", label: t("attachments.library.menuExport"), onSelect: onExport },
-    { id: "rename", label: t("attachments.library.menuRename"), onSelect: onStartRename },
+    { id: "export", label: t("common.export"), onSelect: onExport },
+    { id: "rename", label: t("common.rename"), onSelect: onStartRename },
     {
       id: "delete",
       label: t("attachments.library.menuDelete"),

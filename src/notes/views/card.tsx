@@ -264,7 +264,7 @@ export function ViewCard({
           />
         )}
         <div style={CARD_TITLE_STYLE}>
-          {row.title ?? t("notes.views.cards.untitled")}
+          {row.title ?? t("common.untitled")}
         </div>
         {columns.map((col) => {
           const prop = row.values[col];

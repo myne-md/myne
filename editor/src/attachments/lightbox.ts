@@ -297,8 +297,8 @@ export function showAttachmentLightbox(opts: LightboxOptions): void {
     exportBtn.className = "cm-attach-lightbox-export";
     exportBtn.setAttribute("data-testid", "attachment-lightbox.export");
     exportBtn.setAttribute("aria-label", i18n.t("editor.attachment.lightbox.exportAria"));
-    exportBtn.title = i18n.t("editor.attachment.lightbox.export");
-    exportBtn.textContent = i18n.t("editor.attachment.lightbox.export");
+    exportBtn.title = i18n.t("common.export");
+    exportBtn.textContent = i18n.t("common.export");
     const exportId = opts.id;
     exportBtn.addEventListener("click", (e) => {
       e.stopPropagation();

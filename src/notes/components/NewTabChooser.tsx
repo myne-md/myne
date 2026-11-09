@@ -423,7 +423,7 @@ export function NewTabChooser({
                 }}
               >
                 {row.kind === "note"
-                  ? (row.title ?? t("notes.newTab.untitled"))
+                  ? (row.title ?? t("common.untitled"))
                   : row.action.label}
               </span>
               <span style={ROW_META}>{meta(row)}</span>

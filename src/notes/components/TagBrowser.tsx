@@ -432,7 +432,7 @@ export function TagBrowser({
                 style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
               >
                 <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--weight-medium)", color: "var(--accent)" }}>
-                  {r.title ?? t("notes.tagBrowser.untitled")}
+                  {r.title ?? t("common.untitled")}
                 </span>
                 {mode === "or" && r.matchedKeys.length > 0 && (
                   <span style={{ display: "inline-flex", gap: "var(--space-1)", marginInlineStart: 8 }}>
