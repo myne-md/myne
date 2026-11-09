@@ -90,7 +90,7 @@ export function mountRecordingBar(opts: RecordingBarOptions): RecordingBarHandle
   cancel.type = "button";
   cancel.className = "cm-voice-rec-cancel";
   cancel.setAttribute("data-testid", "voice-record.cancel");
-  cancel.textContent = i18n.t("editor.attachment.recording.cancel");
+  cancel.textContent = i18n.t("common.cancel");
   cancel.addEventListener("click", () => opts.onCancel());
   bar.appendChild(cancel);
 

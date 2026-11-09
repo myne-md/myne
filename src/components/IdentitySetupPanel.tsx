@@ -346,7 +346,7 @@ export function IdentitySetupPanel({
                 onClick={() => setStep("phrase")}
                 data-testid={testId("confirm-back")}
               >
-                {t("identitySetup.back")}
+                {t("common.back")}
               </Button>
             ) : null}
             <div style={{ flex: 1 }} />
@@ -357,7 +357,7 @@ export function IdentitySetupPanel({
                 onClick={() => setStep("confirm")}
                 data-testid={testId("phrase-continue")}
               >
-                {t("identitySetup.phraseContinue")}
+                {t("common.continue")}
               </Button>
             ) : (
               <Button
@@ -475,7 +475,7 @@ export function IdentitySetupPanel({
                     }}
                     data-testid={testId("recover-back")}
                   >
-                    {t("identitySetup.back")}
+                    {t("common.back")}
                   </Button>
                 )}
                 <div style={{ flex: 1 }} />
@@ -555,7 +555,7 @@ export function IdentitySetupPanel({
               style={{ alignSelf: "flex-start" }}
               data-testid={testId("cancel")}
             >
-              {t("identitySetup.back")}
+              {t("common.back")}
             </Button>
           ) : null}
         </div>

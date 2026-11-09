@@ -98,7 +98,7 @@ export function DeleteAttachmentDialog({
       onClose={deleting ? () => {} : onClose}
       labelId="delete-attachment-title"
       width={460}
-      closeLabel={t("attachments.deleteDialog.cancel")}
+      closeLabel={t("common.cancel")}
       bodyBleed
     >
       <div style={BODY_STYLE}>
@@ -134,7 +134,7 @@ export function DeleteAttachmentDialog({
           disabled={deleting}
           data-testid="delete-attachment.cancel"
         >
-          {t("attachments.deleteDialog.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="danger"

@@ -190,7 +190,7 @@ function MemoryRow(props: {
             onClick={() => setEditing(false)}
             style={LINK_BUTTON_STYLE}
           >
-            {t("settings.memory.cancel")}
+            {t("common.cancel")}
           </button>
         </div>
       </li>
@@ -488,7 +488,7 @@ export function MemorySection(props: {
                     data-testid="settings.memory.seed.remove-cancel"
                     onClick={() => setConfirmingSeedClear(false)}
                   >
-                    {t("settings.memory.cancelLabel")}
+                    {t("common.cancel")}
                   </Button>
                 </div>
               ) : (
@@ -524,7 +524,7 @@ export function MemorySection(props: {
               onClick={() => setConfirmingClear(false)}
               style={LINK_BUTTON_STYLE}
             >
-              {t("settings.memory.cancelLabel")}
+              {t("common.cancel")}
             </button>
           </>
         ) : (

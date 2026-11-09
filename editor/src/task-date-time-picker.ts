@@ -240,7 +240,7 @@ export function buildTaskDateTimeControl(initial: string): TaskDateTimeControl {
   const clear = button(
     "cm-task-field-clear",
     "editor.task-field-clear",
-    i18n.t("editor.taskField.clear"),
+    i18n.t("common.clear"),
   );
   dateSection.appendChild(clear);
   root.appendChild(dateSection);

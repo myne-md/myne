@@ -164,7 +164,7 @@ export function PasswordChangeForm({
               cursor: inFlight ? "default" : "pointer",
             }}
           >
-            {t("settings.changePassword.cancel")}
+            {t("common.cancel")}
           </button>
         )}
       </div>

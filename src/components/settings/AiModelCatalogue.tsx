@@ -442,7 +442,7 @@ function CatalogueRow(props: {
             onClick={() => cancelModelDownloadFor(props.artifact)}
             data-testid={`ai.download-cancel-${props.artifact}`}
           >
-            {t("settings.ai.downloadCancel")}
+            {t("common.cancel")}
           </Button>
         ) : (
           <>

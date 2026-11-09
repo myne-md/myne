@@ -236,7 +236,7 @@ export function BackupExportModal({
               onClick={() => void backupCancel()}
               data-testid="backup-export.cancel"
             >
-              {t("backup.export.cancel")}
+              {t("common.cancel")}
             </Button>
           </div>
         </>

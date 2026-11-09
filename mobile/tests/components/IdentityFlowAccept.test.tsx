@@ -624,7 +624,7 @@ describe("IdentityFlow name step (myne-md/myne#851 task 15)", () => {
       screen.getByTestId("identity-flow.name-input").getAttribute("aria-label"),
     ).toBe("sync.nameGate.label");
     expect(screen.getByTestId("identity-flow.name.save").textContent).toBe(
-      "sync.nameGate.save",
+      "common.continue",
     );
   });
 });

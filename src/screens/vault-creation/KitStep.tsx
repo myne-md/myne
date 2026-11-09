@@ -310,7 +310,7 @@ export function KitStep({
             icon="arrow-left"
             data-testid="create.phrase-back"
           >
-            {t("vaultCreation.kit.back")}
+            {t("common.back")}
           </Button>
         )}
         <div style={{ flex: 1 }} />

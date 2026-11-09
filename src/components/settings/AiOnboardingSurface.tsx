@@ -109,7 +109,7 @@ function DownloadCard(props: {
               onClick={() => cancelModelDownloadFor(props.artifact)}
               data-testid={`aiOnboarding.cancel.${props.artifact}`}
             >
-              {t("aiOnboarding.cancel")}
+              {t("common.cancel")}
             </Button>
           </>
         )}

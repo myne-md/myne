@@ -379,7 +379,7 @@ export function McpSection({
                     disabled={deciding !== null}
                     data-testid="settings.mcp-write-request-dismiss"
                   >
-                    {t("settings.ai.externalAccess.writeRequestDismiss")}
+                    {t("common.dismiss")}
                   </Button>
                 </div>
               </div>

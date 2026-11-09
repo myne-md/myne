@@ -729,7 +729,7 @@ function RestoreConfirm({
             data-testid="snapshots.restore-cancel"
             onClick={onCancel}
           >
-            {t("notes.snapshots.cancel")}
+            {t("common.cancel")}
           </button>
           <button
             type="button"

@@ -793,7 +793,7 @@ export function Unlock({
           {...ctaInteraction(false)}
           data-testid="unlock.resume-cta"
         >
-          <span>{t("unlock.continue")}</span>
+          <span>{t("common.continue")}</span>
         </button>
       </CenteredCard>
     );

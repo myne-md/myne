@@ -449,7 +449,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
             onClick={onCancel}
             style={CANCEL_BUTTON_STYLE}
           >
-            {t("notes.deleteConfirm.cancel")}
+            {t("common.cancel")}
           </button>
           <button
             ref={confirmRef}

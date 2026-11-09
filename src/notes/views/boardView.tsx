@@ -888,7 +888,7 @@ export function BoardView({
                     data-testid={VIEW_TESTID.boardRenameCancel}
                     onClick={() => setRenameTarget(null)}
                   >
-                    {t("notes.views.board.cancelLaneRename")}
+                    {t("common.cancel")}
                   </Button>
                 </div>
               ) : (
@@ -1004,7 +1004,7 @@ export function BoardView({
         <p style={CONFIRM_BODY_STYLE}>{t("notes.list.trashConfirmWarning")}</p>
         <div style={CONFIRM_ACTIONS_STYLE}>
           <Button variant="ghost" onClick={() => setTrashTarget(null)}>
-            {t("notes.views.board.cancel")}
+            {t("common.cancel")}
           </Button>
           <Button
             variant="danger"

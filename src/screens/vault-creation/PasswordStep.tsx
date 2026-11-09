@@ -56,7 +56,7 @@ export function PasswordStep({ error, onBack, onSubmit }: PasswordStepProps) {
         onSubmit={onSubmit}
         testIdPrefix="create"
         secondaryAction={{
-          label: t("vaultCreation.password.back"),
+          label: t("common.back"),
           onClick: onBack,
           icon: "arrow-left",
         }}

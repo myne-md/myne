@@ -77,11 +77,11 @@ export function NameStep({ value, onChange, onSubmit, onBack }: NameStepProps) {
             icon="arrow-left"
             data-testid="create.name-back"
           >
-            {t("vaultCreation.name.back")}
+            {t("common.back")}
           </Button>
           <div style={{ flex: 1 }} />
           <Button type="submit" variant="primary" data-testid="create.name-continue">
-            {t("vaultCreation.name.continue")}
+            {t("common.continue")}
           </Button>
         </div>
       </form>

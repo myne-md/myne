@@ -220,7 +220,7 @@ export function UpdateNotice({
                 onClick={onCancel}
                 data-testid="update.notice-cancel"
               >
-                {t("update.notice.cancel")}
+                {t("common.cancel")}
               </Button>
               <Button
                 variant="primary"

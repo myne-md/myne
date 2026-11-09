@@ -1670,7 +1670,7 @@ export function IdentityFlow({
           </Button>
         )}
         <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.held-cancel">
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
       </FooterBar>
     </Screen>
@@ -1770,7 +1770,7 @@ export function IdentityFlow({
       </ScreenScroll>
       <FooterBar>
         <Button variant="secondary" full={false} onClick={() => setStep("gate")}>
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
         <Button onClick={() => void createIdentity()} disabled={busy} data-testid="identity-flow.create">
           {busy ? t("identityFlow.create.working") : t("identityFlow.create.cta")}
@@ -1845,14 +1845,14 @@ export function IdentityFlow({
             setStep("home");
           }}
         >
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
         <Button
           onClick={() => void continueRegisterServer()}
           disabled={busy || registerServerUrl.trim() === ""}
           data-testid="identity-flow.register-continue"
         >
-          {t("identityHome.registerContinue")}
+          {t("common.continue")}
         </Button>
       </FooterBar>
       {busy && <BlockingOverlay title={t("identityFlow.register.working")} />}
@@ -1906,7 +1906,7 @@ export function IdentityFlow({
             setStep("register");
           }}
         >
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
         <Button
           onClick={() => void registerIdentity()}
@@ -2028,7 +2028,7 @@ export function IdentityFlow({
           </Button>
         ) : null}
         <Button variant="ghost" onClick={onCancel} data-testid="identity-flow.person-join-cancel">
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
       </FooterBar>
     </Screen>
@@ -2077,7 +2077,7 @@ export function IdentityFlow({
           onClick={onCancel}
           data-testid="identity-flow.person-join-finish-cancel"
         >
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
       </FooterBar>
     </Screen>
@@ -2210,7 +2210,7 @@ export function IdentityFlow({
             disabled={!revealed}
             data-testid="identity-flow.phrase-continue"
           >
-            {t("identityFlow.phrase.continue")}
+            {t("common.continue")}
           </Button>
         </FooterBar>
       </Screen>
@@ -2306,7 +2306,7 @@ export function IdentityFlow({
               disabled={!allCorrect}
               data-testid="identity-flow.typeback-continue"
             >
-              {t("identityFlow.phrase.continue")}
+              {t("common.continue")}
             </Button>
           )}
         </FooterBar>
@@ -2377,7 +2377,7 @@ export function IdentityFlow({
           onClick={leaveRecover}
           data-testid="identity-flow.recover-back"
         >
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
         <Button
           onClick={() => void recoverIdentity()}
@@ -2444,7 +2444,7 @@ export function IdentityFlow({
             setStep("home");
           }}
         >
-          {t("identityFlow.back")}
+          {t("common.back")}
         </Button>
         <Button
           onClick={() => void unlockIdentity()}
@@ -2807,7 +2807,7 @@ export function IdentityFlow({
                     }}
                     data-testid="identity-flow.home-forget-cancel"
                   >
-                    {t("identityFlow.forget.cancel")}
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </div>
@@ -2989,7 +2989,7 @@ export function IdentityFlow({
                 onClick={leaveAccept}
                 data-testid="identity-flow.accept-cancel"
               >
-                {t("identityFlow.back")}
+                {t("common.back")}
               </Button>
               <Button
                 onClick={() => goAcceptStep("accept-phrase")}
@@ -3170,7 +3170,7 @@ export function IdentityFlow({
                 onClick={leaveJoin}
                 data-testid="identity-flow.join-cancel"
               >
-                {t("identityFlow.back")}
+                {t("common.back")}
               </Button>
               <Button
                 onClick={() => goJoinStep("join-password")}
@@ -3258,10 +3258,10 @@ export function IdentityFlow({
             disabled={!ready}
             data-testid="identity-flow.name.save"
           >
-            {t("sync.nameGate.save")}
+            {t("common.continue")}
           </Button>
         </FooterBar>
-        {nameBusy && <BlockingOverlay title={t("sync.nameGate.save")} />}
+        {nameBusy && <BlockingOverlay title={t("common.continue")} />}
       </Screen>
     );
   };

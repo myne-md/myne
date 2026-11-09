@@ -186,7 +186,7 @@ export function CleanUnusedAttachmentsDialog({
       onClose={busy ? () => {} : onClose}
       labelId="clean-unused-title"
       width={460}
-      closeLabel={t("attachments.cleanUnused.cancel")}
+      closeLabel={t("common.cancel")}
     >
       <div style={BODY_STYLE}>
         <div>{t("attachments.cleanUnused.intro", { count: n })}</div>
@@ -224,7 +224,7 @@ export function CleanUnusedAttachmentsDialog({
           disabled={busy}
           data-testid="clean-unused.cancel"
         >
-          {t("attachments.cleanUnused.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="danger"

@@ -199,7 +199,7 @@ export function EventComposerSheet({
           {t("calendar.composer.create")}
         </Button>
         <Button variant="ghost" onClick={onClose} data-testid="calendar.composer.cancel">
-          {t("calendar.composer.cancel")}
+          {t("common.cancel")}
         </Button>
       </div>
     </Sheet>

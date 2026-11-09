@@ -139,7 +139,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
   }
 
   const backLabel =
-    entry === "settings" ? t("restore.backLabel") : t("restore.cancelLabel");
+    entry === "settings" ? t("common.back") : t("common.back");
 
   return (
     <CenteredCard>
@@ -219,7 +219,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 onClick={() => void backupCancel()}
                 data-testid="restore.cancel"
               >
-                {t("restore.working.cancel")}
+                {t("common.cancel")}
               </Button>
             </div>
           </>

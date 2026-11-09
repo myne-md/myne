@@ -740,7 +740,7 @@ function SetupBody({
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="ghost" onClick={onCancel} data-testid="import.cancel">
-          {t("notes.import.modal.cancel")}
+          {t("common.cancel")}
         </Button>
         <Button
           variant="primary"
@@ -875,7 +875,7 @@ function RunningBody({
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="secondary" onClick={onCancel} disabled={cancelling}>
-          {cancelling ? t("notes.import.modal.cancelling") : t("notes.import.modal.cancel")}
+          {cancelling ? t("notes.import.modal.cancelling") : t("common.cancel")}
         </Button>
       </div>
     </>

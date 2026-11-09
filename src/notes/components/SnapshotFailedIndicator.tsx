@@ -76,7 +76,7 @@ export function SnapshotFailedIndicator() {
         style={DISMISS_STYLE}
         onClick={() => setVisible(false)}
       >
-        {t("notes.snapshotFailed.dismiss")}
+        {t("common.dismiss")}
       </button>
     </div>
   );

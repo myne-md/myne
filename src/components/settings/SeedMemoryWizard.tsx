@@ -542,7 +542,7 @@ export function SeedMemoryWizard(props: {
           ) : null}
           <div style={ACTIONS}>
             <Button variant="ghost" onClick={close} data-testid="settings.memory.seed.cancel">
-              {t("settings.memory.seed.cancel")}
+              {t("common.cancel")}
             </Button>
             <Button
               data-testid="settings.memory.seed.continue"
@@ -554,7 +554,7 @@ export function SeedMemoryWizard(props: {
               }
               onClick={() => void generate()}
             >
-              {t("settings.memory.seed.continue")}
+              {t("common.continue")}
             </Button>
           </div>
         </div>
@@ -704,7 +704,7 @@ export function SeedMemoryWizard(props: {
                     setStep("scope");
                   }}
                 >
-                  {t("settings.memory.seed.back")}
+                  {t("common.back")}
                 </Button>
                 <Button
                   data-testid="settings.memory.seed.apply"
@@ -804,7 +804,7 @@ export function SeedMemoryRow(props: {
               data-testid="settings.memory.seed.rebuild-cancel"
               onClick={() => setConfirming(false)}
             >
-              {t("settings.memory.seed.cancel")}
+              {t("common.cancel")}
             </Button>
           </>
         ) : (

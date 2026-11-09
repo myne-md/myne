@@ -44,8 +44,6 @@
     "composer": {
       "placeholder": "Ask the AI…",
       "scopeLabel": "Working on",
-      "scopeOpenNote": "This note",
-      "scopeAllVault": "All notes",
       "scopeQuestion": "What the agent can read",
       "scopeFolders": "Folders",
       "scopeApplies": "Applies to your next message. Trashed, archived and template notes are always left out.",
@@ -201,7 +199,6 @@
       "alreadyApplied": "Applied",
       "appendFlag": "adds to the end",
       "moveFlag": "moves to another folder",
-      "vaultRoot": "Vault root",
       "newNotesHeading_one": "{{count}} new note",
       "newNotesHeading_other": "{{count}} new notes",
       "createdCount_one": "{{count}} note created.",
@@ -276,7 +273,6 @@
     },
     "download": "Download",
     "downloading": "Downloading…",
-    "cancel": "Cancel",
     "complete": "Ready",
     "retry": "Retry",
     "skip": "Skip",
@@ -284,7 +280,6 @@
   },
   "attachments": {
     "cleanUnused": {
-      "cancel": "Cancel",
       "cleaning": "Cleaning…",
       "completeTitle": "Cleanup complete",
       "deleteCta": "Delete {{count}} unused",
@@ -312,7 +307,6 @@
       "upload": "Upload"
     },
     "deleteDialog": {
-      "cancel": "Cancel",
       "confirmPrompt": "Permanently delete this attachment? This can't be undone.",
       "delete": "Delete",
       "deleting": "Deleting…",
@@ -456,7 +450,6 @@
       }
     },
     "export": {
-      "cancel": "Cancel",
       "copying": "Copying {{done}} of {{total}}…",
       "phraseNotSubstitute": "A backup alone will not get you back in if you lose your password: the file holds your notes, not your password or your identity phrase.",
       "preparing": "Preparing…",
@@ -993,7 +986,6 @@
         "noticeContainerChanged": "Compressed to {{format}}: {{from}} → {{to}}"
       },
       "convert": {
-        "cancel": "Cancel",
         "confirm": "Convert",
         "skipped": "skipped: {{note}}",
         "subtitle_one": "1 reference will be rewritten. Review before committing.",
@@ -1088,13 +1080,11 @@
       },
       "recording": {
         "barAria": "Recording voice note",
-        "cancel": "Cancel",
         "noAudio": "No audio detected. Check your microphone.",
         "saving": "Saving…",
         "stop": "Stop"
       },
       "rename": {
-        "cancel": "Cancel",
         "title": "Rename attachment"
       },
       "summary": {
@@ -1216,7 +1206,6 @@
         "title": "Meeting AI"
       },
       "barAria": "Meeting session",
-      "cancel": "Cancel",
       "chunksMissing": "Part of the meeting did not transfer, so the note has a gap. The audio that arrived is still there.",
       "clipFailed": "A part of the meeting could not be saved. The rest is still in the note.",
       "machineNotice": "This is a machine transcript of the meeting and may contain errors.",
@@ -1394,7 +1383,6 @@
           "truncated": "Summarized the first {{count}} characters.",
           "you": "You",
           "history": "History",
-          "historyCancel": "Cancel",
           "historyDelete": "Delete",
           "historyDeleteBody": "This deletes the conversation from every device the next time it connects. This can't be undone.",
           "historyDeleteTitle": "Delete conversation",
@@ -1613,7 +1601,6 @@
     "taskField": {
       "addAffordance": "Add task field",
       "addTime": "Add time",
-      "clear": "Clear",
       "dateGrid": "Choose a date",
       "dateNext": "Next month",
       "datePrev": "Previous month",
@@ -1733,7 +1720,6 @@
         "embed": "Embed: {{label}}"
       },
       "convert": {
-        "cancel": "Cancel",
         "choiceClause_one": " · {{count}} needs a choice.",
         "choiceClause_other": " · {{count}} need a choice.",
         "chooseTarget": "Choose target…",
@@ -1920,7 +1906,6 @@
         "filterPlainText": "Plain text"
       },
       "modal": {
-        "cancel": "Cancel",
         "export": "Export…",
         "includeAttachments_one": "Include {{count}} attachment",
         "includeAttachments_other": "Include {{count}} attachments",
@@ -1931,12 +1916,10 @@
       }
     },
     "egress": {
-      "cancel": "Cancel",
       "confirm": "Download",
       "title": "Download this file"
     },
     "pdf": {
-      "cancel": "Cancel",
       "continue": "Continue…",
       "title": "Export as PDF"
     },
@@ -1973,12 +1956,10 @@
         "runningCounts": "{{done}} / {{total}} {{phase}}"
       },
       "running": {
-        "cancel": "Cancel",
         "cancelling": "Cancelling…",
         "title": "Exporting…"
       },
       "setup": {
-        "cancel": "Cancel",
         "choose": "Choose…",
         "chooseFolder": "Choose a folder…",
         "destinationLabel": "Destination",
@@ -2027,7 +2008,6 @@
   },
   "notes": {
     "archive": {
-      "cancel": "Cancel",
       "count_one": "{{count}} note",
       "count_other": "{{count}} notes",
       "delete": "Delete",
@@ -2071,7 +2051,6 @@
       "none": "None"
     },
     "deleteConfirm": {
-      "cancel": "Cancel",
       "delete": "Delete",
       "title": "Delete this note?",
       "warning": "This cannot be undone."
@@ -2101,7 +2080,6 @@
     "filterBuilder": {
       "addCondition": "Add condition",
       "addFilterGroup": "Add filter group",
-      "cancel": "Cancel",
       "conditionNegate": "Condition: is or is not",
       "conditionType": "Condition: what to match",
       "conditionValue": "Condition: the value to match",
@@ -2235,7 +2213,6 @@
     "import": {
       "base": {},
       "modal": {
-        "cancel": "Cancel",
         "cancelledNotImported": "{{count}} not imported",
         "cancelledNotImported_one": "{{count}} not imported",
         "cancelledNotImported_other": "{{count}} not imported",
@@ -2478,7 +2455,6 @@
       "viewSettingsTitle": "View settings"
     },
     "newFromTemplate": {
-      "back": "Back",
       "blankNote": "Blank note",
       "createNote": "Create note",
       "createFirstTemplate": "Create a template",
@@ -2559,11 +2535,9 @@
       "savingEllipsis": "Saving…"
     },
     "snapshotFailed": {
-      "dismiss": "Dismiss",
       "message": "Couldn’t save a snapshot. Your note is saved, but its version history may be incomplete (the disk may be full)."
     },
     "snapshots": {
-      "cancel": "Cancel",
       "changeCount_one": "{{count}} change since this snapshot",
       "changeCount_other": "{{count}} changes since this snapshot",
       "changeCountPrev_one": "{{count}} change from the previous snapshot",
@@ -2605,8 +2579,6 @@
       "unpin": "Unpin"
     },
     "tagBrowser": {
-      "cancel": "Cancel",
-      "clear": "Clear",
       "combineTagsWith": "Combine tags with",
       "filtering": "Filtering…",
       "modeAll": "All",
@@ -2696,11 +2668,9 @@
         "renameLane": "Rename lane {{lane}}",
         "newLaneName": "New lane name",
         "saveLaneName": "Save lane name",
-        "cancelLaneRename": "Cancel",
         "lanesNotSaved": "The cards moved, but the lane order could not be saved.",
         "laneOrderRestored": "The lane order is back.",
         "laneOrderRestoreFailed": "The lane order could not be restored.",
-        "cancel": "Cancel",
         "archiveFailed": "The note could not be archived.",
         "trashFailed": "The note could not be moved to the trash.",
         "noGroupBy": "This board has no lane property. Choose a property to group by in view settings."
@@ -2782,7 +2752,6 @@
         "threeTwo": "3:2",
         "wide": "16:9 (wide)"
       },
-      "cancel": "Cancel",
       "cardSize": "Card size",
       "cardSizeValue": "{{size}} px",
       "columns": "Columns",
@@ -2852,7 +2821,6 @@
     }
   },
   "photoNote": {
-    "cancel": "Cancel",
     "commitNew": "Create note",
     "commitNote": "Add to this note",
     "defaultTitle": "Photo note {{date}}",
@@ -2875,6 +2843,7 @@
     "readingArrived": "The reading arrived while you were typing. It is kept below, waiting for you.",
     "untitledFile": "Photo",
     "openFailed": "The note was created, but it could not be opened.",
+    "cancel": "Cancel",
     "newNote": "New note",
     "thisNote": "This note"
   },
@@ -2895,7 +2864,6 @@
     },
     "deeplink": {
       "body": "It lives outside every vault, so Myne will not encrypt it.",
-      "cancel": "Cancel",
       "confirm": "Open",
       "failed": "The file could not be opened. It may have moved or changed.",
       "title": "Open this local file?"
@@ -2922,7 +2890,6 @@
       "confirmLabel": "Confirm master password",
       "defaultEmptyCaption": "Choose something you can remember. It cannot be reset.",
       "mismatch": "Passwords do not match.",
-      "passwordLabel": "Master password",
       "suggestPassword": "Suggest password",
       "tooShort": "Use at least {{n}} characters."
     },
@@ -3061,8 +3028,6 @@
     }
   },
   "restore": {
-    "backLabel": "Back",
-    "cancelLabel": "Back",
     "collision": {
       "body": "A vault from this backup already exists on this device. You can keep both: the restored copy appears as a separate vault in your vault list. Or you can restore now and then remove the existing vault from the vault list yourself. Removal asks you to type DELETE, and only makes sense after you confirm the restored vault opens.",
       "keepBoth": "Keep both",
@@ -3091,7 +3056,6 @@
       "versionHistory": "Version history entries: {{n}}"
     },
     "working": {
-      "cancel": "Cancel",
       "restoringProgress": "Restoring… {{done}} of {{total}}",
       "verifying": "Verifying backup…",
       "verifyingProgress": "Verifying backup… {{done}} of {{total}}"
@@ -3359,7 +3323,6 @@
       "title": "Automatic backups"
     },
     "changePassword": {
-      "cancel": "Cancel",
       "checkingStrength": "Checking strength…",
       "strengthUnavailable": "The strength check could not load, so only the minimum length is checked.",
       "confirmLabel": "Confirm new password",
@@ -3488,9 +3451,7 @@
       "periodTemplateAriaLabel": "{{period}} note template"
     },
     "deleteVault": {
-      "cancel": "Cancel",
       "caseSensitiveHint": "Case-sensitive. Type the word exactly to enable deletion.",
-      "continue": "Continue",
       "copyPrimary": "This permanently deletes this vault and every note inside it. The action cannot be undone, and your recovery phrase will not restore the data.",
       "copySecondary": "Vault keys are zeroized from memory before the files are unlinked; any orphan ciphertext that remains on disk stays unrecoverable Argon2id-wrapped junk.",
       "keychainNote": "When the deletion completes, Myne also asks your system keychain to delete the biometric unlock key it stored for this vault, on the platforms where it stores one.",
@@ -3560,7 +3521,6 @@
     },
     "hotkeys": {
       "addBindingAria": "Add a shortcut for {{command}}",
-      "cancel": "Cancel",
       "capturePrompt": "Press a key…",
       "conflictIndicator": "⚠ conflict",
       "conflictTitle": "Also used by {{commands}}",
@@ -3679,7 +3639,6 @@
       "autoTagUnavailable": "No tag model is installed yet. Turn the switch on in Settings, AI, once it is.",
       "consent": {
         "accept": "Send my notes to {{provider}}",
-        "cancel": "Cancel",
         "cannotVerifyLabel": "What Myne cannot check",
         "connectionLabel": "How it travels",
         "revokeLabel": "How to undo this",
@@ -3763,7 +3722,6 @@
       "downloadInstall": "Download",
       "downloading": "Downloading…",
       "downloadingPercent": "Downloading… {{percent}}%",
-      "downloadCancel": "Cancel",
       "downloadFailed": "The download did not finish.",
       "downloadFailedChecksum": "The download did not match its fingerprint and was rejected. Try again.",
       "sideloadDisclosure": "Developer mode also lets you point Myne at a model file you got yourself. A file you download from elsewhere is not checked by Myne, so only use one you trust.",
@@ -3881,7 +3839,6 @@
         "writeRequestLine": "{{connection}} tried to {{verb}} in {{folder}}, which it may read but not write. Nothing was changed.",
         "writeRequestLineTyped": "{{connection}} tried to {{verb}} in {{folder}}, which it may read but not write: “{{summary}}”. Nothing was changed.",
         "writeRequestAccept": "Allow {{folder}}",
-        "writeRequestDismiss": "Dismiss",
         "writeRequestAccepted": "{{folder}} is now writable by {{connection}}. Nothing else changed.",
         "writeRequestStale": "That request could not be accepted: its connection is gone, or the folder is no longer something it may read. Nothing was changed.",
         "writeRequestFailed": "Could not save that decision. Nothing was changed.",
@@ -3905,8 +3862,6 @@
       "empty": "Entries appear here when the assistant learns something during a run.",
       "deleteLabel": "Delete",
       "save": "Save",
-      "cancel": "Cancel",
-      "cancelLabel": "Cancel",
       "saveFailed": "Could not save the entry.",
       "deleteFailed": "Could not delete the entry.",
       "entryUnreadable": "Couldn't read this entry. It is still stored; delete it here or fix it in Settings.",
@@ -4437,7 +4392,6 @@
       "confirmTitle": "Update and restart Myne?",
       "confirmBody": "Your vault will be locked and Myne will restart. Downloading and installing can take a few minutes on a slow connection.",
       "confirmPrimary": "Lock vault and update",
-      "cancel": "Cancel",
       "pill": "Update available"
     },
     "updating": {
@@ -4723,8 +4677,7 @@
       "restoredToast": "Restored as a new note."
     },
     "stale": {
-      "body": "Myne hasn’t reached the sync server in several days. Your notes are saving on this device, but nothing has left it, so this is the only copy. Open Settings → Sync to see why.",
-      "dismiss": "Dismiss"
+      "body": "Myne hasn’t reached the sync server in several days. Your notes are saving on this device, but nothing has left it, so this is the only copy. Open Settings → Sync to see why."
     },
     "status": {
       "awaitingApproval": "Awaiting approval",
@@ -4815,10 +4768,7 @@
       "deviceClaimsUnverified_other": "{{count}} device claims could not be verified: the member each names did not sign them.",
       "nameUnverified": "Name not verified",
       "nameLabel": "Your display name",
-      "nameEdit": "Rename",
       "nameSave": "Save",
-      "nameClear": "Clear",
-      "nameCancel": "Cancel",
       "nameErrorEmpty": "Enter a name, or use Clear to remove yours.",
       "nameErrorTooLong": "That name is too long.",
       "nameErrorUnreadable": "The name store could not be read on this device. Nothing was saved.",
@@ -4872,8 +4822,7 @@
       "title": "Choose a display name",
       "body": "This is how the other members of this vault will see you in the member list. Your fingerprint stays beside it, and you can change the name later.",
       "label": "Your display name",
-      "checking": "Checking your name…",
-      "save": "Continue"
+      "checking": "Checking your name…"
     }
   },
   "tasks": {
@@ -4930,9 +4879,7 @@
       "medium": "Medium"
     },
     "section": {
-      "done": "Done",
       "later": "Later",
-      "none": "No date",
       "overdue": "Overdue",
       "upcoming": "Upcoming"
     },
@@ -4942,7 +4889,6 @@
     },
     "status": {
       "all": "All",
-      "done": "Done",
       "undone": "Open"
     },
     "view": {
@@ -4982,7 +4928,6 @@
       "emptyTitle": "No templates yet",
       "listLabel": "Templates",
       "newTemplate": "New template",
-      "newTemplateName": "Untitled template",
       "nameLabel": "Template name",
       "create": "Create",
       "createFailed": "Couldn't create the template. Try again.",
@@ -5001,7 +4946,6 @@
     "apply": "Apply theme",
     "applying": "Applying…",
     "byAuthor": "This link says it's by {{author}}",
-    "cancel": "Cancel",
     "collision": {
       "keepBoth": "Keep both and install as “{{name}}”",
       "question": "You already have a theme called “{{name}}”.",
@@ -5038,7 +4982,6 @@
   },
   "unlock": {
     "backToPicker": "Choose a different vault",
-    "continue": "Continue",
     "decrypting": "Decrypting…",
     "memberSubtitle": "Open this shared vault.",
     "memberNoCredential": "This shared vault was set up on another device. To open it here, accept a new invite from the vault owner: this device holds no password for it, and the recovery phrase no longer unlocks a shared vault.",
@@ -5139,7 +5082,6 @@
   },
   "vaultCreation": {
     "briefing": {
-      "back": "Back",
       "continue": "Continue to vault creation",
       "eyebrow": "New vault",
       "heading": "Before you create your vault",
@@ -5164,7 +5106,6 @@
       "why": "Why?"
     },
     "confirm": {
-      "back": "Back",
       "commit": "Create vault",
       "committing": "Saving…",
       "eyebrowLabel": "Confirm phrase",
@@ -5250,7 +5191,6 @@
     },
     "kit": {
       "accountFor": "Account number — when you add another device",
-      "back": "Back",
       "continue": "I've saved this, confirm phrase",
       "copied": "The kit is on your clipboard. Myne clears it in 30 seconds, even if you move on, as long as the app keeps running.",
       "copiedNoAutoClear": "Copied. Myne cannot clear your clipboard here, so the kit stays on it until you copy something else.",
@@ -5266,8 +5206,6 @@
       "savedToFile": "Saved. It is a plain text file holding both secrets, so keep it somewhere only you can read."
     },
     "name": {
-      "back": "Back",
-      "continue": "Continue",
       "eyebrowLabel": "Name your vault",
       "heading": "What should we call this vault?",
       "helper": "The name is stored encrypted with the vault. On this device it is shown on the startup vault picker before you unlock, so anyone who can see that screen can read it; hide vault names in Settings to turn that off. You can change it later.",
@@ -5290,7 +5228,6 @@
       }
     },
     "password": {
-      "back": "Back",
       "heading": "Choose a master password",
       "helperLead": "Myne does not store your password or recovery phrase.",
       "submit": "Generate recovery phrase"
@@ -5372,7 +5309,6 @@
       "accountLabel": "Account number (optional)",
       "accountPlaceholder": "MY-XXXX-XXXX-XXXX-XXXX-X (optional)",
       "body": "Pick the vault you want to recover. A vault that still carries its own recovery phrase can be recovered with those 24 words; one that does not says so when you pick it. You can also type your account number to jump straight to it.",
-      "cancel": "Cancel",
       "checking": "Checking…",
       "loadFailed": "No vaults could be loaded right now.",
       "loading": "Loading your vaults…",
@@ -5429,12 +5365,9 @@
       "code": "Scan the code from my other device",
       "codeBody": "A device that already has your identity shows a code; this one joins the account and waits for its approval."
     },
-    "forget": {
-      "cancel": "Cancel"
-    },
+    "forget": {},
     "lead": "An identity lets people invite you to a vault, and lets one identity own many vaults. It needs a sync server to hold your encrypted notes and reach you.",
     "skip": "Not now, use this device only",
-    "back": "Back",
     "createFailed": "Could not create the identity. Check the sync server and try again.",
     "held": {
       "title": "An identity is already on this device",
@@ -5462,7 +5395,6 @@
       "typebackLead": "Enter these four words from the identity phrase you just saved.",
       "wordNumber": "Word #{{position}}",
       "wordMismatch": "That does not match word #{{pos}}.",
-      "continue": "Continue",
       "registerCta": "Save and register",
       "registerLater": "Later",
       "registerHint": "Registering adds this identity to {{server}}, the sync server this device already uses, so people can invite you and your vaults can sync. Later keeps it on this device only, and the identity home can register it then."
@@ -5540,7 +5472,6 @@
     "pending": "This device is waiting for another device on the account to approve it.",
     "phraseTitle": "Save your identity phrase",
     "phraseWarning": "Write these 24 words down and keep them safe. This is the only time they are shown; they are the only way to recover this identity.",
-    "phraseContinue": "Continue",
     "typeBackLead": "Enter these four words from the identity phrase you just saved.",
     "typeBackMismatch": "That does not match word #{{pos}}.",
     "typeBackWordAtPosition": "Word #{{pos}}",
@@ -5551,8 +5482,7 @@
     "createAction": "Create",
     "recoverTitle": "I already have one",
     "recoverHint": "Recover it on this device with its 24-word recovery phrase.",
-    "recoverAction": "Recover",
-    "back": "Back"
+    "recoverAction": "Recover"
   },
   "personIdentityCode": {
     "copy": "Copy identity code",
@@ -5569,7 +5499,6 @@
     "invitesUnregistered": "This identity is not registered with a sync server yet, so no invitation can reach it.",
     "stepIndicator": "Step {{n}} of {{total}} · {{label}}",
     "stepVerifyOwner": "Verify the owner",
-    "stepRecoveryPhrase": "Recovery phrase",
     "stepDevicePassword": "Device password",
     "phraseHeading": "Enter your recovery phrase",
     "passwordHeading": "Password for this device",
@@ -5606,7 +5535,6 @@
     "forgetCheckbox": "I understand this identity will be removed from this device.",
     "forgetConfirm": "Forget identity",
     "forgetError": "Could not forget the identity. Try again.",
-    "registerContinue": "Continue",
     "registerSubmit": "Register",
     "registerError": "Could not register. Check the phrase and the server address, then try again.",
     "registerServerLabel": "Sync server address",
@@ -5617,12 +5545,12 @@
     "registerServerError": "That server could not be reached. Check the address and try again. Your words are still here.",
     "accountNumberHint": "Derived from your identity phrase, so it cannot be lost, and it is not a secret. Use it for support or for a server operator handoff.",
     "copyAccountNumber": "Copy account number",
-    "registerPhraseLabel": "Your identity phrase, 24 words"
+    "registerPhraseLabel": "Your identity phrase, 24 words",
+    "stepRecoveryPhrase": "Recovery phrase"
   },
   "welcome": {
     "createCta": "Create new vault",
     "repairResidue": {
-      "cancel": "Cancel",
       "cleaningUp": "Cleaning up…",
       "cleanUp": "Clean up",
       "confirmBody_one": "{{count}} file will be removed. They're already unreadable; nothing recoverable is lost.",
@@ -5638,7 +5566,8 @@
       "foundTitle": "Leftover files from an incomplete deletion",
       "partialBody_one": "{{count}} file may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
       "partialBody_other": "{{count}} files may be locked by another app (antivirus, file sync, or search indexing). Close the app and try again in a moment, or remove the vault folder manually.",
-      "partialTitle": "Some files couldn't be removed"
+      "partialTitle": "Some files couldn't be removed",
+      "cancel": "Cancel"
     },
     "repairCleanedUp_one": "Cleaned up {{count}} leftover file.",
     "repairCleanedUp_other": "Cleaned up {{count}} leftover files.",

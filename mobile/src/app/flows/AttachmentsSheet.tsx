@@ -181,7 +181,7 @@ export function AttachmentsSheet({
   // the Files page (where it sits beside the primary Upload).
   const cleanBtn = (style: React.CSSProperties) =>
     cleanup ? (
-      <button onClick={() => setCleanup(null)} style={style}>{t("attachments.cleanUnused.cancel")}</button>
+      <button onClick={() => setCleanup(null)} style={style}>{t("common.cancel")}</button>
     ) : (
       <button onClick={() => void reviewUnused()} style={style}>{t("attachments.library.cleanUnused")}</button>
     );
