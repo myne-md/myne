@@ -217,7 +217,17 @@ describeE2E("diagnostic log switch (myne-md/myne#860)", () => {
         );
 
         // The block is the real nine-field allowlist document, not a placeholder.
-        const block = await blockPreview(s);
+        // WAIT for the block to fill: the preview is rendered from a host read that
+        // lands after the panel mounts, so a single read can catch the empty
+        // placeholder (measured 2026-11-08 on a loaded seat: `expected '' to contain
+        // 'version:'`). Polling is the shape every async surface in this suite uses.
+        const block = await s.waitUntil(
+          async () => {
+            const text = await blockPreview(s);
+            return text.includes("version:") ? text : null;
+          },
+          { label: "the diagnostic block preview fills in", timeoutMs: 20_000 },
+        );
         expect(block).toContain("version:");
         expect(block).toContain("failureCode:");
         expect(block).toContain("engine:");
