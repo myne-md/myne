@@ -29,6 +29,10 @@ async function openAiPanel(page: Page): Promise<void> {
   await page.getByRole("button", { name: "Settings" }).first().click();
   await expect(page.getByText("AI", { exact: true })).toBeVisible();
   await page.getByText("AI", { exact: true }).click();
+  // The limit rows sit behind the Advanced disclosure (0.17.0 owner pass: the
+  // panel leads with the switches a user changes, not with the ones that bound
+  // them). A flow spec that skipped this row was asserting a layout nobody ships.
+  await page.getByTestId("settings.ai.advanced-row").click();
   await page.getByTestId("settings.aiLimits.budget").scrollIntoViewIfNeeded();
   await expect(page.getByTestId("settings.aiLimits")).toBeVisible();
 }

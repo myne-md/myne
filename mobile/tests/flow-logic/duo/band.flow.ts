@@ -151,12 +151,19 @@ test.describe("the unfolded band", () => {
 
     await page.getByTestId("editor.back").click();
     await expect(page.getByTestId("notes.list-drawer")).toBeVisible();
-    // The TEXT, not a row count: the dev-only seed spread contributes rows of its
-    // own, so a count is satisfied by rows this scenario never wrote, and since the
-    // autosave landed the click can also be beaten by the debounce. The typed line
-    // is the note's first body line, which is what a row shows as its snippet.
+    // The claim is the WRITE, and BOTH ledgers carry one: a note that has never
+    // been saved is flushed through `note_create`, an existing one through
+    // `note_update`/the live session patch. Reading only the update ledger is how
+    // this spec failed while the fix was already in place.
     await expect
-      .poll(async () => (await page.getByTestId("notes.row").allTextContents()).join(" | "))
+      .poll(async () =>
+        (
+          await page.evaluate(() => {
+            const w = window as unknown as { __noteCreates?: string[]; __noteUpdates?: string[] };
+            return [...(w.__noteCreates ?? []), ...(w.__noteUpdates ?? [])];
+          })
+        ).join("\n"),
+      )
       .toContain("this must reach disk before it is replaced");
   });
 

@@ -2586,14 +2586,17 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     setView("list");
   }, []);
 
-  const newNote = useCallback(() => {
+  const newNote = useCallback(async () => {
+    // Flush first: the autosave is a debounce a tap can beat, and this control
+    // replaces the buffer outright, so the line typed a moment ago would be gone.
+    if (!(await persistOpenBuffer())) return;
     // Create in the folder you're currently viewing (root → empty body).
     setEditorText(buildInitialPlaintext(normalizeFolderPath(currentFolder)));
     setEditing({ id: null });
     setEditorError(null);
     setReadingMode(false);
     setView("editor");
-  }, [currentFolder]);
+  }, [currentFolder, persistOpenBuffer]);
 
   const newDrawing = useCallback(async () => {
     if (!(await persistOpenBuffer())) return;
@@ -2616,7 +2619,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
   // sheet in its ready state - the user taps Stop when done (safer than
   // auto-arming the mic on a cold launch).
   const startCapture = useCallback((mode: CaptureMode) => {
-    newNote();
+    void newNote();
     if (mode === "voice") setRecordOpen(true);
   }, [newNote]);
   useEffect(() => {
@@ -2629,10 +2632,8 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
     return () => window.removeEventListener(CAPTURE_EVENT, onCapture);
   }, [startCapture]);
   // Apple Watch pending-capture drain (§9.18): this editor mounts on every unlock
-  // path (password / PIN / biometric / reload-probe), so draining here turns any
-  // queued watch-dictated captures into notes right after unlock.
-  // `drainPendingCaptures` self-serialises (StrictMode-safe) and is a no-op when
-  // the queue is empty; refresh the list if it created any so they appear.
+  // path, so draining here turns queued watch dictations into notes right after
+  // unlock. `drainPendingCaptures` self-serialises and no-ops when empty.
   useEffect(() => {
     const runDrain = () => {
       // Share-import drain (§9.20, SYNC-4/6): decrypt + import any files shared
@@ -3961,7 +3962,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                   )}
                   {listView === "notes" && (
                     <button
-                      onClick={newNote}
+                      onClick={() => void newNote()}
                       data-testid="notes.new-note"
                       aria-label={t("common.newnote")}
                       style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 6, height: 36, border: "none", borderRadius: 10, background: "var(--accent)", color: "var(--accent-on)", padding: "0 14px", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
@@ -5475,7 +5476,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               {renderNotesPane({ header: sizeClass === "medium", tabBar: sizeClass === "medium" })}
             </div>
             <div data-testid="workspace.detail-pane" style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {editing ? renderEditorPane() : <EmptyDetail onNew={newNote} />}
+              {editing ? renderEditorPane() : <EmptyDetail onNew={() => void newNote()} />}
             </div>
           </>
         ) : (
