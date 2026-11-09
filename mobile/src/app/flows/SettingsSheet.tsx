@@ -24,6 +24,9 @@ import { PeriodicNotesBlock } from "../../components";
 import { ColorGroupsBlock } from "../../components";
 import { AiExcludedFoldersBlock } from "../../components";
 import { AiLimitsBlock } from "../../components";
+
+/** Minimum PIN length: the Rust `pin::MIN_PIN_LEN`, and the desktop panel's constant. */
+const MIN_PIN_LEN = 6;
 import { AttachmentOcrBlock } from "../../components";
 import { AiConsentScreen } from "../../components";
 import { MemorySection } from "./MemorySection";
@@ -2026,8 +2029,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
   async function submitSetupPin() {
     setPinError(null);
-    if (pin.length < 6) {
-      setPinError(t("settings.quickUnlock.pinTooShort"));
+    if (pin.length < MIN_PIN_LEN) {
+      setPinError(t("settings.quickUnlock.errorPinTooShort", { count: MIN_PIN_LEN }));
       return;
     }
     if (!/^\d+$/.test(pin)) {
@@ -2050,7 +2053,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
       const kind = (e as { kind?: string })?.kind;
       setPinError(
         kind === "PinTooShort"
-          ? t("settings.quickUnlock.pinTooShort")
+          ? t("settings.quickUnlock.errorPinTooShort", { count: MIN_PIN_LEN })
           : kind === "PinNotDigits"
             ? t("settings.quickUnlock.errorPinNotDigits")
             : t("settings.quickUnlock.setupError"),
@@ -2565,9 +2568,9 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
         {panel === "editor" && (
           <div style={PANEL_STACK}>
             <SegmentBlock
-              label={t("settings.editor.defaultView")}
+              label={t("settings.viewMode.label")}
               options={["live", "reading", "source"]}
-              labels={[t("editor.chrome.viewMode.live"), t("settings.viewMode.optionReading"), t("settings.viewMode.optionSource")]}
+              labels={[t("settings.viewMode.optionLive"), t("settings.viewMode.optionReading"), t("settings.viewMode.optionSource")]}
               value={eff.editor_default_view_mode ?? "live"}
               onPick={(v) => writeDraftPref("editor_default_view_mode", v, () => setEditorDefaultViewMode(v))}
             />
@@ -2594,8 +2597,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 onToggle={() => writeDraftPref("editor_line_numbers", !(eff.editor_line_numbers ?? false), () => setEditorLineNumbers(!(eff.editor_line_numbers ?? false)))}
               />
               <ToggleRow
-                title={t("settings.editor.typewriter")}
-                subtitle={t("settings.editor.typewriterSubtitle")}
+                title={t("settings.focusMode.typewriterLabel")}
+                subtitle={t("settings.focusMode.typewriterHelperMobile")}
                 on={eff.editor_focus_typewriter ?? false}
                 onToggle={() => writeDraftPref("editor_focus_typewriter", !(eff.editor_focus_typewriter ?? false), () => setEditorFocusTypewriter(!(eff.editor_focus_typewriter ?? false)))}
               />
@@ -2605,7 +2608,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                 onToggle={() => writeDraftPref("editor_focus_dim_inactive", !(eff.editor_focus_dim_inactive ?? false), () => setEditorFocusDimInactive(!(eff.editor_focus_dim_inactive ?? false)))}
               />
               <ToggleRow
-                title={t("settings.editor.enableArchiving")}
+                title={t("settings.archive.label")}
+                subtitle={t("settings.archive.helper")}
                 on={!(eff.archive_disabled ?? false)}
                 onToggle={() => {
                   const nextDisabled = !(eff.archive_disabled ?? false);
@@ -2940,7 +2944,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
           <div style={{ marginTop: 4 }}>
             <Group>
               <Row first>
-                <span style={rowLabel}>{t("settings.about.version")}</span>
+                <span style={rowLabel}>{t("settings.about.sections.version")}</span>
                 {/* `__APP_VERSION__`, not a literal. `mobile/vite.config.ts`
                     injects it from `mobile/package.json` and says in its own
                     comment that this row reads it — which was not true: the
@@ -2949,7 +2953,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                     bug report from it pointed at a source tree that could not
                     contain the bug. myne-md/myne#555, `settings.panel.about`. */}
                 <span style={{ fontSize: 16, color: "var(--fg-3)" }}>
-                  {__APP_VERSION__} · {import.meta.env.MODE === "production" ? t("settings.about.buildChannelStable") : t("settings.about.dev")}
+                  {__APP_VERSION__} · {import.meta.env.MODE === "production" ? t("settings.about.updateChannelStable") : t("settings.about.dev")}
                 </span>
               </Row>
               <Row>
@@ -3069,7 +3073,7 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
                   {t("settings.quickUnlock.pinSetupHelper")}
                 </div>
                 <FieldLabel mt={14}>{t("settings.quickUnlock.methodPin")}</FieldLabel>
-                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder6")}  />
+                <SheetInput type="password" inputMode="numeric" value={pin} onChange={setPin} placeholder={t("settings.quickUnlock.pinPlaceholder", { count: MIN_PIN_LEN })}  />
                 <FieldLabel mt={12}>{t("settings.quickUnlock.confirmPin")}</FieldLabel>
                 <SheetInput type="password" inputMode="numeric" value={pinConfirm} onChange={setPinConfirm} placeholder={t("settings.quickUnlock.reenterPin")} />
                 <div style={{ marginTop: 18 }}>
