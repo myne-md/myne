@@ -10,6 +10,7 @@ import {
   reorderSequence,
   applyReorderWrite,
 } from "../../src/notes/components/itemOrderReorder";
+import { rewriteItemOrderPrefix } from "../../editor/src/host/notes/itemOrder";
 
 describe("itemOrderKey", () => {
   it("folds folder paths and keeps note UUIDs verbatim", () => {
@@ -268,5 +269,41 @@ describe("applyReorderWrite — dual-write contract (generic over order type)", 
     });
     expect(outcome).toBe("positioned");
     expect(seen).toEqual([{ "": ["a", "b"] }]);
+  });
+});
+
+describe("rewriteItemOrderPrefix — a RENAME keeps the manual order", () => {
+  // The owner's report (2026-11-08): rearrange a folder, rename it, and its
+  // position changes. `item_order` is path-keyed twice over, so a rename has to
+  // move the container KEY and every child ENTRY that names the folder.
+  it("re-keys the renamed container and every descendant container", () => {
+    const order = { "projects/": ["n1", "n2"], "projects/old/": ["n3"], "other/": ["n4"] };
+    const { next, changed } = rewriteItemOrderPrefix(order, "Projects/", "Work/");
+    expect(changed).toBe(true);
+    expect(next).toEqual({
+      "work/": ["n1", "n2"],
+      "work/old/": ["n3"],
+      "other/": ["n4"],
+    });
+  });
+
+  it("rewrites the parent's child entry, so the row keeps its slot", () => {
+    const order = { "": ["n0", "Projects/", "Zeta/"] };
+    const { next } = rewriteItemOrderPrefix(order, "Projects/", "Work/");
+    expect(next[""]).toEqual(["n0", "Work/", "Zeta/"]);
+  });
+
+  it("leaves note UUIDs alone and reports no change for an unrelated path", () => {
+    const order = { "": ["0190-uuid", "Zeta/"] };
+    const untouched = rewriteItemOrderPrefix(order, "Projects/", "Work/");
+    expect(untouched.changed).toBe(false);
+    expect(untouched.next).toBe(order);
+    const uuids = rewriteItemOrderPrefix({ "projects/": ["0190-uuid"] }, "Projects/", "Work/");
+    expect(uuids.next["work/"]).toEqual(["0190-uuid"]);
+  });
+
+  it("is a no-op for a case-only rename, which folds to the same identity", () => {
+    const order = { "projects/": ["n1"] };
+    expect(rewriteItemOrderPrefix(order, "Projects/", "PROJECTS/").changed).toBe(false);
   });
 });

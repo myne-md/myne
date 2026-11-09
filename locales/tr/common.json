@@ -1322,7 +1322,6 @@
           "copyFailed": "Kopyalanamadı",
           "copyYourMessage": "Mesajınızı kopyala",
           "emptyTitle": "Notlarınız hakkında sorun",
-          "noticeSettingsCta": "Yapay zeka ayarlarını aç",
           "viewDiff": "Değişiklikleri görüntüle",
           "revertRun": "Bu çalıştırmayı geri al",
           "diffTitle": "Önerilen değişiklikler",
@@ -1745,7 +1744,6 @@
     },
     "sortSheet": {
       "title": "Sırala",
-      "manual": "Manuel sıralama",
       "titleAsc": "Başlık · A → Z",
       "titleDesc": "Başlık · Z → A",
       "arrangement": "Benim sıralamam"
@@ -3327,9 +3325,7 @@
       "helper": "Görsel eklerden ve taranmış PDF’lerden bu cihazda metin okur, böylece arama onları içeriklerine göre bulabilir. Hiçbir şey yüklenmez. Bunu kapatmak arka plandaki metin çıkarma işlemini durdurur; hâlihazırda çıkarılmış metin korunur.",
       "errorSaveSetting": "Bu ayar kaydedilemedi.",
       "processing_one": "1 ek okunuyor…",
-      "processing_other": "{{count}} ek okunuyor…",
-      "mobileDeviceLocal": "Bu ayar cihaz başına: bu telefonun neleri dizinleyeceğine karar verir, böylece diğer cihazlarınız kendi seçimini korur.",
-      "draftUse": "Bu okuduğu metin, nota ekleyebileceğiniz bir taslak olarak da sunulur. Bir not, diğerleri gibi şifreli eşitlenir."
+      "processing_other": "{{count}} ek okunuyor…"
     },
     "autoBackup": {
       "backupFolder": "Yedekleme klasörü",
@@ -3887,8 +3883,6 @@
       "autoLockSearchPlaceholder": "Sürelerde ara…",
       "hideVaultNamesLabel": "Kilit ekranında kasa adlarını gizle",
       "hideVaultNamesHelper": "Kullanılabilir bir anahtar zinciri olan cihazlarda, bu cihaz bir kasanın kilidini bir kez açtıktan sonra kasa seçici o kasanın adını gösterir. Bu açıkken her kasa bunun yerine Kasa 2 gibi bir yer tutucu gösterir ve liste nasıl sıralanırsa sıralansın o numara kasada kalır.",
-      "hideVaultNamesErases": "Bunu açmak, burada saklanan adları okunabilir kılan anahtarları yok eder; böylece o adlar bu cihazda kurtarılamaz ve ayar açık kaldığı sürece başka bir ad yazılmaz.",
-      "hideVaultNamesResidue": "Daha önce alınmış bir kopyaya erişemez: adlar görünürken alınmış bir tam sistem yedeklemesi, bir disk imajı ya da bu diskin sistem düzeyindeki başka herhangi bir kopyası hem saklanan adları hem de anahtarlarını taşır.",
       "hideVaultNamesUnavailable": "Myne, uygulamanın bu kopyasında kasa adlarını saklayamaz, bu yüzden burada hiçbir kasa adı saklamaz ve bu seçenek açılamaz. Seçici zaten her kasa için bir yer tutucu gösteriyor.",
       "hideVaultNamesErrorRead": "Geçerli ayar okunamadı. Yeniden belirlemek için düğmeyi kapatıp açın.",
       "hideVaultNamesErrorSave": "Ayar kaydedilemedi, bu yüzden değişmedi. Açmaya çalışıyorduysanız saklanan bazı adlar çoktan yok edilmiş olabilir; tamamlamak için yeniden açın.",
@@ -3952,7 +3946,6 @@
       "turnOffError": "Hızlı kilit açma kapatılamadı",
       "biometricOnToast": "{{method}} ile hızlı kilit açma açık",
       "biometricUnavailable": "{{method}} bu cihazda kullanılamıyor.",
-      "warningBanner": "Yalnızca bir kolaylık. PIN kullanıyorsanız yeniden başlatma sonrasında parolanız yine gerekir; parmak izi ya da yüz doğrulaması yeniden başlatmayı da kapsar.",
       "biometricToggleSubtitle": "Otomatik kilit sonrası {{method}} ile kilidi aç",
       "pinOnLead": "PIN hızlı kilit açma ",
       "pinOnEmphasis": "açık",
@@ -4092,8 +4085,6 @@
         "heading": "Pijamalı hasta şoför",
         "bullet1": "Yağız şoföre çabucak güvendi",
         "bullet2": "Zıplayan zebralar şaşırtıcı biçimde çevik",
-        "spellCaption": "Yazım denetimi",
-        "spellSample": "yanlis",
         "dateTime": "Tarih ve saat",
         "toolbar": "Araç çubuğu",
         "task": "Görevler",

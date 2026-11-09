@@ -15,7 +15,6 @@ export type HoldPoint = { x: number; y: number };
  *  a hold that never moved is still the sheet. */
 export type HoldDrag = {
   onStart: (point: HoldPoint) => void;
-  onMove: (point: HoldPoint) => void;
   /** `moved` is false when the finger never left the press point. */
   onEnd: (point: HoldPoint, moved: boolean) => void;
 };
@@ -94,7 +93,6 @@ export function useHold(
       if (dragging.current) {
         // Carrying a row: a move is a target change, never a scroll.
         movedSinceHold.current = true;
-        drag?.onMove({ x: e.clientX, y: e.clientY });
         return;
       }
       if (

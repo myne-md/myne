@@ -186,25 +186,20 @@ describe("hide vault names: the disclosure", () => {
     expect(screen.queryByTestId("settings.hide-vault-names-explanation")).toBeNull();
   });
 
-  it("says what enabling destroys and that nothing further is written", () => {
-    const copy = t("settings.privacy.hideVaultNamesErases").toLowerCase();
+  it("carries the destructive sentence and no qualification beside it", () => {
+    // The two sentences that used to sit behind the `?` (what the erase cannot
+    // reach, and the carriers it misses) left the app with it and stay in
+    // `threat-model.md` §7 (`decisions/clients/0799`). What the row must still say
+    // is the ACT, in one sentence, so a reader never has to open anything to learn
+    // that turning it on destroys something.
+    const copy = t("settings.privacy.hideVaultNamesInline").toLowerCase();
     expect(copy).toContain("destroys the keys");
-    expect(copy).toContain("no further name is written");
-  });
-
-  it("names the copy erase cannot reach, rather than implying it reaches everything", () => {
-    const copy = t("settings.privacy.hideVaultNamesResidue").toLowerCase();
-    expect(copy).toContain("cannot reach");
-    // The two carriers the decision entry names: a full-system backup and a
-    // whole-disk copy. A residue sentence that mentioned neither would be a
-    // caveat with nothing in it.
-    expect(copy).toMatch(/backup/);
-    expect(copy).toMatch(/disk image/);
-    // "snapshot" is RESERVED for per-note version history
-    // (`myne-website/src/content/user-guide/_authoring.md` block 3), and
-    // `privacy-model.md` uses it in that sense two paragraphs from where this
-    // sentence is quoted. One word for two things is the defect.
-    expect(copy).not.toMatch(/snapshot/);
+    for (const gone of [
+      "settings.privacy.hideVaultNamesErases",
+      "settings.privacy.hideVaultNamesResidue",
+    ]) {
+      expect(t(gone), `${gone} is back on the row`).toBe(gone);
+    }
   });
 
   it("claims no more than the threat model allows", () => {
@@ -214,8 +209,7 @@ describe("hide vault names: the disclosure", () => {
     for (const key of [
       "settings.privacy.hideVaultNamesLabel",
       "settings.privacy.hideVaultNamesHelper",
-      "settings.privacy.hideVaultNamesErases",
-      "settings.privacy.hideVaultNamesResidue",
+      "settings.privacy.hideVaultNamesInline",
       "settings.privacy.hideVaultNamesUnavailable",
     ]) {
       const copy = t(key).toLowerCase();

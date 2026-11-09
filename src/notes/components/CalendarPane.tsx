@@ -144,6 +144,28 @@ export function CalendarPane({
   // Optimistic spans keyed by note id, so the row lands where it was dropped and
   // is put back by the reload when the write is refused.
   const [optimistic, setOptimistic] = useState<Record<string, EventSpan>>({});
+  const io = useMemo(
+    () => ({
+      readNote: noteRead,
+      writeNote: (id: string, body: string, base: string) => noteUpdate(id, body, base),
+      flushDirtyPanes: ws.flushAll,
+    }),
+    [ws],
+  );
+  /** A projected occurrence has no note: name the series instead. */
+  const refuseOccurrence = useCallback(
+    (row: CalendarRow) =>
+      setOccurrence({
+        refusal: {
+          reason: "belongs-to-series" as const,
+          seriesNoteId: seriesNoteId(row),
+          occurrenceDate: occurrenceDate(row),
+          title: row.title,
+        },
+        row,
+      }),
+    [],
+  );
   const [failure, setFailure] = useState<EventWriteRefusal | null>(null);
   /**
    * The full form's date, or `null` when it is closed.
@@ -265,11 +287,7 @@ export function CalendarPane({
         await skipOccurrence({
           noteId: seriesNoteId(row),
           occurrenceDate: occurrenceDate(row),
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
+          io,
         });
         setOccurrence(null);
       } catch (err) {
@@ -295,11 +313,7 @@ export function CalendarPane({
           noteId: seriesNoteId(row),
           occurrenceDate: occurrenceDate(row),
           time: retime,
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
+          io,
         });
         setOccurrence(null);
         setRetime("");
@@ -322,15 +336,7 @@ export function CalendarPane({
       // exceptions). Refuse it with the two honest alternatives rather than a
       // toast, and refuse BEFORE any planner runs.
       if (isProjected(gesture.row)) {
-        setOccurrence({
-          refusal: {
-            reason: "belongs-to-series",
-            seriesNoteId: seriesNoteId(gesture.row),
-            occurrenceDate: occurrenceDate(gesture.row),
-            title: gesture.row.title,
-          },
-          row: gesture.row,
-        });
+        refuseOccurrence(gesture.row);
         return;
       }
       const from = parseCivilDate(gesture.rendered.start.slice(0, 10));
@@ -349,11 +355,7 @@ export function CalendarPane({
           noteId: gesture.row.noteId,
           rendered: gesture.rendered,
           next,
-          io: {
-            readNote: noteRead,
-            writeNote: (id, body, base) => noteUpdate(id, body, base),
-            flushDirtyPanes: ws.flushAll,
-          },
+          io,
         });
         // Re-index before reloading, or the fresh read returns the OLD `start`.
         await reindexNote(gesture.row.noteId);
@@ -482,15 +484,7 @@ export function CalendarPane({
         }
         if (isProjected(row)) {
           // An appearance has no note of its own: the panel names the series.
-          setOccurrence({
-            refusal: {
-              reason: "belongs-to-series",
-              seriesNoteId: seriesNoteId(row),
-              occurrenceDate: occurrenceDate(row),
-              title: row.title,
-            },
-            row,
-          });
+          refuseOccurrence(row);
           return;
         }
         setEditing(row);
@@ -503,15 +497,7 @@ export function CalendarPane({
               // answers (edit the series, add a one-off, cancel this one) instead
               // of a menu with a fourth thing that would have no legal write.
               event.preventDefault();
-              setOccurrence({
-                refusal: {
-                  reason: "belongs-to-series",
-                  seriesNoteId: seriesNoteId(row),
-                  occurrenceDate: occurrenceDate(row),
-                  title: row.title,
-                },
-                row,
-              });
+              refuseOccurrence(row);
             }
           : undefined
       }
@@ -924,9 +910,8 @@ export function CalendarPane({
 
   return (
     <div
-      // The pane is granted no gutters (`PaneView`'s calendar branch), so this
-      // inset is the surface's own and symmetric: `space-2` all round, which puts
-      // the outer cells as far from the window edge as from each other.
+      // No gutters are granted (`PaneView`'s calendar branch), so the inset is this
+      // surface's own and symmetric: `space-2` all round.
       style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, gap: "var(--space-2)", padding: "var(--space-2)" }}
       data-testid="calendar.pane"
       data-pane={paneId}
@@ -1123,11 +1108,7 @@ export function CalendarPane({
                 noteId: editing.noteId,
                 rendered: { start: editing.start, end: editing.end, allDay: editing.allDay },
                 next: editFromPlan(plan.input),
-                io: {
-                  readNote: noteRead,
-                  writeNote: (id, body, base) => noteUpdate(id, body, base),
-                  flushDirtyPanes: ws.flushAll,
-                },
+                io,
               });
               // `note_update` does not touch the index this pane reads.
               await reindexNote(editing.noteId);

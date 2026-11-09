@@ -252,16 +252,15 @@ function HideVaultNamesRow() {
       // the act. The four limits left the screen and stay recorded in
       // `threat-model.md` §7 (`decisions/clients/0799`).
       helper={t("settings.privacy.hideVaultNamesInline")}
-      control={(helperId, explanationId) => (
+      control={(helperId) => (
         <Switch
           checked={hidden}
           onChange={busy ? undefined : (next) => void toggle(next)}
           ariaLabel={t("settings.privacy.hideVaultNamesLabel")}
-          // The row's one sentence, and only that: the explanation slot this
-          // control used to concatenate is gone with the `?`. `explanationId` is
-          // still accepted by the row's contract and is now undefined here, which
-          // is why the platform is spelled out rather than defaulted.
-          ariaDescribedBy={explanationId === undefined ? helperId : `${helperId} ${explanationId}`}
+          // The row's one sentence and nothing else: the explanation slot went
+          // with the `?`, so this row passes no `explanation` and the row hands
+          // back no `explanationId`.
+          ariaDescribedBy={helperId}
           testId="settings.hide-vault-names-toggle"
         />
       )}

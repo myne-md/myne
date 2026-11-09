@@ -600,7 +600,8 @@ export function AiChatTab({
           screens away from what the user was doing. The consent text is still
           reachable, it is the AI panel's own screen, where someone who wants to
           read it goes. A chat panel does not need to send them.
-          `ai.notice-settings` is gone from the surface and from its tests. */}
+          `ai.notice-settings` is gone; `decisions/clients/0802` reverses #970's
+          "keeping the route" half. */}
       {/* The conversation itself, shared with the agent tab. Gated on
           `ai_enabled` so the composer is reachable in the stub E2E build and in
           a no-model state, where a send surfaces the honest error turn. */}

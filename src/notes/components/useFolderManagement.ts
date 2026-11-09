@@ -48,7 +48,9 @@ import {
   type FolderArchivePlan,
   type FolderDeletePlan,
 } from "../folderActions";
+import { rewriteItemOrderPrefix } from "@myne/editor/host/notes/itemOrder";
 import { FOLDER_DRAG_MIME } from "./reorderDnd";
+import { toast } from "../../components/toast/toastStore";
 import { moveNote } from "../moveNote";
 import { writeTabDrag } from "../tabDrag";
 import { itemKey, noteItem } from "../workspaceState";
@@ -279,6 +281,22 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     [itemColors, folderIcons, writeItemColors, writeFolderIcons],
   );
 
+  /** Rewrite `item_order` through a folder-prefix transform, and persist when it
+   *  moved. */
+  const reorderRemap = useCallback(
+    (remap: (order: Record<string, string[]>) => {
+      next: Record<string, readonly string[]>;
+      changed: boolean;
+    }) => {
+      const { next, changed } = remap(itemOrder as Record<string, string[]>);
+      if (!changed) return;
+      const asMutable = next as Record<string, string[]>;
+      setItemOrder(asMutable);
+      void persistItemOrder(asMutable);
+    },
+    [itemOrder],
+  );
+
   // The latest derived tree, kept in a ref so handlers stay referentially
   // stable while still reading current subtree state (delete-emptiness etc.).
   const treeRef = useRef<FolderTree>(EMPTY_TREE);
@@ -296,7 +314,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
   const [menu, setMenu] = useState<FolderMenuState>(null);
   const [newFolder, setNewFolder] = useState<NewFolderState>(null);
   const [renamingFolderKey, setRenamingFolderKey] = useState<string | null>(null);
-  const [blockNotice, setBlockNotice] = useState<string | null>(null);
+  /** A refused folder action reports through the ONE toast stack (#238). */
+  const reportBlocked = useCallback((message: string) => {
+    toast({ message, variant: "error", testId: "notes.folder-notice" });
+  }, []);
   const [caseMerge, setCaseMerge] = useState<CaseMergeState>(null);
   const [confirmFolderDelete, setConfirmFolderDelete] =
     useState<ConfirmFolderDeleteState>(null);
@@ -425,10 +446,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // the promise to outlive being emptied, which is what the notice says.
       void registerDeliberateFolders(mutationFrom(prev, next)).then((outcome) => {
         if (outcome === "budget-full") {
-          setBlockNotice(i18n.t("notes.folderManagement.folderListFull"));
+          reportBlocked(i18n.t("notes.folderManagement.folderListFull"));
         } else if (outcome === "failed") {
           setDeliberate(prev);
-          setBlockNotice(i18n.t("notes.folderManagement.folderNotRemembered"));
+          reportBlocked(i18n.t("notes.folderManagement.folderNotRemembered"));
         }
       });
     },
@@ -466,7 +487,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       const rejection = validateFolderNameInput(name, norm);
       if (rejection !== null) {
         if (rejection === "empty") setNewFolder(null);
-        else setBlockNotice(folderInputRejectionMessage(rejection));
+        else reportBlocked(folderInputRejectionMessage(rejection));
         return;
       }
       setNewFolder(null);
@@ -546,7 +567,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // sentence is the folder-specific one rather than the neutral shared
         // string, which is what `panesNotSettledMessage` taking resolved
         // sentences is for.
-        setBlockNotice(
+        reportBlocked(
           panesNotSettledMessage(err, {
             unsettled: i18n.t("notes.folderManagement.unsettledSave"),
             failed: i18n.t("notes.folderManagement.renameFailed"),
@@ -570,13 +591,16 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // subtree. Gated on the rename having LANDED rather than on `!invalid`,
       // which is true for the refused arm too.
       if (result.invalid === true || result.failed.length > 0) {
-        setBlockNotice(i18n.t("notes.folderManagement.renameFailed"));
+        reportBlocked(i18n.t("notes.folderManagement.renameFailed"));
         return;
       }
       // Re-root the folder's color + icon onto the new path (and any descendant
       // folder's, since the rename re-roots the whole subtree) so a rename
       // never silently strips a decoration (MYND-184/185 durability).
       applyDecorationRemap((m) => rewriteFolderPrefix(m, node.path, newPath));
+      // The manual ORDER is path-keyed too: skip this and the folder's position
+      // and every child entry naming it are dropped (owner, 2026-11-08).
+      reorderRemap((order) => rewriteItemOrderPrefix(order, node.path, newPath));
       // Re-root the archived_folders set too (folder-archive) — else renaming
       // an ancestor of an archived folder would leave a stale entry and the
       // subtree would silently un-archive. Folded-prefix, same subtree as the
@@ -622,7 +646,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // residue (an empty folder back under the old name at the next unlock)
         // and says removing it is safe, rather than promising a retry that a
         // second rename cannot perform.
-        setBlockNotice(i18n.t("notes.folderManagement.deliberateWriteFailed"));
+        reportBlocked(i18n.t("notes.folderManagement.deliberateWriteFailed"));
       } else if (result.mcpScopeRewriteFailed === true) {
         // A different failure with a different consequence, so it gets its own
         // sentence rather than sharing the one above: the notes are right and the
@@ -630,10 +654,10 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
         // name the OLD path, which for a deny list means the folder it was kept
         // out of is now readable. Nothing reconciles it later, so the user is told
         // where to look instead of being told the rename is done.
-        setBlockNotice(i18n.t("notes.folderManagement.mcpScopeRewriteFailed"));
+        reportBlocked(i18n.t("notes.folderManagement.mcpScopeRewriteFailed"));
       }
     },
-    [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap],
+    [ctx, deliberate, archivedFolders, notesForOps, applyDecorationRemap, reorderRemap],
   );
 
   const commitRenameFolder = useCallback(
@@ -644,11 +668,11 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // the resulting path must fit PATH_MAX. On rejection keep the rename
       // input open (don't clear `renamingFolderKey`) + surface the notice.
       if (!isLegalSegment(newName)) {
-        setBlockNotice(folderInputRejectionMessage("illegal-segment"));
+        reportBlocked(folderInputRejectionMessage("illegal-segment"));
         return;
       }
       if (!isLegalPathLength(newPath)) {
-        setBlockNotice(folderInputRejectionMessage("too-long"));
+        reportBlocked(folderInputRejectionMessage("too-long"));
         return;
       }
       setRenamingFolderKey(null);
@@ -687,7 +711,7 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       const newPath = parent + name;
       const norm = normalizeFolderPath(newPath);
       if (norm === null) {
-        setBlockNotice(folderInputRejectionMessage("illegal-segment"));
+        reportBlocked(folderInputRejectionMessage("illegal-segment"));
         return;
       }
       // Already there — nothing to do, and reporting it as an error would be
@@ -696,18 +720,18 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
       // Into itself or its own descendant: `Projects/` cannot live inside
       // `Projects/Myne/`. Folded so a case-only spelling cannot slip past.
       if (foldSegment(parent).startsWith(foldSegment(node.path))) {
-        setBlockNotice(i18n.t("notes.folderManagement.moveIntoSelf"));
+        reportBlocked(i18n.t("notes.folderManagement.moveIntoSelf"));
         return;
       }
       if (!isLegalPathLength(norm)) {
-        setBlockNotice(folderInputRejectionMessage("too-long"));
+        reportBlocked(folderInputRejectionMessage("too-long"));
         return;
       }
       // A folder of the same folded name already in the target would merge two
       // subtrees irreversibly.
       const existing = findByFoldedKey(treeRef.current.roots, foldSegment(norm));
       if (existing !== null) {
-        setBlockNotice(i18n.t("notes.folderManagement.moveCollision"));
+        reportBlocked(i18n.t("notes.folderManagement.moveCollision"));
         return;
       }
       await applyFolderPathChange(node, norm);
@@ -891,13 +915,6 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     () => setConfirmFolderDelete(null),
     [],
   );
-  const dismissBlock = useCallback(() => setBlockNotice(null), []);
-  // Auto-dismiss the block notice.
-  useEffect(() => {
-    if (blockNotice === null) return;
-    const t = setTimeout(() => setBlockNotice(null), 4000);
-    return () => clearTimeout(t);
-  }, [blockNotice]);
 
   // ---- drag & drop ---------------------------------------------------------
   //
@@ -1295,8 +1312,6 @@ export function useFolderManagement(ctx: UseSelectedNoteReturn) {
     commitRenameFolder,
     cancelRenameFolder,
     moveFolderTo,
-    blockNotice,
-    dismissBlock,
     caseMerge,
     confirmCaseMerge,
     cancelCaseMerge,

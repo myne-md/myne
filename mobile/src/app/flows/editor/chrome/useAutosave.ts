@@ -7,11 +7,12 @@
 // still lands.
 
 import { useEffect, useRef } from "react";
+import {
+  AUTOSAVE_IDLE_MS,
+  AUTOSAVE_MAX_MS,
+} from "@myne/client-core/autosave";
 
-/** Idle delay after the last keystroke before the buffer is written. */
-export const AUTOSAVE_IDLE_MS = 1000;
-/** Longest a change may wait under continuous typing. */
-export const AUTOSAVE_MAX_MS = 10_000;
+export { AUTOSAVE_IDLE_MS, AUTOSAVE_MAX_MS };
 
 /**
  * Call `persist` `AUTOSAVE_IDLE_MS` after `idleText` stops changing, and at most

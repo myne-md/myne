@@ -19,7 +19,7 @@ describe("useHold drag", () => {
     const onEnd = vi.fn();
     const onStart = vi.fn();
     const { result } = renderHook(() =>
-      useHold(undefined, { onStart, onMove: () => {}, onEnd }),
+      useHold(undefined, { onStart, onEnd }),
     );
     act(() => result.current.handlers.onPointerDown(evt(10, 10)));
     act(() => vi.advanceTimersByTime(500));
@@ -34,7 +34,7 @@ describe("useHold drag", () => {
     vi.useFakeTimers();
     const onEnd = vi.fn();
     const { result } = renderHook(() =>
-      useHold(undefined, { onStart: () => {}, onMove: () => {}, onEnd }),
+      useHold(undefined, { onStart: () => {}, onEnd }),
     );
     act(() => result.current.handlers.onPointerDown(evt(10, 10)));
     act(() => vi.advanceTimersByTime(500));
@@ -48,7 +48,7 @@ describe("useHold drag", () => {
     vi.useFakeTimers();
     const onEnd = vi.fn();
     const { result } = renderHook(() =>
-      useHold(undefined, { onStart: () => {}, onMove: () => {}, onEnd }),
+      useHold(undefined, { onStart: () => {}, onEnd }),
     );
     act(() => result.current.handlers.onPointerDown(evt(10, 10)));
     act(() => result.current.handlers.onPointerCancel());
