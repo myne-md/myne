@@ -68,6 +68,9 @@ const WIRE_TIMEOUT_MS = 60_000;
  *  keystroke command wedges, so waiting the full minute buys nothing. */
 const SEND_KEYS_TIMEOUT_MS = 12_000;
 
+/** Text longer than this is set page-side in one act instead of typed. */
+const PASTE_ABOVE_CHARS = 120;
+
 async function wire<T>(
   baseUrl: string,
   method: "GET" | "POST" | "DELETE",
@@ -540,7 +543,13 @@ export class Element {
     } catch (e) {
       if (!(e instanceof Error) || !/did not answer/.test(e.message)) throw e;
     }
-    await this.session.execute<void>(
+    await this.setText(text);
+  }
+
+  /** Set the value in ONE page-side act: the native setter, then the two events a
+   *  controlled input listens for. */
+  private setText(text: string): Promise<void> {
+    return this.session.execute<void>(
       "var el = arguments[0], text = arguments[1];" +
         "el.focus();" +
         "var proto = Object.getPrototypeOf(el);" +
@@ -562,6 +571,17 @@ export class Element {
    *  value tracker ignores on some components (observed on the Input
    *  primitive: post-clear keystrokes APPEND) — keystrokes always land. */
   async replaceText(text: string): Promise<void> {
+    // **Long text pastes; it does not type.** Keystrokes are replayed one char at
+    // a time and the app pays a React render for each: measured 2026-11-09 on the
+    // roster's identity-code field, a 730-char code did not finish inside 180 s
+    // (`POST /element/<id>/value`, Element Send Keys, timed out three times and the
+    // page-side retry then queued behind the backlog the first one left). No user
+    // types an identity code - it is pasted - so one page-side set is both the
+    // honest and the only bounded shape.
+    if (text.length > PASTE_ABOVE_CHARS) {
+      await this.setText(text);
+      return;
+    }
     const current = await this.property<string>("value");
     await this.sendKeys("\uE003".repeat((current ?? "").length) + text);
   }
