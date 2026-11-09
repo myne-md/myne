@@ -3179,7 +3179,6 @@
       "vaultLabelSave": "Save",
       "vaultIconLabel": "ICON",
       "vaultIconDefault": "Default (wordmark)",
-      "renamedToast": "Vault renamed",
       "renameError": "Couldn't rename the vault",
       "newPasswordMismatch": "New passwords don't match.",
       "samePassword": "New password is the same as the current password.",

@@ -1315,8 +1315,6 @@ export type Panel =
   // deeper action panels (nested under a category)
   | "change-password"
   | "delete-vault"
-  | "rename"
-  | "quick-unlock"
   // MYND-555: editor format-bar customization (device-local layout).
   | "format-bar"
   // Phase-2 sync (MYND-459): the sync settings panel + its sub-screens.
@@ -1483,9 +1481,7 @@ const PANEL_PARENT: Record<Panel, Panel> = {
   ai: "root",
   about: "root",
   diagnostics: "root",
-  rename: "vault",
   "change-password": "vault",
-  "quick-unlock": "vault",
   "format-bar": "editor",
   "delete-vault": "account",
   sync: "root",
@@ -1509,9 +1505,7 @@ const PANEL_DEPTH: Record<Panel, number> = {
   ai: 1,
   about: 1,
   diagnostics: 1,
-  rename: 2,
   "change-password": 2,
-  "quick-unlock": 2,
   "format-bar": 2,
   "delete-vault": 2,
   sync: 1,
@@ -1545,9 +1539,7 @@ const PANEL_TITLE: Record<Panel, string> = {
   ai: "settings.shell.panels.ai",
   about: "settings.shell.panels.about",
   diagnostics: "settings.shell.panels.diagnostics",
-  rename: "settings.panelTitle.vaultName",
   "change-password": "settings.changePassword.title",
-  "quick-unlock": "settings.quickUnlock.title",
   "format-bar": "settings.toolbarCustomize.label",
   "delete-vault": "settings.deleteVault.heading",
   sync: "settings.shell.panels.sync",
@@ -1789,6 +1781,8 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
   }
 
   const [renameText, setRenameText] = useState("");
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameSaved, setRenameSaved] = useState(false);
 
   /** Optimistic prefs setter: reflect instantly, persist, revert the one key on
    *  failure. Deliberately NOT named `writePref`: that is the IPC chokepoint in
@@ -2015,15 +2009,26 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
     writeDraftPref("icon", name, () => setVaultIcon(name));
   };
 
+  // The field shows the SAVED name: entering the panel seeds it from the vault's
+  // own label, and a save re-seeds it from the value the pref now holds.
+  useEffect(() => {
+    if (panel !== "vault") return;
+    setRenameText(eff.label ?? "");
+  }, [panel, eff.label]);
+
   async function submitRename() {
     const label = renameText.trim();
+    setRenameBusy(true);
+    setRenameSaved(false);
     try {
       if (HAS_TAURI) await setVaultLabel(label.length > 0 ? label : null);
       setDraft((d) => ({ ...d, label: label.length > 0 ? label : null }));
-      setToast(t("settings.vault.renamedToast"));
-      setPanel("vault");
+      // The notice is the feedback: a toast would say it once and vanish.
+      setRenameSaved(true);
     } catch {
       setToast(t("settings.vault.renameError"));
+    } finally {
+      setRenameBusy(false);
     }
   }
 
@@ -2376,19 +2381,35 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
         {panel === "vault" && (
           <div style={{ marginTop: 4 }}>
             <Group>
-              <Row
-                first
-                onClick={() => {
-                  setRenameText(eff.label ?? "");
-                  setPanel("rename");
-                }}
-              >
-                <span style={rowLabel}>{t("settings.panelTitle.vaultName")}</span>
-                <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 16, color: "var(--fg-3)" }}>{vaultDisplayLabel(eff.label)}</span>
-                  <RowChevron />
-                </span>
-              </Row>
+              {/* A field, not a drill-down, as on desktop: a name is one line, and
+                  the panel hid the sentence about other devices. */}
+              <div style={{ padding: "12px 14px" }} data-testid="settings.vault-name">
+                <div style={{ fontSize: 16, color: "var(--fg-1)" }}>{t("settings.panelTitle.vaultName")}</div>
+                <div style={{ fontSize: 12, color: "var(--fg-3)", marginTop: 2, lineHeight: 1.4 }}>
+                  {t("settings.vault.vaultLabelHelper")}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <SheetInput
+                    value={renameText}
+                    onChange={setRenameText}
+                    placeholder={t("settings.vault.vaultLabelPlaceholder")}
+                  />
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <Button onClick={() => void submitRename()} disabled={renameBusy}>
+                    {t("settings.vault.vaultLabelSave")}
+                  </Button>
+                </div>
+                {renameSaved && (
+                  <div
+                    role="status"
+                    data-testid="settings.vault-rename-notice"
+                    style={{ marginTop: 10, fontSize: 12, lineHeight: 1.5, color: "var(--fg-3)" }}
+                  >
+                    {t("settings.vault.vaultLabelRenameNotice")}
+                  </div>
+                )}
+              </div>
               <Row onClick={() => setPanel("change-password")}>
                 <span style={rowLabel}>{t("common.changepassword")}</span>
                 <RowChevron />
@@ -3043,19 +3064,6 @@ export function SettingsSheet({ vaultId, onClose, onLock, onDeleteVaultSuccess, 
 
             <div style={{ marginTop: 16, textAlign: "center", fontFamily: "var(--font-mono)", fontSize: 11, color: "var(--line-3)" }}>
               {t("settings.footerTagline")}
-            </div>
-          </div>
-        )}
-
-        {panel === "rename" && (
-          <div>
-            <FieldLabel mt={4}>{t("settings.panelTitle.vaultName")}</FieldLabel>
-            <SheetInput value={renameText} onChange={setRenameText} autoFocus placeholder={vaultDisplayLabel(null)} />
-            <div style={{ marginTop: 14, fontSize: 13, lineHeight: 1.5, color: "var(--fg-3)" }}>
-              {t("settings.vault.renameHelper")}
-            </div>
-            <div style={{ marginTop: 18 }}>
-              <Button onClick={submitRename}>{t("settings.vault.vaultLabelSave")}</Button>
             </div>
           </div>
         )}
