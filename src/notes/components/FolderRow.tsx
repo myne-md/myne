@@ -280,9 +280,9 @@ export type FolderRowProps = {
   onFolderReorderLeave?: (key: string) => void;
   /** A dragged folder was dropped relative to this row (reorder). */
   onFolderReorderDrop?: (node: FolderNode, place: "above" | "below") => void;
-  /** myne#281 — a folder dropped INTO this one (the middle-half zone). The
-   *  second argument is the source path read back from the `dataTransfer`, which
-   *  survives a `dragend` that cleared the drag's ref. */
+  /** myne#281: a folder dropped INTO this one (the middle-half zone). The second
+   *  argument is the source path read back from the `dataTransfer`, which survives
+   *  a `dragend` that cleared the drag's ref. */
   onDropFolderInto?: (node: FolderNode, draggedPath: string | null) => void;
   /** Any drag originating from this row ended (cleanup transient UI). */
   onDragEnd?: () => void;

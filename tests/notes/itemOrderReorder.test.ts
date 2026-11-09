@@ -272,7 +272,7 @@ describe("applyReorderWrite — dual-write contract (generic over order type)", 
   });
 });
 
-describe("rewriteItemOrderPrefix — a RENAME keeps the manual order", () => {
+describe("rewriteItemOrderPrefix, a RENAME keeps the manual order", () => {
   // The owner's report (2026-11-08): rearrange a folder, rename it, and its
   // position changes. `item_order` is path-keyed twice over, so a rename has to
   // move the container KEY and every child ENTRY that names the folder.
