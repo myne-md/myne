@@ -6129,6 +6129,8 @@
       "repeatDay": "Day of the month",
       "repeatLastDay": "The last day",
       "repeatOrdinal": "Which one",
+      "decrease": "Decrease {{label}}",
+      "increase": "Increase {{label}}",
       "remind": "Remind me, at most {{days}} days before",
       "remindNone": "No reminder",
       "leadBeyondHorizon": "A reminder reaches at most {{days}} days ahead. Pick a shorter lead.",

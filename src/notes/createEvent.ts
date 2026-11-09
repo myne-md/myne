@@ -79,7 +79,7 @@ export function buildEventNoteBytes(input: NewEventInput): Uint8Array {
  * `folder` defaults to the VAULT ROOT, and that is the fix rather than an
  * omission (owner, 2026-11-08). A default of `Calendar/` created a folder
  * nobody asked for on the first event and then kept it alive through the
- * deliberate-folder registry even after every event in it was deleted — and
+ * deliberate-folder registry even after every event in it was deleted, and
  * because `.ics` import already passed `null`, the two halves of one feature
  * filed the same note in two different places. `kind` is an event's identity,
  * so nothing needs a folder of its own: a caller that wants one names it.

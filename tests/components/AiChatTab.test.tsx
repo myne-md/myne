@@ -1729,7 +1729,7 @@ describe("AiChatTab: one line, and one press to the full text (issue #970, item 
     // the sentence above it already names the provider, and a Settings door in a
     // chat panel is a control three screens away from what the user was doing.
     // Asserted with the handler PRESENT, because the old test could pass for the
-    // wrong reason — a shell with no Settings rendered no button either way.
+    // wrong reason, a shell with no Settings rendered no button either way.
     backendClass = "in_process_local";
     surfaceState = { kind: "available" };
     render(<AiChatTab onOpenSettings={vi.fn()} />);

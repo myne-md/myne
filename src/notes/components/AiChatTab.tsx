@@ -598,7 +598,7 @@ export function AiChatTab({
           the reader had just been told one line earlier; and putting a Settings
           door in the middle of a chat panel is a control whose target is three
           screens away from what the user was doing. The consent text is still
-          reachable — it is the AI panel's own screen, where someone who wants to
+          reachable, it is the AI panel's own screen, where someone who wants to
           read it goes. A chat panel does not need to send them.
           `ai.notice-settings` is gone from the surface and from its tests. */}
       {/* The conversation itself, shared with the agent tab. Gated on

@@ -76,7 +76,7 @@ export async function noteCreate(
   // **Registered in the index HERE, because this is the one line every create
   // path crosses** (myne-md/myne#1037). `note_create` upserts the SEARCH index
   // and nothing else, so a note nobody opens had no property row until some
-  // later reconcile — and the note that is never opened is exactly what the
+  // later reconcile, and the note that is never opened is exactly what the
   // calendar writes into: a cell click produced a note the grid could not see,
   // and it stayed invisible until the app was restarted. The three call sites
   // that did remember (`sidebarState`'s new note and its duplicate) were doing

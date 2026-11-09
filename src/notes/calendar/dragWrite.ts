@@ -156,15 +156,9 @@ export async function applyEventMove(args: {
   await commitEventWrite({ noteId, source, body: decoder.decode(bytes), io });
 }
 
-/**
- * Read the note and refuse unless it still says what the row was drawn from.
- *
- * The two writers in this directory (a drag and a form edit) patch different
- * fields but owe the same three steps before they may: flush the panes holding
- * unsaved keystrokes, read, and verify the value-anchor. Kept here rather than
- * copied, because a second copy of "check the anchor" is a second place the check
- * can be dropped.
- */
+/** Read the note and refuse unless it still says what the row was drawn from.
+ *  Both writers in this directory owe the same three steps (flush, read, verify),
+ *  and a second copy of the anchor check is a second place it can be dropped. */
 export async function openEventWrite(args: {
   readonly noteId: string;
   readonly rendered: EventSpan;
@@ -184,13 +178,9 @@ export async function openEventWrite(args: {
   return source;
 }
 
-/**
- * Write `body` over `source`, refusing when disk moved past `source`.
- *
- * `source` is the pre-image the patches were computed from, so its hash is the
- * expected-base guard: a pull-apply between the read and this write turns the
- * write into a named refusal instead of an overwrite.
- */
+/** Write `body` over `source`, refusing when disk moved past it: the pre-image's
+ *  hash is the expected-base guard, so a pull-apply between the read and the write
+ *  is a named refusal rather than an overwrite. */
 export async function commitEventWrite(args: {
   readonly noteId: string;
   readonly source: string;

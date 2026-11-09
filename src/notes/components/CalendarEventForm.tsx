@@ -72,6 +72,10 @@ export type EventFormValues = {
   readonly calendar: string | null;
   readonly repeat: RecurrenceRule | null;
   readonly remind: ReminderChoice | null;
+  /** The note carries a `repeat:`/`remind:` this control cannot represent (a
+   *  hand-written `1w`). The writer must leave that line ALONE: `null` deletes it. */
+  readonly repeatUntouched?: boolean;
+  readonly remindUntouched?: boolean;
 };
 
 /** Which field failed, and why. `field` is what the surface focuses. */
@@ -133,11 +137,8 @@ function parseRepeat(raw: string): RecurrenceRule | null {
   return parsed.ok ? parsed.rule : null;
 }
 
-/**
- * The form's values for a row the calendar is already showing. A row carries the
- * emitted forms, so this reads the values the note holds rather than interpreting
- * the vocabulary a second time.
- */
+/** The form's values for a row the calendar is already showing, read from the
+ *  emitted forms rather than by interpreting the vocabulary a second time. */
 export function formFromRow(row: {
   readonly title: string | null;
   readonly start: string;
@@ -148,6 +149,9 @@ export function formFromRow(row: {
 }): EventFormValues {
   const start = parseEventInstant(row.start);
   const end = row.end == null ? null : parseEventInstant(row.end);
+  // `== null`: a row from an older host carries `undefined` here.
+  const repeat = row.repeat == null ? null : parseRepeat(row.repeat);
+  const remind = row.remind == null ? null : parseReminderLead(row.remind);
   return {
     title: row.title ?? "",
     startDate: start === null ? row.start.slice(0, 10) : formatCivilDate(start.date),
@@ -155,10 +159,10 @@ export function formFromRow(row: {
     endDate: end === null ? null : formatCivilDate(end.date),
     endTime: end === null ? null : end.time,
     calendar: row.calendar ?? null,
-    // `== null` rather than `=== null`: a row from an older host, and every
-    // fixture written before a field existed, carries `undefined` here.
-    repeat: row.repeat == null ? null : parseRepeat(row.repeat),
-    remind: row.remind == null ? null : parseReminderLead(row.remind),
+    repeat,
+    remind,
+    repeatUntouched: row.repeat != null && repeat === null,
+    remindUntouched: row.remind != null && remind === null,
   };
 }
 
@@ -210,8 +214,18 @@ export function planEventForm(
       start,
       end,
       calendar: values.calendar,
-      repeat: values.repeat === null ? null : formatRecurrenceRule(values.repeat),
-      remind: values.remind === null ? null : values.remind.raw,
+      repeat:
+        values.repeatUntouched === true
+          ? undefined
+          : values.repeat === null
+            ? null
+            : formatRecurrenceRule(values.repeat),
+      remind:
+        values.remindUntouched === true
+          ? undefined
+          : values.remind === null
+            ? null
+            : values.remind.raw,
     },
   };
 }
@@ -247,8 +261,8 @@ export function CalendarEventForm({
   onClose,
 }: {
   readonly initial: EventFormValues;
-  /** Heading only: both modes write through the same plan, so an edit cannot
-   *  produce a record a create would not. */
+  /** Both modes write through the same plan, so an edit cannot produce a record
+   *  a create would not. */
   readonly mode?: "create" | "edit";
   readonly onSubmit?: (values: EventFormValues) => Promise<void> | void;
   readonly onClose: () => void;
@@ -415,9 +429,8 @@ export function CalendarEventForm({
             <div style={{ display: "flex", gap: "var(--space-2)" }}>
               <CountField
                 label={t("calendar.form.repeatDay")}
-                // A "last day" rule has no number to step. The control shows 31
-                // and a step turns it back into a numbered rule, which is what
-                // the button beside it toggles to anyway.
+                // A "last day" rule has no number to step; stepping makes it
+                // numbered again, which is what the button beside it does anyway.
                 value={values.repeat.day === "last" ? 31 : values.repeat.day}
                 min={1}
                 max={31}

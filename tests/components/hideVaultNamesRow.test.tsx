@@ -178,10 +178,9 @@ describe("hide vault names: the disclosure", () => {
 
   it("draws no question mark and no popover at all", () => {
     // The `?` and its three paragraphs are GONE (owner, 2026-11-08): the popover
-    // was the noise, not its wording. What left the screen is stated verbatim in
-    // `myne-agents/docs/threat-model.md` §5's hide-vault-names bullet, which is
-    // where a security claim is read; the row keeps the one sentence that is the
-    // ACT (asserted right below, and required since #411).
+    // was the noise, not its wording. The four limits stay recorded in
+    // `myne-agents/docs/threat-model.md` §7 (`decisions/clients/0799`), and the
+    // row keeps the one sentence that is the ACT (required since #411).
     mountPanel();
     expect(screen.queryByTestId("settings.hide-vault-names-explain")).toBeNull();
     expect(screen.queryByTestId("settings.hide-vault-names-explanation")).toBeNull();

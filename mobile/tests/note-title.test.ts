@@ -28,7 +28,7 @@ describe("deriveTitleSnippet", () => {
 
   it("handles a note that is only a title line (no snippet)", () => {
     // The single line is the snippet and there is nothing after it, so the note
-    // reads as untitled with its first line as the second line — which is what
+    // reads as untitled with its first line as the second line, which is what
     // desktop shows for the same bytes.
     expect(deriveTitleSnippet("# Only a heading")).toEqual({ title: "", snippet: "Only a heading" });
   });

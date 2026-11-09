@@ -27,6 +27,7 @@ import {
   evictClosedTabs,
   isRestoringScroll,
   recallScroll,
+  readerMovedRecently,
   rememberScroll,
 } from "../scrollMemory";
 import { applyScrollAnchor } from "../scrollAnchorApply";
@@ -1109,6 +1110,12 @@ export function PaneView({
         sc.dataset.scrollRestore = "skip-top";
         return;
       }
+      // The armed offset above only knows what the ANCHOR said. A reader who has
+      // scrolled since is somewhere else on purpose, and this restore is late.
+      if (readerMovedRecently(noteId, 400) && sc !== null && sc.scrollTop > 4) {
+        sc.dataset.scrollRestore = "skip-reader-moved";
+        return;
+      }
       applyScrollAnchor(v, anchor, noteId);
     };
 
@@ -1209,6 +1216,14 @@ export function PaneView({
         const noteId = activeIdRef.current;
         if (view === null || noteId === null) {
           scroller.dataset.scrollRo = "skip-null";
+          return;
+        }
+        // A scrollbar APPEARING shrinks `clientWidth` exactly like a narrower
+        // pane does, and the reader who caused it was scrolling a note that just
+        // grew past a screen. Restoring then drags them back up to where the
+        // anchor was before that scroll.
+        if (readerMovedRecently(noteId)) {
+          scroller.dataset.scrollRo = "skip-reader-moved";
           return;
         }
         const anchor = recallScroll(noteId);
@@ -2264,7 +2279,7 @@ export function PaneView({
       // The calendar fills its pane and takes NO gutters: a month grid is the
       // widest surface in the product, and `tabKinds` gives it the whole surface
       // on entry (both sidebars close) so the reading measure would only take
-      // width back off it — 48px of a layout that is already all grid. The task
+      // width back off it, 48px of a layout that is already all grid. The task
       // list keeps its gutters because it is a list of lines; this is the second
       // full-bleed body beside the graph.
       return {

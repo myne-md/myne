@@ -1,24 +1,11 @@
 // The calendar's date, time and count fields (myne-md/myne#1037).
 //
-// An event form is the one surface in the product where a DATE is the answer to a
-// question the user is being asked, and it shipped with `<input type="date">`,
-// `type="time"` and `type="number">`. Those are WebView widgets: they look like
-// whatever the platform's form controls look like, they ignore every token in the
-// design system, they cannot be themed (a custom palette reaches none of them),
-// and they differ between the desktop app, the browser client and the phone. The
-// owner's report is exactly that: "the date pickers are not our components".
-//
-// **Why calendar fields rather than general primitives.** These are the only date
-// and time fields in the shared tree — `rg 'type="date"' src` returns this form
-// and nothing else — so a `primitives/` module would be an abstraction over one
-// caller. They live beside the grid math they reuse instead.
-//
-// **What they reuse.** The month matrix is `grid.ts`'s, not a second calendar: a
-// picker whose week starts on a different day from the pane's would be two
-// answers to "which day is this". The displayed forms are
-// `datetimeFormat.ts`'s, so a user who set `dd/mm/yyyy` reads the same date here
-// as in the note. The emitted value is still the canonical `YYYY-MM-DD` /
-// `HH:MM` the dialect stores — the field only changes what is READ.
+// `<input type="date">` and its siblings are WebView widgets: they ignore every
+// design token, a custom palette reaches none of them, and they differ between the
+// desktop app, the browser client and the phone. They live here rather than in
+// `primitives/` because this form is their only caller, and they reuse `grid.ts`
+// for the month matrix and `datetimeFormat` for what the user reads, so a picker
+// cannot disagree with the pane about which day is which.
 
 import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -435,6 +422,7 @@ export function CountField({
   onChange: (next: number) => void;
   testId: string;
 }) {
+  const { t } = useTranslation();
   const clamp = (next: number): number => Math.max(min, Math.min(max, next));
   return (
     <div
@@ -445,7 +433,7 @@ export function CountField({
     >
       <IconButton
         icon="minus"
-        label={label}
+        label={t("calendar.form.decrease", { label })}
         iconSize={13}
         bordered
         disabled={value <= min}
@@ -461,7 +449,7 @@ export function CountField({
       </span>
       <IconButton
         icon="plus"
-        label={label}
+        label={t("calendar.form.increase", { label })}
         iconSize={13}
         bordered
         disabled={value >= max}

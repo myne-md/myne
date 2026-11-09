@@ -210,13 +210,11 @@ export function HideVaultNamesBlock({ onResolved }: HideVaultNamesBlockProps): R
             {/* The label, and ONE sentence under it (owner, 2026-11-08). The
                 info sheet that used to hang off the title is gone on BOTH clients
                 on the same day and for the same reason: three qualifying
-                paragraphs behind a `?` are the noise, not the wording. Nothing is
-                lost from the record either — the threat model's §5
-                hide-vault-names bullet states all four limits verbatim, and it is
-                the place a security claim is read.
+                paragraphs behind a `?` are the noise, not the wording. The four
+                limits stay recorded in `threat-model.md` §7
+                (`decisions/clients/0799`).
                 `tests/hide-vault-names.test.ts` pins that this row and the
-                desktop panel name the SAME locale keys, so a client that kept the
-                sheet would fail there rather than drift. */}
+                desktop panel name the SAME locale keys. */}
             <div style={TITLE_ROW_STYLE}>
               <div style={rowLabel}>{t("settings.privacy.hideVaultNamesLabel")}</div>
             </div>

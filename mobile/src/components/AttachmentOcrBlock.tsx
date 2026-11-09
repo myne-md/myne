@@ -96,7 +96,7 @@ export function AttachmentOcrBlock({ enabled }: { enabled: boolean }) {
       {/* One helper line, the same one desktop prints (owner, 2026-11-08).
           This block used to add two more: "this one is per device" and a
           paragraph about the extracted text being offered as a draft. Both were
-          true and both were duplication — the first restates what the toggle's
+          true and both were duplication, the first restates what the toggle's
           own state already means on a phone-only surface, and the second describes
           another screen's behaviour (the draft sheet) inside a settings row. */}
       <div style={HINT_STYLE} data-testid="settings.attachmentOcr.helper">

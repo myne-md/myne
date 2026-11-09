@@ -289,7 +289,7 @@ const PREVIEW_BANDS: Record<EditorTopicId, readonly PreviewBand[]> = {
   // Writing is EMPTY (owner, 2026-11-08). Its bands were the note specimen and a
   // spell demo, and neither answers a question the topic asks: the specimen is
   // the same note `text` already draws one tab to the left, and a squiggle under
-  // a misspelled word is not something a user decides by looking at it — they
+  // a misspelled word is not something a user decides by looking at it, they
   // turn spell check on and see it in their own note. So the column is the
   // controls' width here, exactly as it already is for `periodic`/`calendar`.
   writing: [],
