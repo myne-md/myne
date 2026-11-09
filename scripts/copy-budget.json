@@ -1,0 +1,212 @@
+{
+  "aliases": {
+    "aiOnboarding.done": {
+      "owner": "common.done",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "attachments.library.clearSearchAriaLabel": {
+      "owner": "common.clearsearch",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "calendar.composer.cancel": {
+      "owner": "common.cancel",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "calendar.today": {
+      "owner": "common.today",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "commands.actions.closeTab.label": {
+      "owner": "common.closetab",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "commands.actions.emptyTrash.label": {
+      "owner": "common.emptytrash",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "commands.actions.newFolder.label": {
+      "owner": "common.newfolder",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "commands.actions.newNote.label": {
+      "owner": "common.newnote",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "editor.chrome.rightPanel.tabs.tasks": {
+      "owner": "common.tasks",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "editor.taskField.title.due": {
+      "owner": "common.duedate",
+      "reason": "Reached through an interpolated prefix (`editor.taskField.title.${kind}`), so no call site names it and the catalogue entry is the only place the field label can live."
+    },
+    "identityHome.stepRecoveryPhrase": {
+      "owner": "common.recoveryphrase",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "invites.empty": {
+      "owner": "common.noinvitationsyet",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "invites.retry": {
+      "owner": "common.tryagain",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "notes.import.modal.closeAriaLabel": {
+      "owner": "common.close",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "notes.newTab.places.tasks": {
+      "owner": "common.tasks",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "notes.newTab.places.today": {
+      "owner": "common.today",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "notes.pane.tasksTab": {
+      "owner": "common.tasks",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "photoNote.cancel": {
+      "owner": "common.cancel",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "photoNote.newNote": {
+      "owner": "common.newnote",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "photoNote.thisNote": {
+      "owner": "common.thisnote",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    },
+    "plainFile.importLocked": {
+      "owner": "common.thevaultislockedunlockitthentryagain",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.account.numberLabel": {
+      "owner": "common.accountnumber",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.changePassword.title": {
+      "owner": "common.changepassword",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.customThemes.cancel": {
+      "owner": "common.cancel",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.customThemes.export": {
+      "owner": "common.export",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.dailyNotes.sectionPeriodic": {
+      "owner": "common.periodicnotes",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.editor.sections.tasks": {
+      "owner": "common.tasks",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.editor.topics.periodic": {
+      "owner": "common.periodicnotes",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.memory.seed.back": {
+      "owner": "common.back",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.memory.seed.cancel": {
+      "owner": "common.cancel",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.memory.seed.continue": {
+      "owner": "common.continue",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.storage.exportLabel": {
+      "owner": "common.export",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "settings.vault.changePasswordHeading": {
+      "owner": "common.changepassword",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "sync.devices.platform.unknown": {
+      "owner": "common.thisdevice",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "sync.join.cancel": {
+      "owner": "common.cancel",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "vaultCreation.orchestrator.closePrompt.cancelLabel": {
+      "owner": "common.cancel",
+      "reason": "A per-surface key reached through an indirection this guard cannot follow (a label map, a command palette entry), so the value is shared with `common.*` while the key stays local."
+    },
+    "welcome.repairResidue.cancel": {
+      "owner": "common.cancel",
+      "reason": "A mobile copy spec resolves this key by name while `common.*` owns the value, so the key stays as an alias and the spec keeps proving the surface reaches a real catalogue entry."
+    }
+  },
+  "surfaces": {
+    "src/components/settings/settingsTopics.ts": 182,
+    "src/components/settings/AboutPanel.tsx": 1252,
+    "src/components/settings/AccountPanel.tsx": 1057,
+    "src/components/settings/AiModelCatalogue.tsx": 410,
+    "src/components/settings/AiOnboardingSurface.tsx": 511,
+    "src/components/settings/AiPanel.tsx": 4078,
+    "src/components/settings/AiProviderConsent.tsx": 227,
+    "src/components/settings/AppearancePanel.tsx": 1095,
+    "src/components/settings/ArchiveSettings.tsx": 284,
+    "src/components/settings/AttachmentCompressionSettings.tsx": 366,
+    "src/components/settings/AttachmentOcrSettings.tsx": 284,
+    "src/components/settings/AutomaticBackupBlock.tsx": 507,
+    "src/components/settings/BarCustomizeSettings.tsx": 177,
+    "src/components/settings/BrowserExtensionsPanel.tsx": 18,
+    "src/components/settings/CalendarSettings.tsx": 444,
+    "src/components/settings/CliAccessSettings.tsx": 1207,
+    "src/components/settings/CliPanel.tsx": 3,
+    "src/components/settings/ConnectedExtensions.tsx": 212,
+    "src/components/settings/CustomizeList.tsx": 32,
+    "src/components/settings/DateTimeSettings.tsx": 607,
+    "src/components/settings/DefaultViewModeSettings.tsx": 178,
+    "src/components/settings/DiagnosticsPanel.tsx": 1206,
+    "src/components/settings/EditorPanel.tsx": 509,
+    "src/components/settings/FilesPanel.tsx": 28,
+    "src/components/settings/FocusModeSettings.tsx": 248,
+    "src/components/settings/FolderNotesSettings.tsx": 365,
+    "src/components/settings/HelperDisclosure.tsx": 23,
+    "src/components/settings/HotkeysPanel.tsx": 687,
+    "src/components/settings/LanguageSelect.tsx": 48,
+    "src/components/settings/LineNumbersSettings.tsx": 128,
+    "src/components/settings/McpGrantDialog.tsx": 2330,
+    "src/components/settings/McpSection.tsx": 2223,
+    "src/components/settings/MemberPasswordSettings.tsx": 736,
+    "src/components/settings/MemorySection.tsx": 1299,
+    "src/components/settings/ModelPathButton.tsx": 29,
+    "src/components/settings/NetworkPanel.tsx": 2081,
+    "src/components/settings/NewNoteLocationSettings.tsx": 235,
+    "src/components/settings/PeriodicNotesSettings.tsx": 637,
+    "src/components/settings/PlainFileSettings.tsx": 369,
+    "src/components/settings/PrivacyPanel.tsx": 1425,
+    "src/components/settings/QuickUnlockSettings.tsx": 1146,
+    "src/components/settings/ReminderSettings.tsx": 274,
+    "src/components/settings/RibbonCustomizeSettings.tsx": 394,
+    "src/components/settings/SeedMemoryWizard.tsx": 1155,
+    "src/components/settings/SpellSettings.tsx": 378,
+    "src/components/settings/StartupOpenSettings.tsx": 206,
+    "src/components/settings/StoragePanel.tsx": 477,
+    "src/components/settings/SyncPanel.tsx": 1514,
+    "src/components/settings/ToolbarCustomizeSettings.tsx": 287,
+    "src/components/settings/TranscriptionPanel.tsx": 261,
+    "src/components/settings/TypographySettings.tsx": 81,
+    "src/components/settings/VaultPanel.tsx": 1191,
+    "src/components/settings/ViewsSettings.tsx": 118,
+    "src/components/settings/VimModeSettings.tsx": 494,
+    "src/components/settings/browser-icons.tsx": 37,
+    "src/components/settings/search/settingsSearchIndex.ts": 1515,
+    "src/components/settings/search/SettingsSearch.tsx": 31,
+    "src/components/settings/search/SettingsSearchResults.tsx": 86
+  }
+}

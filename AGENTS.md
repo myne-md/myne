@@ -468,6 +468,7 @@ The full table, one row per guard with the failure it prevents and where it fire
 | `check-twin-drift.mjs` | warns (never fails) when a change touches one side of a twin module pair and not the… | `pre-commit` + CI `pnpm-build` |
 | `check-i18n.mjs` | no empty English source value in `locales/en/common.json`; every static `t("…")` key in… | `pre-commit` + CI `pnpm-build` |
 | `check-i18n-coverage.mjs` | what the row above leaves out by design, which is why it is a second script rather than a… | `pre-commit` + CI `i18n-coverage` |
+| `check-copy-budget.mjs` | two one-way ratchets over the catalogue: a key outside `common.*` may not carry a value `common.*` already owns unless `scripts/copy-budget.json` records it with a reason, and a settings surface may not render more English copy than its recorded total… | `pre-commit` + CI `pnpm-build` |
 | `check-npm-licenses.mjs` | the npm analogue of `cargo-deny`: every transitive npm license is on an allowlist… | CI `npm-licenses` |
 | `gen-third-party-licenses.mjs` | the ship notice rather than the allowlist: `public/THIRD-PARTY-LICENSES.txt` is generated… | CI `pnpm-build` |
 | `check-private-path-refs.mjs` | ratchet: the set of files under `myne-agents/docs/`, `src/` or `mobile/src/` that name a path into a… | `pre-commit` + CI `pnpm-build` |
