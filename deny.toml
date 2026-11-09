@@ -82,6 +82,26 @@ ignore = [
     # — re-argue it, don't re-date it.
     "RUSTSEC-2023-0071",  # rsa: Marvin timing sidechannel; unreachable here (above).
 
+    # ── the bundled-SQLite advisory (RUSTSEC-2026-0459), published 2026-11-09 ──
+    # `libsqlite3-sys` below 0.39 bundles a SQLite with CVE-2026-119375. The
+    # advisory's own exposure clause is what decides this one: it applies "only to
+    # a process that opens a database file, with its -wal, that a less trusted
+    # party could have written". The reachability argument, verified not assumed:
+    #
+    #   · `cargo tree -p myne-tor-sidecar -e normal -i libsqlite3-sys` answers one
+    #     chain: rusqlite → tor-dirmgr → arti-client → arti → myne-tor-sidecar.
+    #     That is arti's on-disk directory cache, inside the user's own data
+    #     directory and written by the sidecar process itself; nothing else on the
+    #     machine, and no network peer, hands it a `-wal`.
+    #   · `cargo tree -p myne-desktop -e normal -i libsqlite3-sys` matches no
+    #     package, so the audited desktop binary does not carry it at all.
+    #   · Upgrading is not available in this tree: 0.39 needs rusqlite 0.41, which
+    #     arti 2.5 does not use, and it declares a Rust 1.89 floor.
+    #
+    # Drop this when arti moves to rusqlite 0.41. If the sidecar ever opens a
+    # database some other process can write, the argument is void — re-argue it.
+    "RUSTSEC-2026-0459",  # bundled SQLite (CVE-2026-119375), arti cache only.
+
     # ── the `zip` extraction advisories, published together on 2026-10-17 ─────
     # RUSTSEC-2026-0367 / -0368 / -0369 are all one surface: `ZipArchive::extract`,
     # `ZipStreamReader::extract` and the stream extraction API WRITING an
