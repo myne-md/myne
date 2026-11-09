@@ -1145,7 +1145,7 @@ function SummaryBody({
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="primary" onClick={onDone} data-testid="import.done">
-          {t("notes.import.modal.done")}
+          {t("common.done")}
         </Button>
       </div>
     </>
@@ -1451,7 +1451,7 @@ function AttentionRow({
             }}
           />
           <Button variant="secondary" icon={copied ? "check" : "copy"} onClick={copy}>
-            {copied ? t("notes.import.modal.copied") : t("notes.import.modal.copy")}
+            {copied ? t("notes.import.modal.copied") : t("common.copy")}
           </Button>
           <Button variant="ghost" onClick={onResolve}>
             {t("notes.import.modal.markDone")}
@@ -1515,7 +1515,7 @@ function ErrorBody({
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="secondary" onClick={onClose}>
-          {t("notes.import.modal.close")}
+          {t("common.close")}
         </Button>
       </div>
     </>

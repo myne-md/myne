@@ -256,7 +256,7 @@ export function DateField({
                 pick(today);
               }}
             >
-              {t("calendar.today")}
+              {t("common.today")}
             </Button>
             <span style={{ flex: "1 1 auto" }} />
             {allowEmpty && value !== null && (

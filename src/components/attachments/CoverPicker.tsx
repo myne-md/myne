@@ -222,7 +222,7 @@ export function CoverPicker({
       labelId="cover-picker-title"
       width={560}
       height={560}
-      closeLabel={t("attachments.coverPicker.close")}
+      closeLabel={t("common.close")}
     >
       <div style={TOOLBAR_STYLE}>
         <Button
@@ -258,7 +258,7 @@ export function CoverPicker({
         {dragging ? (
           <div style={DROP_HINT_STYLE}>{t("attachments.coverPicker.dropHint")}</div>
         ) : images === null ? (
-          <div style={STATE_STYLE}>{t("attachments.coverPicker.loading")}</div>
+          <div style={STATE_STYLE}>{t("common.loading")}</div>
         ) : images.length === 0 ? (
           <div style={STATE_STYLE} data-testid="cover-picker.empty">
             {t("attachments.coverPicker.empty")}

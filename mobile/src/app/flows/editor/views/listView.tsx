@@ -100,7 +100,7 @@ export function MobileListView({
               style={ROW_STYLE}
             >
               <div style={TITLE_STYLE}>
-                {row.title || t("notes.views.cards.untitled")}
+                {row.title || t("common.untitled")}
               </div>
               {metaCols.length > 0 && (
                 <div style={META_STYLE}>

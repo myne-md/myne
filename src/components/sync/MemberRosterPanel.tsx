@@ -666,7 +666,7 @@ export function MemberRosterPanel({
                     onClick={() => openNameEditor(m)}
                   >
                     {m.name_state === "verified"
-                      ? t("sync.memberRoster.nameEdit")
+                      ? t("common.rename")
                       : t("sync.memberRoster.nameInviteCta")}
                   </Button>
                 ) : null}
@@ -706,7 +706,7 @@ export function MemberRosterPanel({
                     data-testid="member-roster.remove-button"
                     onClick={() => setRemoveTarget(m)}
                   >
-                    {t("sync.memberRoster.remove")}
+                    {t("common.remove")}
                   </Button>
                 ) : null}
               </li>
@@ -1109,7 +1109,7 @@ function RemoveConfirmDialog({
       open
       testId="member-roster.remove-confirm"
       labelId={labelId}
-      title={t("sync.memberRoster.remove")}
+      title={t("common.remove")}
       onClose={onCancel}
     >
       <p>{t("sync.memberRoster.removeConfirm", { name })}</p>
@@ -1128,7 +1128,7 @@ function RemoveConfirmDialog({
           disabled={busy}
           onClick={() => void onConfirm()}
         >
-          {t("sync.memberRoster.remove")}
+          {t("common.remove")}
         </Button>
       </div>
     </ModalShell>

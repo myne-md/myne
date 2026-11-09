@@ -27,7 +27,7 @@ export const CALLOUT_HTML_TYPES: Readonly<Record<string, CalloutHtmlType>> = {
   important: { tone: "success", labelKey: "editor.callout.label.important" },
   success: { tone: "success", labelKey: "editor.callout.label.success" },
   check: { tone: "success", labelKey: "editor.callout.label.success" },
-  done: { tone: "success", labelKey: "editor.callout.label.done" },
+  done: { tone: "success", labelKey: "common.done" },
   question: { tone: "warning", labelKey: "editor.callout.label.question" },
   faq: { tone: "warning", labelKey: "editor.callout.label.faq" },
   warning: { tone: "warning", labelKey: "editor.callout.label.warning" },

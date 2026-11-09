@@ -419,7 +419,7 @@ export function DeleteConfirmModal(props: DeleteConfirmModalProps) {
 
   const displayTitle =
     noteTitle === null || noteTitle === undefined || noteTitle.trim() === ""
-      ? t("notes.deleteConfirm.untitled")
+      ? t("common.untitled")
       : noteTitle;
   const bodyLine = body ?? `“${displayTitle}”`;
 

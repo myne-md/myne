@@ -101,7 +101,7 @@ export function BacklinksTab() {
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
-                {row.sourceTitle ?? t("editor.chrome.backlinks.untitled")}
+                {row.sourceTitle ?? t("common.untitled")}
               </span>
               {row.count > 1 && (
                 <span style={{ fontSize: 12, color: "var(--fg-3)", marginInlineStart: 6 }}>
@@ -150,7 +150,7 @@ export function BacklinksTab() {
               style={{ ...SIDEBAR_CARD_STYLE, transition: HOVER_TRANSITION }}
             >
               <span style={{ fontSize: 12, fontWeight: "var(--weight-semibold)", color: "var(--fg-1)" }}>
-                {row.targetTitle ?? t("editor.chrome.backlinks.untitled")}
+                {row.targetTitle ?? t("common.untitled")}
               </span>
               {row.count > 1 && (
                 <span style={{ fontSize: 12, color: "var(--fg-3)", marginInlineStart: 6 }}>

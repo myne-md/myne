@@ -381,7 +381,7 @@ export function ViewImportDialog({ open, onClose }: ViewImportDialogProps) {
       labelId="view-import-title"
       onClose={onClose}
       width={520}
-      closeLabel={t("notes.views.import.close")}
+      closeLabel={t("common.close")}
       testId="view-import.modal"
       bodyBleed
     >
@@ -390,7 +390,7 @@ export function ViewImportDialog({ open, onClose }: ViewImportDialogProps) {
       </div>
       <div style={FOOTER_STYLE}>
         <Button variant="ghost" data-testid="view-import.close" onClick={onClose}>
-          {t("notes.views.import.close")}
+          {t("common.close")}
         </Button>
         {footer()}
       </div>

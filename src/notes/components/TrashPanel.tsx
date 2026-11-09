@@ -233,7 +233,7 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
             )}
             <IconButton
               icon="x"
-              label={t("notes.trash.close")}
+              label={t("common.close")}
               tooltip
               testId="trash.close"
               onClick={onClose}
@@ -255,10 +255,10 @@ export function TrashPanel({ open, onClose }: TrashPanelProps) {
               <div key={r.noteUuid} style={ROW_STYLE}>
                 <span
                   style={ROW_TITLE_STYLE}
-                  title={r.title ?? t("notes.trash.untitled")}
+                  title={r.title ?? t("common.untitled")}
                 >
                   {r.title === null || r.title.trim() === ""
-                    ? t("notes.trash.untitled")
+                    ? t("common.untitled")
                     : r.title}
                 </span>
                 <span style={AGE_STYLE}>

@@ -278,7 +278,7 @@ export function RestoreBackup({ entry, onExit }: RestoreBackupProps) {
                 {t("restore.damaged.salvage")}
               </Button>
               <Button variant="secondary" onClick={onExit}>
-                {t("restore.damaged.close")}
+                {t("common.close")}
               </Button>
             </div>
           </>

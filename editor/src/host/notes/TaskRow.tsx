@@ -417,7 +417,7 @@ export function TaskRow({
           // is the STORED bytes: the chip localizes a recurrence rule through
           // `recurrenceLabel`, and this row does not import a decoration-layer
           // module to do the same.
-          aria-label={`${i18n.t("editor.taskField.title.priority")}, ${task.priority}`}
+          aria-label={`${i18n.t("common.priority")}, ${task.priority}`}
           data-testid={`${testIdPrefix}.priority`}
         >
           <ChipGlyph kind="priority" value={task.priority} />

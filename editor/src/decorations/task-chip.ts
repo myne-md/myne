@@ -218,7 +218,7 @@ const FIELD_NAME: Record<ChipKind, () => string> = {
   due: () => i18n.t("editor.taskField.title.due"),
   remind: () => i18n.t("editor.taskField.title.remind"),
   repeat: () => i18n.t("editor.taskField.title.repeat"),
-  priority: () => i18n.t("editor.taskField.title.priority"),
+  priority: () => i18n.t("common.priority"),
 };
 
 const PRIORITY_WORDS: ReadonlySet<string> = new Set([

@@ -364,7 +364,7 @@ export function AttachmentsSheet({
               {renaming !== e.id && (
                 <div style={{ display: "flex", gap: 2, flexShrink: 0 }}>
                   {onInsert && <button onClick={() => onInsert(e.id, e.filename)} style={actionBtn("var(--accent)")}>{t("attachments.insert")}</button>}
-                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("attachments.library.menuRename")}</button>
+                  <button onClick={() => { setRenaming(e.id); setRenameText(e.filename); }} style={actionBtn("var(--fg-2)")}>{t("common.rename")}</button>
                   <button onClick={() => void remove(e.id)} style={actionBtn("var(--danger)")}>{t("attachments.deleteDialog.delete")}</button>
                 </div>
               )}

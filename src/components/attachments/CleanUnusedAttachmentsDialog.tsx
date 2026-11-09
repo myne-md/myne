@@ -149,7 +149,7 @@ export function CleanUnusedAttachmentsDialog({
         onClose={onClose}
         labelId="clean-unused-title"
         width={460}
-        closeLabel={t("attachments.cleanUnused.close")}
+        closeLabel={t("common.close")}
       >
         <div style={BODY_STYLE} data-testid="clean-unused.summary">
           <div>
@@ -171,7 +171,7 @@ export function CleanUnusedAttachmentsDialog({
             onClick={onClose}
             data-testid="clean-unused.close"
           >
-            {t("attachments.cleanUnused.close")}
+            {t("common.close")}
           </Button>
         </div>
       </ModalShell>

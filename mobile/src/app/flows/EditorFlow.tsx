@@ -4065,7 +4065,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                 </span>
                 <div style={{ display: "flex", gap: 14, flexShrink: 0 }}>
                   <button onClick={() => setViewEditor({ initial: activeView })} style={{ border: "none", background: "transparent", color: "var(--accent)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
-                    {t("editor.list.edit")}
+                    {t("common.edit")}
                   </button>
                   <button onClick={() => setActiveViewId(null)} style={{ border: "none", background: "transparent", color: "var(--fg-3)", fontSize: 13, fontWeight: 600, cursor: "pointer", padding: 0 }}>
                     {t("notes.tagBrowser.clear")}
@@ -4615,7 +4615,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
 
         {rowActions && (
           <NoteRowActionsSheet
-            title={rowActions.title || t("notes.row.untitled")}
+            title={rowActions.title || t("common.untitled")}
             favorited={favSet.has(rowActions.id)}
             onClose={() => setRowActions(null)}
             onOpen={() => {
@@ -4698,7 +4698,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
               <>
                 <div style={SHEET_TITLE}>
                   {folderPrompt.mode === "rename"
-                    ? t("attachments.library.menuRename")
+                    ? t("common.rename")
                     : folderPrompt.mode === "subfolder"
                       ? t("notes.list.newSubfolder")
                       : t("notes.list.newFolder")}
@@ -4725,7 +4725,7 @@ export function EditorFlow({ vaultId: stageVaultId, onLock, onCreateVault, onJoi
                     data-testid="notes.folder-prompt-submit"
                     onClick={() => void submitFolderPrompt()}
                   >
-                    {folderPrompt.mode === "rename" ? t("attachments.library.menuRename") : t("notes.list.newFolder")}
+                    {folderPrompt.mode === "rename" ? t("common.rename") : t("notes.list.newFolder")}
                   </Button>
                 </div>
               </>

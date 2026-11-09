@@ -167,7 +167,7 @@ export function SidebarPane({
             note-scoped list is a tab here rather than the phone's sheet. */}
         <NavItem
           testid="sidebar.nav-tasks"
-          label={t("tasks.title")}
+          label={t("common.tasks")}
           active={tab === "tasks"}
           onClick={onTasks}
           icon={<svg width="17" height="17" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6" rx="1.6" {...gi} /><path d="M5.4 7l1.3 1.3L9 5.8" {...gi} /><path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" {...gi} /></svg>}

@@ -948,7 +948,7 @@ export function CalendarPane({
         />
         <IconButton
           icon="calendar-days"
-          label={t("calendar.today")}
+          label={t("common.today")}
           iconSize={14}
           onClick={() => setAnchor(parseCivilDate(today) ?? todayCivilDate())}
         />

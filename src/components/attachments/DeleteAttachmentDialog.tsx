@@ -114,7 +114,7 @@ export function DeleteAttachmentDialog({
                 const title = cache.get(id as NoteId)?.title ?? null;
                 const label =
                   title === null || title.trim() === ""
-                    ? t("attachments.deleteDialog.untitled")
+                    ? t("common.untitled")
                     : title;
                 return <li key={id}>{label}</li>;
               })}

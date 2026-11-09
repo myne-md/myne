@@ -2168,7 +2168,7 @@ export function IdentityFlow({
                     data-testid="identity-flow.phrase-copy"
                   >
                     <Icon name="copy" size={16} color="var(--fg-2)" strokeWidth={1.5} />
-                    {t("vaultCreation.kit.copy")}
+                    {t("common.copy")}
                   </Button>
                 ) : null}
                 <Button

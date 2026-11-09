@@ -484,7 +484,7 @@ function RecoveredPreviewModal({
             data-testid="sync.recovered-preview-close"
             onClick={onClose}
           >
-            {t("sync.panel.recovered.close")}
+            {t("common.close")}
           </button>
         </div>
       </div>

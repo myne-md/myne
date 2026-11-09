@@ -120,7 +120,7 @@ export function ListView({
         onContextMenu={onContextMenu ? rows.contextMenu(row.noteId) : undefined}
       >
         <span style={TITLE_STYLE} title={row.title ?? undefined}>
-          {row.title ?? t("notes.views.cards.untitled")}
+          {row.title ?? t("common.untitled")}
         </span>
         {metaCols.length > 0 && (
           <span style={META_STYLE}>

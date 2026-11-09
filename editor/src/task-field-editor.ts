@@ -725,7 +725,7 @@ function buildBody(kind: TaskFieldKind, value: string, popup: FieldPopupHost): F
   if (kind === "priority") {
     const select = buildSelectControl({
       testId: "editor.task-field-input",
-      ariaLabel: i18n.t("editor.taskField.title.priority"),
+      ariaLabel: i18n.t("common.priority"),
       options: PRIORITY_VALUES.map((level) => ({ value: level, label: level })),
       value: PRIORITY_VALUES.includes(value as never) ? value : "medium",
       popup,

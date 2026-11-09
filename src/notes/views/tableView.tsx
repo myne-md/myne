@@ -433,14 +433,14 @@ export function TableView({
               testId="view.bulk-select-row"
               noteId={row.noteId}
               label={t("notes.views.bulk.selectRow", {
-                title: row.title ?? t("notes.views.cards.untitled"),
+                title: row.title ?? t("common.untitled"),
               })}
               checked={selected.has(row.noteId)}
               onToggle={() => toggleRow(row.noteId)}
             />
           )}
           <span style={NAME_TEXT_STYLE}>
-            {row.title ?? t("notes.views.cards.untitled")}
+            {row.title ?? t("common.untitled")}
           </span>
         </span>
         {columns.map((col) => {
@@ -467,7 +467,7 @@ export function TableView({
         <p key={entry.noteId} style={REFUSAL_STYLE} data-note-id={entry.noteId}>
           {t("notes.views.bulk.refusedLine", {
             title:
-              rowById.get(entry.noteId)?.title ?? t("notes.views.cards.untitled"),
+              rowById.get(entry.noteId)?.title ?? t("common.untitled"),
             reason: refusalSentence(entry.reason, t),
           })}
         </p>
@@ -497,7 +497,7 @@ export function TableView({
               {
                 title:
                   rowById.get(entry.noteId)?.title ??
-                  t("notes.views.cards.untitled"),
+                  t("common.untitled"),
               },
             )}
           </p>

@@ -941,9 +941,7 @@ export function AgentHubList({
                 <div style={ROW_STYLE}>
                   <Input
                     data-testid="agent.hub-rename-input"
-                    aria-label={t(
-                      "editor.chrome.rightPanel.aiChat.historyRename",
-                    )}
+                    aria-label={t("common.rename")}
                     value={draft}
                     onChange={(e) => setDraft(e.currentTarget.value)}
                     onKeyDown={(e) => {
@@ -957,7 +955,7 @@ export function AgentHubList({
                     data-testid="agent.hub-rename-confirm"
                     onClick={() => void commitRename(row.id)}
                   >
-                    {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                    {t("common.rename")}
                   </Button>
                 </div>
               ) : (
@@ -1255,7 +1253,7 @@ export function AgentHubList({
                               setMenuId(null);
                             }}
                           >
-                            {t("editor.chrome.rightPanel.aiChat.historyRename")}
+                            {t("common.rename")}
                           </Button>
                           <Button
                             variant="ghost"

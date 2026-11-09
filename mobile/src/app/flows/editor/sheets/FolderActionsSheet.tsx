@@ -56,7 +56,7 @@ export function FolderActionsSheet({
           {row(t("notes.newTab.createDrawing"), onNewDrawing)}
           {row(t("notes.list.newSubfolder"), onNewSubfolder, { testId: "notes.folder-new-subfolder" })}
           {sep}
-          {row(t("attachments.library.menuRename"), onRename, { groupTop: true })}
+          {row(t("common.rename"), onRename, { groupTop: true })}
           {row(t("notes.list.icon"), onDecorate, { testId: "notes.folder-icon-action" })}
           {row(t("notes.list.color"), onDecorate, { testId: "notes.folder-color-action" })}
           {row(t("notes.list.archiveFolder"), onArchive)}

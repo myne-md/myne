@@ -181,7 +181,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
     [
       { value: "any", label: i18n.t("tasks.builder.any") },
       { value: "overdue", label: i18n.t("tasks.filter.overdue") },
-      { value: "today", label: i18n.t("tasks.filter.today") },
+      { value: "today", label: i18n.t("common.today") },
       { value: "week", label: i18n.t("tasks.filter.upcoming") },
       { value: "none", label: i18n.t("tasks.builder.noDueDate") },
     ],
@@ -203,7 +203,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   const sort = select(
     [
       { value: "due", label: i18n.t("tasks.builder.sortDue") },
-      { value: "priority", label: i18n.t("tasks.builder.sortPriority") },
+      { value: "priority", label: i18n.t("common.priority") },
       { value: "path", label: i18n.t("tasks.builder.sortPath") },
     ],
     DEFAULT_CHOICE.sort,
@@ -222,7 +222,7 @@ export function openTaskQueryBuilder(options: Options): QueryBuilderHandle {
   surface.appendChild(field(i18n.t("tasks.builder.folder"), path, "editor.task-query-builder.row.path"));
   surface.appendChild(field(i18n.t("tasks.builder.tag"), tag, "editor.task-query-builder.row.tag"));
   surface.appendChild(
-    field(i18n.t("tasks.builder.priority"), priority, "editor.task-query-builder.row.priority"),
+    field(i18n.t("common.priority"), priority, "editor.task-query-builder.row.priority"),
   );
   surface.appendChild(field(i18n.t("tasks.builder.sort"), sort, "editor.task-query-builder.row.sort"));
 

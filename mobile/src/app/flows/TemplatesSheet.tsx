@@ -53,7 +53,7 @@ export function TemplatesSheet({
               {tpl.title || t("templates.manager.newTemplateName")}
             </div>
             <button onClick={() => onUse(tpl.id)} style={btn("var(--accent)")}>{t("templates.use")}</button>
-            <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("templates.edit")}</button>
+            <button onClick={() => onEdit(tpl.id)} style={btn("var(--fg-2)")}>{t("common.edit")}</button>
           </div>
           {confirmDelete === tpl.id ? (
             <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 12, justifyContent: "flex-end" }}>

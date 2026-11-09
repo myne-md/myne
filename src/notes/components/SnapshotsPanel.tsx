@@ -454,11 +454,11 @@ export function SnapshotsPanel({
           </h2>
           <span
             style={SUBTITLE_STYLE}
-            title={noteTitle ?? t("notes.snapshots.untitled")}
+            title={noteTitle ?? t("common.untitled")}
           >
             {noteTitle && noteTitle.trim() !== ""
               ? noteTitle
-              : t("notes.snapshots.untitled")}
+              : t("common.untitled")}
           </span>
         </div>
 
@@ -471,7 +471,7 @@ export function SnapshotsPanel({
             <div style={LIST_STYLE} aria-label={t("notes.snapshots.listLabel")}>
               {loading && snaps.length === 0 ? (
                 <div style={{ ...ROW_META_STYLE, padding: "var(--space-3) var(--space-5)" }}>
-                  {t("notes.snapshots.loading")}
+                  {t("common.loading")}
                 </div>
               ) : (
                 snaps.map((s, idx) => {
@@ -616,7 +616,7 @@ export function SnapshotsPanel({
             style={{ ...BTN_STYLE, marginInlineStart: "auto" }}
             onClick={onClose}
           >
-            {t("notes.snapshots.close")}
+            {t("common.close")}
           </button>
         </div>
       </div>

@@ -205,7 +205,7 @@ export function NewNoteFromTemplateModal({
       bodyBleed
     >
       {templates === null ? (
-        <div style={LOADING_STYLE}>{t("notes.newFromTemplate.loading")}</div>
+        <div style={LOADING_STYLE}>{t("common.loading")}</div>
       ) : step.kind === "name" ? (
         <div style={NAME_STEP_STYLE}>
           <label htmlFor="new-from-template-name" style={LABEL_STYLE}>
@@ -225,7 +225,7 @@ export function NewNoteFromTemplateModal({
                 confirmName();
               }
             }}
-            placeholder={t("notes.newFromTemplate.namePlaceholder")}
+            placeholder={t("common.untitled")}
             style={INPUT_STYLE}
           />
           <div style={ACTIONS_STYLE}>

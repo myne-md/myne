@@ -482,7 +482,7 @@ function EditorSettingsPreview() {
   const dueText = formatStoredValue(PREVIEW_SAMPLE_VALUE.slice(0, 10), display);
   const taskBand = (
     <div style={BAND_STYLE} data-testid="settings.editor-preview-task">
-      <BandCaption>{t("settings.editor.preview.task")}</BandCaption>
+      <BandCaption>{t("common.tasks")}</BandCaption>
       <div style={TASK_ROW_STYLE}>
         <span style={TASK_BOX_STYLE} aria-hidden="true" />
         <span style={TASK_TEXT_STYLE}>{t("settings.editor.preview.taskSampleOpen")}</span>
@@ -767,7 +767,7 @@ export function EditorPanel({ onShowToast, focusAnchorId }: EditorPanelProps = {
 
       <SettingsTopicPanel panelId="editor" topicId="tasks">
       <SettingsSection
-        title={t("settings.editor.sections.tasks")}
+        title={t("common.tasks")}
         testId="settings.section.editor-tasks"
       >
         {/* Task chip ink colour (myne-md/myne#656 item 4) - device-local. */}

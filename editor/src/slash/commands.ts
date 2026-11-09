@@ -337,7 +337,7 @@ export function slashCommands(): readonly SlashCommand[] {
     },
     {
       id: "priority",
-      label: i18n.t("editor.slash.priority"),
+      label: i18n.t("common.priority"),
       icon: "!",
       svgIcon: "flag",
       apply: (v, f, t) => openTaskFieldFromSlash(v, f, t, "priority"),

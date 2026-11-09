@@ -601,7 +601,7 @@ export function DeviceManagementPanel({
           // device is not enrolled) `devices` stays null with an error set above — show
           // nothing here rather than spinning on "Loading…" forever.
           error ? null : (
-            <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("sync.devices.loading")}</div>
+            <div style={{ color: "var(--fg-3)", fontSize: "var(--text-sm)" }}>{t("common.loading")}</div>
           )
         ) : approved.length === 0 ? (
           <EmptyState
@@ -664,7 +664,7 @@ export function DeviceManagementPanel({
                     devices enrolled before names existed are named from whatever
                     device the user happens to be holding. Icon-only (E3d): the
                     tooltip carries the label, `aria-label` the a11y name. */}
-                <Tooltip label={t("sync.devices.rename")}>
+                <Tooltip label={t("common.rename")}>
                   <button
                     type="button"
                     style={{
@@ -673,7 +673,7 @@ export function DeviceManagementPanel({
                     }}
                     {...btnHover(busy || renaming !== null)}
                     disabled={busy || renaming !== null}
-                    aria-label={t("sync.devices.rename")}
+                    aria-label={t("common.rename")}
                     onClick={() =>
                       setRenaming({ id: d.device_id_hex, value: displayName(d, names) })
                     }
@@ -707,7 +707,7 @@ export function DeviceManagementPanel({
                   </Tooltip>
                 )}
                 {!d.is_current && plane === "owner" && (
-                  <Tooltip label={t("sync.devices.remove")}>
+                  <Tooltip label={t("common.remove")}>
                     <button
                       type="button"
                       style={{
@@ -716,7 +716,7 @@ export function DeviceManagementPanel({
                         opacity: busy ? 0.5 : 1,
                       }}
                       disabled={busy}
-                      aria-label={t("sync.devices.remove")}
+                      aria-label={t("common.remove")}
                       {...removeDeviceSurface(busy)}
                       onClick={() => setConfirmRemove(d.device_id_hex)}
                       data-testid="sync.remove-device"
@@ -761,7 +761,7 @@ export function DeviceManagementPanel({
                       }}
                       data-testid="sync.remove-confirm-yes"
                     >
-                      {t("sync.devices.remove")}
+                      {t("common.remove")}
                     </button>
                     <button
                       type="button"

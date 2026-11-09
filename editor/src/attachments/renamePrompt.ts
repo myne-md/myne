@@ -32,7 +32,7 @@ export interface TextPromptCopy {
 
 const RENAME_COPY: TextPromptCopy = {
   titleKey: "editor.attachment.rename.title",
-  confirmKey: "editor.attachment.rename.confirm",
+  confirmKey: "common.rename",
   testidPrefix: "attachment-rename",
 };
 

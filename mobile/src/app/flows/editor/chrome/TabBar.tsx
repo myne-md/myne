@@ -116,13 +116,13 @@ export function TabBar({
           bar at all is the information-architecture decision — it says tasks are
           alongside notes in the product's mobile identity — and it is hard to
           reverse, because top-level navigation is something users learn. */}
-      <button data-testid="workspace.tab-tasks" onClick={onTasks} aria-label={t("tasks.title")} style={tab}>
+      <button data-testid="workspace.tab-tasks" onClick={onTasks} aria-label={t("common.tasks")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
           <rect x="4" y="4" width="6" height="6" rx="1.6" stroke={col(active === "tasks")} strokeWidth="1.8" />
           <path d="M5.4 7l1.3 1.3L9 5.8" stroke={col(active === "tasks")} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
           <path d="M13 6.5h7M13 12h7M13 17.5h7M5 12h5M5 17.5h5" stroke={col(active === "tasks")} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
-        <span style={label(active === "tasks")}>{t("tasks.title")}</span>
+        <span style={label(active === "tasks")}>{t("common.tasks")}</span>
       </button>
       <button data-testid="workspace.tab-graph" onClick={onGraph} aria-label={t("editor.chrome.barItems.graph")} style={tab}>
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
